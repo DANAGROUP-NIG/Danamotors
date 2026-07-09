@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Dana motors backend repo",
+  "keywords": [
+    "Dana",
+    "motors",
+    "drive",
+    "care",
+    "car",
+    "service",
+    "workshop"
+  ],
+  "homepage": "https://github.com/DANAGROUP-NIG/drivecare_backend#readme",
+  "bugs": {
+    "url": "https://github.com/DANAGROUP-NIG/drivecare_backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DANAGROUP-NIG/drivecare_backend.git"
+  },
+  "license": "ISC",
+  "author": "devzeke",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "mongoose": "^9.7.4"
+  }
+}

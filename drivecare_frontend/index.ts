@@ -1,0 +1,12 @@
+export { default as Header } from "./features/header/Header";
+export { default as Hero } from "./features/hero/Hero";
+export { default as TrustedBy } from "./features/trustedBy/TrustedBy";
+export { default as ProductOverview } from "./features/productOverview/ProductOverview";
+export { default as FeatureGrid } from "./features/featureGrid/FeatureGrid";
+export { default as Workflow } from "./features/workflow/Workflow";
+export { default as DashboardShowcase } from "./features/dashboardShowcase/DashboardShowcase";
+export { default as ServicePlans } from "./features/servicePlans/ServicePlans";
+export { default as BookingSection } from "./features/bookingSection/BookingSection";
+export { default as FAQ } from "./features/faq/FAQ";
+export { default as FinalCTA } from "./features/finalCTA/FinalCTA";
+export { default as Footer } from "./features/footer/Footer";
