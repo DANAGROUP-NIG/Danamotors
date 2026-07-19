@@ -27,6 +27,9 @@ export default function Header() {
           <a className="transition hover:text-white" href="/#book">Book Service</a>
         </nav>
         <div className="flex items-center gap-2 text-white">
+          <Button className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default" asChild>
+            <Link href="/login">Login</Link>
+          </Button>
           <Button className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default">
             <Link href="/#book">Book now</Link>
           </Button>
@@ -85,6 +88,11 @@ export default function Header() {
           </nav>
 
           <div className="mt-8 flex flex-col gap-3">
+            <Button className="w-full justify-center bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default" asChild>
+              <Link href="/login" onClick={() => setIsOpen(false)}>
+                Login
+              </Link>
+            </Button>
             <Button className="w-full justify-center bg-white text-primary hover:bg-white/90" variant="default">
               <Link href="/#book" onClick={() => setIsOpen(false)}>
                 Book now
