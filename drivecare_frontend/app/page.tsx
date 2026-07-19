@@ -1,5 +1,4 @@
-﻿import "react-day-picker/style.css";
-import {
+﻿import {
   Header,
   Hero,
   TrustedBy,
@@ -16,7 +15,7 @@ import {
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden">
+    <main className="landing-bg min-h-screen overflow-hidden pt-20">
       <Header />
       <Hero />
       <TrustedBy />

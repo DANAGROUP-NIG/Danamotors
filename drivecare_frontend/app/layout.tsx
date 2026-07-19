@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Providers } from "@/app/providers";
+import { Providers } from "@/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body>
+      <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

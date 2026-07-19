@@ -1,46 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { registerSchema, type RegisterFormValues } from "./schemas/auth.schema";
+import { useRegister } from "./hooks/use-register";
 
-const registerSchema = z
-  .object({
-    email: z.string().email("Enter a valid email"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Confirm your password"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
-
-type RegisterValues = z.infer<typeof registerSchema>;
-
-export default function RegisterForm() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+function RegisterFormContent() {
+  const register = useRegister();
   const {
-    register,
+    register: field,
     handleSubmit,
     formState: { errors },
-  } = useForm<RegisterValues>({ resolver: zodResolver(registerSchema) });
+  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
 
-  async function onSubmit(values: RegisterValues) {
-    setLoading(true);
-    try {
-      // TODO: wire to register API
-      console.log("Register", values);
-      await new Promise((r) => setTimeout(r, 700));
-      router.push("/login");
-    } finally {
-      setLoading(false);
-    }
+  function onSubmit(values: RegisterFormValues) {
+    register.mutate({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      password: values.password,
+      phoneNumber: values.phoneNumber || undefined,
+    });
   }
 
   return (
@@ -51,14 +35,57 @@ export default function RegisterForm() {
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">First name</span>
+              <input
+                type="text"
+                className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
+                {...field("firstName")}
+              />
+              {errors.firstName && (
+                <span className="text-xs text-red-500">{errors.firstName.message}</span>
+              )}
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Last name</span>
+              <input
+                type="text"
+                className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
+                {...field("lastName")}
+              />
+              {errors.lastName && (
+                <span className="text-xs text-red-500">{errors.lastName.message}</span>
+              )}
+            </label>
+          </div>
+
           <label className="grid gap-2">
             <span className="text-sm font-semibold">Email</span>
             <input
               type="email"
               className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
-              {...register("email")}
+              {...field("email")}
             />
-            {errors.email && <span className="text-xs text-red-500">{errors.email.message}</span>}
+            {errors.email && (
+              <span className="text-xs text-red-500">{errors.email.message}</span>
+            )}
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold">
+              Phone number <span className="font-normal text-muted-foreground">(optional)</span>
+            </span>
+            <input
+              type="tel"
+              className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
+              {...field("phoneNumber")}
+            />
+            {errors.phoneNumber && (
+              <span className="text-xs text-red-500">{errors.phoneNumber.message}</span>
+            )}
           </label>
 
           <label className="grid gap-2">
@@ -66,9 +93,11 @@ export default function RegisterForm() {
             <input
               type="password"
               className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
-              {...register("password")}
+              {...field("password")}
             />
-            {errors.password && <span className="text-xs text-red-500">{errors.password.message}</span>}
+            {errors.password && (
+              <span className="text-xs text-red-500">{errors.password.message}</span>
+            )}
           </label>
 
           <label className="grid gap-2">
@@ -76,22 +105,44 @@ export default function RegisterForm() {
             <input
               type="password"
               className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
-              {...register("confirmPassword")}
+              {...field("confirmPassword")}
             />
             {errors.confirmPassword && (
               <span className="text-xs text-red-500">{errors.confirmPassword.message}</span>
             )}
           </label>
 
-          <Button type="submit" size="lg" className="mt-2" disabled={loading}>
-            {loading ? "Creating..." : "Create account"}
+          <Button
+            type="submit"
+            size="lg"
+            className="mt-2"
+            disabled={register.isPending}
+          >
+            {register.isPending ? "Creating…" : "Create account"}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Already have an account? <a className="text-primary hover:underline" href="/login">Sign in</a>
+            Already have an account?{" "}
+            <a className="text-primary hover:underline" href="/login">
+              Sign in
+            </a>
           </p>
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+export default function RegisterForm() {
+  return (
+    <Suspense
+      fallback={
+        <Card>
+          <CardContent className="p-6">Loading…</CardContent>
+        </Card>
+      }
+    >
+      <RegisterFormContent />
+    </Suspense>
   );
 }
