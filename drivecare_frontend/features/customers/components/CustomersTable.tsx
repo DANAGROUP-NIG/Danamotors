@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useBranchStore } from "@/store/branch.store";
 import { useCustomers } from "../hooks/use-customers";
 import { getCustomerInitials } from "../services/customer.service";
 import { CustomerDeleteButton } from "./CustomerDeleteButton";
@@ -19,16 +20,22 @@ export function CustomersTable() {
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Simple debounce via timeout ref isn't possible without useRef here,
-  // so we search on blur / Enter and expose a clear button instead.
-  // A future pass can add useDebounce if desired.
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+
+  // Reset to page 1 when branch changes
+  useEffect(() => {
+    setPage(1);
+  }, [activeBranch?.id]);
+
   const { data, isLoading, isError, isFetching } = useCustomers({
     page,
-    pageSize: PAGE_SIZE,
+    limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
+    branchId: activeBranch?.id,
   });
 
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1;
+  const total = data?.meta?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function commitSearch() {
     setPage(1);
@@ -102,7 +109,7 @@ export function CustomersTable() {
             <tbody>
               {isLoading ? (
                 <SkeletonRows />
-              ) : !data?.items.length ? (
+              ) : !data?.customers?.length ? (
                 <tr>
                   <td
                     colSpan={5}
@@ -114,7 +121,7 @@ export function CustomersTable() {
                   </td>
                 </tr>
               ) : (
-                data.items.map((customer) => (
+                data.customers.map((customer) => (
                   <CustomerRow
                     key={customer.id}
                     customer={customer}
@@ -134,7 +141,7 @@ export function CustomersTable() {
         </div>
 
         {/* Pagination footer */}
-        {data && data.total > PAGE_SIZE && (
+        {total > PAGE_SIZE && (
           <div
             className={cn(
               "flex items-center justify-between border-t border-[#e8edf3] px-4 py-3",
@@ -143,7 +150,7 @@ export function CustomersTable() {
           >
             <p className="text-xs text-muted-foreground">
               Showing {(page - 1) * PAGE_SIZE + 1}–
-              {Math.min(page * PAGE_SIZE, data.total)} of {data.total}
+              {Math.min(page * PAGE_SIZE, total)} of {total}
             </p>
             <div className="flex gap-1">
               <Button
@@ -205,7 +212,9 @@ function CustomerRow({
           </div>
         </td>
         <td className="px-4 py-3 text-muted-foreground">{customer.email}</td>
-        <td className="px-4 py-3 text-muted-foreground">{customer.phone}</td>
+        <td className="px-4 py-3 text-muted-foreground">
+          {customer.phoneNumber ?? <span className="text-border">—</span>}
+        </td>
         <td className="px-4 py-3 text-muted-foreground">
           {customer.address ?? <span className="text-border">—</span>}
         </td>

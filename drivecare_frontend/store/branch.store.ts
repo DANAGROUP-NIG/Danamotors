@@ -6,6 +6,14 @@ import { persist } from "zustand/middleware";
 export interface Branch {
   id: string;
   name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  phoneNumber?: string;
+  email?: string;
+  isActive?: boolean;
+  usersCount?: number;
   location?: string;
 }
 
@@ -43,6 +51,7 @@ export const useBranchStore = create<BranchState>()(
       setBranches: (branches) =>
         set((state) => ({
           branches,
+          isLoading: false,
           isFetched: true,
           error: null,
           // keep activeBranch in sync — if current active still exists keep it,

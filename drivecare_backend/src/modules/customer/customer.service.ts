@@ -12,12 +12,13 @@ export class CustomerService {
     this.customerRepository = new CustomerRepository();
   }
 
-  async listCustomers(params: { page: number; limit: number; search?: string }) {
+  async listCustomers(params: { page: number; limit: number; search?: string; branchId?: string }) {
     const skip = (params.page - 1) * params.limit;
     const { customers, total } = await this.customerRepository.listCustomers({
       skip,
       take: params.limit,
       search: params.search,
+      branchId: params.branchId,
     });
 
     return {

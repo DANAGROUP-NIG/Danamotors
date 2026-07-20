@@ -1,4 +1,4 @@
-import { Header } from "@/index";
+import LandingHeader from "@/components/headers/LandingHeader";
 import ForgotPasswordForm from "@/features/auth/ForgotPasswordForm";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 export default function ForgotPasswordPage() {
   return (
     <main className="min-h-screen bg-background">
-      <Header />
+      <LandingHeader />
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center justify-center px-4 py-12">
         <div className="w-full">
           <div className="mx-auto max-w-md">

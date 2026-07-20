@@ -7,6 +7,8 @@ import serviceRoutes from '../modules/service/service.routes';
 import workshopRoutes from '../modules/workshop/workshop.routes';
 import inventoryRoutes from '../modules/inventory/inventory.routes';
 import financeRoutes from '../modules/finance/finance.routes';
+import branchRoutes from '../modules/branch/branch.routes';
+import dashboardRoutes from '../modules/dashboard/dashboard.routes';
 
 const router = Router();
 
@@ -28,5 +30,7 @@ router.use('/service', serviceRoutes);
 router.use('/workshop', workshopRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
+router.use('/branches', branchRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

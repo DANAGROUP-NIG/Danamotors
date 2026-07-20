@@ -4,8 +4,9 @@ import { getCustomersRequest } from "../api/customer.api";
 
 type UseCustomersParams = {
   page?: number;
-  pageSize?: number;
+  limit?: number;
   search?: string;
+  branchId?: string;
 };
 
 export function useCustomers(params?: UseCustomersParams) {

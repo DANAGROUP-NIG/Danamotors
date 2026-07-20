@@ -11,6 +11,7 @@ export class ServiceRepository {
   async createAppointment(data: {
     customerId: string;
     vehicleId: string;
+    branchId: string;
     scheduledAt: Date;
     durationMins?: number;
     notes?: string;
@@ -25,12 +26,11 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            user: { select: { email: true, firstName: true, lastName: true } },
           },
         },
         vehicle: true,
+        branch: true,
         jobCards: true,
       },
       orderBy: { scheduledAt: 'desc' },
@@ -44,12 +44,11 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            user: { select: { email: true, firstName: true, lastName: true } },
           },
         },
         vehicle: true,
+        branch: true,
         jobCards: true,
       },
     });
@@ -66,6 +65,7 @@ export class ServiceRepository {
     appointmentId?: string;
     customerId?: string;
     vehicleId?: string;
+    branchId: string;
     jobNumber: string;
     description: string;
     status?: string;
@@ -80,12 +80,11 @@ export class ServiceRepository {
     return prisma.jobCard.findMany({
       include: {
         appointment: true,
+        branch: true,
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            user: { select: { email: true, firstName: true, lastName: true } },
           },
         },
         vehicle: true,
@@ -101,12 +100,11 @@ export class ServiceRepository {
       where: { id },
       include: {
         appointment: true,
+        branch: true,
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            user: { select: { email: true, firstName: true, lastName: true } },
           },
         },
         vehicle: true,

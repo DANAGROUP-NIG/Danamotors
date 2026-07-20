@@ -12,24 +12,25 @@ export class ServiceService {
   async createAppointment(data: {
     customerId: string;
     vehicleId: string;
+    branchName: string;
     scheduledAt: string;
     durationMins?: number;
     notes?: string;
     status?: string;
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-    if (!customer) {
-      throw new NotFoundError('Customer not found');
-    }
+    if (!customer) throw new NotFoundError('Customer not found');
 
     const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-    if (!vehicle) {
-      throw new NotFoundError('Vehicle not found');
-    }
+    if (!vehicle) throw new NotFoundError('Vehicle not found');
+
+    const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
+    if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
     return this.serviceRepository.createAppointment({
       customerId: data.customerId,
       vehicleId: data.vehicleId,
+      branchId: branch.id,
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
       notes: data.notes,
@@ -73,6 +74,7 @@ export class ServiceService {
     appointmentId?: string;
     customerId?: string;
     vehicleId?: string;
+    branchName: string;
     jobNumber: string;
     description: string;
     status?: string;
@@ -82,26 +84,34 @@ export class ServiceService {
   }) {
     if (data.appointmentId) {
       const appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
-      if (!appointment) {
-        throw new NotFoundError('Appointment not found');
-      }
+      if (!appointment) throw new NotFoundError('Appointment not found');
     }
 
     if (data.customerId) {
       const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-      if (!customer) {
-        throw new NotFoundError('Customer not found');
-      }
+      if (!customer) throw new NotFoundError('Customer not found');
     }
 
     if (data.vehicleId) {
       const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-      if (!vehicle) {
-        throw new NotFoundError('Vehicle not found');
-      }
+      if (!vehicle) throw new NotFoundError('Vehicle not found');
     }
 
-    return this.serviceRepository.createJobCard(data);
+    const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
+    if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
+
+    return this.serviceRepository.createJobCard({
+      appointmentId: data.appointmentId,
+      customerId: data.customerId,
+      vehicleId: data.vehicleId,
+      branchId: branch.id,
+      jobNumber: data.jobNumber,
+      description: data.description,
+      status: data.status,
+      estimatedHours: data.estimatedHours,
+      estimatedCost: data.estimatedCost,
+      assignedTo: data.assignedTo,
+    });
   }
 
   async listJobCards() {

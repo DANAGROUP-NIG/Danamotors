@@ -65,6 +65,7 @@ export class AdminService {
     lastName: string;
     phoneNumber?: string;
     roleId: string;
+    branchName: string;
   }) {
     const existing = await this.adminRepository.findUserByEmail(data.email);
     if (existing) {
@@ -76,6 +77,11 @@ export class AdminService {
       throw new NotFoundError('The specified role does not exist');
     }
 
+    const branch = await this.adminRepository.findBranchByName(data.branchName);
+    if (!branch) {
+      throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
+    }
+
     const passwordHash = await bcrypt.hash(data.passwordHash, 10);
     const user = await this.adminRepository.createUser({
       email: data.email,
@@ -84,6 +90,7 @@ export class AdminService {
       lastName: data.lastName,
       phoneNumber: data.phoneNumber,
       roleId: data.roleId,
+      branchId: branch.id,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

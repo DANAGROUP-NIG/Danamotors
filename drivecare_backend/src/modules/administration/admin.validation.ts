@@ -8,6 +8,7 @@ export const createUserSchema = z.object({
     lastName: z.string().min(1, 'Last name is required'),
     phoneNumber: z.string().optional(),
     roleId: z.string().uuid('Invalid role ID'),
+    branchName: z.string().min(1, 'Branch name is required'),
   }),
 });
 

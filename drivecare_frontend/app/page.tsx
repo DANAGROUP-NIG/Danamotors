@@ -1,5 +1,4 @@
 ﻿import {
-  Header,
   Hero,
   TrustedBy,
   ProductOverview,
@@ -13,10 +12,12 @@
   Footer,
 } from "../index";
 
+import LandingHeader from "@/components/headers/LandingHeader";
+
 export default function Home() {
   return (
     <main className="landing-bg min-h-screen overflow-hidden pt-20">
-      <Header />
+      <LandingHeader />
       <Hero />
       <TrustedBy />
       <ProductOverview />

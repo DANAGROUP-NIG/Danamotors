@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/page-header";
 
 const SETTINGS_CARDS = [
   { title: "Users & Roles",      description: "Manage staff accounts and permission levels." },

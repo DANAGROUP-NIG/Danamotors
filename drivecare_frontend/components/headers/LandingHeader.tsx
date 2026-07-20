@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HeaderLogo } from "./HeaderLogo";
+import HeaderLogo from "./HeaderLogo";
 
-export default function Header() {
+export default function LandingHeader() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -21,16 +21,31 @@ export default function Header() {
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <HeaderLogo />
         <nav className="hidden items-center gap-7 text-sm font-medium text-white/80 lg:flex">
-          <a className="transition hover:text-white" href="/#features">Services</a>
-          <a className="transition hover:text-white" href="/#workflow">Workflow</a>
-          <a className="transition hover:text-white" href="/#services">Service Plans</a>
-          <a className="transition hover:text-white" href="/#book">Book Service</a>
+          <a className="transition hover:text-white" href="/#features">
+            Services
+          </a>
+          <a className="transition hover:text-white" href="/#workflow">
+            Workflow
+          </a>
+          <a className="transition hover:text-white" href="/#services">
+            Service Plans
+          </a>
+          <a className="transition hover:text-white" href="/#book">
+            Book Service
+          </a>
         </nav>
         <div className="flex items-center gap-2 text-white">
-          <Button className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default" asChild>
+          <Button
+            className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20"
+            variant="default"
+            asChild
+          >
             <Link href="/login">Login</Link>
           </Button>
-          <Button className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default">
+          <Button
+            className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20"
+            variant="default"
+          >
             <Link href="/#book">Book now</Link>
           </Button>
           <Button
@@ -47,7 +62,9 @@ export default function Header() {
 
       <div
         className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
-          isOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+          isOpen
+            ? "pointer-events-auto opacity-100"
+            : "pointer-events-none opacity-0"
         }`}
       >
         <div
@@ -73,27 +90,50 @@ export default function Header() {
           </div>
 
           <nav className="flex flex-col gap-4 text-base font-medium text-white/80">
-            <Link href="/#features" onClick={() => setIsOpen(false)} className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white">
+            <Link
+              href="/#features"
+              onClick={() => setIsOpen(false)}
+              className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white"
+            >
               Services
             </Link>
-            <Link href="/#workflow" onClick={() => setIsOpen(false)} className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white">
+            <Link
+              href="/#workflow"
+              onClick={() => setIsOpen(false)}
+              className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white"
+            >
               Workflow
             </Link>
-            <Link href="/#services" onClick={() => setIsOpen(false)} className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white">
+            <Link
+              href="/#services"
+              onClick={() => setIsOpen(false)}
+              className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white"
+            >
               Service Plans
             </Link>
-            <Link href="/#book" onClick={() => setIsOpen(false)} className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white">
+            <Link
+              href="/#book"
+              onClick={() => setIsOpen(false)}
+              className="block rounded-md px-2 py-3 hover:bg-white/10 hover:text-white"
+            >
               Book Service
             </Link>
           </nav>
 
           <div className="mt-8 flex flex-col gap-3">
-            <Button className="w-full justify-center bg-white/10 text-white border border-white/20 hover:bg-white/20" variant="default" asChild>
+            <Button
+              className="w-full justify-center bg-white/10 text-white border border-white/20 hover:bg-white/20"
+              variant="default"
+              asChild
+            >
               <Link href="/login" onClick={() => setIsOpen(false)}>
                 Login
               </Link>
             </Button>
-            <Button className="w-full justify-center bg-white text-primary hover:bg-white/90" variant="default">
+            <Button
+              className="w-full justify-center bg-white text-primary hover:bg-white/90"
+              variant="default"
+            >
               <Link href="/#book" onClick={() => setIsOpen(false)}>
                 Book now
               </Link>

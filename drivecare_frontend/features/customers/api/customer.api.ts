@@ -9,13 +9,15 @@ import type {
 
 export async function getCustomersRequest(params?: {
   page?: number;
-  pageSize?: number;
+  limit?: number;
   search?: string;
+  branchId?: string;
 }): Promise<CustomerListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
-  if (params?.pageSize) query.set("pageSize", String(params.pageSize));
+  if (params?.limit) query.set("limit", String(params.limit));
   if (params?.search) query.set("search", params.search);
+  if (params?.branchId) query.set("branchId", params.branchId);
   const qs = query.toString();
   return apiGet<CustomerListResponse>(
     `${API_ROUTES.customers.base}${qs ? `?${qs}` : ""}`,

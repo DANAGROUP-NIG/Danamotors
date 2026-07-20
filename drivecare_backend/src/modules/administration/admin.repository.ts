@@ -73,6 +73,7 @@ export class AdminRepository {
     lastName: string;
     phoneNumber?: string;
     roleId: string;
+    branchId: string;
   }): Promise<User> {
     return prisma.user.create({
       data,
@@ -136,6 +137,12 @@ export class AdminRepository {
       where: {
         name: { in: names },
       },
+    });
+  }
+
+  async findBranchByName(name: string) {
+    return prisma.branch.findUnique({
+      where: { name },
     });
   }
 

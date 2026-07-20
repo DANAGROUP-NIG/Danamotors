@@ -51,7 +51,7 @@ export class AdminController {
 
   createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { email, password, firstName, lastName, phoneNumber, roleId } = req.body;
+      const { email, password, firstName, lastName, phoneNumber, roleId, branchName } = req.body;
       const result = await this.adminService.createUser({
         email,
         passwordHash: password,
@@ -59,6 +59,7 @@ export class AdminController {
         lastName,
         phoneNumber,
         roleId,
+        branchName,
       });
 
       res.status(201).json({

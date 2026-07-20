@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { Building2, ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBranchStore } from "@/store/branch.store";
-import { useFetchBranches } from "./hooks/use-fetch-branches";
+import { useFetchBranches } from "./hooks/useFetchBranches";
 
-export default function BranchSwitcher({ enabled = true }: { enabled?: boolean }) {
-  const { branches, activeBranch, setActiveBranch, isLoading, error } = useBranchStore();
+export default function BranchSwitcher({
+  enabled = true,
+}: {
+  enabled?: boolean;
+}) {
+  const { branches, activeBranch, setActiveBranch, isLoading, error } =
+    useBranchStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -17,7 +22,8 @@ export default function BranchSwitcher({ enabled = true }: { enabled?: boolean }
   // Close on outside click / Escape
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -30,7 +36,7 @@ export default function BranchSwitcher({ enabled = true }: { enabled?: boolean }
     };
   }, []);
 
-  function select(branch: typeof branches[number]) {
+  function select(branch: (typeof branches)[number]) {
     setActiveBranch(branch);
     setOpen(false);
   }
@@ -62,8 +68,8 @@ export default function BranchSwitcher({ enabled = true }: { enabled?: boolean }
           {isLoading
             ? "Loading branches…"
             : error
-            ? "Failed to load"
-            : (activeBranch?.name ?? "Select branch")}
+              ? "Failed to load"
+              : (activeBranch?.name ?? "Select branch")}
         </span>
 
         <ChevronDown
@@ -98,11 +104,17 @@ export default function BranchSwitcher({ enabled = true }: { enabled?: boolean }
                     )}
                   >
                     <Building2 className="size-3.5 shrink-0 opacity-70" />
-                    <span className="flex-1 truncate text-left">{branch.name}</span>
+                    <span className="flex-1 truncate text-left">
+                      {branch.name}
+                    </span>
                     {branch.location && (
-                      <span className="truncate text-[11px] text-white/50">{branch.location}</span>
+                      <span className="truncate text-[11px] text-white/50">
+                        {branch.location}
+                      </span>
                     )}
-                    {isActive && <Check className="ml-auto size-3.5 shrink-0 text-white" />}
+                    {isActive && (
+                      <Check className="ml-auto size-3.5 shrink-0 text-white" />
+                    )}
                   </button>
                 </li>
               );

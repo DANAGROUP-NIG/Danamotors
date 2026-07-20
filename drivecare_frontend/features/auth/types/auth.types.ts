@@ -6,6 +6,7 @@ export type AuthUser = {
   phoneNumber?: string;
   role: string;
   permissions: string[];
+  branchId?: string | null;
 };
 
 export type LoginPayload = {
@@ -19,6 +20,7 @@ export type RegisterPayload = {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  branchName?: string;
 };
 
 export type LoginResponse = {

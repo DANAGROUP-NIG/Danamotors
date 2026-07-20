@@ -1,5 +1,5 @@
-import prisma from '../../prisma/client';
-import { User, Role, RefreshToken } from '@prisma/client';
+import prisma from "../../prisma/client";
+import { User, Role, RefreshToken } from "@prisma/client";
 
 export interface UserWithRoleAndPermissions extends User {
   role: Role & {
@@ -59,6 +59,7 @@ export class AuthRepository {
     lastName: string;
     phoneNumber?: string;
     roleId: string;
+    branchId?: string;
   }): Promise<UserWithRoleAndPermissions> {
     return prisma.user.create({
       data,
@@ -76,7 +77,11 @@ export class AuthRepository {
     }) as Promise<UserWithRoleAndPermissions>;
   }
 
-  async saveRefreshToken(userId: string, token: string, expiresAt: Date): Promise<RefreshToken> {
+  async saveRefreshToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<RefreshToken> {
     return prisma.refreshToken.create({
       data: {
         token,
@@ -86,7 +91,9 @@ export class AuthRepository {
     });
   }
 
-  async findRefreshToken(token: string): Promise<(RefreshToken & { user: UserWithRoleAndPermissions }) | null> {
+  async findRefreshToken(
+    token: string,
+  ): Promise<(RefreshToken & { user: UserWithRoleAndPermissions }) | null> {
     return prisma.refreshToken.findUnique({
       where: { token },
       include: {

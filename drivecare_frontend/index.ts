@@ -1,4 +1,3 @@
-export { default as Header } from "./features/landing/header/Header";
 export { default as Hero } from "./features/landing/hero/Hero";
 export { default as TrustedBy } from "./features/landing/trustedBy/TrustedBy";
 export { default as ProductOverview } from "./features/landing/productOverview/ProductOverview";

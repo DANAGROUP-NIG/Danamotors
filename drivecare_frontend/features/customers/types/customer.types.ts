@@ -3,8 +3,10 @@ export type Customer = {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phoneNumber?: string;
   address?: string;
+  city?: string;
+  state?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -20,8 +22,11 @@ export type CreateCustomerPayload = {
 export type UpdateCustomerPayload = Partial<CreateCustomerPayload>;
 
 export type CustomerListResponse = {
-  items: Customer[];
-  total: number;
-  page: number;
-  pageSize: number;
+  customers: Customer[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 };

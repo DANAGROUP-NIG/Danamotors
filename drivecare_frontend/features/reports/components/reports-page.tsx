@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/page-header";
 
 const REPORT_CARDS = [
   { title: "Revenue Report",      description: "Daily, weekly, and monthly revenue breakdown." },

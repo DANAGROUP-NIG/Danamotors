@@ -10,8 +10,8 @@ export const API_ROUTES = {
     resetPassword: "/auth/reset-password",
   },
   customers: {
-    base: "/customer",
-    detail: (id: string) => `/customer/${id}`,
+    base: "/customers",
+    detail: (id: string) => `/customers/${id}`,
   },
   vehicles: {
     base: "/vehicle",

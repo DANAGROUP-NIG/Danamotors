@@ -19,6 +19,7 @@ export const registerSchema = z
       .or(z.literal("")),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
+    branchName: z.string().optional(),
   })
   .refine((d) => d.password === d.confirmPassword, {
     path: ["confirmPassword"],

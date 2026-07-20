@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useAuth, type AppRole } from "@/features/auth/hooks/use-auth";
 import { useBranchStore } from "@/store/branch.store";
-import { useFetchBranches } from "@/features/branches/hooks/use-fetch-branches";
+import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,69 +57,138 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",
     items: [
-      { label: "Dashboard",    href: "/dashboard",    icon: LayoutDashboard },
-      { label: "Customers",    href: "/customers",    icon: Users,
-        roles: ["admin", "manager", "receptionist"] },
-      { label: "Vehicles",     href: "/vehicles",     icon: Car,
-        roles: ["admin", "manager", "receptionist", "technician"] },
-      { label: "Appointments", href: "/appointments", icon: CalendarDays,
-        roles: ["admin", "manager", "receptionist"] },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      {
+        label: "Customers",
+        href: "/customers",
+        icon: Users,
+        roles: ["admin", "manager", "receptionist"],
+      },
+      {
+        label: "Vehicles",
+        href: "/vehicles",
+        icon: Car,
+        roles: ["admin", "manager", "receptionist", "technician"],
+      },
+      {
+        label: "Appointments",
+        href: "/appointments",
+        icon: CalendarDays,
+        roles: ["admin", "manager", "receptionist"],
+      },
     ],
   },
   {
     label: "Workshop",
     roles: ["admin", "manager", "technician", "receptionist"],
     items: [
-      { label: "Job Cards",   href: "/job-cards",   icon: ClipboardList, badge: 24,
-        roles: ["admin", "manager", "technician", "receptionist"] },
-      { label: "Inspection",  href: "/inspections", icon: ShieldCheck,
-        roles: ["admin", "manager", "technician"] },
-      { label: "Repairs",     href: "/repairs",     icon: Wrench,
-        roles: ["admin", "manager", "technician"] },
-      { label: "Technicians", href: "/technicians", icon: UserCog,
-        roles: ["admin", "manager"] },
+      {
+        label: "Job Cards",
+        href: "/job-cards",
+        icon: ClipboardList,
+        badge: 24,
+        roles: ["admin", "manager", "technician", "receptionist"],
+      },
+      {
+        label: "Inspection",
+        href: "/inspections",
+        icon: ShieldCheck,
+        roles: ["admin", "manager", "technician"],
+      },
+      {
+        label: "Repairs",
+        href: "/repairs",
+        icon: Wrench,
+        roles: ["admin", "manager", "technician"],
+      },
+      {
+        label: "Technicians",
+        href: "/technicians",
+        icon: UserCog,
+        roles: ["admin", "manager"],
+      },
     ],
   },
   {
     label: "Operations",
     roles: ["admin", "manager", "accountant"],
     items: [
-      { label: "Inventory",  href: "/inventory",  icon: Package,
-        roles: ["admin", "manager"] },
-      { label: "Purchasing", href: "/purchasing", icon: ReceiptText,
-        roles: ["admin", "manager", "accountant"] },
-      { label: "Finance",    href: "/finance",    icon: BarChart2,
-        roles: ["admin", "manager", "accountant"] },
-      { label: "Reports",    href: "/reports",    icon: FileText,
-        roles: ["admin", "manager", "accountant"] },
+      {
+        label: "Inventory",
+        href: "/inventory",
+        icon: Package,
+        roles: ["admin", "manager"],
+      },
+      {
+        label: "Purchasing",
+        href: "/purchasing",
+        icon: ReceiptText,
+        roles: ["admin", "manager", "accountant"],
+      },
+      {
+        label: "Finance",
+        href: "/finance",
+        icon: BarChart2,
+        roles: ["admin", "manager", "accountant"],
+      },
+      {
+        label: "Reports",
+        href: "/reports",
+        icon: FileText,
+        roles: ["admin", "manager", "accountant"],
+      },
     ],
   },
   {
     label: "Account",
     items: [
-      { label: "Settings", href: "/settings", icon: Settings,
-        roles: ["admin", "manager"] },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+        roles: ["admin", "manager"],
+      },
     ],
   },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
-  { label: "Home",     href: "/dashboard",    icon: LayoutDashboard },
-  { label: "Vehicles", href: "/vehicles",     icon: Car,
-    roles: ["admin", "manager", "receptionist", "technician"] },
-  { label: "Book",     href: "/appointments", icon: CalendarDays,
-    roles: ["admin", "manager", "receptionist"] },
-  { label: "Jobs",     href: "/job-cards",    icon: Bell,
-    roles: ["admin", "manager", "technician", "receptionist"] },
-  { label: "Settings", href: "/settings",     icon: Settings,
-    roles: ["admin", "manager"] },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+  {
+    label: "Vehicles",
+    href: "/vehicles",
+    icon: Car,
+    roles: ["admin", "manager", "receptionist", "technician"],
+  },
+  {
+    label: "Book",
+    href: "/appointments",
+    icon: CalendarDays,
+    roles: ["admin", "manager", "receptionist"],
+  },
+  {
+    label: "Jobs",
+    href: "/job-cards",
+    icon: Bell,
+    roles: ["admin", "manager", "technician", "receptionist"],
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+    roles: ["admin", "manager"],
+  },
 ];
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 const COLLAPSED_KEY = "drivecare-sidebar-collapsed";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const logout = useLogout();
   const { user, isHydrated, isSuperAdmin, hasAccess } = useAuth();
@@ -141,70 +210,104 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     });
   }
 
-  // Branch store — fetch only for SuperAdmin
-  useFetchBranches(isSuperAdmin);
-  const { branches, activeBranch, setActiveBranch, isLoading: branchLoading } = useBranchStore();
+  // Branch store — fetch for all users so everyone sees the current branch
+  useFetchBranches(true);
+  const {
+    branches,
+    activeBranch,
+    setActiveBranch,
+    isLoading: branchLoading,
+    isFetched: branchesFetched,
+  } = useBranchStore();
 
-function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  // For non-SuperAdmin: lock activeBranch to the user's assigned branch
+  useEffect(() => {
+    if (isSuperAdmin || !branchesFetched || branches.length === 0) return;
 
-  return (
-    <div
-      ref={ref}
-      className="relative"
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
-    >
-      {children}
-      {visible && (
-        <div
-          role="tooltip"
-          className={cn(
-            "pointer-events-none absolute left-full top-1/2 z-50 -translate-y-1/2 ml-3",
-            "whitespace-nowrap rounded-md bg-[#0d2a3d] px-2.5 py-1.5",
-            "text-xs font-medium text-white shadow-lg",
-            // small left arrow
-            "before:absolute before:-left-1.5 before:top-1/2 before:-translate-y-1/2",
-            "before:border-4 before:border-transparent before:border-r-[#0d2a3d]",
-          )}
-        >
-          {label}
-        </div>
-      )}
-    </div>
-  );
-}
+    const userBranchId = user?.branchId;
+    if (!userBranchId) return;
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+    // Only update if the current activeBranch doesn't match
+    if (activeBranch?.id === userBranchId) return;
 
-function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
-  if (collapsed) {
+    const userBranch = branches.find((b) => b.id === userBranchId);
+    if (userBranch) {
+      setActiveBranch(userBranch);
+    }
+  }, [isSuperAdmin, branchesFetched, branches, user?.branchId, activeBranch?.id, setActiveBranch]);
+
+  function NavTooltip({
+    label,
+    children,
+  }: {
+    label: string;
+    children: React.ReactNode;
+  }) {
+    const [visible, setVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
     return (
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="mx-auto h-9 w-9 animate-pulse rounded-lg bg-white/10" />
+      <div
+        ref={ref}
+        className="relative"
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+      >
+        {children}
+        {visible && (
+          <div
+            role="tooltip"
+            className={cn(
+              "pointer-events-none absolute left-full top-1/2 z-50 -translate-y-1/2 ml-3",
+              "whitespace-nowrap rounded-md bg-[#0d2a3d] px-2.5 py-1.5",
+              "text-xs font-medium text-white shadow-lg",
+              // small left arrow
+              "before:absolute before:-left-1.5 before:top-1/2 before:-translate-y-1/2",
+              "before:border-4 before:border-transparent before:border-r-[#0d2a3d]",
+            )}
+          >
+            {label}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+  function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
+    if (collapsed) {
+      return (
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              className="mx-auto h-9 w-9 animate-pulse rounded-lg bg-white/10"
+            />
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
+        {[4, 4, 4, 1].map((count, gi) => (
+          <div key={gi}>
+            <div className="mb-1.5 mx-2 h-2 w-12 animate-pulse rounded bg-white/10" />
+            <div className="flex flex-col gap-0.5">
+              {Array.from({ length: count }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-9 animate-pulse rounded-lg bg-white/10"
+                />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     );
   }
-  return (
-    <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-      {[4, 4, 4, 1].map((count, gi) => (
-        <div key={gi}>
-          <div className="mb-1.5 mx-2 h-2 w-12 animate-pulse rounded bg-white/10" />
-          <div className="flex flex-col gap-0.5">
-            {Array.from({ length: count }).map((_, i) => (
-              <div key={i} className="h-9 animate-pulse rounded-lg bg-white/10" />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
-// ─── Tooltip (shown on collapsed icon-only items) ─────────────────────────────
+  // ─── Tooltip (shown on collapsed icon-only items) ─────────────────────────────
 
   const initials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
@@ -216,7 +319,6 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f0f4f8]">
-
       {/* ── Mobile backdrop ─────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
@@ -238,16 +340,19 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
           collapsed ? "lg:w-[60px]" : "lg:w-[220px]",
           // mobile: fixed width, slides in/out
           "w-[220px]",
-          sidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full lg:translate-x-0",
+          sidebarOpen
+            ? "translate-x-0 shadow-xl"
+            : "-translate-x-full lg:translate-x-0",
         )}
         style={{ backgroundColor: "#05141F", color: "white" }}
       >
-
         {/* ── Logo row ──────────────────────────────────────────────── */}
-        <div className={cn(
-          "flex h-16 shrink-0 items-center border-b border-white/10",
-          collapsed ? "justify-center px-0" : "px-5",
-        )}>
+        <div
+          className={cn(
+            "flex h-16 shrink-0 items-center border-b border-white/10",
+            collapsed ? "justify-center px-0" : "px-5",
+          )}
+        >
           {/* Logo — hidden when collapsed */}
           {!collapsed && (
             <img
@@ -267,10 +372,11 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed
-              ? <ChevronRight className="size-4" />
-              : <ChevronLeft  className="size-4" />
-            }
+            {collapsed ? (
+              <ChevronRight className="size-4" />
+            ) : (
+              <ChevronLeft className="size-4" />
+            )}
           </button>
 
           {/* Mobile close button */}
@@ -288,44 +394,52 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
           <SidebarSkeleton collapsed={collapsed} />
         ) : (
           <>
-            {/* Branch select — superadmin only, hidden when collapsed */}
-            {isSuperAdmin && !collapsed && (
+            {/* Branch display — all users see current branch; SuperAdmin can switch */}
+            {!collapsed && (
               <div className="shrink-0 px-3 pt-3">
                 <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
                   <Building2 className="size-4 shrink-0 text-white/50" />
-                  <select
-                    aria-label="Select branch"
-                    disabled={branchLoading || branches.length === 0}
-                    value={activeBranch?.id ?? ""}
-                    onChange={(e) => {
-                      const found = branches.find((b) => b.id === e.target.value);
-                      if (found) setActiveBranch(found);
-                    }}
-                    className={cn(
-                      "flex-1 bg-transparent text-sm font-medium text-white outline-none",
-                      "disabled:opacity-50 disabled:cursor-not-allowed",
-                      "[&>option]:bg-[#05141F] [&>option]:text-white",
-                    )}
-                  >
-                    {branchLoading ? (
-                      <option value="">Loading…</option>
-                    ) : branches.length === 0 ? (
-                      <option value="">No branches</option>
-                    ) : (
-                      branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}{b.location ? ` — ${b.location}` : ""}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <ChevronDown className="size-3.5 shrink-0 text-white/40 pointer-events-none" />
+                  {isSuperAdmin ? (
+                    <select
+                      aria-label="Select branch"
+                      value={activeBranch?.id ?? ""}
+                      onChange={(e) => {
+                        const found = branches.find(
+                          (b) => b.id === e.target.value,
+                        );
+                        if (found) setActiveBranch(found);
+                      }}
+                      className={cn(
+                        "flex-1 bg-transparent text-sm font-medium text-white outline-none cursor-pointer",
+                        "[&>option]:bg-[#05141F] [&>option]:text-white",
+                      )}
+                    >
+                      {branchLoading ? (
+                        <option value="">Loading…</option>
+                      ) : branches.length === 0 ? (
+                        <option value="">No branches</option>
+                      ) : (
+                        branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  ) : (
+                    <span className="flex-1 truncate text-sm font-medium text-white">
+                      {branchLoading
+                        ? "Loading…"
+                        : activeBranch?.name ?? "No branch"}
+                    </span>
+                  )}
+                  {isSuperAdmin && <ChevronDown className="size-3.5 shrink-0 text-white/40 pointer-events-none" />}
                 </div>
               </div>
             )}
 
-            {/* Branch icon-only when collapsed + superadmin */}
-            {isSuperAdmin && collapsed && (
+            {/* Branch icon-only when collapsed */}
+            {collapsed && (
               <div className="shrink-0 flex justify-center pt-3">
                 <NavTooltip label={activeBranch?.name ?? "Select branch"}>
                   <span className="inline-grid size-9 place-items-center rounded-lg bg-white/10 text-white/50">
@@ -337,91 +451,111 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
 
             <nav
               className={cn(
-                "flex flex-1 flex-col overflow-y-auto py-4",
+                "flex flex-1 flex-col overflow-y-auto py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                 collapsed ? "items-center gap-1 px-2" : "gap-5 px-3",
               )}
               aria-label="Main navigation"
             >
-              {NAV_GROUPS.filter((group) => hasAccess(group.roles ?? [])).map((group) => {
-                const visibleItems = group.items.filter((item) => hasAccess(item.roles ?? []));
-                if (visibleItems.length === 0) return null;
+              {NAV_GROUPS.filter((group) => hasAccess(group.roles ?? [])).map(
+                (group) => {
+                  const visibleItems = group.items.filter((item) =>
+                    hasAccess(item.roles ?? []),
+                  );
+                  if (visibleItems.length === 0) return null;
 
-                return (
-                  <div key={group.label} className={cn("w-full", collapsed && "flex flex-col items-center gap-1")}>
+                  return (
+                    <div
+                      key={group.label}
+                      className={cn(
+                        "w-full",
+                        collapsed && "flex flex-col items-center gap-1",
+                      )}
+                    >
+                      {/* Group label — hidden when collapsed */}
+                      {!collapsed && (
+                        <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+                          {group.label}
+                        </p>
+                      )}
 
-                    {/* Group label — hidden when collapsed */}
-                    {!collapsed && (
-                      <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
-                        {group.label}
-                      </p>
-                    )}
+                      {/* Divider between groups when collapsed */}
+                      {collapsed && (
+                        <div className="my-1 w-8 border-t border-white/10" />
+                      )}
 
-                    {/* Divider between groups when collapsed */}
-                    {collapsed && (
-                      <div className="my-1 w-8 border-t border-white/10" />
-                    )}
+                      <div
+                        className={cn(
+                          "flex flex-col gap-0.5 w-full",
+                          collapsed && "items-center",
+                        )}
+                      >
+                        {visibleItems.map(
+                          ({ label, href, icon: Icon, badge }) => {
+                            const active = isActive(href);
 
-                    <div className={cn("flex flex-col gap-0.5 w-full", collapsed && "items-center")}>
-                      {visibleItems.map(({ label, href, icon: Icon, badge }) => {
-                        const active = isActive(href);
+                            if (collapsed) {
+                              return (
+                                <NavTooltip key={href} label={label}>
+                                  <Link
+                                    href={href}
+                                    onClick={() => setSidebarOpen(false)}
+                                    aria-current={active ? "page" : undefined}
+                                    aria-label={label}
+                                    className={cn(
+                                      "relative flex size-9 items-center justify-center rounded-lg transition-colors",
+                                      active
+                                        ? "bg-white/15 text-white"
+                                        : "text-white/70 hover:bg-white/10 hover:text-white",
+                                    )}
+                                  >
+                                    <Icon className="size-[17px] shrink-0" />
+                                    {/* Badge dot when collapsed */}
+                                    {badge != null && (
+                                      <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
+                                        {badge > 9 ? "9+" : badge}
+                                      </span>
+                                    )}
+                                  </Link>
+                                </NavTooltip>
+                              );
+                            }
 
-                        if (collapsed) {
-                          return (
-                            <NavTooltip key={href} label={label}>
+                            return (
                               <Link
+                                key={href}
                                 href={href}
                                 onClick={() => setSidebarOpen(false)}
                                 aria-current={active ? "page" : undefined}
-                                aria-label={label}
                                 className={cn(
-                                  "relative flex size-9 items-center justify-center rounded-lg transition-colors",
+                                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                                   active
                                     ? "bg-white/15 text-white"
                                     : "text-white/70 hover:bg-white/10 hover:text-white",
                                 )}
                               >
                                 <Icon className="size-[17px] shrink-0" />
-                                {/* Badge dot when collapsed */}
+                                <span className="flex-1 truncate">{label}</span>
                                 {badge != null && (
-                                  <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
-                                    {badge > 9 ? "9+" : badge}
+                                  <span
+                                    className={cn(
+                                      "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none",
+                                      active
+                                        ? "bg-white/20 text-white"
+                                        : "bg-white/10 text-white/70",
+                                    )}
+                                  >
+                                    {badge}
                                   </span>
                                 )}
                               </Link>
-                            </NavTooltip>
-                          );
-                        }
-
-                        return (
-                          <Link
-                            key={href}
-                            href={href}
-                            onClick={() => setSidebarOpen(false)}
-                            aria-current={active ? "page" : undefined}
-                            className={cn(
-                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                              active
-                                ? "bg-white/15 text-white"
-                                : "text-white/70 hover:bg-white/10 hover:text-white",
-                            )}
-                          >
-                            <Icon className="size-[17px] shrink-0" />
-                            <span className="flex-1 truncate">{label}</span>
-                            {badge != null && (
-                              <span className={cn(
-                                "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none",
-                                active ? "bg-white/20 text-white" : "bg-white/10 text-white/70",
-                              )}>
-                                {badge}
-                              </span>
-                            )}
-                          </Link>
-                        );
-                      })}
+                            );
+                          },
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </nav>
           </>
         )}
@@ -429,7 +563,12 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
         {/* ── User card + logout ────────────────────────────────────── */}
         <div className="shrink-0 border-t border-white/10 p-3">
           {!isHydrated ? (
-            <div className={cn("flex items-center gap-3 rounded-lg p-2", collapsed && "justify-center")}>
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-lg p-2",
+                collapsed && "justify-center",
+              )}
+            >
               <div className="size-9 animate-pulse rounded-full bg-white/10 shrink-0" />
               {!collapsed && (
                 <div className="flex flex-col gap-1.5">
@@ -472,7 +611,10 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
                     {user?.role ?? "Workshop Manager"}
                   </p>
                 </div>
-                <span className="size-2 shrink-0 rounded-full bg-emerald-400" aria-label="Online" />
+                <span
+                  className="size-2 shrink-0 rounded-full bg-emerald-400"
+                  aria-label="Online"
+                />
               </div>
               <button
                 className={cn(
@@ -493,10 +635,8 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
 
       {/* ── Right column ────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">
-
         {/* ── Top header ──────────────────────────────────────────── */}
         <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[#e8edf3] bg-white px-4 lg:px-6">
-
           {/* Mobile hamburger */}
           <button
             className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:hidden"
@@ -526,7 +666,10 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
               aria-label="Notifications"
             >
               <Bell className="size-[18px]" />
-              <span className="absolute right-1.5 top-1.5 flex size-2" aria-hidden="true">
+              <span
+                className="absolute right-1.5 top-1.5 flex size-2"
+                aria-hidden="true"
+              >
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                 <span className="relative inline-flex size-2 rounded-full bg-red-500" />
               </span>
@@ -566,23 +709,25 @@ function SidebarSkeleton({ collapsed }: { collapsed: boolean }) {
           className="flex h-16 shrink-0 items-center justify-around border-t border-[#e8edf3] bg-white px-2 lg:hidden"
           aria-label="Mobile navigation"
         >
-          {BOTTOM_NAV.filter((item) => hasAccess(item.roles ?? [])).map(({ label, href, icon: Icon }) => {
-            const active = isActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors",
-                  active ? "text-primary" : "text-slate-400",
-                )}
-              >
-                <Icon className={cn("size-5", active && "stroke-[2.5px]")} />
-                {label}
-              </Link>
-            );
-          })}
+          {BOTTOM_NAV.filter((item) => hasAccess(item.roles ?? [])).map(
+            ({ label, href, icon: Icon }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors",
+                    active ? "text-primary" : "text-slate-400",
+                  )}
+                >
+                  <Icon className={cn("size-5", active && "stroke-[2.5px]")} />
+                  {label}
+                </Link>
+              );
+            },
+          )}
         </nav>
       </div>
     </div>

@@ -2,7 +2,7 @@ import prisma from '../../prisma/client';
 import { Customer, CustomerDocument, ServiceHistory, Prisma, User, Role } from '@prisma/client';
 
 export class CustomerRepository {
-  async listCustomers(params: { skip: number; take: number; search?: string }) {
+  async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string }) {
     const where: Record<string, any> = {};
 
     if (params.search) {
@@ -10,6 +10,14 @@ export class CustomerRepository {
         { user: { email: { contains: params.search, mode: 'insensitive' } } },
         { user: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { user: { lastName: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (params.branchId) {
+      where.OR = [
+        ...(where.OR ?? []),
+        { jobCards: { some: { branchId: params.branchId } } },
+        { appointments: { some: { branchId: params.branchId } } },
       ];
     }
 
@@ -62,9 +70,7 @@ export class CustomerRepository {
   }): Promise<User & { role: Role }> {
     return prisma.user.create({
       data,
-      include: {
-        role: true,
-      },
+      include: { role: true },
     });
   }
 

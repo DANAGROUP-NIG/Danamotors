@@ -22,6 +22,7 @@ export const createAppointmentSchema = z.object({
   body: z.object({
     customerId: z.string().uuid('Invalid customer ID'),
     vehicleId: z.string().uuid('Invalid vehicle ID'),
+    branchName: z.string().min(1, 'Branch name is required'),
     scheduledAt: z.string().datetime('Invalid scheduled date'),
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
@@ -46,6 +47,7 @@ export const createJobCardSchema = z.object({
     appointmentId: z.string().uuid('Invalid appointment ID').optional(),
     customerId: z.string().uuid('Invalid customer ID').optional(),
     vehicleId: z.string().uuid('Invalid vehicle ID').optional(),
+    branchName: z.string().min(1, 'Branch name is required'),
     jobNumber: z.string().min(1, 'Job number is required'),
     description: z.string().min(1, 'Description is required'),
     status: z.string().optional(),

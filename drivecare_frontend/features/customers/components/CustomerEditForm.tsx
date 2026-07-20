@@ -35,7 +35,7 @@ export function CustomerEditForm({
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
-      phone: customer.phone,
+      phone: customer.phoneNumber ?? "",
       address: customer.address ?? "",
     },
   });
@@ -46,7 +46,7 @@ export function CustomerEditForm({
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
-      phone: customer.phone,
+      phone: customer.phoneNumber ?? "",
       address: customer.address ?? "",
     });
   }, [customer, reset]);

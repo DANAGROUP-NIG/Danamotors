@@ -4,7 +4,9 @@ import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_KEY, USER_KEY } from "./constants";
 const ACCESS_TOKEN_KEY = ACCESS_TOKEN_COOKIE;
 
 export function setAccessToken(token: string) {
-  document.cookie = `${ACCESS_TOKEN_KEY}=${token}; path=/; max-age=${60 * 15}; SameSite=Lax`;
+  // Extend max-age to 7 days so that Next.js middleware is not bypassed after 15 mins of inactivity.
+  // The backend still invalidates the actual token after 15 mins, forcing a silent refresh.
+  document.cookie = `${ACCESS_TOKEN_KEY}=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
 }
 
 export function getAccessTokenFromCookie(): string | null {

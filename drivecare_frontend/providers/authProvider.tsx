@@ -45,8 +45,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const user = await getMeRequest();
         setUser(user);
       } catch (err) {
-        clearSession();
-        reset();
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        // Only clear session if token is explicitly rejected (401/403/404)
+        if (status === 401 || status === 403 || status === 404) {
+          clearSession();
+          reset();
+        }
       } finally {
         setHydrated(true);
       }

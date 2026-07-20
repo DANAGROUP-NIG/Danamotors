@@ -8,6 +8,24 @@ datasource db {
 }
 
 
+model Branch {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  phoneNumber String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  jobCards     JobCard[]
+  appointments ServiceAppointment[]
+}
+
 model User {
   id           String        @id @default(uuid())
   email        String        @unique
@@ -21,6 +39,8 @@ model User {
   
   roleId       String
   role         Role          @relation(fields: [roleId], references: [id])
+  branchId     String?
+  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   refreshTokens RefreshToken[]
   auditLogs    AuditLog[]
   customer     Customer?     @relation()
@@ -105,7 +125,7 @@ model Customer {
   vehicles               Vehicle[]
   vehicleOwnerships      VehicleOwnership[]
   appointments           ServiceAppointment[]
-  jobCards              JobCard[]
+  jobCards               JobCard[]
   approvals              CustomerApproval[]
   invoices               Invoice[]
 }
@@ -116,6 +136,8 @@ model ServiceAppointment {
   customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   vehicleId     String
   vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  branchId      String
+  branch        Branch    @relation(fields: [branchId], references: [id])
   scheduledAt   DateTime
   durationMins  Int?
   notes         String?
@@ -127,28 +149,30 @@ model ServiceAppointment {
 }
 
 model JobCard {
-  id             String             @id @default(uuid())
+  id             String              @id @default(uuid())
   appointmentId  String?
   appointment    ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   customerId     String?
-  customer       Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer       Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
   vehicleId      String?
-  vehicle        Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  jobNumber      String             @unique
+  vehicle        Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  branchId       String
+  branch         Branch              @relation(fields: [branchId], references: [id])
+  jobNumber      String              @unique
   description    String
-  status         String             @default("Open")
+  status         String              @default("Open")
   estimatedHours Float?
   estimatedCost  Float?
   assignedTo     String?
-  progress       Int?               @default(0)
-  qcStatus       String?            @default("Pending")
+  progress       Int?                @default(0)
+  qcStatus       String?             @default("Pending")
   qcNotes        String?
   qualityInspectorId String?
-  qualityInspector User?            @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
+  qualityInspector   User?           @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
   technicianId   String?
-  technician     User?              @relation("TechnicianAssignments", fields: [technicianId], references: [id], onDelete: SetNull)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  technician     User?               @relation("TechnicianAssignments", fields: [technicianId], references: [id], onDelete: SetNull)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   inspections    Inspection[]
   estimates      Estimate[]

@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/page-header";
 
 const FINANCE_CARDS = [
   { title: "Quotations",  href: "/quotations",  description: "Service cost estimates awaiting customer approval." },

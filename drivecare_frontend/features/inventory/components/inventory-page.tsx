@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/page-header";
 import { useInventory } from "../hooks/use-inventory";
 import { InventoryCreateForm } from "./InventoryCreateForm";
 import { InventoryTable } from "./InventoryTable";

@@ -8,6 +8,7 @@ export interface LoginResponse {
     lastName: string;
     role: string;
     permissions: string[];
+    branchId?: string | null;
   };
 }
 
