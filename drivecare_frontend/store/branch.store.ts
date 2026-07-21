@@ -54,13 +54,14 @@ export const useBranchStore = create<BranchState>()(
           isLoading: false,
           isFetched: true,
           error: null,
-          // keep activeBranch in sync — if current active still exists keep it,
-          // otherwise default to first branch
           activeBranch:
-            state.activeBranch &&
-            branches.some((b) => b.id === state.activeBranch!.id)
-              ? state.activeBranch
-              : (branches[0] ?? null),
+            // Preserve "All Branches" (null) once user explicitly selected it
+            state.isFetched && state.activeBranch === null
+              ? null
+              : state.activeBranch &&
+                  branches.some((b) => b.id === state.activeBranch!.id)
+                ? state.activeBranch
+                : (branches[0] ?? null),
         })),
 
       setActiveBranch: (branch) => set({ activeBranch: branch }),

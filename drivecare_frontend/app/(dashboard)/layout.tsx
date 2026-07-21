@@ -148,6 +148,11 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Settings,
         roles: ["admin", "manager"],
       },
+      {
+        label: "Log out",
+        href: "/logout",
+        icon: LogOut,
+      },
     ],
   },
 ];
@@ -180,6 +185,156 @@ const BOTTOM_NAV: NavItem[] = [
   },
 ];
 
+// ─── Branch Dropdown ───────────────────────────────────────────────────────────
+
+function BranchDropdown({
+  branches,
+  activeBranch,
+  isLoading,
+  canSwitch,
+  canSeeAll,
+  onSelect,
+  onAllSelect,
+}: {
+  branches: { id: string; name: string }[];
+  activeBranch: { id: string; name: string } | null;
+  isLoading: boolean;
+  canSwitch: boolean;
+  canSeeAll: boolean;
+  onSelect: (branch: { id: string; name: string }) => void;
+  onAllSelect: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  const isAll = canSeeAll && activeBranch === null;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => canSwitch && setOpen((v) => !v)}
+        disabled={!canSwitch || isLoading}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5",
+          "transition-all duration-150",
+          canSwitch
+            ? "bg-white/10 hover:bg-white/15 cursor-pointer"
+            : "bg-white/5 cursor-default",
+        )}
+      >
+        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-white/10">
+          <Building2 className="size-3.5 text-white/60" />
+        </span>
+        <div className="min-w-0 flex-1 text-left">
+          {isLoading ? (
+            <div className="h-3.5 w-20 animate-pulse rounded bg-white/10" />
+          ) : (
+            <>
+              <p className="truncate text-[11px] font-medium uppercase tracking-wider text-white/40">
+                Branch
+              </p>
+              <p className="truncate text-sm font-semibold text-white">
+                {isAll
+                  ? "All Branches"
+                  : activeBranch?.name ?? branches[0]?.name ?? "No branch"}
+              </p>
+            </>
+          )}
+        </div>
+        {canSwitch && (
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-white/40 transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        )}
+      </button>
+
+      {open && canSwitch && (
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-white/10 bg-[#0c1e2e] shadow-2xl shadow-black/40">
+          {canSeeAll && (
+            <button
+              type="button"
+              onClick={() => {
+                onAllSelect();
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors",
+                isAll
+                  ? "bg-white/10 text-white"
+                  : "text-white/70 hover:bg-white/5 hover:text-white",
+              )}
+            >
+              <span className="inline-flex size-7 items-center justify-center rounded-md bg-white/10 text-[11px] font-bold text-white/60">
+                All
+              </span>
+              <span className="text-sm font-medium">All Branches</span>
+              {isAll && (
+                <span className="ml-auto size-1.5 rounded-full bg-emerald-400" />
+              )}
+            </button>
+          )}
+          {canSeeAll && branches.length > 0 && (
+            <div className="mx-3 border-t border-white/5" />
+          )}
+          <div className="max-h-56 overflow-y-auto py-1">
+            {branches.map((b) => {
+              const isActive = activeBranch?.id === b.id;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(b);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors",
+                    isActive
+                      ? "bg-white/10 text-white"
+                      : "text-white/70 hover:bg-white/5 hover:text-white",
+                  )}
+                >
+                  <span className="inline-flex size-7 items-center justify-center rounded-md bg-white/10 text-[10px] font-bold text-white/60">
+                    {b.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="truncate text-sm font-medium">{b.name}</span>
+                  {isActive && (
+                    <span className="ml-auto size-1.5 rounded-full bg-emerald-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {branches.length === 0 && !isLoading && (
+            <p className="px-4 py-3 text-center text-xs text-white/40">
+              No branches available
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 const COLLAPSED_KEY = "drivecare-sidebar-collapsed";
@@ -191,7 +346,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const logout = useLogout();
-  const { user, isHydrated, isSuperAdmin, hasAccess } = useAuth();
+  const { user, isHydrated, isSuperAdmin, isAdminOrAbove, hasAccess } = useAuth();
 
   // Mobile drawer state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -222,7 +377,7 @@ export default function DashboardLayout({
 
   // For non-SuperAdmin: lock activeBranch to the user's assigned branch
   useEffect(() => {
-    if (isSuperAdmin || !branchesFetched || branches.length === 0) return;
+    if (isAdminOrAbove || !branchesFetched || branches.length === 0) return;
 
     const userBranchId = user?.branchId;
     if (!userBranchId) return;
@@ -234,7 +389,7 @@ export default function DashboardLayout({
     if (userBranch) {
       setActiveBranch(userBranch);
     }
-  }, [isSuperAdmin, branchesFetched, branches, user?.branchId, activeBranch?.id, setActiveBranch]);
+  }, [isAdminOrAbove, branchesFetched, branches, user?.branchId, activeBranch?.id, setActiveBranch]);
 
   function NavTooltip({
     label,
@@ -397,51 +552,22 @@ export default function DashboardLayout({
             {/* Branch display — all users see current branch; SuperAdmin can switch */}
             {!collapsed && (
               <div className="shrink-0 px-3 pt-3">
-                <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
-                  <Building2 className="size-4 shrink-0 text-white/50" />
-                  {isSuperAdmin ? (
-                    <select
-                      aria-label="Select branch"
-                      value={activeBranch?.id ?? ""}
-                      onChange={(e) => {
-                        const found = branches.find(
-                          (b) => b.id === e.target.value,
-                        );
-                        if (found) setActiveBranch(found);
-                      }}
-                      className={cn(
-                        "flex-1 bg-transparent text-sm font-medium text-white outline-none cursor-pointer",
-                        "[&>option]:bg-[#05141F] [&>option]:text-white",
-                      )}
-                    >
-                      {branchLoading ? (
-                        <option value="">Loading…</option>
-                      ) : branches.length === 0 ? (
-                        <option value="">No branches</option>
-                      ) : (
-                        branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  ) : (
-                    <span className="flex-1 truncate text-sm font-medium text-white">
-                      {branchLoading
-                        ? "Loading…"
-                        : activeBranch?.name ?? "No branch"}
-                    </span>
-                  )}
-                  {isSuperAdmin && <ChevronDown className="size-3.5 shrink-0 text-white/40 pointer-events-none" />}
-                </div>
+                <BranchDropdown
+                  branches={branches}
+                  activeBranch={activeBranch}
+                  isLoading={branchLoading}
+                  canSwitch={isAdminOrAbove}
+                  canSeeAll={isSuperAdmin}
+                  onSelect={(b) => setActiveBranch(b)}
+                  onAllSelect={() => setActiveBranch(null as any)}
+                />
               </div>
             )}
 
             {/* Branch icon-only when collapsed */}
             {collapsed && (
               <div className="shrink-0 flex justify-center pt-3">
-                <NavTooltip label={activeBranch?.name ?? "Select branch"}>
+                <NavTooltip label={activeBranch?.name ?? "All Branches"}>
                   <span className="inline-grid size-9 place-items-center rounded-lg bg-white/10 text-white/50">
                     <Building2 className="size-4" />
                   </span>
@@ -491,32 +617,62 @@ export default function DashboardLayout({
                       >
                         {visibleItems.map(
                           ({ label, href, icon: Icon, badge }) => {
-                            const active = isActive(href);
+                            const active = href !== "/logout" && isActive(href);
+                            const isLogout = href === "/logout";
 
                             if (collapsed) {
                               return (
                                 <NavTooltip key={href} label={label}>
-                                  <Link
-                                    href={href}
-                                    onClick={() => setSidebarOpen(false)}
-                                    aria-current={active ? "page" : undefined}
-                                    aria-label={label}
-                                    className={cn(
-                                      "relative flex size-9 items-center justify-center rounded-lg transition-colors",
-                                      active
-                                        ? "bg-white/15 text-white"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white",
-                                    )}
-                                  >
-                                    <Icon className="size-[17px] shrink-0" />
-                                    {/* Badge dot when collapsed */}
-                                    {badge != null && (
-                                      <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
-                                        {badge > 9 ? "9+" : badge}
-                                      </span>
-                                    )}
-                                  </Link>
+                                  {isLogout ? (
+                                    <button
+                                      onClick={() => logout.mutate()}
+                                      disabled={logout.isPending}
+                                      aria-label={label}
+                                      className="relative flex size-9 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
+                                    >
+                                      <Icon className="size-[17px] shrink-0" />
+                                    </button>
+                                  ) : (
+                                    <Link
+                                      href={href}
+                                      onClick={() => setSidebarOpen(false)}
+                                      aria-current={active ? "page" : undefined}
+                                      aria-label={label}
+                                      className={cn(
+                                        "relative flex size-9 items-center justify-center rounded-lg transition-colors",
+                                        active
+                                          ? "bg-white/15 text-white"
+                                          : "text-white/70 hover:bg-white/10 hover:text-white",
+                                      )}
+                                    >
+                                      <Icon className="size-[17px] shrink-0" />
+                                      {badge != null && (
+                                        <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
+                                          {badge > 9 ? "9+" : badge}
+                                        </span>
+                                      )}
+                                    </Link>
+                                  )}
                                 </NavTooltip>
+                              );
+                            }
+
+                            if (isLogout) {
+                              return (
+                                <button
+                                  key={href}
+                                  onClick={() => logout.mutate()}
+                                  disabled={logout.isPending}
+                                  className={cn(
+                                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                                    "text-red-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50",
+                                  )}
+                                >
+                                  <Icon className="size-[17px] shrink-0" />
+                                  <span className="flex-1 truncate text-left">
+                                    {logout.isPending ? "Logging out…" : label}
+                                  </span>
+                                </button>
                               );
                             }
 
@@ -560,7 +716,7 @@ export default function DashboardLayout({
           </>
         )}
 
-        {/* ── User card + logout ────────────────────────────────────── */}
+        {/* ── User card ────────────────────────────────────────────── */}
         <div className="shrink-0 border-t border-white/10 p-3">
           {!isHydrated ? (
             <div
@@ -577,32 +733,17 @@ export default function DashboardLayout({
                 </div>
               )}
             </div>
-          ) : collapsed ? (
-            /* Collapsed: just avatar + logout icon stacked */
-            <div className="flex flex-col items-center gap-2">
-              <NavTooltip label={`${user?.firstName} ${user?.lastName ?? ""}`}>
-                <span className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white cursor-default">
-                  {initials}
-                </span>
-              </NavTooltip>
-              <NavTooltip label="Log out">
-                <button
-                  className="flex size-9 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
-                  onClick={() => logout.mutate()}
-                  disabled={logout.isPending}
-                  aria-label="Log out"
-                >
-                  <LogOut className="size-[17px]" />
-                </button>
-              </NavTooltip>
-            </div>
           ) : (
-            /* Expanded: full user card */
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-                <span className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white">
-                  {initials}
-                </span>
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-2 py-2",
+                collapsed && "justify-center",
+              )}
+            >
+              <span className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white">
+                {initials}
+              </span>
+              {!collapsed && (
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white">
                     {user?.firstName} {user?.lastName}
@@ -611,23 +752,13 @@ export default function DashboardLayout({
                     {user?.role ?? "Workshop Manager"}
                   </p>
                 </div>
+              )}
+              {!collapsed && (
                 <span
                   className="size-2 shrink-0 rounded-full bg-emerald-400"
                   aria-label="Online"
                 />
-              </div>
-              <button
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-                  "text-white/60 transition-colors hover:bg-white/10 hover:text-white",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-                onClick={() => logout.mutate()}
-                disabled={logout.isPending}
-              >
-                <LogOut className="size-[17px] shrink-0" />
-                {logout.isPending ? "Logging out…" : "Log out"}
-              </button>
+              )}
             </div>
           )}
         </div>
