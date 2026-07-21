@@ -4,7 +4,7 @@ import { Providers } from "@/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DriveCare | Dana Group Car Service Platform",
+  title: "Dana Motors | Car Service Platform",
   description:
     "Book car service, track repairs, approve estimates, and get pickup updates through Dana Group's DriveCare platform.",
 };

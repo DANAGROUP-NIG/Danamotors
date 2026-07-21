@@ -1,18 +1,9 @@
 "use client";
 
 import { useAuthStore } from "@/store/auth.store";
+import { type AppRole } from "../roles";
 
-// ─── Role constants ────────────────────────────────────────────────────────────
-// Normalised to lowercase. Add variants here if the API changes casing.
-
-export type AppRole =
-  | "superadmin"
-  | "admin"
-  | "manager"
-  | "technician"
-  | "receptionist"
-  | "accountant"
-  | "viewer";
+export type { AppRole };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 

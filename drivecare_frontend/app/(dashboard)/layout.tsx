@@ -31,7 +31,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/features/auth/hooks/use-logout";
-import { useAuth, type AppRole } from "@/features/auth/hooks/use-auth";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import {
+  MANAGE_ROLES,
+  WORKSHOP_ROLES,
+  FINANCE_ROLES,
+  CUSTOMER_ROLES,
+  VEHICLE_ROLES,
+  TECHNICIAN_ROLES,
+  type AppRole,
+} from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 
@@ -62,80 +71,80 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Customers",
         href: "/customers",
         icon: Users,
-        roles: ["admin", "manager", "receptionist"],
+        roles: CUSTOMER_ROLES,
       },
       {
         label: "Vehicles",
         href: "/vehicles",
         icon: Car,
-        roles: ["admin", "manager", "receptionist", "technician"],
+        roles: VEHICLE_ROLES,
       },
       {
         label: "Appointments",
         href: "/appointments",
         icon: CalendarDays,
-        roles: ["admin", "manager", "receptionist"],
+        roles: CUSTOMER_ROLES,
       },
     ],
   },
   {
     label: "Workshop",
-    roles: ["admin", "manager", "technician", "receptionist"],
+    roles: WORKSHOP_ROLES,
     items: [
       {
         label: "Job Cards",
         href: "/job-cards",
         icon: ClipboardList,
         badge: 24,
-        roles: ["admin", "manager", "technician", "receptionist"],
+        roles: WORKSHOP_ROLES,
       },
       {
         label: "Inspection",
         href: "/inspections",
         icon: ShieldCheck,
-        roles: ["admin", "manager", "technician"],
+        roles: TECHNICIAN_ROLES,
       },
       {
         label: "Repairs",
         href: "/repairs",
         icon: Wrench,
-        roles: ["admin", "manager", "technician"],
+        roles: TECHNICIAN_ROLES,
       },
       {
         label: "Technicians",
         href: "/technicians",
         icon: UserCog,
-        roles: ["admin", "manager"],
+        roles: MANAGE_ROLES,
       },
     ],
   },
   {
     label: "Operations",
-    roles: ["admin", "manager", "accountant"],
+    roles: FINANCE_ROLES,
     items: [
       {
         label: "Inventory",
         href: "/inventory",
         icon: Package,
-        roles: ["admin", "manager"],
+        roles: MANAGE_ROLES,
       },
       {
         label: "Purchasing",
         href: "/purchasing",
         icon: ReceiptText,
-        roles: ["admin", "manager", "accountant"],
+        roles: FINANCE_ROLES,
       },
       {
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        roles: ["admin", "manager", "accountant"],
+        roles: FINANCE_ROLES,
       },
       {
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        roles: ["admin", "manager", "accountant"],
+        roles: FINANCE_ROLES,
       },
     ],
   },
@@ -146,7 +155,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Settings",
         href: "/settings",
         icon: Settings,
-        roles: ["admin", "manager"],
+        roles: MANAGE_ROLES,
       },
       {
         label: "Log out",
@@ -163,25 +172,25 @@ const BOTTOM_NAV: NavItem[] = [
     label: "Vehicles",
     href: "/vehicles",
     icon: Car,
-    roles: ["admin", "manager", "receptionist", "technician"],
+    roles: VEHICLE_ROLES,
   },
   {
     label: "Book",
     href: "/appointments",
     icon: CalendarDays,
-    roles: ["admin", "manager", "receptionist"],
+    roles: CUSTOMER_ROLES,
   },
   {
     label: "Jobs",
     href: "/job-cards",
     icon: Bell,
-    roles: ["admin", "manager", "technician", "receptionist"],
+    roles: WORKSHOP_ROLES,
   },
   {
     label: "Settings",
     href: "/settings",
     icon: Settings,
-    roles: ["admin", "manager"],
+    roles: MANAGE_ROLES,
   },
 ];
 

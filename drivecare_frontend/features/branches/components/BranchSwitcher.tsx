@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Building2, ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBranchStore } from "@/store/branch.store";
-import { useFetchBranches } from "./hooks/useFetchBranches";
+import { useFetchBranches } from "../hooks/useFetchBranches";
 
 export default function BranchSwitcher({
   enabled = true,

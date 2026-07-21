@@ -23,14 +23,9 @@ import {
   Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth, type AppRole } from "@/features/auth/hooks/use-auth";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { FINANCE_ROLES, WORKSHOP_ROLES, MANAGE_ROLES } from "@/features/auth/roles";
 import { useDashboardStats } from "@/features/dashboard/hooks/useDashboardStats";
-
-// ─── Role-access matrix ───────────────────────────────────────────────────────
-
-const FINANCE_ROLES: AppRole[] = ["admin", "manager", "accountant"];
-const WORKSHOP_ROLES: AppRole[] = ["admin", "manager", "technician", "receptionist"];
-const MANAGE_ROLES: AppRole[] = ["admin", "manager"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,8 +190,8 @@ export default function DashboardPage() {
   const canSeeFinance = hasAccess(FINANCE_ROLES);
   const canSeeWorkshop = hasAccess(WORKSHOP_ROLES);
   const canManage = hasAccess(MANAGE_ROLES);
-  const canSeeInventory = hasAccess(["admin", "manager"]);
-  const canCreateJob = hasAccess(["admin", "manager", "technician", "receptionist"]);
+  const canSeeInventory = hasAccess(MANAGE_ROLES);
+  const canCreateJob = hasAccess(WORKSHOP_ROLES);
 
   const kpiCount = [
     canSeeFinance,
