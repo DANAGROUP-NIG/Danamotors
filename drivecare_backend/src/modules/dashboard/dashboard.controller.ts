@@ -11,7 +11,8 @@ export class DashboardController {
   getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { branchId } = req.query as { branchId?: string };
-      const result = await this.dashboardService.getStats(branchId);
+      const userId = req.user!.userId;
+      const result = await this.dashboardService.getStats(branchId, userId);
       res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);

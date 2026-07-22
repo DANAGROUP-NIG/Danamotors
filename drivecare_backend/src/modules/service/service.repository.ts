@@ -20,21 +20,53 @@ export class ServiceRepository {
     return prisma.serviceAppointment.create({ data });
   }
 
-  async listAppointments() {
-    return prisma.serviceAppointment.findMany({
-      include: {
-        customer: {
-          select: {
-            id: true,
-            user: { select: { email: true, firstName: true, lastName: true } },
+  async listAppointments(params: {
+    skip: number;
+    take: number;
+    search?: string;
+    branchId?: string;
+    status?: string;
+  }) {
+    const where: Record<string, unknown> = {};
+
+    if (params.branchId) {
+      where.branchId = params.branchId;
+    }
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { notes: { contains: params.search, mode: 'insensitive' } },
+        { customer: { user: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+        { customer: { user: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const [appointments, total] = await Promise.all([
+      prisma.serviceAppointment.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              user: { select: { email: true, firstName: true, lastName: true } },
+            },
           },
+          vehicle: true,
+          branch: { select: { id: true, name: true } },
+          jobCards: true,
         },
-        vehicle: true,
-        branch: true,
-        jobCards: true,
-      },
-      orderBy: { scheduledAt: 'desc' },
-    });
+        orderBy: { scheduledAt: 'desc' },
+      }),
+      prisma.serviceAppointment.count({ where }),
+    ]);
+
+    return { appointments, total };
   }
 
   async findAppointmentById(id: string) {
@@ -61,6 +93,10 @@ export class ServiceRepository {
     });
   }
 
+  async deleteAppointment(id: string): Promise<void> {
+    await prisma.serviceAppointment.delete({ where: { id } });
+  }
+
   async createJobCard(data: {
     appointmentId?: string;
     customerId?: string;
@@ -76,8 +112,17 @@ export class ServiceRepository {
     return prisma.jobCard.create({ data });
   }
 
-  async listJobCards() {
+  async listJobCards(params?: { skip?: number; take?: number; branchId?: string }) {
+    const where: Record<string, unknown> = {};
+
+    if (params?.branchId) {
+      where.branchId = params.branchId;
+    }
+
     return prisma.jobCard.findMany({
+      where,
+      skip: params?.skip,
+      take: params?.take,
       include: {
         appointment: true,
         branch: true,

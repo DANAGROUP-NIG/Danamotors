@@ -13,13 +13,17 @@ export class VehicleController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
+      const branchId = req.query.branchId as string | undefined;
 
-      const result = await this.vehicleService.listVehicles({ page, limit, search });
+      const result = await this.vehicleService.listVehicles({ page, limit, search, branchId });
 
       res.status(200).json({
         status: 'success',
         statusCode: 200,
-        ...result,
+        data: {
+          vehicles: result.vehicles,
+          meta: result.meta,
+        },
       });
     } catch (error) {
       next(error);
@@ -72,6 +76,21 @@ export class VehicleController {
         data: {
           vehicle: result,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await this.vehicleService.deleteVehicle(id);
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'Vehicle deleted successfully',
       });
     } catch (error) {
       next(error);

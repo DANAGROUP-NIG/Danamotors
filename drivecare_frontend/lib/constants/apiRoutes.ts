@@ -13,13 +13,23 @@ export const API_ROUTES = {
     base: "/customers",
     detail: (id: string) => `/customers/${id}`,
   },
+  branches: {
+    base: "/branches",
+    detail: (id: string) => `/branches/${id}`,
+  },
   vehicles: {
-    base: "/vehicle",
-    detail: (id: string) => `/vehicle/${id}`,
+    base: "/vehicles",
+    detail: (id: string) => `/vehicles/${id}`,
   },
   appointments: {
-    base: "/service",
-    detail: (id: string) => `/service/${id}`,
+    base: "/service/appointments",
+    detail: (id: string) => `/service/appointments/${id}`,
+  },
+  service: {
+    jobCards: {
+      base: "/service/job-cards",
+      detail: (id: string) => `/service/job-cards/${id}`,
+    },
   },
   workshop: {
     jobCards: {
@@ -55,12 +65,15 @@ export const API_ROUTES = {
   },
   administration: {
     users: {
-      base: "/administration/users",
-      detail: (id: string) => `/administration/users/${id}`,
+      base: "/admin/users",
+      detail: (id: string) => `/admin/users/${id}`,
     },
     roles: {
-      base: "/administration/roles",
-      detail: (id: string) => `/administration/roles/${id}`,
+      base: "/admin/roles",
+      detail: (id: string) => `/admin/roles/${id}`,
+    },
+    permissions: {
+      base: "/admin/permissions",
     },
   },
 } as const;

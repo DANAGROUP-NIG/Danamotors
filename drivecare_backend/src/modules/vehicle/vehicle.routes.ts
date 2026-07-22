@@ -21,6 +21,7 @@ router.get('/', requirePermission(PERMISSIONS.VEHICLE_READ), controller.getVehic
 router.get('/:id', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(vehicleIdParamSchema), controller.getVehicle);
 router.post('/', requirePermission(PERMISSIONS.VEHICLE_CREATE), validateRequest(createVehicleSchema), controller.createVehicle);
 router.put('/:id', requirePermission(PERMISSIONS.VEHICLE_UPDATE), validateRequest(updateVehicleSchema), controller.updateVehicle);
+router.delete('/:id', requirePermission(PERMISSIONS.VEHICLE_DELETE), validateRequest(vehicleIdParamSchema), controller.deleteVehicle);
 
 router.post('/:id/images', requirePermission(PERMISSIONS.VEHICLE_UPDATE), validateRequest(createVehicleImageSchema), controller.addVehicleImage);
 router.get('/:id/images', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(vehicleIdParamSchema), controller.getVehicleImages);

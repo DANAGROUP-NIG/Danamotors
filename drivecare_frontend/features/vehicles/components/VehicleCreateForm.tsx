@@ -41,6 +41,9 @@ export function VehicleCreateForm({ onSuccess }: VehicleCreateFormProps) {
           <Field label="Customer ID" error={errors.customerId?.message}>
             <input className={inputCls} placeholder="Customer UUID" {...register("customerId")} />
           </Field>
+          <Field label="VIN" error={errors.vin?.message}>
+            <input className={inputCls} placeholder="Vehicle Identification Number" {...register("vin")} />
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Make" error={errors.make?.message}>
               <input className={inputCls} placeholder="Toyota" {...register("make")} />
@@ -53,21 +56,27 @@ export function VehicleCreateForm({ onSuccess }: VehicleCreateFormProps) {
             <Field label="Year" error={errors.year?.message}>
               <input type="number" className={inputCls} placeholder="2020" {...register("year")} />
             </Field>
-            <Field label="License plate" error={errors.licensePlate?.message}>
-              <input className={inputCls} placeholder="LND-123AB" {...register("licensePlate")} />
+            <Field label="Trim (optional)" error={errors.trim?.message}>
+              <input className={inputCls} placeholder="SE" {...register("trim")} />
             </Field>
             <Field label="Color" error={errors.color?.message}>
               <input className={inputCls} placeholder="Silver" {...register("color")} />
             </Field>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="VIN (optional)" error={errors.vin?.message}>
-              <input className={inputCls} {...register("vin")} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Warranty Provider" error={errors.warrantyProvider?.message}>
+              <input className={inputCls} placeholder="Provider name" {...register("warrantyProvider")} />
             </Field>
-            <Field label="Mileage (km)" error={errors.mileage?.message}>
-              <input type="number" className={inputCls} placeholder="0" {...register("mileage")} />
+            <Field label="Warranty Status" error={errors.warrantyStatus?.message}>
+              <input className={inputCls} placeholder="Active" {...register("warrantyStatus")} />
+            </Field>
+            <Field label="Warranty Expires" error={errors.warrantyExpiresAt?.message}>
+              <input type="datetime-local" className={inputCls} {...register("warrantyExpiresAt")} />
             </Field>
           </div>
+          <Field label="Ownership Status" error={errors.ownershipStatus?.message}>
+            <input className={inputCls} placeholder="Owned" {...register("ownershipStatus")} />
+          </Field>
           <Button type="submit" disabled={create.isPending} className="mt-1">
             {create.isPending ? "Adding…" : "Add vehicle"}
           </Button>

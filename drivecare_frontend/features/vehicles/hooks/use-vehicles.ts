@@ -4,8 +4,9 @@ import { getVehiclesRequest } from "../api/vehicle.api";
 
 type UseVehiclesParams = {
   page?: number;
-  pageSize?: number;
-  customerId?: string;
+  limit?: number;
+  search?: string;
+  branchId?: string;
 };
 
 export function useVehicles(params?: UseVehiclesParams) {

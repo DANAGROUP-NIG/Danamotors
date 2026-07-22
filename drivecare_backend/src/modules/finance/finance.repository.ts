@@ -2,8 +2,15 @@ import prisma from '../../prisma/client';
 import { Invoice, Payment, Receipt } from '@prisma/client';
 
 export class FinanceRepository {
-  async listInvoices(): Promise<Invoice[]> {
+  async listInvoices(params?: { branchId?: string }): Promise<Invoice[]> {
+    const where: Record<string, any> = {};
+
+    if (params?.branchId) {
+      where.jobCard = { branchId: params.branchId };
+    }
+
     return prisma.invoice.findMany({
+      where,
       include: {
         customer: {
           select: {
@@ -63,8 +70,15 @@ export class FinanceRepository {
     return prisma.invoice.delete({ where: { id } });
   }
 
-  async listPayments(): Promise<Payment[]> {
+  async listPayments(params?: { branchId?: string }): Promise<Payment[]> {
+    const where: Record<string, any> = {};
+
+    if (params?.branchId) {
+      where.invoice = { jobCard: { branchId: params.branchId } };
+    }
+
     return prisma.payment.findMany({
+      where,
       include: {
         invoice: true,
         recordedBy: {
@@ -99,8 +113,15 @@ export class FinanceRepository {
     return prisma.payment.create({ data });
   }
 
-  async listReceipts(): Promise<Receipt[]> {
+  async listReceipts(params?: { branchId?: string }): Promise<Receipt[]> {
+    const where: Record<string, any> = {};
+
+    if (params?.branchId) {
+      where.invoice = { jobCard: { branchId: params.branchId } };
+    }
+
     return prisma.receipt.findMany({
+      where,
       include: {
         invoice: true,
         issuedBy: {

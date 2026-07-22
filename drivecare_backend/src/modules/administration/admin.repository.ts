@@ -7,11 +7,16 @@ export class AdminRepository {
     take: number;
     search?: string;
     roleId?: string;
+    branchId?: string;
   }): Promise<{ users: User[]; total: number }> {
     const where: Record<string, unknown> = {};
 
     if (params.roleId) {
       where.roleId = params.roleId;
+    }
+
+    if (params.branchId) {
+      where.branchId = params.branchId;
     }
 
     if (params.search) {
@@ -29,6 +34,12 @@ export class AdminRepository {
         take: params.take,
         include: {
           role: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          branch: {
             select: {
               id: true,
               name: true,
@@ -85,6 +96,10 @@ export class AdminRepository {
       where: { id },
       data,
     });
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await prisma.user.delete({ where: { id } });
   }
 
   async listRoles(): Promise<(Role & { permissionsCount: number })[]> {

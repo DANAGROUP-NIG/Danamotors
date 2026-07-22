@@ -2,22 +2,29 @@ import { z } from "zod";
 
 export const createVehicleSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  year: z.coerce
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear() + 1, "Enter a valid year"),
-  licensePlate: z.string().min(1, "License plate is required"),
-  vin: z.string().optional(),
+  vin: z.string().min(1, "VIN is required"),
+  make: z.string().optional(),
+  model: z.string().optional(),
+  year: z.coerce.number().int().optional(),
+  trim: z.string().optional(),
   color: z.string().optional(),
-  mileage: z.coerce.number().nonnegative().optional(),
+  warrantyProvider: z.string().optional(),
+  warrantyStatus: z.string().optional(),
+  warrantyExpiresAt: z.string().optional(),
+  ownershipStatus: z.string().optional(),
 });
 
-export const updateVehicleSchema = createVehicleSchema
-  .omit({ customerId: true })
-  .partial();
+export const updateVehicleSchema = z.object({
+  make: z.string().optional(),
+  model: z.string().optional(),
+  year: z.coerce.number().int().optional(),
+  trim: z.string().optional(),
+  color: z.string().optional(),
+  warrantyProvider: z.string().optional(),
+  warrantyStatus: z.string().optional(),
+  warrantyExpiresAt: z.string().optional(),
+  ownershipStatus: z.string().optional(),
+});
 
 export type CreateVehicleFormValues = z.infer<typeof createVehicleSchema>;
 export type UpdateVehicleFormValues = z.infer<typeof updateVehicleSchema>;

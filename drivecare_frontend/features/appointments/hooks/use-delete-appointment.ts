@@ -10,12 +10,12 @@ export function useDeleteAppointment() {
     mutationFn: (id: string) => deleteAppointmentRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
-      toast.success("Appointment cancelled");
+      toast.success("Appointment deleted");
     },
     onError: (error: unknown) => {
       const message =
         (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message ?? "Failed to cancel appointment";
+          ?.data?.message ?? "Failed to delete appointment";
       toast.error(message);
     },
   });

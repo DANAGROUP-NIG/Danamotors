@@ -38,3 +38,22 @@ export const requirePermission = (...requiredPermissions: string[]) => {
     next();
   };
 };
+
+/**
+ * Ensures the requesting user's branch matches the resource's branch.
+ * SuperAdmin bypasses this check.
+ * Admin must belong to the same branch as the resource.
+ */
+export function assertBranchOwnership(req: Request, resourceBranchId?: string | null): void {
+  if (!req.user) {
+    throw new UnauthorizedError();
+  }
+
+  if (req.user.role === ROLES.SUPER_ADMIN) {
+    return;
+  }
+
+  if (resourceBranchId && req.user.branchId && resourceBranchId !== req.user.branchId) {
+    throw new ForbiddenError('You can only manage resources within your own branch');
+  }
+}

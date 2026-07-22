@@ -26,6 +26,7 @@ router.post('/appointments', requirePermission(PERMISSIONS.SERVICE_CREATE), vali
 router.get('/appointments', requirePermission(PERMISSIONS.SERVICE_READ), controller.listAppointments);
 router.get('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(serviceIdParamSchema), controller.getAppointment);
 router.put('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(updateAppointmentSchema), controller.updateAppointment);
+router.delete('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_DELETE), validateRequest(serviceIdParamSchema), controller.deleteAppointment);
 
 router.post('/job-cards', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createJobCardSchema), controller.createJobCard);
 router.get('/job-cards', requirePermission(PERMISSIONS.SERVICE_READ), controller.listJobCards);

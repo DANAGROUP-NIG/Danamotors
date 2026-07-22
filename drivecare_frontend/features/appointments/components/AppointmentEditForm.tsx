@@ -5,13 +5,24 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { useUpdateAppointment } from "../hooks/use-update-appointment";
-import { updateAppointmentSchema, type UpdateAppointmentFormValues } from "../schemas/appointment.schema";
+import {
+  updateAppointmentSchema,
+  type UpdateAppointmentFormValues,
+} from "../schemas/appointment.schema";
 import type { Appointment } from "../types/appointment.types";
 
-const inputCls = "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-const selectCls = "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
+const inputCls =
+  "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="grid gap-1.5">
       <span className="text-sm font-semibold">{label}</span>
@@ -21,18 +32,16 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
-const SERVICE_TYPES = ["Routine Service", "Diagnostics", "Repair", "Inspection", "Oil Change", "Tyre Change"];
-
 const STATUS_OPTIONS = [
-  { value: "booked", label: "Booked" },
-  { value: "checked_in", label: "Checked In" },
-  { value: "inspection", label: "Inspection" },
-  { value: "awaiting_approval", label: "Awaiting Approval" },
-  { value: "in_repair", label: "In Repair" },
-  { value: "quality_check", label: "Quality Check" },
-  { value: "ready", label: "Ready" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "Pending", label: "Pending" },
+  { value: "Checked In", label: "Checked In" },
+  { value: "Inspection", label: "Inspection" },
+  { value: "Awaiting Approval", label: "Awaiting Approval" },
+  { value: "In Repair", label: "In Repair" },
+  { value: "Quality Check", label: "Quality Check" },
+  { value: "Ready", label: "Ready" },
+  { value: "Completed", label: "Completed" },
+  { value: "Cancelled", label: "Cancelled" },
 ] as const;
 
 interface AppointmentEditFormProps {
@@ -41,46 +50,73 @@ interface AppointmentEditFormProps {
   onCancel?: () => void;
 }
 
-export function AppointmentEditForm({ appointment, onSuccess, onCancel }: AppointmentEditFormProps) {
+export function AppointmentEditForm({
+  appointment,
+  onSuccess,
+  onCancel,
+}: AppointmentEditFormProps) {
   const update = useUpdateAppointment(appointment.id);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateAppointmentFormValues>({
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<UpdateAppointmentFormValues>({
     resolver: zodResolver(updateAppointmentSchema),
     defaultValues: {
-      serviceType: appointment.serviceType,
-      scheduledAt: appointment.scheduledAt.slice(0, 16), // trim to datetime-local format
+      scheduledAt: appointment.scheduledAt.slice(0, 16),
       status: appointment.status,
       notes: appointment.notes ?? "",
+      durationMins: appointment.durationMins ?? undefined,
     },
   });
 
   useEffect(() => {
     reset({
-      serviceType: appointment.serviceType,
       scheduledAt: appointment.scheduledAt.slice(0, 16),
       status: appointment.status,
       notes: appointment.notes ?? "",
+      durationMins: appointment.durationMins ?? undefined,
     });
   }, [appointment, reset]);
 
   function onSubmit(values: UpdateAppointmentFormValues) {
-    update.mutate(values, { onSuccess });
+    const payload = {
+      ...values,
+      scheduledAt: values.scheduledAt
+        ? new Date(values.scheduledAt).toISOString()
+        : undefined,
+    };
+    update.mutate(payload, { onSuccess });
   }
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Service type" error={errors.serviceType?.message}>
-          <select className={selectCls} {...register("serviceType")}>
-            {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
         <Field label="Scheduled date" error={errors.scheduledAt?.message}>
-          <input type="datetime-local" className={inputCls} {...register("scheduledAt")} />
+          <input
+            type="datetime-local"
+            className={inputCls}
+            {...register("scheduledAt")}
+          />
         </Field>
         <Field label="Status" error={errors.status?.message}>
-          <select className={selectCls} {...register("status")}>
-            {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <select className={inputCls} {...register("status")}>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
           </select>
+        </Field>
+        <Field label="Duration (minutes)" error={errors.durationMins?.message}>
+          <input
+            type="number"
+            className={inputCls}
+            placeholder="e.g. 60"
+            {...register("durationMins")}
+          />
         </Field>
       </div>
       <Field label="Notes (optional)" error={errors.notes?.message}>
@@ -94,7 +130,15 @@ export function AppointmentEditForm({ appointment, onSuccess, onCancel }: Appoin
           {update.isPending ? "Saving…" : "Save changes"}
         </Button>
         {onCancel && (
-          <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={update.isPending}>Cancel</Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={update.isPending}
+          >
+            Cancel
+          </Button>
         )}
       </div>
     </form>

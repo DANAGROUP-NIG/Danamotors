@@ -1,6 +1,7 @@
 import { apiGet } from "@/lib/api/apiClient";
 
 export interface DashboardStats {
+  // Core
   todayRevenue: number;
   revenueDelta: number;
   totalJobs: number;
@@ -13,6 +14,27 @@ export interface DashboardStats {
   revenueChart: { day: string; value: number }[];
   topTechnicians: { rank: number; name: string; jobs: number; rate: number }[];
   inventoryAlerts: number;
+  // Technician
+  myAssignedJobs: number;
+  myCompletedJobs: number;
+  myCompletionRate: number;
+  myJobsByStatus: { name: string; value: number; color: string }[];
+  // Receptionist
+  upcomingAppointments: {
+    id: string;
+    scheduledAt: string;
+    customerName: string;
+    vehicle: string;
+    branch: string;
+    status: string;
+  }[];
+  todayBookings: number;
+  pendingAppointments: number;
+  // Accountant
+  openInvoices: number;
+  overdueInvoices: number;
+  totalOutstanding: number;
+  monthlyRevenue: number;
 }
 
 export async function getDashboardStats(

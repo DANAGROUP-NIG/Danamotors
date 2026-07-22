@@ -47,8 +47,8 @@ export class FinanceService {
     });
   }
 
-  async listInvoices() {
-    return this.financeRepository.listInvoices();
+  async listInvoices(params?: { branchId?: string }) {
+    return this.financeRepository.listInvoices(params);
   }
 
   async getInvoice(id: string) {
@@ -134,8 +134,8 @@ export class FinanceService {
     return payment;
   }
 
-  async listPayments() {
-    return this.financeRepository.listPayments();
+  async listPayments(params?: { branchId?: string }) {
+    return this.financeRepository.listPayments(params);
   }
 
   async getPayment(id: string) {
@@ -174,8 +174,8 @@ export class FinanceService {
     });
   }
 
-  async listReceipts() {
-    return this.financeRepository.listReceipts();
+  async listReceipts(params?: { branchId?: string }) {
+    return this.financeRepository.listReceipts(params);
   }
 
   async getReceipt(id: string) {

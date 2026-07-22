@@ -66,7 +66,10 @@ export class BranchRepository {
     return prisma.branch.update({ where: { id }, data });
   }
 
-  async deleteBranch(id: string): Promise<Branch> {
-    return prisma.branch.delete({ where: { id } });
+  async deleteBranch(id: string): Promise<{ id: string; name: string }> {
+    const branch = await prisma.branch.findUnique({ where: { id }, select: { id: true, name: true } });
+    if (!branch) throw new Error('Branch not found');
+    await prisma.branch.delete({ where: { id } });
+    return branch;
   }
 }

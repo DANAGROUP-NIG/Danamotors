@@ -38,8 +38,31 @@ export class ServiceService {
     });
   }
 
-  async listAppointments() {
-    return this.serviceRepository.listAppointments();
+  async listAppointments(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    branchId?: string;
+    status?: string;
+  }) {
+    const skip = (params.page - 1) * params.limit;
+    const { appointments, total } = await this.serviceRepository.listAppointments({
+      skip,
+      take: params.limit,
+      search: params.search,
+      branchId: params.branchId,
+      status: params.status,
+    });
+
+    return {
+      appointments,
+      meta: {
+        total,
+        page: params.page,
+        limit: params.limit,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
   }
 
   async getAppointment(id: string) {
@@ -68,6 +91,14 @@ export class ServiceService {
       notes: data.notes,
       status: data.status,
     });
+  }
+
+  async deleteAppointment(id: string) {
+    const appointment = await this.serviceRepository.findAppointmentById(id);
+    if (!appointment) {
+      throw new NotFoundError('Appointment not found');
+    }
+    await this.serviceRepository.deleteAppointment(id);
   }
 
   async createJobCard(data: {
@@ -114,8 +145,25 @@ export class ServiceService {
     });
   }
 
-  async listJobCards() {
-    return this.serviceRepository.listJobCards();
+  async listJobCards(params?: { page?: number; limit?: number; branchId?: string }) {
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [jobCards, total] = await Promise.all([
+      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId }),
+      prisma.jobCard.count({ where: params?.branchId ? { branchId: params.branchId } : {} }),
+    ]);
+
+    return {
+      jobCards,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getJobCard(id: string) {

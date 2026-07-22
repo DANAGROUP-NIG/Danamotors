@@ -139,11 +139,11 @@ export class BranchService {
       throw new NotFoundError('Branch not found');
     }
 
-    await this.branchRepository.deleteBranch(id);
+    const deleted = await this.branchRepository.deleteBranch(id);
 
     return {
-      id: branch.id,
-      name: branch.name,
+      id: deleted.id,
+      name: deleted.name,
     };
   }
 }

@@ -1,41 +1,56 @@
 export type AppointmentStatus =
-  | "booked"
-  | "checked_in"
-  | "inspection"
-  | "awaiting_approval"
-  | "in_repair"
-  | "quality_check"
-  | "ready"
-  | "completed"
-  | "cancelled";
+  | "Pending"
+  | "Checked In"
+  | "Inspection"
+  | "Awaiting Approval"
+  | "In Repair"
+  | "Quality Check"
+  | "Ready"
+  | "Completed"
+  | "Cancelled";
 
 export type Appointment = {
   id: string;
   customerId: string;
   vehicleId: string;
-  serviceType: string;
-  status: AppointmentStatus;
+  branchId: string;
   scheduledAt: string;
+  durationMins?: number;
   notes?: string;
+  status: AppointmentStatus;
   createdAt: string;
   updatedAt: string;
+  customer?: {
+    id: string;
+    user: { email: string; firstName: string; lastName: string };
+  };
+  vehicle?: Record<string, unknown>;
+  branch?: { id: string; name: string };
+  jobCards?: unknown[];
 };
 
 export type CreateAppointmentPayload = {
   customerId: string;
   vehicleId: string;
-  serviceType: string;
+  branchName: string;
   scheduledAt: string;
+  durationMins?: number;
   notes?: string;
 };
 
-export type UpdateAppointmentPayload = Partial<CreateAppointmentPayload> & {
+export type UpdateAppointmentPayload = {
+  scheduledAt?: string;
+  durationMins?: number;
+  notes?: string;
   status?: AppointmentStatus;
 };
 
 export type AppointmentListResponse = {
-  items: Appointment[];
-  total: number;
-  page: number;
-  pageSize: number;
+  appointments: Appointment[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 };

@@ -23,6 +23,7 @@ router.get('/users', requirePermission(PERMISSIONS.USER_READ), controller.getUse
 router.get('/users/:id', requirePermission(PERMISSIONS.USER_READ), validateRequest(userIdParamSchema), controller.getUser);
 router.post('/users', requirePermission(PERMISSIONS.USER_CREATE), validateRequest(createUserSchema), controller.createUser);
 router.put('/users/:id', requirePermission(PERMISSIONS.USER_UPDATE), validateRequest(updateUserSchema), controller.updateUser);
+router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validateRequest(userIdParamSchema), controller.deleteUser);
 
 // Roles & Permissions Management
 router.get('/roles', requirePermission(PERMISSIONS.ROLE_READ), controller.getRoles);

@@ -4,7 +4,9 @@ import { getAppointmentsRequest } from "../api/appointment.api";
 
 type UseAppointmentsParams = {
   page?: number;
-  pageSize?: number;
+  limit?: number;
+  search?: string;
+  branchId?: string;
   status?: string;
 };
 

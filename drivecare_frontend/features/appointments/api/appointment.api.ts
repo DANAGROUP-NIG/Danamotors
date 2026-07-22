@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type {
   Appointment,
@@ -9,12 +9,16 @@ import type {
 
 export async function getAppointmentsRequest(params?: {
   page?: number;
-  pageSize?: number;
+  limit?: number;
+  search?: string;
+  branchId?: string;
   status?: string;
 }): Promise<AppointmentListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
-  if (params?.pageSize) query.set("pageSize", String(params.pageSize));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.search) query.set("search", params.search);
+  if (params?.branchId) query.set("branchId", params.branchId);
   if (params?.status) query.set("status", params.status);
   const qs = query.toString();
   return apiGet<AppointmentListResponse>(
@@ -24,14 +28,16 @@ export async function getAppointmentsRequest(params?: {
 
 export async function getAppointmentRequest(
   id: string,
-): Promise<Appointment> {
-  return apiGet<Appointment>(API_ROUTES.appointments.detail(id));
+): Promise<{ appointment: Appointment }> {
+  return apiGet<{ appointment: Appointment }>(
+    API_ROUTES.appointments.detail(id),
+  );
 }
 
 export async function createAppointmentRequest(
   payload: CreateAppointmentPayload,
-): Promise<Appointment> {
-  return apiPost<Appointment, CreateAppointmentPayload>(
+): Promise<{ appointment: Appointment }> {
+  return apiPost<{ appointment: Appointment }, CreateAppointmentPayload>(
     API_ROUTES.appointments.base,
     payload,
   );
@@ -40,8 +46,8 @@ export async function createAppointmentRequest(
 export async function updateAppointmentRequest(
   id: string,
   payload: UpdateAppointmentPayload,
-): Promise<Appointment> {
-  return apiPatch<Appointment, UpdateAppointmentPayload>(
+): Promise<{ appointment: Appointment }> {
+  return apiPut<{ appointment: Appointment }, UpdateAppointmentPayload>(
     API_ROUTES.appointments.detail(id),
     payload,
   );

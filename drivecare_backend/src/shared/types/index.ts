@@ -3,6 +3,7 @@ export interface JWTPayload {
   email: string;
   role: string;
   permissions: string[];
+  branchId?: string | null;
 }
 
 declare global {

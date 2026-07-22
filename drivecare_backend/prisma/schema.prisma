@@ -137,7 +137,7 @@ model ServiceAppointment {
   vehicleId     String
   vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   branchId      String
-  branch        Branch    @relation(fields: [branchId], references: [id])
+  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   scheduledAt   DateTime
   durationMins  Int?
   notes         String?
@@ -157,7 +157,7 @@ model JobCard {
   vehicleId      String?
   vehicle        Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   branchId       String
-  branch         Branch              @relation(fields: [branchId], references: [id])
+  branch         Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
   jobNumber      String              @unique
   description    String
   status         String              @default("Open")

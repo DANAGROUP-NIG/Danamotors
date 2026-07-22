@@ -14,6 +14,7 @@ export class AdminService {
     limit: number;
     search?: string;
     roleId?: string;
+    branchId?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { users, total } = await this.adminRepository.listUsers({
@@ -21,6 +22,7 @@ export class AdminService {
       take: params.limit,
       search: params.search,
       roleId: params.roleId,
+      branchId: params.branchId,
     });
 
     return {
@@ -124,6 +126,14 @@ export class AdminService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...rest } = updated as any;
     return rest;
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.adminRepository.findUserById(id);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    await this.adminRepository.deleteUser(id);
   }
 
   async getRoles() {

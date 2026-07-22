@@ -5,6 +5,8 @@ import { Pencil, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { DELETE_ROLES } from "@/features/auth/roles";
 import { useInventory } from "../hooks/use-inventory";
 import { InventoryDeleteButton } from "./InventoryDeleteButton";
 import { InventoryEditForm } from "./InventoryEditForm";
@@ -17,6 +19,8 @@ export function InventoryTable() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { hasAccess } = useAuth();
+  const canDelete = hasAccess(DELETE_ROLES);
 
   const { data, isLoading, isError, isFetching } = useInventory({
     page,
@@ -103,6 +107,7 @@ export function InventoryTable() {
                     onEdit={() => setEditingId((prev) => prev === item.id ? null : item.id)}
                     onEditSuccess={() => setEditingId(null)}
                     onEditCancel={() => setEditingId(null)}
+                    canDelete={canDelete}
                   />
                 ))
               )}
@@ -126,9 +131,9 @@ export function InventoryTable() {
   );
 }
 
-function InventoryRow({ item, isEditing, onEdit, onEditSuccess, onEditCancel }: {
+function InventoryRow({ item, isEditing, onEdit, onEditSuccess, onEditCancel, canDelete }: {
   item: InventoryItem; isEditing: boolean;
-  onEdit: () => void; onEditSuccess: () => void; onEditCancel: () => void;
+  onEdit: () => void; onEditSuccess: () => void; onEditCancel: () => void; canDelete: boolean;
 }) {
   const isLow = item.quantity <= item.reorderLevel;
 
@@ -158,7 +163,7 @@ function InventoryRow({ item, isEditing, onEdit, onEditSuccess, onEditCancel }: 
             >
               <Pencil className="size-3.5" />
             </Button>
-            <InventoryDeleteButton item={item} />
+            {canDelete && <InventoryDeleteButton item={item} />}
           </div>
         </td>
       </tr>

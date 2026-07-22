@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ServiceService } from './service.service';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import { ROLES } from '../../shared/constants/roles';
+import prisma from '../../prisma/client';
 
 export class ServiceController {
   private serviceService: ServiceService;
@@ -10,6 +13,14 @@ export class ServiceController {
 
   createAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // Admin can only create appointments in their own branch
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.branchId && req.body.branchName) {
+        const userBranch = await prisma.branch.findUnique({ where: { id: req.user.branchId } });
+        if (userBranch) {
+          req.body.branchName = userBranch.name;
+        }
+      }
+
       const result = await this.serviceService.createAppointment(req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Appointment booked successfully', data: { appointment: result } });
     } catch (error) {
@@ -17,10 +28,28 @@ export class ServiceController {
     }
   };
 
-  listAppointments = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listAppointments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.serviceService.listAppointments();
-      res.status(200).json({ status: 'success', statusCode: 200, data: { appointments: result } });
+      const page = zCoerceNumber(req.query.page, 1);
+      const limit = zCoerceNumber(req.query.limit, 10);
+      const search = req.query.search as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+      const status = req.query.status as string | undefined;
+
+      // Only SuperAdmin can see all branches; admin and everyone else are locked to their branch
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
+
+      const result = await this.serviceService.listAppointments({
+        page,
+        limit,
+        search,
+        branchId,
+        status,
+      });
+
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
@@ -39,8 +68,22 @@ export class ServiceController {
   updateAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const appointment = await this.serviceService.getAppointment(id);
+      assertBranchOwnership(req, (appointment as any).branchId);
       const result = await this.serviceService.updateAppointment(id, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Appointment updated successfully', data: { appointment: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const appointment = await this.serviceService.getAppointment(id);
+      assertBranchOwnership(req, (appointment as any).branchId);
+      await this.serviceService.deleteAppointment(id);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Appointment deleted successfully' });
     } catch (error) {
       next(error);
     }
@@ -55,10 +98,18 @@ export class ServiceController {
     }
   };
 
-  listJobCards = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listJobCards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.serviceService.listJobCards();
-      res.status(200).json({ status: 'success', statusCode: 200, data: { jobCards: result } });
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 50;
+      let branchId = req.query.branchId as string | undefined;
+
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
+
+      const result = await this.serviceService.listJobCards({ page, limit, branchId });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
@@ -123,6 +174,12 @@ export class ServiceController {
       next(error);
     }
   };
+}
+
+function zCoerceNumber(val: any, fallback: number): number {
+  if (val === undefined || val === null) return fallback;
+  const num = Number(val);
+  return isNaN(num) ? fallback : num;
 }
 
 export default ServiceController;

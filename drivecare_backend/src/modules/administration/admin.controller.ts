@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { AdminService } from './admin.service';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import { ROLES } from '../../shared/constants/roles';
+import prisma from '../../prisma/client';
 
 export class AdminController {
   private adminService: AdminService;
@@ -14,18 +17,25 @@ export class AdminController {
       const limit = zCoerceNumber(req.query.limit, 10);
       const search = req.query.search as string | undefined;
       const roleId = req.query.roleId as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+
+      // Only SuperAdmin can see all branches; admin and everyone else are locked to their branch
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
 
       const result = await this.adminService.getUsers({
         page,
         limit,
         search,
         roleId,
+        branchId,
       });
 
       res.status(200).json({
         status: 'success',
         statusCode: 200,
-        ...result,
+        data: result,
       });
     } catch (error) {
       next(error);
@@ -52,6 +62,14 @@ export class AdminController {
   createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, password, firstName, lastName, phoneNumber, roleId, branchName } = req.body;
+
+      // Admin can only create users in their own branch — override branchName with their branch
+      let enforcedBranchName = branchName;
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.branchId) {
+        const userBranch = await prisma.branch.findUnique({ where: { id: req.user.branchId } });
+        enforcedBranchName = userBranch?.name ?? branchName;
+      }
+
       const result = await this.adminService.createUser({
         email,
         passwordHash: password,
@@ -59,7 +77,7 @@ export class AdminController {
         lastName,
         phoneNumber,
         roleId,
-        branchName,
+        branchName: enforcedBranchName,
       });
 
       res.status(201).json({
@@ -79,6 +97,10 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { firstName, lastName, phoneNumber, roleId, isActive } = req.body;
+
+      const existingUser = await this.adminService.getUser(id);
+      assertBranchOwnership(req, (existingUser as any).branchId);
+
       const result = await this.adminService.updateUser(id, {
         firstName,
         lastName,
@@ -94,6 +116,25 @@ export class AdminController {
         data: {
           user: result,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+
+      const existingUser = await this.adminService.getUser(id);
+      assertBranchOwnership(req, (existingUser as any).branchId);
+
+      await this.adminService.deleteUser(id);
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'User deleted successfully',
       });
     } catch (error) {
       next(error);

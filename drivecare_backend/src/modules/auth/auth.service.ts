@@ -23,6 +23,7 @@ export class AuthService {
     email: string;
     role: string;
     permissions: string[];
+    branchId?: string | null;
   }): string {
     return jwt.sign(payload, config.JWT_SECRET, {
       expiresIn: config.JWT_ACCESS_EXPIRATION as any,
@@ -103,6 +104,7 @@ export class AuthService {
       email: newUser.email,
       role: newUser.role.name,
       permissions,
+      branchId: newUser.branchId ?? null,
     };
 
     const accessToken = this.generateAccessToken(jwtPayload);
@@ -169,6 +171,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       permissions,
+      branchId: user.branchId ?? null,
     };
 
     const accessToken = this.generateAccessToken(jwtPayload);
@@ -231,6 +234,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       permissions,
+      branchId: user.branchId ?? null,
     };
 
     const accessToken = this.generateAccessToken(jwtPayload);

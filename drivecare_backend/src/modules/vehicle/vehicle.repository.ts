@@ -2,7 +2,7 @@ import prisma from '../../prisma/client';
 import { Prisma, Vehicle, VehicleImage, VehicleOwnership } from '@prisma/client';
 
 export class VehicleRepository {
-  async listVehicles(params: { skip: number; take: number; search?: string }) {
+  async listVehicles(params: { skip: number; take: number; search?: string; branchId?: string }) {
     const where: Record<string, any> = {};
 
     if (params.search) {
@@ -12,6 +12,15 @@ export class VehicleRepository {
         { model: { contains: params.search, mode: 'insensitive' } },
         { color: { contains: params.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (params.branchId) {
+      where.customer = {
+        OR: [
+          { jobCards: { some: { branchId: params.branchId } } },
+          { appointments: { some: { branchId: params.branchId } } },
+        ],
+      };
     }
 
     const [vehicles, total] = await Promise.all([
@@ -81,6 +90,10 @@ export class VehicleRepository {
       where: { id },
       data,
     });
+  }
+
+  async deleteVehicle(id: string): Promise<void> {
+    await prisma.vehicle.delete({ where: { id } });
   }
 
   async addImage(data: {

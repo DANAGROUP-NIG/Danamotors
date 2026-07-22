@@ -1,4 +1,21 @@
 -- CreateTable
+CREATE TABLE "public"."Branch" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "address" TEXT,
+    "city" TEXT,
+    "state" TEXT,
+    "country" TEXT,
+    "phoneNumber" TEXT,
+    "email" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Branch_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -10,6 +27,7 @@ CREATE TABLE "public"."User" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "roleId" TEXT NOT NULL,
+    "branchId" TEXT,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -90,6 +108,7 @@ CREATE TABLE "public"."ServiceAppointment" (
     "id" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
     "vehicleId" TEXT NOT NULL,
+    "branchId" TEXT NOT NULL,
     "scheduledAt" TIMESTAMP(3) NOT NULL,
     "durationMins" INTEGER,
     "notes" TEXT,
@@ -106,6 +125,7 @@ CREATE TABLE "public"."JobCard" (
     "appointmentId" TEXT,
     "customerId" TEXT,
     "vehicleId" TEXT,
+    "branchId" TEXT NOT NULL,
     "jobNumber" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'Open',
@@ -351,6 +371,9 @@ CREATE TABLE "public"."ServiceHistory" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Branch_name_key" ON "public"."Branch"("name");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
 
 -- CreateIndex
@@ -381,6 +404,9 @@ CREATE UNIQUE INDEX "Invoice_invoiceNumber_key" ON "public"."Invoice"("invoiceNu
 ALTER TABLE "public"."User" ADD CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."User" ADD CONSTRAINT "User_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "public"."Branch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."RolePermission" ADD CONSTRAINT "RolePermission_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."Role"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -402,6 +428,9 @@ ALTER TABLE "public"."ServiceAppointment" ADD CONSTRAINT "ServiceAppointment_cus
 ALTER TABLE "public"."ServiceAppointment" ADD CONSTRAINT "ServiceAppointment_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "public"."Vehicle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."ServiceAppointment" ADD CONSTRAINT "ServiceAppointment_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "public"."Branch"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."JobCard" ADD CONSTRAINT "JobCard_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "public"."ServiceAppointment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -409,6 +438,9 @@ ALTER TABLE "public"."JobCard" ADD CONSTRAINT "JobCard_customerId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "public"."JobCard" ADD CONSTRAINT "JobCard_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "public"."Vehicle"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."JobCard" ADD CONSTRAINT "JobCard_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "public"."Branch"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."JobCard" ADD CONSTRAINT "JobCard_qualityInspectorId_fkey" FOREIGN KEY ("qualityInspectorId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

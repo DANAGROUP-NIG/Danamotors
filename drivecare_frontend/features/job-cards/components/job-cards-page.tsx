@@ -1,31 +1,25 @@
 "use client";
 
 import { PageHeader } from "@/components/page-header";
+import { useBranchStore } from "@/store/branch.store";
+import { useJobCards } from "../hooks/use-job-cards";
+import { JobCardsTable } from "./JobCardsTable";
 
 export function JobCardsPage() {
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const { data } = useJobCards({ page: 1, limit: 1, branchId: activeBranch?.id });
+
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
         title="Job Cards"
-        description="Workshop job cards track open repair work orders."
+        description={
+          data?.meta?.total != null
+            ? `${data.meta.total} ${data.meta.total === 1 ? "job card" : "job cards"} on record`
+            : undefined
+        }
       />
-      <PlaceholderTable columns={["Job #", "Vehicle", "Technician", "Started", "Status"]}
-        message="No job cards yet. They will appear here once the workshop module is wired." />
-    </div>
-  );
-}
-
-function PlaceholderTable({ columns, message }: { columns: string[]; message: string }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-[#e8edf3] bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead className="border-b border-[#e8edf3] bg-[#f8fafc]">
-          <tr>{columns.map((c) => <th key={c} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{c}</th>)}</tr>
-        </thead>
-        <tbody>
-          <tr><td colSpan={columns.length} className="px-4 py-14 text-center text-sm text-muted-foreground">{message}</td></tr>
-        </tbody>
-      </table>
+      <JobCardsTable />
     </div>
   );
 }

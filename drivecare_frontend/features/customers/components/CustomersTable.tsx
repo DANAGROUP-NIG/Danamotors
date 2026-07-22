@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useBranchStore } from "@/store/branch.store";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { DELETE_ROLES } from "@/features/auth/roles";
 import { useCustomers } from "../hooks/use-customers";
 import { getCustomerInitials } from "../services/customer.service";
 import { CustomerDeleteButton } from "./CustomerDeleteButton";
@@ -21,6 +23,8 @@ export function CustomersTable() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
+  const { hasAccess } = useAuth();
+  const canDelete = hasAccess(DELETE_ROLES);
 
   // Reset to page 1 when branch changes
   useEffect(() => {
@@ -122,18 +126,19 @@ export function CustomersTable() {
                 </tr>
               ) : (
                 data.customers.map((customer) => (
-                  <CustomerRow
-                    key={customer.id}
-                    customer={customer}
-                    isEditing={editingId === customer.id}
-                    onEdit={() =>
-                      setEditingId((prev) =>
-                        prev === customer.id ? null : customer.id,
-                      )
-                    }
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
-                  />
+                   <CustomerRow
+                     key={customer.id}
+                     customer={customer}
+                     isEditing={editingId === customer.id}
+                     onEdit={() =>
+                       setEditingId((prev) =>
+                         prev === customer.id ? null : customer.id,
+                       )
+                     }
+                     onEditSuccess={() => setEditingId(null)}
+                     onEditCancel={() => setEditingId(null)}
+                     canDelete={canDelete}
+                   />
                 ))
               )}
             </tbody>
@@ -185,12 +190,14 @@ function CustomerRow({
   onEdit,
   onEditSuccess,
   onEditCancel,
+  canDelete,
 }: {
   customer: Customer;
   isEditing: boolean;
   onEdit: () => void;
   onEditSuccess: () => void;
   onEditCancel: () => void;
+  canDelete: boolean;
 }) {
   return (
     <>
@@ -234,7 +241,7 @@ function CustomerRow({
             >
               <Pencil className="size-3.5" />
             </Button>
-            <CustomerDeleteButton customer={customer} />
+            {canDelete && <CustomerDeleteButton customer={customer} />}
           </div>
         </td>
       </tr>

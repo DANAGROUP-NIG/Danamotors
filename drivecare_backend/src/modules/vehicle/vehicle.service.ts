@@ -10,12 +10,13 @@ export class VehicleService {
     this.vehicleRepository = new VehicleRepository();
   }
 
-  async listVehicles(params: { page: number; limit: number; search?: string }) {
+  async listVehicles(params: { page: number; limit: number; search?: string; branchId?: string }) {
     const skip = (params.page - 1) * params.limit;
     const { vehicles, total } = await this.vehicleRepository.listVehicles({
       skip,
       take: params.limit,
       search: params.search,
+      branchId: params.branchId,
     });
 
     return {
@@ -147,6 +148,15 @@ export class VehicleService {
       warrantyExpiresAt: data.warrantyExpiresAt ? new Date(data.warrantyExpiresAt) : undefined,
       ownershipStatus: data.ownershipStatus,
     });
+  }
+
+  async deleteVehicle(id: string) {
+    const vehicle = await this.vehicleRepository.findVehicleById(id);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle not found');
+    }
+
+    await this.vehicleRepository.deleteVehicle(id);
   }
 
   async addVehicleImage(vehicleId: string, data: { url: string; type?: string; metadata?: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput }) {

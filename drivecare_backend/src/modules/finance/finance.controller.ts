@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { FinanceService } from './finance.service';
+import { ROLES } from '../../shared/constants/roles';
 
 export class FinanceController {
   private financeService: FinanceService;
@@ -17,9 +18,13 @@ export class FinanceController {
     }
   };
 
-  listInvoices = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listInvoices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.listInvoices();
+      let branchId = req.query.branchId as string | undefined;
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
+      const result = await this.financeService.listInvoices({ branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { invoices: result } });
     } catch (error) {
       next(error);
@@ -65,9 +70,13 @@ export class FinanceController {
     }
   };
 
-  listPayments = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listPayments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.listPayments();
+      let branchId = req.query.branchId as string | undefined;
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
+      const result = await this.financeService.listPayments({ branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { payments: result } });
     } catch (error) {
       next(error);
@@ -93,9 +102,13 @@ export class FinanceController {
     }
   };
 
-  listReceipts = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listReceipts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.listReceipts();
+      let branchId = req.query.branchId as string | undefined;
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
+      const result = await this.financeService.listReceipts({ branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { receipts: result } });
     } catch (error) {
       next(error);
