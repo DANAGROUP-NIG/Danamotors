@@ -1,5 +1,5 @@
 import prisma from '../../prisma/client';
-import { Customer, CustomerDocument, ServiceHistory, Prisma, User, Role } from '@prisma/client';
+import { Customer, CustomerDocument, ServiceHistory, Prisma } from '@prisma/client';
 
 export class CustomerRepository {
   async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string }) {
@@ -7,18 +7,15 @@ export class CustomerRepository {
 
     if (params.search) {
       where.OR = [
-        { user: { email: { contains: params.search, mode: 'insensitive' } } },
-        { user: { firstName: { contains: params.search, mode: 'insensitive' } } },
-        { user: { lastName: { contains: params.search, mode: 'insensitive' } } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { firstName: { contains: params.search, mode: 'insensitive' } },
+        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { phoneNumber: { contains: params.search, mode: 'insensitive' } },
       ];
     }
 
     if (params.branchId) {
-      where.OR = [
-        ...(where.OR ?? []),
-        { jobCards: { some: { branchId: params.branchId } } },
-        { appointments: { some: { branchId: params.branchId } } },
-      ];
+      where.branchId = params.branchId;
     }
 
     const [customers, total] = await Promise.all([
@@ -26,10 +23,6 @@ export class CustomerRepository {
         where,
         skip: params.skip,
         take: params.take,
-        include: {
-          user: true,
-          documents: true,
-        },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.customer.count({ where }),
@@ -42,40 +35,17 @@ export class CustomerRepository {
     return prisma.customer.findUnique({
       where: { id },
       include: {
-        user: true,
         documents: true,
         serviceHistory: true,
       },
-    });
-  }
-
-  async findCustomerByUserId(userId: string) {
-    return prisma.customer.findUnique({
-      where: { userId },
-      include: {
-        user: true,
-        documents: true,
-        serviceHistory: true,
-      },
-    });
-  }
-
-  async createUser(data: {
-    email: string;
-    passwordHash: string;
-    firstName: string;
-    lastName: string;
-    phoneNumber?: string;
-    roleId: string;
-  }): Promise<User & { role: Role }> {
-    return prisma.user.create({
-      data,
-      include: { role: true },
     });
   }
 
   async createCustomerProfile(data: {
-    userId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber?: string;
     dateOfBirth?: Date;
     driverLicenseNumber?: string;
     address?: string;
@@ -84,6 +54,7 @@ export class CustomerRepository {
     postalCode?: string;
     country?: string;
     preferredContactMethod?: string;
+    branchId: string;
   }): Promise<Customer> {
     return prisma.customer.create({
       data,

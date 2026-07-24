@@ -1,9 +1,7 @@
-import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { CustomerRepository } from './customer.repository';
-import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
-import { ROLES } from '../../shared/constants/roles';
+import { NotFoundError, ConflictError } from '../../shared/errors/appError';
 
 export class CustomerService {
   private customerRepository: CustomerRepository;
@@ -24,10 +22,10 @@ export class CustomerService {
     return {
       customers: customers.map((customer) => ({
         id: customer.id,
-        email: customer.user.email,
-        firstName: customer.user.firstName,
-        lastName: customer.user.lastName,
-        phoneNumber: customer.user.phoneNumber,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: customer.email,
+        phoneNumber: customer.phoneNumber,
         dateOfBirth: customer.dateOfBirth,
         driverLicenseNumber: customer.driverLicenseNumber,
         address: customer.address,
@@ -36,9 +34,9 @@ export class CustomerService {
         postalCode: customer.postalCode,
         country: customer.country,
         preferredContactMethod: customer.preferredContactMethod,
+        branchId: customer.branchId,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
-        documentsCount: customer.documents.length,
       })),
       meta: {
         total,
@@ -57,13 +55,10 @@ export class CustomerService {
 
     return {
       id: customer.id,
-      user: {
-        id: customer.user.id,
-        email: customer.user.email,
-        firstName: customer.user.firstName,
-        lastName: customer.user.lastName,
-        phoneNumber: customer.user.phoneNumber,
-      },
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: customer.email,
+      phoneNumber: customer.phoneNumber,
       dateOfBirth: customer.dateOfBirth,
       driverLicenseNumber: customer.driverLicenseNumber,
       address: customer.address,
@@ -72,6 +67,7 @@ export class CustomerService {
       postalCode: customer.postalCode,
       country: customer.country,
       preferredContactMethod: customer.preferredContactMethod,
+      branchId: customer.branchId,
       documents: customer.documents,
       serviceHistory: customer.serviceHistory,
       createdAt: customer.createdAt,
@@ -80,10 +76,9 @@ export class CustomerService {
   }
 
   async createCustomer(data: {
-    email: string;
-    passwordHash: string;
     firstName: string;
     lastName: string;
+    email: string;
     phoneNumber?: string;
     dateOfBirth?: string;
     driverLicenseNumber?: string;
@@ -93,30 +88,18 @@ export class CustomerService {
     postalCode?: string;
     country?: string;
     preferredContactMethod?: string;
+    branchId: string;
   }) {
-    const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
-    if (existingUser) {
+    const existing = await prisma.customer.findUnique({ where: { email: data.email } });
+    if (existing) {
       throw new ConflictError('A customer with this email address already exists');
     }
 
-    const customerRole = await prisma.role.findUnique({ where: { name: ROLES.CUSTOMER } });
-    if (!customerRole) {
-      throw new BadRequestError('Customer role is not configured');
-    }
-
-    const passwordHash = await bcrypt.hash(data.passwordHash, 10);
-
-    const user = await this.customerRepository.createUser({
-      email: data.email,
-      passwordHash,
+    const customer = await this.customerRepository.createCustomerProfile({
       firstName: data.firstName,
       lastName: data.lastName,
+      email: data.email,
       phoneNumber: data.phoneNumber,
-      roleId: customerRole.id,
-    });
-
-    const customer = await this.customerRepository.createCustomerProfile({
-      userId: user.id,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
       driverLicenseNumber: data.driverLicenseNumber,
       address: data.address,
@@ -125,17 +108,15 @@ export class CustomerService {
       postalCode: data.postalCode,
       country: data.country,
       preferredContactMethod: data.preferredContactMethod,
+      branchId: data.branchId,
     });
 
     return {
       id: customer.id,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumber,
-      },
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: customer.email,
+      phoneNumber: customer.phoneNumber,
       dateOfBirth: customer.dateOfBirth,
       driverLicenseNumber: customer.driverLicenseNumber,
       address: customer.address,
@@ -144,6 +125,7 @@ export class CustomerService {
       postalCode: customer.postalCode,
       country: customer.country,
       preferredContactMethod: customer.preferredContactMethod,
+      branchId: customer.branchId,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     };
@@ -152,6 +134,7 @@ export class CustomerService {
   async updateCustomer(id: string, data: {
     firstName?: string;
     lastName?: string;
+    email?: string;
     phoneNumber?: string;
     dateOfBirth?: string;
     driverLicenseNumber?: string;
@@ -161,6 +144,7 @@ export class CustomerService {
     postalCode?: string;
     country?: string;
     preferredContactMethod?: string;
+    branchId?: string;
   }) {
     const customer = await this.customerRepository.findCustomerById(id);
     if (!customer) {
@@ -168,6 +152,10 @@ export class CustomerService {
     }
 
     const updatedCustomer = await this.customerRepository.updateCustomer(id, {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phoneNumber: data.phoneNumber,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : customer.dateOfBirth,
       driverLicenseNumber: data.driverLicenseNumber,
       address: data.address,
@@ -176,26 +164,15 @@ export class CustomerService {
       postalCode: data.postalCode,
       country: data.country,
       preferredContactMethod: data.preferredContactMethod,
-    });
-
-    await prisma.user.update({
-      where: { id: customer.userId },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phoneNumber: data.phoneNumber,
-      },
+      branchId: data.branchId,
     });
 
     return {
       id: updatedCustomer.id,
-      user: {
-        id: customer.user.id,
-        email: customer.user.email,
-        firstName: data.firstName ?? customer.user.firstName,
-        lastName: data.lastName ?? customer.user.lastName,
-        phoneNumber: data.phoneNumber ?? customer.user.phoneNumber,
-      },
+      firstName: updatedCustomer.firstName,
+      lastName: updatedCustomer.lastName,
+      email: updatedCustomer.email,
+      phoneNumber: updatedCustomer.phoneNumber,
       dateOfBirth: updatedCustomer.dateOfBirth,
       driverLicenseNumber: updatedCustomer.driverLicenseNumber,
       address: updatedCustomer.address,
@@ -204,6 +181,7 @@ export class CustomerService {
       postalCode: updatedCustomer.postalCode,
       country: updatedCustomer.country,
       preferredContactMethod: updatedCustomer.preferredContactMethod,
+      branchId: updatedCustomer.branchId,
       createdAt: updatedCustomer.createdAt,
       updatedAt: updatedCustomer.updatedAt,
     };

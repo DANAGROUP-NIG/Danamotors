@@ -9,9 +9,9 @@ export class WorkshopRepository {
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            email: true,
+            firstName: true,
+            lastName: true,
           },
         },
         vehicle: true,

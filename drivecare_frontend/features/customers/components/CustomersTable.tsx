@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, CUSTOMER_CREATE_ROLES } from "@/features/auth/roles";
 import { useCustomers } from "../hooks/use-customers";
 import { getCustomerInitials } from "../services/customer.service";
 import { CustomerDeleteButton } from "./CustomerDeleteButton";
@@ -25,6 +27,8 @@ export function CustomersTable() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
   const canDelete = hasAccess(DELETE_ROLES);
+  const canEdit = hasAccess(CUSTOMER_CREATE_ROLES);
+  const canManage = canEdit || canDelete;
 
   // Reset to page 1 when branch changes
   useEffect(() => {
@@ -40,6 +44,9 @@ export function CustomersTable() {
 
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const editingCustomer =
+    data?.customers?.find((c) => c.id === editingId) ?? null;
 
   function commitSearch() {
     setPage(1);
@@ -107,7 +114,7 @@ export function CustomersTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Phone</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Address</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>
+                {canManage && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -116,7 +123,7 @@ export function CustomersTable() {
               ) : !data?.customers?.length ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={canManage ? 5 : 4}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     {debouncedSearch
@@ -129,15 +136,10 @@ export function CustomersTable() {
                    <CustomerRow
                      key={customer.id}
                      customer={customer}
-                     isEditing={editingId === customer.id}
-                     onEdit={() =>
-                       setEditingId((prev) =>
-                         prev === customer.id ? null : customer.id,
-                       )
-                     }
-                     onEditSuccess={() => setEditingId(null)}
-                     onEditCancel={() => setEditingId(null)}
                      canDelete={canDelete}
+                     canEdit={canEdit}
+                     canManage={canManage}
+                     onEdit={() => setEditingId(customer.id)}
                    />
                 ))
               )}
@@ -178,6 +180,20 @@ export function CustomersTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      <ModalFame
+        isOpen={!!editingId}
+        onClose={() => setEditingId(null)}
+        title="Edit customer"
+      >
+        {editingCustomer && (
+          <CustomerEditForm
+            customer={editingCustomer}
+            onSuccess={() => setEditingId(null)}
+          />
+        )}
+      </ModalFame>
     </div>
   );
 }
@@ -186,79 +202,60 @@ export function CustomersTable() {
 
 function CustomerRow({
   customer,
-  isEditing,
-  onEdit,
-  onEditSuccess,
-  onEditCancel,
   canDelete,
+  canEdit,
+  canManage,
+  onEdit,
 }: {
   customer: Customer;
-  isEditing: boolean;
-  onEdit: () => void;
-  onEditSuccess: () => void;
-  onEditCancel: () => void;
   canDelete: boolean;
+  canEdit: boolean;
+  canManage: boolean;
+  onEdit: () => void;
 }) {
+  const router = useRouter();
   return (
-    <>
-      <tr
-        className={cn(
-          "border-t border-border transition-colors",
-          isEditing ? "bg-muted/50" : "hover:bg-muted/30",
-        )}
-      >
-        {/* Avatar + name */}
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/customers/${customer.id}`)}
+    >
+      {/* Avatar + name */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
+            {getCustomerInitials(customer)}
+          </span>
+          <span className="font-medium">
+            {customer.firstName} {customer.lastName}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{customer.email}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {customer.phoneNumber ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {customer.address ?? <span className="text-border">—</span>}
+      </td>
+      {canManage && (
         <td className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
-              {getCustomerInitials(customer)}
-            </span>
-            <span className="font-medium">
-              {customer.firstName} {customer.lastName}
-            </span>
-          </div>
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">{customer.email}</td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {customer.phoneNumber ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {customer.address ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                "h-7 w-7 p-0",
-                isEditing
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-label={`Edit ${customer.firstName} ${customer.lastName}`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
+          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                aria-label={`Edit ${customer.firstName} ${customer.lastName}`}
+                onClick={onEdit}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
             {canDelete && <CustomerDeleteButton customer={customer} />}
           </div>
         </td>
-      </tr>
-
-      {/* Inline edit row */}
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={5} className="px-4 py-4">
-            <CustomerEditForm
-              customer={customer}
-              onSuccess={onEditSuccess}
-              onCancel={onEditCancel}
-            />
-          </td>
-        </tr>
       )}
-    </>
+    </tr>
   );
 }
 

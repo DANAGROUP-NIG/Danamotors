@@ -4,41 +4,80 @@
 export type AppRole =
   | "superadmin"
   | "admin"
-  | "manager"
-  | "technician"
-  | "receptionist"
-  | "accountant"
-  | "viewer"
+  | "storemanager"
   | "workshopmanager"
-  | "serviceadvisor"
-  | "storemanager";
+  | "accountant"
+  | "serviceadviser"
+  | "technician"
+  | "receptionist";
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.
 
-export const FINANCE_ROLES: AppRole[] = ["admin", "manager", "accountant", "serviceadvisor"];
+export const FINANCE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "accountant",
+  "serviceadviser",
+];
+
 export const WORKSHOP_ROLES: AppRole[] = [
+  "superadmin",
   "admin",
-  "manager",
-  "technician",
-  "receptionist",
   "workshopmanager",
-  "serviceadvisor",
-  "storemanager",
-];
-export const MANAGE_ROLES: AppRole[] = ["admin", "manager"];
-export const CUSTOMER_ROLES: AppRole[] = ["admin", "manager", "receptionist", "serviceadvisor"];
-export const VEHICLE_ROLES: AppRole[] = [
-  "admin",
-  "manager",
-  "receptionist",
+  "serviceadviser",
   "technician",
-  "serviceadvisor",
-  "storemanager",
+  "receptionist",
 ];
-export const TECHNICIAN_ROLES: AppRole[] = ["admin", "manager", "technician", "workshopmanager"];
+
+export const MANAGE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "storemanager",
+  "workshopmanager",
+];
+
+export const CUSTOMER_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "serviceadviser",
+  "receptionist",
+];
+export const CUSTOMER_CREATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "serviceadviser",
+  "receptionist",
+];
+export const VEHICLE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+  "serviceadviser",
+  "technician",
+  "receptionist",
+];
+export const VEHICLE_CREATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+  "serviceadviser",
+  "receptionist",
+];
+export const TECHNICIAN_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+  "technician",
+];
+
 export const BRANCH_ROLES: AppRole[] = ["superadmin"];
 
 // Roles allowed to delete records (no delete for receptionist, viewer, etc.)
-export const DELETE_ROLES: AppRole[] = ["superadmin", "admin", "manager", "workshopmanager"];
+export const DELETE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "storemanager",
+  "workshopmanager",
+];

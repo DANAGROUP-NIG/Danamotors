@@ -12,6 +12,7 @@ export class ServiceRepository {
     customerId: string;
     vehicleId: string;
     branchId: string;
+    createdById?: string;
     scheduledAt: Date;
     durationMins?: number;
     notes?: string;
@@ -40,8 +41,9 @@ export class ServiceRepository {
     if (params.search) {
       where.OR = [
         { notes: { contains: params.search, mode: 'insensitive' } },
-        { customer: { user: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { customer: { user: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { email: { contains: params.search, mode: 'insensitive' } } },
       ];
     }
 
@@ -54,11 +56,21 @@ export class ServiceRepository {
           customer: {
             select: {
               id: true,
-              user: { select: { email: true, firstName: true, lastName: true } },
+              firstName: true,
+              lastName: true,
+              email: true,
             },
           },
           vehicle: true,
           branch: { select: { id: true, name: true } },
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
           jobCards: true,
         },
         orderBy: { scheduledAt: 'desc' },
@@ -76,11 +88,21 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
-            user: { select: { email: true, firstName: true, lastName: true } },
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
         vehicle: true,
         branch: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
         jobCards: true,
       },
     });
@@ -129,7 +151,9 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
-            user: { select: { email: true, firstName: true, lastName: true } },
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
         vehicle: true,
@@ -149,7 +173,9 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
-            user: { select: { email: true, firstName: true, lastName: true } },
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
         vehicle: true,

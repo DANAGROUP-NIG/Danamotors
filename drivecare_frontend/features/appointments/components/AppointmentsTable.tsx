@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DELETE_ROLES } from "@/features/auth/roles";
@@ -65,6 +67,9 @@ export function AppointmentsTable() {
 
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const editingAppointment =
+    data?.appointments?.find((a) => a.id === editingId) ?? null;
 
   function changeFilter(s: AppointmentStatus | "") {
     setStatusFilter(s);
@@ -146,13 +151,8 @@ export function AppointmentsTable() {
                   <AppointmentRow
                     key={appt.id}
                     appointment={appt}
-                    isEditing={editingId === appt.id}
-                    onEdit={() =>
-                      setEditingId((prev) => (prev === appt.id ? null : appt.id))
-                    }
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
                     canDelete={canDelete}
+                    onEdit={() => setEditingId(appt.id)}
                   />
                 ))
               )}
@@ -192,6 +192,20 @@ export function AppointmentsTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      <ModalFame
+        isOpen={!!editingId}
+        onClose={() => setEditingId(null)}
+        title="Edit appointment"
+      >
+        {editingAppointment && (
+          <AppointmentEditForm
+            appointment={editingAppointment}
+            onSuccess={() => setEditingId(null)}
+          />
+        )}
+      </ModalFame>
     </div>
   );
 }
@@ -200,93 +214,68 @@ export function AppointmentsTable() {
 
 function AppointmentRow({
   appointment,
-  isEditing,
-  onEdit,
-  onEditSuccess,
-  onEditCancel,
   canDelete,
+  onEdit,
 }: {
   appointment: Appointment;
-  isEditing: boolean;
-  onEdit: () => void;
-  onEditSuccess: () => void;
-  onEditCancel: () => void;
   canDelete: boolean;
+  onEdit: () => void;
 }) {
-  const customerName = appointment.customer?.user
-    ? `${appointment.customer.user.firstName} ${appointment.customer.user.lastName}`
+  const router = useRouter();
+  const customerName = appointment.customer
+    ? `${appointment.customer.firstName} ${appointment.customer.lastName}`
     : "—";
 
   return (
-    <>
-      <tr
-        className={cn(
-          "border-t border-border transition-colors",
-          isEditing ? "bg-muted/50" : "hover:bg-muted/30",
-        )}
-      >
-        <td className="px-4 py-3 font-medium">{customerName}</td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {appointment.vehicle
-            ? `${(appointment.vehicle as Record<string, unknown>).make ?? ""} ${(appointment.vehicle as Record<string, unknown>).model ?? ""}`
-            : "—"}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {appointment.branch?.name ?? "—"}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {new Date(appointment.scheduledAt).toLocaleString(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </td>
-        <td className="px-4 py-3">
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-1 text-xs font-semibold",
-              STATUS_COLORS[appointment.status],
-            )}
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/appointments/${appointment.id}`)}
+    >
+      <td className="px-4 py-3 font-medium">{customerName}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {appointment.vehicle
+          ? `${(appointment.vehicle as Record<string, unknown>).make ?? ""} ${(appointment.vehicle as Record<string, unknown>).model ?? ""}`
+          : "—"}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {appointment.branch?.name ?? "—"}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {new Date(appointment.scheduledAt).toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })}
+      </td>
+      <td className="px-4 py-3">
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-xs font-semibold",
+            STATUS_COLORS[appointment.status],
+          )}
+        >
+          {STATUS_LABELS[appointment.status]}
+        </span>
+      </td>
+      <td className="max-w-xs px-4 py-3 text-muted-foreground">
+        <span className="line-clamp-1">
+          {appointment.notes ?? <span className="text-border">—</span>}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Edit appointment`}
+            onClick={onEdit}
           >
-            {STATUS_LABELS[appointment.status]}
-          </span>
-        </td>
-        <td className="max-w-xs px-4 py-3 text-muted-foreground">
-          <span className="line-clamp-1">
-            {appointment.notes ?? <span className="text-border">—</span>}
-          </span>
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                "h-7 w-7 p-0",
-                isEditing
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-label={`Edit appointment`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            {canDelete && <AppointmentDeleteButton appointment={appointment} />}
-          </div>
-        </td>
-      </tr>
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={7} className="px-4 py-4">
-            <AppointmentEditForm
-              appointment={appointment}
-              onSuccess={onEditSuccess}
-              onCancel={onEditCancel}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+            <Pencil className="size-3.5" />
+          </Button>
+          {canDelete && <AppointmentDeleteButton appointment={appointment} />}
+        </div>
+      </td>
+    </tr>
   );
 }
 

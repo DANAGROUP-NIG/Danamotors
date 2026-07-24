@@ -5,6 +5,7 @@ import { Pencil, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranches } from "../hooks/use-branches";
 import { BranchEditForm } from "./BranchEditForm";
 import { BranchDeleteButton } from "./BranchDeleteButton";
@@ -26,6 +27,8 @@ export function BranchesTable() {
   const branches = data?.branches ?? [];
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
+
+  const editingBranch = branches.find((b) => b.id === editingId) ?? null;
 
   function commitSearch() {
     setPage(1);
@@ -112,14 +115,7 @@ export function BranchesTable() {
                   <BranchRow
                     key={branch.id}
                     branch={branch}
-                    isEditing={editingId === branch.id}
-                    onEdit={() =>
-                      setEditingId((prev) =>
-                        prev === branch.id ? null : branch.id,
-                      )
-                    }
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
+                    onEdit={() => setEditingId(branch.id)}
                   />
                 ))
               )}
@@ -159,90 +155,74 @@ export function BranchesTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      <ModalFame
+        isOpen={!!editingId}
+        onClose={() => setEditingId(null)}
+        title="Edit branch"
+      >
+        {editingBranch && (
+          <BranchEditForm
+            branch={editingBranch}
+            onSuccess={() => setEditingId(null)}
+          />
+        )}
+      </ModalFame>
     </div>
   );
 }
 
 function BranchRow({
   branch,
-  isEditing,
   onEdit,
-  onEditSuccess,
-  onEditCancel,
 }: {
   branch: Branch;
-  isEditing: boolean;
   onEdit: () => void;
-  onEditSuccess: () => void;
-  onEditCancel: () => void;
 }) {
   return (
-    <>
-      <tr
-        className={cn(
-          "border-t border-border transition-colors",
-          isEditing ? "bg-muted/50" : "hover:bg-muted/30",
-        )}
-      >
-        <td className="px-4 py-3 font-medium">{branch.name}</td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {branch.city ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {branch.state ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {branch.phoneNumber ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {branch.email ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">{branch.usersCount}</td>
-        <td className="px-4 py-3">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-              branch.isActive
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-red-50 text-red-700",
-            )}
+    <tr className="border-t border-border transition-colors hover:bg-muted/30">
+      <td className="px-4 py-3 font-medium">{branch.name}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {branch.city ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {branch.state ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {branch.phoneNumber ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {branch.email ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{branch.usersCount}</td>
+      <td className="px-4 py-3">
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            branch.isActive
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-700",
+          )}
+        >
+          {branch.isActive ? "Active" : "Inactive"}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Edit ${branch.name}`}
+            onClick={onEdit}
           >
-            {branch.isActive ? "Active" : "Inactive"}
-          </span>
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                "h-7 w-7 p-0",
-                isEditing
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-label={`Edit ${branch.name}`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            <BranchDeleteButton branch={branch} />
-          </div>
-        </td>
-      </tr>
-
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={8} className="px-4 py-4">
-            <BranchEditForm
-              branch={branch}
-              onSuccess={onEditSuccess}
-              onCancel={onEditCancel}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+            <Pencil className="size-3.5" />
+          </Button>
+          <BranchDeleteButton branch={branch} />
+        </div>
+      </td>
+    </tr>
   );
 }
 

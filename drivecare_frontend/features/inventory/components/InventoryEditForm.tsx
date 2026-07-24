@@ -4,31 +4,19 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateInventoryItem } from "../hooks/use-update-inventory-item";
 import { updateInventoryItemSchema, type UpdateInventoryItemFormValues } from "../schemas/inventory.schema";
 import type { InventoryItem } from "../types/inventory.types";
-
-const inputCls = "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-    </label>
-  );
-}
 
 const CATEGORIES = ["Engine", "Electrical", "Brakes", "Tyres", "Body", "Fluids", "Filters", "Suspension", "Other"];
 
 interface InventoryEditFormProps {
   item: InventoryItem;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
-export function InventoryEditForm({ item, onSuccess, onCancel }: InventoryEditFormProps) {
+export function InventoryEditForm({ item, onSuccess }: InventoryEditFormProps) {
   const update = useUpdateInventoryItem(item.id);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateInventoryItemFormValues>({
     resolver: zodResolver(updateInventoryItemSchema),
@@ -95,14 +83,9 @@ export function InventoryEditForm({ item, onSuccess, onCancel }: InventoryEditFo
       <Field label="Description (optional)" error={errors.description?.message}>
         <input className={inputCls} {...register("description")} />
       </Field>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={update.isPending}>
-          {update.isPending ? "Saving…" : "Save changes"}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={update.isPending}>Cancel</Button>
-        )}
-      </div>
+      <Button type="submit" size="sm" disabled={update.isPending}>
+        {update.isPending ? "Saving…" : "Save changes"}
+      </Button>
     </form>
   );
 }

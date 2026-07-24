@@ -76,4 +76,7 @@ export const API_ROUTES = {
       base: "/admin/permissions",
     },
   },
+  search: {
+    base: "/search",
+  },
 } as const;

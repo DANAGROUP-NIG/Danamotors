@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPut, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type {
   CreateCustomerPayload,
@@ -25,7 +25,10 @@ export async function getCustomersRequest(params?: {
 }
 
 export async function getCustomerRequest(id: string): Promise<Customer> {
-  return apiGet<Customer>(API_ROUTES.customers.detail(id));
+  const data = await apiGet<{ customer: Customer }>(
+    API_ROUTES.customers.detail(id),
+  );
+  return data.customer;
 }
 
 export async function createCustomerRequest(
@@ -41,7 +44,7 @@ export async function updateCustomerRequest(
   id: string,
   payload: UpdateCustomerPayload,
 ): Promise<Customer> {
-  return apiPatch<Customer, UpdateCustomerPayload>(
+  return apiPut<Customer, UpdateCustomerPayload>(
     API_ROUTES.customers.detail(id),
     payload,
   );

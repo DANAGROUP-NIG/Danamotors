@@ -17,6 +17,7 @@ export class ServiceService {
     durationMins?: number;
     notes?: string;
     status?: string;
+    createdById?: string;
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) throw new NotFoundError('Customer not found');
@@ -31,6 +32,7 @@ export class ServiceService {
       customerId: data.customerId,
       vehicleId: data.vehicleId,
       branchId: branch.id,
+      createdById: data.createdById,
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
       notes: data.notes,

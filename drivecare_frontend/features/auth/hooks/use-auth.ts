@@ -19,16 +19,17 @@ export function useAuth() {
   // Convenience booleans
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
-  const isManager = role === "manager";
+  const isStoreManager = role === "storemanager";
+  const isWorkshopManager = role === "workshopmanager";
+  const isAdviser = role === "serviceadviser";
   const isTechnician = role === "technician";
   const isReceptionist = role === "receptionist";
   const isAccountant = role === "accountant";
-  const isViewer = role === "viewer";
 
   // Hierarchy shorthand: "admin or above"
   const isAdminOrAbove = isSuperAdmin || isAdmin;
-  const isManagerOrAbove = isAdminOrAbove || isManager;
-
+  const isManagerOrAbove = isStoreManager || isWorkshopManager;
+  const isAdviserOrAbove = isManagerOrAbove || isAdviser;
   /**
    * hasAccess(["superadmin", "admin"])
    * Returns true when the current user's role matches ANY of the provided roles.
@@ -37,6 +38,7 @@ export function useAuth() {
   function hasAccess(allowedRoles: AppRole[]): boolean {
     if (!allowedRoles.length) return true;
     if (!role) return false;
+
     // superadmin always passes
     if (isSuperAdmin) return true;
     return allowedRoles.includes(role);
@@ -50,14 +52,14 @@ export function useAuth() {
     // individual role flags
     isSuperAdmin,
     isAdmin,
-    isManager,
     isTechnician,
     isReceptionist,
     isAccountant,
-    isViewer,
+
     // composite flags
     isAdminOrAbove,
     isManagerOrAbove,
+    isAdviserOrAbove,
     // generic checker
     hasAccess,
   };

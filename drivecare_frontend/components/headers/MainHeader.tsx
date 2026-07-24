@@ -1,22 +1,21 @@
-import { useAuth } from "@/features/auth/hooks/use-auth";
+"use client";
+
+import { useState } from "react";
 
 //components
 import HeaderSearch from "./HeaderSearch";
+import UserDropdown from "./UserDropdown";
+import FeedbackModal from "@/components/modals/FeedbackModal";
 
 //icons
-import { Menu, Search, Bell, MessageSquare, ChevronDown } from "lucide-react";
+import { Menu, Bell, MessageSquare } from "lucide-react";
 
 type mainHeaderProbs = {
   setSidebarOpen: (v: boolean) => void;
 };
 
 export default function MainHeader({ setSidebarOpen }: mainHeaderProbs) {
-  const { user, isHydrated, isSuperAdmin, isAdminOrAbove, hasAccess } =
-    useAuth();
-
-  const initials = user
-    ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
-    : "?";
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[#e8edf3] bg-white px-4 lg:px-6">
@@ -49,27 +48,23 @@ export default function MainHeader({ setSidebarOpen }: mainHeaderProbs) {
         </button>
 
         <button
+          onClick={() => setFeedbackOpen(true)}
           className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-          aria-label="Messages"
+          aria-label="Send feedback"
         >
           <MessageSquare className="size-[18px]" />
         </button>
 
         <div className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
 
-        <button
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-slate-100"
-          aria-label="Account menu"
-        >
-          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-white">
-            {initials}
-          </span>
-          <span className="hidden text-sm font-semibold text-slate-700 lg:block">
-            {user?.firstName} {user?.lastName}
-          </span>
-          <ChevronDown className="hidden size-3.5 text-slate-400 lg:block" />
-        </button>
+        <UserDropdown />
       </div>
+
+      {/* Feedback modal */}
+      <FeedbackModal
+        isOpen={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </header>
   );
 }

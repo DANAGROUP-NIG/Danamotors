@@ -13,7 +13,15 @@ export class DashboardService {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     const thirtyDaysAgo = new Date(startOfToday);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+    const dayOfWeek = startOfToday.getDay();
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYesterdayBookings = new Date(startOfToday);
+    startOfYesterdayBookings.setDate(startOfYesterdayBookings.getDate() - 1);
+    const endOfYesterdayBookings = new Date(startOfToday);
 
+    // ── Batch 1: Core job stats ────────────────────────────────────
     const [
       totalJobs,
       totalJobsYesterday,
@@ -22,36 +30,14 @@ export class DashboardService {
       completedJobs,
       completedJobsYesterday,
       jobsByStatus,
-      revenueResult,
-      revenueYesterdayResult,
-      revenueChart,
-      topTechniciansRaw,
-      inventoryAlerts,
-      // Technician-specific
-      myAssignedJobs,
-      myCompletedJobs,
-      myJobsByStatus,
-      // Receptionist-specific
-      upcomingAppointments,
-      todayBookings,
-      pendingAppointments,
-      // Accountant-specific
-      openInvoices,
-      overdueInvoices,
-      totalOutstanding,
-      monthlyRevenue,
     ] = await Promise.all([
-      // ── Core stats ──────────────────────────────────────────────
       prisma.jobCard.count({ where: jobWhere }),
-
       prisma.jobCard.count({
         where: { ...jobWhere, createdAt: { gte: startOfYesterday, lt: startOfToday } },
       }),
-
       prisma.jobCard.count({
         where: { ...jobWhere, status: 'In Progress' },
       }),
-
       prisma.jobCard.count({
         where: {
           ...jobWhere,
@@ -59,11 +45,9 @@ export class DashboardService {
           updatedAt: { gte: startOfYesterday, lt: startOfToday },
         },
       }),
-
       prisma.jobCard.count({
         where: { ...jobWhere, status: 'Closed' },
       }),
-
       prisma.jobCard.count({
         where: {
           ...jobWhere,
@@ -71,13 +55,21 @@ export class DashboardService {
           updatedAt: { gte: startOfYesterday, lt: startOfToday },
         },
       }),
-
       prisma.jobCard.groupBy({
         by: ['status'],
         where: jobWhere,
         _count: { id: true },
       }),
+    ]);
 
+    // ── Batch 2: Revenue + chart + tech + inventory ────────────────
+    const [
+      revenueResult,
+      revenueYesterdayResult,
+      revenueChart,
+      topTechniciansRaw,
+      inventoryAlerts,
+    ] = await Promise.all([
       prisma.payment.aggregate({
         where: {
           paymentDate: { gte: startOfToday },
@@ -85,7 +77,6 @@ export class DashboardService {
         },
         _sum: { amount: true },
       }),
-
       prisma.payment.aggregate({
         where: {
           paymentDate: { gte: startOfYesterday, lt: startOfToday },
@@ -93,11 +84,8 @@ export class DashboardService {
         },
         _sum: { amount: true },
       }),
-
-      // Revenue chart
-      (() => {
-        if (branchId) {
-          return prisma.$queryRaw<{ day: string; value: number }[]>`
+      branchId
+        ? prisma.$queryRaw<{ day: string; value: number }[]>`
             SELECT
               TO_CHAR(p."paymentDate", 'Dy') AS day,
               COALESCE(SUM(p."amount"), 0)::float AS value
@@ -108,24 +96,19 @@ export class DashboardService {
               AND j."branchId" = ${branchId}
             GROUP BY TO_CHAR(p."paymentDate", 'Dy'), DATE(p."paymentDate")
             ORDER BY DATE(p."paymentDate") ASC
-          `;
-        }
-        return prisma.$queryRaw<{ day: string; value: number }[]>`
-          SELECT
-            TO_CHAR(p."paymentDate", 'Dy') AS day,
-            COALESCE(SUM(p."amount"), 0)::float AS value
-          FROM "Payment" p
-          JOIN "Invoice" i ON p."invoiceId" = i."id"
-          WHERE p."paymentDate" >= ${sevenDaysAgo}
-          GROUP BY TO_CHAR(p."paymentDate", 'Dy'), DATE(p."paymentDate")
-          ORDER BY DATE(p."paymentDate") ASC
-        `;
-      })(),
-
-      // Top technicians
-      (() => {
-        if (branchId) {
-          return prisma.$queryRaw<
+          `
+        : prisma.$queryRaw<{ day: string; value: number }[]>`
+            SELECT
+              TO_CHAR(p."paymentDate", 'Dy') AS day,
+              COALESCE(SUM(p."amount"), 0)::float AS value
+            FROM "Payment" p
+            JOIN "Invoice" i ON p."invoiceId" = i."id"
+            WHERE p."paymentDate" >= ${sevenDaysAgo}
+            GROUP BY TO_CHAR(p."paymentDate", 'Dy'), DATE(p."paymentDate")
+            ORDER BY DATE(p."paymentDate") ASC
+          `,
+      branchId
+        ? prisma.$queryRaw<
             { firstName: string; lastName: string; jobCount: number; completedCount: number }[]
           >`
             SELECT
@@ -139,55 +122,49 @@ export class DashboardService {
             GROUP BY u."id", u."firstName", u."lastName"
             ORDER BY "jobCount" DESC
             LIMIT 5
-          `;
-        }
-        return prisma.$queryRaw<
-          { firstName: string; lastName: string; jobCount: number; completedCount: number }[]
-        >`
-          SELECT
-            u."firstName",
-            u."lastName",
-            COUNT(j."id")::int AS "jobCount",
-            COUNT(CASE WHEN j."status" = 'Closed' THEN 1 END)::int AS "completedCount"
-          FROM "User" u
-          JOIN "JobCard" j ON j."technicianId" = u."id"
-          GROUP BY u."id", u."firstName", u."lastName"
-          ORDER BY "jobCount" DESC
-          LIMIT 5
-        `;
-      })(),
-
-      // Inventory alerts
+          `
+        : prisma.$queryRaw<
+            { firstName: string; lastName: string; jobCount: number; completedCount: number }[]
+          >`
+            SELECT
+              u."firstName",
+              u."lastName",
+              COUNT(j."id")::int AS "jobCount",
+              COUNT(CASE WHEN j."status" = 'Closed' THEN 1 END)::int AS "completedCount"
+            FROM "User" u
+            JOIN "JobCard" j ON j."technicianId" = u."id"
+            GROUP BY u."id", u."firstName", u."lastName"
+            ORDER BY "jobCount" DESC
+            LIMIT 5
+          `,
       prisma.$queryRaw<{ count: number }[]>`
         SELECT COUNT(*)::int AS count
         FROM "SparePart"
         WHERE "minimumStock" > 0
           AND "stock" <= "minimumStock"
       `.then((r) => r[0]?.count ?? 0).catch(() => 0),
+    ]);
 
-      // ── Technician-specific ─────────────────────────────────────
+    // ── Batch 3: Technician + receptionist ──────────────────────────
+    const [
+      myAssignedJobs,
+      myCompletedJobs,
+      myJobsByStatus,
+      upcomingAppointments,
+      todayBookings,
+      pendingAppointments,
+      yesterdayBookings,
+      weekBookings,
+    ] = await Promise.all([
       userId
-        ? prisma.jobCard.count({
-            where: { technicianId: userId, ...jobWhere },
-          })
+        ? prisma.jobCard.count({ where: { technicianId: userId, ...jobWhere } })
         : Promise.resolve(0),
-
       userId
-        ? prisma.jobCard.count({
-            where: { technicianId: userId, status: 'Closed', ...jobWhere },
-          })
+        ? prisma.jobCard.count({ where: { technicianId: userId, status: 'Closed', ...jobWhere } })
         : Promise.resolve(0),
-
       userId
-        ? prisma.jobCard.groupBy({
-            by: ['status'],
-            where: { technicianId: userId, ...jobWhere },
-            _count: { id: true },
-          })
+        ? prisma.jobCard.groupBy({ by: ['status'], where: { technicianId: userId, ...jobWhere }, _count: { id: true } })
         : Promise.resolve([]),
-
-      // ── Receptionist-specific ───────────────────────────────────
-      // Upcoming appointments (from now onwards)
       prisma.serviceAppointment.findMany({
         where: {
           scheduledAt: { gte: startOfToday },
@@ -195,40 +172,70 @@ export class DashboardService {
           ...(branchId ? { branchId } : {}),
         },
         include: {
-          customer: { include: { user: { select: { firstName: true, lastName: true } } } },
+          customer: { select: { firstName: true, lastName: true } },
           vehicle: { select: { make: true, model: true, year: true } },
           branch: { select: { name: true } },
         },
         orderBy: { scheduledAt: 'asc' },
         take: 10,
       }),
-
-      // Today's bookings count
       prisma.serviceAppointment.count({
         where: {
           scheduledAt: { gte: startOfToday, lt: new Date(startOfToday.getTime() + 86400000) },
           ...(branchId ? { branchId } : {}),
         },
       }),
-
-      // Pending appointments count
+      prisma.serviceAppointment.count({
+        where: { status: 'Pending', ...(branchId ? { branchId } : {}) },
+      }),
       prisma.serviceAppointment.count({
         where: {
-          status: 'Pending',
+          scheduledAt: { gte: startOfYesterdayBookings, lt: endOfYesterdayBookings },
           ...(branchId ? { branchId } : {}),
         },
       }),
+      prisma.serviceAppointment.count({
+        where: { scheduledAt: { gte: startOfWeek }, ...(branchId ? { branchId } : {}) },
+      }),
+    ]);
 
-      // ── Accountant-specific ─────────────────────────────────────
-      // Open (Unpaid) invoices
+    // ── Batch 4: Remaining receptionist + accountant ───────────────
+    const [
+      last7DaysBookings,
+      monthBookings,
+      lastMonthBookings,
+      bookingsByStatus,
+      openInvoices,
+      overdueInvoices,
+      totalOutstanding,
+      monthlyRevenue,
+    ] = await Promise.all([
+      prisma.serviceAppointment.count({
+        where: { scheduledAt: { gte: sevenDaysAgo }, ...(branchId ? { branchId } : {}) },
+      }),
+      prisma.serviceAppointment.count({
+        where: { scheduledAt: { gte: startOfMonth }, ...(branchId ? { branchId } : {}) },
+      }),
+      prisma.serviceAppointment.count({
+        where: {
+          scheduledAt: {
+            gte: new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() - 1, 1),
+            lt: startOfMonth,
+          },
+          ...(branchId ? { branchId } : {}),
+        },
+      }),
+      prisma.serviceAppointment.groupBy({
+        by: ['status'],
+        where: { ...(branchId ? { branchId } : {}) },
+        _count: { id: true },
+      }),
       prisma.invoice.count({
         where: {
           status: { in: ['Unpaid', 'Partially Paid'] },
           ...(branchId ? { jobCard: { branchId } } : {}),
         },
       }),
-
-      // Overdue invoices
       prisma.invoice.count({
         where: {
           status: { in: ['Unpaid', 'Partially Paid'] },
@@ -236,8 +243,6 @@ export class DashboardService {
           ...(branchId ? { jobCard: { branchId } } : {}),
         },
       }),
-
-      // Total outstanding amount
       prisma.invoice.aggregate({
         where: {
           status: { in: ['Unpaid', 'Partially Paid'] },
@@ -245,8 +250,6 @@ export class DashboardService {
         },
         _sum: { total: true },
       }),
-
-      // Monthly revenue (last 30 days)
       prisma.payment.aggregate({
         where: {
           paymentDate: { gte: thirtyDaysAgo },
@@ -299,7 +302,6 @@ export class DashboardService {
       rate: t.jobCount > 0 ? Math.round((t.completedCount / t.jobCount) * 100) : 0,
     }));
 
-    // ── Format technician data ──────────────────────────────────────
     const myJobsByStatusFormatted = (myJobsByStatus as any[]).map((s: any) => ({
       name: s.status,
       value: s._count.id,
@@ -310,12 +312,11 @@ export class DashboardService {
       ? Math.round(((myCompletedJobs as number) / (myAssignedJobs as number)) * 100)
       : 0;
 
-    // ── Format receptionist data ────────────────────────────────────
     const formattedAppointments = (upcomingAppointments as any[]).map((a: any) => ({
       id: a.id,
       scheduledAt: a.scheduledAt,
-      customerName: a.customer?.user
-        ? `${a.customer.user.firstName} ${a.customer.user.lastName}`
+      customerName: a.customer
+        ? `${a.customer.firstName} ${a.customer.lastName}`
         : 'Unknown',
       vehicle: a.vehicle
         ? `${a.vehicle.year} ${a.vehicle.make} ${a.vehicle.model}`
@@ -324,12 +325,37 @@ export class DashboardService {
       status: a.status,
     }));
 
-    // ── Format accountant data ──────────────────────────────────────
+    const bookingStatusColors: Record<string, string> = {
+      'Pending': '#f59e0b',
+      'Confirmed': '#22c55e',
+      'Checked In': '#2563eb',
+      'Inspection': '#7c3aed',
+      'In Repair': '#f97316',
+      'Awaiting Approval': '#0ea5e9',
+      'Quality Check': '#8b5cf6',
+      'Ready': '#10b981',
+      'Completed': '#22c55e',
+      'Cancelled': '#ef4444',
+    };
+
+    const bookingsByStatusFormatted = (bookingsByStatus as any[]).map((s: any) => ({
+      name: s.status,
+      value: s._count.id,
+      color: bookingStatusColors[s.status] ?? '#94a3b8',
+    }));
+
+    const weekBookingsDelta = (last7DaysBookings as number) > 0
+      ? Math.round((((weekBookings as number) - (last7DaysBookings as number)) / Math.max(last7DaysBookings as number, 1)) * 100 * 10) / 10
+      : (weekBookings as number) > 0 ? 100 : 0;
+
+    const monthBookingsDelta = (lastMonthBookings as number) > 0
+      ? Math.round((((monthBookings as number) - (lastMonthBookings as number)) / (lastMonthBookings as number)) * 100 * 10) / 10
+      : (monthBookings as number) > 0 ? 100 : 0;
+
     const totalOutstandingAmount = Number((totalOutstanding as any)._sum?.total ?? 0);
     const monthlyRevenueAmount = Number((monthlyRevenue as any)._sum?.amount ?? 0);
 
     return {
-      // Core
       todayRevenue,
       revenueDelta,
       totalJobs,
@@ -342,16 +368,21 @@ export class DashboardService {
       revenueChart: revenueChartFormatted,
       topTechnicians,
       inventoryAlerts,
-      // Technician
       myAssignedJobs,
       myCompletedJobs,
       myCompletionRate,
       myJobsByStatus: myJobsByStatusFormatted,
-      // Receptionist
       upcomingAppointments: formattedAppointments,
       todayBookings,
       pendingAppointments,
-      // Accountant
+      yesterdayBookings,
+      weekBookings,
+      last7DaysBookings,
+      monthBookings,
+      lastMonthBookings,
+      weekBookingsDelta,
+      monthBookingsDelta,
+      bookingsByStatus: bookingsByStatusFormatted,
       openInvoices,
       overdueInvoices,
       totalOutstanding: totalOutstandingAmount,

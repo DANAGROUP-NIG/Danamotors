@@ -18,14 +18,23 @@ export type Appointment = {
   durationMins?: number;
   notes?: string;
   status: AppointmentStatus;
+  createdById?: string;
   createdAt: string;
   updatedAt: string;
   customer?: {
     id: string;
-    user: { email: string; firstName: string; lastName: string };
+    firstName: string;
+    lastName: string;
+    email: string;
   };
   vehicle?: Record<string, unknown>;
   branch?: { id: string; name: string };
+  createdBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   jobCards?: unknown[];
 };
 
@@ -36,6 +45,7 @@ export type CreateAppointmentPayload = {
   scheduledAt: string;
   durationMins?: number;
   notes?: string;
+  createdById?: string;
 };
 
 export type UpdateAppointmentPayload = {

@@ -8,10 +8,9 @@ export const customerIdParamSchema = z.object({
 
 export const createCustomerSchema = z.object({
   body: z.object({
-    email: z.string().email('Invalid email address'),
-    password: z.string().min(6, 'Password must be at least 6 characters long'),
     firstName: z.string().min(1, 'First name is required'),
     lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Invalid email address'),
     phoneNumber: z.string().optional(),
     dateOfBirth: z.string().datetime().optional(),
     driverLicenseNumber: z.string().optional(),
@@ -21,6 +20,7 @@ export const createCustomerSchema = z.object({
     postalCode: z.string().optional(),
     country: z.string().optional(),
     preferredContactMethod: z.string().optional(),
+    branchId: z.string().uuid('Invalid branch ID'),
   }),
 });
 
@@ -28,6 +28,7 @@ export const updateCustomerSchema = z.object({
   body: z.object({
     firstName: z.string().optional(),
     lastName: z.string().optional(),
+    email: z.string().email().optional(),
     phoneNumber: z.string().optional(),
     dateOfBirth: z.string().datetime().optional(),
     driverLicenseNumber: z.string().optional(),
@@ -37,6 +38,7 @@ export const updateCustomerSchema = z.object({
     postalCode: z.string().optional(),
     country: z.string().optional(),
     preferredContactMethod: z.string().optional(),
+    branchId: z.string().uuid('Invalid branch ID').optional(),
   }),
   params: z.object({
     id: z.string().uuid('Invalid customer ID'),

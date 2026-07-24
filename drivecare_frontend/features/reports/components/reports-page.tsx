@@ -1,14 +1,32 @@
 "use client";
 
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/headers/page-header";
 
 const REPORT_CARDS = [
-  { title: "Revenue Report",      description: "Daily, weekly, and monthly revenue breakdown." },
-  { title: "Job Completion Rate", description: "On-time job completion and technician performance." },
-  { title: "Parts Usage",         description: "Most-used parts and inventory turnover analysis." },
-  { title: "Customer Retention",  description: "Returning customer rate and visit frequency." },
-  { title: "Technician Workload", description: "Active jobs per technician and capacity utilisation." },
-  { title: "Inspection Outcomes", description: "Fault categories, approval rates, and repair conversion." },
+  {
+    title: "Revenue Report",
+    description: "Daily, weekly, and monthly revenue breakdown.",
+  },
+  {
+    title: "Job Completion Rate",
+    description: "On-time job completion and technician performance.",
+  },
+  {
+    title: "Parts Usage",
+    description: "Most-used parts and inventory turnover analysis.",
+  },
+  {
+    title: "Customer Retention",
+    description: "Returning customer rate and visit frequency.",
+  },
+  {
+    title: "Technician Workload",
+    description: "Active jobs per technician and capacity utilisation.",
+  },
+  {
+    title: "Inspection Outcomes",
+    description: "Fault categories, approval rates, and repair conversion.",
+  },
 ];
 
 export function ReportsPage() {

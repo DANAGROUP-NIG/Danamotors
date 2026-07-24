@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { VehicleService } from './vehicle.service';
+import { ROLES } from '../../shared/constants/roles';
 
 export class VehicleController {
   private vehicleService: VehicleService;
@@ -13,7 +14,11 @@ export class VehicleController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
-      const branchId = req.query.branchId as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+        branchId = req.user.branchId ?? undefined;
+      }
 
       const result = await this.vehicleService.listVehicles({ page, limit, search, branchId });
 

@@ -30,6 +30,14 @@ export interface DashboardStats {
   }[];
   todayBookings: number;
   pendingAppointments: number;
+  yesterdayBookings: number;
+  weekBookings: number;
+  last7DaysBookings: number;
+  monthBookings: number;
+  lastMonthBookings: number;
+  weekBookingsDelta: number;
+  monthBookingsDelta: number;
+  bookingsByStatus: { name: string; value: number; color: string }[];
   // Accountant
   openInvoices: number;
   overdueInvoices: number;

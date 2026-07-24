@@ -132,8 +132,8 @@ export function PaymentsTable() {
 }
 
 function PaymentRow({ payment }: { payment: Payment }) {
-  const customerName = payment.invoice?.customer?.user
-    ? `${payment.invoice.customer.user.firstName} ${payment.invoice.customer.user.lastName}`
+  const customerName = payment.invoice?.customer
+    ? `${payment.invoice.customer.firstName} ${payment.invoice.customer.lastName}`
     : "—";
 
   return (

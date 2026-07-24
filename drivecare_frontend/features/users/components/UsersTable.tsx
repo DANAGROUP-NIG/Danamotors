@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DELETE_ROLES } from "@/features/auth/roles";
@@ -48,6 +50,8 @@ export function UsersTable() {
 
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const editingUser = data?.users?.find((u) => u.id === editingId) ?? null;
 
   function commitSearch() {
     setPage(1);
@@ -151,15 +155,8 @@ export function UsersTable() {
                   <UserRow
                     key={user.id}
                     user={user}
-                    isEditing={editingId === user.id}
-                    onEdit={() =>
-                      setEditingId((prev) =>
-                        prev === user.id ? null : user.id,
-                      )
-                    }
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
                     canDelete={canDelete}
+                    onEdit={() => setEditingId(user.id)}
                   />
                 ))
               )}
@@ -200,6 +197,20 @@ export function UsersTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      <ModalFame
+        isOpen={!!editingId}
+        onClose={() => setEditingId(null)}
+        title="Edit user"
+      >
+        {editingUser && (
+          <UserEditForm
+            user={editingUser}
+            onSuccess={() => setEditingId(null)}
+          />
+        )}
+      </ModalFame>
     </div>
   );
 }
@@ -208,96 +219,69 @@ export function UsersTable() {
 
 function UserRow({
   user,
-  isEditing,
-  onEdit,
-  onEditSuccess,
-  onEditCancel,
   canDelete,
+  onEdit,
 }: {
   user: User;
-  isEditing: boolean;
-  onEdit: () => void;
-  onEditSuccess: () => void;
-  onEditCancel: () => void;
   canDelete: boolean;
+  onEdit: () => void;
 }) {
+  const router = useRouter();
   return (
-    <>
-      <tr
-        className={cn(
-          "border-t border-border transition-colors",
-          isEditing ? "bg-muted/50" : "hover:bg-muted/30",
-        )}
-      >
-        {/* Avatar + name */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
-              {getUserInitials(user)}
-            </span>
-            <span className="font-medium">
-              {user.firstName} {user.lastName}
-            </span>
-          </div>
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
-        <td className="px-4 py-3">
-          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-            {user.role?.name ?? "—"}
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/users/${user.id}`)}
+    >
+      {/* Avatar + name */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
+            {getUserInitials(user)}
           </span>
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {user.branch?.name ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">
-          {user.phoneNumber ?? <span className="text-border">—</span>}
-        </td>
-        <td className="px-4 py-3">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-              user.isActive
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-red-50 text-red-700",
-            )}
+          <span className="font-medium">
+            {user.firstName} {user.lastName}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+          {user.role?.name ?? "—"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {user.branch?.name ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {user.phoneNumber ?? <span className="text-border">—</span>}
+      </td>
+      <td className="px-4 py-3">
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            user.isActive
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-700",
+          )}
+        >
+          {user.isActive ? "Active" : "Inactive"}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Edit ${user.firstName} ${user.lastName}`}
+            onClick={onEdit}
           >
-            {user.isActive ? "Active" : "Inactive"}
-          </span>
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                "h-7 w-7 p-0",
-                isEditing
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              aria-label={`Edit ${user.firstName} ${user.lastName}`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            {canDelete && <UserDeleteButton user={user} />}
-          </div>
-        </td>
-      </tr>
-
-      {/* Inline edit row */}
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={7} className="px-4 py-4">
-            <UserEditForm
-              user={user}
-              onSuccess={onEditSuccess}
-              onCancel={onEditCancel}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+            <Pencil className="size-3.5" />
+          </Button>
+          {canDelete && <UserDeleteButton user={user} />}
+        </div>
+      </td>
+    </tr>
   );
 }
 

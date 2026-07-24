@@ -18,11 +18,9 @@ export type Payment = {
     jobCardId: string;
     customer: {
       id: string;
-      user: {
-        email: string;
-        firstName: string;
-        lastName: string;
-      };
+      firstName: string;
+      lastName: string;
+      email: string;
     };
     jobCard: {
       id: string;

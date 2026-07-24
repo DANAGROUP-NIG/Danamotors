@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 
@@ -22,6 +22,7 @@ model Branch {
   updatedAt   DateTime @updatedAt
 
   users        User[]
+  customers    Customer[]
   jobCards     JobCard[]
   appointments ServiceAppointment[]
 }
@@ -43,7 +44,7 @@ model User {
   branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   refreshTokens RefreshToken[]
   auditLogs    AuditLog[]
-  customer     Customer?     @relation()
+  createdAppointments ServiceAppointment[] @relation("ReceptionistBookings")
   technicianAssignments JobCard[] @relation("TechnicianAssignments")
   qualityInspectorAssignments JobCard[] @relation("QualityInspectorAssignments")
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
@@ -107,8 +108,10 @@ model AuditLog {
 
 model Customer {
   id                     String             @id @default(uuid())
-  userId                 String             @unique
-  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName              String
+  lastName               String
+  email                  String             @unique
+  phoneNumber            String?
   dateOfBirth            DateTime?
   driverLicenseNumber    String?
   address                String?
@@ -117,9 +120,11 @@ model Customer {
   postalCode             String?
   country                String?
   preferredContactMethod String?
+  branchId               String
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
+  branch                 Branch             @relation(fields: [branchId], references: [id])
   documents              CustomerDocument[]
   serviceHistory         ServiceHistory[]
   vehicles               Vehicle[]
@@ -138,6 +143,8 @@ model ServiceAppointment {
   vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   branchId      String
   branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdById   String?
+  createdBy     User?     @relation("ReceptionistBookings", fields: [createdById], references: [id], onDelete: SetNull)
   scheduledAt   DateTime
   durationMins  Int?
   notes         String?

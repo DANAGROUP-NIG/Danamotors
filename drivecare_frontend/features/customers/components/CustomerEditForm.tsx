@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateCustomer } from "../hooks/use-update-customer";
 import {
   updateCustomerSchema,
@@ -14,13 +15,11 @@ import type { Customer } from "../types/customer.types";
 interface CustomerEditFormProps {
   customer: Customer;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
 export function CustomerEditForm({
   customer,
   onSuccess,
-  onCancel,
 }: CustomerEditFormProps) {
   const update = useUpdateCustomer(customer.id);
 
@@ -35,18 +34,17 @@ export function CustomerEditForm({
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
-      phone: customer.phoneNumber ?? "",
+      phoneNumber: customer.phoneNumber ?? "",
       address: customer.address ?? "",
     },
   });
 
-  // Re-populate if the customer prop changes (e.g. selecting a different row)
   useEffect(() => {
     reset({
       firstName: customer.firstName,
       lastName: customer.lastName,
       email: customer.email,
-      phone: customer.phoneNumber ?? "",
+      phoneNumber: customer.phoneNumber ?? "",
       address: customer.address ?? "",
     });
   }, [customer, reset]);
@@ -70,53 +68,17 @@ export function CustomerEditForm({
         <input type="email" className={inputCls} {...register("email")} />
       </Field>
 
-      <Field label="Phone" error={errors.phone?.message}>
-        <input className={inputCls} {...register("phone")} />
+      <Field label="Phone" error={errors.phoneNumber?.message}>
+        <input className={inputCls} {...register("phoneNumber")} />
       </Field>
 
       <Field label="Address (optional)" error={errors.address?.message}>
         <input className={inputCls} {...register("address")} />
       </Field>
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={update.isPending} size="sm">
-          {update.isPending ? "Saving…" : "Save changes"}
-        </Button>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={update.isPending}
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
+      <Button type="submit" disabled={update.isPending} size="sm">
+        {update.isPending ? "Saving…" : "Save changes"}
+      </Button>
     </form>
-  );
-}
-
-// ─── shared helpers ────────────────────────────────────────────────────────────
-
-const inputCls =
-  "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-    </label>
   );
 }

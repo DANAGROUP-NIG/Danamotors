@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/headers/page-header";
 import { useBranchStore } from "@/store/branch.store";
 import { useInvoices } from "../hooks/use-invoices";
 import { InvoicesTable } from "./InvoicesTable";

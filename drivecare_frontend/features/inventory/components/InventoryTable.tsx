@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DELETE_ROLES } from "@/features/auth/roles";
 import { useInventory } from "../hooks/use-inventory";
@@ -28,6 +30,8 @@ export function InventoryTable() {
     category: categoryFilter || undefined,
   });
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1;
+
+  const editingItem = data?.items?.find((i) => i.id === editingId) ?? null;
 
   function changeCategory(c: string) { setCategoryFilter(c); setPage(1); }
 
@@ -103,11 +107,8 @@ export function InventoryTable() {
                   <InventoryRow
                     key={item.id}
                     item={item}
-                    isEditing={editingId === item.id}
-                    onEdit={() => setEditingId((prev) => prev === item.id ? null : item.id)}
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
                     canDelete={canDelete}
+                    onEdit={() => setEditingId(item.id)}
                   />
                 ))
               )}
@@ -127,54 +128,59 @@ export function InventoryTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      <ModalFame
+        isOpen={!!editingId}
+        onClose={() => setEditingId(null)}
+        title="Edit inventory item"
+      >
+        {editingItem && (
+          <InventoryEditForm item={editingItem} onSuccess={() => setEditingId(null)} />
+        )}
+      </ModalFame>
     </div>
   );
 }
 
-function InventoryRow({ item, isEditing, onEdit, onEditSuccess, onEditCancel, canDelete }: {
-  item: InventoryItem; isEditing: boolean;
-  onEdit: () => void; onEditSuccess: () => void; onEditCancel: () => void; canDelete: boolean;
+function InventoryRow({ item, canDelete, onEdit }: {
+  item: InventoryItem; canDelete: boolean; onEdit: () => void;
 }) {
+  const router = useRouter();
   const isLow = item.quantity <= item.reorderLevel;
 
   return (
-    <>
-      <tr className={cn("border-t border-border transition-colors", isEditing ? "bg-muted/50" : "hover:bg-muted/30")}>
-        <td className="px-4 py-3">
-          <p className="font-medium">{item.name}</p>
-          <p className="text-xs text-muted-foreground">{item.partNumber}</p>
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">{item.category}</td>
-        <td className="px-4 py-3">
-          <span className={cn("font-semibold", isLow ? "text-amber-600" : "text-foreground")}>
-            {item.quantity}
-          </span>
-          {isLow && <AlertTriangle className="ml-1.5 inline size-3.5 text-amber-500" />}
-        </td>
-        <td className="px-4 py-3 text-muted-foreground">{item.reorderLevel}</td>
-        <td className="px-4 py-3 text-muted-foreground">₦{item.unitCost.toLocaleString()}</td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm" variant="ghost"
-              className={cn("h-7 w-7 p-0", isEditing ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-              aria-label={`Edit ${item.name}`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            {canDelete && <InventoryDeleteButton item={item} />}
-          </div>
-        </td>
-      </tr>
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={6} className="px-4 py-4">
-            <InventoryEditForm item={item} onSuccess={onEditSuccess} onCancel={onEditCancel} />
-          </td>
-        </tr>
-      )}
-    </>
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/inventory/${item.id}`)}
+    >
+      <td className="px-4 py-3">
+        <p className="font-medium">{item.name}</p>
+        <p className="text-xs text-muted-foreground">{item.partNumber}</p>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{item.category}</td>
+      <td className="px-4 py-3">
+        <span className={cn("font-semibold", isLow ? "text-amber-600" : "text-foreground")}>
+          {item.quantity}
+        </span>
+        {isLow && <AlertTriangle className="ml-1.5 inline size-3.5 text-amber-500" />}
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{item.reorderLevel}</td>
+      <td className="px-4 py-3 text-muted-foreground">₦{item.unitCost.toLocaleString()}</td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm" variant="ghost"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Edit ${item.name}`}
+            onClick={onEdit}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+          {canDelete && <InventoryDeleteButton item={item} />}
+        </div>
+      </td>
+    </tr>
   );
 }
 

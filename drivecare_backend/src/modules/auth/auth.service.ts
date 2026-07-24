@@ -54,7 +54,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(data.passwordHash, 10);
     const userCount = await this.authRepository.countUsers();
 
-    let roleToAssign = ROLES.CUSTOMER as string;
+    let roleToAssign = ROLES.RECEPTIONIST as string;
 
     // Auto-promote first user to SuperAdmin
     if (userCount === 0) {

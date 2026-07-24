@@ -4,33 +4,13 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateAppointment } from "../hooks/use-update-appointment";
 import {
   updateAppointmentSchema,
   type UpdateAppointmentFormValues,
 } from "../schemas/appointment.schema";
 import type { Appointment } from "../types/appointment.types";
-
-const inputCls =
-  "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-    </label>
-  );
-}
 
 const STATUS_OPTIONS = [
   { value: "Pending", label: "Pending" },
@@ -47,13 +27,11 @@ const STATUS_OPTIONS = [
 interface AppointmentEditFormProps {
   appointment: Appointment;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
 export function AppointmentEditForm({
   appointment,
   onSuccess,
-  onCancel,
 }: AppointmentEditFormProps) {
   const update = useUpdateAppointment(appointment.id);
 
@@ -125,22 +103,9 @@ export function AppointmentEditForm({
           {...register("notes")}
         />
       </Field>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={update.isPending}>
-          {update.isPending ? "Saving…" : "Save changes"}
-        </Button>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={update.isPending}
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
+      <Button type="submit" size="sm" disabled={update.isPending}>
+        {update.isPending ? "Saving…" : "Save changes"}
+      </Button>
     </form>
   );
 }

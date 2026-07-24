@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -128,12 +129,16 @@ export function JobCardsTable() {
 // ─── Row ───────────────────────────────────────────────────────────────────────
 
 function JobCardRow({ jobCard }: { jobCard: JobCard }) {
+  const router = useRouter();
   const vehicleLabel = `${jobCard.vehicle.year} ${jobCard.vehicle.make} ${jobCard.vehicle.model}`;
-  const customerName = `${jobCard.customer.user.firstName} ${jobCard.customer.user.lastName}`;
+  const customerName = `${jobCard.customer.firstName} ${jobCard.customer.lastName}`;
   const statusClass = STATUS_STYLES[jobCard.status] ?? "bg-gray-100 text-gray-600";
 
   return (
-    <tr className="border-t border-border transition-colors hover:bg-muted/30">
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/job-cards/${jobCard.id}`)}
+    >
       <td className="px-4 py-3 font-medium">{jobCard.jobNumber}</td>
       <td className="px-4 py-3 text-muted-foreground">{vehicleLabel}</td>
       <td className="px-4 py-3 text-muted-foreground">{customerName}</td>

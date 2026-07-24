@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/headers/page-header";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useUsers } from "../hooks/use-users";
@@ -29,21 +30,20 @@ export function UsersPage() {
             : undefined
         }
         actions={
-          <Button
-            onClick={() => setShowForm((v) => !v)}
-            variant={showForm ? "outline" : "default"}
-            size="sm"
-          >
-            {showForm ? (
-              <><X className="size-4" />Cancel</>
-            ) : (
-              <><Plus className="size-4" />Add user</>
-            )}
+          <Button onClick={() => setShowForm(true)} size="sm">
+            <Plus className="size-4" />
+            Add user
           </Button>
         }
       />
 
-      {showForm && <UserCreateForm onSuccess={() => setShowForm(false)} />}
+      <ModalFame
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title="Add user"
+      >
+        <UserCreateForm onSuccess={() => setShowForm(false)} />
+      </ModalFame>
       <UsersTable />
     </div>
   );

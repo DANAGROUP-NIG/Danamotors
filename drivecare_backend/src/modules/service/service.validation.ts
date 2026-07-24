@@ -27,6 +27,7 @@ export const createAppointmentSchema = z.object({
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
+    createdById: z.string().uuid('Invalid user ID').optional(),
   }),
 });
 

@@ -25,7 +25,10 @@ export async function getInventoryRequest(params?: {
 export async function getInventoryItemRequest(
   id: string,
 ): Promise<InventoryItem> {
-  return apiGet<InventoryItem>(API_ROUTES.inventory.detail(id));
+  const data = await apiGet<{ sparePart: InventoryItem }>(
+    API_ROUTES.inventory.detail(id),
+  );
+  return data.sparePart;
 }
 
 export async function createInventoryItemRequest(

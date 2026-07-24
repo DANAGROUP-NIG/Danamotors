@@ -1,7 +1,8 @@
-import prisma from '../../prisma/client';
-import { User, Role, Permission } from '@prisma/client';
+import prisma from "../../prisma/client";
+import { User, Role, Permission } from "@prisma/client";
 
 export class AdminRepository {
+  // user repo
   async listUsers(params: {
     skip: number;
     take: number;
@@ -21,9 +22,9 @@ export class AdminRepository {
 
     if (params.search) {
       where.OR = [
-        { email: { contains: params.search, mode: 'insensitive' } },
-        { firstName: { contains: params.search, mode: 'insensitive' } },
-        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: "insensitive" } },
+        { firstName: { contains: params.search, mode: "insensitive" } },
+        { lastName: { contains: params.search, mode: "insensitive" } },
       ];
     }
 
@@ -46,7 +47,7 @@ export class AdminRepository {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.user.count({ where }),
     ]);
@@ -102,6 +103,7 @@ export class AdminRepository {
     await prisma.user.delete({ where: { id } });
   }
 
+  // roles repo
   async listRoles(): Promise<(Role & { permissionsCount: number })[]> {
     const roles = await prisma.role.findMany({
       include: {
@@ -135,33 +137,10 @@ export class AdminRepository {
     });
   }
 
-  async createRole(data: { name: string; description?: string }): Promise<Role> {
-    return prisma.role.create({
-      data,
-    });
-  }
-
-  async listPermissions(): Promise<Permission[]> {
-    return prisma.permission.findMany({
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  async findPermissionsByNames(names: string[]): Promise<Permission[]> {
-    return prisma.permission.findMany({
-      where: {
-        name: { in: names },
-      },
-    });
-  }
-
-  async findBranchByName(name: string) {
-    return prisma.branch.findUnique({
-      where: { name },
-    });
-  }
-
-  async updateRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+  async updateRolePermissions(
+    roleId: string,
+    permissionIds: string[],
+  ): Promise<void> {
     await prisma.$transaction([
       prisma.rolePermission.deleteMany({
         where: { roleId },
@@ -173,6 +152,37 @@ export class AdminRepository {
         })),
       }),
     ]);
+  }
+
+  async createRole(data: {
+    name: string;
+    description?: string;
+  }): Promise<Role> {
+    return prisma.role.create({
+      data,
+    });
+  }
+
+  // permission repo
+  async listPermissions(): Promise<Permission[]> {
+    return prisma.permission.findMany({
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async findPermissionsByNames(names: string[]): Promise<Permission[]> {
+    return prisma.permission.findMany({
+      where: {
+        name: { in: names },
+      },
+    });
+  }
+
+  // Branch
+  async findBranchByName(name: string) {
+    return prisma.branch.findUnique({
+      where: { name },
+    });
   }
 }
 export default AdminRepository;

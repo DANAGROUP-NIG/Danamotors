@@ -4,29 +4,17 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateVehicle } from "../hooks/use-update-vehicle";
 import { updateVehicleSchema, type UpdateVehicleFormValues } from "../schemas/vehicle.schema";
 import type { Vehicle } from "../types/vehicle.types";
 
-const inputCls = "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-    </label>
-  );
-}
-
 interface VehicleEditFormProps {
   vehicle: Vehicle;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
-export function VehicleEditForm({ vehicle, onSuccess, onCancel }: VehicleEditFormProps) {
+export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
   const update = useUpdateVehicle(vehicle.id);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateVehicleFormValues>({
     resolver: zodResolver(updateVehicleSchema),
@@ -99,16 +87,9 @@ export function VehicleEditForm({ vehicle, onSuccess, onCancel }: VehicleEditFor
       <Field label="Ownership Status" error={errors.ownershipStatus?.message}>
         <input className={inputCls} {...register("ownershipStatus")} />
       </Field>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={update.isPending}>
-          {update.isPending ? "Saving…" : "Save changes"}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={update.isPending}>
-            Cancel
-          </Button>
-        )}
-      </div>
+      <Button type="submit" size="sm" disabled={update.isPending}>
+        {update.isPending ? "Saving…" : "Save changes"}
+      </Button>
     </form>
   );
 }

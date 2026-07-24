@@ -3,14 +3,21 @@ import { toast } from "sonner";
 import { branchKeys } from "../api/branch.keys";
 import { createBranchRequest } from "../api/branch.api";
 import type { CreateBranchPayload } from "../types/branch.types";
+import { apiGet } from "@/lib/api/apiClient";
+import { useBranchStore, type Branch } from "@/store/branch.store";
 
 export function useCreateBranch() {
   const queryClient = useQueryClient();
+  const { setBranches } = useBranchStore();
 
   return useMutation({
     mutationFn: (payload: CreateBranchPayload) => createBranchRequest(payload),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: branchKeys.lists() });
+      try {
+        const data = await apiGet<{ branches: Branch[] }>("/branches");
+        setBranches(data.branches);
+      } catch {}
       toast.success("Branch created");
     },
     onError: (error: unknown) => {

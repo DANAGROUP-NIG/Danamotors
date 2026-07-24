@@ -30,11 +30,9 @@ export type JobCardBranch = {
 
 export type JobCardCustomer = {
   id: string;
-  user: {
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
+  firstName: string;
+  lastName: string;
+  email: string;
 };
 
 export type JobCardVehicle = {

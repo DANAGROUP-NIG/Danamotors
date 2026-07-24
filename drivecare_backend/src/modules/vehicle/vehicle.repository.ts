@@ -32,13 +32,9 @@ export class VehicleRepository {
           customer: {
             select: {
               id: true,
-              user: {
-                select: {
-                  email: true,
-                  firstName: true,
-                  lastName: true,
-                },
-              },
+              firstName: true,
+              lastName: true,
+              email: true,
             },
           },
           images: true,
@@ -57,8 +53,11 @@ export class VehicleRepository {
       where: { id },
       include: {
         customer: {
-          include: {
-            user: true,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
         images: true,

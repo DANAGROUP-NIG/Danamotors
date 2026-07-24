@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { ForbiddenError, UnauthorizedError } from '../shared/errors/appError';
-import { ROLES } from '../shared/constants/roles';
+import { Request, Response, NextFunction } from "express";
+import { ForbiddenError, UnauthorizedError } from "../shared/errors/appError";
+import { ROLES } from "../shared/constants/roles";
 
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -9,7 +9,9 @@ export const requireRole = (...allowedRoles: string[]) => {
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      throw new ForbiddenError('You do not have the required role to access this resource');
+      throw new ForbiddenError(
+        "You do not have the required role to access this resource",
+      );
     }
 
     next();
@@ -28,11 +30,13 @@ export const requirePermission = (...requiredPermissions: string[]) => {
     }
 
     const hasPermission = requiredPermissions.every((permission) =>
-      req.user?.permissions.includes(permission)
+      req.user?.permissions.includes(permission),
     );
 
     if (!hasPermission) {
-      throw new ForbiddenError('You do not have the required permissions to access this resource');
+      throw new ForbiddenError(
+        "You do not have the required permissions to access this resource",
+      );
     }
 
     next();
@@ -44,7 +48,10 @@ export const requirePermission = (...requiredPermissions: string[]) => {
  * SuperAdmin bypasses this check.
  * Admin must belong to the same branch as the resource.
  */
-export function assertBranchOwnership(req: Request, resourceBranchId?: string | null): void {
+export function assertBranchOwnership(
+  req: Request,
+  resourceBranchId?: string | null,
+): void {
   if (!req.user) {
     throw new UnauthorizedError();
   }
@@ -53,7 +60,13 @@ export function assertBranchOwnership(req: Request, resourceBranchId?: string | 
     return;
   }
 
-  if (resourceBranchId && req.user.branchId && resourceBranchId !== req.user.branchId) {
-    throw new ForbiddenError('You can only manage resources within your own branch');
+  if (
+    resourceBranchId &&
+    req.user.branchId &&
+    resourceBranchId !== req.user.branchId
+  ) {
+    throw new ForbiddenError(
+      "You can only manage resources within your own branch",
+    );
   }
 }

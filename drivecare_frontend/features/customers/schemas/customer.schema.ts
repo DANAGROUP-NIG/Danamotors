@@ -4,8 +4,9 @@ export const createCustomerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Enter a valid email"),
-  phone: z.string().min(7, "Enter a valid phone number"),
+  phoneNumber: z.string().optional(),
   address: z.string().optional(),
+  branchId: z.string().min(1, "Branch is required"),
 });
 
 export const updateCustomerSchema = createCustomerSchema.partial();

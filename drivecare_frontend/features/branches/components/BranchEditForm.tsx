@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateBranch } from "../hooks/use-update-branch";
 import {
   updateBranchSchema,
@@ -11,38 +12,12 @@ import {
 } from "../schemas/branch.schema";
 import type { Branch } from "../types/branch.types";
 
-const inputCls =
-  "h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-sm font-semibold">{label}</span>
-      {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
-    </label>
-  );
-}
-
 interface BranchEditFormProps {
   branch: Branch;
   onSuccess?: () => void;
-  onCancel?: () => void;
 }
 
-export function BranchEditForm({
-  branch,
-  onSuccess,
-  onCancel,
-}: BranchEditFormProps) {
+export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
   const update = useUpdateBranch(branch.id);
 
   const {
@@ -113,22 +88,9 @@ export function BranchEditForm({
         </Field>
       </div>
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={update.isPending} size="sm">
-          {update.isPending ? "Saving…" : "Save changes"}
-        </Button>
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={update.isPending}
-          >
-            Cancel
-          </Button>
-        )}
-      </div>
+      <Button type="submit" disabled={update.isPending} size="sm">
+        {update.isPending ? "Saving…" : "Save changes"}
+      </Button>
     </form>
   );
 }

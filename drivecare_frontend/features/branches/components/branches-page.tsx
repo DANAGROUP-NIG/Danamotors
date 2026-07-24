@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/headers/page-header";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranches } from "../hooks/use-branches";
 import { BranchCreateForm } from "./BranchCreateForm";
 import { BranchesTable } from "./BranchesTable";
@@ -22,21 +23,20 @@ export function BranchesPage() {
             : undefined
         }
         actions={
-          <Button
-            onClick={() => setShowForm((v) => !v)}
-            variant={showForm ? "outline" : "default"}
-            size="sm"
-          >
-            {showForm ? (
-              <><X className="size-4" />Cancel</>
-            ) : (
-              <><Plus className="size-4" />Add branch</>
-            )}
+          <Button onClick={() => setShowForm(true)} size="sm">
+            <Plus className="size-4" />
+            Add branch
           </Button>
         }
       />
 
-      {showForm && <BranchCreateForm onSuccess={() => setShowForm(false)} />}
+      <ModalFame
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title="Add branch"
+      >
+        <BranchCreateForm onSuccess={() => setShowForm(false)} />
+      </ModalFame>
       <BranchesTable />
     </div>
   );

@@ -8,3 +8,9 @@ export function cn(...inputs: ClassValue[]) {
 export function isActive(href: string, pathname: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+export const today = new Date().toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});

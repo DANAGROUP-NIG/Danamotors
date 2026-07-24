@@ -15,9 +15,9 @@ export class FinanceRepository {
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            email: true,
+            firstName: true,
+            lastName: true,
           },
         },
         jobCard: true,
@@ -35,9 +35,9 @@ export class FinanceRepository {
         customer: {
           select: {
             id: true,
-            user: {
-              select: { email: true, firstName: true, lastName: true },
-            },
+            email: true,
+            firstName: true,
+            lastName: true,
           },
         },
         jobCard: true,

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, VEHICLE_CREATE_ROLES } from "@/features/auth/roles";
 import { useVehicles } from "../hooks/use-vehicles";
 import { VehicleDeleteButton } from "./VehicleDeleteButton";
 import { VehicleEditForm } from "./VehicleEditForm";
@@ -23,6 +25,8 @@ export function VehiclesTable() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
   const canDelete = hasAccess(DELETE_ROLES);
+  const canEdit = hasAccess(VEHICLE_CREATE_ROLES);
+  const canManage = canEdit || canDelete;
 
   useEffect(() => {
     setPage(1);
@@ -32,6 +36,8 @@ export function VehiclesTable() {
   const vehicles = data?.vehicles ?? [];
   const meta = data?.meta;
   const totalPages = meta?.totalPages ?? 1;
+
+  const editingVehicle = vehicles.find((v) => v.id === editingId) ?? null;
 
   function commitSearch() { setPage(1); setCommittedSearch(search); }
   function clearSearch() { setSearch(""); setCommittedSearch(""); setPage(1); }
@@ -76,7 +82,7 @@ export function VehiclesTable() {
                 <th className="px-4 py-3 text-left font-semibold">Year</th>
                 <th className="px-4 py-3 text-left font-semibold">Color</th>
                 <th className="px-4 py-3 text-left font-semibold">Ownership</th>
-                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                {canManage && <th className="px-4 py-3 text-right font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -84,7 +90,7 @@ export function VehiclesTable() {
                 <SkeletonRows />
               ) : !vehicles.length ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 7 : 6} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {committedSearch ? `No vehicles matching "${committedSearch}"` : "No vehicles yet. Add one above."}
                   </td>
                 </tr>
@@ -93,11 +99,10 @@ export function VehiclesTable() {
                   <VehicleRow
                     key={vehicle.id}
                     vehicle={vehicle}
-                    isEditing={editingId === vehicle.id}
-                    onEdit={() => setEditingId((prev) => prev === vehicle.id ? null : vehicle.id)}
-                    onEditSuccess={() => setEditingId(null)}
-                    onEditCancel={() => setEditingId(null)}
                     canDelete={canDelete}
+                    canEdit={canEdit}
+                    canManage={canManage}
+                    onEdit={() => setEditingId(vehicle.id)}
                   />
                 ))
               )}
@@ -117,46 +122,57 @@ export function VehiclesTable() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      {canEdit && (
+        <ModalFame
+          isOpen={!!editingId}
+          onClose={() => setEditingId(null)}
+          title="Edit vehicle"
+        >
+          {editingVehicle && (
+            <VehicleEditForm vehicle={editingVehicle} onSuccess={() => setEditingId(null)} />
+          )}
+        </ModalFame>
+      )}
     </div>
   );
 }
 
-function VehicleRow({ vehicle, isEditing, onEdit, onEditSuccess, onEditCancel, canDelete }: {
-  vehicle: Vehicle; isEditing: boolean;
-  onEdit: () => void; onEditSuccess: () => void; onEditCancel: () => void; canDelete: boolean;
+function VehicleRow({ vehicle, canDelete, canEdit, canManage, onEdit }: {
+  vehicle: Vehicle; canDelete: boolean; canEdit: boolean; canManage: boolean; onEdit: () => void;
 }) {
+  const router = useRouter();
   const customerName = vehicle.customer ? `${vehicle.customer.firstName} ${vehicle.customer.lastName}` : "—";
   return (
-    <>
-      <tr className={cn("border-t border-border transition-colors", isEditing ? "bg-muted/50" : "hover:bg-muted/30")}>
-        <td className="px-4 py-3 font-medium">{vehicle.make ?? "—"} {vehicle.model ?? ""}</td>
-        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{vehicle.vin}</td>
-        <td className="px-4 py-3 text-muted-foreground">{customerName}</td>
-        <td className="px-4 py-3 text-muted-foreground">{vehicle.year ?? <span className="text-border">—</span>}</td>
-        <td className="px-4 py-3 text-muted-foreground">{vehicle.color ?? <span className="text-border">—</span>}</td>
-        <td className="px-4 py-3 text-muted-foreground">{vehicle.ownershipStatus ?? <span className="text-border">—</span>}</td>
+    <tr
+      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+      onClick={() => router.push(`/vehicles/${vehicle.id}`)}
+    >
+      <td className="px-4 py-3 font-medium">{vehicle.make ?? "—"} {vehicle.model ?? ""}</td>
+      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{vehicle.vin}</td>
+      <td className="px-4 py-3 text-muted-foreground">{customerName}</td>
+      <td className="px-4 py-3 text-muted-foreground">{vehicle.year ?? <span className="text-border">—</span>}</td>
+      <td className="px-4 py-3 text-muted-foreground">{vehicle.color ?? <span className="text-border">—</span>}</td>
+      <td className="px-4 py-3 text-muted-foreground">{vehicle.ownershipStatus ?? <span className="text-border">—</span>}</td>
+      {canManage && (
         <td className="px-4 py-3">
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm" variant="ghost"
-              className={cn("h-7 w-7 p-0", isEditing ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-              aria-label={`Edit ${vehicle.make} ${vehicle.model}`}
-              onClick={onEdit}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
+          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {canEdit && (
+              <Button
+                size="sm" variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                aria-label={`Edit ${vehicle.make} ${vehicle.model}`}
+                onClick={onEdit}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
             {canDelete && <VehicleDeleteButton vehicle={vehicle} />}
           </div>
         </td>
-      </tr>
-      {isEditing && (
-        <tr className="border-t border-border bg-muted/30">
-          <td colSpan={7} className="px-4 py-4">
-            <VehicleEditForm vehicle={vehicle} onSuccess={onEditSuccess} onCancel={onEditCancel} />
-          </td>
-        </tr>
       )}
-    </>
+    </tr>
   );
 }
 

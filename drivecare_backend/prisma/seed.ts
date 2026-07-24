@@ -279,14 +279,9 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
 }
 
 async function seedCustomers() {
-  const customerRole = await prisma.role.findUniqueOrThrow({
-    where: { name: ROLES.CUSTOMER },
-  });
-
   const customers = [
     {
       email: "john.doe@gmail.com",
-      password: "Customer@123",
       firstName: "John",
       lastName: "Doe",
       phone: "+2348011111111",
@@ -300,7 +295,6 @@ async function seedCustomers() {
     },
     {
       email: "amaka.obi@gmail.com",
-      password: "Customer@123",
       firstName: "Amaka",
       lastName: "Obi",
       phone: "+2348022222222",
@@ -314,7 +308,6 @@ async function seedCustomers() {
     },
     {
       email: "seun.adeyemi@gmail.com",
-      password: "Customer@123",
       firstName: "Seun",
       lastName: "Adeyemi",
       phone: "+2348033333333",
@@ -328,7 +321,6 @@ async function seedCustomers() {
     },
     {
       email: "biodun.alao@yahoo.com",
-      password: "Customer@123",
       firstName: "Biodun",
       lastName: "Alao",
       phone: "+2348044444444",
@@ -342,7 +334,6 @@ async function seedCustomers() {
     },
     {
       email: "ngozi.nwosu@gmail.com",
-      password: "Customer@123",
       firstName: "Ngozi",
       lastName: "Nwosu",
       phone: "+2348055555555",
@@ -358,46 +349,36 @@ async function seedCustomers() {
 
   const result = [];
   for (const c of customers) {
-    const passwordHash = await hash(c.password);
-    const existing = await prisma.user.findUnique({
+    const existingCustomer = await prisma.customer.findUnique({
       where: { email: c.email },
     });
-    let user = existing;
-    if (!user) {
-      user = await prisma.user.create({
+    const customer =
+      existingCustomer ??
+      (await prisma.customer.create({
         data: {
-          email: c.email,
-          passwordHash,
           firstName: c.firstName,
           lastName: c.lastName,
+          email: c.email,
           phoneNumber: c.phone,
-          isActive: true,
-          roleId: customerRole.id,
+          dateOfBirth: new Date(c.dob),
+          driverLicenseNumber: c.license,
+          address: c.address,
+          city: c.city,
+          state: c.state,
+          postalCode: c.postalCode,
+          country: c.country,
+          preferredContactMethod: "Phone",
         },
-      });
-    }
-    const customer = await prisma.customer.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: {
-        userId: user.id,
-        dateOfBirth: new Date(c.dob),
-        driverLicenseNumber: c.license,
-        address: c.address,
-        city: c.city,
-        state: c.state,
-        postalCode: c.postalCode,
-        country: c.country,
-        preferredContactMethod: "Phone",
-      },
-    });
-    result.push({ user, customer });
+      }));
+    result.push({ customer });
   }
   console.log(`✅ Seeded ${result.length} customers`);
   return result;
 }
 
-async function seedVehicles(customers: { customer: { id: string } }[]) {
+async function seedVehicles(
+  customers: { customer: { id: string } }[],
+) {
   const [c0, c1, c2, c3, c4] = customers;
 
   const vehicles = [
@@ -595,33 +576,32 @@ async function seedSpareParts() {
   return result;
 }
 
-async function seedAppointmentsAndJobCards(
+async function seedAppointments(
   branches: { id: string; name: string }[],
-  customers: { user: { id: string }; customer: { id: string } }[],
+  customers: { customer: { id: string } }[],
   vehicles: { id: string }[],
-  staffUsers: { id: string; email: string }[],
-  spareParts: { id: string; partNumber: string }[],
+  receptionists: { id: string; email: string; branchId: string | null }[],
 ) {
   const [mainBranch, abujaBranch, phBranch] = branches;
   const [c0, c1, c2, c3, c4] = customers;
-  // vehicles: 0,1=John | 2,3=Amaka | 4=Seun | 5,6=Biodun | 7=Ngozi
   const [v0, v1, v2, v3, v4, v5, v6, v7] = vehicles;
 
-  const tech1 = staffUsers.find((u) => u.email === "tech1@drivecare.com")!;
-  const tech2 = staffUsers.find((u) => u.email === "tech2@drivecare.com")!;
-  const tech3 = staffUsers.find((u) => u.email === "tech3@drivecare.com")!;
-  const tech4 = staffUsers.find((u) => u.email === "tech4@drivecare.com")!;
-  const oilPart = spareParts.find((p) => p.partNumber === "ENG-OIL-5W30")!;
-  const filterPart = spareParts.find((p) => p.partNumber === "FIL-OIL-001")!;
-  const brakePad = spareParts.find((p) => p.partNumber === "BRK-PAD-F01")!;
-  const sparkPlug = spareParts.find((p) => p.partNumber === "SPN-SPK-001")!;
+  const reception1 = receptionists.find(
+    (r) => r.email === "reception1@drivecare.com",
+  )!;
+  const reception2 = receptionists.find(
+    (r) => r.email === "reception2@drivecare.com",
+  )!;
+  const reception3 = receptionists.find(
+    (r) => r.email === "reception3@drivecare.com",
+  )!;
 
-  // ── Appointments ──────────────────────────────────────────────────────────
   const apptData = [
     {
       customerId: c0.customer.id,
       vehicleId: v0.id,
       branchId: mainBranch.id,
+      createdById: reception1.id,
       scheduledAt: new Date("2026-03-10T09:00:00Z"),
       durationMins: 120,
       notes: "Full service + brake check",
@@ -631,6 +611,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c0.customer.id,
       vehicleId: v1.id,
       branchId: abujaBranch.id,
+      createdById: reception2.id,
       scheduledAt: new Date("2026-05-20T10:00:00Z"),
       durationMins: 90,
       notes: "Oil change and inspection",
@@ -640,6 +621,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c1.customer.id,
       vehicleId: v2.id,
       branchId: mainBranch.id,
+      createdById: reception1.id,
       scheduledAt: new Date("2026-04-05T08:30:00Z"),
       durationMins: 60,
       notes: "Routine service",
@@ -649,6 +631,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c1.customer.id,
       vehicleId: v3.id,
       branchId: phBranch.id,
+      createdById: reception3.id,
       scheduledAt: new Date("2026-06-01T11:00:00Z"),
       durationMins: 90,
       notes: "Tyre rotation + balance",
@@ -658,6 +641,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c2.customer.id,
       vehicleId: v4.id,
       branchId: mainBranch.id,
+      createdById: reception1.id,
       scheduledAt: new Date("2026-05-15T14:00:00Z"),
       durationMins: 180,
       notes: "Full diagnostic scan",
@@ -667,6 +651,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c3.customer.id,
       vehicleId: v5.id,
       branchId: phBranch.id,
+      createdById: reception3.id,
       scheduledAt: new Date("2026-04-22T09:30:00Z"),
       durationMins: 120,
       notes: "Brake replacement",
@@ -676,6 +661,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c3.customer.id,
       vehicleId: v6.id,
       branchId: abujaBranch.id,
+      createdById: reception2.id,
       scheduledAt: new Date("2026-06-10T10:30:00Z"),
       durationMins: 60,
       notes: "Oil change",
@@ -685,6 +671,7 @@ async function seedAppointmentsAndJobCards(
       customerId: c4.customer.id,
       vehicleId: v7.id,
       branchId: mainBranch.id,
+      createdById: reception1.id,
       scheduledAt: new Date("2026-06-05T15:00:00Z"),
       durationMins: 90,
       notes: "Spark plug replacement",
@@ -694,7 +681,6 @@ async function seedAppointmentsAndJobCards(
 
   const appts = [];
   for (const a of apptData) {
-    // upsert by customer + vehicle + scheduledAt to stay idempotent
     const existing = await prisma.serviceAppointment.findFirst({
       where: {
         customerId: a.customerId,
@@ -707,22 +693,12 @@ async function seedAppointmentsAndJobCards(
     appts.push(appt);
   }
   console.log(`✅ Seeded ${appts.length} appointments`);
-  return {
-    appts,
-    tech1,
-    tech2,
-    tech3,
-    tech4,
-    oilPart,
-    filterPart,
-    brakePad,
-    sparkPlug,
-  };
+  return appts;
 }
 
 async function seedJobCards(
   branches: { id: string; name: string }[],
-  customers: { user: { id: string }; customer: { id: string } }[],
+  customers: { customer: { id: string } }[],
   vehicles: { id: string }[],
   appts: {
     id: string;
@@ -1193,14 +1169,19 @@ async function main() {
   console.log("\nSeeding spare parts...");
   const spareParts = await seedSpareParts();
 
-  // 7. Appointments
+  // 7. Appointments (with receptionist as createdBy)
   console.log("\nSeeding appointments...");
-  const { appts } = await seedAppointmentsAndJobCards(
+  const receptionistUsers = staffUsers.filter(
+    (u) =>
+      u.email === "reception1@drivecare.com" ||
+      u.email === "reception2@drivecare.com" ||
+      u.email === "reception3@drivecare.com",
+  );
+  const appts = await seedAppointments(
     branches,
     customers,
     vehicles,
-    staffUsers,
-    spareParts,
+    receptionistUsers,
   );
 
   // 8. Job cards

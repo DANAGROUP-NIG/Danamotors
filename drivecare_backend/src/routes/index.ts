@@ -9,6 +9,7 @@ import inventoryRoutes from '../modules/inventory/inventory.routes';
 import financeRoutes from '../modules/finance/finance.routes';
 import branchRoutes from '../modules/branch/branch.routes';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes';
+import searchRoutes from '../modules/search/search.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/branches', branchRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/search', searchRoutes);
 
 export default router;
