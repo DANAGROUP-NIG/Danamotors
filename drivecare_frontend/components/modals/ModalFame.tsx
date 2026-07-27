@@ -50,7 +50,7 @@ export default function ModalFame({
       />
 
       {/* Modal */}
-      <div className="relative z-10 my-auto w-full max-w-lg overflow-hidden rounded-2xl border border-white/20 bg-background/95 shadow-2xl backdrop-blur-xl sm:rounded-3xl">
+      <div className="relative z-10 my-auto w-full max-w-lg rounded-2xl border border-white/20 bg-background/95 shadow-2xl backdrop-blur-xl sm:rounded-3xl">
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6 sm:py-5">
@@ -68,10 +68,11 @@ export default function ModalFame({
         )}
 
         {/* Content */}
-        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto p-5 sm:max-h-[calc(100vh-10rem)] sm:p-6">
+        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto p-5 sm:max-h-[calc(100vh-10rem)] sm:p-6 pb-12">
           {children}
         </div>
       </div>
     </div>
   );
 }
+

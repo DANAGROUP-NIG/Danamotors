@@ -1,25 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Play, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-
-const heroStats = [
-  ["24/7", "service updates"],
-  ["6", "clear service stages"],
-  ["12k+", "vehicles supported"],
-];
-
-const sliderImages = [
-  "/bg/hero-1.jpg",
-  "/bg/hero-2.jpg",
-  "/bg/hero-3.jpg",
-  "/bg/hero-5.jpg",
-  "/bg/pexels-shvetsa-4315570.jpg",
-];
+import { HeroActions } from "./HeroActions";
+import { HeroStats } from "./HeroStats";
+import { HeroImageSlider } from "./HeroImageSlider";
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false);
@@ -54,25 +41,9 @@ export default function Hero() {
             the service operations behind the scenes.
           </p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button size="lg">
-              Book Service
-              <ArrowRight />
-            </Button>
-            <Button size="lg" variant="outline">
-              <Play />
-              Track My Car
-            </Button>
-          </div>
+          <HeroActions />
 
-          <div className="mt-8 grid max-w-lg grid-cols-3 gap-4 border-t border-border pt-6">
-            {heroStats.map(([value, label]) => (
-              <div key={label}>
-                <p className="text-2xl font-black">{value}</p>
-                <p className="mt-1 text-xs font-medium text-muted-foreground">{label}</p>
-              </div>
-            ))}
-          </div>
+          <HeroStats />
         </motion.div>
 
         <motion.div
@@ -82,62 +53,10 @@ export default function Hero() {
           className="relative h-full overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl shadow-blue-950/10"
         >
           <div className="absolute inset-0 h-full w-full">
-            {mounted ? <ImageSlider /> : <div className="h-full w-full" />}
+            {mounted ? <HeroImageSlider /> : <div className="h-full w-full" />}
           </div>
         </motion.div>
       </div>
     </section>
-  );
-}
-
-function ImageSlider() {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setIndex((current) => (current + 1) % sliderImages.length);
-    }, 4000);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="relative h-full w-full">
-      {sliderImages.map((src, slideIndex) => (
-        <div
-          key={src}
-          className={`absolute inset-0 transition-opacity duration-1000 ${
-            slideIndex === index ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          <Image
-            src={src}
-            alt={`Hero background ${slideIndex + 1}`}
-            fill
-            sizes="(max-width: 1024px) 100vw, 45vw"
-            className="object-cover"
-            priority={slideIndex === 0}
-          />
-          <div className="absolute inset-0 bg-slate-950/30" />
-        </div>
-      ))}
-
-      <div className="absolute inset-x-0 bottom-4 mx-auto flex max-w-md items-center justify-between rounded-full bg-black/40 px-4 py-3 text-white backdrop-blur-sm">
-        <p className="text-sm">Slide {index + 1} of {sliderImages.length}</p>
-        <div className="flex gap-2">
-          {sliderImages.map((_, dotIndex) => (
-            <button
-              key={dotIndex}
-              type="button"
-              onClick={() => setIndex(dotIndex)}
-              className={`h-2.5 w-2.5 rounded-full transition ${
-                dotIndex === index ? "bg-white" : "bg-white/40"
-              }`}
-              aria-label={`Show slide ${dotIndex + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }

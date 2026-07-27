@@ -11,7 +11,7 @@ export function useCreateVehicle() {
     mutationFn: (payload: CreateVehiclePayload) =>
       createVehicleRequest(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vehicleKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
       toast.success("Vehicle added");
     },
     onError: (error: unknown) => {

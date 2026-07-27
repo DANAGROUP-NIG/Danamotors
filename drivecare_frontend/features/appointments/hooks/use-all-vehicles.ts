@@ -10,9 +10,14 @@ export function useAllVehicles(opts?: { customerId?: string; branchId?: string }
       getVehiclesRequest({ limit: 500, branchId: opts?.branchId }).then(
         (r) =>
           opts?.customerId
-            ? r.vehicles.filter((v) => v.customer.id === opts.customerId)
+            ? r.vehicles.filter(
+                (v: any) =>
+                  v.customer?.id === opts.customerId ||
+                  v.customerId === opts.customerId,
+              )
             : r.vehicles,
       ),
     staleTime: 5 * 60 * 1000,
   });
 }
+

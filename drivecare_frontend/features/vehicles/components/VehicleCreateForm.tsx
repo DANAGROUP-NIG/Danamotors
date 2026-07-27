@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { useAllCustomers } from "@/features/appointments/hooks/use-all-customers";
+import { CustomerSelectWithCreate } from "@/features/customers/components/CustomerSelectWithCreate";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateVehicle } from "../hooks/use-create-vehicle";
@@ -18,13 +18,12 @@ export function VehicleCreateForm({ onSuccess }: VehicleCreateFormProps) {
   const create = useCreateVehicle();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { isSuperAdmin } = useAuth();
-  const { data: customers, isLoading: loadingCustomers } = useAllCustomers(
-    isSuperAdmin ? undefined : activeBranch?.id,
-  );
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateVehicleFormValues>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CreateVehicleFormValues>({
     resolver: zodResolver(createVehicleSchema),
   });
+
+  const selectedCustomerId = watch("customerId");
 
   function onSubmit(values: CreateVehicleFormValues) {
     create.mutate(values, { onSuccess: () => { reset(); onSuccess?.(); } });
@@ -33,16 +32,11 @@ export function VehicleCreateForm({ onSuccess }: VehicleCreateFormProps) {
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
       <Field label="Customer" error={errors.customerId?.message}>
-        <select className={inputCls} {...register("customerId")}>
-          <option value="">
-            {loadingCustomers ? "Loading customers…" : "Select customer"}
-          </option>
-          {customers?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.firstName} {c.lastName} — {c.email}
-            </option>
-          ))}
-        </select>
+        <CustomerSelectWithCreate
+          value={selectedCustomerId}
+          onChange={(customerId) => setValue("customerId", customerId, { shouldValidate: true })}
+          branchId={isSuperAdmin ? undefined : activeBranch?.id}
+        />
       </Field>
       <Field label="VIN" error={errors.vin?.message}>
         <input className={inputCls} placeholder="Vehicle Identification Number" {...register("vin")} />
@@ -72,3 +66,4 @@ export function VehicleCreateForm({ onSuccess }: VehicleCreateFormProps) {
     </form>
   );
 }
+

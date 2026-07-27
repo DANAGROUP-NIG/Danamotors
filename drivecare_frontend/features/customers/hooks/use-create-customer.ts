@@ -11,7 +11,7 @@ export function useCreateCustomer() {
     mutationFn: (payload: CreateCustomerPayload) =>
       createCustomerRequest(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: customerKeys.all });
       toast.success("Customer created");
     },
     onError: (error: unknown) => {
