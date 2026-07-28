@@ -9,7 +9,8 @@ export type AppRole =
   | "accountant"
   | "serviceadviser"
   | "technician"
-  | "receptionist";
+  | "receptionist"
+  | "receptionmanager";
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
@@ -29,6 +30,7 @@ export const WORKSHOP_ROLES: AppRole[] = [
   "serviceadviser",
   "technician",
   "receptionist",
+  "receptionmanager",
 ];
 
 export const MANAGE_ROLES: AppRole[] = [
@@ -43,12 +45,14 @@ export const CUSTOMER_ROLES: AppRole[] = [
   "admin",
   "serviceadviser",
   "receptionist",
+  "receptionmanager",
 ];
 export const CUSTOMER_CREATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "serviceadviser",
   "receptionist",
+  "receptionmanager",
 ];
 export const VEHICLE_ROLES: AppRole[] = [
   "superadmin",
@@ -57,6 +61,7 @@ export const VEHICLE_ROLES: AppRole[] = [
   "serviceadviser",
   "technician",
   "receptionist",
+  "receptionmanager",
 ];
 export const VEHICLE_CREATE_ROLES: AppRole[] = [
   "superadmin",
@@ -64,6 +69,7 @@ export const VEHICLE_CREATE_ROLES: AppRole[] = [
   "workshopmanager",
   "serviceadviser",
   "receptionist",
+  "receptionmanager",
 ];
 export const TECHNICIAN_ROLES: AppRole[] = [
   "superadmin",
@@ -80,4 +86,5 @@ export const DELETE_ROLES: AppRole[] = [
   "admin",
   "storemanager",
   "workshopmanager",
+  "receptionmanager",
 ];

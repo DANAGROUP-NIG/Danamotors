@@ -18,6 +18,7 @@ export type Vehicle = {
   warrantyExpiresAt: string | null;
   ownershipStatus: string | null;
   customer: VehicleCustomer;
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
   imagesCount: number;
   ownershipsCount: number;
   createdAt: string;

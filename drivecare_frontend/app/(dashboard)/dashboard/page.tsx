@@ -8,6 +8,7 @@ import type { AppRole } from "@/features/auth/hooks/use-auth";
 import ModalFame from "@/components/modals/ModalFame";
 import { JobCardCreateForm } from "@/features/job-cards";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
+import ReceptionManagerDashboard from "@/features/dashboard/components/ReceptionManagerDashboard";
 
 import { DashboardWelcomeHeader } from "@/features/dashboard/components/common/DashboardWelcomeHeader";
 import { InventoryAlertBanner } from "@/features/dashboard/components/common/InventoryAlertBanner";
@@ -29,7 +30,7 @@ const WORKSHOP_ROLES: AppRole[] = ["admin", "technician", "receptionist"];
 const MANAGE_ROLES: AppRole[] = ["admin"];
 
 export default function DashboardPage() {
-  const { user, hasAccess, isReceptionist } = useAuth();
+  const { user, hasAccess, isReceptionist, isReceptionManager } = useAuth();
   const [showNewJobCard, setShowNewJobCard] = useState(false);
 
   const totalJobs = useMemo(
@@ -55,6 +56,12 @@ export default function DashboardPage() {
     canSeeWorkshop,
   ].filter(Boolean).length;
 
+  // Reception managers get their own dedicated dashboard
+  if (isReceptionManager) {
+    return <ReceptionManagerDashboard />;
+  }
+
+  // Receptionists get their own dedicated dashboard
   if (isReceptionist) {
     return <ReceptionistDashboard />;
   }

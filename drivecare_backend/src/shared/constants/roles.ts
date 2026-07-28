@@ -7,6 +7,7 @@ export const ROLES = {
   SERVICE_ADVISOR: "ServiceAdviser",
   TECHNICIAN: "Technician",
   RECEPTIONIST: "Receptionist",
+  RECEPTION_MANAGER: "ReceptionManager",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
@@ -163,5 +164,21 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SERVICE_CREATE, // create appointments
     PERMISSIONS.SERVICE_UPDATE, // reschedule / cancel
     PERMISSIONS.FINANCE_READ,
+  ],
+
+  // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
+  [ROLES.RECEPTION_MANAGER]: [
+    PERMISSIONS.CUSTOMER_READ,
+    PERMISSIONS.CUSTOMER_CREATE,
+    PERMISSIONS.CUSTOMER_UPDATE,
+    PERMISSIONS.CUSTOMER_DELETE,
+    PERMISSIONS.VEHICLE_READ,
+    PERMISSIONS.VEHICLE_CREATE,
+    PERMISSIONS.VEHICLE_UPDATE,
+    PERMISSIONS.VEHICLE_DELETE,
+    PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.SERVICE_CREATE,
+    PERMISSIONS.SERVICE_UPDATE,
+    PERMISSIONS.SERVICE_DELETE,
   ],
 };

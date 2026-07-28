@@ -132,6 +132,7 @@ export function AppointmentsTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Scheduled</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Notes</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Agent</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
@@ -140,7 +141,7 @@ export function AppointmentsTable() {
                 <SkeletonRows />
               ) : !data?.appointments?.length ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {statusFilter
                       ? `No appointments with status "${STATUS_LABELS[statusFilter]}"`
                       : "No appointments yet. Book one above."}
@@ -261,6 +262,9 @@ function AppointmentRow({
           {appointment.notes ?? <span className="text-border">—</span>}
         </span>
       </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {appointment.createdBy ? appointment.createdBy.firstName : <span className="text-border">—</span>}
+      </td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
@@ -286,7 +290,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }).map((_, i) => (
         <tr key={i} className="border-t border-border">
-          {Array.from({ length: 6 }).map((__, j) => (
+          {Array.from({ length: 7 }).map((__, j) => (
             <td key={j} className="px-4 py-3">
               <div className="h-4 w-28 animate-pulse rounded bg-muted" />
             </td>

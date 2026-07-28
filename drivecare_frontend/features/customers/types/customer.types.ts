@@ -13,6 +13,7 @@ export type Customer = {
   country?: string;
   preferredContactMethod?: string;
   branchId: string;
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
 };

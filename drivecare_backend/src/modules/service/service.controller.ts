@@ -14,14 +14,15 @@ export class ServiceController {
   createAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Admin can only create appointments in their own branch
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.branchId && req.body.branchName) {
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER && req.user.branchId && req.body.branchName) {
         const userBranch = await prisma.branch.findUnique({ where: { id: req.user.branchId } });
         if (userBranch) {
           req.body.branchName = userBranch.name;
         }
       }
 
-      const result = await this.serviceService.createAppointment(req.body);
+      const createdById = req.user?.userId;
+      const result = await this.serviceService.createAppointment({ ...req.body, createdById });
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Appointment booked successfully', data: { appointment: result } });
     } catch (error) {
       next(error);
@@ -35,10 +36,16 @@ export class ServiceController {
       const search = req.query.search as string | undefined;
       let branchId = req.query.branchId as string | undefined;
       const status = req.query.status as string | undefined;
+      let createdById: string | undefined;
 
-      // Only SuperAdmin can see all branches; admin and everyone else are locked to their branch
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      // Only SuperAdmin and ReceptionManager can see all branches; others are locked to their branch
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
         branchId = req.user.branchId ?? undefined;
+      }
+
+      // Receptionists can only see their own bookings
+      if (req.user && req.user.role === ROLES.RECEPTIONIST) {
+        createdById = req.user.userId;
       }
 
       const result = await this.serviceService.listAppointments({
@@ -47,6 +54,7 @@ export class ServiceController {
         search,
         branchId,
         status,
+        createdById,
       });
 
       res.status(200).json({ status: 'success', statusCode: 200, data: result });
@@ -91,7 +99,8 @@ export class ServiceController {
 
   createJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.serviceService.createJobCard(req.body);
+      const createdById = req.user?.userId;
+      const result = await this.serviceService.createJobCard({ ...req.body, createdById });
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Job card created successfully', data: { jobCard: result } });
     } catch (error) {
       next(error);
@@ -104,7 +113,7 @@ export class ServiceController {
       const limit = Number(req.query.limit) || 50;
       let branchId = req.query.branchId as string | undefined;
 
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
         branchId = req.user.branchId ?? undefined;
       }
 

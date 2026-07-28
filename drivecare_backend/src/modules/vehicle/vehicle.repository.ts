@@ -2,7 +2,7 @@ import prisma from '../../prisma/client';
 import { Prisma, Vehicle, VehicleImage, VehicleOwnership } from '@prisma/client';
 
 export class VehicleRepository {
-  async listVehicles(params: { skip: number; take: number; search?: string; branchId?: string }) {
+  async listVehicles(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
     const where: Record<string, any> = {};
 
     if (params.search) {
@@ -23,6 +23,10 @@ export class VehicleRepository {
       };
     }
 
+    if (params.createdById) {
+      where.createdById = params.createdById;
+    }
+
     const [vehicles, total] = await Promise.all([
       prisma.vehicle.findMany({
         where,
@@ -36,6 +40,9 @@ export class VehicleRepository {
               lastName: true,
               email: true,
             },
+          },
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true },
           },
           images: true,
           ownerships: true,
@@ -78,6 +85,7 @@ export class VehicleRepository {
     warrantyStatus?: string;
     warrantyExpiresAt?: Date;
     ownershipStatus?: string;
+    createdById?: string;
   }): Promise<Vehicle> {
     return prisma.vehicle.create({
       data,

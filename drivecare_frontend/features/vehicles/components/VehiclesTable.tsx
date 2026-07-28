@@ -92,6 +92,7 @@ export function VehiclesTable() {
                 <th className="px-4 py-3 text-left font-semibold">Year</th>
                 <th className="px-4 py-3 text-left font-semibold">Color</th>
                 <th className="px-4 py-3 text-left font-semibold">Ownership</th>
+                <th className="px-4 py-3 text-left font-semibold">Agent</th>
                 {canManage && (
                   <th className="px-4 py-3 text-right font-semibold">Actions</th>
                 )}
@@ -102,7 +103,7 @@ export function VehiclesTable() {
                 <SkeletonRows />
               ) : !vehicles.length ? (
                 <DataTableEmptyState
-                  colSpan={canManage ? 7 : 6}
+                  colSpan={canManage ? 8 : 7}
                   searchQuery={committedSearch}
                   entityName="vehicles"
                 />
@@ -192,6 +193,9 @@ function VehicleRow({
       <td className="px-4 py-3 text-muted-foreground">
         {vehicle.ownershipStatus ?? <span className="text-border">—</span>}
       </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {vehicle.createdBy ? vehicle.createdBy.firstName : <span className="text-border">—</span>}
+      </td>
       {canManage && (
         <td className="px-4 py-3">
           <div
@@ -222,7 +226,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }).map((_, i) => (
         <tr key={i} className="border-t border-border">
-          {Array.from({ length: 6 }).map((__, j) => (
+          {Array.from({ length: 7 }).map((__, j) => (
             <td key={j} className="px-4 py-3">
               <div className="h-4 w-24 animate-pulse rounded bg-muted" />
             </td>

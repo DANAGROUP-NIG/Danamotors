@@ -114,6 +114,7 @@ export function CustomersTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Phone</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Address</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Agent</th>
                 {canManage && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>}
               </tr>
             </thead>
@@ -123,7 +124,7 @@ export function CustomersTable() {
               ) : !data?.customers?.length ? (
                 <tr>
                   <td
-                    colSpan={canManage ? 5 : 4}
+                    colSpan={canManage ? 6 : 5}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     {debouncedSearch
@@ -237,6 +238,9 @@ function CustomerRow({
       <td className="px-4 py-3 text-muted-foreground">
         {customer.address ?? <span className="text-border">—</span>}
       </td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {customer.createdBy ? customer.createdBy.firstName : <span className="text-border">—</span>}
+      </td>
       {canManage && (
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -280,6 +284,9 @@ function SkeletonRows() {
           </td>
           <td className="px-4 py-3">
             <div className="h-4 w-36 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
           </td>
           <td className="px-4 py-3" />
         </tr>

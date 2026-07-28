@@ -46,6 +46,7 @@ export class ServiceService {
     search?: string;
     branchId?: string;
     status?: string;
+    createdById?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { appointments, total } = await this.serviceRepository.listAppointments({
@@ -54,6 +55,7 @@ export class ServiceService {
       search: params.search,
       branchId: params.branchId,
       status: params.status,
+      createdById: params.createdById,
     });
 
     return {
@@ -114,6 +116,7 @@ export class ServiceService {
     estimatedHours?: number;
     estimatedCost?: number;
     assignedTo?: string;
+    createdById?: string;
   }) {
     if (data.appointmentId) {
       const appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
@@ -144,6 +147,7 @@ export class ServiceService {
       estimatedHours: data.estimatedHours,
       estimatedCost: data.estimatedCost,
       assignedTo: data.assignedTo,
+      createdById: data.createdById,
     });
   }
 

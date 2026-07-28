@@ -254,6 +254,15 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       role: ROLES.RECEPTIONIST,
       branchId: phBranch.id,
     },
+    // Reception Manager
+    {
+      email: "recptionmanager@drivecare.com",
+      password: "RecpManager@123",
+      firstName: "Blessing",
+      lastName: "Effiong",
+      role: ROLES.RECEPTION_MANAGER,
+      branchId: mainBranch.id,
+    },
   ];
 
   const result = [];

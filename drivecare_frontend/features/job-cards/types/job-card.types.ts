@@ -60,6 +60,7 @@ export type JobCard = {
   appointmentId?: string;
   customerId: string;
   vehicleId: string;
+  createdBy?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
   appointment?: JobCardAppointment;

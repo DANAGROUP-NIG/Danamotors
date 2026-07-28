@@ -44,6 +44,9 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs    AuditLog[]
   createdAppointments ServiceAppointment[] @relation("ReceptionistBookings")
+  createdCustomers    Customer[]            @relation("CreatedCustomers")
+  createdVehicles     Vehicle[]             @relation("CreatedVehicles")
+  createdJobCards     JobCard[]             @relation("CreatedJobCards")
   technicianAssignments JobCard[] @relation("TechnicianAssignments")
   qualityInspectorAssignments JobCard[] @relation("QualityInspectorAssignments")
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
@@ -120,10 +123,12 @@ model Customer {
   country                String?
   preferredContactMethod String?
   branchId               String
+  createdById            String?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
   branch                 Branch             @relation(fields: [branchId], references: [id])
+  createdBy              User?              @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
   documents              CustomerDocument[]
   serviceHistory         ServiceHistory[]
   vehicles               Vehicle[]
@@ -177,6 +182,8 @@ model JobCard {
   qualityInspector   User?           @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
   technicianId   String?
   technician     User?               @relation("TechnicianAssignments", fields: [technicianId], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?               @relation("CreatedJobCards", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -240,8 +247,11 @@ model Vehicle {
   warrantyStatus    String?
   warrantyExpiresAt DateTime?
   ownershipStatus   String?
+  createdById       String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+
+  createdBy         User?              @relation("CreatedVehicles", fields: [createdById], references: [id], onDelete: SetNull)
 
   images            VehicleImage[]
   ownerships        VehicleOwnership[]

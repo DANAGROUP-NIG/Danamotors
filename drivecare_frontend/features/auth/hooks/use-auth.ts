@@ -24,6 +24,7 @@ export function useAuth() {
   const isAdviser = role === "serviceadviser";
   const isTechnician = role === "technician";
   const isReceptionist = role === "receptionist";
+  const isReceptionManager = role === "receptionmanager";
   const isAccountant = role === "accountant";
 
   // Hierarchy shorthand: "admin or above"
@@ -54,6 +55,7 @@ export function useAuth() {
     isAdmin,
     isTechnician,
     isReceptionist,
+    isReceptionManager,
     isAccountant,
 
     // composite flags

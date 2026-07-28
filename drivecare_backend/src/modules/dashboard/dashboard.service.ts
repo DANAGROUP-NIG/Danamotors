@@ -16,6 +16,8 @@ export class DashboardService {
     const dayOfWeek = startOfToday.getDay();
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYesterdayBookings = new Date(startOfToday);
     startOfYesterdayBookings.setDate(startOfYesterdayBookings.getDate() - 1);
@@ -145,17 +147,8 @@ export class DashboardService {
       `.then((r) => r[0]?.count ?? 0).catch(() => 0),
     ]);
 
-    // ── Batch 3: Technician + receptionist ──────────────────────────
-    const [
-      myAssignedJobs,
-      myCompletedJobs,
-      myJobsByStatus,
-      upcomingAppointments,
-      todayBookings,
-      pendingAppointments,
-      yesterdayBookings,
-      weekBookings,
-    ] = await Promise.all([
+    // ── Batch 3a: Technician jobs ───────────────────────────────────
+    const [myAssignedJobs, myCompletedJobs, myJobsByStatus] = await Promise.all([
       userId
         ? prisma.jobCard.count({ where: { technicianId: userId, ...jobWhere } })
         : Promise.resolve(0),
@@ -165,51 +158,49 @@ export class DashboardService {
       userId
         ? prisma.jobCard.groupBy({ by: ['status'], where: { technicianId: userId, ...jobWhere }, _count: { id: true } })
         : Promise.resolve([]),
-      prisma.serviceAppointment.findMany({
-        where: {
-          scheduledAt: { gte: startOfToday },
-          status: { in: ['Pending', 'Confirmed'] },
-          ...(branchId ? { branchId } : {}),
-        },
-        include: {
-          customer: { select: { firstName: true, lastName: true } },
-          vehicle: { select: { make: true, model: true, year: true } },
-          branch: { select: { name: true } },
-        },
-        orderBy: { scheduledAt: 'asc' },
-        take: 10,
-      }),
+    ]);
+
+    // ── Batch 3b: Appointment counts ───────────────────────────────
+    const todayEnd = new Date(startOfToday.getTime() + 86400000);
+    const lastMonthStart = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() - 1, 1);
+
+    const [todayBookings, pendingAppointments, yesterdayBookings, weekBookings, todayAppointmentsList] = await Promise.all([
       prisma.serviceAppointment.count({
-        where: {
-          scheduledAt: { gte: startOfToday, lt: new Date(startOfToday.getTime() + 86400000) },
-          ...(branchId ? { branchId } : {}),
-        },
+        where: { scheduledAt: { gte: startOfToday, lt: todayEnd }, ...(branchId ? { branchId } : {}) },
       }),
       prisma.serviceAppointment.count({
         where: { status: 'Pending', ...(branchId ? { branchId } : {}) },
       }),
       prisma.serviceAppointment.count({
-        where: {
-          scheduledAt: { gte: startOfYesterdayBookings, lt: endOfYesterdayBookings },
-          ...(branchId ? { branchId } : {}),
-        },
+        where: { scheduledAt: { gte: startOfYesterdayBookings, lt: endOfYesterdayBookings }, ...(branchId ? { branchId } : {}) },
       }),
       prisma.serviceAppointment.count({
         where: { scheduledAt: { gte: startOfWeek }, ...(branchId ? { branchId } : {}) },
       }),
+      prisma.serviceAppointment.findMany({
+        where: { scheduledAt: { gte: startOfToday, lt: todayEnd }, ...(branchId ? { branchId } : {}) },
+        select: { id: true, status: true, scheduledAt: true },
+      }),
     ]);
 
-    // ── Batch 4: Remaining receptionist + accountant ───────────────
-    const [
-      last7DaysBookings,
-      monthBookings,
-      lastMonthBookings,
-      bookingsByStatus,
-      openInvoices,
-      overdueInvoices,
-      totalOutstanding,
-      monthlyRevenue,
-    ] = await Promise.all([
+    // ── Batch 3c: Upcoming appointments ────────────────────────────
+    const upcomingAppointments = await prisma.serviceAppointment.findMany({
+      where: {
+        scheduledAt: { gte: startOfToday, lt: endOfWeek },
+        status: { in: ['Pending', 'Confirmed'] },
+        ...(branchId ? { branchId } : {}),
+      },
+      include: {
+        customer: { select: { firstName: true, lastName: true } },
+        vehicle: { select: { make: true, model: true, year: true } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      take: 50,
+    });
+
+    // ── Batch 4a: Booking period counts ────────────────────────────
+    const [last7DaysBookings, monthBookings, lastMonthBookings, bookingsByStatus] = await Promise.all([
       prisma.serviceAppointment.count({
         where: { scheduledAt: { gte: sevenDaysAgo }, ...(branchId ? { branchId } : {}) },
       }),
@@ -218,10 +209,7 @@ export class DashboardService {
       }),
       prisma.serviceAppointment.count({
         where: {
-          scheduledAt: {
-            gte: new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() - 1, 1),
-            lt: startOfMonth,
-          },
+          scheduledAt: { gte: lastMonthStart, lt: startOfMonth },
           ...(branchId ? { branchId } : {}),
         },
       }),
@@ -230,6 +218,10 @@ export class DashboardService {
         where: { ...(branchId ? { branchId } : {}) },
         _count: { id: true },
       }),
+    ]);
+
+    // ── Batch 4b: Accountant stats ─────────────────────────────────
+    const [openInvoices, overdueInvoices, totalOutstanding, monthlyRevenue] = await Promise.all([
       prisma.invoice.count({
         where: {
           status: { in: ['Unpaid', 'Partially Paid'] },
@@ -258,6 +250,85 @@ export class DashboardService {
         _sum: { amount: true },
       }),
     ]);
+
+    // ── Batch 4c: Personal receptionist booking counts ─────────────
+    const [myTotalBookings, myTodayBookings, myYesterdayBookings, myWeekBookings, myLastMonthBookings] = await Promise.all([
+      userId
+        ? prisma.serviceAppointment.count({
+            where: { createdById: userId },
+          })
+        : Promise.resolve(0),
+      userId
+        ? prisma.serviceAppointment.count({
+            where: {
+              createdById: userId,
+              scheduledAt: { gte: startOfToday, lt: todayEnd },
+            },
+          })
+        : Promise.resolve(0),
+      userId
+        ? prisma.serviceAppointment.count({
+            where: {
+              createdById: userId,
+              scheduledAt: { gte: startOfYesterdayBookings, lt: endOfYesterdayBookings },
+            },
+          })
+        : Promise.resolve(0),
+      userId
+        ? prisma.serviceAppointment.count({
+            where: {
+              createdById: userId,
+              scheduledAt: { gte: startOfWeek },
+            },
+          })
+        : Promise.resolve(0),
+      userId
+        ? prisma.serviceAppointment.count({
+            where: {
+              createdById: userId,
+              scheduledAt: { gte: lastMonthStart, lt: startOfMonth },
+            },
+          })
+        : Promise.resolve(0),
+    ]);
+
+    // ── Batch 5: ReceptionManager cross-branch stats ──────────────
+    const receptionistRole = await prisma.role.findUnique({ where: { name: 'Receptionist' } });
+
+    const [totalReceptionists, receptionistPerformanceRaw] = await Promise.all([
+      receptionistRole
+        ? prisma.user.count({ where: { roleId: receptionistRole.id, isActive: true } })
+        : Promise.resolve(0),
+      receptionistRole
+        ? prisma.$queryRaw<
+            { userId: string; firstName: string; lastName: string; branchName: string; appointmentCount: number; completedCount: number }[]
+          >`
+            SELECT
+              u."id" AS "userId",
+              u."firstName",
+              u."lastName",
+              COALESCE(b."name", 'Unassigned') AS "branchName",
+              COUNT(sa."id")::int AS "appointmentCount",
+              COUNT(CASE WHEN sa."status" = 'Completed' THEN 1 END)::int AS "completedCount"
+            FROM "User" u
+            LEFT JOIN "Branch" b ON u."branchId" = b."id"
+            LEFT JOIN "ServiceAppointment" sa ON sa."createdById" = u."id"
+            WHERE u."roleId" = ${receptionistRole.id}
+              AND u."isActive" = true
+            GROUP BY u."id", u."firstName", u."lastName", b."name"
+            ORDER BY "appointmentCount" DESC
+          `
+        : Promise.resolve([]),
+    ]);
+
+    const receptionistPerformance = (receptionistPerformanceRaw as any[]).map((r: any) => ({
+      name: `${r.firstName} ${r.lastName}`,
+      branch: r.branchName,
+      appointmentsCreated: r.appointmentCount,
+      completionRate: r.appointmentCount > 0
+        ? Math.round((r.completedCount / r.appointmentCount) * 100)
+        : 0,
+    }));
 
     // ── Format core data ────────────────────────────────────────────
     const todayRevenue = Number(revenueResult._sum.amount ?? 0);
@@ -387,6 +458,14 @@ export class DashboardService {
       overdueInvoices,
       totalOutstanding: totalOutstandingAmount,
       monthlyRevenue: monthlyRevenueAmount,
+      totalReceptionists,
+      receptionistPerformance,
+      todayAvailableAppointments: todayAppointmentsList,
+      myTotalBookings,
+      myTodayBookings,
+      myYesterdayBookings,
+      myWeekBookings,
+      myLastMonthBookings,
     };
   }
 }

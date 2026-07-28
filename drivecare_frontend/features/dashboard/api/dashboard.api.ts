@@ -43,6 +43,21 @@ export interface DashboardStats {
   overdueInvoices: number;
   totalOutstanding: number;
   monthlyRevenue: number;
+  // ReceptionManager
+  totalReceptionists: number;
+  receptionistPerformance: {
+    name: string;
+    branch: string;
+    appointmentsCreated: number;
+    completionRate: number;
+  }[];
+  // Receptionist personal stats
+  todayAvailableAppointments: { id: string; status: string; scheduledAt: string }[];
+  myTotalBookings: number;
+  myTodayBookings: number;
+  myYesterdayBookings: number;
+  myWeekBookings: number;
+  myLastMonthBookings: number;
 }
 
 export async function getDashboardStats(

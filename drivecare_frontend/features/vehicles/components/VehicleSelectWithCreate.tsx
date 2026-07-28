@@ -38,6 +38,7 @@ export function VehicleSelectWithCreate({
   const [searchQuery, setSearchQuery] = useState("");
   const [showInlineCreate, setShowInlineCreate] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const lastCreatedVehicleRef = useRef<Vehicle | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({
     top: 0,
     left: 0,
@@ -58,9 +59,9 @@ export function VehicleSelectWithCreate({
 
   const createVehicleMutation = useCreateVehicle();
 
-  // Selected vehicle object
+  // Selected vehicle object — falls back to locally-stored just-created vehicle
   const selectedVehicle = useMemo(() => {
-    return vehicles.find((v) => v.id === value);
+    return vehicles.find((v) => v.id === value) ?? (lastCreatedVehicleRef.current?.id === value ? lastCreatedVehicleRef.current : null);
   }, [vehicles, value]);
 
   // Filtered vehicle list based on typing
@@ -141,29 +142,33 @@ export function VehicleSelectWithCreate({
       customerId,
     };
     createVehicleMutation.mutate(payload, {
-      onSuccess: (res: any) => {
+      onSuccess: async (res: any) => {
         const createdVehicle: Vehicle = res?.vehicle || res;
         if (createdVehicle?.id) {
           const formattedVehicle: Vehicle = {
             ...createdVehicle,
             customer: createdVehicle.customer || ({ id: customerId, email: "", firstName: "", lastName: "" }),
           };
-          queryClient.setQueriesData({ queryKey: vehicleKeys.all }, (old: any) => {
-            if (!old) return old;
-            if (Array.isArray(old)) {
-              if (old.some((v) => v?.id === formattedVehicle.id)) return old;
-              return [formattedVehicle, ...old];
-            }
-            if (typeof old === "object" && Array.isArray(old.vehicles)) {
-              if (old.vehicles.some((v: any) => v?.id === formattedVehicle.id)) return old;
-              return {
-                ...old,
-                vehicles: [formattedVehicle, ...old.vehicles],
-              };
-            }
-            return old;
-          });
-          queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
+
+          queryClient.setQueriesData(
+            { queryKey: [...vehicleKeys.all, "all"] },
+            (old: any) => {
+              if (!old) return [formattedVehicle];
+              if (Array.isArray(old)) {
+                if (old.some((v) => v?.id === formattedVehicle.id)) return old;
+                return [formattedVehicle, ...old];
+              }
+              if (typeof old === "object" && Array.isArray(old.vehicles)) {
+                if (old.vehicles.some((v: any) => v?.id === formattedVehicle.id)) return old;
+                return { ...old, vehicles: [formattedVehicle, ...old.vehicles] };
+              }
+              return [formattedVehicle];
+            },
+          );
+
+          await queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
+
+          lastCreatedVehicleRef.current = formattedVehicle;
           onChange(createdVehicle.id);
         }
         setShowInlineCreate(false);
@@ -175,6 +180,7 @@ export function VehicleSelectWithCreate({
   }
 
   const handleSelectVehicle = (vehicle: Vehicle) => {
+    lastCreatedVehicleRef.current = null;
     onChange(vehicle.id);
     setIsOpen(false);
     setSearchQuery("");
@@ -182,6 +188,7 @@ export function VehicleSelectWithCreate({
 
   const handleClearSelection = (e: React.MouseEvent) => {
     e.stopPropagation();
+    lastCreatedVehicleRef.current = null;
     onChange("");
     setSearchQuery("");
   };

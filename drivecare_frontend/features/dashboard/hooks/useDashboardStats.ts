@@ -12,6 +12,8 @@ export function useDashboardStats() {
     queryKey: dashboardKeys.stats(activeBranch?.id),
     queryFn: () => getDashboardStats(activeBranch?.id),
     enabled: true,
-    placeholderData: (prev) => prev,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }

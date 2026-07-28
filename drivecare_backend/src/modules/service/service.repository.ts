@@ -27,6 +27,7 @@ export class ServiceRepository {
     search?: string;
     branchId?: string;
     status?: string;
+    createdById?: string;
   }) {
     const where: Record<string, unknown> = {};
 
@@ -36,6 +37,10 @@ export class ServiceRepository {
 
     if (params.status) {
       where.status = params.status;
+    }
+
+    if (params.createdById) {
+      where.createdById = params.createdById;
     }
 
     if (params.search) {
@@ -130,6 +135,7 @@ export class ServiceRepository {
     estimatedHours?: number;
     estimatedCost?: number;
     assignedTo?: string;
+    createdById?: string;
   }): Promise<JobCard> {
     return prisma.jobCard.create({ data });
   }
@@ -157,6 +163,9 @@ export class ServiceRepository {
           },
         },
         vehicle: true,
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         inspections: true,
         estimates: true,
       },
@@ -179,6 +188,9 @@ export class ServiceRepository {
           },
         },
         vehicle: true,
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         inspections: true,
         estimates: true,
       },

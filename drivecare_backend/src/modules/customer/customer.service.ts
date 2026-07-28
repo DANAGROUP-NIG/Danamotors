@@ -10,13 +10,14 @@ export class CustomerService {
     this.customerRepository = new CustomerRepository();
   }
 
-  async listCustomers(params: { page: number; limit: number; search?: string; branchId?: string }) {
+  async listCustomers(params: { page: number; limit: number; search?: string; branchId?: string; createdById?: string }) {
     const skip = (params.page - 1) * params.limit;
     const { customers, total } = await this.customerRepository.listCustomers({
       skip,
       take: params.limit,
       search: params.search,
       branchId: params.branchId,
+      createdById: params.createdById,
     });
 
     return {
@@ -35,6 +36,7 @@ export class CustomerService {
         country: customer.country,
         preferredContactMethod: customer.preferredContactMethod,
         branchId: customer.branchId,
+        createdBy: (customer as any).createdBy ?? null,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
       })),
@@ -89,6 +91,7 @@ export class CustomerService {
     country?: string;
     preferredContactMethod?: string;
     branchId: string;
+    createdById?: string;
   }) {
     const existing = await prisma.customer.findUnique({ where: { email: data.email } });
     if (existing) {
@@ -109,6 +112,7 @@ export class CustomerService {
       country: data.country,
       preferredContactMethod: data.preferredContactMethod,
       branchId: data.branchId,
+      createdById: data.createdById,
     });
 
     return {

@@ -10,13 +10,14 @@ export class VehicleService {
     this.vehicleRepository = new VehicleRepository();
   }
 
-  async listVehicles(params: { page: number; limit: number; search?: string; branchId?: string }) {
+  async listVehicles(params: { page: number; limit: number; search?: string; branchId?: string; createdById?: string }) {
     const skip = (params.page - 1) * params.limit;
     const { vehicles, total } = await this.vehicleRepository.listVehicles({
       skip,
       take: params.limit,
       search: params.search,
       branchId: params.branchId,
+      createdById: params.createdById,
     });
 
     return {
@@ -38,6 +39,7 @@ export class VehicleService {
           firstName: vehicle.customer.firstName,
           lastName: vehicle.customer.lastName,
         },
+        createdBy: (vehicle as any).createdBy ?? null,
         imagesCount: vehicle.images.length,
         ownershipsCount: vehicle.ownerships.length,
         createdAt: vehicle.createdAt,
@@ -95,6 +97,7 @@ export class VehicleService {
     warrantyStatus?: string;
     warrantyExpiresAt?: string;
     ownershipStatus?: string;
+    createdById?: string;
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) {
@@ -118,6 +121,7 @@ export class VehicleService {
       warrantyStatus: data.warrantyStatus,
       warrantyExpiresAt: data.warrantyExpiresAt ? new Date(data.warrantyExpiresAt) : undefined,
       ownershipStatus: data.ownershipStatus,
+      createdById: data.createdById,
     });
   }
 

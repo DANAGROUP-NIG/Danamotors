@@ -15,12 +15,17 @@ export class CustomerController {
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
       let branchId = req.query.branchId as string | undefined;
+      let createdById: string | undefined;
 
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
         branchId = req.user.branchId ?? undefined;
       }
 
-      const result = await this.customerService.listCustomers({ page, limit, search, branchId });
+      if (req.user && req.user.role === ROLES.RECEPTIONIST) {
+        createdById = req.user.userId;
+      }
+
+      const result = await this.customerService.listCustomers({ page, limit, search, branchId, createdById });
 
       res.status(200).json({
         status: 'success',
@@ -54,7 +59,8 @@ export class CustomerController {
 
   createCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.customerService.createCustomer(req.body);
+      const createdById = req.user?.userId;
+      const result = await this.customerService.createCustomer({ ...req.body, createdById });
 
       res.status(201).json({
         status: 'success',

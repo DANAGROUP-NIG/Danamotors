@@ -1,25 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   CalendarDays,
-  Clock,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Plus,
   Car,
   CheckCircle2,
   UserPlus,
   ClipboardList,
+  ChevronDown,
+  CalendarCheck,
+  Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useDashboardStats } from "../hooks/useDashboardStats";
+import { Button } from "@/components/ui/button";
 
-const TABS = ["Day", "7 Days", "Week", "Month"] as const;
-type Tab = (typeof TABS)[number];
+const PERIODS = ["Today", "Yesterday", "Last Week", "Last Month"] as const;
+type Period = (typeof PERIODS)[number];
+
+const APT_FILTERS = ["Today", "Tomorrow", "This Week"] as const;
+type AptFilter = (typeof APT_FILTERS)[number];
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-GB", {
@@ -37,16 +42,32 @@ function fmtDate(iso: string) {
 
 export default function ReceptionistDashboard() {
   const { user } = useAuth();
-  const { data, isLoading, isError } = useDashboardStats();
-  const [activeTab, setActiveTab] = useState<Tab>("Day");
+  const { data, isLoading, isFetching, isError } = useDashboardStats();
+  const [activePeriod, setActivePeriod] = useState<Period>("Today");
+  const [aptFilter, setAptFilter] = useState<AptFilter>("Today");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  if (isLoading) {
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  if (isFetching) {
     return (
       <div className="flex flex-col gap-6 p-4 lg:p-6 animate-pulse">
         <div className="h-6 w-48 rounded bg-slate-200" />
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
               className="h-32 rounded-xl border border-[#e8edf3] bg-white p-5"
@@ -57,6 +78,10 @@ export default function ReceptionistDashboard() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
+          <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
         </div>
       </div>
     );
@@ -71,281 +96,244 @@ export default function ReceptionistDashboard() {
     );
   }
 
-  const todayDelta =
-    data.yesterdayBookings > 0
-      ? Math.round(
-          ((data.todayBookings - data.yesterdayBookings) /
-            data.yesterdayBookings) *
-            100 *
-            10,
-        ) / 10
-      : data.todayBookings > 0
-        ? 100
-        : 0;
-
-  const tabStats: Record<Tab, { value: number; delta: number; deltaLabel: string }> = {
-    Day: {
-      value: data.todayBookings,
-      delta: todayDelta,
+  const periodStats: Record<
+    Period,
+    { value: number; delta: number; deltaLabel: string }
+  > = {
+    Today: {
+      value: data.myTodayBookings,
+      delta:
+        data.myYesterdayBookings > 0
+          ? Math.round(
+              ((data.myTodayBookings - data.myYesterdayBookings) /
+                Math.max(data.myYesterdayBookings, 1)) *
+                100 *
+                10,
+            ) / 10
+          : data.myTodayBookings > 0
+            ? 100
+            : 0,
       deltaLabel: "vs yesterday",
     },
-    "7 Days": {
-      value: data.last7DaysBookings,
-      delta: data.weekBookingsDelta,
-      deltaLabel: "vs previous 7 days",
+    Yesterday: {
+      value: data.myYesterdayBookings,
+      delta:
+        data.yesterdayBookings > 0
+          ? Math.round(
+              ((data.myYesterdayBookings - data.myTodayBookings) /
+                Math.max(data.myTodayBookings, 1)) *
+                100 *
+                10,
+            ) / 10
+          : data.myYesterdayBookings > 0
+            ? 100
+            : 0,
+      deltaLabel: "vs today",
     },
-    Week: {
-      value: data.weekBookings,
+    "Last Week": {
+      value: data.myWeekBookings,
       delta: data.weekBookingsDelta,
-      deltaLabel: "vs last week",
+      deltaLabel: "vs prev week",
     },
-    Month: {
-      value: data.monthBookings,
+    "Last Month": {
+      value: data.myLastMonthBookings,
       delta: data.monthBookingsDelta,
-      deltaLabel: "vs last month",
+      deltaLabel: "vs prev month",
     },
   };
 
-  const current = tabStats[activeTab];
+  const current = periodStats[activePeriod];
+
+  const periodLabel: Record<Period, string> = {
+    Today: "Today's Bookings",
+    Yesterday: "Yesterday's Bookings",
+    "Last Week": "This Week",
+    "Last Month": "This Month",
+  };
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const endOfWeek = new Date(now);
+  const dow = endOfWeek.getDay();
+  endOfWeek.setDate(endOfWeek.getDate() + (7 - (dow === 0 ? 7 : dow)));
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const filteredAppointments = data.upcomingAppointments.filter((apt) => {
+    const aptDate = new Date(apt.scheduledAt).toISOString().slice(0, 10);
+    if (aptFilter === "Today") return aptDate === todayStr;
+    if (aptFilter === "Tomorrow") return aptDate === tomorrowStr;
+    if (aptFilter === "This Week") return new Date(apt.scheduledAt) <= endOfWeek;
+    return true;
+  });
 
   return (
     <div className="flex flex-col gap-6 p-4 lg:p-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">
-            Welcome back, {user?.firstName} 👋
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Here&apos;s your booking overview
-          </p>
-        </div>
-        <button
-          onClick={() => router.push("/appointments")}
-          className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-primary/30 transition hover:bg-primary/90"
-        >
-          <Plus className="size-4" />
-          Book Appointment
-        </button>
+      <div>
+        <h1 className="text-xl font-bold text-foreground">
+          Welcome back, {user?.firstName} 👋
+        </h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Here&apos;s your booking overview
+        </p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <button
-          onClick={() => router.push("/appointments")}
-          className="flex items-center gap-3 rounded-xl border border-[#e8edf3] bg-white p-4 shadow-sm transition hover:border-primary/30 hover:bg-primary/5"
-        >
-          <span className="inline-grid size-10 place-items-center rounded-lg bg-primary/10">
-            <CalendarDays className="size-5 text-primary" />
-          </span>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">Book Appointment</p>
-            <p className="text-xs text-muted-foreground">Schedule a service</p>
-          </div>
-        </button>
-        <button
-          onClick={() => router.push("/customers")}
-          className="flex items-center gap-3 rounded-xl border border-[#e8edf3] bg-white p-4 shadow-sm transition hover:border-primary/30 hover:bg-primary/5"
-        >
-          <span className="inline-grid size-10 place-items-center rounded-lg bg-emerald-50">
-            <UserPlus className="size-5 text-emerald-600" />
-          </span>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">New Customer</p>
-            <p className="text-xs text-muted-foreground">Register a customer</p>
-          </div>
-        </button>
-        <button
-          onClick={() => router.push("/vehicles")}
-          className="flex items-center gap-3 rounded-xl border border-[#e8edf3] bg-white p-4 shadow-sm transition hover:border-primary/30 hover:bg-primary/5"
-        >
-          <span className="inline-grid size-10 place-items-center rounded-lg bg-blue-50">
-            <Car className="size-5 text-blue-600" />
-          </span>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">Add Vehicle</p>
-            <p className="text-xs text-muted-foreground">Register a vehicle</p>
-          </div>
-        </button>
-        <button
-          onClick={() => router.push("/job-cards")}
-          className="flex items-center gap-3 rounded-xl border border-[#e8edf3] bg-white p-4 shadow-sm transition hover:border-primary/30 hover:bg-primary/5"
-        >
-          <span className="inline-grid size-10 place-items-center rounded-lg bg-amber-50">
-            <ClipboardList className="size-5 text-amber-600" />
-          </span>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">Job Cards</p>
-            <p className="text-xs text-muted-foreground">View all jobs</p>
-          </div>
-        </button>
-      </div>
-
-      {/* Period tabs */}
-      <div className="flex gap-1 rounded-lg border border-[#e8edf3] bg-white p-1 shadow-sm w-fit">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-xs font-semibold transition",
-              activeTab === tab
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* Active period bookings */}
-        <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
+      {/* KPI Cards Row */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Overall Performance with dropdown */}
+        <div className="relative flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">
-              {activeTab === "Day"
-                ? "Today's Bookings"
-                : activeTab === "Week"
-                  ? "This Week"
-                  : activeTab === "7 Days"
-                    ? "Last 7 Days"
-                    : "This Month"}
+              {periodLabel[activePeriod]}
             </p>
-            <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
-              <CalendarDays className="size-4 text-blue-600" />
+            <span className="inline-grid size-8 place-items-center rounded-lg bg-primary/10">
+              <ClipboardList className="size-4 text-primary" />
             </span>
           </div>
           <p className="text-2xl font-extrabold text-foreground">
             {current.value}
           </p>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 text-xs font-semibold",
-              current.delta >= 0 ? "text-emerald-600" : "text-red-500",
+          {activePeriod === "Yesterday" ? (
+            <span className="text-xs text-muted-foreground">&nbsp;</span>
+          ) : (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-xs font-semibold",
+                current.delta >= 0 ? "text-emerald-600" : "text-red-500",
+              )}
+            >
+              {current.delta >= 0 ? (
+                <TrendingUp className="size-3.5" />
+              ) : (
+                <TrendingDown className="size-3.5" />
+              )}
+              {current.delta >= 0 ? "+" : ""}
+              {current.delta}% {current.deltaLabel}
+            </span>
+          )}
+
+          {/* Dropdown */}
+          <div ref={dropdownRef} className="mt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-between gap-2 rounded-lg border-[#e8edf3] bg-slate-50 px-3 text-xs font-semibold text-foreground hover:bg-slate-100"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            >
+              {activePeriod}
+              <ChevronDown
+                className={cn(
+                  "size-3.5 text-muted-foreground transition-transform",
+                  dropdownOpen && "rotate-180",
+                )}
+              />
+            </Button>
+            {dropdownOpen && (
+              <div className="absolute left-5 right-5 z-10 mt-1 overflow-hidden rounded-lg border border-[#e8edf3] bg-white shadow-lg">
+                {PERIODS.map((p) => (
+                  <Button
+                    key={p}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "w-full justify-start rounded-none px-3 text-xs font-medium",
+                      activePeriod === p
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground",
+                    )}
+                    onClick={() => {
+                      setActivePeriod(p);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    {p}
+                  </Button>
+                ))}
+              </div>
             )}
-          >
-            {current.delta >= 0 ? (
-              <TrendingUp className="size-3.5" />
-            ) : (
-              <TrendingDown className="size-3.5" />
-            )}
-            {current.delta >= 0 ? "+" : ""}
-            {current.delta}% {current.deltaLabel}
-          </span>
+          </div>
         </div>
 
-        {/* Pending */}
+        {/* Today's Available Appointments */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">
-              Pending
+              Available Today
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
-              <Clock className="size-4 text-amber-500" />
+              <CalendarCheck className="size-4 text-amber-500" />
             </span>
           </div>
           <p className="text-2xl font-extrabold text-foreground">
-            {data.pendingAppointments}
+            {data.todayAvailableAppointments.filter(
+              (a) => a.status === "Pending" && new Date(a.scheduledAt).toISOString().slice(0, 10) === todayStr,
+            ).length}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Appointments scheduled for today
           </p>
         </div>
 
-        {/* Yesterday */}
+        {/* Total My Appointments */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">
-              Yesterday
-            </p>
-            <span className="inline-grid size-8 place-items-center rounded-lg bg-slate-100">
-              <CalendarDays className="size-4 text-slate-500" />
-            </span>
-          </div>
-          <p className="text-2xl font-extrabold text-foreground">
-            {data.yesterdayBookings}
-          </p>
-        </div>
-
-        {/* Active Jobs (in-progress across branch) */}
-        <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
-              Active Jobs
+              Total Appointments
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
               <CheckCircle2 className="size-4 text-green-600" />
             </span>
           </div>
           <p className="text-2xl font-extrabold text-foreground">
-            {data.inProgressJobs}
+            {data.myTotalBookings}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            All your booked appointments
           </p>
         </div>
       </div>
 
-      {/* Bookings by status + Upcoming */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.6fr]">
-        {/* Bookings by status */}
-        <div className="rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
-          <p className="mb-4 text-sm font-semibold text-foreground">
-            Bookings by Status
-          </p>
-          {data.bookingsByStatus.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {data.bookingsByStatus.map((s) => {
-                const total = data.bookingsByStatus.reduce(
-                  (sum, item) => sum + item.value,
-                  0,
-                );
-                const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
-                return (
-                  <div key={s.name} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ background: s.color }}
-                        />
-                        {s.name}
-                      </span>
-                      <span className="text-xs font-bold text-foreground">
-                        {s.value}
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${pct}%`,
-                          background: s.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <CheckCircle2 className="size-8 text-slate-300" />
-              <p className="text-sm text-muted-foreground">No bookings yet</p>
-            </div>
-          )}
-        </div>
-
+      {/* Bottom grid: Upcoming (wider) + Quick Links */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
         {/* Upcoming Appointments */}
         <div className="rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">
               Upcoming Appointments
             </p>
-            <a
-              href="/appointments"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              View all →
+            <a href="/appointments">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs font-semibold text-primary hover:text-primary/80"
+              >
+                View all →
+              </Button>
             </a>
           </div>
-          {data.upcomingAppointments.length > 0 ? (
+
+          {/* Filter chips */}
+          <div className="mb-3 flex gap-1.5">
+            {APT_FILTERS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setAptFilter(f)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                  aptFilter === f
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          {filteredAppointments.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -358,7 +346,7 @@ export default function ReceptionistDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f1f5f9]">
-                  {data.upcomingAppointments.map(
+                  {filteredAppointments.map(
                     (apt: {
                       id: string;
                       scheduledAt: string;
@@ -367,7 +355,7 @@ export default function ReceptionistDashboard() {
                       branch: string;
                       status: string;
                     }) => (
-                      <tr key={apt.id} className="hover:bg-slate-50">
+                      <tr key={apt.id} className="cursor-pointer hover:bg-slate-50" onClick={() => router.push(`/appointments/${apt.id}`)}>
                         <td className="py-2.5">
                           <div className="flex flex-col">
                             <span className="font-medium text-foreground">
@@ -420,6 +408,70 @@ export default function ReceptionistDashboard() {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Quick Links */}
+        <div className="flex flex-col gap-4 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="inline-grid size-8 place-items-center rounded-lg bg-primary/10">
+              <Zap className="size-4 text-primary" />
+            </span>
+            <p className="text-sm font-semibold text-foreground">Quick Links</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              className="h-auto justify-start gap-3 rounded-lg border-[#e8edf3] px-4 py-3 text-left"
+              onClick={() => router.push("/appointments")}
+            >
+              <span className="inline-grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10">
+                <CalendarDays className="size-4.5 text-primary" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  New Appointment
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Schedule a service
+                </p>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-auto justify-start gap-3 rounded-lg border-[#e8edf3] px-4 py-3 text-left"
+              onClick={() => router.push("/customers")}
+            >
+              <span className="inline-grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50">
+                <UserPlus className="size-4.5 text-emerald-600" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Register Customer
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Add a new customer
+                </p>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-auto justify-start gap-3 rounded-lg border-[#e8edf3] px-4 py-3 text-left"
+              onClick={() => router.push("/vehicles")}
+            >
+              <span className="inline-grid size-9 shrink-0 place-items-center rounded-lg bg-blue-50">
+                <Car className="size-4.5 text-blue-600" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Register Vehicle
+                </p>
+                <p className="text-xs text-muted-foreground">Add a vehicle</p>
+              </div>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

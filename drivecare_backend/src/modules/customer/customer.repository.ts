@@ -2,7 +2,7 @@ import prisma from '../../prisma/client';
 import { Customer, CustomerDocument, ServiceHistory, Prisma } from '@prisma/client';
 
 export class CustomerRepository {
-  async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string }) {
+  async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
     const where: Record<string, any> = {};
 
     if (params.search) {
@@ -18,12 +18,21 @@ export class CustomerRepository {
       where.branchId = params.branchId;
     }
 
+    if (params.createdById) {
+      where.createdById = params.createdById;
+    }
+
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
         where,
         skip: params.skip,
         take: params.take,
         orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+        },
       }),
       prisma.customer.count({ where }),
     ]);
@@ -55,6 +64,7 @@ export class CustomerRepository {
     country?: string;
     preferredContactMethod?: string;
     branchId: string;
+    createdById?: string;
   }): Promise<Customer> {
     return prisma.customer.create({
       data,

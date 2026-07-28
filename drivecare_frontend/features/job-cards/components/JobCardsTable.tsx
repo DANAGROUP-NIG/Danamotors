@@ -65,6 +65,7 @@ export function JobCardsTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Vehicle</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Branch</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Agent</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Progress</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
               </tr>
@@ -75,7 +76,7 @@ export function JobCardsTable() {
               ) : !data?.jobCards?.length ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     No job cards yet. They will appear here once created.
@@ -143,6 +144,9 @@ function JobCardRow({ jobCard }: { jobCard: JobCard }) {
       <td className="px-4 py-3 text-muted-foreground">{vehicleLabel}</td>
       <td className="px-4 py-3 text-muted-foreground">{customerName}</td>
       <td className="px-4 py-3 text-muted-foreground">{jobCard.branch.name}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {jobCard.createdBy ? jobCard.createdBy.firstName : <span className="text-border">—</span>}
+      </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
@@ -188,7 +192,13 @@ function SkeletonRows() {
             <div className="h-4 w-28 animate-pulse rounded bg-muted" />
           </td>
           <td className="px-4 py-3">
+            <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
             <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
           </td>
           <td className="px-4 py-3">
             <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />

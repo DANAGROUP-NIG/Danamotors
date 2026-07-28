@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { appointmentKeys } from "../api/appointment.keys";
+import { dashboardKeys } from "@/features/dashboard/api/dashboard.keys";
 import { deleteAppointmentRequest } from "../api/appointment.api";
 
 export function useDeleteAppointment() {
@@ -10,6 +11,7 @@ export function useDeleteAppointment() {
     mutationFn: (id: string) => deleteAppointmentRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       toast.success("Appointment deleted");
     },
     onError: (error: unknown) => {
