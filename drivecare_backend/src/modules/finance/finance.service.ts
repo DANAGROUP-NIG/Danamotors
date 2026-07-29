@@ -47,7 +47,7 @@ export class FinanceService {
     });
   }
 
-  async listInvoices(params?: { branchId?: string }) {
+  async listInvoices(params?: { branchId?: string; customerId?: string }) {
     return this.financeRepository.listInvoices(params);
   }
 

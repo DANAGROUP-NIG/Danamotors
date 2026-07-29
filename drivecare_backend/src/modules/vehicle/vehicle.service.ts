@@ -10,7 +10,7 @@ export class VehicleService {
     this.vehicleRepository = new VehicleRepository();
   }
 
-  async listVehicles(params: { page: number; limit: number; search?: string; branchId?: string; createdById?: string }) {
+  async listVehicles(params: { page: number; limit: number; search?: string; branchId?: string; createdById?: string; customerId?: string }) {
     const skip = (params.page - 1) * params.limit;
     const { vehicles, total } = await this.vehicleRepository.listVehicles({
       skip,
@@ -18,6 +18,7 @@ export class VehicleService {
       search: params.search,
       branchId: params.branchId,
       createdById: params.createdById,
+      customerId: params.customerId,
     });
 
     return {

@@ -6,11 +6,13 @@ export async function getJobCardsRequest(params?: {
   page?: number;
   limit?: number;
   branchId?: string;
+  customerId?: string;
 }): Promise<JobCardListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.branchId) query.set("branchId", params.branchId);
+  if (params?.customerId) query.set("customerId", params.customerId);
   const qs = query.toString();
   return apiGet<JobCardListResponse>(
     `${API_ROUTES.service.jobCards.base}${qs ? `?${qs}` : ""}`,

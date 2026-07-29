@@ -8,6 +8,7 @@ type UseAppointmentsParams = {
   search?: string;
   branchId?: string;
   status?: string;
+  customerId?: string;
 };
 
 export function useAppointments(params?: UseAppointmentsParams) {

@@ -2,7 +2,7 @@ import prisma from '../../prisma/client';
 import { Prisma, Vehicle, VehicleImage, VehicleOwnership } from '@prisma/client';
 
 export class VehicleRepository {
-  async listVehicles(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
+  async listVehicles(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string; customerId?: string }) {
     const where: Record<string, any> = {};
 
     if (params.search) {
@@ -12,6 +12,10 @@ export class VehicleRepository {
         { model: { contains: params.search, mode: 'insensitive' } },
         { color: { contains: params.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (params.customerId) {
+      where.customerId = params.customerId;
     }
 
     if (params.branchId) {

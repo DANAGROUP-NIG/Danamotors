@@ -8,6 +8,7 @@ type UseVehiclesParams = {
   limit?: number;
   search?: string;
   branchId?: string;
+  customerId?: string;
 };
 
 export function useVehicles(params?: UseVehiclesParams) {

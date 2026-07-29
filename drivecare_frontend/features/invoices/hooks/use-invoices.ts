@@ -4,6 +4,7 @@ import { getInvoicesRequest } from "../api/invoice.api";
 
 type UseInvoicesParams = {
   branchId?: string;
+  customerId?: string;
 };
 
 export function useInvoices(params?: UseInvoicesParams) {

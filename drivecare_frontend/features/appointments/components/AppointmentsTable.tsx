@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, SERVICE_UPDATE_ROLES } from "@/features/auth/roles";
 import { useAppointments } from "../hooks/use-appointments";
 import { AppointmentEditForm } from "./AppointmentEditForm";
 import { AppointmentDeleteButton } from "./AppointmentDeleteButton";
@@ -51,6 +51,8 @@ export function AppointmentsTable() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
   const canDelete = hasAccess(DELETE_ROLES);
+  const canEdit = hasAccess(SERVICE_UPDATE_ROLES);
+  const canManage = canEdit || canDelete;
   // SuperAdmin: null activeBranch = all branches; everyone else: locked to their branch
   const branchId = activeBranch?.id ?? undefined;
 
@@ -133,7 +135,7 @@ export function AppointmentsTable() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Notes</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Agent</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>
+                {canManage && <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -141,7 +143,7 @@ export function AppointmentsTable() {
                 <SkeletonRows />
               ) : !data?.appointments?.length ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={canManage ? 8 : 7} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     {statusFilter
                       ? `No appointments with status "${STATUS_LABELS[statusFilter]}"`
                       : "No appointments yet. Book one above."}
@@ -152,7 +154,9 @@ export function AppointmentsTable() {
                   <AppointmentRow
                     key={appt.id}
                     appointment={appt}
+                    canEdit={canEdit}
                     canDelete={canDelete}
+                    canManage={canManage}
                     onEdit={() => setEditingId(appt.id)}
                   />
                 ))
@@ -215,11 +219,15 @@ export function AppointmentsTable() {
 
 function AppointmentRow({
   appointment,
+  canEdit,
   canDelete,
+  canManage,
   onEdit,
 }: {
   appointment: Appointment;
+  canEdit: boolean;
   canDelete: boolean;
+  canManage: boolean;
   onEdit: () => void;
 }) {
   const router = useRouter();
@@ -265,20 +273,24 @@ function AppointmentRow({
       <td className="px-4 py-3 text-muted-foreground">
         {appointment.createdBy ? appointment.createdBy.firstName : <span className="text-border">—</span>}
       </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Edit appointment`}
-            onClick={onEdit}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-          {canDelete && <AppointmentDeleteButton appointment={appointment} />}
-        </div>
-      </td>
+      {canManage && (
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                aria-label={`Edit appointment`}
+                onClick={onEdit}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
+            {canDelete && <AppointmentDeleteButton appointment={appointment} />}
+          </div>
+        </td>
+      )}
     </tr>
   );
 }

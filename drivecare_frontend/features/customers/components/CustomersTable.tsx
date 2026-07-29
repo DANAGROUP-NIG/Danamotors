@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, CUSTOMER_CREATE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, CUSTOMER_UPDATE_ROLES } from "@/features/auth/roles";
 import { useCustomers } from "../hooks/use-customers";
 import { getCustomerInitials } from "../services/customer.service";
 import { CustomerDeleteButton } from "./CustomerDeleteButton";
@@ -27,7 +27,7 @@ export function CustomersTable() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
   const canDelete = hasAccess(DELETE_ROLES);
-  const canEdit = hasAccess(CUSTOMER_CREATE_ROLES);
+  const canEdit = hasAccess(CUSTOMER_UPDATE_ROLES);
   const canManage = canEdit || canDelete;
 
   // Reset to page 1 when branch changes

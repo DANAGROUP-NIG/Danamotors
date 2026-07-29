@@ -2,8 +2,12 @@ import prisma from '../../prisma/client';
 import { Invoice, Payment, Receipt } from '@prisma/client';
 
 export class FinanceRepository {
-  async listInvoices(params?: { branchId?: string }): Promise<Invoice[]> {
+  async listInvoices(params?: { branchId?: string; customerId?: string }): Promise<Invoice[]> {
     const where: Record<string, any> = {};
+
+    if (params?.customerId) {
+      where.customerId = params.customerId;
+    }
 
     if (params?.branchId) {
       where.jobCard = { branchId: params.branchId };

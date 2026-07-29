@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { FINANCE_ROLES, WORKSHOP_ROLES, MANAGE_ROLES } from "@/features/auth/roles";
 import { useDashboardStats } from "../hooks/useDashboardStats";
+import { useEffect, useState } from "react";
 
 import { DashboardWelcomeHeader } from "./common/DashboardWelcomeHeader";
 import { InventoryAlertBanner } from "./common/InventoryAlertBanner";
@@ -21,12 +22,15 @@ function fmtFull(n: number) {
 export default function AdminDashboard() {
   const { user, hasAccess } = useAuth();
   const { data, isLoading, isError } = useDashboardStats();
+  const [today, setToday] = useState("");
 
-  const today = new Date().toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }));
+  }, []);
 
   const canSeeFinance = hasAccess(FINANCE_ROLES);
   const canSeeWorkshop = hasAccess(WORKSHOP_ROLES);

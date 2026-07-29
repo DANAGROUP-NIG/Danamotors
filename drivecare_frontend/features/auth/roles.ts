@@ -54,6 +54,12 @@ export const CUSTOMER_CREATE_ROLES: AppRole[] = [
   "receptionist",
   "receptionmanager",
 ];
+export const CUSTOMER_UPDATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "serviceadviser",
+  "receptionmanager",
+];
 export const VEHICLE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
@@ -71,6 +77,13 @@ export const VEHICLE_CREATE_ROLES: AppRole[] = [
   "receptionist",
   "receptionmanager",
 ];
+export const VEHICLE_UPDATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+  "serviceadviser",
+  "receptionmanager",
+];
 export const TECHNICIAN_ROLES: AppRole[] = [
   "superadmin",
   "admin",
@@ -79,6 +92,15 @@ export const TECHNICIAN_ROLES: AppRole[] = [
 ];
 
 export const BRANCH_ROLES: AppRole[] = ["superadmin"];
+
+export const SERVICE_UPDATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "serviceadviser",
+  "workshopmanager",
+  "technician",
+  "receptionmanager",
+];
 
 // Roles allowed to delete records (no delete for receptionist, viewer, etc.)
 export const DELETE_ROLES: AppRole[] = [

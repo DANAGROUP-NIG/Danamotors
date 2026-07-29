@@ -21,10 +21,11 @@ export class FinanceController {
   listInvoices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       let branchId = req.query.branchId as string | undefined;
+      const customerId = req.query.customerId as string | undefined;
       if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
         branchId = req.user.branchId ?? undefined;
       }
-      const result = await this.financeService.listInvoices({ branchId });
+      const result = await this.financeService.listInvoices({ branchId, customerId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { invoices: result } });
     } catch (error) {
       next(error);

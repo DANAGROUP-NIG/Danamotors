@@ -47,6 +47,7 @@ export class ServiceService {
     branchId?: string;
     status?: string;
     createdById?: string;
+    customerId?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { appointments, total } = await this.serviceRepository.listAppointments({
@@ -56,6 +57,7 @@ export class ServiceService {
       branchId: params.branchId,
       status: params.status,
       createdById: params.createdById,
+      customerId: params.customerId,
     });
 
     return {
@@ -151,14 +153,17 @@ export class ServiceService {
     });
   }
 
-  async listJobCards(params?: { page?: number; limit?: number; branchId?: string }) {
+  async listJobCards(params?: { page?: number; limit?: number; branchId?: string; customerId?: string }) {
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 50;
     const skip = (page - 1) * limit;
+    const where: Record<string, unknown> = {};
+    if (params?.branchId) where.branchId = params.branchId;
+    if (params?.customerId) where.customerId = params.customerId;
 
     const [jobCards, total] = await Promise.all([
-      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId }),
-      prisma.jobCard.count({ where: params?.branchId ? { branchId: params.branchId } : {} }),
+      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId, customerId: params?.customerId }),
+      prisma.jobCard.count({ where }),
     ]);
 
     return {

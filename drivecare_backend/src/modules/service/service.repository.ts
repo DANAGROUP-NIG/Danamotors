@@ -28,6 +28,7 @@ export class ServiceRepository {
     branchId?: string;
     status?: string;
     createdById?: string;
+    customerId?: string;
   }) {
     const where: Record<string, unknown> = {};
 
@@ -41,6 +42,10 @@ export class ServiceRepository {
 
     if (params.createdById) {
       where.createdById = params.createdById;
+    }
+
+    if (params.customerId) {
+      where.customerId = params.customerId;
     }
 
     if (params.search) {
@@ -140,11 +145,15 @@ export class ServiceRepository {
     return prisma.jobCard.create({ data });
   }
 
-  async listJobCards(params?: { skip?: number; take?: number; branchId?: string }) {
+  async listJobCards(params?: { skip?: number; take?: number; branchId?: string; customerId?: string }) {
     const where: Record<string, unknown> = {};
 
     if (params?.branchId) {
       where.branchId = params.branchId;
+    }
+
+    if (params?.customerId) {
+      where.customerId = params.customerId;
     }
 
     return prisma.jobCard.findMany({

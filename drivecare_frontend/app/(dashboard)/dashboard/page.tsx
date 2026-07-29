@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { TrendingUp, Wrench, Car, CheckCircle2 } from "lucide-react";
-import { cn, today } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { AppRole } from "@/features/auth/hooks/use-auth";
 import ModalFame from "@/components/modals/ModalFame";
@@ -32,6 +32,15 @@ const MANAGE_ROLES: AppRole[] = ["admin"];
 export default function DashboardPage() {
   const { user, hasAccess, isReceptionist, isReceptionManager } = useAuth();
   const [showNewJobCard, setShowNewJobCard] = useState(false);
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }));
+  }, []);
 
   const totalJobs = useMemo(
     () => JOBS_BY_STATUS.reduce((s, d) => s + d.value, 0),

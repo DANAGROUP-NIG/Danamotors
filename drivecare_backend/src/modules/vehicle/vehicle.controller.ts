@@ -14,6 +14,7 @@ export class VehicleController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
+      const customerId = req.query.customerId as string | undefined;
       let branchId = req.query.branchId as string | undefined;
       let createdById: string | undefined;
 
@@ -25,7 +26,7 @@ export class VehicleController {
         createdById = req.user.userId;
       }
 
-      const result = await this.vehicleService.listVehicles({ page, limit, search, branchId, createdById });
+      const result = await this.vehicleService.listVehicles({ page, limit, search, branchId, createdById, customerId });
 
       res.status(200).json({
         status: 'success',

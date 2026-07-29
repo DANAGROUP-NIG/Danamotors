@@ -6,6 +6,7 @@ type UseJobCardsParams = {
   page?: number;
   limit?: number;
   branchId?: string;
+  customerId?: string;
 };
 
 export function useJobCards(params?: UseJobCardsParams) {

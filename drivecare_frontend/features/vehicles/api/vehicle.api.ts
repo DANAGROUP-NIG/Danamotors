@@ -12,12 +12,14 @@ export async function getVehiclesRequest(params?: {
   limit?: number;
   search?: string;
   branchId?: string;
+  customerId?: string;
 }): Promise<VehicleListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.search) query.set("search", params.search);
   if (params?.branchId) query.set("branchId", params.branchId);
+  if (params?.customerId) query.set("customerId", params.customerId);
   const qs = query.toString();
   return apiGet<VehicleListResponse>(
     `${API_ROUTES.vehicles.base}${qs ? `?${qs}` : ""}`,
