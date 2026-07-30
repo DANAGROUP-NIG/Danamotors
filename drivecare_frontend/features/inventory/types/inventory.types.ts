@@ -4,30 +4,33 @@ export type InventoryItem = {
   name: string;
   description?: string;
   category: string;
-  quantity: number;
-  unitCost: number;
-  reorderLevel: number;
+  unitPrice: number;
   supplierId?: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type CreateInventoryItemPayload = {
+export type SparePartPayload = {
   partNumber: string;
   name: string;
   description?: string;
   category: string;
-  quantity: number;
-  unitCost: number;
-  reorderLevel: number;
-  supplierId?: string;
+  unitPrice: number;
 };
 
-export type UpdateInventoryItemPayload = Partial<CreateInventoryItemPayload>;
+export type UpdateSparePartPayload = Partial<SparePartPayload>;
 
-export type InventoryListResponse = {
-  items: InventoryItem[];
-  total: number;
-  page: number;
-  pageSize: number;
+export type BranchStockItem = {
+  id: string;
+  branchId: string;
+  partId: string;
+  quantity: number;
+  reservedQuantity: number;
+  minimumStock: number;
+  maximumStock: number | null;
+  part: InventoryItem;
+};
+
+export type BranchStockListResponse = {
+  stockItems: BranchStockItem[];
 };

@@ -17,7 +17,7 @@ export function InventoryCreateForm({ onSuccess }: InventoryCreateFormProps) {
   const create = useCreateInventoryItem();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateInventoryItemFormValues>({
     resolver: zodResolver(createInventoryItemSchema),
-    defaultValues: { quantity: 0, unitCost: 0, reorderLevel: 5 },
+    defaultValues: { unitPrice: 0 },
   });
 
   function onSubmit(values: CreateInventoryItemFormValues) {
@@ -41,19 +41,8 @@ export function InventoryCreateForm({ onSuccess }: InventoryCreateFormProps) {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
-        <Field label="Supplier ID (optional)" error={errors.supplierId?.message}>
-          <input className={inputCls} {...register("supplierId")} />
-        </Field>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Quantity" error={errors.quantity?.message}>
-          <input type="number" className={inputCls} {...register("quantity")} />
-        </Field>
-        <Field label="Unit cost (₦)" error={errors.unitCost?.message}>
-          <input type="number" className={inputCls} {...register("unitCost")} />
-        </Field>
-        <Field label="Reorder level" error={errors.reorderLevel?.message}>
-          <input type="number" className={inputCls} {...register("reorderLevel")} />
+        <Field label="Unit price (₦)" error={errors.unitPrice?.message}>
+          <input type="number" className={inputCls} {...register("unitPrice")} />
         </Field>
       </div>
       <Field label="Description (optional)" error={errors.description?.message}>

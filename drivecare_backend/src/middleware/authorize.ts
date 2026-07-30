@@ -56,7 +56,7 @@ export function assertBranchOwnership(
     throw new UnauthorizedError();
   }
 
-  if (req.user.role === ROLES.SUPER_ADMIN || req.user.role === ROLES.RECEPTION_MANAGER) {
+  if (req.user.role === ROLES.SUPER_ADMIN || req.user.role === ROLES.RECEPTION_MANAGER || req.user.role === ROLES.GENERAL_STORE_MANAGER) {
     return;
   }
 

@@ -20,12 +20,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, SERVICE_UPDATE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, SERVICE_UPDATE_ROLES, APPOINTMENT_UPDATE_ROLES } from "@/features/auth/roles";
 import { useAppointment } from "@/features/appointments";
 import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-appointment";
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
 import ModalFame from "@/components/modals/ModalFame";
 import { AppointmentEditForm } from "@/features/appointments/components/AppointmentEditForm";
+import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { AppRole } from "@/features/auth/roles";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
@@ -87,6 +88,7 @@ export default function AppointmentDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showJobCardCreate, setShowJobCardCreate] = useState(false);
 
   if (isLoading) {
     return (
@@ -116,7 +118,7 @@ export default function AppointmentDetailPage() {
   const nextStatus = NEXT_STATUS[appointment.status];
   const canTransition = nextStatus && hasAccess(STATUS_TRANSITION_ROLES[nextStatus] ?? []);
   const canCancel = hasAccess(CANCEL_ROLES) && appointment.status !== "Completed" && appointment.status !== "Cancelled";
-  const canEdit = hasAccess(SERVICE_UPDATE_ROLES);
+  const canEdit = hasAccess(APPOINTMENT_UPDATE_ROLES);
   const canDelete = hasAccess(DELETE_ROLES);
   const canCreateJobCard = hasAccess(SERVICE_UPDATE_ROLES) && appointment.status !== "Cancelled";
 
@@ -191,12 +193,10 @@ export default function AppointmentDetailPage() {
             </Button>
           )}
           {canCreateJobCard && (
-            <Link href={`/job-cards/new?appointmentId=${appointment.id}&customerId=${customer?.id}&vehicleId=${vehicle?.id}`}>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <Wrench className="size-4" />
-                Create Job Card
-              </Button>
-            </Link>
+            <Button size="sm" variant="outline" onClick={() => setShowJobCardCreate(true)} className="gap-1.5">
+              <Wrench className="size-4" />
+              Create Job Card
+            </Button>
           )}
           {canCancel && (
             <Button size="sm" variant="outline" onClick={handleCancel} disabled={update.isPending} className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700">
@@ -309,6 +309,18 @@ export default function AppointmentDetailPage() {
         <AppointmentEditForm
           appointment={appointment}
           onSuccess={() => setShowEdit(false)}
+        />
+      </ModalFame>
+
+      <ModalFame isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} title="Create Job Card">
+        <JobCardCreateForm
+          onSuccess={() => setShowJobCardCreate(false)}
+          defaultValues={{
+            appointmentId: appointment.id,
+            customerId: appointment.customerId,
+            vehicleId: appointment.vehicleId,
+            branchName: (branch?.name as string) ?? "",
+          }}
         />
       </ModalFame>
 

@@ -56,6 +56,61 @@ export class InventoryController {
     }
   };
 
+  // ── Branch Stock ───────────────────────────────────────────────────────
+
+  getBranchStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { branchId, partId } = req.params;
+      const result = await this.inventoryService.getBranchStock(branchId, partId);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { stock: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listBranchStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { branchId } = req.params;
+      const result = await this.inventoryService.listBranchStock(branchId);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { stockItems: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listAllStock = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.listAllStock();
+      res.status(200).json({ status: 'success', statusCode: 200, data: { stockItems: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  adjustStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.adjustStock({
+        ...req.body,
+        recordedById: req.user?.userId,
+      });
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Stock adjusted successfully', data: { stock: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listStockTransactions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { branchId, partId } = req.query as { branchId?: string; partId?: string };
+      const result = await this.inventoryService.listStockTransactions(branchId, partId);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { transactions: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Purchase Requests ──────────────────────────────────────────────────
+
   createPurchaseRequest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.inventoryService.createPurchaseRequest(req.body);
@@ -94,6 +149,8 @@ export class InventoryController {
     }
   };
 
+  // ── Part Issuances ─────────────────────────────────────────────────────
+
   createPartIssuance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.inventoryService.createPartIssuance(req.body);
@@ -122,6 +179,8 @@ export class InventoryController {
     }
   };
 
+  // ── Part Returns ───────────────────────────────────────────────────────
+
   createPartReturn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.inventoryService.createPartReturn(req.body);
@@ -145,6 +204,94 @@ export class InventoryController {
       const { id } = req.params;
       const result = await this.inventoryService.getPartReturn(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { partReturn: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Inter-Branch Transfers ─────────────────────────────────────────────
+
+  createTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.createTransfer({
+        ...req.body,
+        requestedById: req.user?.userId,
+      });
+      res.status(201).json({ status: 'success', statusCode: 201, message: 'Transfer created successfully', data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.getTransfer(id);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listTransfers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { status, requestingBranchId, sourceBranchId } = req.query as {
+        status?: string;
+        requestingBranchId?: string;
+        sourceBranchId?: string;
+      };
+      const result = await this.inventoryService.listTransfers({ status, requestingBranchId, sourceBranchId });
+      res.status(200).json({ status: 'success', statusCode: 200, data: { transfers: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  approveTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.approveTransfer(id, req.user!.userId);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer approved successfully', data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  dispatchTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.dispatchTransfer(id, req.user!.userId, req.body.items);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer dispatched successfully', data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  receiveTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.receiveTransfer(id, req.user!.userId, req.body.items);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer received successfully', data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  rejectTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.rejectTransfer(id, req.user!.userId, req.body.notes);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer rejected', data: { transfer: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancelTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.cancelTransfer(id);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer cancelled', data: { transfer: result } });
     } catch (error) {
       next(error);
     }

@@ -102,8 +102,8 @@ export class ServiceController {
 
   createJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST) {
-        throw new ForbiddenError('Receptionists cannot create job cards');
+      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
+        throw new ForbiddenError('Only workshop roles can create job cards');
       }
       const createdById = req.user?.userId;
       const result = await this.serviceService.createJobCard({ ...req.body, createdById });
@@ -118,13 +118,17 @@ export class ServiceController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 50;
       const customerId = req.query.customerId as string | undefined;
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
       if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
         branchId = req.user.branchId ?? undefined;
       }
 
-      const result = await this.serviceService.listJobCards({ page, limit, branchId, customerId });
+      const result = await this.serviceService.listJobCards({ page, limit, branchId, customerId, search, status, dateFrom, dateTo });
       res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);
@@ -143,6 +147,9 @@ export class ServiceController {
 
   updateJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
+        throw new ForbiddenError('Only workshop roles can update job cards');
+      }
       const { id } = req.params;
       const result = await this.serviceService.updateJobCard(id, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Job card updated successfully', data: { jobCard: result } });
@@ -153,8 +160,8 @@ export class ServiceController {
 
   addInspection = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST) {
-        throw new ForbiddenError('Receptionists cannot add inspections');
+      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
+        throw new ForbiddenError('Only workshop roles can add inspections');
       }
       const { id } = req.params;
       const result = await this.serviceService.addInspection(id, req.body);
@@ -166,8 +173,8 @@ export class ServiceController {
 
   addEstimate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST) {
-        throw new ForbiddenError('Receptionists cannot add estimates');
+      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
+        throw new ForbiddenError('Only workshop roles can add estimates');
       }
       const { id } = req.params;
       const result = await this.serviceService.addEstimate(id, req.body);
@@ -179,6 +186,9 @@ export class ServiceController {
 
   addApproval = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
+        throw new ForbiddenError('Only workshop roles can record approvals');
+      }
       const { id } = req.params;
       const result = await this.serviceService.addApproval(id, req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Customer approval recorded successfully', data: { approval: result } });

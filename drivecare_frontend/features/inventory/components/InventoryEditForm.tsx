@@ -25,10 +25,7 @@ export function InventoryEditForm({ item, onSuccess }: InventoryEditFormProps) {
       name: item.name,
       description: item.description ?? "",
       category: item.category,
-      quantity: item.quantity,
-      unitCost: item.unitCost,
-      reorderLevel: item.reorderLevel,
-      supplierId: item.supplierId ?? "",
+      unitPrice: item.unitPrice,
     },
   });
 
@@ -38,10 +35,7 @@ export function InventoryEditForm({ item, onSuccess }: InventoryEditFormProps) {
       name: item.name,
       description: item.description ?? "",
       category: item.category,
-      quantity: item.quantity,
-      unitCost: item.unitCost,
-      reorderLevel: item.reorderLevel,
-      supplierId: item.supplierId ?? "",
+      unitPrice: item.unitPrice,
     });
   }, [item, reset]);
 
@@ -65,19 +59,8 @@ export function InventoryEditForm({ item, onSuccess }: InventoryEditFormProps) {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
-        <Field label="Supplier ID (optional)" error={errors.supplierId?.message}>
-          <input className={inputCls} {...register("supplierId")} />
-        </Field>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Quantity" error={errors.quantity?.message}>
-          <input type="number" className={inputCls} {...register("quantity")} />
-        </Field>
-        <Field label="Unit cost (₦)" error={errors.unitCost?.message}>
-          <input type="number" className={inputCls} {...register("unitCost")} />
-        </Field>
-        <Field label="Reorder level" error={errors.reorderLevel?.message}>
-          <input type="number" className={inputCls} {...register("reorderLevel")} />
+        <Field label="Unit price (₦)" error={errors.unitPrice?.message}>
+          <input type="number" className={inputCls} {...register("unitPrice")} />
         </Field>
       </div>
       <Field label="Description (optional)" error={errors.description?.message}>

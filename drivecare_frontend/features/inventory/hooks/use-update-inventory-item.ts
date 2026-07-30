@@ -2,13 +2,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { inventoryKeys } from "../api/inventory.keys";
 import { updateInventoryItemRequest } from "../api/inventory.api";
-import type { UpdateInventoryItemPayload } from "../types/inventory.types";
+import type { UpdateSparePartPayload } from "../types/inventory.types";
 
 export function useUpdateInventoryItem(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: UpdateInventoryItemPayload) =>
+    mutationFn: (payload: UpdateSparePartPayload) =>
       updateInventoryItemRequest(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.detail(id) });

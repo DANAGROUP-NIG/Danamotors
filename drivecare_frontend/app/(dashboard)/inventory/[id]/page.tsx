@@ -41,9 +41,7 @@ export default function InventoryDetailPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailField label="Category" value={item.category} />
           <DetailField label="Description" value={item.description} />
-          <DetailField label="Quantity" value={item.quantity} />
-          <DetailField label="Unit Cost" value={item.unitCost ? `₦${item.unitCost.toLocaleString()}` : null} />
-          <DetailField label="Reorder Level" value={item.reorderLevel} />
+          <DetailField label="Unit Price" value={item.unitPrice ? `₦${item.unitPrice.toLocaleString()}` : null} />
         </div>
       </div>
     </div>

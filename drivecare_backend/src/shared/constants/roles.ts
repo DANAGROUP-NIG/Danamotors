@@ -1,7 +1,8 @@
 export const ROLES = {
   SUPER_ADMIN: "SuperAdmin",
   ADMIN: "Admin",
-  STORE_MANAGER: "StoreManager",
+  GENERAL_STORE_MANAGER: "GeneralStoreManager",
+  BRANCH_STORE_MANAGER: "BranchStoreManager",
   WORKSHOP_MANAGER: "WorkshopManager",
   ACCOUNTANT: "Accountant",
   SERVICE_ADVISOR: "ServiceAdviser",
@@ -56,6 +57,14 @@ export const PERMISSIONS = {
   INVENTORY_UPDATE: "inventory:update",
   INVENTORY_DELETE: "inventory:delete",
 
+  // Inventory Transfer
+  TRANSFER_READ: "transfer:read",
+  TRANSFER_CREATE: "transfer:create",
+  TRANSFER_UPDATE: "transfer:update",
+  TRANSFER_APPROVE: "transfer:approve",
+  TRANSFER_DISPATCH: "transfer:dispatch",
+  TRANSFER_RECEIVE: "transfer:receive",
+
   // Finance Management
   FINANCE_READ: "finance:read",
   FINANCE_CREATE: "finance:create",
@@ -93,14 +102,34 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.FINANCE_CREATE,
   ],
 
-  // Manages and oversees parts inventory
-  [ROLES.STORE_MANAGER]: [
+  // Cross-branch inventory manager: manages stock across ALL branches
+  [ROLES.GENERAL_STORE_MANAGER]: [
     PERMISSIONS.INVENTORY_READ,
     PERMISSIONS.INVENTORY_CREATE,
     PERMISSIONS.INVENTORY_UPDATE,
     PERMISSIONS.INVENTORY_DELETE,
+    PERMISSIONS.TRANSFER_READ,
+    PERMISSIONS.TRANSFER_CREATE,
+    PERMISSIONS.TRANSFER_UPDATE,
+    PERMISSIONS.TRANSFER_APPROVE,
+    PERMISSIONS.TRANSFER_DISPATCH,
+    PERMISSIONS.TRANSFER_RECEIVE,
     PERMISSIONS.SERVICE_READ,
     PERMISSIONS.VEHICLE_READ,
+    PERMISSIONS.CUSTOMER_READ,
+  ],
+
+  // Branch-scoped inventory manager: manages stock for their assigned branch only
+  [ROLES.BRANCH_STORE_MANAGER]: [
+    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.INVENTORY_CREATE,
+    PERMISSIONS.INVENTORY_UPDATE,
+    PERMISSIONS.TRANSFER_READ,
+    PERMISSIONS.TRANSFER_CREATE,
+    PERMISSIONS.TRANSFER_RECEIVE,
+    PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.VEHICLE_READ,
+    PERMISSIONS.CUSTOMER_READ,
   ],
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory

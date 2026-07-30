@@ -4,7 +4,8 @@
 export type AppRole =
   | "superadmin"
   | "admin"
-  | "storemanager"
+  | "generalstoremanager"
+  | "branchstoremanager"
   | "workshopmanager"
   | "accountant"
   | "serviceadviser"
@@ -31,12 +32,15 @@ export const WORKSHOP_ROLES: AppRole[] = [
   "technician",
   "receptionist",
   "receptionmanager",
+  "generalstoremanager",
+  "branchstoremanager",
 ];
 
 export const MANAGE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "storemanager",
+  "generalstoremanager",
+  "branchstoremanager",
   "workshopmanager",
 ];
 
@@ -46,6 +50,8 @@ export const CUSTOMER_ROLES: AppRole[] = [
   "serviceadviser",
   "receptionist",
   "receptionmanager",
+  "generalstoremanager",
+  "branchstoremanager",
 ];
 export const CUSTOMER_CREATE_ROLES: AppRole[] = [
   "superadmin",
@@ -68,6 +74,8 @@ export const VEHICLE_ROLES: AppRole[] = [
   "technician",
   "receptionist",
   "receptionmanager",
+  "generalstoremanager",
+  "branchstoremanager",
 ];
 export const VEHICLE_CREATE_ROLES: AppRole[] = [
   "superadmin",
@@ -93,7 +101,24 @@ export const TECHNICIAN_ROLES: AppRole[] = [
 
 export const BRANCH_ROLES: AppRole[] = ["superadmin"];
 
+export const SERVICE_CREATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+  "serviceadviser",
+  "generalstoremanager",
+  "branchstoremanager",
+];
+
 export const SERVICE_UPDATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "serviceadviser",
+  "workshopmanager",
+  "technician",
+];
+
+export const APPOINTMENT_UPDATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "serviceadviser",
@@ -106,7 +131,28 @@ export const SERVICE_UPDATE_ROLES: AppRole[] = [
 export const DELETE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "storemanager",
+  "generalstoremanager",
   "workshopmanager",
   "receptionmanager",
+];
+
+export const INVENTORY_MANAGER_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "generalstoremanager",
+  "branchstoremanager",
+  "workshopmanager",
+];
+
+export const USER_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+];
+
+export const TRANSFER_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "generalstoremanager",
+  "branchstoremanager",
 ];

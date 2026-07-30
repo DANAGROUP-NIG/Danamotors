@@ -14,6 +14,17 @@ export type Estimate = {
   amount: number;
   currency: string;
   status: string;
+  approvals?: CustomerApproval[];
+};
+
+export type CustomerApproval = {
+  id: string;
+  estimateId: string;
+  customerId: string;
+  approved: boolean | null;
+  decisionDate: string | null;
+  comments: string | null;
+  status: string;
 };
 
 export type JobCardAppointment = {
@@ -44,6 +55,47 @@ export type JobCardVehicle = {
   color: string;
 };
 
+export type PartIssuance = {
+  id: string;
+  quantity: number;
+  notes?: string;
+  issuedAt: string;
+  sparePart: {
+    id: string;
+    partNumber: string;
+    name: string;
+    unitPrice: number;
+  };
+  issuedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+  returns: PartReturn[];
+};
+
+export type PartReturn = {
+  id: string;
+  quantity: number;
+  reason?: string;
+  returnedAt: string;
+  status: string;
+};
+
+export type JobCardInvoice = {
+  id: string;
+  invoiceNumber: string;
+  issuedDate: string;
+  dueDate?: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: string;
+  notes?: string;
+  payments: unknown[];
+  receipts: unknown[];
+};
+
 export type JobCard = {
   id: string;
   jobNumber: string;
@@ -60,7 +112,10 @@ export type JobCard = {
   appointmentId?: string;
   customerId: string;
   vehicleId: string;
+  assignedTo?: string;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
+  technician?: { id: string; firstName: string; lastName: string } | null;
+  qualityInspector?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
   appointment?: JobCardAppointment;
@@ -69,6 +124,8 @@ export type JobCard = {
   vehicle: JobCardVehicle;
   inspections: Inspection[];
   estimates: Estimate[];
+  partIssuances?: PartIssuance[];
+  invoices?: JobCardInvoice[];
 };
 
 export type JobCardListResponse = {

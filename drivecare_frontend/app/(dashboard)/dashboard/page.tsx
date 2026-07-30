@@ -4,11 +4,11 @@ import { useMemo, useState, useEffect } from "react";
 import { TrendingUp, Wrench, Car, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import type { AppRole } from "@/features/auth/hooks/use-auth";
 import ModalFame from "@/components/modals/ModalFame";
 import { JobCardCreateForm } from "@/features/job-cards";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
 import ReceptionManagerDashboard from "@/features/dashboard/components/ReceptionManagerDashboard";
+import StoreManagerDashboard from "@/features/dashboard/components/StoreManagerDashboard";
 
 import { DashboardWelcomeHeader } from "@/features/dashboard/components/common/DashboardWelcomeHeader";
 import { InventoryAlertBanner } from "@/features/dashboard/components/common/InventoryAlertBanner";
@@ -19,18 +19,22 @@ import { TopTechniciansCard } from "@/features/dashboard/components/common/TopTe
 import { DashboardFallbackState } from "@/features/dashboard/components/common/DashboardFallbackState";
 
 import {
+  FINANCE_ROLES,
+  WORKSHOP_ROLES,
+  MANAGE_ROLES,
+  INVENTORY_MANAGER_ROLES,
+  SERVICE_CREATE_ROLES,
+} from "@/features/auth/roles";
+
+import {
   REVENUE_DATA,
   JOBS_BY_STATUS,
   TOP_TECHNICIANS,
   SPARKLINES,
 } from "@/constant";
 
-const FINANCE_ROLES: AppRole[] = ["admin", "accountant"];
-const WORKSHOP_ROLES: AppRole[] = ["admin", "technician", "receptionist"];
-const MANAGE_ROLES: AppRole[] = ["admin"];
-
 export default function DashboardPage() {
-  const { user, hasAccess, isReceptionist, isReceptionManager } = useAuth();
+  const { user, hasAccess, isReceptionist, isReceptionManager, isStoreManager } = useAuth();
   const [showNewJobCard, setShowNewJobCard] = useState(false);
   const [today, setToday] = useState("");
 
@@ -50,13 +54,8 @@ export default function DashboardPage() {
   const canSeeFinance = hasAccess(FINANCE_ROLES);
   const canSeeWorkshop = hasAccess(WORKSHOP_ROLES);
   const canManage = hasAccess(MANAGE_ROLES);
-  const canSeeInventory = hasAccess(["superadmin", "admin", "storemanager"]);
-  const canCreateJob = hasAccess([
-    "superadmin",
-    "admin",
-    "workshopmanager",
-    "serviceadviser",
-  ]);
+  const canSeeInventory = hasAccess(INVENTORY_MANAGER_ROLES);
+  const canCreateJob = hasAccess(SERVICE_CREATE_ROLES);
 
   const kpiCount = [
     canSeeFinance,
@@ -73,6 +72,11 @@ export default function DashboardPage() {
   // Receptionists get their own dedicated dashboard
   if (isReceptionist) {
     return <ReceptionistDashboard />;
+  }
+
+  // Store managers get their own inventory-focused dashboard
+  if (isStoreManager) {
+    return <StoreManagerDashboard />;
   }
 
   return (

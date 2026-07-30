@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
+import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { useBranchStore } from "@/store/branch.store";
 import { useInvoices } from "../hooks/use-invoices";
 import type { Invoice } from "../types/invoice.types";
@@ -28,6 +28,8 @@ function formatDate(dateStr?: string) {
 }
 
 export function InvoicesTable() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
@@ -40,9 +42,19 @@ export function InvoicesTable() {
   });
 
   const allInvoices = data?.invoices ?? [];
-  const total = allInvoices.length;
+  const filtered = debouncedSearch
+    ? allInvoices.filter((inv) =>
+        [inv.invoiceNumber, inv.customer?.firstName, inv.customer?.lastName]
+          .filter(Boolean)
+          .some((f) => f!.toLowerCase().includes(debouncedSearch.toLowerCase())),
+      )
+    : allInvoices;
+  const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const invoices = allInvoices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const invoices = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  function commitSearch() { setDebouncedSearch(search); setPage(1); }
+  function clearSearch() { setSearch(""); setDebouncedSearch(""); setPage(1); }
 
   if (isError) {
     return (
@@ -56,97 +68,65 @@ export function InvoicesTable() {
     );
   }
 
+  const columns: Column<Invoice>[] = [
+    {
+      header: "Invoice #",
+      render: (inv) => <span className="font-medium">{inv.invoiceNumber}</span>,
+    },
+    {
+      header: "Customer",
+      render: (inv) => <span className="text-muted-foreground">{inv.customer.firstName} {inv.customer.lastName}</span>,
+    },
+    {
+      header: "Job Card",
+      render: (inv) => <span className="text-muted-foreground">{inv.jobCard?.jobNumber ?? "—"}</span>,
+    },
+    {
+      header: "Amount",
+      render: (inv) => <span className="text-muted-foreground">{formatCurrency(inv.total)}</span>,
+    },
+    {
+      header: "Due Date",
+      render: (inv) => <span className="text-muted-foreground">{formatDate(inv.dueDate)}</span>,
+    },
+    {
+      header: "Status",
+      render: (inv) => {
+        const statusClass = STATUS_STYLES[inv.status] ?? "bg-gray-100 text-gray-600";
+        return (
+          <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusClass)}>
+            {inv.status}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="grid gap-4">
-      <div className="overflow-hidden rounded-xl border border-[#e8edf3] bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[#e8edf3] bg-[#f8fafc]">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Invoice #</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Customer</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Job Card</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Amount</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Due Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <SkeletonRows />
-              ) : !invoices.length ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    No invoices yet.
-                  </td>
-                </tr>
-              ) : (
-                invoices.map((invoice) => (
-                  <InvoiceRow key={invoice.id} invoice={invoice} />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {total > PAGE_SIZE && (
-          <div
-            className={cn(
-              "flex items-center justify-between border-t border-[#e8edf3] px-4 py-3",
-              isFetching && "opacity-60",
-            )}
-          >
-            <p className="text-xs text-muted-foreground">
-              Showing {(page - 1) * PAGE_SIZE + 1}–
-              {Math.min(page * PAGE_SIZE, total)} of {total}
-            </p>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" disabled={page <= 1 || isFetching} onClick={() => setPage((p) => p - 1)}>
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages || isFetching} onClick={() => setPage((p) => p + 1)}>
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <DataTable<Invoice>
+        columns={columns}
+        data={invoices}
+        isLoading={isLoading}
+        isFetching={isFetching}
+        emptyMessage="No invoices yet."
+        rowKey={(inv) => inv.id}
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      >
+        <DataTableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onSearch={commitSearch}
+          onClearSearch={clearSearch}
+          placeholder="Search by invoice # or customer…"
+          isLoading={isLoading}
+          isFetching={isFetching}
+        />
+      </DataTable>
     </div>
-  );
-}
-
-function InvoiceRow({ invoice }: { invoice: Invoice }) {
-  const customerName = `${invoice.customer.firstName} ${invoice.customer.lastName}`;
-  const statusClass = STATUS_STYLES[invoice.status] ?? "bg-gray-100 text-gray-600";
-
-  return (
-    <tr className="border-t border-border transition-colors hover:bg-muted/30">
-      <td className="px-4 py-3 font-medium">{invoice.invoiceNumber}</td>
-      <td className="px-4 py-3 text-muted-foreground">{customerName}</td>
-      <td className="px-4 py-3 text-muted-foreground">{invoice.jobCard?.jobNumber ?? "—"}</td>
-      <td className="px-4 py-3 text-muted-foreground">{formatCurrency(invoice.total)}</td>
-      <td className="px-4 py-3 text-muted-foreground">{formatDate(invoice.dueDate)}</td>
-      <td className="px-4 py-3">
-        <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusClass)}>
-          {invoice.status}
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-t border-border">
-          {Array.from({ length: 6 }).map((__, j) => (
-            <td key={j} className="px-4 py-3">
-              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

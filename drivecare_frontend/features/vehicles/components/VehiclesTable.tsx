@@ -12,15 +12,14 @@ import { DELETE_ROLES, VEHICLE_UPDATE_ROLES } from "@/features/auth/roles";
 import { useVehicles } from "../hooks/use-vehicles";
 import { VehicleDeleteButton } from "./VehicleDeleteButton";
 import { VehicleEditForm } from "./VehicleEditForm";
-import type { Vehicle } from "../types/vehicle.types";
 
+import { DataTable } from "@/components/ui/table-components/DataTable";
 import { DataTableSearchHeader } from "@/components/ui/table-components/DataTableSearchHeader";
-import { DataTablePagination } from "@/components/ui/table-components/DataTablePagination";
-import { DataTableEmptyState } from "@/components/ui/table-components/DataTableEmptyState";
 
 const PAGE_SIZE = 10;
 
 export function VehiclesTable() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -70,72 +69,111 @@ export function VehiclesTable() {
   }
 
   return (
-    <div className="grid gap-4">
-      <DataTableSearchHeader
-        search={search}
-        onSearchChange={setSearch}
-        onCommitSearch={commitSearch}
-        onClearSearch={clearSearch}
-        placeholder="Search by make, model, VIN, or customer…"
+    <>
+      <DataTable
+        columns={[
+          {
+            header: "Vehicle",
+            render: (v) => (
+              <span className="font-medium">
+                {v.make ?? "—"} {v.model ?? ""}
+              </span>
+            ),
+          },
+          {
+            header: "VIN",
+            render: (v) => v.vin,
+            className: "font-mono text-xs text-muted-foreground",
+          },
+          {
+            header: "Customer",
+            render: (v) =>
+              v.customer
+                ? `${v.customer.firstName} ${v.customer.lastName}`
+                : "—",
+            className: "text-muted-foreground",
+          },
+          {
+            header: "Year",
+            render: (v) =>
+              v.year ?? <span className="text-border">—</span>,
+            className: "text-muted-foreground",
+          },
+          {
+            header: "Color",
+            render: (v) =>
+              v.color ?? <span className="text-border">—</span>,
+            className: "text-muted-foreground",
+          },
+          {
+            header: "Ownership",
+            render: (v) =>
+              v.ownershipStatus ?? <span className="text-border">—</span>,
+            className: "text-muted-foreground",
+          },
+          {
+            header: "Agent",
+            render: (v) =>
+              v.createdBy ? v.createdBy.firstName : <span className="text-border">—</span>,
+            className: "text-muted-foreground",
+          },
+          ...(canManage
+            ? [
+                {
+                  header: "Actions",
+                  render: (v: (typeof vehicles)[number]) => (
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          aria-label={`Edit ${v.make} ${v.model}`}
+                          onClick={() => setEditingId(v.id)}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      )}
+                      {canDelete && <VehicleDeleteButton vehicle={v} />}
+                    </div>
+                  ),
+                  headerClassName: "text-right",
+                  className: "text-right",
+                },
+              ]
+            : []),
+        ]}
+        data={vehicles}
         isLoading={isLoading}
         isFetching={isFetching}
-      />
+        emptyMessage={
+          committedSearch
+            ? `No vehicles matching "${committedSearch}"`
+            : "No vehicles yet."
+        }
+        searchQuery={committedSearch}
+        rowKey={(v) => v.id}
+        onRowClick={(v) => router.push(`/vehicles/${v.id}`)}
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={meta?.total ?? 0}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      >
+        <DataTableSearchHeader
+          search={search}
+          onSearchChange={setSearch}
+          onCommitSearch={commitSearch}
+          onClearSearch={clearSearch}
+          placeholder="Search by make, model, VIN, or customer…"
+          isLoading={isLoading}
+          isFetching={isFetching}
+        />
+      </DataTable>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border bg-muted">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold">Vehicle</th>
-                <th className="px-4 py-3 text-left font-semibold">VIN</th>
-                <th className="px-4 py-3 text-left font-semibold">Customer</th>
-                <th className="px-4 py-3 text-left font-semibold">Year</th>
-                <th className="px-4 py-3 text-left font-semibold">Color</th>
-                <th className="px-4 py-3 text-left font-semibold">Ownership</th>
-                <th className="px-4 py-3 text-left font-semibold">Agent</th>
-                {canManage && (
-                  <th className="px-4 py-3 text-right font-semibold">Actions</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <SkeletonRows />
-              ) : !vehicles.length ? (
-                <DataTableEmptyState
-                  colSpan={canManage ? 8 : 7}
-                  searchQuery={committedSearch}
-                  entityName="vehicles"
-                />
-              ) : (
-                vehicles.map((vehicle) => (
-                  <VehicleRow
-                    key={vehicle.id}
-                    vehicle={vehicle}
-                    canDelete={canDelete}
-                    canEdit={canEdit}
-                    canManage={canManage}
-                    onEdit={() => setEditingId(vehicle.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {meta && (
-          <DataTablePagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={meta.total}
-            totalPages={totalPages}
-            isFetching={isFetching}
-            onPageChange={setPage}
-          />
-        )}
-      </div>
-
-      {/* Edit modal */}
       {canEdit && (
         <ModalFame
           isOpen={!!editingId}
@@ -150,90 +188,6 @@ export function VehiclesTable() {
           )}
         </ModalFame>
       )}
-    </div>
-  );
-}
-
-function VehicleRow({
-  vehicle,
-  canDelete,
-  canEdit,
-  canManage,
-  onEdit,
-}: {
-  vehicle: Vehicle;
-  canDelete: boolean;
-  canEdit: boolean;
-  canManage: boolean;
-  onEdit: () => void;
-}) {
-  const router = useRouter();
-  const customerName = vehicle.customer
-    ? `${vehicle.customer.firstName} ${vehicle.customer.lastName}`
-    : "—";
-
-  return (
-    <tr
-      className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
-      onClick={() => router.push(`/vehicles/${vehicle.id}`)}
-    >
-      <td className="px-4 py-3 font-medium">
-        {vehicle.make ?? "—"} {vehicle.model ?? ""}
-      </td>
-      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-        {vehicle.vin}
-      </td>
-      <td className="px-4 py-3 text-muted-foreground">{customerName}</td>
-      <td className="px-4 py-3 text-muted-foreground">
-        {vehicle.year ?? <span className="text-border">—</span>}
-      </td>
-      <td className="px-4 py-3 text-muted-foreground">
-        {vehicle.color ?? <span className="text-border">—</span>}
-      </td>
-      <td className="px-4 py-3 text-muted-foreground">
-        {vehicle.ownershipStatus ?? <span className="text-border">—</span>}
-      </td>
-      <td className="px-4 py-3 text-muted-foreground">
-        {vehicle.createdBy ? vehicle.createdBy.firstName : <span className="text-border">—</span>}
-      </td>
-      {canManage && (
-        <td className="px-4 py-3">
-          <div
-            className="flex items-center justify-end gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {canEdit && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                aria-label={`Edit ${vehicle.make} ${vehicle.model}`}
-                onClick={onEdit}
-              >
-                <Pencil className="size-3.5" />
-              </Button>
-            )}
-            {canDelete && <VehicleDeleteButton vehicle={vehicle} />}
-          </div>
-        </td>
-      )}
-    </tr>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-t border-border">
-          {Array.from({ length: 7 }).map((__, j) => (
-            <td key={j} className="px-4 py-3">
-              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            </td>
-          ))}
-          <td className="px-4 py-3" />
-        </tr>
-      ))}
     </>
   );
 }

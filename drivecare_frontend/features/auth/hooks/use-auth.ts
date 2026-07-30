@@ -19,7 +19,9 @@ export function useAuth() {
   // Convenience booleans
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
-  const isStoreManager = role === "storemanager";
+  const isStoreManager = role === "generalstoremanager" || role === "branchstoremanager";
+  const isGeneralStoreManager = role === "generalstoremanager";
+  const isBranchStoreManager = role === "branchstoremanager";
   const isWorkshopManager = role === "workshopmanager";
   const isAdviser = role === "serviceadviser";
   const isTechnician = role === "technician";
@@ -53,6 +55,11 @@ export function useAuth() {
     // individual role flags
     isSuperAdmin,
     isAdmin,
+    isStoreManager,
+    isGeneralStoreManager,
+    isBranchStoreManager,
+    isWorkshopManager,
+    isAdviser,
     isTechnician,
     isReceptionist,
     isReceptionManager,

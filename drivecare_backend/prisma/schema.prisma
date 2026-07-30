@@ -20,10 +20,13 @@ model Branch {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users        User[]
-  customers    Customer[]
-  jobCards     JobCard[]
-  appointments ServiceAppointment[]
+  users          User[]
+  customers      Customer[]
+  jobCards       JobCard[]
+  appointments   ServiceAppointment[]
+  inventoryStocks InventoryStock[]
+  transferRequests InterBranchTransfer[] @relation("RequestingBranch")
+  transferSources  InterBranchTransfer[] @relation("SourceBranch")
 }
 
 model User {
@@ -54,6 +57,11 @@ model User {
   returnedPartReturns PartReturn[] @relation("UserPartReturns")
   recordedPayments Payment[] @relation("UserRecordedPayments")
   issuedReceipts Receipt[] @relation("UserIssuedReceipts")
+  transferRequests InterBranchTransfer[] @relation("TransferRequestedBy")
+  transferApprovals InterBranchTransfer[] @relation("TransferApprovedBy")
+  transferDispatches InterBranchTransfer[] @relation("TransferDispatchedBy")
+  transferReceives InterBranchTransfer[] @relation("TransferReceivedBy")
+  recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
 }
 
 model Role {
@@ -276,13 +284,82 @@ model SparePart {
   description   String?
   category      String?
   unitPrice     Float             @default(0)
-  stock         Int               @default(0)
-  minimumStock  Int               @default(0)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
   purchaseRequests PurchaseRequest[]
   issuances        PartIssuance[]
+  inventoryStocks  InventoryStock[]
+  stockTransactions StockTransaction[]
+  transferItems    InterBranchTransferItem[]
+}
+
+model InventoryStock {
+  id              String   @id @default(uuid())
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  partId          String
+  part            SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+  quantity        Int      @default(0)
+  reservedQuantity Int     @default(0)
+  minimumStock    Int      @default(0)
+  maximumStock    Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([branchId, partId])
+}
+
+model StockTransaction {
+  id          String   @id @default(uuid())
+  branchId    String
+  partId      String
+  part        SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+  type        String   // RECEIVED, ISSUED, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT, RESERVED, UNRESERVED
+  quantity    Int      // positive for increases, negative for decreases
+  referenceId String?  // link to transfer ID, issuance ID, etc.
+  notes       String?
+  recordedById  String?
+  recordedBy    User?   @relation("UserStockTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+}
+
+model InterBranchTransfer {
+  id                  String                     @id @default(uuid())
+  transferNumber      String                     @unique
+  requestingBranchId  String
+  requestingBranch    Branch                     @relation("RequestingBranch", fields: [requestingBranchId], references: [id])
+  sourceBranchId      String
+  sourceBranch        Branch                     @relation("SourceBranch", fields: [sourceBranchId], references: [id])
+  requestedById       String
+  requestedBy         User                       @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  approvedById        String?
+  approvedBy          User?                      @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  dispatchedById      String?
+  dispatchedBy        User?                      @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id])
+  receivedById        String?
+  receivedBy          User?                      @relation("TransferReceivedBy", fields: [receivedById], references: [id])
+  status              String                     @default("Pending") // Pending, Approved, Rejected, Dispatched, InTransit, Received, Completed, Cancelled
+  notes               String?
+  approvedAt          DateTime?
+  dispatchedAt        DateTime?
+  receivedAt          DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  items               InterBranchTransferItem[]
+}
+
+model InterBranchTransferItem {
+  id                String             @id @default(uuid())
+  transferId        String
+  transfer          InterBranchTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  partId            String
+  part              SparePart          @relation(fields: [partId], references: [id])
+  requestedQuantity Int
+  dispatchedQuantity Int?
+  receivedQuantity  Int?
+  createdAt         DateTime           @default(now())
 }
 
 model PurchaseRequest {

@@ -7,6 +7,10 @@ type UseJobCardsParams = {
   limit?: number;
   branchId?: string;
   customerId?: string;
+  search?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export function useJobCards(params?: UseJobCardsParams) {

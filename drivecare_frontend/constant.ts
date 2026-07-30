@@ -19,6 +19,7 @@ import {
   ReceiptText,
   ShieldCheck,
   Building2,
+  ArrowLeftRight,
 } from "lucide-react";
 
 //User roles
@@ -30,10 +31,12 @@ import {
   VEHICLE_ROLES,
   TECHNICIAN_ROLES,
   BRANCH_ROLES,
+  TRANSFER_ROLES,
+  USER_ROLES,
   type AppRole,
 } from "@/features/auth/roles";
 
-const INVENTORY_ROLES: AppRole[] = [...MANAGE_ROLES, "workshopmanager", "storemanager"];
+const INVENTORY_ROLES: AppRole[] = [...MANAGE_ROLES, "workshopmanager"];
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -64,7 +67,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Users",
         href: "/users",
         icon: Shield,
-        roles: MANAGE_ROLES,
+        roles: USER_ROLES,
       },
       {
         label: "Branches",
@@ -107,12 +110,24 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Operations",
-    roles: FINANCE_ROLES,
+    roles: [...new Set([...FINANCE_ROLES, ...INVENTORY_ROLES])],
     items: [
       {
         label: "Inventory",
         href: "/inventory",
         icon: Package,
+        roles: INVENTORY_ROLES,
+      },
+      {
+        label: "Transfers",
+        href: "/transfers",
+        icon: ArrowLeftRight,
+        roles: TRANSFER_ROLES,
+      },
+      {
+        label: "Purchase Requests",
+        href: "/purchase-requests",
+        icon: ClipboardList,
         roles: INVENTORY_ROLES,
       },
       {

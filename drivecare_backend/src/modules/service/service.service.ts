@@ -153,16 +153,43 @@ export class ServiceService {
     });
   }
 
-  async listJobCards(params?: { page?: number; limit?: number; branchId?: string; customerId?: string }) {
+  async listJobCards(params?: {
+    page?: number;
+    limit?: number;
+    branchId?: string;
+    customerId?: string;
+    search?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 50;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
+    if (params?.status) where.status = params.status;
+
+    if (params?.search) {
+      where.OR = [
+        { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const createdAtFilter: Record<string, Date> = {};
+    if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     const [jobCards, total] = await Promise.all([
-      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId, customerId: params?.customerId }),
+      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId, customerId: params?.customerId, search: params?.search, status: params?.status, dateFrom: params?.dateFrom, dateTo: params?.dateTo }),
       prisma.jobCard.count({ where }),
     ]);
 

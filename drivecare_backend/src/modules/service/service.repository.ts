@@ -145,7 +145,16 @@ export class ServiceRepository {
     return prisma.jobCard.create({ data });
   }
 
-  async listJobCards(params?: { skip?: number; take?: number; branchId?: string; customerId?: string }) {
+  async listJobCards(params?: {
+    skip?: number;
+    take?: number;
+    branchId?: string;
+    customerId?: string;
+    search?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
     const where: Record<string, unknown> = {};
 
     if (params?.branchId) {
@@ -155,6 +164,27 @@ export class ServiceRepository {
     if (params?.customerId) {
       where.customerId = params.customerId;
     }
+
+    if (params?.status) {
+      where.status = params.status;
+    }
+
+    if (params?.search) {
+      where.OR = [
+        { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const createdAtFilter: Record<string, Date> = {};
+    if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     return prisma.jobCard.findMany({
       where,
@@ -200,8 +230,35 @@ export class ServiceRepository {
         createdBy: {
           select: { id: true, firstName: true, lastName: true },
         },
+        technician: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        qualityInspector: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         inspections: true,
-        estimates: true,
+        estimates: {
+          include: {
+            approvals: true,
+          },
+        },
+        partIssuances: {
+          include: {
+            sparePart: {
+              select: { id: true, partNumber: true, name: true, unitPrice: true },
+            },
+            issuedBy: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+            returns: true,
+          },
+        },
+        invoices: {
+          include: {
+            payments: true,
+            receipts: true,
+          },
+        },
       },
     });
   }

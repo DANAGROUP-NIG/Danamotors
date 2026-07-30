@@ -48,6 +48,14 @@ export const API_ROUTES = {
   inventory: {
     base: "/inventory",
     detail: (id: string) => `/inventory/${id}`,
+    stock: {
+      base: "/inventory/stock",
+      byBranch: (branchId: string) => `/inventory/stock/${branchId}`,
+    },
+    parts: {
+      base: "/inventory/parts",
+      detail: (id: string) => `/inventory/parts/${id}`,
+    },
   },
   finance: {
     quotations: {

@@ -14,9 +14,10 @@ import {
 
 interface JobCardCreateFormProps {
   onSuccess?: () => void;
+  defaultValues?: Partial<CreateJobCardFormValues>;
 }
 
-export function JobCardCreateForm({ onSuccess }: JobCardCreateFormProps) {
+export function JobCardCreateForm({ onSuccess, defaultValues }: JobCardCreateFormProps) {
   const create = useCreateJobCard();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { isSuperAdmin } = useAuth();
@@ -29,7 +30,15 @@ export function JobCardCreateForm({ onSuccess }: JobCardCreateFormProps) {
   } = useForm<CreateJobCardFormValues>({
     resolver: zodResolver(createJobCardSchema),
     defaultValues: {
-      branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
+      branchName: defaultValues?.branchName ?? (isSuperAdmin ? "" : (activeBranch?.name ?? "")),
+      appointmentId: defaultValues?.appointmentId ?? "",
+      customerId: defaultValues?.customerId ?? "",
+      vehicleId: defaultValues?.vehicleId ?? "",
+      jobNumber: defaultValues?.jobNumber ?? "",
+      description: defaultValues?.description ?? "",
+      estimatedHours: defaultValues?.estimatedHours,
+      estimatedCost: defaultValues?.estimatedCost,
+      assignedTo: defaultValues?.assignedTo,
     },
   });
 
