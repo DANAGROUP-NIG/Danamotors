@@ -148,5 +148,27 @@ export class AuthController {
       next(error);
     }
   };
+
+  updateMe = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const userId = req.user!.userId;
+      const result = await this.authService.updateMe(userId, req.body);
+
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Profile updated successfully",
+        data: {
+          user: result,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 export default AuthController;

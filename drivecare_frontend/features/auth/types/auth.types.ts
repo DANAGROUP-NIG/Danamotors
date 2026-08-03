@@ -23,6 +23,14 @@ export type RegisterPayload = {
   branchName?: string;
 };
 
+export type UpdateProfilePayload = {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  currentPassword?: string;
+  newPassword?: string;
+};
+
 export type LoginResponse = {
   accessToken: string;
   refreshToken: string;

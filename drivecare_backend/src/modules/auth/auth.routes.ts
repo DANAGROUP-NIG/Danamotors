@@ -6,6 +6,7 @@ import {
   loginSchema,
   registerSchema,
   refreshTokenSchema,
+  updateMeSchema,
 } from "./auth.validation";
 
 const router = Router();
@@ -23,5 +24,11 @@ router.post("/logout", validateRequest(refreshTokenSchema), controller.logout);
 // Protected routes
 router.post("/logout-all", authMiddleware, controller.logoutAll);
 router.get("/me", authMiddleware, controller.getMe);
+router.put(
+  "/me",
+  authMiddleware,
+  validateRequest(updateMeSchema),
+  controller.updateMe,
+);
 
 export default router;

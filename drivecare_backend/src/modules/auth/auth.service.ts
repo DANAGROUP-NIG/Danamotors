@@ -281,5 +281,63 @@ export class AuthService {
       branchId: user.branchId,
     };
   }
+
+  // update my profile
+  async updateMe(userId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) {
+    const user = await this.authRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedError("User session not found");
+    }
+
+    let passwordHash: string | undefined;
+    if (data.newPassword) {
+      if (!data.currentPassword) {
+        throw new BadRequestError(
+          "Current password is required to set a new password",
+        );
+      }
+      const isPasswordValid = await bcrypt.compare(
+        data.currentPassword,
+        user.passwordHash,
+      );
+      if (!isPasswordValid) {
+        throw new BadRequestError("Current password is incorrect");
+      }
+      passwordHash = await bcrypt.hash(data.newPassword, 10);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        passwordHash,
+      },
+    });
+
+    await this.authRepository.createAuditLog({
+      action: "USER_PROFILE_UPDATED",
+      details: "User updated their own profile",
+      userId,
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      phoneNumber: updated.phoneNumber,
+      role: user.role.name,
+      permissions: user.role.permissions.map((p) => p.permission.name),
+      branchId: updated.branchId,
+    };
+  }
 }
 export default AuthService;

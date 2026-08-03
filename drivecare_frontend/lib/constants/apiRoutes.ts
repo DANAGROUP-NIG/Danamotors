@@ -1,6 +1,7 @@
 export const API_ROUTES = {
   auth: {
     me: "/auth/me",
+    updateMe: "/auth/me",
     login: "/auth/login",
     register: "/auth/register",
     logout: "/auth/logout",

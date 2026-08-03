@@ -24,3 +24,16 @@ export const refreshTokenSchema = z.object({
     refreshToken: z.string().min(1, "Refresh token is required"),
   }),
 });
+
+export const updateMeSchema = z.object({
+  body: z.object({
+    firstName: z.string().min(1, "First name is required").optional(),
+    lastName: z.string().min(1, "Last name is required").optional(),
+    phoneNumber: z.string().optional(),
+    currentPassword: z.string().optional(),
+    newPassword: z
+      .string()
+      .min(6, "Password must be at least 6 characters long")
+      .optional(),
+  }),
+});
