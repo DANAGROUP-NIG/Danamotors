@@ -27,4 +27,5 @@ export type {
   SparePartPayload,
   UpdateSparePartPayload,
   BranchStockItem,
+  BranchStockEntry,
 } from "./types/inventory.types";

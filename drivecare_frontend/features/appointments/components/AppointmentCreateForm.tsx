@@ -67,12 +67,18 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
             branchId={isSuperAdmin ? undefined : activeBranch?.id}
           />
         </Field>
-        <Field label="Vehicle" error={errors.vehicleId?.message}>
+        <Field label="Vehicle Reg No" error={errors.vehicleId?.message}>
           <VehicleSelectWithCreate
             value={selectedVehicleId}
             customerId={selectedCustomerId}
             onChange={(vehicleId) => {
               setValue("vehicleId", vehicleId, { shouldValidate: true });
+            }}
+            onVehicleSelect={(vehicle) => {
+              const ownerId = vehicle.customer?.id ?? "";
+              if (ownerId) {
+                setValue("customerId", ownerId, { shouldValidate: true });
+              }
             }}
             branchId={isSuperAdmin ? undefined : activeBranch?.id}
           />

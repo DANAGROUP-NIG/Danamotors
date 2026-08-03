@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPut, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type {
   CreateUserPayload,
@@ -46,7 +46,7 @@ export async function updateUserRequest(
   id: string,
   payload: UpdateUserPayload,
 ): Promise<{ user: UserWithRole }> {
-  return apiPatch<{ user: UserWithRole }, UpdateUserPayload>(
+  return apiPut<{ user: UserWithRole }, UpdateUserPayload>(
     API_ROUTES.administration.users.detail(id),
     payload,
   );

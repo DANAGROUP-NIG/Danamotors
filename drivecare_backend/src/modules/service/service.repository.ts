@@ -29,6 +29,8 @@ export class ServiceRepository {
     status?: string;
     createdById?: string;
     customerId?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const where: Record<string, unknown> = {};
 
@@ -46,6 +48,17 @@ export class ServiceRepository {
 
     if (params.customerId) {
       where.customerId = params.customerId;
+    }
+
+    const scheduledAtFilter: Record<string, Date> = {};
+    if (params.dateFrom) {
+      scheduledAtFilter.gte = new Date(`${params.dateFrom}T00:00:00`);
+    }
+    if (params.dateTo) {
+      scheduledAtFilter.lte = new Date(`${params.dateTo}T23:59:59.999`);
+    }
+    if (Object.keys(scheduledAtFilter).length > 0) {
+      where.scheduledAt = scheduledAtFilter;
     }
 
     if (params.search) {
@@ -69,6 +82,7 @@ export class ServiceRepository {
               firstName: true,
               lastName: true,
               email: true,
+              phoneNumber: true,
             },
           },
           vehicle: true,
@@ -101,6 +115,7 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -178,6 +193,7 @@ export class ServiceRepository {
         { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
         { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
         { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
       ];
     }
 

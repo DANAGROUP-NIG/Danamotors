@@ -37,6 +37,12 @@ export const createSparePartSchema = z.object({
     description: z.string().optional(),
     category: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
+    branchStock: z.array(z.object({
+      branchId: z.string().uuid('Invalid branch ID'),
+      quantity: z.number().int().nonnegative('Quantity must be 0 or more'),
+      minimumStock: z.number().int().nonnegative().optional(),
+      rackLocation: z.string().max(100).optional(),
+    })).optional(),
   }),
 });
 

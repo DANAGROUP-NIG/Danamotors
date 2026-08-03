@@ -368,7 +368,7 @@ export default function ReceptionManagerDashboard() {
                 <tr className="border-b border-[#e8edf3] text-xs text-muted-foreground">
                   <th className="pb-2 font-medium">Time</th>
                   <th className="pb-2 font-medium">Customer</th>
-                  <th className="pb-2 font-medium">Vehicle</th>
+                  <th className="pb-2 font-medium">Vehicle Reg No</th>
                   <th className="pb-2 font-medium">Branch</th>
                   <th className="pb-2 font-medium">Status</th>
                 </tr>
@@ -380,10 +380,15 @@ export default function ReceptionManagerDashboard() {
                     scheduledAt: string;
                     customerName: string;
                     vehicle: string;
+                    vehicleRegNo?: string;
                     branch: string;
                     status: string;
                   }) => (
-                    <tr key={apt.id} className="hover:bg-slate-50">
+                    <tr
+                      key={apt.id}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => router.push(`/appointments/${apt.id}`)}
+                    >
                       <td className="py-2.5">
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground">
@@ -397,8 +402,8 @@ export default function ReceptionManagerDashboard() {
                       <td className="py-2.5 font-medium text-foreground">
                         {apt.customerName}
                       </td>
-                      <td className="py-2.5 text-muted-foreground">
-                        {apt.vehicle}
+                      <td className="py-2.5 font-semibold text-foreground">
+                        {apt.vehicleRegNo || apt.vehicle}
                       </td>
                       <td className="py-2.5 text-muted-foreground">
                         {apt.branch}

@@ -19,6 +19,7 @@ export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateVehicleFormValues>({
     resolver: zodResolver(updateVehicleSchema),
     defaultValues: {
+      registrationNumber: vehicle.registrationNumber ?? "",
       make: vehicle.make ?? "",
       model: vehicle.model ?? "",
       year: vehicle.year ?? undefined,
@@ -33,6 +34,7 @@ export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
 
   useEffect(() => {
     reset({
+      registrationNumber: vehicle.registrationNumber ?? "",
       make: vehicle.make ?? "",
       model: vehicle.model ?? "",
       year: vehicle.year ?? undefined,
@@ -54,6 +56,9 @@ export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <Field label="Registration number (Reg No)" error={errors.registrationNumber?.message}>
+        <input className={inputCls} placeholder="e.g. KJA-837-AA" {...register("registrationNumber")} />
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Make" error={errors.make?.message}>
           <input className={inputCls} {...register("make")} />

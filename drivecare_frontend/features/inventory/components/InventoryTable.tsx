@@ -102,8 +102,12 @@ export function InventoryTable() {
       },
     },
     {
-      header: "Reorder at",
+      header: "Minimum stock",
       render: (stock) => <span className="text-muted-foreground">{stock.minimumStock}</span>,
+    },
+    {
+      header: "Rack location",
+      render: (stock) => <span className="text-muted-foreground">{stock.rackLocation ?? "—"}</span>,
     },
     {
       header: "Unit price",
@@ -151,7 +155,7 @@ export function InventoryTable() {
         {lowStockCount > 0 && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <AlertTriangle className="size-4 shrink-0 text-amber-500" />
-            <span><strong>{lowStockCount}</strong> {lowStockCount === 1 ? "item is" : "items are"} at or below reorder level.</span>
+            <span><strong>{lowStockCount}</strong> {lowStockCount === 1 ? "item is" : "items are"} at or below minimum stock.</span>
           </div>
         )}
 

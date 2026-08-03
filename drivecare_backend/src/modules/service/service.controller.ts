@@ -38,6 +38,8 @@ export class ServiceController {
       const customerId = req.query.customerId as string | undefined;
       let branchId = req.query.branchId as string | undefined;
       const status = req.query.status as string | undefined;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
       let createdById: string | undefined;
 
       // Only SuperAdmin and ReceptionManager can see all branches; others are locked to their branch
@@ -58,6 +60,8 @@ export class ServiceController {
         status,
         createdById,
         customerId,
+        dateFrom,
+        dateTo,
       });
 
       res.status(200).json({ status: 'success', statusCode: 200, data: result });

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES } from "@/features/auth/roles";
+import { DELETE_ROLES, USER_UPDATE_ROLES } from "@/features/auth/roles";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable } from "@/components/ui/table-components/DataTable";
 import { useUsers } from "../hooks/use-users";
@@ -31,6 +31,7 @@ export function UsersTable() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
   const canDelete = hasAccess(DELETE_ROLES);
+  const canUpdate = hasAccess(USER_UPDATE_ROLES);
 
   // SuperAdmin: null activeBranch = all branches; everyone else: locked to their branch
   const branchId = activeBranch?.id ?? undefined;
@@ -142,15 +143,17 @@ export function UsersTable() {
                 className="flex items-center justify-end gap-1"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                  aria-label={`Edit ${u.firstName} ${u.lastName}`}
-                  onClick={() => setEditingId(u.id)}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
+                {canUpdate && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label={`Edit ${u.firstName} ${u.lastName}`}
+                    onClick={() => setEditingId(u.id)}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                )}
                 {canDelete && <UserDeleteButton user={u} />}
               </div>
             ),

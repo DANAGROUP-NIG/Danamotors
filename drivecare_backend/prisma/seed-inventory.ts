@@ -230,7 +230,7 @@ async function seedInventoryStock(branches: { id: string; name: string }[], part
     const isAbuja = branch.name.toLowerCase().includes("abuja");
     const stockChance = isMain ? 0.9 : isAbuja ? 0.60 : 0.45;
 
-    const ops: { branchId: string; partId: string; quantity: number; minimumStock: number; maximumStock: number }[] = [];
+    const ops: { branchId: string; partId: string; quantity: number; minimumStock: number; rackLocation: string; maximumStock: number }[] = [];
 
     for (const p of parts) {
       if (Math.random() > stockChance) continue;
@@ -240,6 +240,7 @@ async function seedInventoryStock(branches: { id: string; name: string }[], part
         partId: p.id,
         quantity: base,
         minimumStock: Math.max(3, Math.floor(base * 0.15)),
+        rackLocation: `Aisle ${rng(1, 6)} Rack ${rng(1, 12)}`,
         maximumStock: base * 4,
       });
     }

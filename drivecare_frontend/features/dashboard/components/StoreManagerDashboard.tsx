@@ -114,7 +114,7 @@ export default function StoreManagerDashboard() {
             <>
               <p className="text-sm font-semibold text-amber-900">
                 {data.inventoryAlerts} item{data.inventoryAlerts !== 1 ? "s" : ""} below
-                reorder level
+                minimum stock
               </p>
               <p className="text-xs text-amber-700">
                 Restock needed — review and create purchase requests before the next service
@@ -215,7 +215,7 @@ export default function StoreManagerDashboard() {
             </span>
             <div>
               <p className="text-lg font-extrabold text-foreground">{data.inventoryAlerts}</p>
-              <p className="text-[11px] text-muted-foreground">Parts below reorder level</p>
+              <p className="text-[11px] text-muted-foreground">Parts below minimum stock</p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-lg border border-[#e8edf3] p-3">

@@ -8,6 +8,7 @@ export class VehicleRepository {
     if (params.search) {
       where.OR = [
         { vin: { contains: params.search, mode: 'insensitive' } },
+        { registrationNumber: { contains: params.search, mode: 'insensitive' } },
         { make: { contains: params.search, mode: 'insensitive' } },
         { model: { contains: params.search, mode: 'insensitive' } },
         { color: { contains: params.search, mode: 'insensitive' } },
@@ -80,6 +81,7 @@ export class VehicleRepository {
   async createVehicle(data: {
     customerId: string;
     vin: string;
+    registrationNumber?: string;
     make?: string;
     model?: string;
     year?: number;

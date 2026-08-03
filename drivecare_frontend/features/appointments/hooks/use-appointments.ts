@@ -9,6 +9,8 @@ type UseAppointmentsParams = {
   branchId?: string;
   status?: string;
   customerId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export function useAppointments(params?: UseAppointmentsParams) {

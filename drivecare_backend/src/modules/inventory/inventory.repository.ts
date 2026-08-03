@@ -50,6 +50,7 @@ export class InventoryRepository {
     partId: string;
     quantity: number;
     minimumStock?: number;
+    rackLocation?: string | null;
     maximumStock?: number;
   }): Promise<InventoryStock> {
     return prisma.inventoryStock.upsert({
@@ -59,11 +60,13 @@ export class InventoryRepository {
         partId: data.partId,
         quantity: data.quantity,
         minimumStock: data.minimumStock ?? 0,
+        rackLocation: data.rackLocation ?? null,
         maximumStock: data.maximumStock,
       },
       update: {
         quantity: { increment: data.quantity },
         minimumStock: data.minimumStock ?? undefined,
+        rackLocation: data.rackLocation ?? undefined,
         maximumStock: data.maximumStock ?? undefined,
       },
     });

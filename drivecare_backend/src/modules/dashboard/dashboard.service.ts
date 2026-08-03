@@ -192,7 +192,14 @@ export class DashboardService {
       },
       include: {
         customer: { select: { firstName: true, lastName: true } },
-        vehicle: { select: { make: true, model: true, year: true } },
+        vehicle: {
+          select: {
+            make: true,
+            model: true,
+            year: true,
+            registrationNumber: true,
+          },
+        },
         branch: { select: { name: true } },
       },
       orderBy: { scheduledAt: 'asc' },
@@ -392,6 +399,7 @@ export class DashboardService {
       vehicle: a.vehicle
         ? `${a.vehicle.year} ${a.vehicle.make} ${a.vehicle.model}`
         : 'Unknown',
+      vehicleRegNo: a.vehicle?.registrationNumber ?? '',
       branch: a.branch?.name ?? 'Unknown',
       status: a.status,
     }));

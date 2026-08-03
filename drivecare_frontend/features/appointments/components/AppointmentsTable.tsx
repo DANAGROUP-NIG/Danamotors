@@ -54,6 +54,8 @@ export function AppointmentsTable() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const router = useRouter();
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -65,7 +67,7 @@ export function AppointmentsTable() {
 
   useEffect(() => {
     setPage(1);
-  }, [activeBranch?.id, statusFilter]);
+  }, [activeBranch?.id, statusFilter, dateFrom, dateTo]);
 
   const { data, isLoading, isError, isFetching } = useAppointments({
     page,
@@ -73,6 +75,8 @@ export function AppointmentsTable() {
     status: statusFilter || undefined,
     search: debouncedSearch || undefined,
     branchId,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   });
 
   const total = data?.meta?.total ?? 0;
@@ -100,11 +104,11 @@ export function AppointmentsTable() {
       },
     },
     {
-      header: "Vehicle",
+      header: "Vehicle Reg No",
       render: (a) => (
         <span className="text-muted-foreground">
-          {a.vehicle
-            ? `${(a.vehicle as Record<string, unknown>).make ?? ""} ${(a.vehicle as Record<string, unknown>).model ?? ""}`
+          {(a.vehicle as Record<string, unknown> | null | undefined)?.registrationNumber
+            ? String((a.vehicle as Record<string, unknown>).registrationNumber)
             : "—"}
         </span>
       ),
@@ -221,7 +225,32 @@ export function AppointmentsTable() {
           onSearch={commitSearch}
           onClearSearch={clearSearch}
           placeholder="Search by customer, vehicle, or job…"
-          filters={<DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />}
+          filters={
+            <>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setDateFrom(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setDateTo(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />
+            </>
+          }
         />
       </DataTable>
 

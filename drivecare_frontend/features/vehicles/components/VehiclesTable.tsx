@@ -86,6 +86,12 @@ export function VehiclesTable() {
             className: "font-mono text-xs text-muted-foreground",
           },
           {
+            header: "Reg No",
+            render: (v) =>
+              v.registrationNumber ?? <span className="text-border">—</span>,
+            className: "text-muted-foreground",
+          },
+          {
             header: "Customer",
             render: (v) =>
               v.customer
@@ -168,7 +174,7 @@ export function VehiclesTable() {
           onSearchChange={setSearch}
           onCommitSearch={commitSearch}
           onClearSearch={clearSearch}
-          placeholder="Search by make, model, VIN, or customer…"
+          placeholder="Search by make, model, VIN, reg no, or customer…"
           isLoading={isLoading}
           isFetching={isFetching}
         />

@@ -84,10 +84,14 @@ export default function JobCardDetailPage() {
   }
 
   const tone = STATUS_TONES[jobCard.status as JobCardStatus] ?? "gray";
-  const vehicleLabel = `${jobCard.vehicle.year} ${jobCard.vehicle.make} ${jobCard.vehicle.model}`;
-  const customerName = `${jobCard.customer.firstName} ${jobCard.customer.lastName}`;
+  const vehicleLabel = jobCard.vehicle
+    ? `${jobCard.vehicle.year ?? ""} ${jobCard.vehicle.make ?? ""} ${jobCard.vehicle.model ?? ""}`.trim() || "—"
+    : "—";
+  const customerName = jobCard.customer
+    ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+    : "—";
   const totalPartsCost = (jobCard.partIssuances ?? []).reduce(
-    (sum, p) => sum + p.sparePart.unitPrice * p.quantity, 0
+    (sum, p) => sum + (p.sparePart?.unitPrice ?? 0) * p.quantity, 0
   );
   const totalInvoiced = (jobCard.invoices ?? []).reduce(
     (sum, inv) => sum + inv.total, 0
@@ -149,7 +153,7 @@ export default function JobCardDetailPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailField icon={<Building2 className="size-4" />} label="Branch" value={jobCard.branch.name} />
+            <DetailField icon={<Building2 className="size-4" />} label="Branch" value={jobCard.branch?.name} />
             <DetailField icon={<User className="size-4" />} label="Created By" value={jobCard.createdBy?.firstName} />
             <DetailField icon={<Wrench className="size-4" />} label="Assigned To" value={jobCard.assignedTo} />
             <DetailField icon={<Clock className="size-4" />} label="Updated" value={fmtDate(jobCard.updatedAt)} />
@@ -161,30 +165,36 @@ export default function JobCardDetailPage() {
           <SectionCard icon={<User className="size-4" />} title="Customer">
             <div className="space-y-2 text-sm">
               <p className="font-medium text-slate-800">{customerName}</p>
-              <p className="text-slate-500">{jobCard.customer.email}</p>
-              <Link href={`/customers/${jobCard.customer.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                View full profile
-              </Link>
+              <p className="text-slate-500">{jobCard.customer?.email ?? "—"}</p>
+              {jobCard.customer && (
+                <Link href={`/customers/${jobCard.customer.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                  View full profile
+                </Link>
+              )}
             </div>
           </SectionCard>
 
           <SectionCard icon={<Car className="size-4" />} title="Vehicle">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Reg No</p>
+                <p className="text-slate-800">{jobCard.vehicle?.registrationNumber ?? "—"}</p>
+              </div>
+              <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Make / Model</p>
                 <p className="text-slate-800">{vehicleLabel}</p>
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">VIN</p>
-                <p className="text-slate-800">{jobCard.vehicle.vin}</p>
+                <p className="text-slate-800">{jobCard.vehicle?.vin ?? "—"}</p>
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Color</p>
-                <p className="text-slate-800">{jobCard.vehicle.color}</p>
+                <p className="text-slate-800">{jobCard.vehicle?.color ?? "—"}</p>
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Year</p>
-                <p className="text-slate-800">{jobCard.vehicle.year}</p>
+                <p className="text-slate-800">{jobCard.vehicle?.year ?? "—"}</p>
               </div>
             </div>
           </SectionCard>
@@ -473,19 +483,19 @@ function DetailField({ icon, label, value }: { icon?: React.ReactNode; label: st
 }
 
 function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
-  const lineTotal = issuance.sparePart.unitPrice * issuance.quantity;
+  const lineTotal = (issuance.sparePart?.unitPrice ?? 0) * issuance.quantity;
   const returnedQty = issuance.returns?.reduce((s, r) => s + r.quantity, 0) ?? 0;
   return (
     <tr className="border-t border-slate-100">
-      <td className="px-3 py-2 font-medium text-slate-700">{issuance.sparePart.partNumber}</td>
-      <td className="px-3 py-2 text-slate-600">{issuance.sparePart.name}</td>
+      <td className="px-3 py-2 font-medium text-slate-700">{issuance.sparePart?.partNumber ?? "—"}</td>
+      <td className="px-3 py-2 text-slate-600">{issuance.sparePart?.name ?? "—"}</td>
       <td className="px-3 py-2 text-right text-slate-700">
         {issuance.quantity}
         {returnedQty > 0 && <span className="ml-1 text-xs text-slate-400">(-{returnedQty})</span>}
       </td>
-      <td className="px-3 py-2 text-right text-slate-600">{issuance.sparePart.unitPrice.toLocaleString()}</td>
+      <td className="px-3 py-2 text-right text-slate-600">{(issuance.sparePart?.unitPrice ?? 0).toLocaleString()}</td>
       <td className="px-3 py-2 text-right font-medium text-slate-800">{lineTotal.toLocaleString()}</td>
-      <td className="px-3 py-2 text-slate-600">{issuance.issuedBy.firstName}</td>
+      <td className="px-3 py-2 text-slate-600">{issuance.issuedBy?.firstName ?? "—"}</td>
     </tr>
   );
 }

@@ -8,6 +8,7 @@ export type VehicleCustomer = {
 export type Vehicle = {
   id: string;
   vin: string;
+  registrationNumber: string | null;
   make: string | null;
   model: string | null;
   year: number | null;
@@ -28,6 +29,7 @@ export type Vehicle = {
 export type CreateVehiclePayload = {
   customerId: string;
   vin: string;
+  registrationNumber?: string;
   make?: string;
   model?: string;
   year?: number;

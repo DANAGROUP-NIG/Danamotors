@@ -132,7 +132,7 @@ export default function WorkshopManagerDashboard() {
                 {data.inventoryAlerts} inventory alert{data.inventoryAlerts !== 1 ? "s" : ""}
               </p>
               <p className="text-xs text-amber-700">
-                Items at or below reorder level — review before next service day.
+                Items at or below minimum stock — review before next service day.
               </p>
             </>
           ) : (

@@ -219,6 +219,7 @@ export default function AppointmentDetailPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailField label="Name" value={customer ? `${customer.firstName} ${customer.lastName}` : null} />
               <DetailField label="Email" value={customer?.email} />
+              <DetailField label="Phone" value={customer?.phoneNumber ?? null} />
               {customer && (
                 <div className="sm:col-span-2">
                   <Link href={`/customers/${customer.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
@@ -233,6 +234,7 @@ export default function AppointmentDetailPage() {
             <SectionTitle icon={<Car className="size-4" />} title="Vehicle" />
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailField label="Make / Model" value={vehicle ? `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || "—" : "—"} />
+              <DetailField label="Vehicle Reg No" value={vehicle?.registrationNumber as string | undefined} />
               <DetailField label="Year" value={vehicle?.year as string | number | undefined} />
               <DetailField label="VIN" value={vehicle?.vin as string | undefined} />
               <DetailField label="Color" value={vehicle?.color as string | undefined} />

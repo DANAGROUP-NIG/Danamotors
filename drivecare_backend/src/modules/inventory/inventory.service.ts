@@ -27,13 +27,55 @@ export class InventoryService {
     description?: string;
     category?: string;
     unitPrice?: number;
+    branchStock?: { branchId: string; quantity: number; minimumStock?: number; rackLocation?: string }[];
+    recordedById?: string;
   }) {
     const existing = await prisma.sparePart.findUnique({ where: { partNumber: data.partNumber } });
     if (existing) {
       throw new ConflictError('A spare part with this part number already exists');
     }
 
-    return this.inventoryRepository.createSparePart(data);
+    const { branchStock, recordedById, ...partData } = data;
+
+    if (!branchStock || branchStock.length === 0) {
+      return this.inventoryRepository.createSparePart(partData);
+    }
+
+    const branchIds = branchStock.map((b) => b.branchId);
+    if (new Set(branchIds).size !== branchIds.length) {
+      throw new BadRequestError('Each branch can only be stocked once per part');
+    }
+
+    const branches = await prisma.branch.findMany({ where: { id: { in: branchIds } } });
+    if (branches.length !== branchIds.length) {
+      throw new NotFoundError('One or more branches not found');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const part = await tx.sparePart.create({ data: partData });
+      for (const stock of branchStock) {
+        await tx.inventoryStock.create({
+          data: {
+            branchId: stock.branchId,
+            partId: part.id,
+            quantity: stock.quantity,
+            minimumStock: stock.minimumStock ?? 0,
+            rackLocation: stock.rackLocation ?? null,
+          },
+        });
+        await tx.stockTransaction.create({
+          data: {
+            branchId: stock.branchId,
+            partId: part.id,
+            type: 'STOCKED',
+            quantity: stock.quantity,
+            notes: 'Initial stock across branches',
+            recordedById,
+          },
+        });
+      }
+      return part;
+    });
   }
 
   async updateSparePart(id: string, data: {

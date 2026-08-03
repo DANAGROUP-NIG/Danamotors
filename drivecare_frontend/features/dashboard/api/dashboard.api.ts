@@ -25,6 +25,7 @@ export interface DashboardStats {
     scheduledAt: string;
     customerName: string;
     vehicle: string;
+    vehicleRegNo?: string;
     branch: string;
     status: string;
   }[];

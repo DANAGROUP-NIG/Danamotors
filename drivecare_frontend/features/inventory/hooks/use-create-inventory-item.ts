@@ -11,7 +11,7 @@ export function useCreateInventoryItem() {
     mutationFn: (payload: SparePartPayload) =>
       createInventoryItemRequest(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: inventoryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
       toast.success("Item added to inventory");
     },
     onError: (error: unknown) => {

@@ -147,7 +147,11 @@ export const INVENTORY_MANAGER_ROLES: AppRole[] = [
 export const USER_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "workshopmanager",
+];
+
+export const USER_UPDATE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
 ];
 
 export const TRANSFER_ROLES: AppRole[] = [

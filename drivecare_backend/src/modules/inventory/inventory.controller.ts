@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { InventoryService } from './inventory.service';
+import { ForbiddenError } from '../../shared/errors/appError';
+import { ROLES } from '../../shared/constants/roles';
 
 export class InventoryController {
   private inventoryService: InventoryService;
@@ -29,7 +31,21 @@ export class InventoryController {
 
   createSparePart = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.inventoryService.createSparePart(req.body);
+      const { branchStock, ...partData } = req.body;
+
+      // Only cross-branch managers can stock multiple branches at once
+      if (branchStock && branchStock.length > 0) {
+        const role = req.user?.role;
+        if (role !== ROLES.SUPER_ADMIN && role !== ROLES.GENERAL_STORE_MANAGER) {
+          throw new ForbiddenError('Only SuperAdmin and General Store Manager can stock multiple branches simultaneously');
+        }
+      }
+
+      const result = await this.inventoryService.createSparePart({
+        ...partData,
+        branchStock,
+        recordedById: req.user?.userId,
+      });
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Spare part created successfully', data: { sparePart: result } });
     } catch (error) {
       next(error);

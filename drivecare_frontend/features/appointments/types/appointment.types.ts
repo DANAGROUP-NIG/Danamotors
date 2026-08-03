@@ -26,6 +26,7 @@ export type Appointment = {
     firstName: string;
     lastName: string;
     email: string;
+    phoneNumber?: string | null;
   };
   vehicle?: Record<string, unknown>;
   branch?: { id: string; name: string };

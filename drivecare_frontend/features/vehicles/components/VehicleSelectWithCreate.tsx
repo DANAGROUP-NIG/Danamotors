@@ -28,6 +28,7 @@ import type { Vehicle } from "@/features/vehicles/types/vehicle.types";
 interface VehicleSelectWithCreateProps {
   value?: string;
   onChange: (vehicleId: string) => void;
+  onVehicleSelect?: (vehicle: Vehicle) => void;
   customerId?: string;
   branchId?: string;
   error?: string;
@@ -37,6 +38,7 @@ interface VehicleSelectWithCreateProps {
 export function VehicleSelectWithCreate({
   value,
   onChange,
+  onVehicleSelect,
   customerId,
   branchId,
   error,
@@ -87,7 +89,7 @@ export function VehicleSelectWithCreate({
     const q = searchQuery.toLowerCase();
     return vehicles.filter((v) => {
       const fullVehicle =
-        `${v.year ?? ""} ${v.make ?? ""} ${v.model ?? ""} ${v.vin ?? ""}`.toLowerCase();
+        `${v.registrationNumber ?? ""} ${v.vin ?? ""}`.toLowerCase();
       return fullVehicle.includes(q);
     });
   }, [vehicles, searchQuery]);
@@ -144,6 +146,7 @@ export function VehicleSelectWithCreate({
     resolver: zodResolver(createVehicleSchema),
     defaultValues: {
       customerId: customerId || "",
+      registrationNumber: searchQuery.trim() || "",
       make: searchQuery.split(" ")[0] || "",
       model: searchQuery.split(" ").slice(1).join(" ") || "",
     },
@@ -214,6 +217,7 @@ export function VehicleSelectWithCreate({
   const handleSelectVehicle = (vehicle: Vehicle) => {
     lastCreatedVehicleRef.current = null;
     onChange(vehicle.id);
+    onVehicleSelect?.(vehicle);
     setIsOpen(false);
     setSearchQuery("");
   };
@@ -225,7 +229,22 @@ export function VehicleSelectWithCreate({
     setSearchQuery("");
   };
 
-  const isDisabled = disabled || !customerId;
+  // Auto-select the vehicle (and its owner via onVehicleSelect) when the typed
+  // query exactly matches a registration number
+  useEffect(() => {
+    if (!searchQuery.trim() || vehicles.length === 0) return;
+    const q = searchQuery.trim().toLowerCase();
+    const exactMatch = vehicles.find(
+      (v) =>
+        v.registrationNumber && v.registrationNumber.toLowerCase() === q,
+    );
+    if (exactMatch) {
+      handleSelectVehicle(exactMatch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  const isDisabled = disabled;
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -235,8 +254,7 @@ export function VehicleSelectWithCreate({
           <div className="flex items-center gap-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
             <Car className="h-4 w-4 text-primary shrink-0" />
             <span className="font-medium text-foreground truncate">
-              {selectedVehicle.year ? `${selectedVehicle.year} ` : ""}
-              {selectedVehicle.make ?? ""} {selectedVehicle.model ?? ""}
+              {selectedVehicle.registrationNumber ?? selectedVehicle.vin}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-2 bg-background pl-1">
@@ -265,11 +283,9 @@ export function VehicleSelectWithCreate({
             type="text"
             className={`${inputCls} pl-9 pr-8`}
             placeholder={
-              !customerId
-                ? "Select a customer first"
-                : loadingVehicles
-                  ? "Loading vehicles…"
-                  : "Type make, model, year or VIN…"
+              loadingVehicles
+                ? "Loading vehicles…"
+                : "Type vehicle registration number…"
             }
             value={searchQuery}
             disabled={isDisabled || loadingVehicles}
@@ -298,7 +314,6 @@ export function VehicleSelectWithCreate({
       {/* Floating Dropdown Portal - position: fixed at z-[99999] floating above ALL text & inputs */}
       {isOpen &&
         !showInlineCreate &&
-        customerId &&
         mounted &&
         createPortal(
           <div
@@ -319,7 +334,7 @@ export function VehicleSelectWithCreate({
             ) : filteredVehicles.length > 0 ? (
               <div className="py-1">
                 <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Select Vehicle ({filteredVehicles.length})
+                  Select Vehicle Reg No ({filteredVehicles.length})
                 </div>
                 {filteredVehicles.map((v) => {
                   const isSelected = v.id === value;
@@ -338,12 +353,11 @@ export function VehicleSelectWithCreate({
                         <Car className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <div className="truncate">
                           <span className="font-medium">
-                            {v.year ? `${v.year} ` : ""}
-                            {v.make ?? ""} {v.model ?? ""}
+                            {v.registrationNumber ?? v.vin}
                           </span>
-                          {v.vin && (
+                          {!v.registrationNumber && v.vin && (
                             <span className="ml-2 text-xs text-muted-foreground">
-                              (VIN: {v.vin})
+                              (no reg no)
                             </span>
                           )}
                         </div>
@@ -355,14 +369,16 @@ export function VehicleSelectWithCreate({
                   );
                 })}
                 <div className="sticky bottom-0 border-t border-slate-200 bg-white p-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowInlineCreate(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add new vehicle for this customer
-                  </button>
+                  {customerId && (
+                    <button
+                      type="button"
+                      onClick={() => setShowInlineCreate(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add new vehicle for this customer
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -370,16 +386,22 @@ export function VehicleSelectWithCreate({
                 <p className="text-xs text-muted-foreground">
                   No vehicle found matching &quot;{searchQuery}&quot;
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2.5 w-full text-xs font-semibold gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
-                  onClick={() => setShowInlineCreate(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add new vehicle
-                </Button>
+                {customerId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2.5 w-full text-xs font-semibold gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+                    onClick={() => setShowInlineCreate(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add new vehicle
+                  </Button>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Select a customer first to add a new vehicle.
+                  </p>
+                )}
               </div>
             )}
           </div>,
@@ -417,6 +439,17 @@ export function VehicleSelectWithCreate({
               </div>
 
               <div className="grid gap-3.5">
+                <Field
+                  label="Registration number (Reg No)"
+                  error={vehicleErrors.registrationNumber?.message}
+                >
+                  <input
+                    className={inputCls}
+                    placeholder="e.g. KJA-837-AA"
+                    {...registerVehicle("registrationNumber")}
+                  />
+                </Field>
+
                 <Field label="VIN" error={vehicleErrors.vin?.message}>
                   <input
                     className={inputCls}

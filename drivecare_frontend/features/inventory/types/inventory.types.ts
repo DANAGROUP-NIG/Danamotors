@@ -10,12 +10,20 @@ export type InventoryItem = {
   updatedAt: string;
 };
 
+export type BranchStockEntry = {
+  branchId: string;
+  quantity: number;
+  minimumStock?: number;
+  rackLocation?: string;
+};
+
 export type SparePartPayload = {
   partNumber: string;
   name: string;
   description?: string;
   category: string;
   unitPrice: number;
+  branchStock?: BranchStockEntry[];
 };
 
 export type UpdateSparePartPayload = Partial<SparePartPayload>;
@@ -27,6 +35,7 @@ export type BranchStockItem = {
   quantity: number;
   reservedQuantity: number;
   minimumStock: number;
+  rackLocation: string | null;
   maximumStock: number | null;
   part: InventoryItem;
 };

@@ -60,6 +60,7 @@ export class SearchService {
       where: {
         OR: [
           { vin: { contains: q, mode: 'insensitive' } },
+          { registrationNumber: { contains: q, mode: 'insensitive' } },
           { make: { contains: q, mode: 'insensitive' } },
           { model: { contains: q, mode: 'insensitive' } },
           { color: { contains: q, mode: 'insensitive' } },

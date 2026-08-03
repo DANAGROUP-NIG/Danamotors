@@ -14,6 +14,8 @@ export async function getAppointmentsRequest(params?: {
   branchId?: string;
   status?: string;
   customerId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }): Promise<AppointmentListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -22,6 +24,8 @@ export async function getAppointmentsRequest(params?: {
   if (params?.branchId) query.set("branchId", params.branchId);
   if (params?.status) query.set("status", params.status);
   if (params?.customerId) query.set("customerId", params.customerId);
+  if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) query.set("dateTo", params.dateTo);
   const qs = query.toString();
   return apiGet<AppointmentListResponse>(
     `${API_ROUTES.appointments.base}${qs ? `?${qs}` : ""}`,

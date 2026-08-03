@@ -29,7 +29,7 @@ export function InventoryAlertBanner({ alertsCount = 7 }: InventoryAlertBannerPr
               {alertsCount} inventory alert{alertsCount !== 1 ? "s" : ""}
             </p>
             <p className="text-xs text-amber-700">
-              Items at or below reorder level — review before next service day.
+              Items at or below minimum stock — review before next service day.
             </p>
           </>
         ) : (

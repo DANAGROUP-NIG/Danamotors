@@ -93,16 +93,26 @@ export function JobCardsTable() {
       render: (jc) => <span className="font-medium">{jc.jobNumber}</span>,
     },
     {
-      header: "Vehicle",
-      render: (jc) => <span className="text-muted-foreground">{jc.vehicle.year} {jc.vehicle.make} {jc.vehicle.model}</span>,
+      header: "Vehicle Reg No",
+      render: (jc) => (
+        <span className="font-medium text-muted-foreground">
+          {jc.vehicle?.registrationNumber ?? "—"}
+        </span>
+      ),
     },
     {
       header: "Customer",
-      render: (jc) => <span className="text-muted-foreground">{jc.customer.firstName} {jc.customer.lastName}</span>,
+      render: (jc) => (
+        <span className="text-muted-foreground">
+          {jc.customer ? `${jc.customer.firstName} ${jc.customer.lastName}` : "—"}
+        </span>
+      ),
     },
     {
       header: "Branch",
-      render: (jc) => <span className="text-muted-foreground">{jc.branch.name}</span>,
+      render: (jc) => (
+        <span className="text-muted-foreground">{jc.branch?.name ?? "—"}</span>
+      ),
     },
     {
       header: "Agent",

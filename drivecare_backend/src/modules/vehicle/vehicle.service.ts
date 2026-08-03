@@ -25,6 +25,7 @@ export class VehicleService {
       vehicles: vehicles.map((vehicle) => ({
         id: vehicle.id,
         vin: vehicle.vin,
+        registrationNumber: vehicle.registrationNumber,
         make: vehicle.make,
         model: vehicle.model,
         year: vehicle.year,
@@ -64,6 +65,7 @@ export class VehicleService {
     return {
       id: vehicle.id,
       vin: vehicle.vin,
+      registrationNumber: vehicle.registrationNumber,
       make: vehicle.make,
       model: vehicle.model,
       year: vehicle.year,
@@ -89,6 +91,7 @@ export class VehicleService {
   async createVehicle(data: {
     customerId: string;
     vin: string;
+    registrationNumber?: string;
     make?: string;
     model?: string;
     year?: number;
@@ -110,9 +113,21 @@ export class VehicleService {
       throw new ConflictError('A vehicle with this VIN already exists');
     }
 
+    if (data.registrationNumber) {
+      const existingReg = await prisma.vehicle.findFirst({
+        where: { registrationNumber: data.registrationNumber },
+      });
+      if (existingReg) {
+        throw new ConflictError('A vehicle with this registration number already exists');
+      }
+    }
+
     return this.vehicleRepository.createVehicle({
       customerId: data.customerId,
       vin: data.vin,
+      registrationNumber: data.registrationNumber
+        ? data.registrationNumber.toUpperCase()
+        : undefined,
       make: data.make,
       model: data.model,
       year: data.year,
@@ -127,6 +142,7 @@ export class VehicleService {
   }
 
   async updateVehicle(id: string, data: {
+    registrationNumber?: string;
     make?: string;
     model?: string;
     year?: number;
@@ -143,6 +159,9 @@ export class VehicleService {
     }
 
     return this.vehicleRepository.updateVehicle(id, {
+      registrationNumber: data.registrationNumber
+        ? data.registrationNumber.toUpperCase()
+        : undefined,
       make: data.make,
       model: data.model,
       year: data.year,

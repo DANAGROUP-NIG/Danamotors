@@ -28,6 +28,19 @@ export class ServiceService {
     const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
     if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
+    const activeAppointment = await prisma.serviceAppointment.findFirst({
+      where: {
+        customerId: data.customerId,
+        vehicleId: data.vehicleId,
+        status: { notIn: ['Closed', 'Cancelled', 'Completed'] },
+      },
+    });
+    if (activeAppointment) {
+      throw new ConflictError(
+        `This customer's vehicle already has an active appointment (${activeAppointment.status}). Close, cancel, or complete it before booking another.`,
+      );
+    }
+
     return this.serviceRepository.createAppointment({
       customerId: data.customerId,
       vehicleId: data.vehicleId,
@@ -48,6 +61,8 @@ export class ServiceService {
     status?: string;
     createdById?: string;
     customerId?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { appointments, total } = await this.serviceRepository.listAppointments({
@@ -58,6 +73,8 @@ export class ServiceService {
       status: params.status,
       createdById: params.createdById,
       customerId: params.customerId,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
     });
 
     return {
@@ -180,6 +197,7 @@ export class ServiceService {
         { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
         { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
         { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
       ];
     }
 

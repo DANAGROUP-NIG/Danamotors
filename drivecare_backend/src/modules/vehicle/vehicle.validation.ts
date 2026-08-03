@@ -10,6 +10,12 @@ export const createVehicleSchema = z.object({
   body: z.object({
     customerId: z.string().uuid('Invalid customer ID'),
     vin: z.string().min(1, 'VIN is required'),
+    registrationNumber: z
+      .string()
+      .trim()
+      .max(50)
+      .transform((v) => v.toUpperCase())
+      .optional(),
     make: z.string().optional(),
     model: z.string().optional(),
     year: z.number().int().optional(),
@@ -24,6 +30,12 @@ export const createVehicleSchema = z.object({
 
 export const updateVehicleSchema = z.object({
   body: z.object({
+    registrationNumber: z
+      .string()
+      .trim()
+      .max(50)
+      .transform((v) => v.toUpperCase())
+      .optional(),
     make: z.string().optional(),
     model: z.string().optional(),
     year: z.number().int().optional(),
