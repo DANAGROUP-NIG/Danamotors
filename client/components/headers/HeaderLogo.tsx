@@ -5,7 +5,7 @@ export default function HeaderLogo() {
     <a className="flex items-center gap-3" href="/">
       <img
         src="/logo.webp"
-        alt="Dana Motor DriveCare Logo"
+        alt="Dana Motors Logo"
         className="w-20 h-6 font-bold"
       />
     </a>

@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerService } from './customer.service';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
 
 export class CustomerController {
@@ -44,6 +46,7 @@ export class CustomerController {
     try {
       const { id } = req.params;
       const result = await this.customerService.getCustomer(id);
+      assertBranchOwnership(req, (result as any).branchId);
 
       res.status(200).json({
         status: 'success',
@@ -78,6 +81,11 @@ export class CustomerController {
   updateCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
       const result = await this.customerService.updateCustomer(id, req.body);
 
       res.status(200).json({
@@ -96,6 +104,11 @@ export class CustomerController {
   addCustomerDocument = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
       const result = await this.customerService.addCustomerDocument(id, req.body);
 
       res.status(201).json({
@@ -114,6 +127,11 @@ export class CustomerController {
   getCustomerDocuments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
       const result = await this.customerService.getCustomerDocuments(id);
 
       res.status(200).json({
@@ -131,6 +149,11 @@ export class CustomerController {
   addServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
       const result = await this.customerService.addServiceHistory(id, req.body);
 
       res.status(201).json({
@@ -149,6 +172,11 @@ export class CustomerController {
   getServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
       const result = await this.customerService.getServiceHistory(id);
 
       res.status(200).json({

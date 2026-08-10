@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const faqItems = [
   [
-    "Is DriveCare for car owners?",
-    "Yes. DriveCare helps car users book service, follow repair progress, approve estimates, and know when the car is ready.",
+    "Is Dana Motors for car owners?",
+    "Yes. Dana Motors helps car users book service, follow repair progress, approve estimates, and know when the car is ready.",
   ],
   [
     "Who handles the administration and service management?",

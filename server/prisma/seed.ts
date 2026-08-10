@@ -23,7 +23,7 @@ async function seedBranches() {
       state: "Lagos",
       country: "Nigeria",
       phoneNumber: "+2341000001",
-      email: "main@drivecare.com",
+      email: "main@danamotors.com",
     },
     {
       name: "Abuja Branch",
@@ -32,7 +32,7 @@ async function seedBranches() {
       state: "FCT",
       country: "Nigeria",
       phoneNumber: "+2341000002",
-      email: "abuja@drivecare.com",
+      email: "abuja@danamotors.com",
     },
     {
       name: "Port Harcourt Branch",
@@ -41,7 +41,7 @@ async function seedBranches() {
       state: "Rivers",
       country: "Nigeria",
       phoneNumber: "+2341000003",
-      email: "ph@drivecare.com",
+      email: "ph@danamotors.com",
     },
   ];
   const result = [];
@@ -105,7 +105,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
   const staff = [
     // SuperAdmin
     {
-      email: process.env.SUPERADMIN_EMAIL ?? "superadmin@drivecare.com",
+      email: process.env.SUPERADMIN_EMAIL ?? "superadmin@danamotors.com",
       password: process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin@123",
       firstName: "Super",
       lastName: "Admin",
@@ -114,7 +114,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Admins
     {
-      email: "admin.lagos@drivecare.com",
+      email: "admin.lagos@danamotors.com",
       password: "Admin@123",
       firstName: "Adaeze",
       lastName: "Okonkwo",
@@ -122,7 +122,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "admin.abuja@drivecare.com",
+      email: "admin.abuja@danamotors.com",
       password: "Admin@123",
       firstName: "Emeka",
       lastName: "Nwosu",
@@ -131,7 +131,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Workshop Managers
     {
-      email: "wm.lagos@drivecare.com",
+      email: "wm.lagos@danamotors.com",
       password: "WManager@123",
       firstName: "Rotimi",
       lastName: "Ajayi",
@@ -139,7 +139,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "wm.abuja@drivecare.com",
+      email: "wm.abuja@danamotors.com",
       password: "WManager@123",
       firstName: "Musa",
       lastName: "Ibrahim",
@@ -147,7 +147,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: abujaBranch.id,
     },
     {
-      email: "wm.ph@drivecare.com",
+      email: "wm.ph@danamotors.com",
       password: "WManager@123",
       firstName: "Godwin",
       lastName: "Peters",
@@ -156,7 +156,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Store Managers
     {
-      email: "store.lagos@drivecare.com",
+      email: "store.lagos@danamotors.com",
       password: "Store@123",
       firstName: "Amina",
       lastName: "Bello",
@@ -164,7 +164,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "store.abuja@drivecare.com",
+      email: "store.abuja@danamotors.com",
       password: "Store@123",
       firstName: "Chukwuemeka",
       lastName: "Odu",
@@ -173,7 +173,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Service Advisors
     {
-      email: "advisor1@drivecare.com",
+      email: "advisor1@danamotors.com",
       password: "Advisor@123",
       firstName: "Chidi",
       lastName: "Eze",
@@ -181,7 +181,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "advisor2@drivecare.com",
+      email: "advisor2@danamotors.com",
       password: "Advisor@123",
       firstName: "Fatima",
       lastName: "Bello",
@@ -189,7 +189,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: abujaBranch.id,
     },
     {
-      email: "advisor3@drivecare.com",
+      email: "advisor3@danamotors.com",
       password: "Advisor@123",
       firstName: "Blessing",
       lastName: "Obi",
@@ -198,7 +198,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Technicians
     {
-      email: "tech1@drivecare.com",
+      email: "tech1@danamotors.com",
       password: "Tech@123",
       firstName: "Tunde",
       lastName: "Akinyemi",
@@ -206,7 +206,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "tech2@drivecare.com",
+      email: "tech2@danamotors.com",
       password: "Tech@123",
       firstName: "Kingsley",
       lastName: "Okoro",
@@ -214,7 +214,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "tech3@drivecare.com",
+      email: "tech3@danamotors.com",
       password: "Tech@123",
       firstName: "Usman",
       lastName: "Garba",
@@ -222,7 +222,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: abujaBranch.id,
     },
     {
-      email: "tech4@drivecare.com",
+      email: "tech4@danamotors.com",
       password: "Tech@123",
       firstName: "Ifeanyi",
       lastName: "Chukwu",
@@ -231,7 +231,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Receptionists
     {
-      email: "reception1@drivecare.com",
+      email: "reception1@danamotors.com",
       password: "Recept@123",
       firstName: "Chidinma",
       lastName: "Okafor",
@@ -239,7 +239,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: mainBranch.id,
     },
     {
-      email: "reception2@drivecare.com",
+      email: "reception2@danamotors.com",
       password: "Recept@123",
       firstName: "Hauwa",
       lastName: "Musa",
@@ -247,7 +247,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
       branchId: abujaBranch.id,
     },
     {
-      email: "reception3@drivecare.com",
+      email: "reception3@danamotors.com",
       password: "Recept@123",
       firstName: "Priscilla",
       lastName: "Hart",
@@ -256,7 +256,7 @@ async function seedStaffUsers(branches: { id: string; name: string }[]) {
     },
     // Reception Manager
     {
-      email: "recptionmanager@drivecare.com",
+      email: "recptionmanager@danamotors.com",
       password: "RecpManager@123",
       firstName: "Blessing",
       lastName: "Effiong",

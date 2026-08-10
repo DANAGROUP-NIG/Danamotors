@@ -18,7 +18,7 @@ const router = Router();
 router.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'success',
-    message: 'DriveCare API is healthy',
+    message: 'Dana Motors API is healthy',
     timestamp: new Date().toISOString(),
   });
 });

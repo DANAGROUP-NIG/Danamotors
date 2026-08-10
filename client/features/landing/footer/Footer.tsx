@@ -4,7 +4,7 @@ import HeaderLogo from "@/components/headers/HeaderLogo";
 
 const footerGroups = [
   {
-    title: "DriveCare",
+    title: "Dana Motors",
     links: [
       ["Services", "#features"],
       ["How It Works", "#workflow"],
@@ -48,10 +48,10 @@ export default function Footer() {
             <div className="mt-6 grid gap-3 text-sm text-slate-300">
               <a
                 className="flex items-center gap-3 transition hover:text-white"
-                href="mailto:hello@drivecare.ng"
+                href="mailto:hello@danamotors.ng"
               >
                 <Mail className="size-4 text-blue-300" />
-                hello@drivecare.ng
+                hello@danamotors.ng
               </a>
               <div className="flex items-center gap-3">
                 <MapPin className="size-4 text-blue-300" />
@@ -107,7 +107,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 flex flex-col gap-5 border-t border-white/10 pt-8 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>(c) 2026 DANA DriveCare. All rights reserved.</p>
+          <p>(c) 2026 Dana Motors. All rights reserved.</p>
           <div className="flex items-center gap-2">
             {[
               ["LinkedIn", Linkedin],

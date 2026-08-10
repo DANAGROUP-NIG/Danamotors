@@ -24,6 +24,14 @@ export async function registerRequest(payload: RegisterPayload): Promise<LoginRe
   return apiPost<LoginResponse>(API_ROUTES.auth.register, payload);
 }
 
-export async function forgotPasswordRequest(email: string): Promise<void> {
-  return apiPost<void>(API_ROUTES.auth.forgotPassword, { email });
+export async function forgotPasswordRequest(email: string): Promise<string | undefined> {
+  const result = await apiPost<{ resetLink?: string }>(API_ROUTES.auth.forgotPassword, { email });
+  return result.resetLink;
+}
+
+export async function resetPasswordRequest(payload: {
+  token: string;
+  newPassword: string;
+}): Promise<void> {
+  return apiPost<void>(API_ROUTES.auth.resetPassword, payload);
 }

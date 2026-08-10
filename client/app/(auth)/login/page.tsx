@@ -2,7 +2,7 @@ import LandingHeader from "@/components/headers/LandingHeader";
 import LoginForm from "@/features/auth/LoginForm";
 
 export const metadata = {
-  title: "Login - DriveCare",
+  title: "Login - Dana Motors",
 };
 
 export default function LoginPage() {

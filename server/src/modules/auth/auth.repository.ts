@@ -52,6 +52,15 @@ export class AuthRepository {
     });
   }
 
+  async findByResetTokenHash(
+    tokenHash: string,
+  ): Promise<{ id: string; resetTokenExpiry: Date | null } | null> {
+    return prisma.user.findFirst({
+      where: { resetTokenHash: tokenHash },
+      select: { id: true, resetTokenExpiry: true },
+    });
+  }
+
   async createUser(data: {
     email: string;
     passwordHash: string;

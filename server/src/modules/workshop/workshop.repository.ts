@@ -81,4 +81,52 @@ export class WorkshopRepository {
       },
     });
   }
+
+  async listTechnicians(params: {
+    skip?: number;
+    take?: number;
+    branchId?: string;
+    search?: string;
+  }) {
+    const where: Record<string, unknown> = {
+      role: { is: { name: 'Technician' } },
+    };
+
+    if (params.branchId) {
+      where.branchId = params.branchId;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { firstName: { contains: params.search, mode: 'insensitive' } },
+        { lastName: { contains: params.search, mode: 'insensitive' } },
+        { email: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    return prisma.user.findMany({
+      where,
+      skip: params.skip,
+      take: params.take,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+        isActive: true,
+        branchId: true,
+        branch: { select: { id: true, name: true } },
+        createdAt: true,
+        _count: {
+          select: {
+            technicianAssignments: {
+              where: { status: { notIn: ['Completed', 'Cancelled'] } },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

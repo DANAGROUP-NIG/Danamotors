@@ -3,7 +3,7 @@ import Container from "@/components/ui/Container";
 import RegisterForm from "@/features/auth/RegisterForm";
 
 export const metadata = {
-  title: "Register - DriveCare",
+  title: "Register - Dana Motors",
 };
 
 export default function RegisterPage() {

@@ -14,6 +14,7 @@ const controller = new WorkshopController();
 
 router.use(authMiddleware);
 
+router.get('/technicians', requirePermission(PERMISSIONS.WORKSHOP_READ), controller.listTechnicians);
 router.post('/assign/:id', requirePermission(PERMISSIONS.WORKSHOP_UPDATE), validateRequest(assignTechnicianSchema), controller.assignTechnician);
 router.patch('/progress/:id', requirePermission(PERMISSIONS.WORKSHOP_UPDATE), validateRequest(updateJobProgressSchema), controller.updateProgress);
 router.patch('/qc/:id', requirePermission(PERMISSIONS.WORKSHOP_UPDATE), validateRequest(qcUpdateSchema), controller.updateQC);

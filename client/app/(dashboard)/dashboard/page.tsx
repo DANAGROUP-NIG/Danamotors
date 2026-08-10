@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { TrendingUp, Wrench, Car, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -17,6 +17,8 @@ import { RevenueChartCard } from "@/features/dashboard/components/common/Revenue
 import { JobsByStatusCard } from "@/features/dashboard/components/common/JobsByStatusCard";
 import { TopTechniciansCard } from "@/features/dashboard/components/common/TopTechniciansCard";
 import { DashboardFallbackState } from "@/features/dashboard/components/common/DashboardFallbackState";
+import { DashboardSkeleton } from "@/features/dashboard/components/common/DashboardSkeleton";
+import { useDashboardStats } from "@/features/dashboard/hooks/useDashboardStats";
 
 import {
   FINANCE_ROLES,
@@ -26,12 +28,11 @@ import {
   SERVICE_CREATE_ROLES,
 } from "@/features/auth/roles";
 
-import {
-  REVENUE_DATA,
-  JOBS_BY_STATUS,
-  TOP_TECHNICIANS,
-  SPARKLINES,
-} from "@/constant";
+import { SPARKLINES } from "@/constant";
+
+function formatNaira(n: number) {
+  return `₦${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
 
 export default function DashboardPage() {
   const { user, hasAccess, isReceptionist, isReceptionManager, isStoreManager } = useAuth();
@@ -46,10 +47,7 @@ export default function DashboardPage() {
     }));
   }, []);
 
-  const totalJobs = useMemo(
-    () => JOBS_BY_STATUS.reduce((s, d) => s + d.value, 0),
-    []
-  );
+  const { data: stats, isLoading, isError } = useDashboardStats();
 
   const canSeeFinance = hasAccess(FINANCE_ROLES);
   const canSeeWorkshop = hasAccess(WORKSHOP_ROLES);
@@ -79,6 +77,21 @@ export default function DashboardPage() {
     return <StoreManagerDashboard />;
   }
 
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (isError || !stats) {
+    return (
+      <div className="flex flex-col gap-6 p-4 lg:p-6">
+        <DashboardWelcomeHeader user={user} today={today} />
+        <DashboardFallbackState />
+      </div>
+    );
+  }
+
+  const revenueChartTotal = stats.revenueChart.reduce((s, d) => s + d.value, 0);
+
   return (
     <>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
@@ -91,7 +104,7 @@ export default function DashboardPage() {
         />
 
         {/* Inventory Alert Banner */}
-        {canSeeInventory && <InventoryAlertBanner alertsCount={7} />}
+        {canSeeInventory && <InventoryAlertBanner alertsCount={stats.inventoryAlerts} />}
 
         {/* KPI Grid */}
         {kpiCount > 0 && (
@@ -107,9 +120,9 @@ export default function DashboardPage() {
             {canSeeFinance && (
               <DashboardKpiCard
                 label="Today's Revenue"
-                value="₦3,456,789"
-                delta="+12.5%"
-                up={true}
+                value={formatNaira(stats.todayRevenue)}
+                delta={stats.revenueDelta}
+                up={stats.revenueDelta >= 0}
                 icon={TrendingUp}
                 iconBg="bg-emerald-50"
                 iconColor="text-emerald-600"
@@ -120,9 +133,9 @@ export default function DashboardPage() {
             {canSeeWorkshop && (
               <DashboardKpiCard
                 label="Total Jobs"
-                value="112"
-                delta="+8.3%"
-                up={true}
+                value={String(stats.totalJobs)}
+                delta={stats.jobsDelta}
+                up={stats.jobsDelta >= 0}
                 icon={Wrench}
                 iconBg="bg-blue-50"
                 iconColor="text-blue-600"
@@ -133,9 +146,9 @@ export default function DashboardPage() {
             {canSeeWorkshop && (
               <DashboardKpiCard
                 label="Vehicles In Progress"
-                value="18"
-                delta="-4.2%"
-                up={false}
+                value={String(stats.inProgressJobs)}
+                delta={stats.inProgressDelta}
+                up={stats.inProgressDelta >= 0}
                 icon={Car}
                 iconBg="bg-orange-50"
                 iconColor="text-orange-500"
@@ -146,9 +159,9 @@ export default function DashboardPage() {
             {canSeeWorkshop && (
               <DashboardKpiCard
                 label="Completed Jobs"
-                value="72"
-                delta="+10.1%"
-                up={true}
+                value={String(stats.completedJobs)}
+                delta={stats.completedDelta}
+                up={stats.completedDelta >= 0}
                 icon={CheckCircle2}
                 iconBg="bg-green-50"
                 iconColor="text-green-600"
@@ -175,20 +188,20 @@ export default function DashboardPage() {
           >
             {canSeeFinance && (
               <RevenueChartCard
-                data={REVENUE_DATA}
-                totalFormatted="₦27,589,000"
+                data={stats.revenueChart}
+                totalFormatted={formatNaira(revenueChartTotal)}
               />
             )}
 
             {canSeeWorkshop && (
               <JobsByStatusCard
-                data={JOBS_BY_STATUS}
-                totalJobs={totalJobs}
+                data={stats.jobsByStatus}
+                totalJobs={stats.totalJobs}
               />
             )}
 
             {canManage && (
-              <TopTechniciansCard technicians={TOP_TECHNICIANS} />
+              <TopTechniciansCard technicians={stats.topTechnicians} />
             )}
           </div>
         )}

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { WorkshopService } from './workshop.service';
+import { ROLES } from '../../shared/constants/roles';
 
 export class WorkshopController {
   private workshopService: WorkshopService;
@@ -7,6 +8,24 @@ export class WorkshopController {
   constructor() {
     this.workshopService = new WorkshopService();
   }
+
+  listTechnicians = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 10;
+      const search = req.query.search as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.WORKSHOP_MANAGER && req.user.role !== ROLES.RECEPTION_MANAGER) {
+        branchId = req.user.branchId ?? undefined;
+      }
+
+      const result = await this.workshopService.listTechnicians({ page, limit, branchId, search });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   assignTechnician = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

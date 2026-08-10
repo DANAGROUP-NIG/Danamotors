@@ -15,7 +15,6 @@ export const errorHandler = (
 ): void => {
   let statusCode = 500;
   let message = 'Internal Server Error';
-  let errors: unknown = undefined;
 
   // Handle Custom AppError
   if (err instanceof AppError) {
@@ -61,10 +60,6 @@ export const errorHandler = (
     statusCode,
     message,
   };
-
-  if (errors) {
-    response.errors = errors;
-  }
 
   if (config.NODE_ENV === 'development') {
     response.stack = err.stack;

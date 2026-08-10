@@ -364,4 +364,97 @@ export class ServiceService {
 
     return this.serviceRepository.getApprovals(estimateId);
   }
+
+  async listInspections(params?: {
+    page?: number;
+    limit?: number;
+    branchId?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+    if (params?.branchId) where.jobCard = { branchId: params.branchId };
+    if (params?.status) where.status = params.status;
+
+    if (params?.search) {
+      where.OR = [
+        { findings: { contains: params.search, mode: 'insensitive' } },
+        { notes: { contains: params.search, mode: 'insensitive' } },
+        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const [inspections, total] = await Promise.all([
+      this.serviceRepository.listInspections({
+        skip,
+        take: limit,
+        branchId: params?.branchId,
+        status: params?.status,
+        search: params?.search,
+      }),
+      prisma.inspection.count({ where }),
+    ]);
+
+    return {
+      inspections,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async listEstimates(params?: {
+    page?: number;
+    limit?: number;
+    branchId?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+    if (params?.branchId) where.jobCard = { branchId: params.branchId };
+    if (params?.status) where.status = params.status;
+
+    if (params?.search) {
+      where.OR = [
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const [estimates, total] = await Promise.all([
+      this.serviceRepository.listEstimates({
+        skip,
+        take: limit,
+        branchId: params?.branchId,
+        status: params?.status,
+        search: params?.search,
+      }),
+      prisma.estimate.count({ where }),
+    ]);
+
+    return {
+      estimates,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }

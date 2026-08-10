@@ -10,6 +10,7 @@ import {
   createRoleSchema,
   updateRolePermissionsSchema,
   userIdParamSchema,
+  roleIdParamSchema,
 } from './admin.validation';
 
 const router = Router();
@@ -28,7 +29,7 @@ router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validate
 
 // Roles & Permissions Management
 router.get('/roles', requirePermission(PERMISSIONS.ROLE_READ), controller.getRoles);
-router.get('/roles/:id', requirePermission(PERMISSIONS.ROLE_READ), controller.getRole);
+router.get('/roles/:id', requirePermission(PERMISSIONS.ROLE_READ), validateRequest(roleIdParamSchema), controller.getRole);
 router.post('/roles', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(createRoleSchema), controller.createRole);
 router.put('/roles/:id/permissions', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(updateRolePermissionsSchema), controller.updateRolePermissions);
 

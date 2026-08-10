@@ -33,7 +33,9 @@ router.get('/job-cards', requirePermission(PERMISSIONS.SERVICE_READ), controller
 router.get('/job-cards/:id', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(jobCardIdParamSchema), controller.getJobCard);
 router.put('/job-cards/:id', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(updateJobCardSchema), controller.updateJobCard);
 
+router.get('/inspections', requirePermission(PERMISSIONS.SERVICE_READ), controller.listInspections);
 router.post('/job-cards/:id/inspections', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createInspectionSchema), controller.addInspection);
+router.get('/estimates', requirePermission(PERMISSIONS.SERVICE_READ), controller.listEstimates);
 router.post('/job-cards/:id/estimates', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createEstimateSchema), controller.addEstimate);
 router.post('/estimates/:id/approvals', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createApprovalSchema), controller.addApproval);
 router.get('/estimates/:id/approvals', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(estimateIdParamSchema), controller.getApprovals);

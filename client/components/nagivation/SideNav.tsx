@@ -19,7 +19,7 @@ import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 
 //collapse key
-const COLLAPSED_KEY = "drivecare-sidebar-collapsed";
+const COLLAPSED_KEY = "danamotors-sidebar-collapsed";
 
 //constans
 import { NAV_GROUPS } from "@/constant";

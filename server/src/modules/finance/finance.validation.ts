@@ -42,7 +42,8 @@ export const updateInvoiceSchema = z.object({
 export const createPaymentSchema = z.object({
   body: z.object({
     invoiceId: z.string().uuid('Invalid invoice ID'),
-    recordedById: z.string().uuid('Invalid user ID'),
+    // Optional: the controller always overrides this with the authenticated user.
+    recordedById: z.string().uuid('Invalid user ID').optional(),
     amount: z.number().positive('Payment amount must be positive'),
     method: z.string().min(1, 'Payment method is required'),
     paymentDate: z.string().datetime().optional(),
@@ -54,7 +55,8 @@ export const createPaymentSchema = z.object({
 export const createReceiptSchema = z.object({
   body: z.object({
     invoiceId: z.string().uuid('Invalid invoice ID'),
-    issuedById: z.string().uuid('Invalid user ID'),
+    // Optional: the controller always overrides this with the authenticated user.
+    issuedById: z.string().uuid('Invalid user ID').optional(),
     amount: z.number().positive('Receipt amount must be positive'),
     issuedAt: z.string().datetime().optional(),
     reference: z.string().optional(),

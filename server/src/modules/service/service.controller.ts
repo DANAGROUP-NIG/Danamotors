@@ -74,6 +74,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getAppointment(id);
+      assertBranchOwnership(req, (result as any).branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { appointment: result } });
     } catch (error) {
       next(error);
@@ -143,6 +144,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getJobCard(id);
+      assertBranchOwnership(req, (result as any).branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { jobCard: result } });
     } catch (error) {
       next(error);
@@ -155,6 +157,8 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can update job cards');
       }
       const { id } = req.params;
+      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      assertBranchOwnership(req, card?.branchId);
       const result = await this.serviceService.updateJobCard(id, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Job card updated successfully', data: { jobCard: result } });
     } catch (error) {
@@ -168,6 +172,8 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can add inspections');
       }
       const { id } = req.params;
+      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      assertBranchOwnership(req, card?.branchId);
       const result = await this.serviceService.addInspection(id, req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Inspection added successfully', data: { inspection: result } });
     } catch (error) {
@@ -181,6 +187,8 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can add estimates');
       }
       const { id } = req.params;
+      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      assertBranchOwnership(req, card?.branchId);
       const result = await this.serviceService.addEstimate(id, req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Estimate created successfully', data: { estimate: result } });
     } catch (error) {
@@ -194,6 +202,11 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can record approvals');
       }
       const { id } = req.params;
+      const estimate = await prisma.estimate.findUnique({
+        where: { id },
+        select: { jobCard: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, estimate?.jobCard?.branchId);
       const result = await this.serviceService.addApproval(id, req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Customer approval recorded successfully', data: { approval: result } });
     } catch (error) {
@@ -204,8 +217,51 @@ export class ServiceController {
   getApprovals = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const estimate = await prisma.estimate.findUnique({
+        where: { id },
+        select: { jobCard: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, estimate?.jobCard?.branchId);
       const result = await this.serviceService.getApprovals(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { approvals: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listInspections = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const page = zCoerceNumber(req.query.page, 1);
+      const limit = zCoerceNumber(req.query.limit, 10);
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
+        branchId = req.user.branchId ?? undefined;
+      }
+
+      const result = await this.serviceService.listInspections({ page, limit, branchId, search, status });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listEstimates = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const page = zCoerceNumber(req.query.page, 1);
+      const limit = zCoerceNumber(req.query.limit, 10);
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      let branchId = req.query.branchId as string | undefined;
+
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
+        branchId = req.user.branchId ?? undefined;
+      }
+
+      const result = await this.serviceService.listEstimates({ page, limit, branchId, search, status });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }

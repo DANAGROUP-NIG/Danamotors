@@ -170,5 +170,44 @@ export class AuthController {
       next(error);
     }
   };
+
+  forgotPassword = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.authService.forgotPassword(req.body.email);
+
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: result
+          ? "Password reset link generated"
+          : "If an account exists for that email, a reset link will be sent",
+        data: result ?? undefined,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  resetPassword = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      await this.authService.resetPassword(req.body.token, req.body.newPassword);
+
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Password reset successfully. You can now sign in.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 export default AuthController;

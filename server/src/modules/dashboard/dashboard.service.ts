@@ -139,12 +139,20 @@ export class DashboardService {
             ORDER BY "jobCount" DESC
             LIMIT 5
           `,
-      prisma.$queryRaw<{ count: number }[]>`
-        SELECT COUNT(*)::int AS count
-        FROM "SparePart"
-        WHERE "minimumStock" > 0
-          AND "stock" <= "minimumStock"
-      `.then((r) => r[0]?.count ?? 0).catch(() => 0),
+      branchId
+        ? prisma.$queryRaw<{ count: number }[]>`
+            SELECT COUNT(*)::int AS count
+            FROM "InventoryStock"
+            WHERE "minimumStock" > 0
+              AND "quantity" <= "minimumStock"
+              AND "branchId" = ${branchId}
+          `.then((r) => r[0]?.count ?? 0).catch(() => 0)
+        : prisma.$queryRaw<{ count: number }[]>`
+            SELECT COUNT(*)::int AS count
+            FROM "InventoryStock"
+            WHERE "minimumStock" > 0
+              AND "quantity" <= "minimumStock"
+          `.then((r) => r[0]?.count ?? 0).catch(() => 0),
     ]);
 
     // ── Batch 3a: Technician jobs ───────────────────────────────────

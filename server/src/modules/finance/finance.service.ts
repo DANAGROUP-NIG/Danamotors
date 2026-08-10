@@ -218,19 +218,20 @@ export class FinanceService {
     startDate?: string;
     endDate?: string;
   }) {
-    const where: any = {};
+    const dateFilter: Record<string, Date> = {};
+    if (params.startDate) dateFilter.gte = new Date(params.startDate);
+    if (params.endDate) dateFilter.lte = new Date(params.endDate);
+    const hasDateFilter = Object.keys(dateFilter).length > 0;
 
-    if (params.startDate || params.endDate) {
-      where.createdAt = {};
-      if (params.startDate) where.createdAt.gte = new Date(params.startDate);
-      if (params.endDate) where.createdAt.lte = new Date(params.endDate);
-    }
+    const invoiceWhere = hasDateFilter ? { createdAt: dateFilter } : {};
+    const paymentWhere = hasDateFilter ? { paymentDate: dateFilter } : {};
+    const receiptWhere = hasDateFilter ? { issuedAt: dateFilter } : {};
 
     const [invoiceCount, totalInvoiced, totalPaid, receiptCount] = await Promise.all([
-      prisma.invoice.count({ where }),
-      prisma.invoice.aggregate({ where, _sum: { total: true } }),
-      prisma.payment.aggregate({ where: { ...where, paymentDate: where.createdAt }, _sum: { amount: true } }),
-      prisma.receipt.count({ where }),
+      prisma.invoice.count({ where: invoiceWhere }),
+      prisma.invoice.aggregate({ where: invoiceWhere, _sum: { total: true } }),
+      prisma.payment.aggregate({ where: paymentWhere, _sum: { amount: true } }),
+      prisma.receipt.count({ where: receiptWhere }),
     ]);
 
     return {

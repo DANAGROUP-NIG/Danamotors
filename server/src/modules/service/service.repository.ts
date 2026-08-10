@@ -323,4 +323,119 @@ export class ServiceRepository {
       where: { estimateId },
     });
   }
+
+  async listInspections(params: {
+    skip?: number;
+    take?: number;
+    branchId?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const where: Record<string, unknown> = {};
+
+    if (params.branchId) {
+      where.jobCard = { branchId: params.branchId };
+    }
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { findings: { contains: params.search, mode: 'insensitive' } },
+        { notes: { contains: params.search, mode: 'insensitive' } },
+        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    return prisma.inspection.findMany({
+      where,
+      skip: params.skip,
+      take: params.take,
+      include: {
+        jobCard: {
+          select: {
+            id: true,
+            jobNumber: true,
+            status: true,
+            branchId: true,
+            branch: { select: { id: true, name: true } },
+            customer: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                make: true,
+                model: true,
+                registrationNumber: true,
+                vin: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async listEstimates(params: {
+    skip?: number;
+    take?: number;
+    branchId?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const where: Record<string, unknown> = {};
+
+    if (params.branchId) {
+      where.jobCard = { branchId: params.branchId };
+    }
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
+        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+      ];
+    }
+
+    return prisma.estimate.findMany({
+      where,
+      skip: params.skip,
+      take: params.take,
+      include: {
+        jobCard: {
+          select: {
+            id: true,
+            jobNumber: true,
+            branchId: true,
+            branch: { select: { id: true, name: true } },
+            customer: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+            vehicle: {
+              select: {
+                id: true,
+                make: true,
+                model: true,
+                registrationNumber: true,
+                vin: true,
+              },
+            },
+          },
+        },
+        approvals: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

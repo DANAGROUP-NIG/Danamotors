@@ -73,7 +73,7 @@ export const useBranchStore = create<BranchState>()(
       reset: () => set(initialState),
     }),
     {
-      name: "drivecare-active-branch",
+      name: "danamotors-active-branch",
       // Only persist the selected branch, not the full list or loading state —
       // the list is always re-fetched from the server on mount.
       partialize: (state) => ({ activeBranch: state.activeBranch }),

@@ -47,3 +47,9 @@ export const userIdParamSchema = z.object({
     id: z.string().uuid('Invalid user ID'),
   }),
 });
+
+export const roleIdParamSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid role ID'),
+  }),
+});

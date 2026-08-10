@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { config } from "../../config";
 import prisma from "../../prisma/client";
@@ -10,6 +11,18 @@ import {
 } from "../../shared/errors/appError";
 import { LoginResponse } from "./auth.types";
 import { ROLES } from "../../shared/constants/roles";
+
+// Roles users are allowed to request during public self-registration.
+// Privileged roles (admins, managers, accountants) must be assigned by an
+// administrator through the admin module.
+const SELF_SERVICE_ROLES: string[] = [
+  ROLES.RECEPTIONIST,
+  ROLES.TECHNICIAN,
+  ROLES.SERVICE_ADVISOR,
+];
+
+const hashToken = (token: string): string =>
+  crypto.createHash("sha256").update(token).digest("hex");
 
 export class AuthService {
   private authRepository: AuthRepository;
@@ -60,7 +73,12 @@ export class AuthService {
     if (userCount === 0) {
       roleToAssign = ROLES.SUPER_ADMIN;
     } else if (data.roleName) {
-      // Validate role name
+      // Only non-privileged roles may be self-assigned
+      if (!SELF_SERVICE_ROLES.includes(data.roleName)) {
+        throw new BadRequestError(
+          `Role '${data.roleName}' cannot be self-assigned. Contact an administrator.`,
+        );
+      }
       const roleExists = await this.authRepository.findRoleByName(
         data.roleName,
       );
@@ -117,7 +135,7 @@ export class AuthService {
 
     await this.authRepository.saveRefreshToken(
       newUser.id,
-      refreshToken,
+      hashToken(refreshToken),
       refreshExpiry,
     );
 
@@ -182,7 +200,7 @@ export class AuthService {
 
     await this.authRepository.saveRefreshToken(
       user.id,
-      refreshToken,
+      hashToken(refreshToken),
       refreshExpiry,
     );
 
@@ -211,10 +229,11 @@ export class AuthService {
 
   // Refresh token service
   async refresh(token: string): Promise<{ accessToken: string }> {
-    const dbToken = await this.authRepository.findRefreshToken(token);
+    const tokenHash = hashToken(token);
+    const dbToken = await this.authRepository.findRefreshToken(tokenHash);
     if (!dbToken || dbToken.expiresAt < new Date()) {
       if (dbToken) {
-        await this.authRepository.deleteRefreshToken(token);
+        await this.authRepository.deleteRefreshToken(tokenHash);
       }
       throw new UnauthorizedError("Invalid or expired refresh token");
     }
@@ -228,6 +247,11 @@ export class AuthService {
 
     const user = dbToken.user;
     const permissions = user.role.permissions.map((p) => p.permission.name);
+
+    if (!user.isActive) {
+      await this.authRepository.deleteRefreshToken(tokenHash);
+      throw new UnauthorizedError("Your account has been deactivated");
+    }
 
     const jwtPayload = {
       userId: user.id,
@@ -243,9 +267,10 @@ export class AuthService {
 
   // logout
   async logout(token: string): Promise<void> {
-    const dbToken = await this.authRepository.findRefreshToken(token);
+    const tokenHash = hashToken(token);
+    const dbToken = await this.authRepository.findRefreshToken(tokenHash);
     if (dbToken) {
-      await this.authRepository.deleteRefreshToken(token);
+      await this.authRepository.deleteRefreshToken(tokenHash);
       await this.authRepository.createAuditLog({
         action: "USER_LOGOUT",
         details: "User logged out",
@@ -338,6 +363,62 @@ export class AuthService {
       permissions: user.role.permissions.map((p) => p.permission.name),
       branchId: updated.branchId,
     };
+  }
+
+  // Request a password reset. Returns the reset link because no mail transport
+  // is wired up yet; the link carries a one-time token that expires in 1 hour.
+  async forgotPassword(email: string): Promise<{ resetLink: string } | null> {
+    const user = await this.authRepository.findByEmail(email);
+    if (!user || !user.isActive) {
+      // Always resolve successfully so the endpoint cannot be used to probe emails.
+      return null;
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetTokenHash: hashToken(token),
+        resetTokenExpiry: expiresAt,
+      },
+    });
+
+    await this.authRepository.createAuditLog({
+      action: "PASSWORD_RESET_REQUESTED",
+      details: "Password reset link requested",
+      userId: user.id,
+    });
+
+    const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
+    return { resetLink: `${baseUrl}/reset-password?token=${token}` };
+  }
+
+  // Complete a password reset using a valid, unexpired one-time token.
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const record = await this.authRepository.findByResetTokenHash(hashToken(token));
+    if (!record || !record.resetTokenExpiry || record.resetTokenExpiry < new Date()) {
+      throw new BadRequestError("Invalid or expired password reset token");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: record.id },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    // Invalidate sessions after a password reset.
+    await this.authRepository.deleteUserRefreshTokens(record.id);
+
+    await this.authRepository.createAuditLog({
+      action: "PASSWORD_RESET_COMPLETED",
+      details: "Password reset completed",
+      userId: record.id,
+    });
   }
 }
 export default AuthService;

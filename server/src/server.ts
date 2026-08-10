@@ -4,7 +4,7 @@ import prisma from "./prisma/client";
 
 const server = app.listen(config.PORT, async () => {
   console.log(
-    `🚀 DriveCare backend running on port ${config.PORT} in ${config.NODE_ENV} mode`,
+    `🚀 Dana Motors backend running on port ${config.PORT} in ${config.NODE_ENV} mode`,
   );
 
   try {

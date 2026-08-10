@@ -37,6 +37,8 @@ model User {
   lastName     String
   phoneNumber  String?
   isActive     Boolean       @default(true)
+  resetTokenHash String?
+  resetTokenExpiry DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   

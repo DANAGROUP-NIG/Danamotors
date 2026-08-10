@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 // Inlined — middleware runs in the Edge runtime and cannot safely resolve
 // path aliases (@/) or import from app code.
-const ACCESS_TOKEN_COOKIE = "drivecare_access_token";
+const ACCESS_TOKEN_COOKIE = "danamotors_access_token";
 
 const protectedPrefixes = [
   "/dashboard",

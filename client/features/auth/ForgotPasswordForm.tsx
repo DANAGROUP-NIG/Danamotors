@@ -34,35 +34,64 @@ function ForgotPasswordFormContent() {
         <Badge className="mt-2">We&apos;ll email a reset link</Badge>
       </CardHeader>
       <CardContent>
-        <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold">Email</span>
-            <input
-              type="email"
-              className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
-              {...register("email")}
-            />
-            {errors.email && (
-              <span className="text-xs text-red-500">{errors.email.message}</span>
+        {forgotPassword.isSuccess ? (
+          <div className="grid gap-4">
+            <p className="text-sm text-muted-foreground">
+              A reset link was generated for this account.
+            </p>
+            {forgotPassword.data && (
+              <a
+                href={forgotPassword.data}
+                className="block break-all rounded-md border border-border bg-muted px-3 py-2 text-sm text-primary hover:underline"
+              >
+                {forgotPassword.data}
+              </a>
             )}
-          </label>
+            <Button
+              variant="outline"
+              size="lg"
+              className="mt-1"
+              onClick={() => forgotPassword.reset()}
+            >
+              Send another link
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              <a className="text-primary hover:underline" href="/login">
+                Back to sign in
+              </a>
+            </p>
+          </div>
+        ) : (
+          <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Email</span>
+              <input
+                type="email"
+                className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
+                {...register("email")}
+              />
+              {errors.email && (
+                <span className="text-xs text-red-500">{errors.email.message}</span>
+              )}
+            </label>
 
-          <Button
-            type="submit"
-            size="lg"
-            className="mt-2"
-            disabled={forgotPassword.isPending}
-          >
-            {forgotPassword.isPending ? "Sending…" : "Send reset link"}
-          </Button>
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-2"
+              disabled={forgotPassword.isPending}
+            >
+              {forgotPassword.isPending ? "Sending…" : "Send reset link"}
+            </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Remembered your password?{" "}
-            <a className="text-primary hover:underline" href="/login">
-              Sign in
-            </a>
-          </p>
-        </form>
+            <p className="text-center text-sm text-muted-foreground">
+              Remembered your password?{" "}
+              <a className="text-primary hover:underline" href="/login">
+                Sign in
+              </a>
+            </p>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

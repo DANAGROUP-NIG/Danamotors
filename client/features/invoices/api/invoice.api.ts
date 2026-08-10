@@ -1,4 +1,4 @@
-import { apiGet } from "@/lib/api/apiClient";
+import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type { Invoice, InvoiceListResponse } from "../types/invoice.types";
 
@@ -17,4 +17,47 @@ export async function getInvoicesRequest(params?: {
 
 export async function getInvoiceRequest(id: string): Promise<Invoice> {
   return apiGet<Invoice>(API_ROUTES.finance.invoices.detail(id));
+}
+
+export type CreateInvoicePayload = {
+  customerId: string;
+  jobCardId?: string;
+  invoiceNumber: string;
+  issuedDate?: string;
+  dueDate?: string;
+  subtotal: number;
+  tax?: number;
+  total: number;
+  status?: string;
+  notes?: string;
+};
+
+export type UpdateInvoicePayload = {
+  dueDate?: string;
+  subtotal?: number;
+  tax?: number;
+  total?: number;
+  status?: string;
+  notes?: string;
+};
+
+export async function createInvoiceRequest(
+  payload: CreateInvoicePayload,
+): Promise<Invoice> {
+  const result = await apiPost<{ invoice: Invoice }>(
+    API_ROUTES.finance.invoices.base,
+    payload,
+  );
+  return result.invoice;
+}
+
+export async function updateInvoiceRequest(
+  id: string,
+  payload: UpdateInvoicePayload,
+): Promise<Invoice> {
+  const result = await apiPut<{ invoice: Invoice }>(
+    API_ROUTES.finance.invoices.detail(id),
+    payload,
+  );
+  return result.invoice;
 }

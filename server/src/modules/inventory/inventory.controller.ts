@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { InventoryService } from './inventory.service';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import prisma from '../../prisma/client';
 import { ForbiddenError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
 
@@ -77,6 +79,7 @@ export class InventoryController {
   getBranchStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { branchId, partId } = req.params;
+      assertBranchOwnership(req, branchId);
       const result = await this.inventoryService.getBranchStock(branchId, partId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { stock: result } });
     } catch (error) {
@@ -87,6 +90,7 @@ export class InventoryController {
   listBranchStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { branchId } = req.params;
+      assertBranchOwnership(req, branchId);
       const result = await this.inventoryService.listBranchStock(branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { stockItems: result } });
     } catch (error) {
@@ -105,6 +109,7 @@ export class InventoryController {
 
   adjustStock = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      assertBranchOwnership(req, req.body.branchId);
       const result = await this.inventoryService.adjustStock({
         ...req.body,
         recordedById: req.user?.userId,
@@ -118,6 +123,7 @@ export class InventoryController {
   listStockTransactions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { branchId, partId } = req.query as { branchId?: string; partId?: string };
+      if (branchId) assertBranchOwnership(req, branchId);
       const result = await this.inventoryService.listStockTransactions(branchId, partId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { transactions: result } });
     } catch (error) {
@@ -148,6 +154,11 @@ export class InventoryController {
   getPurchaseRequest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const request = await prisma.purchaseRequest.findUnique({
+        where: { id },
+        select: { requestedBy: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, request?.requestedBy?.branchId);
       const result = await this.inventoryService.getPurchaseRequest(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { purchaseRequest: result } });
     } catch (error) {
@@ -169,6 +180,7 @@ export class InventoryController {
 
   createPartIssuance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      assertBranchOwnership(req, req.body.branchId);
       const result = await this.inventoryService.createPartIssuance(req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Part issuance recorded successfully', data: { issuance: result } });
     } catch (error) {
@@ -188,6 +200,11 @@ export class InventoryController {
   getPartIssuance = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const issuance = await prisma.partIssuance.findUnique({
+        where: { id },
+        select: { jobCard: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, issuance?.jobCard?.branchId);
       const result = await this.inventoryService.getPartIssuance(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { issuance: result } });
     } catch (error) {
@@ -199,6 +216,7 @@ export class InventoryController {
 
   createPartReturn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      assertBranchOwnership(req, req.body.branchId);
       const result = await this.inventoryService.createPartReturn(req.body);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Part return recorded successfully', data: { partReturn: result } });
     } catch (error) {
@@ -218,6 +236,15 @@ export class InventoryController {
   getPartReturn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const partReturn = await prisma.partReturn.findUnique({
+        where: { id },
+        select: {
+          partIssuance: {
+            select: { jobCard: { select: { branchId: true } } },
+          },
+        },
+      });
+      assertBranchOwnership(req, partReturn?.partIssuance?.jobCard?.branchId);
       const result = await this.inventoryService.getPartReturn(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { partReturn: result } });
     } catch (error) {
@@ -229,6 +256,20 @@ export class InventoryController {
 
   createTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.GENERAL_STORE_MANAGER && req.user.branchId) {
+        const { requestingBranchId, sourceBranchId } = req.body as {
+          requestingBranchId?: string;
+          sourceBranchId?: string;
+        };
+        if (
+          requestingBranchId !== req.user.branchId &&
+          sourceBranchId !== req.user.branchId
+        ) {
+          throw new ForbiddenError(
+            'You can only create transfers involving your own branch',
+          );
+        }
+      }
       const result = await this.inventoryService.createTransfer({
         ...req.body,
         requestedById: req.user?.userId,
@@ -242,6 +283,20 @@ export class InventoryController {
   getTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const transfer = await prisma.interBranchTransfer.findUnique({
+        where: { id },
+        select: { requestingBranchId: true, sourceBranchId: true },
+      });
+      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.GENERAL_STORE_MANAGER && req.user.branchId) {
+        if (
+          transfer?.requestingBranchId !== req.user.branchId &&
+          transfer?.sourceBranchId !== req.user.branchId
+        ) {
+          throw new ForbiddenError(
+            'You can only view transfers involving your own branch',
+          );
+        }
+      }
       const result = await this.inventoryService.getTransfer(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { transfer: result } });
     } catch (error) {
@@ -286,6 +341,11 @@ export class InventoryController {
   receiveTransfer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const transfer = await prisma.interBranchTransfer.findUnique({
+        where: { id },
+        select: { requestingBranchId: true },
+      });
+      assertBranchOwnership(req, transfer?.requestingBranchId);
       const result = await this.inventoryService.receiveTransfer(id, req.user!.userId, req.body.items);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Transfer received successfully', data: { transfer: result } });
     } catch (error) {

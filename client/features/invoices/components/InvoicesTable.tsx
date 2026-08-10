@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pencil, ReceiptText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { useBranchStore } from "@/store/branch.store";
 import { useInvoices } from "../hooks/use-invoices";
 import type { Invoice } from "../types/invoice.types";
+import { EditInvoiceModal } from "./EditInvoiceModal";
+import { RecordPaymentModal } from "./RecordPaymentModal";
 
 const PAGE_SIZE = 10;
 
@@ -31,6 +35,8 @@ export function InvoicesTable() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   useEffect(() => {
@@ -100,6 +106,31 @@ export function InvoicesTable() {
         );
       },
     },
+    {
+      header: "Actions",
+      render: (inv) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setPayingInvoice(inv)}
+            title="Record payment"
+          >
+            <ReceiptText className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setEditingInvoice(inv)}
+            title="Edit invoice"
+          >
+            <Pencil className="size-4" />
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -127,6 +158,19 @@ export function InvoicesTable() {
           isFetching={isFetching}
         />
       </DataTable>
+
+      <RecordPaymentModal
+        isOpen={payingInvoice !== null}
+        onClose={() => setPayingInvoice(null)}
+        invoiceId={payingInvoice?.id}
+      />
+      {editingInvoice && (
+        <EditInvoiceModal
+          isOpen={true}
+          onClose={() => setEditingInvoice(null)}
+          invoice={editingInvoice}
+        />
+      )}
     </div>
   );
 }

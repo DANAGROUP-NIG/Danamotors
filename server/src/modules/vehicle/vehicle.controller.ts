@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { VehicleService } from './vehicle.service';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
 
 export class VehicleController {
@@ -45,6 +47,7 @@ export class VehicleController {
     try {
       const { id } = req.params;
       const result = await this.vehicleService.getVehicle(id);
+      assertBranchOwnership(req, (result.customer as any)?.branchId);
 
       res.status(200).json({
         status: 'success',
@@ -79,6 +82,11 @@ export class VehicleController {
   updateVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.updateVehicle(id, req.body);
 
       res.status(200).json({
@@ -97,6 +105,11 @@ export class VehicleController {
   deleteVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       await this.vehicleService.deleteVehicle(id);
 
       res.status(200).json({
@@ -112,6 +125,11 @@ export class VehicleController {
   addVehicleImage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.addVehicleImage(id, req.body);
 
       res.status(201).json({
@@ -130,6 +148,11 @@ export class VehicleController {
   getVehicleImages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.getVehicleImages(id);
 
       res.status(200).json({
@@ -147,6 +170,11 @@ export class VehicleController {
   addVehicleOwnership = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.addVehicleOwnership(id, req.body);
 
       res.status(201).json({
@@ -165,6 +193,11 @@ export class VehicleController {
   getVehicleOwnerships = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id },
+        select: { customer: { select: { branchId: true } } },
+      });
+      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.getVehicleOwnerships(id);
 
       res.status(200).json({

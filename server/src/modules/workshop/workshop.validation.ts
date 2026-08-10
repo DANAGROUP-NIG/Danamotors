@@ -1,11 +1,5 @@
 import { z } from 'zod';
 
-export const jobCardIdParamSchema = z.object({
-  params: z.object({
-    id: z.string().uuid('Invalid job card ID'),
-  }),
-});
-
 export const assignTechnicianSchema = z.object({
   params: z.object({
     id: z.string().uuid('Invalid job card ID'),

@@ -2,7 +2,7 @@ import LandingHeader from "@/components/headers/LandingHeader";
 import ForgotPasswordForm from "@/features/auth/ForgotPasswordForm";
 
 export const metadata = {
-  title: "Forgot Password - DriveCare",
+  title: "Forgot Password - Dana Motors",
 };
 
 export default function ForgotPasswordPage() {

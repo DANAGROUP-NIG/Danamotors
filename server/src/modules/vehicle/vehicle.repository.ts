@@ -44,6 +44,7 @@ export class VehicleRepository {
               firstName: true,
               lastName: true,
               email: true,
+              branchId: true,
             },
           },
           createdBy: {
@@ -70,6 +71,7 @@ export class VehicleRepository {
             firstName: true,
             lastName: true,
             email: true,
+            branchId: true,
           },
         },
         images: true,

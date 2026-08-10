@@ -46,8 +46,7 @@ export class VehicleService {
         ownershipsCount: vehicle.ownerships.length,
         createdAt: vehicle.createdAt,
         updatedAt: vehicle.updatedAt,
-      })),
-      meta: {
+      })),      meta: {
         total,
         page: params.page,
         limit: params.limit,
@@ -80,6 +79,7 @@ export class VehicleService {
         email: vehicle.customer.email,
         firstName: vehicle.customer.firstName,
         lastName: vehicle.customer.lastName,
+        branchId: vehicle.customer.branchId,
       },
       images: vehicle.images,
       ownerships: vehicle.ownerships,

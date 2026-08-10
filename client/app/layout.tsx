@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Dana Motors | Car Service Platform",
   description:
-    "Book car service, track repairs, approve estimates, and get pickup updates through Dana Group's DriveCare platform.",
+    "Book car service, track repairs, approve estimates, and get pickup updates through the Dana Motors platform.",
 };
 
 export default function RootLayout({

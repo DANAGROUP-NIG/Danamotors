@@ -1,7 +1,7 @@
 {
-  "name": "drivecare_backend",
+  "name": "danamotors_backend",
   "version": "1.0.0",
-  "description": "Dana Motors drivecare service backend",
+  "description": "Dana Motors service backend",
   "main": "src/server.ts",
   "scripts": {
     "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
