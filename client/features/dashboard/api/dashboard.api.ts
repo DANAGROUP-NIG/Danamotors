@@ -58,6 +58,7 @@ export interface DashboardStats {
   myTodayBookings: number;
   myYesterdayBookings: number;
   myWeekBookings: number;
+  myMonthBookings: number;
   myLastMonthBookings: number;
 }
 

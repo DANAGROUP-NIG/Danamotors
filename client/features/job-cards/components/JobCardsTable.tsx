@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTableSearchHeader } from "@/components/ui/table-components/DataTableSearchHeader";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
+import { DateInput } from "@/components/forms/DateInput";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { useBranchStore } from "@/store/branch.store";
@@ -168,18 +169,14 @@ export function JobCardsTable() {
           isFetching={isFetching}
         >
           <div className="flex items-center gap-2">
-            <input
-              type="date"
+            <DateInput
               value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(v) => { setDateFrom(v); setPage(1); }}
             />
             <span className="text-xs text-muted-foreground">to</span>
-            <input
-              type="date"
+            <DateInput
               value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-              className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(v) => { setDateTo(v); setPage(1); }}
             />
           </div>
           <DataTableFilterChips

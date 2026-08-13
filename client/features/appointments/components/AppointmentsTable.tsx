@@ -13,6 +13,7 @@ import { DELETE_ROLES, SERVICE_UPDATE_ROLES } from "@/features/auth/roles";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
+import { DateInput } from "@/components/forms/DateInput";
 import { useAppointments } from "../hooks/use-appointments";
 import { AppointmentEditForm } from "./AppointmentEditForm";
 import { AppointmentDeleteButton } from "./AppointmentDeleteButton";
@@ -228,24 +229,20 @@ export function AppointmentsTable() {
           filters={
             <>
               <div className="flex items-center gap-2">
-                <input
-                  type="date"
+                <DateInput
                   value={dateFrom}
-                  onChange={(e) => {
-                    setDateFrom(e.target.value);
+                  onChange={(v) => {
+                    setDateFrom(v);
                     setPage(1);
                   }}
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
                 <span className="text-xs text-muted-foreground">to</span>
-                <input
-                  type="date"
+                <DateInput
                   value={dateTo}
-                  onChange={(e) => {
-                    setDateTo(e.target.value);
+                  onChange={(v) => {
+                    setDateTo(v);
                     setPage(1);
                   }}
-                  className="h-10 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />

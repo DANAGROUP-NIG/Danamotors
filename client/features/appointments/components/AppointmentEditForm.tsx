@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useUpdateAppointment } from "../hooks/use-update-appointment";
 import {
   updateAppointmentSchema,
@@ -37,6 +38,7 @@ export function AppointmentEditForm({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -73,10 +75,12 @@ export function AppointmentEditForm({
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Scheduled date" error={errors.scheduledAt?.message}>
-          <input
-            type="datetime-local"
-            className={inputCls}
-            {...register("scheduledAt")}
+          <Controller
+            control={control}
+            name="scheduledAt"
+            render={({ field }) => (
+              <DateTimeInput value={field.value} onChange={field.onChange} />
+            )}
           />
         </Field>
         <Field label="Status" error={errors.status?.message}>

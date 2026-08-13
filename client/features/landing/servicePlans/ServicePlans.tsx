@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useReactTable, getCoreRowModel, flexRender } from "@tanstack/react-table";
 import { useLandingStore } from "../store/landing.store";
 import { Badge } from "@/components/ui/badge";
@@ -54,8 +55,8 @@ export default function ServicePlans() {
               <p className="text-sm text-muted-foreground">{copy}</p>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant={index === 1 ? "default" : "outline"}>
-                Book {name}
+              <Button className="w-full" variant={index === 1 ? "default" : "outline"} asChild>
+                <Link href="/#book">Book {name}</Link>
               </Button>
             </CardContent>
           </Card>

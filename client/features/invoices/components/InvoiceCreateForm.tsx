@@ -1,10 +1,11 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateInput } from "@/components/forms/DateInput";
 import { useBranchStore } from "@/store/branch.store";
 import { useCustomers } from "@/features/customers/hooks/use-customers";
 import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
@@ -50,6 +51,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
@@ -149,10 +151,22 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Issued date (optional)" error={errors.issuedDate?.message}>
-          <input type="date" className={inputCls} {...register("issuedDate")} />
+          <Controller
+            control={control}
+            name="issuedDate"
+            render={({ field }) => (
+              <DateInput value={field.value} onChange={field.onChange} />
+            )}
+          />
         </Field>
         <Field label="Due date (optional)" error={errors.dueDate?.message}>
-          <input type="date" className={inputCls} {...register("dueDate")} />
+          <Controller
+            control={control}
+            name="dueDate"
+            render={({ field }) => (
+              <DateInput value={field.value} onChange={field.onChange} />
+            )}
+          />
         </Field>
       </div>
 

@@ -1,16 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import {
   CalendarDays,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Car,
   CheckCircle2,
   UserPlus,
   ClipboardList,
-  ChevronDown,
   CalendarCheck,
   Zap,
 } from "lucide-react";
@@ -19,9 +16,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { Button } from "@/components/ui/button";
-
-const PERIODS = ["Today", "Yesterday", "Last Week", "Last Month"] as const;
-type Period = (typeof PERIODS)[number];
 
 const APT_FILTERS = ["Today", "Tomorrow", "This Week"] as const;
 type AptFilter = (typeof APT_FILTERS)[number];
@@ -43,24 +37,8 @@ function fmtDate(iso: string) {
 export default function ReceptionistDashboard() {
   const { user } = useAuth();
   const { data, isLoading, isFetching, isError } = useDashboardStats();
-  const [activePeriod, setActivePeriod] = useState<Period>("Today");
   const [aptFilter, setAptFilter] = useState<AptFilter>("Today");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   if (isFetching) {
     return (
@@ -96,61 +74,6 @@ export default function ReceptionistDashboard() {
     );
   }
 
-  const periodStats: Record<
-    Period,
-    { value: number; delta: number; deltaLabel: string }
-  > = {
-    Today: {
-      value: data.myTodayBookings,
-      delta:
-        data.myYesterdayBookings > 0
-          ? Math.round(
-              ((data.myTodayBookings - data.myYesterdayBookings) /
-                Math.max(data.myYesterdayBookings, 1)) *
-                100 *
-                10,
-            ) / 10
-          : data.myTodayBookings > 0
-            ? 100
-            : 0,
-      deltaLabel: "vs yesterday",
-    },
-    Yesterday: {
-      value: data.myYesterdayBookings,
-      delta:
-        data.yesterdayBookings > 0
-          ? Math.round(
-              ((data.myYesterdayBookings - data.myTodayBookings) /
-                Math.max(data.myTodayBookings, 1)) *
-                100 *
-                10,
-            ) / 10
-          : data.myYesterdayBookings > 0
-            ? 100
-            : 0,
-      deltaLabel: "vs today",
-    },
-    "Last Week": {
-      value: data.myWeekBookings,
-      delta: data.weekBookingsDelta,
-      deltaLabel: "vs prev week",
-    },
-    "Last Month": {
-      value: data.myLastMonthBookings,
-      delta: data.monthBookingsDelta,
-      deltaLabel: "vs prev month",
-    },
-  };
-
-  const current = periodStats[activePeriod];
-
-  const periodLabel: Record<Period, string> = {
-    Today: "Today's Bookings",
-    Yesterday: "Yesterday's Bookings",
-    "Last Week": "This Week",
-    "Last Month": "This Month",
-  };
-
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const tomorrow = new Date(now);
@@ -183,77 +106,43 @@ export default function ReceptionistDashboard() {
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {/* Overall Performance with dropdown */}
-        <div className="relative flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
+        {/* Bookings overview */}
+        <div className="flex flex-col gap-3 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">
-              {periodLabel[activePeriod]}
+              Today&apos;s Bookings
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-primary/10">
               <ClipboardList className="size-4 text-primary" />
             </span>
           </div>
-          <p className="text-2xl font-extrabold text-foreground">
-            {current.value}
-          </p>
-          {activePeriod === "Yesterday" ? (
-            <span className="text-xs text-muted-foreground">&nbsp;</span>
-          ) : (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 text-xs font-semibold",
-                current.delta >= 0 ? "text-emerald-600" : "text-red-500",
-              )}
-            >
-              {current.delta >= 0 ? (
-                <TrendingUp className="size-3.5" />
-              ) : (
-                <TrendingDown className="size-3.5" />
-              )}
-              {current.delta >= 0 ? "+" : ""}
-              {current.delta}% {current.deltaLabel}
-            </span>
-          )}
 
-          {/* Dropdown */}
-          <div ref={dropdownRef} className="mt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-between gap-2 rounded-lg border-[#e8edf3] bg-slate-50 px-3 text-xs font-semibold text-foreground hover:bg-slate-100"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-            >
-              {activePeriod}
-              <ChevronDown
-                className={cn(
-                  "size-3.5 text-muted-foreground transition-transform",
-                  dropdownOpen && "rotate-180",
-                )}
-              />
-            </Button>
-            {dropdownOpen && (
-              <div className="absolute left-5 right-5 z-10 mt-1 overflow-hidden rounded-lg border border-[#e8edf3] bg-white shadow-lg">
-                {PERIODS.map((p) => (
-                  <Button
-                    key={p}
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "w-full justify-start rounded-none px-3 text-xs font-medium",
-                      activePeriod === p
-                        ? "bg-primary/10 text-primary"
-                        : "text-foreground",
-                    )}
-                    onClick={() => {
-                      setActivePeriod(p);
-                      setDropdownOpen(false);
-                    }}
-                  >
-                    {p}
-                  </Button>
-                ))}
-              </div>
-            )}
+          <div className="flex items-end gap-2">
+            <p className="text-3xl font-extrabold leading-none text-foreground">
+              {data.myTodayBookings}
+            </p>
+            <span className="pb-0.5 text-xs text-muted-foreground">
+              today
+            </span>
+          </div>
+
+          <div className="mt-1 grid grid-cols-2 gap-3 border-t border-[#f1f5f9] pt-3">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">
+                This Week
+              </p>
+              <p className="mt-0.5 text-xl font-extrabold text-foreground">
+                {data.myWeekBookings}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">
+                This Month
+              </p>
+              <p className="mt-0.5 text-xl font-extrabold text-foreground">
+                {data.myMonthBookings}
+              </p>
+            </div>
           </div>
         </div>
 

@@ -45,12 +45,13 @@ export default function LandingHeader() {
           <Button
             className="hidden sm:inline-flex bg-white/10 text-white border border-white/20 hover:bg-white/20"
             variant="default"
+            asChild
           >
             <Link href="/#book">Book now</Link>
           </Button>
           <Button
             aria-label="Open menu"
-            className="lg:hidden text-white border-white/20 hover:bg-white/10"
+            className="lg:hidden bg-white/10 text-white border border-white/20 hover:bg-white/20"
             size="icon"
             variant="outline"
             onClick={() => setIsOpen(true)}
@@ -133,6 +134,7 @@ export default function LandingHeader() {
             <Button
               className="w-full justify-center bg-white text-primary hover:bg-white/90"
               variant="default"
+              asChild
             >
               <Link href="/#book" onClick={() => setIsOpen(false)}>
                 Book now

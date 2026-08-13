@@ -1,8 +1,6 @@
 import type { ElementType } from "react";
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Car, ClipboardCheck, FileText, Package } from "lucide-react";
-import { revenueData, statusData } from "../constants/landing.data";
 
 const stats = [
   { title: "Vehicles in service", value: "48", delta: "+9 today", icon: Car },

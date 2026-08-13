@@ -26,6 +26,7 @@ export function BookingFormFields({ register, errors }: BookingFormFieldsProps) 
       </FormField>
       <FormField label="Email address" error={errors.email?.message}>
         <input
+          type="email"
           className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
           {...register("email")}
         />

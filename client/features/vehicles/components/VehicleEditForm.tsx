@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useUpdateVehicle } from "../hooks/use-update-vehicle";
 import { updateVehicleSchema, type UpdateVehicleFormValues } from "../schemas/vehicle.schema";
 import type { Vehicle } from "../types/vehicle.types";
@@ -16,7 +17,7 @@ interface VehicleEditFormProps {
 
 export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
   const update = useUpdateVehicle(vehicle.id);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<UpdateVehicleFormValues>({
+  const { register, control, handleSubmit, reset, formState: { errors } } = useForm<UpdateVehicleFormValues>({
     resolver: zodResolver(updateVehicleSchema),
     defaultValues: {
       registrationNumber: vehicle.registrationNumber ?? "",
@@ -86,7 +87,13 @@ export function VehicleEditForm({ vehicle, onSuccess }: VehicleEditFormProps) {
           <input className={inputCls} {...register("warrantyStatus")} />
         </Field>
         <Field label="Warranty Expires" error={errors.warrantyExpiresAt?.message}>
-          <input type="datetime-local" className={inputCls} {...register("warrantyExpiresAt")} />
+          <Controller
+            control={control}
+            name="warrantyExpiresAt"
+            render={({ field }) => (
+              <DateTimeInput value={field.value} onChange={field.onChange} />
+            )}
+          />
         </Field>
       </div>
       <Field label="Ownership Status" error={errors.ownershipStatus?.message}>

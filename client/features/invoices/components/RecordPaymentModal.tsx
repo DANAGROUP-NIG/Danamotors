@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateInput } from "@/components/forms/DateInput";
 import { useBranchStore } from "@/store/branch.store";
 import { useInvoices } from "../hooks/use-invoices";
 import { useCreatePayment } from "@/features/payments/hooks/use-create-payment";
@@ -39,6 +40,7 @@ export function RecordPaymentModal({
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     reset,
@@ -145,7 +147,13 @@ export function RecordPaymentModal({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Payment date (optional)" error={errors.paymentDate?.message}>
-            <input type="date" className={inputCls} {...register("paymentDate")} />
+            <Controller
+              control={control}
+              name="paymentDate"
+              render={({ field }) => (
+                <DateInput value={field.value} onChange={field.onChange} />
+              )}
+            />
           </Field>
           <Field label="Reference (optional)" error={errors.reference?.message}>
             <input className={inputCls} placeholder="e.g. Txn ref" {...register("reference")} />

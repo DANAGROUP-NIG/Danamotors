@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateInput } from "@/components/forms/DateInput";
 import type { Invoice } from "../types/invoice.types";
 import { useUpdateInvoice } from "../hooks/use-update-invoice";
 
@@ -32,6 +33,7 @@ export function EditInvoiceModal({ isOpen, onClose, invoice }: EditInvoiceModalP
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -94,7 +96,13 @@ export function EditInvoiceModal({ isOpen, onClose, invoice }: EditInvoiceModalP
             </select>
           </Field>
           <Field label="Due date (optional)" error={errors.dueDate?.message}>
-            <input type="date" className={inputCls} {...register("dueDate")} />
+            <Controller
+              control={control}
+              name="dueDate"
+              render={({ field }) => (
+                <DateInput value={field.value} onChange={field.onChange} />
+              )}
+            />
           </Field>
         </div>
 

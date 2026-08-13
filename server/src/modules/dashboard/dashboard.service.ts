@@ -267,7 +267,7 @@ export class DashboardService {
     ]);
 
     // ── Batch 4c: Personal receptionist booking counts ─────────────
-    const [myTotalBookings, myTodayBookings, myYesterdayBookings, myWeekBookings, myLastMonthBookings] = await Promise.all([
+    const [myTotalBookings, myTodayBookings, myYesterdayBookings, myWeekBookings, myMonthBookings, myLastMonthBookings] = await Promise.all([
       userId
         ? prisma.serviceAppointment.count({
             where: { createdById: userId },
@@ -277,7 +277,7 @@ export class DashboardService {
         ? prisma.serviceAppointment.count({
             where: {
               createdById: userId,
-              scheduledAt: { gte: startOfToday, lt: todayEnd },
+              createdAt: { gte: startOfToday, lt: todayEnd },
             },
           })
         : Promise.resolve(0),
@@ -294,6 +294,14 @@ export class DashboardService {
             where: {
               createdById: userId,
               scheduledAt: { gte: startOfWeek },
+            },
+          })
+        : Promise.resolve(0),
+      userId
+        ? prisma.serviceAppointment.count({
+            where: {
+              createdById: userId,
+              scheduledAt: { gte: startOfMonth },
             },
           })
         : Promise.resolve(0),
@@ -481,6 +489,7 @@ export class DashboardService {
       myTodayBookings,
       myYesterdayBookings,
       myWeekBookings,
+      myMonthBookings,
       myLastMonthBookings,
     };
   }

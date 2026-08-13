@@ -1,9 +1,10 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateAppointment } from "../hooks/use-create-appointment";
@@ -26,6 +27,7 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     watch,
@@ -104,7 +106,13 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
           )}
         </Field>
         <Field label="Scheduled date & time" error={errors.scheduledAt?.message}>
-          <input type="datetime-local" className={inputCls} {...register("scheduledAt")} />
+          <Controller
+            control={control}
+            name="scheduledAt"
+            render={({ field }) => (
+              <DateTimeInput value={field.value} onChange={field.onChange} />
+            )}
+          />
         </Field>
       </div>
       <Field label="Duration (minutes, optional)" error={errors.durationMins?.message}>

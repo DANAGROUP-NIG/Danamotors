@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -10,9 +11,11 @@ export default function FinalCTA() {
           Give your car a clearer, more reliable service experience.
         </h2>
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button size="lg" variant="secondary">Book Service</Button>
-          <Button className="border-white/40 bg-transparent text-white hover:bg-white/10" size="lg" variant="outline">
-            Track My Car
+          <Button size="lg" variant="secondary" asChild>
+            <Link href="/#book">Book Service</Link>
+          </Button>
+          <Button className="border-white/40 bg-transparent text-white hover:bg-white/10" size="lg" variant="outline" asChild>
+            <Link href="/login">Track My Car</Link>
           </Button>
         </div>
       </div>

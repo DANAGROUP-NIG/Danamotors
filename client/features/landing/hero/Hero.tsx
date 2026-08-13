@@ -17,7 +17,7 @@ export default function Hero() {
 
   return (
     <section className="relative">
-      <div className="mx-auto grid h-[calc(100vh-5rem)] max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[0.86fr_1.14fr] lg:px-8">
+      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-14 pt-4 sm:px-6 lg:h-[calc(100vh-5rem)] lg:grid-cols-[0.86fr_1.14fr] lg:px-8 lg:pb-0 lg:pt-0">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -50,7 +50,7 @@ export default function Hero() {
           initial={{ opacity: 0, scale: 0.96, y: 30 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1 }}
-          className="relative h-full overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl shadow-blue-950/10"
+          className="relative h-64 overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl shadow-blue-950/10 sm:h-96 lg:h-full"
         >
           <div className="absolute inset-0 h-full w-full">
             {mounted ? <HeroImageSlider /> : <div className="h-full w-full" />}
