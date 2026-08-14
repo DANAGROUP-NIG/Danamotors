@@ -7,6 +7,7 @@ export type AuthUser = {
   role: string;
   permissions: string[];
   branchId?: string | null;
+  customerId?: string;
 };
 
 export type LoginPayload = {
@@ -21,6 +22,14 @@ export type RegisterPayload = {
   lastName: string;
   phoneNumber?: string;
   branchName?: string;
+};
+
+export type CustomerRegisterPayload = {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
 };
 
 export type UpdateProfilePayload = {

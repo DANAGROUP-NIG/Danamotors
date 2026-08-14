@@ -7,6 +7,7 @@ export interface NotificationPayload {
   title: string;
   message: string;
   link?: string | null;
+  branchId?: string | null;
 }
 
 export class NotificationService {
@@ -45,7 +46,7 @@ export class NotificationService {
     });
     await this.notifyUsers(
       users.map((user) => user.id),
-      payload,
+      { ...payload, branchId: payload.branchId ?? branchId ?? null },
     );
   }
 
@@ -54,6 +55,7 @@ export class NotificationService {
     page: number;
     limit: number;
     unreadOnly?: boolean;
+    branchId?: string | null;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { notifications, total } = await this.notificationRepository.listByUser({
@@ -61,6 +63,7 @@ export class NotificationService {
       skip,
       take: params.limit,
       unreadOnly: params.unreadOnly,
+      branchId: params.branchId,
     });
 
     return {
@@ -74,8 +77,8 @@ export class NotificationService {
     };
   }
 
-  async getUnreadCount(userId: string) {
-    return this.notificationRepository.countUnread(userId);
+  async getUnreadCount(userId: string, branchId?: string | null) {
+    return this.notificationRepository.countUnread(userId, branchId);
   }
 
   async markRead(id: string, userId: string) {

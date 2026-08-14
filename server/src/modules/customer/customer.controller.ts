@@ -190,6 +190,31 @@ export class CustomerController {
       next(error);
     }
   };
+
+  manageCustomerAccount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const customer = await prisma.customer.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
+      assertBranchOwnership(req, customer?.branchId);
+      const result = await this.customerService.upsertCustomerAccount(id, req.body);
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: result.created
+          ? 'Customer portal account created successfully'
+          : 'Customer portal account updated successfully',
+        data: {
+          account: result,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export default CustomerController;

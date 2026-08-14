@@ -1,6 +1,6 @@
 import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
-import type { AuthUser, LoginPayload, LoginResponse, RegisterPayload, UpdateProfilePayload } from "../types/auth.types";
+import type { AuthUser, CustomerRegisterPayload, LoginPayload, LoginResponse, RegisterPayload, UpdateProfilePayload } from "../types/auth.types";
 
 export async function loginRequest(payload: LoginPayload): Promise<LoginResponse> {
   return apiPost<LoginResponse>(API_ROUTES.auth.login, payload);
@@ -22,6 +22,10 @@ export async function updateProfileRequest(payload: UpdateProfilePayload): Promi
 
 export async function registerRequest(payload: RegisterPayload): Promise<LoginResponse> {
   return apiPost<LoginResponse>(API_ROUTES.auth.register, payload);
+}
+
+export async function customerRegisterRequest(payload: CustomerRegisterPayload): Promise<LoginResponse> {
+  return apiPost<LoginResponse>(API_ROUTES.auth.customerRegister, payload);
 }
 
 export async function forgotPasswordRequest(email: string): Promise<string | undefined> {

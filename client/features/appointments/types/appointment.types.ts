@@ -14,6 +14,7 @@ export type Appointment = {
   customerId: string;
   vehicleId: string;
   branchId: string;
+  serviceId?: string | null;
   scheduledAt: string;
   durationMins?: number;
   notes?: string;
@@ -30,6 +31,14 @@ export type Appointment = {
   };
   vehicle?: Record<string, unknown>;
   branch?: { id: string; name: string };
+  service?: {
+    id: string;
+    name: string;
+    category?: string | null;
+    description?: string | null;
+    durationMins?: number | null;
+    price: number;
+  } | null;
   createdBy?: {
     id: string;
     firstName: string;
@@ -43,6 +52,7 @@ export type CreateAppointmentPayload = {
   customerId: string;
   vehicleId: string;
   branchName: string;
+  serviceId: string;
   scheduledAt: string;
   durationMins?: number;
   notes?: string;

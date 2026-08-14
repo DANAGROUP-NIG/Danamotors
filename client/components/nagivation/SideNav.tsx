@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, isActive } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -10,19 +10,13 @@ import { X, ChevronLeft, ChevronRight, Building2 } from "lucide-react";
 //store
 import { useBranchStore } from "@/store/branch.store";
 
-//utils
-import { isActive } from "@/lib/utils";
+//types
+import type { NavGroup } from "@/type";
 
 //hooks
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
-
-//collapse key
-const COLLAPSED_KEY = "danamotors-sidebar-collapsed";
-
-//constans
-import { NAV_GROUPS } from "@/constant";
 
 //components
 import NavTootip from "./NavTootip";
@@ -30,16 +24,52 @@ import HeaderLogo from "../headers/HeaderLogo";
 import SidebarSkeleton from "./SidebarSkeleton";
 import BranchDropdown from "@/features/branches/components/BranchDropdown";
 
+//default collapse key
+const DEFAULT_COLLAPSED_KEY = "danamotors-sidebar-collapsed";
+
+export interface SideNavBranchConfig {
+  branches: { id: string; name: string }[];
+  activeBranch: { id: string; name: string } | null;
+  isLoading?: boolean;
+  canSwitch?: boolean;
+  canSeeAll?: boolean;
+  onSelect?: (branch: { id: string; name: string }) => void;
+  onAllSelect?: () => void;
+}
+
+interface SideNavProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (v: boolean) => void;
+  /** Nav groups to render. Items with `href === "/logout"` become the sign-out button. */
+  navGroups: NavGroup[];
+  /**
+   * Branch source:
+   * - `"store"` (default): fetch branches and drive the dropdown from the branch store (staff).
+   * - `"props"`: use the `branch` prop directly (e.g. customer portal read-only branch).
+   */
+  branchSource?: "store" | "props";
+  /** Branch config used when `branchSource === "props"`. */
+  branch?: SideNavBranchConfig;
+  /** localStorage key used to persist the collapsed state. */
+  collapsedKey?: string;
+  /** Text shown under the user's name. Defaults to the user's role. */
+  roleLabel?: string;
+  /** A href that must match the pathname exactly to be active (e.g. "/portal" dashboard). */
+  exactRoot?: string;
+}
+
 export default function SideNav({
   sidebarOpen,
   setSidebarOpen,
-}: {
-  sidebarOpen: boolean;
-  setSidebarOpen: (v: boolean) => void;
-}) {
+  navGroups,
+  branchSource = "store",
+  branch,
+  collapsedKey = DEFAULT_COLLAPSED_KEY,
+  roleLabel,
+  exactRoot,
+}: SideNavProps) {
   const logout = useLogout();
-  const { user, isHydrated, isSuperAdmin, isAdminOrAbove, hasAccess } =
-    useAuth();
+  const { user, isHydrated, isSuperAdmin, hasAccess } = useAuth();
   const pathname = usePathname();
 
   // Desktop collapsed state — persisted
@@ -47,20 +77,20 @@ export default function SideNav({
 
   // Sync from localStorage after hydration to avoid SSR mismatch
   useEffect(() => {
-    const saved = localStorage.getItem(COLLAPSED_KEY);
+    const saved = localStorage.getItem(collapsedKey);
     if (saved === "true") setCollapsed(true);
-  }, []);
+  }, [collapsedKey]);
 
   function toggleCollapsed() {
     setCollapsed((v) => {
       const next = !v;
-      localStorage.setItem(COLLAPSED_KEY, String(next));
+      localStorage.setItem(collapsedKey, String(next));
       return next;
     });
   }
 
-  // Branch store — fetch for all users so everyone sees the current branch
-  useFetchBranches(true);
+  // Branch store — fetch for staff so everyone sees the current branch
+  useFetchBranches(branchSource === "store");
 
   const {
     branches,
@@ -72,6 +102,7 @@ export default function SideNav({
 
   // For non-SuperAdmin: lock activeBranch to the user's assigned branch
   useEffect(() => {
+    if (branchSource !== "store") return;
     if (isSuperAdmin || !branchesFetched || branches.length === 0) return;
 
     const userBranchId = user?.branchId;
@@ -85,13 +116,33 @@ export default function SideNav({
       setActiveBranch(userBranch);
     }
   }, [
-    isAdminOrAbove,
+    branchSource,
     branchesFetched,
     branches,
     user?.branchId,
     activeBranch?.id,
     setActiveBranch,
   ]);
+
+  // Resolve the branch config passed to the dropdown
+  const branchConfig: SideNavBranchConfig =
+    branchSource === "store"
+      ? {
+          branches,
+          activeBranch,
+          isLoading: branchLoading,
+          canSwitch: isSuperAdmin,
+          canSeeAll: isSuperAdmin,
+          onSelect: (b) => setActiveBranch(b),
+          onAllSelect: () => setActiveBranch(null as any),
+        }
+      : branch ?? { branches: [], activeBranch: null };
+
+  function isItemActive(href: string, pathname: string) {
+    if (href === "/logout") return false;
+    if (href === exactRoot) return pathname === href;
+    return isActive(href, pathname);
+  }
 
   return (
     <aside
@@ -153,17 +204,17 @@ export default function SideNav({
         <SidebarSkeleton collapsed={collapsed} />
       ) : (
         <>
-          {/* Branch display — all users see current branch; SuperAdmin can switch */}
+          {/* Branch display — current branch; SuperAdmin can switch */}
           {!collapsed && (
             <div className="shrink-0 px-3 pt-3">
               <BranchDropdown
-                branches={branches}
-                activeBranch={activeBranch}
-                isLoading={branchLoading}
-                canSwitch={isSuperAdmin}
-                canSeeAll={isSuperAdmin}
-                onSelect={(b) => setActiveBranch(b)}
-                onAllSelect={() => setActiveBranch(null as any)}
+                branches={branchConfig.branches}
+                activeBranch={branchConfig.activeBranch}
+                isLoading={branchConfig.isLoading ?? false}
+                canSwitch={branchConfig.canSwitch ?? false}
+                canSeeAll={branchConfig.canSeeAll ?? false}
+                onSelect={(b) => branchConfig.onSelect?.(b)}
+                onAllSelect={() => branchConfig.onAllSelect?.()}
               />
             </div>
           )}
@@ -171,7 +222,7 @@ export default function SideNav({
           {/* Branch icon-only when collapsed */}
           {collapsed && (
             <div className="shrink-0 flex justify-center pt-3">
-              <NavTootip label={activeBranch?.name ?? "All Branches"}>
+              <NavTootip label={branchConfig.activeBranch?.name ?? "All Branches"}>
                 <span className="inline-grid size-9 place-items-center rounded-lg bg-white/10 text-white/50">
                   <Building2 className="size-4" />
                 </span>
@@ -186,8 +237,9 @@ export default function SideNav({
             )}
             aria-label="Main navigation"
           >
-            {NAV_GROUPS.filter((group) => hasAccess(group.roles ?? [])).map(
-              (group) => {
+            {navGroups
+              .filter((group) => hasAccess(group.roles ?? []))
+              .map((group) => {
                 const visibleItems = group.items.filter((item) =>
                   hasAccess(item.roles ?? []),
                 );
@@ -219,104 +271,100 @@ export default function SideNav({
                         collapsed && "items-center",
                       )}
                     >
-                      {visibleItems.map(
-                        ({ label, href, icon: Icon, badge }) => {
-                          const active =
-                            href !== "/logout" && isActive(href, pathname);
-                          const isLogout = href === "/logout";
+                      {visibleItems.map(({ label, href, icon: Icon, badge }) => {
+                        const active = isItemActive(href, pathname);
+                        const isLogout = href === "/logout";
 
-                          if (collapsed) {
-                            return (
-                              <NavTootip key={href} label={label}>
-                                {isLogout ? (
-                                  <button
-                                    onClick={() => logout.mutate()}
-                                    disabled={logout.isPending}
-                                    aria-label={label}
-                                    className="relative flex size-9 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
-                                  >
-                                    <Icon className="size-[17px] shrink-0" />
-                                  </button>
-                                ) : (
-                                  <Link
-                                    href={href}
-                                    onClick={() => setSidebarOpen(false)}
-                                    aria-current={active ? "page" : undefined}
-                                    aria-label={label}
-                                    className={cn(
-                                      "relative flex size-9 items-center justify-center rounded-lg transition-colors",
-                                      active
-                                        ? "bg-white/15 text-white"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white",
-                                    )}
-                                  >
-                                    <Icon className="size-[17px] shrink-0" />
-                                    {badge != null && (
-                                      <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
-                                        {badge > 9 ? "9+" : badge}
-                                      </span>
-                                    )}
-                                  </Link>
-                                )}
-                              </NavTootip>
-                            );
-                          }
-
-                          if (isLogout) {
-                            return (
-                              <button
-                                key={href}
-                                onClick={() => logout.mutate()}
-                                disabled={logout.isPending}
-                                className={cn(
-                                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
-                                  "text-red-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50",
-                                )}
-                              >
-                                <Icon className="size-[17px] shrink-0" />
-                                <span className="flex-1 truncate text-left">
-                                  {logout.isPending ? "Logging out…" : label}
-                                </span>
-                              </button>
-                            );
-                          }
-
+                        if (collapsed) {
                           return (
-                            <Link
+                            <NavTootip key={href} label={label}>
+                              {isLogout ? (
+                                <button
+                                  onClick={() => logout.mutate()}
+                                  disabled={logout.isPending}
+                                  aria-label={label}
+                                  className="relative flex size-9 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50"
+                                >
+                                  <Icon className="size-[17px] shrink-0" />
+                                </button>
+                              ) : (
+                                <Link
+                                  href={href}
+                                  onClick={() => setSidebarOpen(false)}
+                                  aria-current={active ? "page" : undefined}
+                                  aria-label={label}
+                                  className={cn(
+                                    "relative flex size-9 items-center justify-center rounded-lg transition-colors",
+                                    active
+                                      ? "bg-white/15 text-white"
+                                      : "text-white/70 hover:bg-white/10 hover:text-white",
+                                  )}
+                                >
+                                  <Icon className="size-[17px] shrink-0" />
+                                  {badge != null && (
+                                    <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white ring-2 ring-[#05141F]">
+                                      {badge > 9 ? "9+" : badge}
+                                    </span>
+                                  )}
+                                </Link>
+                              )}
+                            </NavTootip>
+                          );
+                        }
+
+                        if (isLogout) {
+                          return (
+                            <button
                               key={href}
-                              href={href}
-                              onClick={() => setSidebarOpen(false)}
-                              aria-current={active ? "page" : undefined}
+                              onClick={() => logout.mutate()}
+                              disabled={logout.isPending}
                               className={cn(
-                                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                                active
-                                  ? "bg-white/15 text-white"
-                                  : "text-white/70 hover:bg-white/10 hover:text-white",
+                                "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+                                "text-red-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50",
                               )}
                             >
                               <Icon className="size-[17px] shrink-0" />
-                              <span className="flex-1 truncate">{label}</span>
-                              {badge != null && (
-                                <span
-                                  className={cn(
-                                    "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none",
-                                    active
-                                      ? "bg-white/20 text-white"
-                                      : "bg-white/10 text-white/70",
-                                  )}
-                                >
-                                  {badge}
-                                </span>
-                              )}
-                            </Link>
+                              <span className="flex-1 truncate text-left">
+                                {logout.isPending ? "Logging out…" : label}
+                              </span>
+                            </button>
                           );
-                        },
-                      )}
+                        }
+
+                        return (
+                          <Link
+                            key={href}
+                            href={href}
+                            onClick={() => setSidebarOpen(false)}
+                            aria-current={active ? "page" : undefined}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                              active
+                                ? "bg-white/15 text-white"
+                                : "text-white/70 hover:bg-white/10 hover:text-white",
+                            )}
+                          >
+                            <Icon className="size-[17px] shrink-0" />
+                            <span className="flex-1 truncate">{label}</span>
+                            {badge != null && (
+                              <span
+                                className={cn(
+                                  "min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none",
+                                  active
+                                    ? "bg-white/20 text-white"
+                                    : "bg-white/10 text-white/70",
+                                )}
+                              >
+                                {badge}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
                     </div>
                   </div>
                 );
-              },
-            )}
+              })}
           </nav>
         </>
       )}
@@ -345,15 +393,16 @@ export default function SideNav({
               collapsed && "justify-center",
             )}
           >
-            {/* {initials} */}
-            <span className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white"></span>
+            <span className="inline-grid size-9 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white">
+              {user?.firstName?.[0] ?? ""}
+            </span>
             {!collapsed && (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
                 </p>
                 <p className="truncate text-xs capitalize text-white/50">
-                  {user?.role ?? "Workshop Manager"}
+                  {roleLabel ?? user?.role ?? "Workshop Manager"}
                 </p>
               </div>
             )}

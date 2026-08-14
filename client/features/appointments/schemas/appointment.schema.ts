@@ -16,6 +16,7 @@ export const createAppointmentSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   vehicleId: z.string().min(1, "Vehicle is required"),
   branchName: z.string().min(1, "Branch is required"),
+  serviceId: z.string().min(1, "Service is required"),
   scheduledAt: z.string().min(1, "Scheduled date is required"),
   durationMins: z.coerce.number().int().positive().optional(),
   notes: z.string().optional(),

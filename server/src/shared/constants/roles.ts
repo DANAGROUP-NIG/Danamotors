@@ -47,6 +47,12 @@ export const PERMISSIONS = {
   SERVICE_UPDATE: "service:update",
   SERVICE_DELETE: "service:delete",
 
+  // Services Catalog Management
+  SERVICES_READ: "services:read",
+  SERVICES_CREATE: "services:create",
+  SERVICES_UPDATE: "services:update",
+  SERVICES_DELETE: "services:delete",
+
   // Workshop Management
   WORKSHOP_READ: "workshop:read",
   WORKSHOP_UPDATE: "workshop:update",
@@ -100,6 +106,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.INVENTORY_UPDATE,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.FINANCE_CREATE,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.SERVICES_CREATE,
+    PERMISSIONS.SERVICES_UPDATE,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -115,6 +124,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TRANSFER_DISPATCH,
     PERMISSIONS.TRANSFER_RECEIVE,
     PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.SERVICES_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.CUSTOMER_READ,
   ],
@@ -128,6 +138,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TRANSFER_CREATE,
     PERMISSIONS.TRANSFER_RECEIVE,
     PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.SERVICES_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.CUSTOMER_READ,
   ],
@@ -145,6 +156,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_UPDATE,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.SERVICES_CREATE,
+    PERMISSIONS.SERVICES_UPDATE,
+    PERMISSIONS.SERVICES_DELETE,
   ],
 
   // Oversees accounting: finance,  inventory
@@ -169,12 +184,14 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.INVENTORY_READ,
     PERMISSIONS.FINANCE_READ,
     PERMISSIONS.FINANCE_CREATE,
+    PERMISSIONS.SERVICES_READ,
   ],
 
   // Executes repairs, updates job card progress
   [ROLES.TECHNICIAN]: [
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICE_UPDATE, // update job card progress / status
     PERMISSIONS.WORKSHOP_READ,
     PERMISSIONS.WORKSHOP_UPDATE,
@@ -189,6 +206,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.SERVICE_READ,
     PERMISSIONS.SERVICE_CREATE, // create appointments
+    PERMISSIONS.SERVICES_READ,
     PERMISSIONS.FINANCE_READ,
   ],
 
@@ -206,5 +224,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SERVICE_CREATE,
     PERMISSIONS.SERVICE_UPDATE,
     PERMISSIONS.SERVICE_DELETE,
+    PERMISSIONS.SERVICES_READ,
   ],
 };

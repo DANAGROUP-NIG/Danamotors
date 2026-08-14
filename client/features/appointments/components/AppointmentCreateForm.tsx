@@ -8,6 +8,7 @@ import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateAppointment } from "../hooks/use-create-appointment";
+import { useServices } from "@/features/services/hooks/use-services";
 import { CustomerSelectWithCreate } from "@/features/customers/components/CustomerSelectWithCreate";
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
 import {
@@ -24,6 +25,9 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
   const { isSuperAdmin } = useAuth();
+  const { data: services, isLoading: servicesLoading } = useServices({
+    limit: 100,
+  });
 
   const {
     register,
@@ -86,6 +90,28 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
           />
         </Field>
       </div>
+      <Field label="Service" error={errors.serviceId?.message}>
+        {servicesLoading ? (
+          <p className="py-1 text-sm text-muted-foreground">Loading services…</p>
+        ) : services && services.services.length > 0 ? (
+          <select
+            className={inputCls}
+            {...register("serviceId")}
+          >
+            <option value="">Select a service</option>
+            {services.services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.durationMins != null ? ` (${s.durationMins} min)` : ""}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="py-1 text-sm text-muted-foreground">
+            No services available. Add services first.
+          </p>
+        )}
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Branch" error={errors.branchName?.message}>
           {isSuperAdmin ? (

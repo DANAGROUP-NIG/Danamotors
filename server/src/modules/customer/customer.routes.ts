@@ -10,6 +10,7 @@ import {
   createCustomerDocumentSchema,
   createServiceHistorySchema,
   customerIdParamSchema,
+  customerAccountSchema,
 } from './customer.validation';
 
 const router = Router();
@@ -27,5 +28,7 @@ router.get('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_READ), valid
 
 router.post('/:id/service-history', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(createServiceHistorySchema), controller.addServiceHistory);
 router.get('/:id/service-history', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getServiceHistory);
+
+router.post('/:id/account', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(customerAccountSchema), controller.manageCustomerAccount);
 
 export default router;

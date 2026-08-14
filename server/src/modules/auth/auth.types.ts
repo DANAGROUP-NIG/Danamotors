@@ -6,6 +6,7 @@ export interface LoginResponse {
     email: string;
     firstName: string;
     lastName: string;
+    phoneNumber?: string;
     role: string;
     permissions: string[];
     branchId?: string | null;

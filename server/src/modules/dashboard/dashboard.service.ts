@@ -345,6 +345,7 @@ export class DashboardService {
     ]);
 
     const receptionistPerformance = (receptionistPerformanceRaw as any[]).map((r: any) => ({
+      userId: r.userId,
       name: `${r.firstName} ${r.lastName}`,
       branch: r.branchName,
       appointmentsCreated: r.appointmentCount,

@@ -14,6 +14,13 @@ export type Customer = {
   preferredContactMethod?: string;
   branchId: string;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
+  hasAccount?: boolean;
+  account?: {
+    id: string;
+    isActive: boolean;
+    lastLoginAt?: string | null;
+    createdAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };

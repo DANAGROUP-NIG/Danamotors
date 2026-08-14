@@ -12,15 +12,21 @@ import { useNotifications } from "../hooks/use-notifications";
 import { useUnreadCount } from "../hooks/use-unread-count";
 import { useMarkNotificationRead } from "../hooks/use-mark-read";
 import { useMarkAllNotificationsRead } from "../hooks/use-mark-all-read";
+import { useBranchStore } from "@/store/branch.store";
 import type { AppNotification } from "../types/notification.types";
 
 export default function NotificationBell() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const activeBranch = useBranchStore((s) => s.activeBranch);
 
-  const { data: listData } = useNotifications({ page: 1, limit: 8 });
-  const { data: unreadData } = useUnreadCount();
+  const { data: listData } = useNotifications({
+    page: 1,
+    limit: 8,
+    branchId: activeBranch?.id,
+  });
+  const { data: unreadData } = useUnreadCount(activeBranch?.id);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 

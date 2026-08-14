@@ -11,7 +11,8 @@ export type AppRole =
   | "serviceadviser"
   | "technician"
   | "receptionist"
-  | "receptionmanager";
+  | "receptionmanager"
+  | "customer";
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
@@ -100,6 +101,12 @@ export const TECHNICIAN_ROLES: AppRole[] = [
 ];
 
 export const BRANCH_ROLES: AppRole[] = ["superadmin"];
+
+export const SERVICES_MANAGE_ROLES: AppRole[] = [
+  "superadmin",
+  "admin",
+  "workshopmanager",
+];
 
 export const SERVICE_CREATE_ROLES: AppRole[] = [
   "superadmin",

@@ -6,6 +6,7 @@ type UseNotificationsParams = {
   page?: number;
   limit?: number;
   unreadOnly?: boolean;
+  branchId?: string;
 };
 
 export function useNotifications(params?: UseNotificationsParams) {

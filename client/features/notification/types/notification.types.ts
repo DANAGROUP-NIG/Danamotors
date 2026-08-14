@@ -5,6 +5,7 @@ export type AppNotification = {
   message: string;
   link: string | null;
   readAt: string | null;
+  branchId: string | null;
   createdAt: string;
 };
 

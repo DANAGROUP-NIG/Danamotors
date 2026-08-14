@@ -21,7 +21,9 @@ export function useLogin() {
       toast.success("Login successful");
 
       const redirect = searchParams.get("redirect");
-      router.push(redirect && redirect.startsWith("/") ? redirect : "/dashboard");
+      const role = data.user.role?.toLowerCase();
+      const defaultPath = role === "customer" ? "/portal" : "/dashboard";
+      router.push(redirect && redirect.startsWith("/") ? redirect : defaultPath);
     },
     onError: (error: unknown) => {
       const message =

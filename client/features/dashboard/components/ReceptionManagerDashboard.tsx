@@ -308,7 +308,7 @@ export default function ReceptionManagerDashboard() {
                 </thead>
                 <tbody className="divide-y divide-[#f1f5f9]">
                   {data.receptionistPerformance.map((r) => (
-                    <tr key={r.name} className="hover:bg-slate-50">
+                    <tr key={r.userId} className="hover:bg-slate-50">
                       <td className="py-2.5 font-medium text-foreground">
                         {r.name}
                       </td>

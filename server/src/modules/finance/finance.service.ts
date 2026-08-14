@@ -155,7 +155,10 @@ export class FinanceService {
         await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branchId, payload);
         await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, branchId, payload);
       } else {
-        await notificationService.notifyUsers([data.recordedById], payload);
+        await notificationService.notifyUsers([data.recordedById], {
+          ...payload,
+          branchId,
+        });
       }
     }
 

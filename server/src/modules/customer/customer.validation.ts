@@ -68,3 +68,13 @@ export const createServiceHistorySchema = z.object({
     id: z.string().uuid('Invalid customer ID'),
   }),
 });
+
+export const customerAccountSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid customer ID'),
+  }),
+  body: z.object({
+    password: z.string().min(6, 'Password must be at least 6 characters long'),
+    isActive: z.boolean().optional(),
+  }),
+});

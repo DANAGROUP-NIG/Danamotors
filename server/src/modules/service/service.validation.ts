@@ -23,6 +23,7 @@ export const createAppointmentSchema = z.object({
     customerId: z.string().uuid('Invalid customer ID'),
     vehicleId: z.string().uuid('Invalid vehicle ID'),
     branchName: z.string().min(1, 'Branch name is required'),
+    serviceId: z.string().uuid('Invalid service ID'),
     scheduledAt: z.string().datetime('Invalid scheduled date'),
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
@@ -34,6 +35,7 @@ export const createAppointmentSchema = z.object({
 export const updateAppointmentSchema = z.object({
   body: z.object({
     scheduledAt: z.string().datetime('Invalid scheduled date').optional(),
+    serviceId: z.string().uuid('Invalid service ID').optional(),
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),

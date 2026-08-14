@@ -46,6 +46,14 @@ export class CustomerRepository {
       include: {
         documents: true,
         serviceHistory: true,
+        account: {
+          select: {
+            id: true,
+            isActive: true,
+            lastLoginAt: true,
+            createdAt: true,
+          },
+        },
       },
     });
   }

@@ -9,7 +9,7 @@ export function useMarkNotificationRead() {
     mutationFn: (id: string) => markNotificationReadRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCountAll() });
     },
   });
 }

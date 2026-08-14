@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 
 export interface CreateNotificationData {
@@ -6,6 +7,7 @@ export interface CreateNotificationData {
   title: string;
   message: string;
   link?: string | null;
+  branchId?: string | null;
 }
 
 export class NotificationRepository {
@@ -20,11 +22,15 @@ export class NotificationRepository {
     skip: number;
     take: number;
     unreadOnly?: boolean;
+    branchId?: string | null;
   }) {
-    const where = {
+    const where: Prisma.NotificationWhereInput = {
       userId: params.userId,
       ...(params.unreadOnly ? { readAt: null } : {}),
     };
+    if (params.branchId) {
+      where.OR = [{ branchId: params.branchId }, { branchId: null }];
+    }
 
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
@@ -39,8 +45,12 @@ export class NotificationRepository {
     return { notifications, total };
   }
 
-  async countUnread(userId: string) {
-    return prisma.notification.count({ where: { userId, readAt: null } });
+  async countUnread(userId: string, branchId?: string | null) {
+    const where: Prisma.NotificationWhereInput = { userId, readAt: null };
+    if (branchId) {
+      where.OR = [{ branchId }, { branchId: null }];
+    }
+    return prisma.notification.count({ where });
   }
 
   async markRead(id: string, userId: string) {

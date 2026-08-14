@@ -25,6 +25,11 @@ export const authMiddleware = async (
     return next(new UnauthorizedError('Invalid or expired authentication token'));
   }
 
+  // Customer portal tokens are not valid for staff-only endpoints.
+  if ('customerId' in decoded && !('userId' in decoded)) {
+    return next(new UnauthorizedError('Staff authentication required'));
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

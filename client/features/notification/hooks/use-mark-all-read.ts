@@ -10,7 +10,7 @@ export function useMarkAllNotificationsRead() {
     mutationFn: markAllNotificationsReadRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCountAll() });
       toast.success("All notifications marked as read");
     },
     onError: () => {

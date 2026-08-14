@@ -13,6 +13,7 @@ import { useNotifications } from "../hooks/use-notifications";
 import { useUnreadCount } from "../hooks/use-unread-count";
 import { useMarkNotificationRead } from "../hooks/use-mark-read";
 import { useMarkAllNotificationsRead } from "../hooks/use-mark-all-read";
+import { useBranchStore } from "@/store/branch.store";
 import {
   getNotificationTypeStyle,
   formatRelativeTime,
@@ -30,14 +31,16 @@ export function NotificationsPage() {
   const router = useRouter();
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(1);
+  const activeBranch = useBranchStore((s) => s.activeBranch);
 
   const unreadOnly = filter === "unread";
   const { data, isLoading, isError, isFetching } = useNotifications({
     page,
     limit: PAGE_SIZE,
     unreadOnly: unreadOnly || undefined,
+    branchId: activeBranch?.id,
   });
-  const { data: unreadData } = useUnreadCount();
+  const { data: unreadData } = useUnreadCount(activeBranch?.id);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 

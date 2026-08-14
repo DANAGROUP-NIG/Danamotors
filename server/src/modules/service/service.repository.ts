@@ -12,13 +12,28 @@ export class ServiceRepository {
     customerId: string;
     vehicleId: string;
     branchId: string;
+    serviceId?: string;
     createdById?: string;
     scheduledAt: Date;
     durationMins?: number;
     notes?: string;
     status?: string;
   }): Promise<ServiceAppointment> {
-    return prisma.serviceAppointment.create({ data });
+    return prisma.serviceAppointment.create({
+      data,
+      include: {
+        service: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            description: true,
+            durationMins: true,
+            price: true,
+          },
+        },
+      },
+    });
   }
 
   async listAppointments(params: {
@@ -87,6 +102,16 @@ export class ServiceRepository {
           },
           vehicle: true,
           branch: { select: { id: true, name: true } },
+          service: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              description: true,
+              durationMins: true,
+              price: true,
+            },
+          },
           createdBy: {
             select: {
               id: true,
@@ -120,6 +145,16 @@ export class ServiceRepository {
         },
         vehicle: true,
         branch: true,
+        service: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            description: true,
+            durationMins: true,
+            price: true,
+          },
+        },
         createdBy: {
           select: {
             id: true,

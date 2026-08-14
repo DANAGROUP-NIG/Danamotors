@@ -5,6 +5,7 @@ export const listNotificationsQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().max(50).optional(),
     unreadOnly: z.enum(['true', 'false']).optional(),
+    branchId: z.string().uuid('Invalid branch ID').optional(),
   }),
 });
 

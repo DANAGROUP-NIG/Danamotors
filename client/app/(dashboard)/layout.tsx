@@ -6,6 +6,9 @@ import SideNav from "@/components/nagivation/SideNav";
 import MainHeader from "@/components/headers/MainHeader";
 import MobileNav from "@/components/nagivation/MobileNav";
 import { RouteGuard } from "@/components/ui/RouteGuard";
+
+//constants
+import { NAV_GROUPS } from "@/constant";
 import {
   FINANCE_ROLES,
   WORKSHOP_ROLES,
@@ -16,6 +19,7 @@ import {
   TRANSFER_ROLES,
   USER_ROLES,
   MANAGE_ROLES,
+  SERVICES_MANAGE_ROLES,
   type AppRole,
 } from "@/features/auth/roles";
 
@@ -34,9 +38,11 @@ const ROUTE_ROLES: Record<string, AppRole[]> = {
   "/purchase-requests": [...MANAGE_ROLES, "workshopmanager"],
   "/purchasing": FINANCE_ROLES,
   "/finance": FINANCE_ROLES,
+  "/credit-applications": FINANCE_ROLES,
   "/reports": FINANCE_ROLES,
   "/payments": FINANCE_ROLES,
   "/quotations": WORKSHOP_ROLES,
+  "/services": SERVICES_MANAGE_ROLES,
   "/settings": MANAGE_ROLES,
 };
 
@@ -62,7 +68,11 @@ export default function DashboardLayout({
       )}
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <SideNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <SideNav
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        navGroups={NAV_GROUPS}
+      />
 
       {/* ── Right column ────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">

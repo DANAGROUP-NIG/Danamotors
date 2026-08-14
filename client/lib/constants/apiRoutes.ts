@@ -4,6 +4,7 @@ export const API_ROUTES = {
     updateMe: "/auth/me",
     login: "/auth/login",
     register: "/auth/register",
+    customerRegister: "/auth/customer/register",
     logout: "/auth/logout",
     refresh: "/auth/refresh",
     logoutAll: "/auth/logout-all",
@@ -13,6 +14,42 @@ export const API_ROUTES = {
   customers: {
     base: "/customers",
     detail: (id: string) => `/customers/${id}`,
+    account: (id: string) => `/customers/${id}/account`,
+  },
+  portal: {
+    me: "/portal/me",
+    changePassword: "/portal/me/password",
+    dashboard: "/portal/dashboard",
+    vehicles: {
+      base: "/portal/vehicles",
+      detail: (id: string) => `/portal/vehicles/${id}`,
+    },
+    jobCards: {
+      base: "/portal/job-cards",
+      detail: (id: string) => `/portal/job-cards/${id}`,
+    },
+    appointments: {
+      base: "/portal/appointments",
+    },
+    services: {
+      base: "/portal/services",
+    },
+    invoices: {
+      base: "/portal/invoices",
+      detail: (id: string) => `/portal/invoices/${id}`,
+    },
+    estimateApproval: (estimateId: string) => `/portal/estimates/${estimateId}/approval`,
+    credit: "/portal/credit",
+    creditApplications: "/portal/credit/applications",
+    creditDecision: (id: string) => `/portal/credit/applications/${id}/decision`,
+  },
+  credit: {
+    applications: {
+      base: "/credit/applications",
+      detail: (id: string) => `/credit/applications/${id}`,
+    },
+    customerCredit: (customerId: string) =>
+      `/credit/customers/${customerId}/credit`,
   },
   branches: {
     base: "/branches",
@@ -31,6 +68,10 @@ export const API_ROUTES = {
       base: "/service/job-cards",
       detail: (id: string) => `/service/job-cards/${id}`,
     },
+  },
+  services: {
+    base: "/services",
+    detail: (id: string) => `/services/${id}`,
   },
   inventory: {
     base: "/inventory",

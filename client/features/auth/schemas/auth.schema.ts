@@ -28,6 +28,26 @@ export const registerSchema = z
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 
+export const customerRegisterSchema = z
+  .object({
+    firstName: z.string().min(1, "First name is required").optional().or(z.literal("")),
+    lastName: z.string().min(1, "Last name is required").optional().or(z.literal("")),
+    email: z.string().email("Enter a valid email"),
+    phoneNumber: z
+      .string()
+      .regex(/^\+?[0-9\s\-()]{7,20}$/, "Enter a valid phone number")
+      .optional()
+      .or(z.literal("")),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
+
+export type CustomerRegisterFormValues = z.infer<typeof customerRegisterSchema>;
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Enter a valid email"),
 });

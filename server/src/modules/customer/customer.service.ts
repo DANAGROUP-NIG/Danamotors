@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import bcrypt from 'bcrypt';
 import prisma from '../../prisma/client';
 import { CustomerRepository } from './customer.repository';
 import { NotFoundError, ConflictError } from '../../shared/errors/appError';
@@ -70,10 +71,57 @@ export class CustomerService {
       country: customer.country,
       preferredContactMethod: customer.preferredContactMethod,
       branchId: customer.branchId,
+      hasAccount: !!customer.account,
+      account: customer.account,
       documents: customer.documents,
       serviceHistory: customer.serviceHistory,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
+    };
+  }
+
+  // Create a portal account for a customer, or reset the password of an
+  // existing one. Used by staff to provision customer logins.
+  async upsertCustomerAccount(customerId: string, data: {
+    password: string;
+    isActive?: boolean;
+  }) {
+    const customer = await this.customerRepository.findCustomerById(customerId);
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const existing = await prisma.customerAccount.findUnique({
+      where: { customerId },
+    });
+
+    let account;
+    let created = false;
+    if (existing) {
+      account = await prisma.customerAccount.update({
+        where: { customerId },
+        data: {
+          passwordHash,
+          ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        },
+      });
+    } else {
+      created = true;
+      account = await prisma.customerAccount.create({
+        data: {
+          customerId,
+          passwordHash,
+          ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        },
+      });
+    }
+
+    return {
+      id: account.id,
+      created,
+      isActive: account.isActive,
+      lastLoginAt: account.lastLoginAt,
     };
   }
 

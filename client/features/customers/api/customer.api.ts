@@ -53,3 +53,14 @@ export async function updateCustomerRequest(
 export async function deleteCustomerRequest(id: string): Promise<void> {
   return apiDelete<void>(API_ROUTES.customers.detail(id));
 }
+
+export async function manageCustomerAccountRequest(
+  id: string,
+  payload: { password: string; isActive?: boolean },
+): Promise<{ account: NonNullable<Customer["account"]> }> {
+  const result = await apiPost<{ account: NonNullable<Customer["account"]> }>(
+    API_ROUTES.customers.account(id),
+    { password: payload.password, isActive: payload.isActive },
+  );
+  return result;
+}

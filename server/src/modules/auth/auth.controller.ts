@@ -128,12 +128,52 @@ export class AuthController {
     }
   };
 
+  registerCustomer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { email, password, firstName, lastName, phoneNumber } = req.body;
+      const result = await this.authService.registerCustomer({
+        email,
+        password,
+        firstName,
+        lastName,
+        phoneNumber,
+      });
+
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Customer account created successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getMe = async (
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
+      if (req.customer) {
+        const result = await this.authService.getMeCustomer(
+          req.customer.customerId,
+        );
+        res.status(200).json({
+          status: "success",
+          statusCode: 200,
+          data: {
+            user: result,
+          },
+        });
+        return;
+      }
+
       const userId = req.user!.userId;
       const result = await this.authService.getMe(userId);
 

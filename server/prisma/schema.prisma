@@ -27,6 +27,7 @@ model Branch {
   inventoryStocks InventoryStock[]
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
+  notifications    Notification[]
 }
 
 model User {
@@ -65,6 +66,8 @@ model User {
   transferReceives InterBranchTransfer[] @relation("TransferReceivedBy")
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
   notifications Notification[]
+  creditTransactions CustomerCreditTransaction[] @relation("UserCreditTransactions")
+  creditRequests CustomerCreditApplication[] @relation("AdvisorCreditRequests")
 }
 
 model Role {
@@ -133,6 +136,7 @@ model Customer {
   postalCode             String?
   country                String?
   preferredContactMethod String?
+  creditBalance          Float              @default(0)
   branchId               String
   createdById            String?
   createdAt              DateTime           @default(now())
@@ -140,6 +144,7 @@ model Customer {
 
   branch                 Branch             @relation(fields: [branchId], references: [id])
   createdBy              User?              @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
+  account                CustomerAccount?
   documents              CustomerDocument[]
   serviceHistory         ServiceHistory[]
   vehicles               Vehicle[]
@@ -148,6 +153,48 @@ model Customer {
   jobCards               JobCard[]
   approvals              CustomerApproval[]
   invoices               Invoice[]
+  creditTransactions     CustomerCreditTransaction[]
+  creditApplications     CustomerCreditApplication[]
+}
+
+model CustomerAccount {
+  id               String    @id @default(uuid())
+  customerId       String    @unique
+  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  passwordHash     String
+  isActive         Boolean   @default(true)
+  resetTokenHash   String?
+  resetTokenExpiry DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  refreshTokens    CustomerRefreshToken[]
+}
+
+model CustomerRefreshToken {
+  id                String          @id @default(uuid())
+  token             String          @unique
+  customerAccountId String
+  customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
+  expiresAt         DateTime
+  createdAt         DateTime        @default(now())
+
+  @@index([customerAccountId])
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  category    String?
+  durationMins Int?
+  price       Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  appointments ServiceAppointment[]
 }
 
 model ServiceAppointment {
@@ -158,6 +205,8 @@ model ServiceAppointment {
   vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   branchId      String
   branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   createdById   String?
   createdBy     User?     @relation("ReceptionistBookings", fields: [createdById], references: [id], onDelete: SetNull)
   scheduledAt   DateTime
@@ -168,6 +217,8 @@ model ServiceAppointment {
   updatedAt     DateTime  @updatedAt
 
   jobCards      JobCard[]
+
+  @@index([serviceId])
 }
 
 model JobCard {
@@ -400,14 +451,15 @@ model Invoice {
 
   payments       Payment[]
   receipts       Receipt[]
+  creditApplications CustomerCreditApplication[]
 }
 
 model Payment {
   id            String      @id @default(uuid())
   invoiceId     String
   invoice       Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  recordedById  String
-  recordedBy    User        @relation("UserRecordedPayments", fields: [recordedById], references: [id], onDelete: Cascade)
+  recordedById  String?
+  recordedBy    User?       @relation("UserRecordedPayments", fields: [recordedById], references: [id], onDelete: SetNull)
   amount        Float
   method        String
   paymentDate   DateTime    @default(now())
@@ -498,6 +550,41 @@ model ServiceHistory {
   updatedAt   DateTime @updatedAt
 }
 
+model CustomerCreditTransaction {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount       Float
+  balanceAfter Float
+  type         String   // CREDIT_IN, ADJUSTMENT, USED
+  description  String?
+  referenceId  String?
+  recordedById String?
+  recordedBy   User?    @relation("UserCreditTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([customerId, createdAt])
+}
+
+model CustomerCreditApplication {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Float
+  status       String   @default("Pending") // Pending, Approved, Declined
+  comments     String?
+  decisionDate DateTime?
+  requestedById String
+  requestedBy  User     @relation("AdvisorCreditRequests", fields: [requestedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([customerId, status])
+  @@index([invoiceId])
+}
+
 model Notification {
   id        String    @id @default(uuid())
   userId    String
@@ -507,8 +594,11 @@ model Notification {
   message   String
   link      String?
   readAt    DateTime?
+  branchId  String?
+  branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+  @@index([branchId, readAt])
 }

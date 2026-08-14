@@ -47,6 +47,7 @@ export interface DashboardStats {
   // ReceptionManager
   totalReceptionists: number;
   receptionistPerformance: {
+    userId: string;
     name: string;
     branch: string;
     appointmentsCreated: number;

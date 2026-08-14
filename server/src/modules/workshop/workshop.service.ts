@@ -80,6 +80,7 @@ export class WorkshopService {
       title: 'Job card assigned to you',
       message: `Job card ${updatedJobCard.jobNumber} has been assigned to you.`,
       link: `/job-cards/${updatedJobCard.id}`,
+      branchId: updatedJobCard.branchId,
     });
 
     return updatedJobCard;

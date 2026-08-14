@@ -487,7 +487,10 @@ export class InventoryService {
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) was approved.`,
       link: `/transfers/${id}`,
     };
-    await notificationService.notifyUsers([transfer.requestedById], payload);
+    await notificationService.notifyUsers([transfer.requestedById], {
+      ...payload,
+      branchId: transfer.requestingBranchId,
+    });
     await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
 
     return updated;
@@ -542,7 +545,10 @@ export class InventoryService {
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been dispatched.`,
       link: `/transfers/${id}`,
     };
-    await notificationService.notifyUsers([transfer.requestedById], payload);
+    await notificationService.notifyUsers([transfer.requestedById], {
+      ...payload,
+      branchId: transfer.requestingBranchId,
+    });
     await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
 
     return updated;
@@ -589,7 +595,10 @@ export class InventoryService {
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been received.`,
       link: `/transfers/${id}`,
     };
-    await notificationService.notifyUsers([transfer.requestedById], payload);
+    await notificationService.notifyUsers([transfer.requestedById], {
+      ...payload,
+      branchId: transfer.requestingBranchId,
+    });
     await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
 
     return updated;

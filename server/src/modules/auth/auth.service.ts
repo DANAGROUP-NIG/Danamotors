@@ -49,6 +49,34 @@ export class AuthService {
     });
   }
 
+  private generateCustomerAccessToken(payload: {
+    customerId: string;
+    email: string;
+    branchId?: string | null;
+  }): string {
+    return jwt.sign(
+      {
+        customerId: payload.customerId,
+        email: payload.email,
+        role: "customer",
+        permissions: ["customer:self"],
+        branchId: payload.branchId ?? null,
+      },
+      config.JWT_SECRET,
+      { expiresIn: config.JWT_ACCESS_EXPIRATION as any },
+    );
+  }
+
+  private generateCustomerRefreshToken(payload: {
+    customerId: string;
+  }): string {
+    return jwt.sign(
+      { type: "customer", customerId: payload.customerId },
+      config.JWT_REFRESH_SECRET,
+      { expiresIn: config.JWT_REFRESH_EXPIRATION as any },
+    );
+  }
+
   // Register service
   async register(data: {
     email: string;
@@ -160,75 +188,171 @@ export class AuthService {
     };
   }
 
-  // Login Service
+  // Login Service. Auto-detects whether the email belongs to a staff user or a
+  // customer portal account.
   async login(
     data: { email: string; passwordHash: string }, // passwordHash is the plain text password passed from controller
     meta?: { ipAddress?: string; userAgent?: string },
   ): Promise<LoginResponse> {
+    // ── Staff login ────────────────────────────────────────────────────────
     const user = await this.authRepository.findByEmail(data.email);
-    if (!user) {
-      throw new UnauthorizedError("Invalid email or password");
-    }
+    if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedError("Your account has been deactivated");
+      }
 
-    if (!user.isActive) {
-      throw new UnauthorizedError("Your account has been deactivated");
-    }
+      const isPasswordValid = await bcrypt.compare(
+        data.passwordHash,
+        user.passwordHash,
+      );
+      if (!isPasswordValid) {
+        throw new UnauthorizedError("Invalid email or password");
+      }
 
-    const isPasswordValid = await bcrypt.compare(
-      data.passwordHash,
-      user.passwordHash,
-    );
-    if (!isPasswordValid) {
-      throw new UnauthorizedError("Invalid email or password");
-    }
+      const permissions = user.role.permissions.map((p) => p.permission.name);
 
-    const permissions = user.role.permissions.map((p) => p.permission.name);
-
-    const jwtPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role.name,
-      permissions,
-      branchId: user.branchId ?? null,
-    };
-
-    const accessToken = this.generateAccessToken(jwtPayload);
-    const refreshToken = this.generateRefreshToken({ userId: user.id });
-
-    const refreshExpiry = new Date();
-    refreshExpiry.setDate(refreshExpiry.getDate() + 7);
-
-    await this.authRepository.saveRefreshToken(
-      user.id,
-      hashToken(refreshToken),
-      refreshExpiry,
-    );
-
-    await this.authRepository.createAuditLog({
-      action: "USER_LOGIN",
-      details: "User logged in successfully",
-      userId: user.id,
-      ipAddress: meta?.ipAddress,
-      userAgent: meta?.userAgent,
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
+      const jwtPayload = {
+        userId: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
         role: user.role.name,
         permissions,
-        branchId: user.branchId,
-      },
-    };
+        branchId: user.branchId ?? null,
+      };
+
+      const accessToken = this.generateAccessToken(jwtPayload);
+      const refreshToken = this.generateRefreshToken({ userId: user.id });
+
+      const refreshExpiry = new Date();
+      refreshExpiry.setDate(refreshExpiry.getDate() + 7);
+
+      await this.authRepository.saveRefreshToken(
+        user.id,
+        hashToken(refreshToken),
+        refreshExpiry,
+      );
+
+      await this.authRepository.createAuditLog({
+        action: "USER_LOGIN",
+        details: "User logged in successfully",
+        userId: user.id,
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
+      });
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role.name,
+          permissions,
+          branchId: user.branchId,
+        },
+      };
+    }
+
+    // ── Customer portal login ──────────────────────────────────────────────
+    const customer = await this.authRepository.findCustomerByEmail(data.email);
+    if (customer) {
+      if (!customer.account) {
+        throw new UnauthorizedError(
+          "No portal account exists for this email. Contact the workshop to set one up.",
+        );
+      }
+
+      if (!customer.account.isActive) {
+        throw new UnauthorizedError("Your account has been deactivated");
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        data.passwordHash,
+        customer.account.passwordHash,
+      );
+      if (!isPasswordValid) {
+        throw new UnauthorizedError("Invalid email or password");
+      }
+
+      await prisma.customerAccount.update({
+        where: { id: customer.account.id },
+        data: { lastLoginAt: new Date() },
+      });
+
+      const accessToken = this.generateCustomerAccessToken({
+        customerId: customer.id,
+        email: customer.email,
+        branchId: customer.branchId,
+      });
+      const refreshToken = this.generateCustomerRefreshToken({
+        customerId: customer.id,
+      });
+
+      const refreshExpiry = new Date();
+      refreshExpiry.setDate(refreshExpiry.getDate() + 7);
+
+      await this.authRepository.saveCustomerRefreshToken(
+        customer.account.id,
+        hashToken(refreshToken),
+        refreshExpiry,
+      );
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: customer.id,
+          email: customer.email,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phoneNumber: customer.phoneNumber ?? undefined,
+          role: "customer",
+          permissions: ["customer:self"],
+          branchId: customer.branchId,
+        },
+      };
+    }
+
+    throw new UnauthorizedError("Invalid email or password");
   }
 
-  // Refresh token service
+  // Refresh token service. Handles both staff and customer refresh tokens.
   async refresh(token: string): Promise<{ accessToken: string }> {
+    // Verify the signature first so we know which account type this token is for.
+    let decoded: jwt.JwtPayload;
+    try {
+      decoded = jwt.verify(token, config.JWT_REFRESH_SECRET) as jwt.JwtPayload;
+    } catch (error) {
+      throw new UnauthorizedError("Invalid refresh token signature");
+    }
+
+    // ── Customer refresh ───────────────────────────────────────────────────
+    if (decoded.type === "customer") {
+      const tokenHash = hashToken(token);
+      const dbToken = await this.authRepository.findCustomerRefreshToken(tokenHash);
+      if (!dbToken || dbToken.expiresAt < new Date()) {
+        if (dbToken) {
+          await this.authRepository.deleteCustomerRefreshToken(tokenHash);
+        }
+        throw new UnauthorizedError("Invalid or expired refresh token");
+      }
+
+      const account = dbToken.customerAccount;
+      if (!account.isActive) {
+        await this.authRepository.deleteCustomerRefreshToken(tokenHash);
+        throw new UnauthorizedError("Your account has been deactivated");
+      }
+
+      const accessToken = this.generateCustomerAccessToken({
+        customerId: account.customer.id,
+        email: account.customer.email,
+        branchId: account.customer.branchId,
+      });
+      return { accessToken };
+    }
+
+    // ── Staff refresh (existing behaviour) ─────────────────────────────────
     const tokenHash = hashToken(token);
     const dbToken = await this.authRepository.findRefreshToken(tokenHash);
     if (!dbToken || dbToken.expiresAt < new Date()) {
@@ -236,13 +360,6 @@ export class AuthService {
         await this.authRepository.deleteRefreshToken(tokenHash);
       }
       throw new UnauthorizedError("Invalid or expired refresh token");
-    }
-
-    // Verify token signature
-    try {
-      jwt.verify(token, config.JWT_REFRESH_SECRET);
-    } catch (error) {
-      throw new UnauthorizedError("Invalid refresh token signature");
     }
 
     const user = dbToken.user;
@@ -268,6 +385,13 @@ export class AuthService {
   // logout
   async logout(token: string): Promise<void> {
     const tokenHash = hashToken(token);
+
+    const customerToken = await this.authRepository.findCustomerRefreshToken(tokenHash);
+    if (customerToken) {
+      await this.authRepository.deleteCustomerRefreshToken(tokenHash);
+      return;
+    }
+
     const dbToken = await this.authRepository.findRefreshToken(tokenHash);
     if (dbToken) {
       await this.authRepository.deleteRefreshToken(tokenHash);
@@ -287,6 +411,251 @@ export class AuthService {
       details: "User logged out from all devices",
       userId,
     });
+  }
+
+  // ── Customer portal ──────────────────────────────────────────────────────
+
+  // Customer self-registration. Links to an existing Customer record by email
+  // so the account is tied to the correct customer profile.
+  async registerCustomer(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    phoneNumber?: string;
+  }): Promise<LoginResponse> {
+    const customer = await this.authRepository.findCustomerByEmail(data.email);
+    if (!customer) {
+      throw new BadRequestError(
+        "No customer record matches this email. Contact the workshop to be registered.",
+      );
+    }
+    if (customer.account) {
+      throw new ConflictError(
+        "A portal account already exists for this email. Please sign in.",
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const account = await this.authRepository.createCustomerAccount(
+      customer.id,
+      passwordHash,
+    );
+
+    const accessToken = this.generateCustomerAccessToken({
+      customerId: customer.id,
+      email: customer.email,
+      branchId: customer.branchId,
+    });
+    const refreshToken = this.generateCustomerRefreshToken({
+      customerId: customer.id,
+    });
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 7);
+
+    await this.authRepository.saveCustomerRefreshToken(
+      account.id,
+      hashToken(refreshToken),
+      refreshExpiry,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: customer.id,
+        email: customer.email,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        phoneNumber: customer.phoneNumber ?? undefined,
+        role: "customer",
+        permissions: ["customer:self"],
+        branchId: customer.branchId,
+      },
+    };
+  }
+
+  // get me (customer)
+  async getMeCustomer(customerId: string) {
+    const customer = await this.authRepository.findCustomerById(customerId);
+    if (!customer) {
+      throw new UnauthorizedError("Customer session not found");
+    }
+    return {
+      id: customer.id,
+      email: customer.email,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phoneNumber: customer.phoneNumber,
+      role: "customer",
+      permissions: ["customer:self"],
+      branchId: customer.branchId,
+    };
+  }
+
+  // update my profile (customer)
+  async updateMeCustomer(customerId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    preferredContactMethod?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) {
+    const customer = await this.authRepository.findCustomerById(customerId);
+    if (!customer) {
+      throw new UnauthorizedError("Customer session not found");
+    }
+
+    let passwordHash: string | undefined;
+    if (data.newPassword) {
+      if (!customer.account) {
+        throw new BadRequestError("No portal account exists for this customer");
+      }
+      if (!data.currentPassword) {
+        throw new BadRequestError(
+          "Current password is required to set a new password",
+        );
+      }
+      const isPasswordValid = await bcrypt.compare(
+        data.currentPassword,
+        customer.account.passwordHash,
+      );
+      if (!isPasswordValid) {
+        throw new BadRequestError("Current password is incorrect");
+      }
+      passwordHash = await bcrypt.hash(data.newPassword, 10);
+    }
+
+    const [updated] = await Promise.all([
+      prisma.customer.update({
+        where: { id: customerId },
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phoneNumber: data.phoneNumber,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode,
+          country: data.country,
+          preferredContactMethod: data.preferredContactMethod,
+        },
+      }),
+      passwordHash
+        ? prisma.customerAccount.update({
+            where: { customerId },
+            data: { passwordHash },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      phoneNumber: updated.phoneNumber,
+      role: "customer",
+      permissions: ["customer:self"],
+      branchId: updated.branchId,
+    };
+  }
+
+  // Request a password reset for either a staff user or a customer account.
+  async forgotPassword(email: string): Promise<{ resetLink: string } | null> {
+    const user = await this.authRepository.findByEmail(email);
+    if (user && user.isActive) {
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetTokenHash: hashToken(token),
+          resetTokenExpiry: expiresAt,
+        },
+      });
+
+      await this.authRepository.createAuditLog({
+        action: "PASSWORD_RESET_REQUESTED",
+        details: "Password reset link requested",
+        userId: user.id,
+      });
+
+      const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
+      return { resetLink: `${baseUrl}/reset-password?token=${token}` };
+    }
+
+    const customer = await this.authRepository.findCustomerByEmail(email);
+    if (customer && customer.account && customer.account.isActive) {
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      await prisma.customerAccount.update({
+        where: { id: customer.account.id },
+        data: {
+          resetTokenHash: hashToken(token),
+          resetTokenExpiry: expiresAt,
+        },
+      });
+
+      const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
+      return { resetLink: `${baseUrl}/reset-password?token=${token}` };
+    }
+
+    // Always resolve successfully so the endpoint cannot be used to probe emails.
+    return null;
+  }
+
+  // Complete a password reset using a valid, unexpired one-time token.
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = hashToken(token);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Staff user reset.
+    const record = await this.authRepository.findByResetTokenHash(tokenHash);
+    if (record && record.resetTokenExpiry && record.resetTokenExpiry >= new Date()) {
+      await prisma.user.update({
+        where: { id: record.id },
+        data: {
+          passwordHash,
+          resetTokenHash: null,
+          resetTokenExpiry: null,
+        },
+      });
+      await this.authRepository.deleteUserRefreshTokens(record.id);
+      await this.authRepository.createAuditLog({
+        action: "PASSWORD_RESET_COMPLETED",
+        details: "Password reset completed",
+        userId: record.id,
+      });
+      return;
+    }
+
+    // Customer account reset.
+    const customerRecord = await this.authRepository.findCustomerByResetTokenHash(tokenHash);
+    if (
+      !customerRecord ||
+      !customerRecord.resetTokenExpiry ||
+      customerRecord.resetTokenExpiry < new Date()
+    ) {
+      throw new BadRequestError("Invalid or expired password reset token");
+    }
+
+    await prisma.customerAccount.update({
+      where: { id: customerRecord.id },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiry: null,
+      },
+    });
+    await this.authRepository.deleteCustomerRefreshTokens(customerRecord.id);
   }
 
   // get me
@@ -363,62 +732,6 @@ export class AuthService {
       permissions: user.role.permissions.map((p) => p.permission.name),
       branchId: updated.branchId,
     };
-  }
-
-  // Request a password reset. Returns the reset link because no mail transport
-  // is wired up yet; the link carries a one-time token that expires in 1 hour.
-  async forgotPassword(email: string): Promise<{ resetLink: string } | null> {
-    const user = await this.authRepository.findByEmail(email);
-    if (!user || !user.isActive) {
-      // Always resolve successfully so the endpoint cannot be used to probe emails.
-      return null;
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetTokenHash: hashToken(token),
-        resetTokenExpiry: expiresAt,
-      },
-    });
-
-    await this.authRepository.createAuditLog({
-      action: "PASSWORD_RESET_REQUESTED",
-      details: "Password reset link requested",
-      userId: user.id,
-    });
-
-    const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
-    return { resetLink: `${baseUrl}/reset-password?token=${token}` };
-  }
-
-  // Complete a password reset using a valid, unexpired one-time token.
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    const record = await this.authRepository.findByResetTokenHash(hashToken(token));
-    if (!record || !record.resetTokenExpiry || record.resetTokenExpiry < new Date()) {
-      throw new BadRequestError("Invalid or expired password reset token");
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
-      where: { id: record.id },
-      data: {
-        passwordHash,
-        resetTokenHash: null,
-        resetTokenExpiry: null,
-      },
-    });
-
-    // Invalidate sessions after a password reset.
-    await this.authRepository.deleteUserRefreshTokens(record.id);
-
-    await this.authRepository.createAuditLog({
-      action: "PASSWORD_RESET_COMPLETED",
-      details: "Password reset completed",
-      userId: record.id,
-    });
   }
 }
 export default AuthService;

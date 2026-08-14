@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   Building2,
   ArrowLeftRight,
+  Wallet,
+  ListChecks,
 } from "lucide-react";
 
 //User roles
@@ -33,6 +35,7 @@ import {
   BRANCH_ROLES,
   TRANSFER_ROLES,
   USER_ROLES,
+  SERVICES_MANAGE_ROLES,
   type AppRole,
 } from "@/features/auth/roles";
 
@@ -101,6 +104,12 @@ export const NAV_GROUPS: NavGroup[] = [
         roles: TECHNICIAN_ROLES,
       },
       {
+        label: "Services",
+        href: "/services",
+        icon: ListChecks,
+        roles: SERVICES_MANAGE_ROLES,
+      },
+      {
         label: "Technicians",
         href: "/technicians",
         icon: UserCog,
@@ -140,6 +149,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
+        roles: FINANCE_ROLES,
+      },
+      {
+        label: "Credit Applications",
+        href: "/credit-applications",
+        icon: Wallet,
         roles: FINANCE_ROLES,
       },
       {

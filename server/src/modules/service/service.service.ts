@@ -16,6 +16,7 @@ export class ServiceService {
     vehicleId: string;
     branchName: string;
     scheduledAt: string;
+    serviceId?: string;
     durationMins?: number;
     notes?: string;
     status?: string;
@@ -29,6 +30,11 @@ export class ServiceService {
 
     const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
     if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
+
+    if (data.serviceId) {
+      const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
+      if (!service) throw new NotFoundError('Service not found');
+    }
 
     const activeAppointment = await prisma.serviceAppointment.findFirst({
       where: {
@@ -47,6 +53,7 @@ export class ServiceService {
       customerId: data.customerId,
       vehicleId: data.vehicleId,
       branchId: branch.id,
+      serviceId: data.serviceId,
       createdById: data.createdById,
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,

@@ -1,5 +1,5 @@
 import prisma from "../../prisma/client";
-import { User, Role, RefreshToken } from "@prisma/client";
+import { User, Role, RefreshToken, Customer, CustomerAccount, CustomerRefreshToken } from "@prisma/client";
 
 export interface UserWithRoleAndPermissions extends User {
   role: Role & {
@@ -8,6 +8,19 @@ export interface UserWithRoleAndPermissions extends User {
         name: string;
       };
     }[];
+  };
+}
+
+export interface CustomerWithAccount extends Customer {
+  account: (CustomerAccount & {
+    customer?: Pick<Customer, "id" | "email" | "branchId">;
+  }) | null;
+}
+
+export interface CustomerRefreshTokenWithAccount
+  extends CustomerRefreshToken {
+  customerAccount: CustomerAccount & {
+    customer: Pick<Customer, "id" | "email" | "branchId">;
   };
 }
 
@@ -49,6 +62,85 @@ export class AuthRepository {
   async findRoleByName(name: string): Promise<Role | null> {
     return prisma.role.findUnique({
       where: { name },
+    });
+  }
+
+  async findCustomerByEmail(
+    email: string,
+  ): Promise<CustomerWithAccount | null> {
+    return prisma.customer.findUnique({
+      where: { email },
+      include: { account: true },
+    }) as Promise<CustomerWithAccount | null>;
+  }
+
+  async findCustomerById(
+    customerId: string,
+  ): Promise<CustomerWithAccount | null> {
+    return prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { account: true },
+    }) as Promise<CustomerWithAccount | null>;
+  }
+
+  async createCustomerAccount(
+    customerId: string,
+    passwordHash: string,
+  ): Promise<CustomerAccount> {
+    return prisma.customerAccount.create({
+      data: { customerId, passwordHash },
+    });
+  }
+
+  async saveCustomerRefreshToken(
+    customerAccountId: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<CustomerRefreshToken> {
+    return prisma.customerRefreshToken.create({
+      data: {
+        token,
+        customerAccountId,
+        expiresAt,
+      },
+    });
+  }
+
+  async findCustomerRefreshToken(
+    token: string,
+  ): Promise<CustomerRefreshTokenWithAccount | null> {
+    return prisma.customerRefreshToken.findUnique({
+      where: { token },
+      include: {
+        customerAccount: {
+          include: {
+            customer: {
+              select: { id: true, email: true, branchId: true },
+            },
+          },
+        },
+      },
+    }) as Promise<CustomerRefreshTokenWithAccount | null>;
+  }
+
+  async deleteCustomerRefreshToken(token: string): Promise<void> {
+    await prisma.customerRefreshToken.deleteMany({
+      where: { token },
+    });
+  }
+
+  async deleteCustomerRefreshTokens(customerAccountId: string): Promise<void> {
+    await prisma.customerRefreshToken.deleteMany({
+      where: { customerAccountId },
+    });
+  }
+
+  async findCustomerByResetTokenHash(
+    tokenHash: string,
+  ): Promise<{ id: string; resetTokenExpiry: Date | null } | null> {
+    return prisma.customerAccount.findFirst({
+      where: { resetTokenHash: tokenHash },
+      select: { id: true, resetTokenExpiry: true },
     });
   }
 

@@ -5,6 +5,7 @@ export { useCustomer } from "./hooks/use-customer";
 export { useCreateCustomer } from "./hooks/use-create-customer";
 export { useUpdateCustomer } from "./hooks/use-update-customer";
 export { useDeleteCustomer } from "./hooks/use-delete-customer";
+export { useManageCustomerAccount } from "./hooks/use-manage-customer-account";
 export { customerKeys } from "./api/customer.keys";
 export {
   getCustomersRequest,
@@ -12,6 +13,7 @@ export {
   createCustomerRequest,
   updateCustomerRequest,
   deleteCustomerRequest,
+  manageCustomerAccountRequest,
 } from "./api/customer.api";
 export { getCustomerFullName, getCustomerInitials } from "./services/customer.service";
 export {

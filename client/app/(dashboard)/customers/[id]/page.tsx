@@ -3,6 +3,8 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useCustomer } from "@/features/customers";
+import { CustomerPortalAccessCard } from "@/features/customers/components/CustomerPortalAccessCard";
+import { CustomerCreditCard } from "@/features/customers/components/CustomerCreditCard";
 import { useVehicles } from "@/features/vehicles/hooks/use-vehicles";
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
@@ -106,6 +108,10 @@ export default function CustomerDetailPage() {
           />
         </div>
       </div>
+
+      <CustomerPortalAccessCard customer={customer} />
+
+      <CustomerCreditCard customer={customer} />
 
       <Section
         icon={<CalendarCheck className="size-4" />}
