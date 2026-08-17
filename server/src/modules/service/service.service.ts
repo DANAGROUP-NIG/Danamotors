@@ -20,6 +20,7 @@ export class ServiceService {
     durationMins?: number;
     notes?: string;
     status?: string;
+    source?: string;
     createdById?: string;
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
@@ -59,22 +60,23 @@ export class ServiceService {
       durationMins: data.durationMins,
       notes: data.notes,
       status: data.status,
+      source: data.source,
     });
 
     const notificationService = new NotificationService();
     const appointmentMessage = `${customer.firstName} ${customer.lastName} booked an appointment at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
-    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, branch.id, {
+    const appointmentPayload = {
       type: 'APPOINTMENT_BOOKED',
       title: 'New appointment booked',
       message: appointmentMessage,
       link: `/appointments/${appointment.id}`,
-    });
-    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branch.id, {
-      type: 'APPOINTMENT_BOOKED',
-      title: 'New appointment booked',
-      message: appointmentMessage,
-      link: `/appointments/${appointment.id}`,
-    });
+    };
+    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, branch.id, appointmentPayload);
+    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branch.id, appointmentPayload);
+    await notificationService.notifyRole(ROLES.RECEPTIONIST, branch.id, appointmentPayload);
+    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, appointmentPayload);
+    await notificationService.notifyRole(ROLES.ADMIN, branch.id, appointmentPayload);
+    await notificationService.notifyRole(ROLES.SUPER_ADMIN, undefined, appointmentPayload);
 
     return appointment;
   }

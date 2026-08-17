@@ -18,6 +18,7 @@ export class ServiceRepository {
     durationMins?: number;
     notes?: string;
     status?: string;
+    source?: string;
   }): Promise<ServiceAppointment> {
     return prisma.serviceAppointment.create({
       data,
