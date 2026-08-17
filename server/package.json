@@ -9,7 +9,16 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed/index.ts",
+    "prisma:seed:branches": "ts-node prisma/seed/branches.ts",
+    "prisma:seed:roles": "ts-node prisma/seed/roles.ts",
+    "prisma:seed:staff": "ts-node prisma/seed/staff.ts",
+    "prisma:seed:services": "ts-node prisma/seed/services.ts",
+    "prisma:seed:spare-parts": "ts-node prisma/seed/spareParts.ts",
+    "prisma:seed:inventory": "ts-node prisma/seed/inventory.ts",
+    "prisma:seed:transactions": "ts-node prisma/seed/transactions.ts",
+    "prisma:seed:portal": "ts-node prisma/seed/portal.ts",
+    "prisma:seed:enquiries": "ts-node prisma/seed/enquiries.ts"
   },
   "author": "buildwithzeke <ayeoluwaseyi@gmail.com>",
   "license": "MIT",
