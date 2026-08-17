@@ -635,7 +635,11 @@ debug@2.6.9:
     ms "2.0.0"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 debug@4:
+=======
+debug@4, debug@^4, debug@^4.4.3, debug@~4.4.1:
+>>>>>>> 99969bdc841fd62e6e0def991cab1e2df5408457
 =======
 debug@4, debug@^4, debug@^4.4.3, debug@~4.4.1:
 >>>>>>> 99969bdc841fd62e6e0def991cab1e2df5408457
