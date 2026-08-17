@@ -2,6 +2,17 @@ import prisma from '../../prisma/client';
 import { NotificationRepository, CreateNotificationData } from './notification.repository';
 import { NotFoundError } from '../../shared/errors/appError';
 
+export const NOTIFICATION_TYPES = {
+  // Existing
+  INVOICE_PAID:        'INVOICE_PAID',
+  ESTIMATE_CREATED:    'ESTIMATE_CREATED',
+  APPOINTMENT_BOOKED:  'APPOINTMENT_BOOKED',
+  // New
+  APPOINTMENT_CREATE:   'APPOINTMENT_CREATE',
+  APPOINTMENT_APPROVED: 'APPOINTMENT_APPROVED',
+  APPOINTMENT_REJECTED: 'APPOINTMENT_REJECTED',
+} as const;
+
 export interface NotificationPayload {
   type: string;
   title: string;
