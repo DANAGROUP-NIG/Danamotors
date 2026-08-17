@@ -11,6 +11,7 @@ import {
 } from "../../shared/errors/appError";
 import { LoginResponse } from "./auth.types";
 import { ROLES } from "../../shared/constants/roles";
+import { JWTPayload } from "@/shared/types";
 
 // Roles users are allowed to request during public self-registration.
 // Privileged roles (admins, managers, accountants) must be assigned by an
@@ -143,9 +144,9 @@ export class AuthService {
       branchId,
     });
 
-    const permissions = newUser.role.permissions.map((p) => p.permission.name);
+    const permissions = newUser.role.permissions.map((p: string[]) => p.permission.name);
 
-    const jwtPayload = {
+    const jwtPayload: JWTPayload = {
       userId: newUser.id,
       email: newUser.email,
       role: newUser.role.name,

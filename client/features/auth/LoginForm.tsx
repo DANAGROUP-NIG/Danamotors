@@ -34,6 +34,8 @@ function LoginFormContent() {
             type="email"
             error={errors.email?.message}
             {...register("email")}
+            // name="username"
+            // autoComplete="username"
           />
 
           <label className="grid gap-2">
@@ -43,6 +45,8 @@ function LoginFormContent() {
                 type={showPassword ? "text" : "password"}
                 className="h-11 w-full rounded-md border border-border bg-background px-3 pr-10 outline-none focus:ring-2 focus:ring-ring"
                 {...register("password")}
+                name="password"
+                autoComplete="current-password"
               />
               <button
                 type="button"
