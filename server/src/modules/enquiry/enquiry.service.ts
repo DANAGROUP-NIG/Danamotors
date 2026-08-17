@@ -70,6 +70,8 @@ export class EnquiryService {
     status?: string;
     branchId?: string;
     search?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { enquiries, total } = await this.enquiryRepository.list({
@@ -78,6 +80,8 @@ export class EnquiryService {
       status: params.status,
       branchId: params.branchId,
       search: params.search,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
     });
 
     return {
@@ -91,7 +95,15 @@ export class EnquiryService {
     };
   }
 
-  async approveEnquiry(id: string, reviewerId: string, reviewNotes?: string) {
+  async approveEnquiry(id: string, reviewerId: string, data: {
+    reviewNotes?: string;
+    customerId: string;
+    vehicleId: string;
+    scheduledAt: string;
+    serviceId?: string;
+    durationMins?: number;
+    notes?: string;
+  }) {
     const enquiry = await this.enquiryRepository.findById(id);
     if (!enquiry) throw new NotFoundError('Enquiry not found');
 
@@ -99,15 +111,28 @@ export class EnquiryService {
       throw new ConflictError(`Enquiry has already been ${enquiry.status.toLowerCase()}`);
     }
 
+    // Validate customer and vehicle exist
+    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
+    if (!customer) throw new NotFoundError('Customer not found');
+
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
+    if (!vehicle) throw new NotFoundError('Vehicle not found');
+
+    if (data.serviceId) {
+      const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
+      if (!service) throw new NotFoundError('Service not found');
+    }
+
     // Create a ServiceAppointment for the approved enquiry
-    const scheduledAt = enquiry.preferredDate || new Date();
     const appointment = await prisma.serviceAppointment.create({
       data: {
-        customerId: '', // Will be linked when customer is registered
-        vehicleId: '', // Will be linked when vehicle is registered
+        customerId: data.customerId,
+        vehicleId: data.vehicleId,
         branchId: enquiry.branchId,
-        scheduledAt,
-        notes: `Approved from enquiry: ${enquiry.serviceDescription}`,
+        serviceId: data.serviceId,
+        scheduledAt: new Date(data.scheduledAt),
+        durationMins: data.durationMins,
+        notes: data.notes || `Approved from enquiry: ${enquiry.serviceDescription}`,
         status: 'Pending',
         source: 'OnlineBooking',
       },
@@ -118,19 +143,21 @@ export class EnquiryService {
     const updated = await this.enquiryRepository.updateStatus(id, {
       status: 'Approved',
       reviewedById: reviewerId,
-      reviewNotes,
+      reviewNotes: data.reviewNotes,
       reviewedAt: new Date(),
       appointmentId: appointment.id,
     });
 
-    // Notify the enquiry originator
+    // Notify Customer Care staff about the approval
     const notificationService = new NotificationService();
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, {
+    const approvalPayload = {
       type: 'APPOINTMENT_APPROVED',
       title: 'Enquiry approved',
-      message: `Your service enquiry has been approved. A staff member will contact you shortly.`,
-      link: `/appointments`,
-    });
+      message: `Enquiry from ${enquiry.firstName} ${enquiry.lastName} has been approved and converted to an appointment.`,
+      link: `/appointments/${appointment.id}`,
+    };
+    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, approvalPayload);
+    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branchId, approvalPayload);
 
     return updated;
   }
@@ -150,14 +177,16 @@ export class EnquiryService {
       reviewedAt: new Date(),
     });
 
-    // Notify the enquiry originator
+    // Notify Customer Care staff about the rejection
     const notificationService = new NotificationService();
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, {
+    const rejectionPayload = {
       type: 'APPOINTMENT_REJECTED',
       title: 'Enquiry rejected',
-      message: `Your service enquiry has been declined. ${reviewNotes || ''}`,
+      message: `Enquiry from ${enquiry.firstName} ${enquiry.lastName} has been rejected.${reviewNotes ? ` Reason: ${reviewNotes}` : ''}`,
       link: `/appointments`,
-    });
+    };
+    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, rejectionPayload);
+    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branchId, rejectionPayload);
 
     return updated;
   }

@@ -50,6 +50,8 @@ export class EnquiryRepository {
     status?: string;
     branchId?: string;
     search?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
     const where: Prisma.EnquiryWhereInput = {};
 
@@ -70,6 +72,11 @@ export class EnquiryRepository {
         { serviceDescription: { contains: params.search, mode: 'insensitive' } },
       ];
     }
+
+    const createdAtFilter: Prisma.DateTimeFilter = {};
+    if (params.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
+    if (params.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     const [enquiries, total] = await Promise.all([
       prisma.enquiry.findMany({

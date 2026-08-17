@@ -42,6 +42,8 @@ export class EnquiryController {
       const limit = Number(req.query.limit) || 10;
       const status = req.query.status as string | undefined;
       const search = req.query.search as string | undefined;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
       // Branch scoping for non-privileged roles
@@ -55,6 +57,8 @@ export class EnquiryController {
         status,
         branchId,
         search,
+        dateFrom,
+        dateTo,
       });
 
       res.status(200).json({ status: 'success', statusCode: 200, data: result });
@@ -63,43 +67,40 @@ export class EnquiryController {
     }
   };
 
-  approveEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  reviewEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { reviewNotes } = req.body;
+      const { action, reviewNotes, customerId, vehicleId, scheduledAt, serviceId, durationMins, notes } = req.body;
       const reviewerId = req.user!.userId;
 
       const existing = await this.enquiryService.getEnquiry(id);
       assertBranchOwnership(req, existing.branchId);
 
-      const result = await this.enquiryService.approveEnquiry(id, reviewerId, reviewNotes);
-      res.status(200).json({
-        status: 'success',
-        statusCode: 200,
-        message: 'Enquiry approved successfully',
-        data: { enquiry: result },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  rejectEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { reviewNotes } = req.body;
-      const reviewerId = req.user!.userId;
-
-      const existing = await this.enquiryService.getEnquiry(id);
-      assertBranchOwnership(req, existing.branchId);
-
-      const result = await this.enquiryService.rejectEnquiry(id, reviewerId, reviewNotes);
-      res.status(200).json({
-        status: 'success',
-        statusCode: 200,
-        message: 'Enquiry rejected',
-        data: { enquiry: result },
-      });
+      if (action === 'approve') {
+        const result = await this.enquiryService.approveEnquiry(id, reviewerId, {
+          reviewNotes,
+          customerId,
+          vehicleId,
+          scheduledAt,
+          serviceId,
+          durationMins,
+          notes,
+        });
+        res.status(200).json({
+          status: 'success',
+          statusCode: 200,
+          message: 'Enquiry approved successfully',
+          data: { enquiry: result },
+        });
+      } else {
+        const result = await this.enquiryService.rejectEnquiry(id, reviewerId, reviewNotes);
+        res.status(200).json({
+          status: 'success',
+          statusCode: 200,
+          message: 'Enquiry rejected',
+          data: { enquiry: result },
+        });
+      }
     } catch (error) {
       next(error);
     }

@@ -7,10 +7,9 @@ import { PERMISSIONS } from '../../shared/constants/roles';
 import {
   createEnquirySchema,
   enquiryIdParamSchema,
-  approveEnquirySchema,
-  rejectEnquirySchema,
-  listEnquiriesSchema,
-} from './enquiry.validation';
+  reviewEnquirySchema,
+  listEnquiriesQuerySchema,
+} from '../service/service.validation';
 
 const router = Router();
 const controller = new EnquiryController();
@@ -57,7 +56,7 @@ router.use(authMiddleware);
 router.get(
   '/',
   requirePermission(PERMISSIONS.SERVICE_READ),
-  validateRequest(listEnquiriesSchema),
+  validateRequest(listEnquiriesQuerySchema),
   controller.listEnquiries,
 );
 
@@ -69,17 +68,10 @@ router.get(
 );
 
 router.patch(
-  '/:id/approve',
+  '/:id/review',
   requirePermission(PERMISSIONS.SERVICE_UPDATE),
-  validateRequest(approveEnquirySchema),
-  controller.approveEnquiry,
-);
-
-router.patch(
-  '/:id/reject',
-  requirePermission(PERMISSIONS.SERVICE_UPDATE),
-  validateRequest(rejectEnquirySchema),
-  controller.rejectEnquiry,
+  validateRequest(reviewEnquirySchema),
+  controller.reviewEnquiry,
 );
 
 export default router;
