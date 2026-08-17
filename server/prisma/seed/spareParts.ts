@@ -1,33 +1,14 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import { PrismaClient } from "@prisma/client";
+import { sleep } from "./helpers";
 
-const prisma = new PrismaClient();
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function rng(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// ─── Parts catalog ──────────────────────────────────────────────────────────
-
-interface PartDef {
+export interface PartDef {
   partNumber: string;
   name: string;
   category: string;
   unitPrice: number;
 }
 
-const PARTS: PartDef[] = [
-  // Lubricants
+export const PARTS: PartDef[] = [
   { partNumber: "ENG-OIL-5W30", name: "Engine Oil 5W-30 (4L)", category: "Lubricants", unitPrice: 8500 },
   { partNumber: "ENG-OIL-10W40", name: "Engine Oil 10W-40 (4L)", category: "Lubricants", unitPrice: 7500 },
   { partNumber: "ENG-OIL-20W50", name: "Engine Oil 20W-50 (4L)", category: "Lubricants", unitPrice: 7000 },
@@ -37,8 +18,6 @@ const PARTS: PartDef[] = [
   { partNumber: "PWR-STEER-FLUID", name: "Power Steering Fluid (1L)", category: "Lubricants", unitPrice: 3800 },
   { partNumber: "DIFF-OIL-75W90", name: "Differential Oil 75W-90 (1L)", category: "Lubricants", unitPrice: 5200 },
   { partNumber: "GREASE-MP-LM", name: "Multi-Purpose Grease (400g)", category: "Lubricants", unitPrice: 2800 },
-
-  // Filters
   { partNumber: "FIL-OIL-001", name: "Oil Filter", category: "Filters", unitPrice: 2500 },
   { partNumber: "FIL-OIL-002", name: "Oil Filter (Heavy Duty)", category: "Filters", unitPrice: 3500 },
   { partNumber: "FIL-AIR-001", name: "Air Filter", category: "Filters", unitPrice: 3200 },
@@ -47,8 +26,6 @@ const PARTS: PartDef[] = [
   { partNumber: "FIL-FUEL-001", name: "Fuel Filter", category: "Filters", unitPrice: 3500 },
   { partNumber: "FIL-FUEL-002", name: "Fuel Filter (Diesel)", category: "Filters", unitPrice: 4500 },
   { partNumber: "FIL-TRANS-001", name: "Transmission Filter", category: "Filters", unitPrice: 4200 },
-
-  // Brakes
   { partNumber: "BRK-PAD-F01", name: "Front Brake Pads (Set)", category: "Brakes", unitPrice: 18000 },
   { partNumber: "BRK-PAD-R01", name: "Rear Brake Pads (Set)", category: "Brakes", unitPrice: 16000 },
   { partNumber: "BRK-PAD-CERA", name: "Ceramic Brake Pads (Set)", category: "Brakes", unitPrice: 25000 },
@@ -59,8 +36,6 @@ const PARTS: PartDef[] = [
   { partNumber: "BRK-CALIPER-R", name: "Rear Brake Caliper", category: "Brakes", unitPrice: 38000 },
   { partNumber: "BRK-LINE-SS", name: "Stainless Brake Line", category: "Brakes", unitPrice: 8500 },
   { partNumber: "BRK-SHOE-R01", name: "Rear Brake Shoes (Set)", category: "Brakes", unitPrice: 12000 },
-
-  // Ignition
   { partNumber: "SPN-SPK-001", name: "Spark Plug (each)", category: "Ignition", unitPrice: 2800 },
   { partNumber: "SPN-SPK-IRID", name: "Iridium Spark Plug (each)", category: "Ignition", unitPrice: 5500 },
   { partNumber: "SPN-SPK-DUAL", name: "Dual Platinum Spark Plug (each)", category: "Ignition", unitPrice: 4200 },
@@ -68,8 +43,6 @@ const PARTS: PartDef[] = [
   { partNumber: "IGN-COIL-PACK", name: "Ignition Coil Pack", category: "Ignition", unitPrice: 35000 },
   { partNumber: "IGN-MODULE-001", name: "Ignition Control Module", category: "Ignition", unitPrice: 22000 },
   { partNumber: "IGN-CABLE-SET", name: "Spark Plug Cable Set", category: "Ignition", unitPrice: 9500 },
-
-  // Electrical
   { partNumber: "BAT-12V-60AH", name: "Battery 12V 60Ah", category: "Electrical", unitPrice: 45000 },
   { partNumber: "BAT-12V-70AH", name: "Battery 12V 70Ah", category: "Electrical", unitPrice: 52000 },
   { partNumber: "BAT-12V-100AH", name: "Battery 12V 100Ah (Diesel)", category: "Electrical", unitPrice: 72000 },
@@ -81,8 +54,6 @@ const PARTS: PartDef[] = [
   { partNumber: "HL-BULB-LED", name: "LED Headlight Bulb (Pair)", category: "Electrical", unitPrice: 15000 },
   { partNumber: "TL-BULB-LED", name: "LED Tail Light Bulb (Pair)", category: "Electrical", unitPrice: 8500 },
   { partNumber: "FOG-LAMP-LED", name: "LED Fog Light (each)", category: "Electrical", unitPrice: 12000 },
-
-  // Tyres
   { partNumber: "TYR-175-70R14", name: "Tyre 175/70R14", category: "Tyres", unitPrice: 28000 },
   { partNumber: "TYR-185-65R15", name: "Tyre 185/65R15", category: "Tyres", unitPrice: 30000 },
   { partNumber: "TYR-195-65R15", name: "Tyre 195/65R15", category: "Tyres", unitPrice: 32000 },
@@ -92,8 +63,6 @@ const PARTS: PartDef[] = [
   { partNumber: "TYR-265-65R17", name: "Tyre 265/65R17 (SUV/4x4)", category: "Tyres", unitPrice: 68000 },
   { partNumber: "TYR-SPARE-SEAL", name: "Tyre Puncture Repair Kit", category: "Tyres", unitPrice: 4500 },
   { partNumber: "TYR-VALVE-TPMS", name: "TPMS Valve (each)", category: "Tyres", unitPrice: 3500 },
-
-  // Cooling
   { partNumber: "COO-THERM-01", name: "Thermostat", category: "Cooling", unitPrice: 7500 },
   { partNumber: "COO-HOSE-RAD", name: "Radiator Hose (Upper)", category: "Cooling", unitPrice: 5500 },
   { partNumber: "COO-HOSE-LWR", name: "Radiator Hose (Lower)", category: "Cooling", unitPrice: 5500 },
@@ -104,8 +73,6 @@ const PARTS: PartDef[] = [
   { partNumber: "COO-WP-001", name: "Water Pump", category: "Cooling", unitPrice: 22000 },
   { partNumber: "COO-EXP-TANK", name: "Coolant Expansion Tank", category: "Cooling", unitPrice: 8500 },
   { partNumber: "COO-TEMP-SENS", name: "Coolant Temperature Sensor", category: "Cooling", unitPrice: 4500 },
-
-  // Suspension
   { partNumber: "SUS-SHOCK-F01", name: "Front Shock Absorber (each)", category: "Suspension", unitPrice: 35000 },
   { partNumber: "SUS-SHOCK-R01", name: "Rear Shock Absorber (each)", category: "Suspension", unitPrice: 32000 },
   { partNumber: "SUS-STRUT-F01", name: "Front Strut Assembly (each)", category: "Suspension", unitPrice: 55000 },
@@ -116,14 +83,10 @@ const PARTS: PartDef[] = [
   { partNumber: "SUS-TIE-ROD", name: "Tie Rod End", category: "Suspension", unitPrice: 7500 },
   { partNumber: "SUS-SWAY-BAR", name: "Sway Bar Link", category: "Suspension", unitPrice: 6500 },
   { partNumber: "SUS-BUSH-KIT", name: "Suspension Bush Kit", category: "Suspension", unitPrice: 12000 },
-
-  // Steering
   { partNumber: "STR-RACK-001", name: "Steering Rack (assembly)", category: "Steering", unitPrice: 95000 },
   { partNumber: "STR-PUMP-001", name: "Power Steering Pump", category: "Steering", unitPrice: 55000 },
   { partNumber: "STR-COULM-JNT", name: "Steering Column Joint", category: "Steering", unitPrice: 12000 },
   { partNumber: "STR-BELLOW-KIT", name: "Steering Rack Bellows Kit", category: "Steering", unitPrice: 6500 },
-
-  // Transmission
   { partNumber: "TRN-CLUTCH-KIT", name: "Clutch Kit (Plate+Disk+Release)", category: "Transmission", unitPrice: 85000 },
   { partNumber: "TRN-CLUTCH-DSK", name: "Clutch Disc", category: "Transmission", unitPrice: 35000 },
   { partNumber: "TRN-CLUTCH-PLT", name: "Clutch Pressure Plate", category: "Transmission", unitPrice: 40000 },
@@ -132,8 +95,6 @@ const PARTS: PartDef[] = [
   { partNumber: "TRN-MOUNT-001", name: "Transmission Mount", category: "Transmission", unitPrice: 9500 },
   { partNumber: "TRN-CV-AXLE-F", name: "Front CV Axle (each)", category: "Transmission", unitPrice: 45000 },
   { partNumber: "TRN-CV-BOOT-KIT", name: "CV Boot Kit", category: "Transmission", unitPrice: 5500 },
-
-  // Body & Exterior
   { partNumber: "BDY-WIPER-BLADE", name: "Wiper Blade (Pair)", category: "Body", unitPrice: 4500 },
   { partNumber: "BDY-WIPER-BEAM", name: "Beam Wiper Blade (Pair)", category: "Body", unitPrice: 7500 },
   { partNumber: "BDY-SIDE-MIRROR", name: "Side Mirror (each)", category: "Body", unitPrice: 15000 },
@@ -143,8 +104,6 @@ const PARTS: PartDef[] = [
   { partNumber: "BDY-GRILLE-001", name: "Grille Assembly", category: "Body", unitPrice: 12000 },
   { partNumber: "BDY-LOCK-ACT", name: "Door Lock Actuator", category: "Body", unitPrice: 9500 },
   { partNumber: "BDY-WIN-REG", name: "Window Regulator", category: "Body", unitPrice: 18000 },
-
-  // A/C & HVAC
   { partNumber: "AC-COMP-001", name: "A/C Compressor", category: "AC", unitPrice: 95000 },
   { partNumber: "AC-COND-001", name: "A/C Condenser", category: "AC", unitPrice: 45000 },
   { partNumber: "AC-EVAP-001", name: "A/C Evaporator", category: "AC", unitPrice: 38000 },
@@ -156,8 +115,6 @@ const PARTS: PartDef[] = [
   { partNumber: "AC-FAN-RES", name: "Blower Motor Resistor", category: "AC", unitPrice: 6500 },
   { partNumber: "AC-GAS-R134A", name: "Refrigerant R-134a (330g)", category: "AC", unitPrice: 5500 },
   { partNumber: "AC-GAS-1234YF", name: "Refrigerant 1234yf (330g)", category: "AC", unitPrice: 12000 },
-
-  // Belts
   { partNumber: "BELT-ALT-001", name: "Alternator Belt", category: "Belts", unitPrice: 3500 },
   { partNumber: "BELT-SERP-001", name: "Serpentine Belt", category: "Belts", unitPrice: 6500 },
   { partNumber: "BELT-SERP-002", name: "Serpentine Belt (Heavy Duty)", category: "Belts", unitPrice: 8500 },
@@ -165,8 +122,6 @@ const PARTS: PartDef[] = [
   { partNumber: "BELT-TIMING-TEN", name: "Timing Belt Tensioner", category: "Belts", unitPrice: 12000 },
   { partNumber: "BELT-TIMING-IDL", name: "Timing Belt Idler Pulley", category: "Belts", unitPrice: 8500 },
   { partNumber: "BELT-AC-001", name: "A/C Compressor Belt", category: "Belts", unitPrice: 3500 },
-
-  // Engine Parts
   { partNumber: "ENG-HEAD-GSKT", name: "Cylinder Head Gasket", category: "Engine", unitPrice: 12000 },
   { partNumber: "ENG-VALVE-IN", name: "Intake Valve (each)", category: "Engine", unitPrice: 4500 },
   { partNumber: "ENG-VALVE-EX", name: "Exhaust Valve (each)", category: "Engine", unitPrice: 5000 },
@@ -177,15 +132,11 @@ const PARTS: PartDef[] = [
   { partNumber: "ENG-CON-ROD-BRG", name: "Connecting Rod Bearing Set", category: "Engine", unitPrice: 12000 },
   { partNumber: "ENG-OIL-PAN", name: "Oil Pan", category: "Engine", unitPrice: 15000 },
   { partNumber: "ENG-VALVE-COVER", name: "Valve Cover Gasket", category: "Engine", unitPrice: 5500 },
-
-  // Exhaust
   { partNumber: "EXH-MUFF-001", name: "Muffler", category: "Exhaust", unitPrice: 28000 },
   { partNumber: "EXH-CAT-001", name: "Catalytic Converter", category: "Exhaust", unitPrice: 85000 },
   { partNumber: "EXH-O2-SENS", name: "Oxygen Sensor", category: "Exhaust", unitPrice: 18000 },
   { partNumber: "EXH-GASKET", name: "Exhaust Manifold Gasket", category: "Exhaust", unitPrice: 4500 },
   { partNumber: "EXH-HANG-KIT", name: "Exhaust Hanger Kit", category: "Exhaust", unitPrice: 3500 },
-
-  // Sensors
   { partNumber: "SNS-MAP-001", name: "MAP Sensor", category: "Sensors", unitPrice: 12000 },
   { partNumber: "SNS-MAF-001", name: "MAF Sensor", category: "Sensors", unitPrice: 25000 },
   { partNumber: "SNS-CKP-001", name: "Crankshaft Position Sensor", category: "Sensors", unitPrice: 8500 },
@@ -195,10 +146,7 @@ const PARTS: PartDef[] = [
   { partNumber: "SNS-PARK-001", name: "Parking Sensor (each)", category: "Sensors", unitPrice: 5500 },
 ];
 
-// ─── Seed Spare Parts ────────────────────────────────────────────────────────
-
-async function seedSpareParts() {
-  // Use createMany with skipDuplicates — single query, no pool exhaustion
+export default async function seedSpareParts(prisma: PrismaClient) {
   const BATCH_SIZE = 50;
   for (let i = 0; i < PARTS.length; i += BATCH_SIZE) {
     const batch = PARTS.slice(i, i + BATCH_SIZE);
@@ -219,138 +167,3 @@ async function seedSpareParts() {
   console.log(`✅ Seeded ${result.length} spare parts`);
   return result;
 }
-
-// ─── Seed Inventory Stock ────────────────────────────────────────────────────
-
-async function seedInventoryStock(branches: { id: string; name: string }[], parts: { id: string; category: string | null }[]) {
-  let count = 0;
-
-  for (const branch of branches) {
-    const isMain = branch.name.toLowerCase().includes("main");
-    const isAbuja = branch.name.toLowerCase().includes("abuja");
-    const stockChance = isMain ? 0.9 : isAbuja ? 0.60 : 0.45;
-
-    const ops: { branchId: string; partId: string; quantity: number; minimumStock: number; rackLocation: string; maximumStock: number }[] = [];
-
-    for (const p of parts) {
-      if (Math.random() > stockChance) continue;
-      const base = isMain ? rng(15, 60) : rng(5, 30);
-      ops.push({
-        branchId: branch.id,
-        partId: p.id,
-        quantity: base,
-        minimumStock: Math.max(3, Math.floor(base * 0.15)),
-        rackLocation: `Aisle ${rng(1, 6)} Rack ${rng(1, 12)}`,
-        maximumStock: base * 4,
-      });
-    }
-
-    const BATCH = 20;
-    let branchCount = 0;
-    for (let i = 0; i < ops.length; i += BATCH) {
-      const batch = ops.slice(i, i + BATCH);
-      await prisma.$transaction(
-        batch.map((o) =>
-          prisma.inventoryStock.upsert({
-            where: { branchId_partId: { branchId: o.branchId, partId: o.partId } },
-            update: {},
-            create: o,
-          }),
-        ),
-      );
-      branchCount += batch.length;
-      console.log(`  ⏳ ${branch.name}: ${branchCount}/${ops.length} stock records...`);
-      await sleep(500);
-    }
-    count += branchCount;
-  }
-  console.log(`✅ Seeded inventory stock for ${branches.length} branches (${count} records)`);
-}
-
-// ─── Seed Stock Transactions ─────────────────────────────────────────────────
-
-async function seedStockTransactions(branches: { id: string }[]) {
-  const types = ["RECEIVED", "ISSUED", "ADJUSTMENT"];
-  let count = 0;
-
-  for (const branch of branches) {
-    const stockRecords = await prisma.inventoryStock.findMany({
-      where: { branchId: branch.id },
-      take: 30,
-    });
-
-    for (const s of stockRecords) {
-      const txCount = 1;
-      const txs: { branchId: string; partId: string; type: string; quantity: number; notes: string }[] = [];
-
-      let runningQty = Math.max(1, s.quantity - rng(5, 15));
-      for (let i = 0; i < txCount; i++) {
-        const type = pick(types);
-        const qty =
-          type === "ISSUED" ? -rng(1, 5) : type === "RECEIVED" ? rng(5, 20) : rng(-3, 8);
-        runningQty += qty;
-        if (runningQty < 0) runningQty = 0;
-        txs.push({
-          branchId: branch.id,
-          partId: s.partId,
-          type,
-          quantity: qty,
-          notes: `Seed: ${type.toLowerCase().replace("_", " ")} via seeding`,
-        });
-      }
-
-      if (txs.length > 0) {
-        await prisma.stockTransaction.createMany({ data: txs, skipDuplicates: true });
-        count += txs.length;
-        await sleep(150);
-      }
-    }
-  }
-  console.log(`✅ Seeded ${count} stock transactions for history`);
-}
-
-// ─── Main ────────────────────────────────────────────────────────────────────
-
-async function main() {
-  console.log("📦 Starting inventory seeding...\n");
-
-  const branches = await prisma.branch.findMany();
-  if (branches.length === 0) {
-    console.log("❌ No branches found. Run the main seed first.");
-    process.exit(1);
-  }
-  console.log(`⏺ Using ${branches.length} existing branches: ${branches.map((b) => b.name).join(", ")}`);
-
-  console.log("\nSeeding spare parts...");
-  const parts = await seedSpareParts();
-
-  console.log("\nSeeding branch-level inventory stock...");
-  await seedInventoryStock(branches, parts);
-
-  console.log("\nSeeding historical stock transactions...");
-  await seedStockTransactions(branches);
-
-  // Summary per branch
-  console.log("\n── Stock Summary ──");
-  for (const branch of branches) {
-    const stockCount = await prisma.inventoryStock.count({
-      where: { branchId: branch.id },
-    });
-    const totalQty = await prisma.inventoryStock.aggregate({
-      where: { branchId: branch.id },
-      _sum: { quantity: true },
-    });
-    console.log(`  ${branch.name}: ${stockCount} part types, ${totalQty._sum.quantity ?? 0} total units`);
-  }
-
-  console.log("\n📦 Inventory seeding complete!");
-}
-
-main()
-  .catch((e) => {
-    console.error("❌ Inventory seeding failed:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });

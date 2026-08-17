@@ -58,23 +58,26 @@ export class ServiceService {
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
       notes: data.notes,
-      status: data.status,
+      status: data.status ?? 'Pending',
+      source: 'WalkIn',
     });
 
     const notificationService = new NotificationService();
-    const appointmentMessage = `${customer.firstName} ${customer.lastName} booked an appointment at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
-    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, branch.id, {
-      type: 'APPOINTMENT_BOOKED',
-      title: 'New appointment booked',
+    const appointmentMessage = `Walk-in: ${customer.firstName} ${customer.lastName} booked at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
+    const appointmentPayload = {
+      type: 'APPOINTMENT_CREATE',
+      title: 'New walk-in appointment',
       message: appointmentMessage,
       link: `/appointments/${appointment.id}`,
-    });
-    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branch.id, {
-      type: 'APPOINTMENT_BOOKED',
-      title: 'New appointment booked',
-      message: appointmentMessage,
-      link: `/appointments/${appointment.id}`,
-    });
+      branchId: branch.id,
+    };
+
+    await Promise.all([
+      notificationService.notifyRole(ROLES.RECEPTIONIST,      branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.ADMIN,             undefined,  appointmentPayload),
+      notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined,  appointmentPayload),
+    ]);
 
     return appointment;
   }
@@ -89,6 +92,7 @@ export class ServiceService {
     customerId?: string;
     dateFrom?: string;
     dateTo?: string;
+    source?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { appointments, total } = await this.serviceRepository.listAppointments({
@@ -101,6 +105,7 @@ export class ServiceService {
       customerId: params.customerId,
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
+      source: params.source,
     });
 
     return {

@@ -24,6 +24,7 @@ model Branch {
   customers      Customer[]
   jobCards       JobCard[]
   appointments   ServiceAppointment[]
+  enquiries      Enquiry[]
   inventoryStocks InventoryStock[]
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
@@ -68,6 +69,7 @@ model User {
   notifications Notification[]
   creditTransactions CustomerCreditTransaction[] @relation("UserCreditTransactions")
   creditRequests CustomerCreditApplication[] @relation("AdvisorCreditRequests")
+  reviewedEnquiries Enquiry[] @relation("EnquiryReviewedBy")
 }
 
 model Role {
@@ -213,10 +215,12 @@ model ServiceAppointment {
   durationMins  Int?
   notes         String?
   status        String    @default("Pending")
+  source        String    @default("WalkIn") // WalkIn | OnlineBooking
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   jobCards      JobCard[]
+  enquiry       Enquiry?
 
   @@index([serviceId])
 }
@@ -601,4 +605,32 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([branchId, readAt])
+}
+
+model Enquiry {
+  id              String    @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String
+  phoneNumber     String
+  vehicleMake     String?
+  vehicleModel    String?
+  vehicleYear     Int?
+  vehicleRegNumber String?
+  serviceDescription String
+  preferredDate   DateTime?
+  branchId        String
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  status          String    @default("Pending") // Pending | Approved | Rejected | Converted
+  appointmentId   String?   @unique
+  appointment     ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  reviewedById    String?
+  reviewedBy      User?     @relation("EnquiryReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes     String?
+  reviewedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([branchId, status])
+  @@index([email])
 }
