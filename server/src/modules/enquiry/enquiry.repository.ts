@@ -28,6 +28,7 @@ const ENQUIRY_SELECT = {
   serviceDescription: true,
   preferredDate: true,
   status: true,
+  appointmentId: true,
   reviewNotes: true,
   reviewedAt: true,
   createdAt: true,

@@ -21,7 +21,7 @@ export class ServiceRepository {
     source?: string;
   }): Promise<ServiceAppointment> {
     return prisma.serviceAppointment.create({
-      data,
+      data: { ...data, source: data.source ?? 'WalkIn' },
       include: {
         service: {
           select: {
@@ -47,6 +47,7 @@ export class ServiceRepository {
     customerId?: string;
     dateFrom?: string;
     dateTo?: string;
+    source?: string;
   }) {
     const where: Record<string, unknown> = {};
 
@@ -56,6 +57,10 @@ export class ServiceRepository {
 
     if (params.status) {
       where.status = params.status;
+    }
+
+    if (params.source) {
+      where.source = params.source;
     }
 
     if (params.createdById) {
@@ -122,6 +127,15 @@ export class ServiceRepository {
             },
           },
           jobCards: true,
+          enquiry: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              status: true,
+            },
+          },
         },
         orderBy: { scheduledAt: 'desc' },
       }),

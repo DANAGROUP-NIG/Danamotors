@@ -92,6 +92,7 @@ export class ServiceService {
     customerId?: string;
     dateFrom?: string;
     dateTo?: string;
+    source?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
     const { appointments, total } = await this.serviceRepository.listAppointments({
@@ -104,6 +105,7 @@ export class ServiceService {
       customerId: params.customerId,
       dateFrom: params.dateFrom,
       dateTo: params.dateTo,
+      source: params.source,
     });
 
     return {
