@@ -1,193 +1,171 @@
 import prisma from '../../prisma/client';
-import { EnquiryRepository } from './enquiry.repository';
+import { EnquiryRepository, CreateEnquiryData } from './enquiry.repository';
 import { NotificationService } from '../notification/notification.service';
-import { NotFoundError, ConflictError } from '../../shared/errors/appError';
+import { ServiceRepository } from '../service/service.repository';
+import { NotFoundError, BadRequestError, ConflictError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
 
 export class EnquiryService {
-  private enquiryRepository: EnquiryRepository;
+  private enquiryRepo = new EnquiryRepository();
+  private notificationService = new NotificationService();
+  private serviceRepo = new ServiceRepository();
 
-  constructor() {
-    this.enquiryRepository = new EnquiryRepository();
-  }
-
-  async createEnquiry(data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    vehicleMake?: string;
-    vehicleModel?: string;
-    vehicleYear?: number;
-    vehicleRegNumber?: string;
-    serviceDescription: string;
-    preferredDate?: string;
-    branchId: string;
-  }) {
-    const branch = await prisma.branch.findUnique({ where: { id: data.branchId } });
-    if (!branch) throw new NotFoundError('Branch not found');
-
-    const enquiry = await this.enquiryRepository.create({
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      phoneNumber: data.phoneNumber,
-      vehicleMake: data.vehicleMake,
-      vehicleModel: data.vehicleModel,
-      vehicleYear: data.vehicleYear,
-      vehicleRegNumber: data.vehicleRegNumber,
-      serviceDescription: data.serviceDescription,
-      preferredDate: data.preferredDate ? new Date(data.preferredDate) : undefined,
-      branchId: data.branchId,
+  async createEnquiry(data: CreateEnquiryData) {
+    const branch = await prisma.branch.findFirst({
+      where: { id: data.branchId, isActive: true },
     });
+    if (!branch) throw new NotFoundError('Branch not found or inactive');
 
-    // Notify Customer Care staff about new enquiry
-    const notificationService = new NotificationService();
-    const notificationPayload = {
+    const enquiry = await this.enquiryRepo.create(data);
+
+    const payload = {
       type: 'APPOINTMENT_CREATE',
-      title: 'New online enquiry',
-      message: `${data.firstName} ${data.lastName} submitted a new service enquiry for ${branch.name}.`,
-      link: `/appointments`,
+      title: 'New online booking enquiry',
+      message: `${data.firstName} ${data.lastName} submitted a service enquiry at ${branch.name}.`,
+      link: `/appointments?tab=enquiries`,
+      branchId: branch.id,
     };
 
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, branch.id, notificationPayload);
-    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, notificationPayload);
-    await notificationService.notifyRole(ROLES.ADMIN, branch.id, notificationPayload);
-    await notificationService.notifyRole(ROLES.SUPER_ADMIN, undefined, notificationPayload);
+    await Promise.all([
+      this.notificationService.notifyRole(ROLES.RECEPTIONIST,       branch.id, payload),
+      this.notificationService.notifyRole(ROLES.RECEPTION_MANAGER,  branch.id, payload),
+      this.notificationService.notifyRole(ROLES.ADMIN,              undefined,  payload),
+      this.notificationService.notifyRole(ROLES.SUPER_ADMIN,        undefined,  payload),
+    ]);
 
-    return enquiry;
-  }
-
-  async getEnquiry(id: string) {
-    const enquiry = await this.enquiryRepository.findById(id);
-    if (!enquiry) throw new NotFoundError('Enquiry not found');
     return enquiry;
   }
 
   async listEnquiries(params: {
     page: number;
     limit: number;
-    status?: string;
     branchId?: string;
+    status?: string;
     search?: string;
     dateFrom?: string;
     dateTo?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
-    const { enquiries, total } = await this.enquiryRepository.list({
-      skip,
-      take: params.limit,
-      status: params.status,
-      branchId: params.branchId,
-      search: params.search,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-    });
-
+    const { enquiries, total } = await this.enquiryRepo.list({ skip, take: params.limit, ...params });
     return {
       enquiries,
-      meta: {
-        total,
-        page: params.page,
-        limit: params.limit,
-        totalPages: Math.ceil(total / params.limit),
-      },
+      meta: { total, page: params.page, limit: params.limit, totalPages: Math.ceil(total / params.limit) },
     };
   }
 
-  async approveEnquiry(id: string, reviewerId: string, data: {
-    reviewNotes?: string;
-    customerId: string;
-    vehicleId: string;
-    scheduledAt: string;
-    serviceId?: string;
-    durationMins?: number;
-    notes?: string;
-  }) {
-    const enquiry = await this.enquiryRepository.findById(id);
+  async getEnquiry(id: string) {
+    const enquiry = await this.enquiryRepo.findById(id);
     if (!enquiry) throw new NotFoundError('Enquiry not found');
+    return enquiry;
+  }
 
+  async reviewEnquiry(
+    id: string,
+    reviewedById: string,
+    data: {
+      action: 'approve' | 'reject';
+      reviewNotes?: string;
+      customerId?:   string;
+      vehicleId?:    string;
+      scheduledAt?:  string;
+      serviceId?:    string;
+      durationMins?: number;
+      notes?:        string;
+    },
+  ) {
+    const enquiry = await this.enquiryRepo.findById(id);
+    if (!enquiry) throw new NotFoundError('Enquiry not found');
     if (enquiry.status !== 'Pending') {
-      throw new ConflictError(`Enquiry has already been ${enquiry.status.toLowerCase()}`);
+      throw new ConflictError(`Enquiry is already ${enquiry.status}. Only Pending enquiries can be reviewed.`);
     }
 
-    // Validate customer and vehicle exist
+    if (data.action === 'reject') {
+      const updated = await this.enquiryRepo.update(id, {
+        status: 'Rejected',
+        reviewedBy: { connect: { id: reviewedById } },
+        reviewNotes: data.reviewNotes,
+        reviewedAt:  new Date(),
+      });
+
+      await this.notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branch.id, {
+        type: 'APPOINTMENT_REJECTED',
+        title: 'Enquiry rejected',
+        message: `The enquiry from ${enquiry.firstName} ${enquiry.lastName} has been rejected.`,
+        link: `/appointments?tab=enquiries`,
+        branchId: enquiry.branch.id,
+      });
+
+      return { enquiry: updated, appointment: null };
+    }
+
+    // ── Approve: validate linked records, create ServiceAppointment ──────────
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-    if (!customer) throw new NotFoundError('Customer not found');
+    if (!customer) throw new NotFoundError('Customer not found — please create the customer record first.');
 
     const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-    if (!vehicle) throw new NotFoundError('Vehicle not found');
+    if (!vehicle) throw new NotFoundError('Vehicle not found — please create the vehicle record first.');
 
-    if (data.serviceId) {
-      const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
-      if (!service) throw new NotFoundError('Service not found');
+    if (vehicle.customerId !== customer.id) {
+      throw new BadRequestError('The selected vehicle does not belong to the selected customer.');
     }
 
-    // Create a ServiceAppointment for the approved enquiry
-    const appointment = await prisma.serviceAppointment.create({
-      data: {
-        customerId: data.customerId,
-        vehicleId: data.vehicleId,
-        branchId: enquiry.branchId,
-        serviceId: data.serviceId,
-        scheduledAt: new Date(data.scheduledAt),
-        durationMins: data.durationMins,
-        notes: data.notes || `Approved from enquiry: ${enquiry.serviceDescription}`,
-        status: 'Pending',
-        source: 'OnlineBooking',
+    // Check no active appointment exists for this customer/vehicle pair
+    const activeAppt = await prisma.serviceAppointment.findFirst({
+      where: {
+        customerId: customer.id,
+        vehicleId:  vehicle.id,
+        status: { notIn: ['Closed', 'Cancelled', 'Completed'] },
       },
-      select: { id: true },
+    });
+    if (activeAppt) {
+      throw new ConflictError(
+        `This customer's vehicle already has an active appointment (${activeAppt.status}).`,
+      );
+    }
+
+    const appointment = await this.serviceRepo.createAppointment({
+      customerId:   customer.id,
+      vehicleId:    vehicle.id,
+      branchId:     enquiry.branch.id,
+      serviceId:    data.serviceId,
+      createdById:  reviewedById,
+      scheduledAt:  new Date(data.scheduledAt!),
+      durationMins: data.durationMins,
+      notes:        data.notes ?? enquiry.serviceDescription,
+      status:       'Pending',
+      source:       'OnlineBooking',
     });
 
-    // Update enquiry status
-    const updated = await this.enquiryRepository.updateStatus(id, {
-      status: 'Approved',
-      reviewedById: reviewerId,
-      reviewNotes: data.reviewNotes,
-      reviewedAt: new Date(),
-      appointmentId: appointment.id,
+    const updatedEnquiry = await this.enquiryRepo.update(id, {
+      status:       'Approved',
+      reviewedBy:   { connect: { id: reviewedById } },
+      reviewNotes:  data.reviewNotes,
+      reviewedAt:   new Date(),
+      appointment:   { connect: { id: appointment.id } },
     });
 
-    // Notify Customer Care staff about the approval
-    const notificationService = new NotificationService();
-    const approvalPayload = {
+    const approvedPayload = {
       type: 'APPOINTMENT_APPROVED',
-      title: 'Enquiry approved',
-      message: `Enquiry from ${enquiry.firstName} ${enquiry.lastName} has been approved and converted to an appointment.`,
+      title: 'Enquiry approved & appointment created',
+      message: `${enquiry.firstName} ${enquiry.lastName}'s enquiry has been approved. Appointment scheduled for ${new Date(appointment.scheduledAt).toLocaleString()}.`,
       link: `/appointments/${appointment.id}`,
+      branchId: enquiry.branch.id,
     };
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, approvalPayload);
-    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branchId, approvalPayload);
 
-    return updated;
+    await Promise.all([
+      this.notificationService.notifyRole(ROLES.RECEPTIONIST,      enquiry.branch.id, approvedPayload),
+      this.notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branch.id, approvedPayload),
+    ]);
+
+    return { enquiry: updatedEnquiry, appointment };
   }
 
-  async rejectEnquiry(id: string, reviewerId: string, reviewNotes?: string) {
-    const enquiry = await this.enquiryRepository.findById(id);
+  async deleteEnquiry(id: string) {
+    const enquiry = await this.enquiryRepo.findById(id);
     if (!enquiry) throw new NotFoundError('Enquiry not found');
-
-    if (enquiry.status !== 'Pending') {
-      throw new ConflictError(`Enquiry has already been ${enquiry.status.toLowerCase()}`);
+    if (enquiry.status === 'Approved') {
+      throw new ConflictError('Cannot delete an approved enquiry. Reject it first.');
     }
-
-    const updated = await this.enquiryRepository.updateStatus(id, {
-      status: 'Rejected',
-      reviewedById: reviewerId,
-      reviewNotes,
-      reviewedAt: new Date(),
-    });
-
-    // Notify Customer Care staff about the rejection
-    const notificationService = new NotificationService();
-    const rejectionPayload = {
-      type: 'APPOINTMENT_REJECTED',
-      title: 'Enquiry rejected',
-      message: `Enquiry from ${enquiry.firstName} ${enquiry.lastName} has been rejected.${reviewNotes ? ` Reason: ${reviewNotes}` : ''}`,
-      link: `/appointments`,
-    };
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, enquiry.branchId, rejectionPayload);
-    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branchId, rejectionPayload);
-
-    return updated;
+    await this.enquiryRepo.delete(id);
   }
 }

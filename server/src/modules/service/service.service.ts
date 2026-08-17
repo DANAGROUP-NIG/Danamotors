@@ -20,7 +20,6 @@ export class ServiceService {
     durationMins?: number;
     notes?: string;
     status?: string;
-    source?: string;
     createdById?: string;
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
@@ -59,24 +58,26 @@ export class ServiceService {
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
       notes: data.notes,
-      status: data.status,
-      source: data.source,
+      status: data.status ?? 'Pending',
+      source: 'WalkIn',
     });
 
     const notificationService = new NotificationService();
-    const appointmentMessage = `${customer.firstName} ${customer.lastName} booked an appointment at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
+    const appointmentMessage = `Walk-in: ${customer.firstName} ${customer.lastName} booked at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
     const appointmentPayload = {
-      type: 'APPOINTMENT_BOOKED',
-      title: 'New appointment booked',
+      type: 'APPOINTMENT_CREATE',
+      title: 'New walk-in appointment',
       message: appointmentMessage,
       link: `/appointments/${appointment.id}`,
+      branchId: branch.id,
     };
-    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, branch.id, appointmentPayload);
-    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branch.id, appointmentPayload);
-    await notificationService.notifyRole(ROLES.RECEPTIONIST, branch.id, appointmentPayload);
-    await notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, appointmentPayload);
-    await notificationService.notifyRole(ROLES.ADMIN, branch.id, appointmentPayload);
-    await notificationService.notifyRole(ROLES.SUPER_ADMIN, undefined, appointmentPayload);
+
+    await Promise.all([
+      notificationService.notifyRole(ROLES.RECEPTIONIST,      branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.ADMIN,             undefined,  appointmentPayload),
+      notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined,  appointmentPayload),
+    ]);
 
     return appointment;
   }
