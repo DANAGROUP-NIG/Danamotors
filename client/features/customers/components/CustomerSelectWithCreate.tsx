@@ -21,7 +21,7 @@ import type { Customer } from "@/features/customers/types/customer.types";
 
 interface CustomerSelectWithCreateProps {
   value?: string;
-  onChange: (customerId: string) => void;
+  onChange: (customerId: string, customerName?: string) => void;
   error?: string;
   branchId?: string;
   disabled?: boolean;
