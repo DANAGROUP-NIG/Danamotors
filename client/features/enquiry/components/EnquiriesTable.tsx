@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,12 +9,11 @@ import { DataTable, type Column } from '@/components/ui/table-components/DataTab
 import { DataTableToolbar } from '@/components/ui/table-components/DataTableToolbar';
 import { DataTableFilterChips } from '@/components/ui/table-components/DataTableFilterChips';
 import { DateInput } from '@/components/forms/DateInput';
-import ModalFame from '@/components/modals/ModalFame';
+// Modal removed: navigate to a dedicated enquiry page instead
 import { useBranchStore } from '@/store/branch.store';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { ENQUIRY_REVIEW_ROLES } from '@/features/auth/roles';
 import { useEnquiries } from '../hooks/use-enquires';
-import { EnquiryReviewModal } from './EnquiryReviewModal';
 import type { Enquiry, EnquiryStatus } from '../types/enquiry.types';
 
 const PAGE_SIZE = 10;
@@ -47,7 +47,7 @@ export function EnquiriesTable() {
   const [statusFilter, setStatusFilter] = useState('Pending');  // default to Pending
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasAccess } = useAuth();
@@ -67,7 +67,7 @@ export function EnquiriesTable() {
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const reviewingEnquiry = data?.enquiries?.find((e) => e.id === reviewingId) ?? null;
+  // no local review modal — navigating to detail page
 
   function commitSearch() { setDebouncedSearch(search); setPage(1); }
   function clearSearch()  { setSearch(''); setDebouncedSearch(''); setPage(1); }
@@ -144,7 +144,7 @@ export function EnquiriesTable() {
             size="sm"
             variant="ghost"
             className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setReviewingId(e.id)}
+            onClick={() => router.push(`/enquiries/${e.id}`)}
           >
             <Eye className="size-3.5" />
             {canReview && e.status === 'open' ? 'Review' : 'View'}
@@ -177,7 +177,7 @@ export function EnquiriesTable() {
             : `No ${statusFilter.toLowerCase()} enquiries found.`
         }
         rowKey={(e) => e.id}
-        onRowClick={(e) => setReviewingId(e.id)}
+        onRowClick={(e) => router.push(`/enquiries/${e.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}
@@ -203,19 +203,7 @@ export function EnquiriesTable() {
         />
       </DataTable>
 
-      {/* Review Modal / Side-sheet */}
-      <ModalFame
-        isOpen={!!reviewingId}
-        onClose={() => setReviewingId(null)}
-        title={reviewingEnquiry ? `Enquiry — ${reviewingEnquiry.firstName} ${reviewingEnquiry.lastName}` : 'Enquiry Details'}
-      >
-        {reviewingEnquiry && (
-          <EnquiryReviewModal
-            enquiry={reviewingEnquiry}
-            onClose={() => setReviewingId(null)}
-          />
-        )}
-      </ModalFame>
+      {/* Navigation to the enquiry detail page replaces the modal */}
     </>
   );
 }
