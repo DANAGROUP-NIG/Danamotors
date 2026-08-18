@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from 'bcryptjs';
 import prisma from "../../prisma/client";
 import { PortalRepository, JobCardWithRelations } from "./portal.repository";
 import { NotFoundError, BadRequestError, UnauthorizedError } from "../../shared/errors/appError";
