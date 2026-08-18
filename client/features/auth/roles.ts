@@ -167,3 +167,28 @@ export const TRANSFER_ROLES: AppRole[] = [
   "generalstoremanager",
   "branchstoremanager",
 ];
+
+
+// Roles that can see and act on the Enquiry triage queue
+export const ENQUIRY_READ_ROLES: AppRole[] = [
+  'superadmin',
+  'admin',
+  'receptionist',
+  'receptionmanager',
+];
+
+// Roles that can approve/reject enquiries (service:update)
+export const ENQUIRY_REVIEW_ROLES: AppRole[] = [
+  'superadmin',
+  'admin',
+  'receptionmanager',
+];
+
+// Roles that can create walk-in appointments (service:create)
+export const APPOINTMENT_CREATE_ROLES: AppRole[] = [
+  'superadmin',
+  'admin',
+  'receptionist',
+  'receptionmanager',
+  'serviceadviser',
+];

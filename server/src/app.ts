@@ -41,7 +41,11 @@ app.use('/api', routes);
 
 // ── Handle 404/Not Found Routes ─────────────────────────────────────────────
 app.use((req, _res, next) => {
-  next(new NotFoundError(`Cannot find ${req.method} ${req.originalUrl} on this server`));
+  next(
+    new NotFoundError(
+      `Cannot find ${req.method} ${req.originalUrl} on this server`,
+    ),
+  );
 });
 
 // ── Global Error Handler ─────────────────────────────────────────────────────
