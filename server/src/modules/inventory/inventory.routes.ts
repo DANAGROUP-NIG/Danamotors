@@ -28,6 +28,452 @@ const controller = new InventoryController();
 
 router.use(authMiddleware);
 
+/**
+ * @openapi
+ * /inventory/parts:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List all spare parts
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by part number or name
+ *     responses:
+ *       200:
+ *         description: Paginated spare parts list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         parts:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/SparePartDTO'
+ *                         meta:
+ *                           $ref: '#/components/schemas/PaginationMeta'
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Create a spare part
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [partNumber, name, unitPrice]
+ *             properties:
+ *               partNumber: { type: string, example: TYT-OIL-5W30 }
+ *               name: { type: string, example: Toyota 5W-30 Engine Oil (4L) }
+ *               description: { type: string }
+ *               unitPrice: { type: number, example: 4500 }
+ *               unit: { type: string, example: Litre }
+ *               categoryId: { type: string }
+ *     responses:
+ *       201:
+ *         description: Spare part created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/SparePartDTO'
+ *
+ * /inventory/parts/{id}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get spare part by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Spare part details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/SparePartDTO'
+ *   put:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Update spare part
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               unitPrice: { type: number }
+ *               unit: { type: string }
+ *     responses:
+ *       200:
+ *         description: Part updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   delete:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Delete spare part
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Part deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/stock:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List stock across all branches
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Stock overview
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/stock/adjust:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Adjust stock quantity
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [branchId, partId, adjustment, reason]
+ *             properties:
+ *               branchId: { type: string }
+ *               partId: { type: string }
+ *               adjustment: { type: integer, description: Positive to add, negative to deduct }
+ *               reason: { type: string, example: Physical count correction }
+ *     responses:
+ *       200:
+ *         description: Stock adjusted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/stock/{branchId}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List stock for a specific branch
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Branch stock
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transactions:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List all stock transactions
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [ISSUANCE, RETURN, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT] }
+ *     responses:
+ *       200:
+ *         description: Stock transactions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/purchase-requests:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Create a purchase request
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [items]
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     partId: { type: string }
+ *                     quantity: { type: integer }
+ *                     unitPrice: { type: number }
+ *               notes: { type: string }
+ *     responses:
+ *       201:
+ *         description: Purchase request created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List purchase requests
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Purchase request list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/purchase-requests/{id}/status:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Update purchase request status
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status: { type: string, enum: [APPROVED, REJECTED, ORDERED, RECEIVED] }
+ *     responses:
+ *       200:
+ *         description: Status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/issuances:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Issue parts for a job card
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobCardId, partId, quantity]
+ *             properties:
+ *               jobCardId: { type: string }
+ *               partId: { type: string }
+ *               quantity: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Parts issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List part issuances
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Issuance list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Create inter-branch stock transfer
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sourceBranchId, destinationBranchId, items]
+ *             properties:
+ *               sourceBranchId: { type: string }
+ *               destinationBranchId: { type: string }
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     partId: { type: string }
+ *                     quantity: { type: integer }
+ *               notes: { type: string }
+ *     responses:
+ *       201:
+ *         description: Transfer created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List stock transfers
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Transfer list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}/approve:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Approve a stock transfer
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Transfer approved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}/dispatch:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Mark transfer as dispatched
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Transfer dispatched
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}/receive:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Confirm transfer receipt
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Transfer received — stock updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ */
 // Spare Parts
 router.get('/parts', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listSpareParts);
 router.get('/parts/:id', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(partIdParamSchema), controller.getSparePart);
@@ -71,3 +517,4 @@ router.patch('/transfers/:id/reject', requirePermission(PERMISSIONS.TRANSFER_APP
 router.patch('/transfers/:id/cancel', requirePermission(PERMISSIONS.TRANSFER_UPDATE), validateRequest(transferIdParamSchema), controller.cancelTransfer);
 
 export default router;
+
