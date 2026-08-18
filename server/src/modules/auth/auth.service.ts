@@ -330,7 +330,8 @@ export class AuthService {
     // ── Customer refresh ───────────────────────────────────────────────────
     if (decoded.type === "customer") {
       const tokenHash = hashToken(token);
-      const dbToken = await this.authRepository.findCustomerRefreshToken(tokenHash);
+      const dbToken =
+        await this.authRepository.findCustomerRefreshToken(tokenHash);
       if (!dbToken || dbToken.expiresAt < new Date()) {
         if (dbToken) {
           await this.authRepository.deleteCustomerRefreshToken(tokenHash);
@@ -386,7 +387,8 @@ export class AuthService {
   async logout(token: string): Promise<void> {
     const tokenHash = hashToken(token);
 
-    const customerToken = await this.authRepository.findCustomerRefreshToken(tokenHash);
+    const customerToken =
+      await this.authRepository.findCustomerRefreshToken(tokenHash);
     if (customerToken) {
       await this.authRepository.deleteCustomerRefreshToken(tokenHash);
       return;
@@ -495,19 +497,22 @@ export class AuthService {
   }
 
   // update my profile (customer)
-  async updateMeCustomer(customerId: string, data: {
-    firstName?: string;
-    lastName?: string;
-    phoneNumber?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    postalCode?: string;
-    country?: string;
-    preferredContactMethod?: string;
-    currentPassword?: string;
-    newPassword?: string;
-  }) {
+  async updateMeCustomer(
+    customerId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+      preferredContactMethod?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    },
+  ) {
     const customer = await this.authRepository.findCustomerById(customerId);
     if (!customer) {
       throw new UnauthorizedError("Customer session not found");
@@ -588,7 +593,9 @@ export class AuthService {
         userId: user.id,
       });
 
-      const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
+      const baseUrl =
+        (process.env.CLIENT_URL as string | undefined) ??
+        "http://localhost:3000";
       return { resetLink: `${baseUrl}/reset-password?token=${token}` };
     }
 
@@ -604,7 +611,9 @@ export class AuthService {
         },
       });
 
-      const baseUrl = (process.env.CLIENT_URL as string | undefined) ?? "http://localhost:3000";
+      const baseUrl =
+        (process.env.CLIENT_URL as string | undefined) ??
+        "http://localhost:3000";
       return { resetLink: `${baseUrl}/reset-password?token=${token}` };
     }
 
@@ -619,7 +628,11 @@ export class AuthService {
 
     // Staff user reset.
     const record = await this.authRepository.findByResetTokenHash(tokenHash);
-    if (record && record.resetTokenExpiry && record.resetTokenExpiry >= new Date()) {
+    if (
+      record &&
+      record.resetTokenExpiry &&
+      record.resetTokenExpiry >= new Date()
+    ) {
       await prisma.user.update({
         where: { id: record.id },
         data: {
@@ -638,7 +651,8 @@ export class AuthService {
     }
 
     // Customer account reset.
-    const customerRecord = await this.authRepository.findCustomerByResetTokenHash(tokenHash);
+    const customerRecord =
+      await this.authRepository.findCustomerByResetTokenHash(tokenHash);
     if (
       !customerRecord ||
       !customerRecord.resetTokenExpiry ||
@@ -677,13 +691,16 @@ export class AuthService {
   }
 
   // update my profile
-  async updateMe(userId: string, data: {
-    firstName?: string;
-    lastName?: string;
-    phoneNumber?: string;
-    currentPassword?: string;
-    newPassword?: string;
-  }) {
+  async updateMe(
+    userId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    },
+  ) {
     const user = await this.authRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedError("User session not found");
