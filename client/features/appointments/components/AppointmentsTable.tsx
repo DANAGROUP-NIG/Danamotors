@@ -23,11 +23,11 @@ const PAGE_SIZE = 10;
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   Pending: "Pending",
-  CheckedIn: "Checked In",
+  "Checked In": "Checked In",
   Inspection: "Inspection",
-  AwaitingApproval: "Awaiting Approval",
-  InRepair: "In Repair",
-  QualityCheck: "Quality Check",
+  "Awaiting Approval": "Awaiting Approval",
+  "In Repair": "In Repair",
+  "Quality Check": "Quality Check",
   Ready: "Ready",
   Completed: "Completed",
   Cancelled: "Cancelled",
@@ -35,11 +35,11 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
   Pending: "bg-slate-100 text-slate-700",
-  CheckedIn: "bg-sky-50 text-sky-700",
+  "Checked In": "bg-sky-50 text-sky-700",
   Inspection: "bg-violet-50 text-violet-700",
-  AwaitingApproval: "bg-amber-50 text-amber-700",
-  InRepair: "bg-orange-50 text-orange-700",
-  QualityCheck: "bg-indigo-50 text-indigo-700",
+  "Awaiting Approval": "bg-amber-50 text-amber-700",
+  "In Repair": "bg-orange-50 text-orange-700",
+  "Quality Check": "bg-indigo-50 text-indigo-700",
   Ready: "bg-emerald-50 text-emerald-700",
   Completed: "bg-green-50 text-green-700",
   Cancelled: "bg-red-50 text-red-600",

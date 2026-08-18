@@ -1,10 +1,10 @@
 export type AppointmentStatus =
   | "Pending"
-  | "CheckedIn"
+  | "Checked In"
   | "Inspection"
-  | "AwaitingApproval"
-  | "InRepair"
-  | "QualityCheck"
+  | "Awaiting Approval"
+  | "In Repair"
+  | "Quality Check"
   | "Ready"
   | "Completed"
   | "Cancelled";
