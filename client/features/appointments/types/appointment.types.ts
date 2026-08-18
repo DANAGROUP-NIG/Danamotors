@@ -18,6 +18,7 @@ export type Appointment = {
   scheduledAt: string;
   durationMins?: number;
   notes?: string;
+  source: AppointmentSource;
   status: AppointmentStatus;
   createdById?: string;
   createdAt: string;

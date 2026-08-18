@@ -39,7 +39,7 @@ export async function reviewEnquiryRequest(
   payload: ReviewEnquiryPayload,
 ): Promise<ReviewEnquiryResponse> {
   return apiPatch<ReviewEnquiryResponse, ReviewEnquiryPayload>(
-    `${API_ROUTES.enquiries.base}/${id}/review`,
+    API_ROUTES.enquiries.review(id),
     payload,
   );
 }
