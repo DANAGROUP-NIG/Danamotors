@@ -9,6 +9,9 @@ export type AppointmentStatus =
   | "Completed"
   | "Cancelled";
 
+
+  export type AppointmentSource = 'WalkIn' | 'OnlineBooking';
+
 export type Appointment = {
   id: string;
   customerId: string;
