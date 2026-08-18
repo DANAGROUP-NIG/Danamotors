@@ -118,6 +118,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
         name: 'Credit',
         description: 'Customer credit accounts, limits, applications, and aging analysis.',
       },
+      {
+        name: 'Enquiries',
+        description: 'Online enquiry submission (public), staff review/approve/reject workflow, and enquiry management.',
+      },
     ],
     components: {
       securitySchemes: {
