@@ -339,11 +339,12 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
   },
   apis: [
     // Scan route files and the central routes index for @openapi JSDoc blocks
-    path.join(__dirname, '../routes/index.ts'),
-    path.join(__dirname, '../modules/**/*.routes.ts'),
+    // Normalize paths to use forward slashes so glob matching works on Windows.
+    path.resolve(__dirname, '../routes/index.ts').replace(/\\/g, '/'),
+    path.resolve(__dirname, '../modules/**/*.routes.ts').replace(/\\/g, '/'),
     // Also scan compiled .js equivalents when running from dist/
-    path.join(__dirname, '../routes/index.js'),
-    path.join(__dirname, '../modules/**/*.routes.js'),
+    path.resolve(__dirname, '../routes/index.js').replace(/\\/g, '/'),
+    path.resolve(__dirname, '../modules/**/*.routes.js').replace(/\\/g, '/'),
   ],
 };
 
