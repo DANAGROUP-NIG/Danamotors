@@ -16,6 +16,9 @@ export const API_ROUTES = {
     detail: (id: string) => `/customers/${id}`,
     account: (id: string) => `/customers/${id}/account`,
   },
+  enquiries: {
+  base: '/enquiries',
+},
   portal: {
     me: "/portal/me",
     changePassword: "/portal/me/password",
