@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { AdminRepository } from './admin.repository';
 import { BadRequestError, NotFoundError, ConflictError } from '../../shared/errors/appError';
 
