@@ -8,7 +8,9 @@ import { type AppRole } from "./features/auth/roles";
 
 export interface NavItem {
   label: string;
-  href: string;
+  href?: string;
+  /** Optional children for nested menus */
+  children?: NavItem[];
   icon: LucideIcon;
   badge?: number;
   roles?: AppRole[];

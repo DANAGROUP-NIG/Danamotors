@@ -74,6 +74,8 @@ export default function SideNav({
 
   // Desktop collapsed state — persisted
   const [collapsed, setCollapsed] = useState(false);
+  // Tracks expanded state for nav items with children
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   // Sync from localStorage after hydration to avoid SSR mismatch
   useEffect(() => {
@@ -271,13 +273,22 @@ export default function SideNav({
                         collapsed && "items-center",
                       )}
                     >
-                      {visibleItems.map(({ label, href, icon: Icon, badge }) => {
-                        const active = isItemActive(href, pathname);
+                      {visibleItems.map((item) => {
+                        const { label, href, icon: Icon, badge, children } = item as any;
                         const isLogout = href === "/logout";
+                        const active = href ? isItemActive(href, pathname) : false;
+                        const hasChildren = Array.isArray(children) && children.length > 0;
+
+                        // helper: check if any child is active
+                        const isAnyChildActive = hasChildren
+                          ? children.some((c: any) => isItemActive(c.href, pathname))
+                          : false;
 
                         if (collapsed) {
+                          const key = label;
+                          const targetHref = href ?? (hasChildren ? children?.[0]?.href : undefined);
                           return (
-                            <NavTootip key={href} label={label}>
+                            <NavTootip key={key} label={label}>
                               {isLogout ? (
                                 <button
                                   onClick={() => logout.mutate()}
@@ -289,7 +300,7 @@ export default function SideNav({
                                 </button>
                               ) : (
                                 <Link
-                                  href={href}
+                                  href={targetHref ?? '#'}
                                   onClick={() => setSidebarOpen(false)}
                                   aria-current={active ? "page" : undefined}
                                   aria-label={label}
@@ -331,10 +342,53 @@ export default function SideNav({
                           );
                         }
 
+                        if (hasChildren) {
+                          const expanded = isAnyChildActive || !!openGroups[label];
+                          return (
+                            <div key={label} className="w-full">
+                              <button
+                                onClick={() => setOpenGroups((s) => ({ ...s, [label]: !s[label] }))}
+                                className={cn(
+                                  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                                  expanded
+                                    ? "bg-white/15 text-white"
+                                    : "text-white/70 hover:bg-white/10 hover:text-white",
+                                )}
+                              >
+                                <Icon className="size-[17px] shrink-0" />
+                                <span className="flex-1 truncate text-left">{label}</span>
+                                <ChevronRight className={cn("size-4 transition-transform", expanded && "rotate-90")} />
+                              </button>
+
+                              {expanded && (
+                                <div className="mt-1 ml-8 flex flex-col gap-1">
+                                  {children.map((c: any) => (
+                                    <Link
+                                      key={c.href}
+                                      href={c.href}
+                                      onClick={() => setSidebarOpen(false)}
+                                      aria-current={isItemActive(c.href, pathname) ? "page" : undefined}
+                                      className={cn(
+                                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                                        isItemActive(c.href, pathname)
+                                          ? "bg-white/15 text-white"
+                                          : "text-white/70 hover:bg-white/10 hover:text-white",
+                                      )}
+                                    >
+                                      <c.icon className="size-[14px] shrink-0" />
+                                      <span className="flex-1 truncate">{c.label}</span>
+                                    </Link>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         return (
                           <Link
                             key={href}
-                            href={href}
+                            href={href!}
                             onClick={() => setSidebarOpen(false)}
                             aria-current={active ? "page" : undefined}
                             className={cn(

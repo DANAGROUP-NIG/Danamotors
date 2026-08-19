@@ -36,6 +36,7 @@ import {
   TRANSFER_ROLES,
   USER_ROLES,
   SERVICES_MANAGE_ROLES,
+  ENQUIRY_READ_ROLES,
   type AppRole,
 } from "@/features/auth/roles";
 
@@ -62,9 +63,12 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Appointments",
-        href: "/appointments",
         icon: CalendarDays,
         roles: CUSTOMER_ROLES,
+        items: [
+          { label: "All Appointments", href: "/appointments", icon: CalendarDays, roles: CUSTOMER_ROLES },
+          { label: "Triage Queue", href: "/enquiries", icon: ClipboardList, roles: ENQUIRY_READ_ROLES },
+        ],
       },
       {
         label: "Users",
