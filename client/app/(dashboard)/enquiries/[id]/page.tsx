@@ -106,7 +106,7 @@ export default function EnquiryPage() {
             onSuccess={() => setShowCreate(false)}
             initialValues={{
               customerId: '',
-              vehicleId: '',
+              vehicleId: enquiry.vehicleRegNumber ?? '',
               branchName: enquiry.branch?.name ?? '',
               scheduledAt: enquiry.preferredDate ? new Date(enquiry.preferredDate).toISOString() : undefined,
               notes: enquiry.serviceDescription ?? undefined,
