@@ -8,7 +8,7 @@ export function useCreateEnquiry() {
   return useMutation<CreateEnquiryResponse, Error, CreateEnquiryPayload>({
     mutationFn: createEnquiryRequest,
     onError: (error) => {
-      // Surface the server's validation message if available
+      
       let message = 'Something went wrong. Please try again.';
       if (axios.isAxiosError(error)) {
         message = error.response?.data?.message ?? message;
@@ -18,6 +18,6 @@ export function useCreateEnquiry() {
       }
       toast.error(message);
     },
-    // onSuccess is handled at the component level to show the confirmation state
+    
   });
 }

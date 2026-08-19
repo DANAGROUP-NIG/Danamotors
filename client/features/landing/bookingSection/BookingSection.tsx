@@ -11,8 +11,6 @@ import { Field, inputCls } from '@/components/forms/FormField';
 import { useBranches } from '@/features/branches/hooks/use-branches';
 import { useCreateEnquiry } from '@/features/enquiry/hooks/use-create-enquiry';
 import { createEnquirySchema, type CreateEnquiryFormValues } from '@/features/enquiry/schemas/enquiry.schema';
-
-// ─── Inline booking date picker ──────────────────────────────────────────────
 import { BookingDatePicker } from './BookingDatePicker';
 
 export default function BookingSection() {
@@ -86,26 +84,7 @@ export default function BookingSection() {
           <div className="flex flex-col gap-6">
             <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              {[
-                { icon: Clock, label: 'Quick Response', desc: 'We confirm within 24 hours' },
-                { icon: MapPin, label: 'Multiple Locations', desc: 'Branches across the city' },
-                { icon: Calendar, label: 'Flexible Scheduling', desc: 'Morning & afternoon slots' },
-              ].map(({ icon: Icon, label, desc }) => (
-                <div
-                  key={label}
-                  className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/75 p-4 backdrop-blur-sm shadow-[0_15px_35px_-25px_rgba(15,23,42,0.7)]"
-                >
-                  <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 ring-1 ring-blue-500/15">
-                    <Icon className="size-4 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{label}</p>
-                    <p className="text-xs text-muted-foreground">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          
           </div>
 
           <Card className="overflow-hidden rounded-[30px] border border-blue-500/20 bg-gradient-to-b from-card via-card to-background shadow-[0_35px_80px_-40px_rgba(37,99,235,0.5)]">
@@ -296,6 +275,27 @@ export default function BookingSection() {
             </CardContent>
           </Card>
         </div>
+        
+         <div className="grid grid-cols-1 gap-3 mt-10 sm:grid-cols-3">
+            {[
+              { icon: Clock, label: 'Quick Response', desc: 'We confirm within 24 hours' },
+              { icon: MapPin, label: 'Multiple Locations', desc: 'Branches across the city' },
+              { icon: Calendar, label: 'Flexible Scheduling', desc: 'Morning & afternoon slots' },
+            ].map(({ icon: Icon, label, desc }) => (
+              <div
+                key={label}
+                className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/75 p-4 backdrop-blur-sm shadow-[0_15px_35px_-25px_rgba(15,23,42,0.7)]"
+              >
+                <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 ring-1 ring-blue-500/15">
+                  <Icon className="size-4 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
       </div>
     </section>
   );
