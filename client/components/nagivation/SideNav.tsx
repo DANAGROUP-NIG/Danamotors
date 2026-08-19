@@ -343,11 +343,22 @@ export default function SideNav({
                         }
 
                         if (hasChildren) {
-                          const expanded = isAnyChildActive || !!openGroups[label];
+                          // If the user has explicitly toggled this group, respect that value.
+                          // Otherwise, default to expanded when any child is active.
+                          const expanded = Object.prototype.hasOwnProperty.call(openGroups, label)
+                            ? !!openGroups[label]
+                            : isAnyChildActive;
                           return (
                             <div key={label} className="w-full">
                               <button
-                                onClick={() => setOpenGroups((s) => ({ ...s, [label]: !s[label] }))}
+                                onClick={() =>
+                                  setOpenGroups((s) => {
+                                    const current = Object.prototype.hasOwnProperty.call(s, label)
+                                      ? !!s[label]
+                                      : isAnyChildActive;
+                                    return { ...s, [label]: !current };
+                                  })
+                                }
                                 className={cn(
                                   "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                                   expanded
@@ -362,33 +373,41 @@ export default function SideNav({
 
                               {expanded && (
                                 <div className="mt-1 ml-8 flex flex-col gap-1">
-                                  {children.map((c: any) => (
-                                    <Link
-                                      key={c.href}
-                                      href={c.href}
-                                      onClick={() => setSidebarOpen(false)}
-                                      aria-current={isItemActive(c.href, pathname) ? "page" : undefined}
-                                      className={cn(
-                                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                                        isItemActive(c.href, pathname)
-                                          ? "bg-white/15 text-white"
-                                          : "text-white/70 hover:bg-white/10 hover:text-white",
-                                      )}
-                                    >
-                                      <c.icon className="size-[14px] shrink-0" />
-                                      <span className="flex-1 truncate">{c.label}</span>
-                                    </Link>
-                                  ))}
+                                  {children.map((c: any, i: number) => {
+                                    const ChildIcon = c.icon;
+                                    const childKey = c.href ?? `${label}-${i}`;
+                                    return (
+                                      <Link
+                                        key={childKey}
+                                        href={c.href ?? '#'}
+                                        onClick={() => setSidebarOpen(false)}
+                                        aria-current={isItemActive(c.href, pathname) ? "page" : undefined}
+                                        className={cn(
+                                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                                          isItemActive(c.href, pathname)
+                                            ? "bg-white/15 text-white"
+                                            : "text-white/70 hover:bg-white/10 hover:text-white",
+                                        )}
+                                      >
+                                        <ChildIcon className="size-[14px] shrink-0" />
+                                        <span className="flex-1 truncate">{c.label}</span>
+                                      </Link>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
                           );
                         }
 
+                        // Non-parent item: ensure stable key and defined href
+                        const itemKey = href ?? `${group.label}-${label}`;
+                        const hrefProp = href ?? '#';
+
                         return (
                           <Link
-                            key={href}
-                            href={href!}
+                            key={itemKey}
+                            href={hrefProp}
                             onClick={() => setSidebarOpen(false)}
                             aria-current={active ? "page" : undefined}
                             className={cn(

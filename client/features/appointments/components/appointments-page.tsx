@@ -52,27 +52,19 @@
 
 
 import { useState } from 'react';
-import { Calendar, Inbox, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ModalFame from '@/components/modals/ModalFame';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { APPOINTMENT_CREATE_ROLES, ENQUIRY_READ_ROLES } from '@/features/auth/roles';
+import { APPOINTMENT_CREATE_ROLES } from '@/features/auth/roles';
 import { AppointmentsTable } from './AppointmentsTable';
 import { AppointmentCreateForm } from './AppointmentCreateForm';
-import { EnquiriesTable } from '@/features/enquiry/components/EnquiriesTable';
-
-const TABS = ['appointments', 'enquiries'] as const;
-type Tab = (typeof TABS)[number];
-
-
 
 export function AppointmentsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('appointments');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { hasAccess } = useAuth();
-  const canCreate    = hasAccess(APPOINTMENT_CREATE_ROLES);
-  const canSeeTriageQueue = hasAccess(ENQUIRY_READ_ROLES);
+  const canCreate = hasAccess(APPOINTMENT_CREATE_ROLES);
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -83,7 +75,7 @@ export function AppointmentsPage() {
             Appointments
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage walk-in bookings and online service enquiries.
+            Manage walk-in bookings.
           </p>
         </div>
 
@@ -99,40 +91,7 @@ export function AppointmentsPage() {
         )}
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────────────────── */}
-      {canSeeTriageQueue && (
-        <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1 w-fit">
-          <button
-            id="tab-appointments"
-            onClick={() => setActiveTab('appointments')}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
-              activeTab === 'appointments'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Calendar className="size-4" />
-            All Appointments
-          </button>
-          <button
-            id="tab-enquiries"
-            onClick={() => setActiveTab('enquiries')}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
-              activeTab === 'enquiries'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Inbox className="size-4" />
-            Triage Queue
-          </button>
-        </div>
-      )}
-
-      {/* ── Tab Content ─────────────────────────────────────────────────── */}
-      {activeTab === 'appointments' || !canSeeTriageQueue
-        ? <AppointmentsTable />
-        : <EnquiriesTable />}
+      <AppointmentsTable />
 
       {/* ── Walk-in Creation Modal ───────────────────────────────────────── */}
       <ModalFame

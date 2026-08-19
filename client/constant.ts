@@ -65,7 +65,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Appointments",
         icon: CalendarDays,
         roles: CUSTOMER_ROLES,
-        items: [
+        children: [
           { label: "All Appointments", href: "/appointments", icon: CalendarDays, roles: CUSTOMER_ROLES },
           { label: "Triage Queue", href: "/enquiries", icon: ClipboardList, roles: ENQUIRY_READ_ROLES },
         ],
