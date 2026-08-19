@@ -1,16 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
+import { CheckCircle2, Calendar, Clock, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Field, inputCls } from '@/components/forms/FormField';
 import { useBranches } from '@/features/branches/hooks/use-branches';
 import { useCreateEnquiry } from '@/features/enquiry/hooks/use-create-enquiry';
 import { createEnquirySchema, type CreateEnquiryFormValues } from '@/features/enquiry/schemas/enquiry.schema';
+
+// ─── Inline booking date picker ──────────────────────────────────────────────
 import { BookingDatePicker } from './BookingDatePicker';
 
 export default function BookingSection() {
@@ -18,7 +20,6 @@ export default function BookingSection() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const createEnquiry = useCreateEnquiry();
-  
   const { data: branchesData, isLoading: branchesLoading } = useBranches();
   const branches = branchesData?.branches ?? [];
 
@@ -26,19 +27,13 @@ export default function BookingSection() {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<CreateEnquiryFormValues>({
     resolver: zodResolver(createEnquirySchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phoneNumber: '',
-      vehicleMake: '',
-      vehicleModel: '',
-      vehicleRegNumber: '',
-      serviceDescription: '',
-      branchId: '',
+      firstName: '', lastName: '', email: '',
+      phoneNumber: '', vehicleMake: '', vehicleModel: '',
+      vehicleRegNumber: '', serviceDescription: '', branchId: '',
     },
   });
 
@@ -47,7 +42,6 @@ export default function BookingSection() {
       ...values,
       preferredDate: selectedDate?.toISOString(),
       vehicleYear: values.vehicleYear ? Number(values.vehicleYear) : undefined,
-      // Strip optional empty strings to undefined
       vehicleMake: values.vehicleMake || undefined,
       vehicleModel: values.vehicleModel || undefined,
       vehicleRegNumber: values.vehicleRegNumber || undefined,
@@ -62,43 +56,36 @@ export default function BookingSection() {
     });
   }
 
-  // Handle loading state for branches
-  const isBranchesLoading = branchesLoading;
-  
-
   return (
-    <section id="book" className="relative py-20 sm:py-28 overflow-hidden">
-      {/* Background decoration */}
+    <section id="book" className="relative overflow-hidden py-20 sm:py-28">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="pointer-events-none absolute inset-0 -z-20"
         style={{
           background:
-            'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(99,102,241,0.08), transparent)',
+            'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(59,130,246,0.12), transparent 60%)',
         }}
       />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,_rgba(15,23,42,0.02),_rgba(15,23,42,0.08))]" aria-hidden />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section header */}
         <div className="mb-12 text-center">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-blue-500">
+          <div className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
             Book a Service
-          </p>
-          <h2 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          </div>
+          <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Schedule Your Vehicle Service
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             Tell us about your vehicle and what you need. Our team will confirm your
             appointment and reach out within 24 hours.
           </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          {/* Left column: date picker + info cards */}
+        <div className="grid gap-8 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="flex flex-col gap-6">
             <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-            {/* Trust signals */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
               {[
                 { icon: Clock, label: 'Quick Response', desc: 'We confirm within 24 hours' },
@@ -107,9 +94,9 @@ export default function BookingSection() {
               ].map(({ icon: Icon, label, desc }) => (
                 <div
                   key={label}
-                  className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/60 p-4 backdrop-blur-sm"
+                  className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/75 p-4 backdrop-blur-sm shadow-[0_15px_35px_-25px_rgba(15,23,42,0.7)]"
                 >
-                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+                  <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 ring-1 ring-blue-500/15">
                     <Icon className="size-4 text-blue-500" />
                   </div>
                   <div>
@@ -121,49 +108,59 @@ export default function BookingSection() {
             </div>
           </div>
 
-          {/* Right column: form / confirmation */}
-          <Card className="rounded-2xl border-border/50 shadow-xl shadow-blue-950/5">
-            <CardHeader>
-              <CardTitle className="font-display text-xl">Send a Service Request</CardTitle>
-             
-            </CardHeader>
+          <Card className="overflow-hidden rounded-[30px] border border-blue-500/20 bg-gradient-to-b from-card via-card to-background shadow-[0_35px_80px_-40px_rgba(37,99,235,0.5)]">
+            <div className="border-b border-border/70 bg-gradient-to-r from-blue-600/10 via-indigo-500/10 to-transparent px-6 py-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">
+                    Service request
+                  </p>
+                  <CardTitle className="mt-2 font-display text-2xl text-foreground">
+                    Send a Service Request
+                  </CardTitle>
+                </div>
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30">
+                  <Calendar className="size-5" />
+                </div>
+              </div>
+              <CardDescription className="mt-2 text-sm text-muted-foreground">
+                Fill in your details below — no account required.
+              </CardDescription>
+            </div>
 
-            <CardContent>
+            <CardContent className="p-5 sm:p-6">
               <AnimatePresence mode="wait">
                 {confirmedId ? (
-                  /* ── Confirmation State ─────────────────────────────────── */
                   <motion.div
                     key="confirmed"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.4 }}
+                    transition={{ duration: 0.35 }}
                     className="flex flex-col items-center gap-4 py-10 text-center"
                   >
-                    <div className="flex size-16 items-center justify-center rounded-full bg-emerald-500/10">
+                    <div className="flex size-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
                       <CheckCircle2 className="size-8 text-emerald-500" />
                     </div>
-                    <h3 className="font-display text-xl font-semibold text-foreground">
+                    <h3 className="font-display text-2xl font-semibold text-foreground">
                       Enquiry Received!
                     </h3>
                     <p className="max-w-xs text-sm text-muted-foreground">
-                      Your service request has been submitted successfully. Our customer care
-                      team will contact you within 24 hours to confirm your appointment.
+                      Your service request has been submitted successfully. Our customer care team will contact you within 24 hours to confirm your appointment.
                     </p>
-                    <p className="mt-1 rounded-lg bg-muted px-3 py-1 font-mono text-xs text-muted-foreground">
+                    <p className="mt-1 rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground ring-1 ring-border">
                       Reference: {confirmedId.slice(0, 8).toUpperCase()}
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-2"
+                      className="mt-2 rounded-full px-5"
                       onClick={() => setConfirmedId(null)}
                     >
                       Submit Another Request
                     </Button>
                   </motion.div>
                 ) : (
-                  /* ── Booking Form ────────────────────────────────────────── */
                   <motion.form
                     key="form"
                     initial={{ opacity: 0 }}
@@ -174,12 +171,11 @@ export default function BookingSection() {
                     onSubmit={handleSubmit(onSubmit)}
                     noValidate
                   >
-                    {/* Name row */}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="First Name *" error={errors.firstName?.message}>
                         <input
                           id="enquiry-first-name"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Amaka"
                           autoComplete="given-name"
                           {...register('firstName')}
@@ -188,7 +184,7 @@ export default function BookingSection() {
                       <Field label="Last Name *" error={errors.lastName?.message}>
                         <input
                           id="enquiry-last-name"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Okafor"
                           autoComplete="family-name"
                           {...register('lastName')}
@@ -196,13 +192,12 @@ export default function BookingSection() {
                       </Field>
                     </div>
 
-                    {/* Contact row */}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="Email Address *" error={errors.email?.message}>
                         <input
                           id="enquiry-email"
                           type="email"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="you@example.com"
                           autoComplete="email"
                           {...register('email')}
@@ -212,7 +207,7 @@ export default function BookingSection() {
                         <input
                           id="enquiry-phone"
                           type="tel"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="+234 801 234 5678"
                           autoComplete="tel"
                           {...register('phoneNumber')}
@@ -220,12 +215,11 @@ export default function BookingSection() {
                       </Field>
                     </div>
 
-                    {/* Vehicle row */}
                     <div className="grid gap-4 sm:grid-cols-3">
                       <Field label="Vehicle Make" error={errors.vehicleMake?.message}>
                         <input
                           id="enquiry-make"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Toyota"
                           {...register('vehicleMake')}
                         />
@@ -233,7 +227,7 @@ export default function BookingSection() {
                       <Field label="Vehicle Model" error={errors.vehicleModel?.message}>
                         <input
                           id="enquiry-model"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Camry"
                           {...register('vehicleModel')}
                         />
@@ -241,59 +235,49 @@ export default function BookingSection() {
                       <Field label="Reg. Number" error={errors.vehicleRegNumber?.message}>
                         <input
                           id="enquiry-reg"
-                          className={inputCls}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. LND 123 AB"
                           {...register('vehicleRegNumber')}
                         />
                       </Field>
                     </div>
 
-                    {/* Branch selection */}
-                    <Field 
-                      label="Preferred Branch *" 
-                     
-                    >
+                    <Field label="Preferred Branch *" error={errors.branchId?.message}>
                       <select
                         id="enquiry-branch"
-                        className={inputCls}
-                        disabled={isBranchesLoading }
+                        className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
+                        disabled={branchesLoading}
                         {...register('branchId')}
                       >
                         <option value="">
-                          Select a branch
+                          {branchesLoading ? 'Loading branches…' : 'Select a branch'}
                         </option>
                         {branches.map((b) => (
                           <option key={b.id} value={b.id}>
-                            {b.name}{b.city ? ` (${b.city})` : ''}
+                            {b.name}
                           </option>
                         ))}
                       </select>
                     </Field>
 
-                    {/* Service description */}
-                    <Field
-                      label="Describe the Service You Need *"
-                      error={errors.serviceDescription?.message}
-                    >
+                    <Field label="Describe the Service You Need *" error={errors.serviceDescription?.message}>
                       <textarea
                         id="enquiry-description"
-                        className={inputCls}
-                        style={{ minHeight: '100px' }}
+                        className="min-h-28 w-full resize-none rounded-xl border border-border bg-background/80 px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-blue-500/30"
                         placeholder="e.g. Engine makes a knocking sound when idling. Also need an oil change."
                         maxLength={500}
                         {...register('serviceDescription')}
                       />
                     </Field>
 
-                    {/* Submit */}
                     <Button
                       id="enquiry-submit"
                       type="submit"
                       size="lg"
-                      disabled={createEnquiry.isPending || isSubmitting}
-                      className="mt-1 w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-900/20 transition-all duration-200"
+                      disabled={createEnquiry.isPending}
+                      className="mt-1 w-full rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-base font-semibold text-white shadow-[0_16px_35px_-18px_rgba(37,99,235,0.8)] transition-all duration-200 hover:brightness-110"
                     >
-                      {createEnquiry.isPending || isSubmitting ? (
+                      {createEnquiry.isPending ? (
                         <>
                           <Loader2 className="mr-2 size-4 animate-spin" />
                           Sending Request…
@@ -304,7 +288,7 @@ export default function BookingSection() {
                     </Button>
 
                     <p className="text-center text-xs text-muted-foreground">
-                      No account required. We'll contact you to confirm the details.
+                      No account required. We&apos;ll contact you to confirm the details.
                     </p>
                   </motion.form>
                 )}
