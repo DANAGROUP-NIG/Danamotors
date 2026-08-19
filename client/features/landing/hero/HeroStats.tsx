@@ -32,11 +32,34 @@ function useCountUp(target: number, duration = 1500) {
   return count;
 }
 
+function parseStatValue(value: string): number {
+  // Special case for "24/7"
+  if (value === "24/7") return 24;
+  
+  const clean = value.replace(/[^0-9kK+.]/g, "");
+  if (clean.includes("k") || clean.includes("K")) {
+    const num = parseFloat(clean.replace(/[kK+]/g, ""));
+    return num * 1000;
+  }
+  return parseInt(clean) || 0;
+}
+
+
+function getStatSuffix(value: string): string {
+  // Special case for "24/7"
+  if (value === "24/7") return "/7";
+  
+  if (value.includes("%")) return "%";
+  if (value.includes("+")) return "+";
+  return "";
+}
+
 export function HeroStats({ stats = HERO_STATS }: HeroStatsProps) {
   return (
     <div className="mt-12 grid max-w-lg grid-cols-3 gap-4 border-t border-border/50 pt-8">
+      
       {stats.map((stat) => {
-        // Parse numeric value from string (e.g., "15k+" -> 15000)
+        // Parse numeric value from string
         const numericValue = parseStatValue(stat.value);
         const suffix = getStatSuffix(stat.value);
         const count = useCountUp(numericValue);
@@ -57,19 +80,3 @@ export function HeroStats({ stats = HERO_STATS }: HeroStatsProps) {
   );
 }
 
-// Helper: Parse "15k+" -> 15000
-function parseStatValue(value: string): number {
-  const clean = value.replace(/[^0-9kK+.]/g, "");
-  if (clean.includes("k") || clean.includes("K")) {
-    const num = parseFloat(clean.replace(/[kK+]/g, ""));
-    return num * 1000;
-  }
-  return parseInt(clean) || 0;
-}
-
-// Helper: Get suffix (+ or %)
-function getStatSuffix(value: string): string {
-  if (value.includes("%")) return "%";
-  if (value.includes("+")) return "+";
-  return "";
-}
