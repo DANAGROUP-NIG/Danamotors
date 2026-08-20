@@ -1,11 +1,22 @@
-import { apiGet, apiPatch, apiDelete } from '@/lib/api/apiClient';
+import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api/apiClient';
 import { API_ROUTES } from '@/lib/constants/apiRoutes';
 import type {
+  CreateEnquiryPayload,
+  CreateEnquiryResponse,
   EnquiryListResponse,
   Enquiry,
   ReviewEnquiryPayload,
   ReviewEnquiryResponse,
 } from '../types/enquiry.types';
+
+export async function createEnquiryRequest(
+  payload: CreateEnquiryPayload,
+): Promise<CreateEnquiryResponse> {
+  return apiPost<CreateEnquiryResponse, CreateEnquiryPayload>(
+    API_ROUTES.enquiries.base,
+    payload,
+  );
+}
 
 export async function getEnquiriesRequest(params?: {
   page?:     number;
@@ -47,3 +58,4 @@ export async function reviewEnquiryRequest(
 export async function deleteEnquiryRequest(id: string): Promise<void> {
   return apiDelete<void>(`${API_ROUTES.enquiries.base}/${id}`);
 }
+

@@ -32,6 +32,28 @@ export type EnquiryListResponse = {
   };
 };
 
+export type CreateEnquiryPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  vehicleMake?: string | null;
+  vehicleModel?: string | null;
+  vehicleYear?: number | null;
+  vehicleRegNumber?: string | null;
+  serviceDescription: string;
+  preferredDate?: string | null;
+  branchId: string;
+};
+
+export type CreateEnquiryResponse = {
+  enquiry: {
+    id: string;
+    status: EnquiryStatus;
+    createdAt: string;
+  };
+};
+
 export type ReviewEnquiryPayload = {
   action:       'approve' | 'reject';
   reviewNotes?: string;
