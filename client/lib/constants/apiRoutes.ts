@@ -63,7 +63,6 @@ export const API_ROUTES = {
     base: "/service/appointments",
     detail: (id: string) => `/service/appointments/${id}`,
   },
-  // -----------NEEDS CONFIRMATION----------
   enquiries: {
     base: "/enquiries",
     detail: (id: string) => `/enquiries/${id}`,
