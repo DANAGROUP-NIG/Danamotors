@@ -17,7 +17,7 @@ import { DateInput } from "@/components/forms/DateInput";
 import { useAppointments } from "../hooks/use-appointments";
 import { AppointmentEditForm } from "./AppointmentEditForm";
 import { AppointmentDeleteButton } from "./AppointmentDeleteButton";
-import type { Appointment, AppointmentStatus } from "../types/appointment.types";
+import type { Appointment, AppointmentStatus, AppointmentSource } from "../types/appointment.types";
 
 const PAGE_SIZE = 10;
 
@@ -45,12 +45,29 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
   Cancelled: "bg-red-50 text-red-600",
 };
 
+const SOURCE_LABELS: Record<AppointmentSource, string> = {
+  WalkIn: "Walk-in",
+  OnlineBooking: "Online",
+};
+
+const SOURCE_COLORS: Record<AppointmentSource, string> = {
+  WalkIn: "bg-amber-50 text-amber-700",
+  OnlineBooking: "bg-blue-50 text-blue-700",
+};
+
+const SOURCE_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Walk-in", value: "WalkIn" },
+  { label: "Online", value: "OnlineBooking" },
+];
+
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as AppointmentStatus[];
 
 const STATUS_OPTIONS = [{ label: "All", value: "" }, ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))];
 
 export function AppointmentsTable() {
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [sourceFilter, setSourceFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -70,10 +87,15 @@ export function AppointmentsTable() {
     setPage(1);
   }, [activeBranch?.id, statusFilter, dateFrom, dateTo]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [activeBranch?.id, statusFilter, sourceFilter, dateFrom, dateTo]);
+
   const { data, isLoading, isError, isFetching } = useAppointments({
     page,
     limit: PAGE_SIZE,
     status: statusFilter || undefined,
+    source: sourceFilter || undefined,
     search: debouncedSearch || undefined,
     branchId,
     dateFrom: dateFrom || undefined,
@@ -84,7 +106,13 @@ export function AppointmentsTable() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const editingAppointment =
-    data?.appointments?.find((a) => a.id === editingId) ?? null;
+    data?.appointments?.find((a) => a.id === editingId) ?? null
+  ;
+
+  function changeSourceFilter(s: string) {
+    setSourceFilter(s);
+    setPage(1);
+  }
 
   function changeFilter(s: string) {
     setStatusFilter(s);
@@ -141,6 +169,19 @@ export function AppointmentsTable() {
           )}
         >
           {STATUS_LABELS[a.status]}
+        </span>
+      ),
+    },
+    {
+      header: "Source",
+      render: (a) => (
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-xs font-semibold",
+            SOURCE_COLORS[a.source],
+          )}
+        >
+          {SOURCE_LABELS[a.source]}
         </span>
       ),
     },
@@ -246,6 +287,7 @@ export function AppointmentsTable() {
                 />
               </div>
               <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />
+              <DataTableFilterChips options={SOURCE_OPTIONS} selected={sourceFilter} onChange={changeSourceFilter} />
             </>
           }
         />

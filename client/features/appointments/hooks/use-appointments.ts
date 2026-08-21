@@ -8,6 +8,7 @@ type UseAppointmentsParams = {
   search?: string;
   branchId?: string;
   status?: string;
+  source?: string;
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;

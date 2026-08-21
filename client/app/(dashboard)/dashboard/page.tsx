@@ -16,6 +16,7 @@ import { DashboardKpiCard } from "@/features/dashboard/components/common/Dashboa
 import { RevenueChartCard } from "@/features/dashboard/components/common/RevenueChartCard";
 import { JobsByStatusCard } from "@/features/dashboard/components/common/JobsByStatusCard";
 import { TopTechniciansCard } from "@/features/dashboard/components/common/TopTechniciansCard";
+import EnquiryTriageWidget from "@/features/enquiry/components/EnquiryTriageWidget";
 import { DashboardFallbackState } from "@/features/dashboard/components/common/DashboardFallbackState";
 import { DashboardSkeleton } from "@/features/dashboard/components/common/DashboardSkeleton";
 import { useDashboardStats } from "@/features/dashboard/hooks/useDashboardStats";
@@ -205,6 +206,11 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+
+        {/* Triage widget */}
+        <div>
+          <EnquiryTriageWidget />
+        </div>
 
         {/* Fallback for unauthorized/viewers */}
         {!canSeeFinance && !canSeeWorkshop && !canManage && (
