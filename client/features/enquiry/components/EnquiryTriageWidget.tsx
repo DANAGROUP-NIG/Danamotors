@@ -27,7 +27,7 @@ export default function EnquiryTriageWidget() {
         <div>Loading…</div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {(data?.data ?? []).map((e: any) => (
+          {(data?.enquiries ?? []).map((e: any) => (
             <li key={e.id}>
               <Link
                 href={`/enquiries/${e.id}`}
