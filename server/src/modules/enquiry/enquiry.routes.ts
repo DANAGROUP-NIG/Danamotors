@@ -108,7 +108,6 @@ const enquiryLimiter = rateLimit({
  *         $ref: '#/components/schemas/ValidationErrorResponse'
  */
 router.post('/', enquiryLimiter, validateRequest(createEnquirySchema), controller.createEnquiry);
-router.get('/', requirePermission(PERMISSIONS.SERVICE_READ), controller.listEnquiries);
 
 // ── Authenticated staff endpoints ────────────────────────────────────────────
 router.use(authMiddleware);
