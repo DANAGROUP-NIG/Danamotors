@@ -1,4 +1,4 @@
-export type EnquiryStatus = 'open' | 'inProgress' | 'approved' | 'rejected';
+export type EnquiryStatus = 'Pending' | 'Approved' | 'Rejected' | 'Converted';
 
 export type Enquiry = {
   id:                 string;

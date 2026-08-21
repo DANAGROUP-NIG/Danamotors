@@ -21,7 +21,8 @@
     "prisma:seed:inventory": "ts-node prisma/seed/inventory.ts",
     "prisma:seed:transactions": "ts-node prisma/seed/transactions.ts",
     "prisma:seed:portal": "ts-node prisma/seed/portal.ts",
-    "prisma:seed:enquiries": "ts-node prisma/seed/enquiries.ts"
+    "prisma:seed:enquiries": "ts-node prisma/seed/enquiries.ts",
+    "prisma:fix:notification-links": "ts-node prisma/migrate-notification-links.ts"
   },
   "author": "buildwithzeke <ayeoluwaseyi@gmail.com>",
   "license": "MIT",

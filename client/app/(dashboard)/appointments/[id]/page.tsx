@@ -20,7 +20,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, SERVICE_UPDATE_ROLES, APPOINTMENT_UPDATE_ROLES } from "@/features/auth/roles";
+import {
+  DELETE_ROLES,
+  SERVICE_UPDATE_ROLES,
+  APPOINTMENT_UPDATE_ROLES,
+} from "@/features/auth/roles";
 import { useAppointment } from "@/features/appointments";
 import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-appointment";
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
@@ -69,9 +73,21 @@ const NEXT_STATUS: Record<string, string | null> = {
 const STATUS_TRANSITION_ROLES: Record<string, AppRole[]> = {
   "Checked In": ["superadmin", "admin", "receptionmanager"],
   Inspection: ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Awaiting Approval": ["technician", "serviceadviser", "superadmin", "admin", "workshopmanager"],
+  "Awaiting Approval": [
+    "technician",
+    "serviceadviser",
+    "superadmin",
+    "admin",
+    "workshopmanager",
+  ],
   "In Repair": ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Quality Check": ["technician", "serviceadviser", "superadmin", "admin", "workshopmanager"],
+  "Quality Check": [
+    "technician",
+    "serviceadviser",
+    "superadmin",
+    "admin",
+    "workshopmanager",
+  ],
   Ready: ["workshopmanager", "serviceadviser", "superadmin", "admin"],
   Completed: ["serviceadviser", "superadmin", "admin", "receptionmanager"],
 };
@@ -103,7 +119,10 @@ export default function AppointmentDetailPage() {
   if (error || !appointment) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href="/appointments" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link
+          href="/appointments"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+        >
           <ArrowLeft className="size-4" /> Back to Appointments
         </Link>
         <p className="text-sm text-red-500">Appointment not found.</p>
@@ -116,13 +135,19 @@ export default function AppointmentDetailPage() {
   const branch = appointment.branch as Record<string, unknown> | undefined;
 
   const nextStatus = NEXT_STATUS[appointment.status];
-  const canTransition = nextStatus && hasAccess(STATUS_TRANSITION_ROLES[nextStatus] ?? []);
-  const canCancel = hasAccess(CANCEL_ROLES) && appointment.status !== "Completed" && appointment.status !== "Cancelled";
+  const canTransition =
+    nextStatus && hasAccess(STATUS_TRANSITION_ROLES[nextStatus] ?? []);
+  const canCancel =
+    hasAccess(CANCEL_ROLES) &&
+    appointment.status !== "Completed" &&
+    appointment.status !== "Cancelled";
   const canEdit = hasAccess(APPOINTMENT_UPDATE_ROLES);
   const canDelete = hasAccess(DELETE_ROLES);
-  const canCreateJobCard = hasAccess(SERVICE_UPDATE_ROLES) && appointment.status !== "Cancelled";
+  const canCreateJobCard =
+    hasAccess(SERVICE_UPDATE_ROLES) && appointment.status !== "Cancelled";
 
-  const isTerminal = appointment.status === "Completed" || appointment.status === "Cancelled";
+  const isTerminal =
+    appointment.status === "Completed" || appointment.status === "Cancelled";
 
   function handleStatusTransition() {
     if (!nextStatus) return;
@@ -142,15 +167,18 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-6">
-      <Link href="/appointments" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-        <ArrowLeft className="size-4" /> Back to Appointments
+      <Link
+        href="/appointments"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+      >
+        <ArrowLeft className="size-4" /> Back to Service & Enquiry Appointments
       </Link>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
-              Appointment
+              Service &amp; Enquiry Appointment
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {new Date(appointment.scheduledAt).toLocaleString(undefined, {
@@ -159,7 +187,9 @@ export default function AppointmentDetailPage() {
               })}
             </p>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[appointment.status] ?? "bg-slate-100 text-slate-600"}`}>
+          <span
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[appointment.status] ?? "bg-slate-100 text-slate-600"}`}
+          >
             {appointment.status}
           </span>
         </div>
@@ -181,25 +211,46 @@ export default function AppointmentDetailPage() {
 
         <div className="mb-6 flex flex-wrap gap-2">
           {canTransition && (
-            <Button size="sm" onClick={handleStatusTransition} disabled={update.isPending} className="gap-1.5">
+            <Button
+              size="sm"
+              onClick={handleStatusTransition}
+              disabled={update.isPending}
+              className="gap-1.5"
+            >
               <CheckCircle className="size-4" />
               Mark as {nextStatus}
             </Button>
           )}
           {canEdit && (
-            <Button size="sm" variant="outline" onClick={() => setShowEdit(true)} className="gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowEdit(true)}
+              className="gap-1.5"
+            >
               <Pencil className="size-4" />
               {!canTransition ? "Edit" : "Reschedule"}
             </Button>
           )}
           {canCreateJobCard && (
-            <Button size="sm" variant="outline" onClick={() => setShowJobCardCreate(true)} className="gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowJobCardCreate(true)}
+              className="gap-1.5"
+            >
               <Wrench className="size-4" />
               Create Job Card
             </Button>
           )}
           {canCancel && (
-            <Button size="sm" variant="outline" onClick={handleCancel} disabled={update.isPending} className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={update.isPending}
+              className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
               <XCircle className="size-4" />
               Cancel
             </Button>
@@ -217,12 +268,23 @@ export default function AppointmentDetailPage() {
           <div className="space-y-4">
             <SectionTitle icon={<User className="size-4" />} title="Customer" />
             <div className="grid gap-3 sm:grid-cols-2">
-              <DetailField label="Name" value={customer ? `${customer.firstName} ${customer.lastName}` : null} />
+              <DetailField
+                label="Name"
+                value={
+                  customer ? `${customer.firstName} ${customer.lastName}` : null
+                }
+              />
               <DetailField label="Email" value={customer?.email} />
-              <DetailField label="Phone" value={customer?.phoneNumber ?? null} />
+              <DetailField
+                label="Phone"
+                value={customer?.phoneNumber ?? null}
+              />
               {customer && (
                 <div className="sm:col-span-2">
-                  <Link href={`/customers/${customer.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                  <Link
+                    href={`/customers/${customer.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
                     View customer profile <ExternalLink className="size-3" />
                   </Link>
                 </div>
@@ -233,64 +295,134 @@ export default function AppointmentDetailPage() {
           <div className="space-y-4">
             <SectionTitle icon={<Car className="size-4" />} title="Vehicle" />
             <div className="grid gap-3 sm:grid-cols-2">
-              <DetailField label="Make / Model" value={vehicle ? `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || "—" : "—"} />
-              <DetailField label="Vehicle Reg No" value={vehicle?.registrationNumber as string | undefined} />
-              <DetailField label="Year" value={vehicle?.year as string | number | undefined} />
-              <DetailField label="VIN" value={vehicle?.vin as string | undefined} />
-              <DetailField label="Color" value={vehicle?.color as string | undefined} />
-              <DetailField label="Trim" value={vehicle?.trim as string | undefined} />
-              <DetailField label="Warranty" value={vehicle?.warrantyStatus as string | undefined} />
+              <DetailField
+                label="Make / Model"
+                value={
+                  vehicle
+                    ? `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() ||
+                      "—"
+                    : "—"
+                }
+              />
+              <DetailField
+                label="Vehicle Reg No"
+                value={vehicle?.registrationNumber as string | undefined}
+              />
+              <DetailField
+                label="Year"
+                value={vehicle?.year as string | number | undefined}
+              />
+              <DetailField
+                label="VIN"
+                value={vehicle?.vin as string | undefined}
+              />
+              <DetailField
+                label="Color"
+                value={vehicle?.color as string | undefined}
+              />
+              <DetailField
+                label="Trim"
+                value={vehicle?.trim as string | undefined}
+              />
+              <DetailField
+                label="Warranty"
+                value={vehicle?.warrantyStatus as string | undefined}
+              />
             </div>
           </div>
 
           <div className="space-y-4">
-            <SectionTitle icon={<Building2 className="size-4" />} title="Branch" />
+            <SectionTitle
+              icon={<Building2 className="size-4" />}
+              title="Branch"
+            />
             <div className="grid gap-3 sm:grid-cols-2">
-              <DetailField label="Branch" value={branch?.name as string | undefined} />
-              <DetailField label="Branch Phone" value={branch?.phone as string | undefined} />
+              <DetailField
+                label="Branch"
+                value={branch?.name as string | undefined}
+              />
+              <DetailField
+                label="Branch Phone"
+                value={branch?.phone as string | undefined}
+              />
             </div>
           </div>
 
           <div className="space-y-4">
             <SectionTitle icon={<Clock className="size-4" />} title="Timing" />
             <div className="grid gap-3 sm:grid-cols-2">
-              <DetailField label="Duration" value={appointment.durationMins ? `${appointment.durationMins} mins` : null} />
-              <DetailField label="Created" value={new Date(appointment.createdAt).toLocaleDateString()} />
-              <DetailField label="Last Updated" value={new Date(appointment.updatedAt).toLocaleDateString()} />
-              <DetailField label="Booked by" value={appointment.createdBy ? `${appointment.createdBy.firstName} ${appointment.createdBy.lastName}` : null} />
+              <DetailField
+                label="Duration"
+                value={
+                  appointment.durationMins
+                    ? `${appointment.durationMins} mins`
+                    : null
+                }
+              />
+              <DetailField
+                label="Created"
+                value={new Date(appointment.createdAt).toLocaleDateString()}
+              />
+              <DetailField
+                label="Last Updated"
+                value={new Date(appointment.updatedAt).toLocaleDateString()}
+              />
+              <DetailField
+                label="Booked by"
+                value={
+                  appointment.createdBy
+                    ? `${appointment.createdBy.firstName} ${appointment.createdBy.lastName}`
+                    : null
+                }
+              />
             </div>
           </div>
         </div>
 
         {appointment.notes && (
           <div className="mt-6 border-t border-slate-100 pt-6">
-            <SectionTitle icon={<FileText className="size-4" />} title="Notes" />
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{appointment.notes}</p>
+            <SectionTitle
+              icon={<FileText className="size-4" />}
+              title="Notes"
+            />
+            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">
+              {appointment.notes}
+            </p>
           </div>
         )}
 
-        {Array.isArray(appointment.jobCards) && appointment.jobCards.length > 0 && (
-          <div className="mt-6 border-t border-slate-100 pt-6">
-            <SectionTitle icon={<Wrench className="size-4" />} title={`Linked Job Cards (${appointment.jobCards.length})`} />
-            <div className="mt-3 space-y-2">
-              {(appointment.jobCards as Record<string, unknown>[]).map((jc) => (
-                <Link
-                  key={jc.id as string}
-                  href={`/job-cards/${jc.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50"
-                >
-                  <span className="font-mono text-xs font-medium text-slate-800">{jc.jobNumber as string}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="flex-1 text-slate-500">{jc.description as string || "—"}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">
-                    {String(jc.status ?? "").replace(/_/g, " ")}
-                  </span>
-                  <ExternalLink className="size-3.5 shrink-0 text-slate-300" />
-                </Link>
-              ))}
+        {Array.isArray(appointment.jobCards) &&
+          appointment.jobCards.length > 0 && (
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <SectionTitle
+                icon={<Wrench className="size-4" />}
+                title={`Linked Job Cards (${appointment.jobCards.length})`}
+              />
+              <div className="mt-3 space-y-2">
+                {(appointment.jobCards as Record<string, unknown>[]).map(
+                  (jc) => (
+                    <Link
+                      key={jc.id as string}
+                      href={`/job-cards/${jc.id}`}
+                      className="flex items-center gap-3 rounded-lg border border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50"
+                    >
+                      <span className="font-mono text-xs font-medium text-slate-800">
+                        {jc.jobNumber as string}
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="flex-1 text-slate-500">
+                        {(jc.description as string) || "—"}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">
+                        {String(jc.status ?? "").replace(/_/g, " ")}
+                      </span>
+                      <ExternalLink className="size-3.5 shrink-0 text-slate-300" />
+                    </Link>
+                  ),
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       {canDelete && (
@@ -307,14 +439,22 @@ export default function AppointmentDetailPage() {
         </div>
       )}
 
-      <ModalFame isOpen={showEdit} onClose={() => setShowEdit(false)} title="Edit appointment">
+      <ModalFame
+        isOpen={showEdit}
+        onClose={() => setShowEdit(false)}
+        title="Edit appointment"
+      >
         <AppointmentEditForm
           appointment={appointment}
           onSuccess={() => setShowEdit(false)}
         />
       </ModalFame>
 
-      <ModalFame isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} title="Create Job Card">
+      <ModalFame
+        isOpen={showJobCardCreate}
+        onClose={() => setShowJobCardCreate(false)}
+        title="Create Job Card"
+      >
         <JobCardCreateForm
           onSuccess={() => setShowJobCardCreate(false)}
           defaultValues={{
@@ -345,16 +485,30 @@ export default function AppointmentDetailPage() {
   );
 }
 
-function DetailField({ label, value }: { label: string; value?: string | number | null }) {
+function DetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
       <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>
     </div>
   );
 }
 
-function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+function SectionTitle({
+  icon,
+  title,
+}: {
+  icon: React.ReactNode;
+  title: string;
+}) {
   return (
     <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
       {icon}

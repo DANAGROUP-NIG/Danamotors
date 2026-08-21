@@ -49,16 +49,14 @@
 //   );
 // }
 
-
-
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import ModalFame from '@/components/modals/ModalFame';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { APPOINTMENT_CREATE_ROLES } from '@/features/auth/roles';
-import { AppointmentsTable } from './AppointmentsTable';
-import { AppointmentCreateForm } from './AppointmentCreateForm';
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ModalFame from "@/components/modals/ModalFame";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { APPOINTMENT_CREATE_ROLES } from "@/features/auth/roles";
+import { AppointmentsTable } from "./AppointmentsTable";
+import { AppointmentCreateForm } from "./AppointmentCreateForm";
 
 export function AppointmentsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -72,10 +70,10 @@ export function AppointmentsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Appointments
+            Service Appointments
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage walk-in bookings.
+            Manage service appointments and walk-in bookings.
           </p>
         </div>
 

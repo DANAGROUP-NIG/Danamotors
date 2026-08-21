@@ -22,7 +22,7 @@ export class EnquiryService {
       type: 'APPOINTMENT_CREATE',
       title: 'New online booking enquiry',
       message: `${data.firstName} ${data.lastName} submitted a service enquiry at ${branch.name}.`,
-      link: `/appointments?tab=enquiries`,
+      link: `/enquiries/${enquiry.id}`,
       branchId: branch.id,
     };
 
@@ -91,7 +91,7 @@ export class EnquiryService {
         type: 'APPOINTMENT_REJECTED',
         title: 'Enquiry rejected',
         message: `The enquiry from ${enquiry.firstName} ${enquiry.lastName} has been rejected.`,
-        link: `/appointments?tab=enquiries`,
+        link: `/enquiries/${id}`,
         branchId: enquiry.branch.id,
       });
 
@@ -148,7 +148,7 @@ export class EnquiryService {
       type: 'APPOINTMENT_APPROVED',
       title: 'Enquiry approved & appointment created',
       message: `${enquiry.firstName} ${enquiry.lastName}'s enquiry has been approved. Appointment scheduled for ${new Date(appointment.scheduledAt).toLocaleString()}.`,
-      link: `/appointments/${appointment.id}`,
+      link: `/enquiries/${id}`,
       branchId: enquiry.branch.id,
     };
 

@@ -66,8 +66,18 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: CalendarDays,
         roles: CUSTOMER_ROLES,
         children: [
-          { label: "All Appointments", href: "/appointments", icon: CalendarDays, roles: CUSTOMER_ROLES },
-          { label: "Triage Queue", href: "/enquiries", icon: ClipboardList, roles: ENQUIRY_READ_ROLES },
+          {
+            label: "Service Appointments",
+            href: "/appointments",
+            icon: CalendarDays,
+            roles: CUSTOMER_ROLES,
+          },
+          {
+            label: "Enquiry Appointments",
+            href: "/enquiries",
+            icon: ClipboardList,
+            roles: ENQUIRY_READ_ROLES,
+          },
         ],
       },
       {
@@ -299,4 +309,3 @@ export const HERO_SLIDER_IMAGES = [
   "/bg/hero-5.jpg",
   "/bg/pexels-shvetsa-4315570.jpg",
 ];
-

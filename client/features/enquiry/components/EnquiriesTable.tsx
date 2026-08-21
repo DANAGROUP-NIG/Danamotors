@@ -19,25 +19,25 @@ import type { Enquiry, EnquiryStatus } from '../types/enquiry.types';
 const PAGE_SIZE = 10;
 
 const STATUS_LABELS: Record<EnquiryStatus, string> = {
-  inProgress:   'InProgress',
-  approved:  'Approved',
-  rejected:  'Rejected',
-  open: 'Open',
+  Pending:   'Pending',
+  Approved:  'Approved',
+  Rejected:  'Rejected',
+  Converted: 'Converted',
 };
 
 const STATUS_COLORS: Record<EnquiryStatus, string> = {
-  open:   'bg-amber-50 text-amber-700',
-  approved:  'bg-emerald-50 text-emerald-700',
-  rejected:  'bg-red-50 text-red-600',
-  inProgress: 'bg-blue-50 text-blue-700',
+  Pending:   'bg-amber-50 text-amber-700',
+  Approved:  'bg-emerald-50 text-emerald-700',
+  Rejected:  'bg-red-50 text-red-600',
+  Converted: 'bg-blue-50 text-blue-700',
 };
 
 const STATUS_OPTIONS = [
   { label: 'All',       value: '' },
-  { label: 'Open',   value: 'Open' },
-  { label: 'InProgress',   value: 'InProgress' },
+  { label: 'Pending',   value: 'Pending' },
   { label: 'Approved',  value: 'Approved' },
   { label: 'Rejected',  value: 'Rejected' },
+  { label: 'Converted', value: 'Converted' },
 ];
 
 export function EnquiriesTable() {
@@ -147,7 +147,7 @@ export function EnquiriesTable() {
             onClick={() => router.push(`/enquiries/${e.id}`)}
           >
             <Eye className="size-3.5" />
-            {canReview && e.status === 'open' ? 'Review' : 'View'}
+            {canReview && e.status === 'Pending' ? 'Review' : 'View'}
           </Button>
         </div>
       ),
