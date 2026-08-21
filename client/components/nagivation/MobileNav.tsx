@@ -27,7 +27,7 @@ export default function () {
           return (
             <Link
               key={href}
-              href={href}
+              href={href as string}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors",

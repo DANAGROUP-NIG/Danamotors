@@ -5,6 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function isActive(href: string, pathname: string) {
+export function isActive(href: string | undefined, pathname: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
