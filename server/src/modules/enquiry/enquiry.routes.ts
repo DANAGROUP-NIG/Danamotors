@@ -9,6 +9,7 @@ import {
   createEnquirySchema,
   reviewEnquirySchema,
   enquiryIdParamSchema,
+  listEnquiriesQuerySchema,
 } from './enquiry.validation';
 
 const router = Router();
@@ -108,7 +109,6 @@ const enquiryLimiter = rateLimit({
  *         $ref: '#/components/schemas/ValidationErrorResponse'
  */
 router.post('/', enquiryLimiter, validateRequest(createEnquirySchema), controller.createEnquiry);
-router.get('/', requirePermission(PERMISSIONS.SERVICE_READ), controller.listEnquiries);
 
 // ── Authenticated staff endpoints ────────────────────────────────────────────
 router.use(authMiddleware);
@@ -183,7 +183,7 @@ router.use(authMiddleware);
  *       401:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   controller.listEnquiries);
+router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
 
 /**
  * @openapi

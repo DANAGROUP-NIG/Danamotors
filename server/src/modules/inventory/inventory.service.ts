@@ -221,7 +221,7 @@ export class InventoryService {
       type: 'PURCHASE_REQUEST_CREATED',
       title: 'New purchase request',
       message: `${sparePart.name} (${data.quantity}) has been requested for purchase.`,
-      link: `/purchase-requests/${purchaseRequest.id}`,
+      link: `/purchase-requests`,
     });
 
     return purchaseRequest;
@@ -446,7 +446,7 @@ export class InventoryService {
       type: 'TRANSFER_REQUESTED',
       title: 'New transfer request',
       message: `Transfer ${transfer.transferNumber} requested from ${sourceBranch.name} to ${reqBranch.name}.`,
-      link: `/transfers/${transfer.id}`,
+      link: `/transfers`,
     });
 
     return createdTransfer;
@@ -485,7 +485,7 @@ export class InventoryService {
       type: 'TRANSFER_APPROVED',
       title: 'Transfer approved',
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) was approved.`,
-      link: `/transfers/${id}`,
+      link: `/transfers`,
     };
     await notificationService.notifyUsers([transfer.requestedById], {
       ...payload,
@@ -543,7 +543,7 @@ export class InventoryService {
       type: 'TRANSFER_DISPATCHED',
       title: 'Transfer dispatched',
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been dispatched.`,
-      link: `/transfers/${id}`,
+      link: `/transfers`,
     };
     await notificationService.notifyUsers([transfer.requestedById], {
       ...payload,
@@ -593,7 +593,7 @@ export class InventoryService {
       type: 'TRANSFER_RECEIVED',
       title: 'Transfer received',
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been received.`,
-      link: `/transfers/${id}`,
+      link: `/transfers`,
     };
     await notificationService.notifyUsers([transfer.requestedById], {
       ...payload,

@@ -40,7 +40,7 @@ export class EnquiryController {
   getEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const enquiry = await this.service.getEnquiry(req.params.id);
-      assertBranchOwnership(req, (enquiry as any).branch?.id);
+      assertBranchOwnership(req, enquiry.branch?.id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { enquiry } });
     } catch (error) { next(error); }
   };

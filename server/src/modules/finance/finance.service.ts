@@ -149,7 +149,7 @@ export class FinanceService {
         type: 'INVOICE_PAID',
         title: 'Invoice paid',
         message: `Invoice ${invoice.invoiceNumber} for ${customer?.firstName ?? ''} ${customer?.lastName ?? ''} is now fully paid.`,
-        link: `/invoices/${invoice.id}`,
+        link: `/invoices`,
       };
       if (branchId) {
         await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branchId, payload);

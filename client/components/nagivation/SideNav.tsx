@@ -287,6 +287,9 @@ export default function SideNav({
                         if (collapsed) {
                           const key = label;
                           const targetHref = href ?? (hasChildren ? children?.[0]?.href : undefined);
+                          // A collapsed parent icon represents its children, so highlight it
+                          // when any child route is active.
+                          const collapsedActive = active || isAnyChildActive;
                           return (
                             <NavTootip key={key} label={label}>
                               {isLogout ? (
@@ -302,11 +305,11 @@ export default function SideNav({
                                 <Link
                                   href={targetHref ?? '#'}
                                   onClick={() => setSidebarOpen(false)}
-                                  aria-current={active ? "page" : undefined}
+                                  aria-current={collapsedActive ? "page" : undefined}
                                   aria-label={label}
                                   className={cn(
                                     "relative flex size-9 items-center justify-center rounded-lg transition-colors",
-                                    active
+                                    collapsedActive
                                       ? "bg-white/15 text-white"
                                       : "text-white/70 hover:bg-white/10 hover:text-white",
                                   )}
@@ -361,8 +364,8 @@ export default function SideNav({
                                 }
                                 className={cn(
                                   "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                                  expanded
-                                    ? "bg-white/15 text-white"
+                                  isAnyChildActive
+                                    ? "text-white"
                                     : "text-white/70 hover:bg-white/10 hover:text-white",
                                 )}
                               >

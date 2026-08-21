@@ -115,7 +115,7 @@ export function EnquiryReviewModal({ enquiry, onClose }: EnquiryReviewModalProps
 
   const reviewEnquiry = useReviewEnquiry();
   const { hasAccess, isSuperAdmin } = useAuth();
-  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES) && enquiry.status === 'open';
+  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES) && enquiry.status === 'Pending';
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data: services } = useServices({ limit: 100 });
 
@@ -130,7 +130,6 @@ export function EnquiryReviewModal({ enquiry, onClose }: EnquiryReviewModalProps
   });
 
   const selectedCustomerId = watch('customerId');
-  const selectedScheduledAt = watch('scheduledAt');
 
   function onApproveSubmit(values: ApproveFormValues) {
     setApproveFormValues(values);
@@ -192,7 +191,7 @@ export function EnquiryReviewModal({ enquiry, onClose }: EnquiryReviewModalProps
           <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{enquiry.serviceDescription}</p>
         </div>
 
-        {enquiry.status !== 'open' && (
+        {enquiry.status !== 'Pending' && (
           <div className="rounded-lg bg-background border border-border p-3">
             <p className="text-xs font-medium text-muted-foreground">
               Reviewed by {enquiry.reviewedBy

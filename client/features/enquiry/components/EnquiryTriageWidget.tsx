@@ -14,7 +14,7 @@ export default function EnquiryTriageWidget() {
 
   const { data, isLoading } = useEnquiries({
     limit: 5,
-    status: "open",
+    status: "Pending",
     branchId: activeBranch?.id,
   });
 
@@ -27,15 +27,17 @@ export default function EnquiryTriageWidget() {
         <div>Loading…</div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {(data?.enquiries ?? []).map((e: any) => (
+          {(data?.enquiries ?? []).map((e) => (
             <li key={e.id}>
               <Link
                 href={`/enquiries/${e.id}`}
                 className="flex justify-between rounded-md p-2 hover:bg-white/5"
               >
                 <div className="truncate">
-                  <div className="text-sm font-medium truncate">{e.title ?? e.subject ?? `Enquiry #${e.id}`}</div>
-                  <div className="text-xs text-white/60 truncate">{e.customerName ?? e.customer?.name}</div>
+                  <div className="text-sm font-medium truncate">
+                    {`${e.firstName} ${e.lastName}`}
+                  </div>
+                  <div className="text-xs text-white/60 truncate">{e.serviceDescription}</div>
                 </div>
                 <div className="ml-4 text-xs text-white/60">
                   {e.createdAt ? formatDistanceToNow(new Date(e.createdAt), { addSuffix: true }) : ''}
