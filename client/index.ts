@@ -1,0 +1,11 @@
+export { default as Hero } from "./features/landing/hero/Hero";
+export { default as TrustedBy } from "./features/landing/trustedBy/TrustedBy";
+export { default as ProductOverview } from "./features/landing/productOverview/ProductOverview";
+export { default as FeatureGrid } from "./features/landing/featureGrid/FeatureGrid";
+export { default as Workflow } from "./features/landing/workflow/Workflow";
+export { default as DashboardShowcase } from "./features/landing/dashboardShowcase/DashboardShowcase";
+export { default as ServicePlans } from "./features/landing/servicePlans/ServicePlans";
+export { default as BookingSection } from "./features/landing/bookingSection/BookingSection";
+export { default as FAQ } from "./features/landing/faq/FAQ";
+export { default as FinalCTA } from "./features/landing/finalCTA/FinalCTA";
+export { default as Footer } from "./features/landing/footer/Footer";

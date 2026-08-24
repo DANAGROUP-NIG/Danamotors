@@ -1,0 +1,87 @@
+@import "tailwindcss";
+@import "react-day-picker/style.css";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #05141F;
+  --primary-rgb: 5 20 31;
+  --primary-foreground: #ffffff;
+  --secondary: #e6eaed;
+  --secondary-foreground: #05141F;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #dbe3ef;
+  --ring: #05141F;
+}
+
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+}
+
+/* Applied only to the landing page <main> so the gradient
+   never leaks into the dashboard or auth routes. */
+.landing-bg {
+  background:
+    radial-gradient(circle at top left, rgba(5, 20, 31, 0.10), transparent 32rem),
+    linear-gradient(180deg, #f8fbff 0%, #eef3f7 45%, #e8eef3 100%);
+}
+
+a {
+  text-decoration: none;
+}
+
+/* Sidebar links must always be white — prevent body foreground bleed */
+aside a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}

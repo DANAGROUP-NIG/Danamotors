@@ -1,0 +1,41 @@
+import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
+import { API_ROUTES } from "@/lib/constants/apiRoutes";
+import type { AuthUser, CustomerRegisterPayload, LoginPayload, LoginResponse, RegisterPayload, UpdateProfilePayload } from "../types/auth.types";
+
+export async function loginRequest(payload: LoginPayload): Promise<LoginResponse> {
+  return apiPost<LoginResponse>(API_ROUTES.auth.login, payload);
+}
+
+export async function logoutRequest(refreshToken: string): Promise<void> {
+  return apiPost<void>(API_ROUTES.auth.logout, { refreshToken });
+}
+
+export async function getMeRequest(): Promise<AuthUser> {
+  const result = await apiGet<{ user: AuthUser }>(API_ROUTES.auth.me);
+  return result.user;
+}
+
+export async function updateProfileRequest(payload: UpdateProfilePayload): Promise<AuthUser> {
+  const result = await apiPut<{ user: AuthUser }>(API_ROUTES.auth.updateMe, payload);
+  return result.user;
+}
+
+export async function registerRequest(payload: RegisterPayload): Promise<LoginResponse> {
+  return apiPost<LoginResponse>(API_ROUTES.auth.register, payload);
+}
+
+export async function customerRegisterRequest(payload: CustomerRegisterPayload): Promise<LoginResponse> {
+  return apiPost<LoginResponse>(API_ROUTES.auth.customerRegister, payload);
+}
+
+export async function forgotPasswordRequest(email: string): Promise<string | undefined> {
+  const result = await apiPost<{ resetLink?: string }>(API_ROUTES.auth.forgotPassword, { email });
+  return result.resetLink;
+}
+
+export async function resetPasswordRequest(payload: {
+  token: string;
+  newPassword: string;
+}): Promise<void> {
+  return apiPost<void>(API_ROUTES.auth.resetPassword, payload);
+}
