@@ -10,8 +10,7 @@ import {
   Building2,
   Clock,
   FileText,
-  CheckCircle,
-  XCircle,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
@@ -32,9 +31,7 @@ export default function EnquiryPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useEnquiry(id);
   const enquiry = data?.enquiry;
-  const [reviewAction, setReviewAction] = useState<
-    "approve-form" | "reject-confirm" | null
-  >(null);
+  const [showReview, setShowReview] = useState(false);
   const { hasAccess } = useAuth();
   const canReview = hasAccess(ENQUIRY_REVIEW_ROLES);
 
@@ -87,25 +84,14 @@ export default function EnquiryPage() {
         {canReview && (
           <div className="mb-6 flex flex-wrap gap-2">
             {enquiry.status === "Pending" ? (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => setReviewAction("approve-form")}
-                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
-                >
-                  <CheckCircle className="size-4" />
-                  Approve &amp; Schedule
-                </Button>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => setReviewAction("reject-confirm")}
-                  className="gap-1.5 border-destructive/40 text-secondary hover:bg-destructive/5 cursor-pointer"
-                >
-                  <XCircle className="size-4" stroke="white" />
-                  Reject
-                </Button>
-              </>
+              <Button
+                size="sm"
+                onClick={() => setShowReview(true)}
+                className="gap-1.5"
+              >
+                <ClipboardCheck className="size-4" />
+                Review &amp; Approve
+              </Button>
             ) : (
               <p className="text-sm text-slate-500">
                 This enquiry has been {enquiry.status.toLowerCase()}.
@@ -217,16 +203,14 @@ export default function EnquiryPage() {
       </div>
 
       <ModalFame
-        isOpen={reviewAction !== null}
-        onClose={() => setReviewAction(null)}
-        title={reviewAction === "reject-confirm" ? "Reject Enquiry" : "Approve & Schedule"}
+        isOpen={showReview}
+        onClose={() => setShowReview(false)}
+        title="Review Enquiry"
       >
-        {enquiry && reviewAction && (
+        {enquiry && (
           <EnquiryReviewModal
-            key={reviewAction}
             enquiry={enquiry}
-            initialStep={reviewAction}
-            onClose={() => setReviewAction(null)}
+            onClose={() => setShowReview(false)}
           />
         )}
       </ModalFame>

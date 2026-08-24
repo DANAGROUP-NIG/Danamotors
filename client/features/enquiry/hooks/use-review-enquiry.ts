@@ -25,7 +25,6 @@ export function useReviewEnquiry() {
 
       // Invalidate enquiry list and appointment list
       queryClient.invalidateQueries({ queryKey: enquiryKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: enquiryKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: appointmentKeys.lists() });
     },
 

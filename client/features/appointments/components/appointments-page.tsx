@@ -81,7 +81,7 @@ export function AppointmentsPage() {
           <Button
             id="appointment-create-btn"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2"
           >
             <Plus className="size-4" />
             New Walk-in
