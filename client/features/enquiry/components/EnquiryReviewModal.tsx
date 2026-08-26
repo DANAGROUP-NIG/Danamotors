@@ -32,6 +32,7 @@ type ApproveFormValues = z.infer<typeof approveSchema>;
 interface EnquiryReviewModalProps {
   enquiry:  Enquiry;
   onClose:  () => void;
+  initialStep?: 'details' | 'approve-form' | 'reject-confirm';
 }
 
 // ─── Confirmation dialog for reject action ────────────────────────────────────
@@ -108,8 +109,12 @@ function ApproveConfirmDialog({
 }
 
 // ─── Main modal component ─────────────────────────────────────────────────────
-export function EnquiryReviewModal({ enquiry, onClose }: EnquiryReviewModalProps) {
-  const [step, setStep] = useState<'details' | 'approve-form' | 'approve-confirm' | 'reject-confirm'>('details');
+export function EnquiryReviewModal({
+  enquiry,
+  onClose,
+  initialStep = 'details',
+}: EnquiryReviewModalProps) {
+  const [step, setStep] = useState<'details' | 'approve-form' | 'approve-confirm' | 'reject-confirm'>(initialStep);
   const [approveFormValues, setApproveFormValues] = useState<ApproveFormValues | null>(null);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
 
