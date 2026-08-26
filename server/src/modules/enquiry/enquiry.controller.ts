@@ -45,6 +45,20 @@ export class EnquiryController {
     } catch (error) { next(error); }
   };
 
+  /**
+   * GET /api/enquiries/:id/prefill
+   * Returns pre-mapped appointment form data derived from the enquiry.
+   * Requires SERVICE_READ permission. Branch ownership is enforced.
+   */
+  prefillFromEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const enquiry = await this.service.getEnquiry(req.params.id);
+      assertBranchOwnership(req, enquiry.branch?.id);
+      const prefill = await this.service.getPrefillData(req.params.id);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { prefill } });
+    } catch (error) { next(error); }
+  };
+
   reviewEnquiry = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const reviewedById = req.user!.userId;

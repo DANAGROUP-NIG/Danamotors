@@ -215,6 +215,40 @@ export class AdminController {
     }
   };
 
+  updateRole = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { name, description } = req.body;
+      const result = await this.adminService.updateRole(id, { name, description });
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'Role updated successfully',
+        data: {
+          role: result,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteRole = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await this.adminService.deleteRole(id);
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'Role deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getPermissions = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.adminService.getPermissions();

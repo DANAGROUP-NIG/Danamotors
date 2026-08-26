@@ -122,6 +122,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
         name: 'Enquiries',
         description: 'Online enquiry submission (public), staff review/approve/reject workflow, and enquiry management.',
       },
+      {
+        name: 'Audit',
+        description: 'System audit trail — tracks all write operations across the platform with user, action, IP, and timestamp details.',
+      },
     ],
     components: {
       securitySchemes: {
@@ -335,6 +339,95 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
             createdAt: { type: 'string', format: 'date-time' },
           },
           required: ['id', 'name', 'address'],
+        },
+        // ── Audit Log DTO ─────────────────────────────────────────
+        AuditLogDTO: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid', example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' },
+            action: { type: 'string', example: 'USER_CREATE' },
+            details: { type: 'string', nullable: true, example: '{"email":"tech@danamotors.com","firstName":"John","roleName":"Technician"}' },
+            ipAddress: { type: 'string', nullable: true, example: '192.168.1.100' },
+            userAgent: { type: 'string', nullable: true, example: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+            createdAt: { type: 'string', format: 'date-time', example: '2026-08-26T10:30:00.000Z' },
+            user: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                firstName: { type: 'string', example: 'Admin' },
+                lastName: { type: 'string', example: 'User' },
+                email: { type: 'string', format: 'email', example: 'admin@danamotors.com' },
+                branchId: { type: 'string', nullable: true },
+              },
+            },
+          },
+          required: ['id', 'action', 'createdAt'],
+        },
+        // ── Audit Log Stats DTO ────────────────────────────────────
+        AuditLogStatsDTO: {
+          type: 'object',
+          properties: {
+            totalLogs: { type: 'integer', example: 1500 },
+            todayCount: { type: 'integer', example: 47 },
+            topActions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  action: { type: 'string', example: 'USER_LOGIN' },
+                  count: { type: 'integer', example: 320 },
+                },
+              },
+            },
+            topUsers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  userId: { type: 'string', format: 'uuid' },
+                  name: { type: 'string', example: 'Admin User' },
+                  count: { type: 'integer', example: 230 },
+                },
+              },
+            },
+          },
+          required: ['totalLogs', 'todayCount', 'topActions', 'topUsers'],
+        },
+        // ── Role DTO ──────────────────────────────────────────────
+        RoleDTO: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'Receptionist' },
+            description: { type: 'string', example: 'Front-desk staff', nullable: true },
+            permissionsCount: { type: 'integer', example: 8 },
+            usersCount: { type: 'integer', example: 5 },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+          required: ['id', 'name'],
+        },
+        // ── Permission DTO ────────────────────────────────────────
+        PermissionDTO: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'user:read' },
+            description: { type: 'string', nullable: true },
+          },
+          required: ['id', 'name'],
+        },
+        // ── Permission Group DTO ──────────────────────────────────
+        PermissionGroupDTO: {
+          type: 'object',
+          properties: {
+            module: { type: 'string', example: 'User Management' },
+            permissions: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PermissionDTO' },
+            },
+          },
+          required: ['module', 'permissions'],
         },
       },
     },

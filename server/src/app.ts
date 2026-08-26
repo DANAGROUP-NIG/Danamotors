@@ -4,6 +4,7 @@ import swaggerUi from 'swagger-ui-express';
 import routes from './routes';
 import swaggerSpec from './config/swagger';
 import { errorHandler } from './middleware/errorHandler';
+import { auditMiddleware } from './middleware/auditMiddleware';
 import { NotFoundError } from './shared/errors/appError';
 
 const app = express();
@@ -37,7 +38,11 @@ app.get('/api/docs.json', (_req, res) => {
 });
 
 // ── Central Routing Hook ────────────────────────────────────────────────────
-app.use('/api', routes);
+// Audit middleware is applied before routes so it can register a res.on('finish')
+// listener on each request. The listener fires after the response is fully sent,
+// regardless of middleware ordering — but the listener must be attached before
+// the route handler runs and calls res.json() / res.send().
+app.use('/api', auditMiddleware, routes);
 
 // ── Handle 404/Not Found Routes ─────────────────────────────────────────────
 app.use((req, _res, next) => {
