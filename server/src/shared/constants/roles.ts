@@ -75,6 +75,9 @@ export const PERMISSIONS = {
   FINANCE_READ: "finance:read",
   FINANCE_CREATE: "finance:create",
   FINANCE_UPDATE: "finance:update",
+
+  // Audit Management
+  AUDIT_READ: "audit:read",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -109,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
+    PERMISSIONS.AUDIT_READ,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
