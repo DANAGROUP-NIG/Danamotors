@@ -24,6 +24,19 @@ export type PermissionItem = {
   description?: string | null;
 };
 
+export type PermissionGroup = {
+  module: string;
+  permissions: PermissionItem[];
+};
+
+type PermissionCatalogResponse = {
+  permissions?: PermissionItem[] | {
+    permissions?: PermissionItem[];
+    groups?: PermissionGroup[];
+  };
+  groups?: PermissionGroup[];
+};
+
 export async function getRoleListRequest(): Promise<{ roles: RoleListItem[] }> {
   return apiGet<{ roles: RoleListItem[] }>(API_ROUTES.administration.roles.base);
 }
@@ -32,8 +45,21 @@ export async function getRoleRequest(id: string): Promise<{ role: RoleDetail }> 
   return apiGet<{ role: RoleDetail }>(API_ROUTES.administration.roles.detail(id));
 }
 
-export async function getPermissionListRequest(): Promise<{ permissions: PermissionItem[] }> {
-  return apiGet<{ permissions: PermissionItem[] }>(API_ROUTES.administration.permissions.base);
+export async function getPermissionListRequest(): Promise<{
+  permissions: PermissionItem[];
+  groups: PermissionGroup[];
+}> {
+  const response = await apiGet<PermissionCatalogResponse>(
+    API_ROUTES.administration.permissions.base,
+  );
+  const nested = !Array.isArray(response.permissions) ? response.permissions : undefined;
+
+  return {
+    permissions: Array.isArray(response.permissions)
+      ? response.permissions
+      : nested?.permissions ?? [],
+    groups: response.groups ?? nested?.groups ?? [],
+  };
 }
 
 export async function createRoleRequest(payload: {
