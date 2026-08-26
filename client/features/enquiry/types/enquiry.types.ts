@@ -70,3 +70,18 @@ export type ReviewEnquiryResponse = {
   enquiry:     Enquiry;
   appointment: import('@/features/appointments/types/appointment.types').Appointment | null;
 };
+
+export type EnquiryPrefillData = {
+  customerId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleRegNumber: string;
+  vehicleId: string;
+  preferredDate: string;
+  branchId: string;
+  branchName: string;
+  serviceDescription: string;
+};

@@ -14,4 +14,5 @@ export const enquiryKeys = {
   list:    (p: EnquiryListParams) => [...enquiryKeys.lists(), p] as const,
   details: () => [...enquiryKeys.all, 'detail']    as const,
   detail:  (id: string) => [...enquiryKeys.details(), id] as const,
+  prefill: (enquiryId: string) => ["enquiry", enquiryId, "prefill"] as const,
 };

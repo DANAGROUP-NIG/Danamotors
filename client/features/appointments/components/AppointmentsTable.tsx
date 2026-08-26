@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -173,19 +174,37 @@ export function AppointmentsTable() {
         </span>
       ),
     },
-    {
+   {
       header: "Source",
       className: "whitespace-nowrap",
-      render: (a) => (
-        <span
-          className={cn(
-            "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
-            SOURCE_COLORS[a.source],
-          )}
-        >
-          {SOURCE_LABELS[a.source]}
-        </span>
-      ),
+      render: (a) => {
+        const isWalkIn = a.source === "WalkIn";
+        const isOnline = a.source === "OnlineBooking";
+        
+        return (
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
+                SOURCE_COLORS[a.source],  
+              )}
+            >
+              {isWalkIn && "🚶 "} 
+              {isOnline && "🌐 "} 
+              {SOURCE_LABELS[a.source]}
+            </span>
+            {isOnline && (a as any).enquiryId && (
+              <Link
+                href={`/enquiries/${(a as any).enquiryId}`}
+                className="text-xs text-primary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                View Enquiry
+              </Link>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: "Notes",

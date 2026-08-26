@@ -1,16 +1,20 @@
 "use client";
-
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation"; 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateAppointment } from "../hooks/use-create-appointment";
 import { useServices } from "@/features/services/hooks/use-services";
+import { useEnquiryPrefill } from "@/features/enquiry/hooks/use-enquiry-prefill"; 
 import { CustomerSelectWithCreate } from "@/features/customers/components/CustomerSelectWithCreate";
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
+import { EnquiryPrefillBanner } from "@/features/enquiry/components/EnquiryPrefillBanner"; 
 import {
   createAppointmentSchema,
   type CreateAppointmentFormValues,
@@ -22,7 +26,10 @@ interface AppointmentCreateFormProps {
 }
 
 export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentCreateFormProps) {
+  const searchParams = useSearchParams();
+  const enquiryId = searchParams.get("enquiryId");
   const create = useCreateAppointment();
+  const { data: prefillData, isLoading: isLoadingPrefill, error: prefillError } = useEnquiryPrefill(enquiryId);
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
   const { isSuperAdmin } = useAuth();
@@ -49,6 +56,19 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
   const selectedCustomerId = watch("customerId");
   const selectedVehicleId = watch("vehicleId");
 
+  useEffect(() => {
+    if (prefillData) {
+      reset({
+        branchName: prefillData.branchName || (isSuperAdmin ? "" : (activeBranch?.name ?? "")),
+        scheduledAt: prefillData.preferredDate || "",
+        notes: prefillData.serviceDescription || "",
+        customerId: prefillData.customerId || "",
+        vehicleId: prefillData.vehicleId || "",
+        ...initialValues,
+      });
+    }
+  }, [prefillData, reset, isSuperAdmin, activeBranch, initialValues]);
+
   function onSubmit(values: CreateAppointmentFormValues) {
     const payload = {
       ...values,
@@ -61,9 +81,52 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
       },
     });
   }
+  if (isLoadingPrefill) {
+      return (
+        <div className="space-y-4">
+          <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-32 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-20 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+        </div>
+      );
+    }
+
+    if (prefillError) {
+    return (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <p className="text-sm font-medium">Failed to load enquiry data. Please try again.</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 text-sm underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+      {/* ✅ ENQUIRY BANNER */}
+
+       {prefillData && (
+          <EnquiryPrefillBanner
+            firstName={prefillData.firstName}
+            lastName={prefillData.lastName}
+            email={prefillData.email}
+            vehicleMake={prefillData.vehicleMake}
+            vehicleModel={prefillData.vehicleModel}
+            vehicleRegNumber={prefillData.vehicleRegNumber}
+          />
+          )}
+
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Customer" error={errors.customerId?.message}>
           <CustomerSelectWithCreate

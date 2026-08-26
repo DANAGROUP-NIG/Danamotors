@@ -7,6 +7,7 @@ import type {
   Enquiry,
   ReviewEnquiryPayload,
   ReviewEnquiryResponse,
+  EnquiryPrefillData, 
 } from '../types/enquiry.types';
 
 export async function createEnquiryRequest(
@@ -59,3 +60,11 @@ export async function deleteEnquiryRequest(id: string): Promise<void> {
   return apiDelete<void>(`${API_ROUTES.enquiries.base}/${id}`);
 }
 
+
+export async function getEnquiryPrefillRequest(
+  enquiryId: string,
+): Promise<EnquiryPrefillData> {
+  return apiGet<EnquiryPrefillData>(
+    `/api/enquiries/${enquiryId}/prefill`,
+  );
+}
