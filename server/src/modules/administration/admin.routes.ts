@@ -9,6 +9,8 @@ import {
   updateUserSchema,
   createRoleSchema,
   updateRolePermissionsSchema,
+  updateRoleSchema,
+  deleteRoleParamSchema,
   userIdParamSchema,
   roleIdParamSchema,
 } from './admin.validation';
@@ -201,78 +203,314 @@ router.put('/users/:id', requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN), requirePer
 router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validateRequest(userIdParamSchema), controller.deleteUser);
 
 // Roles & Permissions Management
+// ──────────────────────────────────────────────────────────────────────────────
+// GET /admin/roles — List all roles
+// ──────────────────────────────────────────────────────────────────────────────
 /**
  * @openapi
  * /admin/roles:
  *   get:
+ *     operationId: listRoles
  *     tags:
  *       - Administration
  *     summary: List all roles
+ *     description: |
+ *       Returns a list of all roles in the system, each including:
+ *       - `permissionsCount` — number of permissions assigned to the role.
+ *       - `usersCount` — number of active users assigned to the role.
+ *
+ *       Requires the `role:read` permission.
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: List of roles
+ *         description: List of all roles with permission and user counts.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
- *   post:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         roles:
+ *                           type: array
+ *                           description: Array of role objects.
+ *                           items:
+ *                             $ref: '#/components/schemas/RoleDTO'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — user lacks the `role:read` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ * /admin/roles/{id}:
+ *   get:
+ *     operationId: getRole
  *     tags:
  *       - Administration
- *     summary: Create a new role
+ *     summary: Get role by ID
+ *     description: |
+ *       Returns a single role with its full list of assigned permissions.
+ *       Each permission includes `id`, `name`, and `description`.
+ *
+ *       Requires the `role:read` permission.
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         description: The UUID of the role.
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Role details with permissions.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         role:
+ *                           type: object
+ *                           properties:
+ *                             id: { type: string, format: uuid }
+ *                             name: { type: string, example: 'Technician' }
+ *                             description: { type: string, nullable: true }
+ *                             permissions:
+ *                               type: array
+ *                               items:
+ *                                 $ref: '#/components/schemas/PermissionDTO'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — user lacks the `role:read` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Not found — no role exists with the given ID.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
+ *   put:
+ *     operationId: updateRole
+ *     tags:
+ *       - Administration
+ *     summary: Update role name and description
+ *     description: |
+ *       Updates the metadata (name and/or description) of a role.
+ *
+ *       **System role protection:**
+ *       The 10 default system roles (SuperAdmin, Admin, GeneralStoreManager,
+ *       BranchStoreManager, WorkshopManager, Accountant, ServiceAdviser,
+ *       Technician, Receptionist, ReceptionManager) **cannot be renamed**.
+ *       Attempting to rename them returns `403 Forbidden`.
+ *
+ *       **Duplicate name check:**
+ *       If the new name conflicts with an existing role, returns `409 Conflict`.
+ *
+ *       Requires the `role:update` permission.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         description: The UUID of the role to update.
+ *         required: true
+ *         schema: { type: string, format: uuid }
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name]
  *             properties:
- *               name: { type: string, example: SERVICE_ADVISOR }
- *               description: { type: string }
+ *               name:
+ *                 type: string
+ *                 minLength: 1
+ *                 description: New role name (must be unique, cannot rename system roles).
+ *                 example: 'Senior Technician'
+ *               description:
+ *                 type: string
+ *                 description: New role description.
+ *                 example: 'Senior-level repair technician with QC authority'
  *     responses:
- *       201:
- *         description: Role created
+ *       200:
+ *         description: Role updated successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message: { type: string, example: 'Role updated successfully' }
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         role:
+ *                           type: object
+ *                           properties:
+ *                             id: { type: string, format: uuid }
+ *                             name: { type: string, example: 'Senior Technician' }
+ *                             description: { type: string, nullable: true }
+ *                             permissions:
+ *                               type: array
+ *                               items:
+ *                                 $ref: '#/components/schemas/PermissionDTO'
+ *       400:
+ *         description: Validation error — invalid ID format or empty name.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationErrorResponse'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — cannot rename a system role, or user lacks `role:update` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               status: error
+ *               statusCode: 403
+ *               message: 'System roles cannot be renamed'
+ *       404:
+ *         description: Not found — no role exists with the given ID.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflict — a role with the proposed name already exists.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               status: error
+ *               statusCode: 409
+ *               message: 'A role with this name already exists'
  *
- * /admin/roles/{id}:
- *   get:
+ *   delete:
+ *     operationId: deleteRole
  *     tags:
  *       - Administration
- *     summary: Get role by ID
+ *     summary: Delete a role
+ *     description: |
+ *       Deletes a custom role and its associated permission assignments
+ *       (cascaded via `RolePermission`).
+ *
+ *       **Guards:**
+ *       - **System roles** (the 10 defaults) **cannot be deleted** — returns `403 Forbidden` with message: `"System roles cannot be deleted"`.
+ *       - **Roles with assigned users** cannot be deleted — returns `409 Conflict` with the count of currently assigned users.
+ *
+ *       Requires the `role:update` permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: The UUID of the role to delete.
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
- *         description: Role details with permissions
+ *         description: Role deleted successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message: { type: string, example: 'Role deleted successfully' }
+ *       400:
+ *         description: Validation error — invalid UUID format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationErrorResponse'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — cannot delete a system role, or user lacks `role:update` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               status: error
+ *               statusCode: 403
+ *               message: 'System roles cannot be deleted'
+ *       404:
+ *         description: Not found — no role exists with the given ID.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflict — role has active user assignments.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               status: error
+ *               statusCode: 409
+ *               message: "Cannot delete role 'Junior Technician'. 3 user(s) are currently assigned to this role."
  *
  * /admin/roles/{id}/permissions:
  *   put:
+ *     operationId: updateRolePermissions
  *     tags:
  *       - Administration
  *     summary: Update role permissions
+ *     description: |
+ *       Replaces all permissions for a role with the provided set.
+ *       Existing permissions are removed and new ones are assigned atomically
+ *       in a database transaction.
+ *
+ *       Requires the `role:update` permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: The UUID of the role to update.
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     requestBody:
  *       required: true
  *       content:
@@ -283,34 +521,115 @@ router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validate
  *             properties:
  *               permissions:
  *                 type: array
+ *                 description: "Array of permission names to assign (e.g. `user:read`, `service:create`)."
  *                 items: { type: string }
- *                 example: [CUSTOMER_READ, VEHICLE_READ]
+ *                 example: ['customer:read', 'vehicle:read', 'service:read']
  *     responses:
  *       200:
- *         description: Permissions updated
+ *         description: Permissions updated successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message: { type: string, example: 'Role permissions updated successfully' }
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         role:
+ *                           type: object
+ *                           properties:
+ *                             id: { type: string, format: uuid }
+ *                             name: { type: string }
+ *                             permissions:
+ *                               type: array
+ *                               items:
+ *                                 $ref: '#/components/schemas/PermissionDTO'
+ *       400:
+ *         description: Validation error — invalid ID or missing permissions array.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationErrorResponse'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — user lacks the `role:update` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Not found — no role exists with the given ID.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  * /admin/permissions:
  *   get:
+ *     operationId: listPermissions
  *     tags:
  *       - Administration
  *     summary: List all available permissions
+ *     description: |
+ *       Returns the full set of system permissions in two formats:
+ *       - **`permissions`** — flat array of all permissions (backwards compatible).
+ *       - **`groups`** — permissions grouped by module (e.g. "User Management", "Service Management").
+ *
+ *       Grouping is derived from the permission name prefix (`user:` → "User Management",
+ *       `service:` → "Service Management", etc.).
+ *
+ *       Requires the `role:read` permission.
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Full list of system permissions
+ *         description: Full list of system permissions, flat and grouped.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         permissions:
+ *                           description: Flat array of all permissions.
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/PermissionDTO'
+ *                         groups:
+ *                           description: Permissions grouped by module.
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/PermissionGroupDTO'
+ *       401:
+ *         description: Unauthorized — missing or invalid JWT token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden — user lacks the `role:read` permission.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/roles', requirePermission(PERMISSIONS.ROLE_READ), controller.getRoles);
 router.get('/roles/:id', requirePermission(PERMISSIONS.ROLE_READ), validateRequest(roleIdParamSchema), controller.getRole);
 router.post('/roles', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(createRoleSchema), controller.createRole);
+router.put('/roles/:id', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(updateRoleSchema), controller.updateRole);
+router.delete('/roles/:id', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(deleteRoleParamSchema), controller.deleteRole);
 router.put('/roles/:id/permissions', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(updateRolePermissionsSchema), controller.updateRolePermissions);
 
 router.get('/permissions', requirePermission(PERMISSIONS.ROLE_READ), controller.getPermissions);
