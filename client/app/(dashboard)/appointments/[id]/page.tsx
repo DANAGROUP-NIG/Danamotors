@@ -161,8 +161,7 @@ export default function AppointmentDetailPage() {
     update.mutate({ status: "Cancelled" });
   }
 
-  const appointmentRef =
-    appointment.ref || `APT-${String(appointment.id).slice(0, 4)}`.toUpperCase();
+  const appointmentRef = `APT-${String(appointment.id).slice(0, 4)}`.toUpperCase();
 
   const customerName = customer
     ? `${customer.firstName} ${customer.lastName}`
@@ -188,11 +187,9 @@ export default function AppointmentDetailPage() {
     minute: "2-digit",
   })}`;
 
-  const agentName = appointment.assignedTo
-    ? `${appointment.assignedTo.firstName} ${appointment.assignedTo.lastName}`
-    : appointment.createdBy
-      ? `${appointment.createdBy.firstName} ${appointment.createdBy.lastName}`
-      : "—";
+  const agentName = appointment.createdBy
+  ? `${appointment.createdBy.firstName} ${appointment.createdBy.lastName}`
+  : "—";
 
   // Rendered once, below the details grid
   const actionButtons = (
@@ -267,7 +264,7 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 px-4 py-8 lg:px-8">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-7xl">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
           {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-[15px] text-slate-500">
