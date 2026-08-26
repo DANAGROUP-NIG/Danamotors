@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ModalFame from "@/components/modals/ModalFame";
 import { PageHeader } from "@/components/headers/page-header";
 import { DataTable } from "@/components/ui/table-components/DataTable";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { RoleCreateModal } from "./role-create-modal";
-import { useAdminRoles } from "../hooks/use-admin-roles";
+import { useAdminRoles, useDeleteRole } from "../hooks/use-admin-roles";
 
 const SYSTEM_ROLE_NAMES = new Set([
   "SuperAdmin",
@@ -30,9 +31,13 @@ export function RolesPage() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const { hasAccess } = useAuth();
-  const canView = hasAccess(["superadmin", "admin"] as any);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const { hasPermission } = useAuth();
+  const canView = hasPermission("role:read");
+  const canCreate = hasPermission("role:create");
+  const canDelete = hasPermission("role:delete");
   const { data, isLoading, isError, isFetching } = useAdminRoles();
+  const deleteRole = useDeleteRole();
 
   const roles = useMemo(() => data?.roles ?? [], [data]);
   const totalPages = Math.max(1, Math.ceil(roles.length / PAGE_SIZE));
@@ -44,6 +49,13 @@ export function RolesPage() {
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+
+  function handleDelete() {
+    if (!deleteTarget) return;
+    deleteRole.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    });
+  }
 
   if (!canView) {
     return (
@@ -67,7 +79,7 @@ export function RolesPage() {
         title="Roles & Permissions"
         description="Manage roles and their associated permissions"
         actions={
-          <Button onClick={() => setIsModalOpen(true)} size="sm" className="cursor-pointer">
+          <Button onClick={() => setIsModalOpen(true)} size="sm" className="cursor-pointer" disabled={!canCreate}>
             <Plus className="size-4" />
             Create Role
           </Button>
@@ -131,6 +143,7 @@ export function RolesPage() {
                   size="icon"
                   className="h-8 w-8"
                   aria-label={`Edit ${role.name}`}
+                  disabled={!hasPermission("role:update")}
                   onClick={() => router.push(`/settings/roles/${role.id}`)}
                 >
                   <Pencil className="size-3.5" />
@@ -140,8 +153,9 @@ export function RolesPage() {
                   size="icon"
                   className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={`Delete ${role.name}`}
-                  disabled={SYSTEM_ROLE_NAMES.has(role.name)}
+                  disabled={!canDelete || SYSTEM_ROLE_NAMES.has(role.name)}
                   title={SYSTEM_ROLE_NAMES.has(role.name) ? "System roles cannot be deleted" : undefined}
+                  onClick={() => setDeleteTarget({ id: role.id, name: role.name })}
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
@@ -157,6 +171,23 @@ export function RolesPage() {
         totalPages={totalPages}
         onPageChange={setPage}
       />
+
+      <ModalFame isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete role">
+        <div className="space-y-4">
+          <p className="text-base font-semibold">Delete Role &quot;{deleteTarget?.name}&quot;?</p>
+          <p className="text-sm text-slate-600">
+            This action cannot be undone. All users currently assigned to this role will need to be reassigned.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteRole.isPending}>
+              {deleteRole.isPending ? "Deleting…" : "Delete Role"}
+            </Button>
+          </div>
+        </div>
+      </ModalFame>
     </div>
   );
 }

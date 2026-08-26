@@ -15,7 +15,8 @@ import BranchSwitcher from "@/features/branches/components/BranchSwitcher";
 
 export function InventoryPage() {
   const [showForm, setShowForm] = useState(false);
-  const { isGeneralStoreManager, isAdminOrAbove } = useAuth();
+  const { isGeneralStoreManager, isAdminOrAbove, hasPermission } = useAuth();
+  const canCreate = hasPermission("sparepart:create");
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const canSwitchBranch = isGeneralStoreManager || isAdminOrAbove;
 
@@ -36,10 +37,12 @@ export function InventoryPage() {
         actions={
           <div className="flex items-center gap-3">
             {canSwitchBranch && <div className="w-48"><BranchSwitcher /></div>}
-            <Button onClick={() => setShowForm(true)} size="sm">
-              <Plus className="size-4" />
-              Add part
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setShowForm(true)} size="sm">
+                <Plus className="size-4" />
+                Add part
+              </Button>
+            )}
           </div>
         }
       />

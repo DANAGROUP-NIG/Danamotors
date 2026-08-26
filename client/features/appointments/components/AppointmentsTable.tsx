@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, SERVICE_UPDATE_ROLES } from "@/features/auth/roles";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
@@ -78,9 +77,9 @@ export function AppointmentsTable() {
 
   const router = useRouter();
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canDelete = hasAccess(DELETE_ROLES);
-  const canEdit = hasAccess(SERVICE_UPDATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission("appointment:delete");
+  const canEdit = hasPermission("appointment:update");
   const canManage = canEdit || canDelete;
   const branchId = activeBranch?.id ?? undefined;
 

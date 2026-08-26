@@ -12,7 +12,6 @@ import { DateInput } from '@/components/forms/DateInput';
 // Modal removed: navigate to a dedicated enquiry page instead
 import { useBranchStore } from '@/store/branch.store';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { ENQUIRY_REVIEW_ROLES } from '@/features/auth/roles';
 import { useEnquiries } from '../hooks/use-enquires';
 import type { Enquiry, EnquiryStatus } from '../types/enquiry.types';
 
@@ -50,8 +49,8 @@ export function EnquiriesTable() {
   const router = useRouter();
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES);
+  const { hasPermission } = useAuth();
+  const canReview = hasPermission("customer:update");
   const branchId = activeBranch?.id ?? undefined;
 
   const { data, isLoading, isError, isFetching } = useEnquiries({

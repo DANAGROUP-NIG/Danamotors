@@ -69,7 +69,7 @@ export default function SideNav({
   exactRoot,
 }: SideNavProps) {
   const logout = useLogout();
-  const { user, isHydrated, isSuperAdmin, hasAccess } = useAuth();
+  const { user, isHydrated, isSuperAdmin, hasAccess, hasAnyPermission } = useAuth();
   const pathname = usePathname();
 
   // Desktop collapsed state — persisted
@@ -240,10 +240,16 @@ export default function SideNav({
             aria-label="Main navigation"
           >
             {navGroups
-              .filter((group) => hasAccess(group.roles ?? []))
+              .filter((group) =>
+                group.permissions?.length
+                  ? hasAnyPermission(group.permissions)
+                  : hasAccess(group.roles ?? []),
+              )
               .map((group) => {
                 const visibleItems = group.items.filter((item) =>
-                  hasAccess(item.roles ?? []),
+                  item.permissions?.length
+                    ? hasAnyPermission(item.permissions)
+                    : hasAccess(item.roles ?? []),
                 );
                 if (visibleItems.length === 0) return null;
 

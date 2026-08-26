@@ -183,7 +183,7 @@ router.use(authMiddleware);
  *       401:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
+router.get('/',      requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
 
 /**
  * @openapi
@@ -278,7 +278,7 @@ router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   validateRequ
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/:id/prefill', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(enquiryIdParamSchema), controller.prefillFromEnquiry);
+router.get('/:id/prefill', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(enquiryIdParamSchema), controller.prefillFromEnquiry);
 
 /**
  * @openapi
@@ -313,7 +313,7 @@ router.get('/:id/prefill', requirePermission(PERMISSIONS.SERVICE_READ), validate
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/:id',   requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
+router.get('/:id',   requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
 
 
 /**
@@ -391,7 +391,7 @@ router.get('/:id',   requirePermission(PERMISSIONS.SERVICE_READ),   validateRequ
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.patch('/:id/review', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
+router.patch('/:id/review', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
 
 /**
  * @openapi
@@ -428,6 +428,6 @@ router.patch('/:id/review', requirePermission(PERMISSIONS.SERVICE_UPDATE), valid
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', requirePermission(PERMISSIONS.SERVICE_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
+router.delete('/:id', requirePermission(PERMISSIONS.CUSTOMER_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
 
 export default router;

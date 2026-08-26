@@ -13,7 +13,6 @@ import { VehicleSelectWithCreate } from '@/features/vehicles/components/VehicleS
 import { useServices } from '@/features/services/hooks/use-services';
 import { useBranchStore } from '@/store/branch.store';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { ENQUIRY_REVIEW_ROLES } from '@/features/auth/roles';
 import { useReviewEnquiry } from '../hooks/use-review-enquiry';
 import type { Enquiry } from '../types/enquiry.types';
 
@@ -119,8 +118,8 @@ export function EnquiryReviewModal({
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
 
   const reviewEnquiry = useReviewEnquiry();
-  const { hasAccess, isSuperAdmin } = useAuth();
-  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES) && enquiry.status === 'Pending';
+  const { hasPermission, isSuperAdmin } = useAuth();
+  const canReview = hasPermission("customer:update") && enquiry.status === 'Pending';
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data: services } = useServices({ limit: 100 });
 

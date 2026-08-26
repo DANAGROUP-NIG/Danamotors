@@ -11,7 +11,6 @@ import { DataTableFilterChips } from "@/components/ui/table-components/DataTable
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useBranchStock } from "../hooks/use-branch-stock";
 import { InventoryDeleteButton } from "./InventoryDeleteButton";
@@ -28,8 +27,9 @@ export function InventoryTable() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const { hasAccess } = useAuth();
-  const canDelete = hasAccess(DELETE_ROLES);
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("sparepart:update");
+  const canDelete = hasPermission("sparepart:delete");
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   const { data: stockData, isLoading, isError, isFetching } = useBranchStock(activeBranch?.id ?? null);
@@ -119,14 +119,16 @@ export function InventoryTable() {
       className: "text-right",
       render: (stock) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            size="sm" variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Edit ${stock.part.name}`}
-            onClick={() => setEditingId(stock.id)}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
+          {canEdit && (
+            <Button
+              size="sm" variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              aria-label={`Edit ${stock.part.name}`}
+              onClick={() => setEditingId(stock.id)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
           {canDelete && <InventoryDeleteButton item={stock.part} />}
         </div>
       ),

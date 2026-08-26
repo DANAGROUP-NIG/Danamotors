@@ -54,15 +54,14 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { APPOINTMENT_CREATE_ROLES } from "@/features/auth/roles";
 import { AppointmentsTable } from "./AppointmentsTable";
 import { AppointmentCreateForm } from "./AppointmentCreateForm";
 
 export function AppointmentsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(APPOINTMENT_CREATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("appointment:create");
 
   return (
     <div className="space-y-6 p-4 lg:p-6">

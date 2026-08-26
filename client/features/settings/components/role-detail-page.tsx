@@ -30,8 +30,10 @@ export function RoleDetailPage() {
   const updateMeta = useUpdateRole(roleId);
   const updatePermissions = useUpdateRolePermissions(roleId);
   const deleteRole = useDeleteRole();
-  const { hasAccess } = useAuth();
-  const canEdit = hasAccess(["superadmin", "admin"] as any);
+  const { hasPermission } = useAuth();
+  const canView = hasPermission("role:read");
+  const canEditRole = hasPermission("role:update");
+  const canDelete = hasPermission("role:delete");
 
   const role = data?.role;
   const [name, setName] = useState("");
@@ -82,7 +84,7 @@ export function RoleDetailPage() {
     });
   }
 
-  const metaDisabled = isSystemRole || !canEdit;
+  const metaDisabled = isSystemRole || !canEditRole;
 
   return (
     <div className="p-4 lg:p-6">
@@ -146,14 +148,14 @@ export function RoleDetailPage() {
                     selectedPermissions={permissions}
                     onChange={setPermissions}
                 />
-                <Button onClick={handleSavePermissions} disabled={updatePermissions.isPending}>
+                <Button onClick={handleSavePermissions} disabled={updatePermissions.isPending || !canEditRole}>
                     {updatePermissions.isPending ? "Saving…" : "Save Permissions"}
                 </Button>
                 </div>
             </div>
         </div>
 
-        {!isSystemRole && (
+        {!isSystemRole && canDelete && (
           <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>

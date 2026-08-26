@@ -20,11 +20,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import {
-  DELETE_ROLES,
-  SERVICE_UPDATE_ROLES,
-  APPOINTMENT_UPDATE_ROLES,
-} from "@/features/auth/roles";
 import { useAppointment } from "@/features/appointments";
 import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-appointment";
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
@@ -32,7 +27,6 @@ import ModalFame from "@/components/modals/ModalFame";
 import { AppointmentEditForm } from "@/features/appointments/components/AppointmentEditForm";
 import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
-import type { AppRole } from "@/features/auth/roles";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -70,35 +64,21 @@ const NEXT_STATUS: Record<string, string | null> = {
   Cancelled: null,
 };
 
-const STATUS_TRANSITION_ROLES: Record<string, AppRole[]> = {
-  "Checked In": ["superadmin", "admin", "receptionmanager"],
-  Inspection: ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Awaiting Approval": [
-    "technician",
-    "serviceadviser",
-    "superadmin",
-    "admin",
-    "workshopmanager",
-  ],
-  "In Repair": ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Quality Check": [
-    "technician",
-    "serviceadviser",
-    "superadmin",
-    "admin",
-    "workshopmanager",
-  ],
-  Ready: ["workshopmanager", "serviceadviser", "superadmin", "admin"],
-  Completed: ["serviceadviser", "superadmin", "admin", "receptionmanager"],
+const STATUS_TRANSITION_PERMISSIONS: Record<string, string> = {
+  "Checked In": "appointment:update",
+  Inspection: "appointment:update",
+  "Awaiting Approval": "appointment:update",
+  "In Repair": "appointment:update",
+  "Quality Check": "appointment:update",
+  Ready: "appointment:update",
+  Completed: "appointment:update",
 };
-
-const CANCEL_ROLES: AppRole[] = ["superadmin", "admin", "receptionmanager"];
 
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data, isLoading, error } = useAppointment(id);
-  const { hasAccess } = useAuth();
+  const { hasPermission } = useAuth();
   const update = useUpdateAppointment(id);
   const del = useDeleteAppointment();
 
@@ -136,15 +116,16 @@ export default function AppointmentDetailPage() {
 
   const nextStatus = NEXT_STATUS[appointment.status];
   const canTransition =
-    nextStatus && hasAccess(STATUS_TRANSITION_ROLES[nextStatus] ?? []);
+    nextStatus &&
+    hasPermission(STATUS_TRANSITION_PERMISSIONS[nextStatus] ?? "");
   const canCancel =
-    hasAccess(CANCEL_ROLES) &&
+    hasPermission("appointment:update") &&
     appointment.status !== "Completed" &&
     appointment.status !== "Cancelled";
-  const canEdit = hasAccess(APPOINTMENT_UPDATE_ROLES);
-  const canDelete = hasAccess(DELETE_ROLES);
+  const canEdit = hasPermission("appointment:update");
+  const canDelete = hasPermission("appointment:delete");
   const canCreateJobCard =
-    hasAccess(SERVICE_UPDATE_ROLES) && appointment.status !== "Cancelled";
+    hasPermission("appointment:update") && appointment.status !== "Cancelled";
 
   const isTerminal =
     appointment.status === "Completed" || appointment.status === "Cancelled";
@@ -171,14 +152,14 @@ export default function AppointmentDetailPage() {
         href="/appointments"
         className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
       >
-        <ArrowLeft className="size-4" /> Back to Service & Enquiry Appointments
+        <ArrowLeft className="size-4" /> Back to Service Appointments
       </Link>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
-              Service &amp; Enquiry Appointment
+              Service Appointment
             </h1>
             <p className="mt-1 text-sm text-slate-500">
               {new Date(appointment.scheduledAt).toLocaleString(undefined, {
