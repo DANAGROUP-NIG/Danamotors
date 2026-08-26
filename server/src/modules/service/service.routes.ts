@@ -396,23 +396,23 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.post('/appointments', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createAppointmentSchema), controller.createAppointment);
-router.get('/appointments', requirePermission(PERMISSIONS.SERVICE_READ), controller.listAppointments);
-router.get('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(serviceIdParamSchema), controller.getAppointment);
-router.put('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(updateAppointmentSchema), controller.updateAppointment);
-router.delete('/appointments/:id', requirePermission(PERMISSIONS.SERVICE_DELETE), validateRequest(serviceIdParamSchema), controller.deleteAppointment);
+router.post('/appointments', requirePermission(PERMISSIONS.APPOINTMENT_CREATE), validateRequest(createAppointmentSchema), controller.createAppointment);
+router.get('/appointments', requirePermission(PERMISSIONS.APPOINTMENT_READ), controller.listAppointments);
+router.get('/appointments/:id', requirePermission(PERMISSIONS.APPOINTMENT_READ), validateRequest(serviceIdParamSchema), controller.getAppointment);
+router.put('/appointments/:id', requirePermission(PERMISSIONS.APPOINTMENT_UPDATE), validateRequest(updateAppointmentSchema), controller.updateAppointment);
+router.delete('/appointments/:id', requirePermission(PERMISSIONS.APPOINTMENT_DELETE), validateRequest(serviceIdParamSchema), controller.deleteAppointment);
 
-router.post('/job-cards', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createJobCardSchema), controller.createJobCard);
-router.get('/job-cards', requirePermission(PERMISSIONS.SERVICE_READ), controller.listJobCards);
-router.get('/job-cards/:id', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(jobCardIdParamSchema), controller.getJobCard);
-router.put('/job-cards/:id', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(updateJobCardSchema), controller.updateJobCard);
+router.post('/job-cards', requirePermission(PERMISSIONS.JOBCARD_CREATE), validateRequest(createJobCardSchema), controller.createJobCard);
+router.get('/job-cards', requirePermission(PERMISSIONS.JOBCARD_READ), controller.listJobCards);
+router.get('/job-cards/:id', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(jobCardIdParamSchema), controller.getJobCard);
+router.put('/job-cards/:id', requirePermission(PERMISSIONS.JOBCARD_UPDATE), validateRequest(updateJobCardSchema), controller.updateJobCard);
 
-router.get('/inspections', requirePermission(PERMISSIONS.SERVICE_READ), controller.listInspections);
-router.post('/job-cards/:id/inspections', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createInspectionSchema), controller.addInspection);
-router.get('/estimates', requirePermission(PERMISSIONS.SERVICE_READ), controller.listEstimates);
-router.post('/job-cards/:id/estimates', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createEstimateSchema), controller.addEstimate);
-router.post('/estimates/:id/approvals', requirePermission(PERMISSIONS.SERVICE_CREATE), validateRequest(createApprovalSchema), controller.addApproval);
-router.get('/estimates/:id/approvals', requirePermission(PERMISSIONS.SERVICE_READ), validateRequest(estimateIdParamSchema), controller.getApprovals);
+router.get('/inspections', requirePermission(PERMISSIONS.INSPECTION_READ), controller.listInspections);
+router.post('/job-cards/:id/inspections', requirePermission(PERMISSIONS.INSPECTION_CREATE), validateRequest(createInspectionSchema), controller.addInspection);
+router.get('/estimates', requirePermission(PERMISSIONS.ESTIMATE_READ), controller.listEstimates);
+router.post('/job-cards/:id/estimates', requirePermission(PERMISSIONS.ESTIMATE_CREATE), validateRequest(createEstimateSchema), controller.addEstimate);
+router.post('/estimates/:id/approvals', requirePermission(PERMISSIONS.ESTIMATE_APPROVE), validateRequest(createApprovalSchema), controller.addApproval);
+router.get('/estimates/:id/approvals', requirePermission(PERMISSIONS.ESTIMATE_READ), validateRequest(estimateIdParamSchema), controller.getApprovals);
 
 export default router;
 

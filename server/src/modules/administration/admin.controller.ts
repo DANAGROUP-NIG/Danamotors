@@ -256,9 +256,7 @@ export class AdminController {
       res.status(200).json({
         status: 'success',
         statusCode: 200,
-        data: {
-          permissions: result,
-        },
+        data: result,
       });
     } catch (error) {
       next(error);

@@ -183,7 +183,102 @@ router.use(authMiddleware);
  *       401:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
+router.get('/',      requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
+
+/**
+ * @openapi
+ * /enquiries/{id}/prefill:
+ *   get:
+ *     tags: [Enquiries]
+ *     summary: Get pre-filled appointment data from an enquiry
+ *     description: >
+ *       Returns a pre-mapped payload derived from an enquiry record that can be used
+ *       to pre-populate the service appointment creation form. Requires SERVICE_READ
+ *       permission. Branch ownership is enforced for non-admin staff.
+ *
+ *       If the enquiry is already `Approved` or `Rejected`, a `linkedAppointmentId`
+ *       field is included (may be `null`) so the frontend can redirect to an existing
+ *       appointment instead of creating a duplicate.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Enquiry ID to pre-fill from
+ *     responses:
+ *       200:
+ *         description: Pre-filled appointment form data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         prefill:
+ *                           type: object
+ *                           properties:
+ *                             customerName:
+ *                               type: string
+ *                               example: Chukwuemeka Obi
+ *                             email:
+ *                               type: string
+ *                               format: email
+ *                               example: emeka@example.com
+ *                             phoneNumber:
+ *                               type: string
+ *                               example: "+2348012345678"
+ *                             vehicleMake:
+ *                               type: string
+ *                               nullable: true
+ *                               example: Honda
+ *                             vehicleModel:
+ *                               type: string
+ *                               nullable: true
+ *                               example: Civic
+ *                             vehicleYear:
+ *                               type: integer
+ *                               nullable: true
+ *                               example: 2023
+ *                             vehicleRegNumber:
+ *                               type: string
+ *                               nullable: true
+ *                               example: ABC-123-DE
+ *                             serviceDescription:
+ *                               type: string
+ *                               example: Brake pads need replacement on front axle
+ *                             preferredDate:
+ *                               type: string
+ *                               format: date-time
+ *                               nullable: true
+ *                             branchId:
+ *                               type: string
+ *                               format: uuid
+ *                             branchName:
+ *                               type: string
+ *                               example: Dana Motors Abuja
+ *                             linkedAppointmentId:
+ *                               type: string
+ *                               format: uuid
+ *                               nullable: true
+ *                               description: >
+ *                                 Only present when the enquiry status is Approved or Rejected.
+ *                                 Non-null if an appointment was created from this enquiry.
+ *       401:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id/prefill', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(enquiryIdParamSchema), controller.prefillFromEnquiry);
 
 /**
  * @openapi
@@ -218,7 +313,8 @@ router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   validateRequ
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/:id',   requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
+router.get('/:id',   requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
+
 
 /**
  * @openapi
@@ -295,7 +391,7 @@ router.get('/:id',   requirePermission(PERMISSIONS.SERVICE_READ),   validateRequ
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.patch('/:id/review', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
+router.patch('/:id/review', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
 
 /**
  * @openapi
@@ -332,6 +428,6 @@ router.patch('/:id/review', requirePermission(PERMISSIONS.SERVICE_UPDATE), valid
  *       404:
  *         $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', requirePermission(PERMISSIONS.SERVICE_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
+router.delete('/:id', requirePermission(PERMISSIONS.CUSTOMER_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
 
 export default router;

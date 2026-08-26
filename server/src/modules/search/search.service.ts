@@ -13,8 +13,8 @@ export interface SearchResult {
 const CATEGORY_PERMISSIONS: Record<keyof SearchResult, string> = {
   customers: 'customer:read',
   vehicles: 'vehicle:read',
-  jobCards: 'service:read',
-  spareParts: 'inventory:read',
+  jobCards: 'jobcard:read',
+  spareParts: 'sparepart:read',
   users: 'user:read',
 };
 

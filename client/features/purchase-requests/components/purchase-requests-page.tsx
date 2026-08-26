@@ -10,6 +10,7 @@ import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { PageHeader } from "@/components/headers/page-header";
 import { usePurchaseRequests } from "../hooks/use-purchase-requests";
 import { useUpdatePurchaseRequestStatus } from "../hooks/use-update-purchase-request-status";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { PurchaseRequest } from "../types/purchase-request.types";
 
 const PAGE_SIZE = 10;
@@ -29,6 +30,8 @@ export function PurchaseRequestsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const update = useUpdatePurchaseRequestStatus();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("purchaserequest:update");
 
   useEffect(() => {
     setPage(1);
@@ -123,7 +126,7 @@ export function PurchaseRequestsPage() {
               size="sm"
               variant="ghost"
               onClick={() => handleApprove(pr)}
-              disabled={update.isPending}
+              disabled={update.isPending || !canManage}
               className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
             >
               <CheckCircle className="size-4" />
@@ -132,7 +135,7 @@ export function PurchaseRequestsPage() {
               size="sm"
               variant="ghost"
               onClick={() => handleReject(pr)}
-              disabled={update.isPending}
+              disabled={update.isPending || !canManage}
               className="text-red-500 hover:bg-red-50 hover:text-red-700"
             >
               <XCircle className="size-4" />
