@@ -14,69 +14,135 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
-  // Administration
+  // ── Administration — Users ─────────────────────────────────────────────────
   USER_READ: "user:read",
   USER_CREATE: "user:create",
   USER_UPDATE: "user:update",
   USER_DELETE: "user:delete",
 
+  // ── Administration — Roles ────────────────────────────────────────────────
   ROLE_READ: "role:read",
+  ROLE_CREATE: "role:create",
   ROLE_UPDATE: "role:update",
+  ROLE_DELETE: "role:delete",
+  ROLE_PERMISSION_UPDATE: "role:permission:update",
 
-  // Branch Management
+  // ── Branch Management ─────────────────────────────────────────────────────
   BRANCH_READ: "branch:read",
   BRANCH_CREATE: "branch:create",
   BRANCH_UPDATE: "branch:update",
   BRANCH_DELETE: "branch:delete",
 
-  // Customer Management
+  // ── Customer Management ───────────────────────────────────────────────────
   CUSTOMER_READ: "customer:read",
   CUSTOMER_CREATE: "customer:create",
   CUSTOMER_UPDATE: "customer:update",
   CUSTOMER_DELETE: "customer:delete",
+  CUSTOMER_DOCUMENT_CREATE: "customer:document:create",
+  CUSTOMER_HISTORY_CREATE: "customer:history:create",
+  CUSTOMER_ACCOUNT_MANAGE: "customer:account:manage",
 
-  // Vehicle Management
+  // ── Vehicle Management ────────────────────────────────────────────────────
   VEHICLE_READ: "vehicle:read",
   VEHICLE_CREATE: "vehicle:create",
   VEHICLE_UPDATE: "vehicle:update",
   VEHICLE_DELETE: "vehicle:delete",
+  VEHICLE_IMAGE_CREATE: "vehicle:image:create",
+  VEHICLE_OWNERSHIP_CREATE: "vehicle:ownership:create",
 
-  // Service Management (appointments, job cards, estimates)
-  SERVICE_READ: "service:read",
-  SERVICE_CREATE: "service:create",
-  SERVICE_UPDATE: "service:update",
-  SERVICE_DELETE: "service:delete",
+  // ── Service — Appointments ────────────────────────────────────────────────
+  APPOINTMENT_READ: "appointment:read",
+  APPOINTMENT_CREATE: "appointment:create",
+  APPOINTMENT_UPDATE: "appointment:update",
+  APPOINTMENT_DELETE: "appointment:delete",
 
-  // Services Catalog Management
+  // ── Service — Job Cards ───────────────────────────────────────────────────
+  JOBCARD_READ: "jobcard:read",
+  JOBCARD_CREATE: "jobcard:create",
+  JOBCARD_UPDATE: "jobcard:update",
+
+  // ── Service — Inspections ─────────────────────────────────────────────────
+  INSPECTION_READ: "inspection:read",
+  INSPECTION_CREATE: "inspection:create",
+
+  // ── Service — Estimates ───────────────────────────────────────────────────
+  ESTIMATE_READ: "estimate:read",
+  ESTIMATE_CREATE: "estimate:create",
+  ESTIMATE_APPROVE: "estimate:approve",
+
+  // ── Services Catalog ──────────────────────────────────────────────────────
   SERVICES_READ: "services:read",
   SERVICES_CREATE: "services:create",
   SERVICES_UPDATE: "services:update",
   SERVICES_DELETE: "services:delete",
 
-  // Workshop Management
+  // ── Workshop — Assignments ────────────────────────────────────────────────
+  ASSIGNMENT_CREATE: "assignment:create",
+
+  // ── Workshop — Job Progress ───────────────────────────────────────────────
+  JOBPROGRESS_UPDATE: "jobprogress:update",
+
+  // ── Workshop — Quality Control ────────────────────────────────────────────
+  QCSTATUS_UPDATE: "qcstatus:update",
+
+  // ── Workshop — Read ───────────────────────────────────────────────────────
   WORKSHOP_READ: "workshop:read",
-  WORKSHOP_UPDATE: "workshop:update",
 
-  // Inventory Management
-  INVENTORY_READ: "inventory:read",
-  INVENTORY_CREATE: "inventory:create",
-  INVENTORY_UPDATE: "inventory:update",
-  INVENTORY_DELETE: "inventory:delete",
+  // ── Inventory — Spare Parts ───────────────────────────────────────────────
+  SPAREPART_READ: "sparepart:read",
+  SPAREPART_CREATE: "sparepart:create",
+  SPAREPART_UPDATE: "sparepart:update",
+  SPAREPART_DELETE: "sparepart:delete",
 
-  // Inventory Transfer
+  // ── Inventory — Stock ─────────────────────────────────────────────────────
+  STOCK_READ: "stock:read",
+  STOCK_UPDATE: "stock:update",
+
+  // ── Inventory — Purchase Requests ─────────────────────────────────────────
+  PURCHASEREQUEST_READ: "purchaserequest:read",
+  PURCHASEREQUEST_CREATE: "purchaserequest:create",
+  PURCHASEREQUEST_UPDATE: "purchaserequest:update",
+
+  // ── Inventory — Part Issuances ────────────────────────────────────────────
+  PARTISSUANCE_READ: "partissuance:read",
+  PARTISSUANCE_CREATE: "partissuance:create",
+
+  // ── Inventory — Part Returns ──────────────────────────────────────────────
+  PARTRETURN_READ: "partreturn:read",
+  PARTRETURN_CREATE: "partreturn:create",
+
+  // ── Inventory — Transfers ─────────────────────────────────────────────────
   TRANSFER_READ: "transfer:read",
   TRANSFER_CREATE: "transfer:create",
   TRANSFER_UPDATE: "transfer:update",
   TRANSFER_APPROVE: "transfer:approve",
+  TRANSFER_REJECT: "transfer:reject",
+  TRANSFER_CANCEL: "transfer:cancel",
   TRANSFER_DISPATCH: "transfer:dispatch",
   TRANSFER_RECEIVE: "transfer:receive",
 
-  // Finance Management
-  FINANCE_READ: "finance:read",
-  FINANCE_CREATE: "finance:create",
-  FINANCE_UPDATE: "finance:update",
+  // ── Finance — Invoices ────────────────────────────────────────────────────
+  INVOICE_READ: "invoice:read",
+  INVOICE_CREATE: "invoice:create",
+  INVOICE_UPDATE: "invoice:update",
+  INVOICE_DELETE: "invoice:delete",
 
-  // Audit Management
+  // ── Finance — Payments ────────────────────────────────────────────────────
+  PAYMENT_READ: "payment:read",
+  PAYMENT_CREATE: "payment:create",
+
+  // ── Finance — Receipts ────────────────────────────────────────────────────
+  RECEIPT_READ: "receipt:read",
+  RECEIPT_CREATE: "receipt:create",
+
+  // ── Finance — Reports ─────────────────────────────────────────────────────
+  FINANCE_REPORT_READ: "financereport:read",
+
+  // ── Credit ────────────────────────────────────────────────────────────────
+  CREDIT_APPLICATION_CREATE: "credit:application:create",
+  CREDIT_ADJUST: "credit:adjust",
+
+  // ── Audit ─────────────────────────────────────────────────────────────────
   AUDIT_READ: "audit:read",
 } as const;
 
@@ -96,19 +162,54 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_UPDATE,
+    PERMISSIONS.CUSTOMER_DOCUMENT_CREATE,
+    PERMISSIONS.CUSTOMER_HISTORY_CREATE,
+    PERMISSIONS.CUSTOMER_ACCOUNT_MANAGE,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.VEHICLE_UPDATE,
-    PERMISSIONS.SERVICE_READ,
-    PERMISSIONS.SERVICE_CREATE,
-    PERMISSIONS.SERVICE_UPDATE,
+    PERMISSIONS.VEHICLE_IMAGE_CREATE,
+    PERMISSIONS.VEHICLE_OWNERSHIP_CREATE,
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.APPOINTMENT_UPDATE,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_CREATE,
+    PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.INSPECTION_READ,
+    PERMISSIONS.INSPECTION_CREATE,
+    PERMISSIONS.ESTIMATE_READ,
+    PERMISSIONS.ESTIMATE_CREATE,
+    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.WORKSHOP_READ,
-    PERMISSIONS.WORKSHOP_UPDATE,
-    PERMISSIONS.INVENTORY_READ,
-    PERMISSIONS.INVENTORY_CREATE,
-    PERMISSIONS.INVENTORY_UPDATE,
-    PERMISSIONS.FINANCE_READ,
-    PERMISSIONS.FINANCE_CREATE,
+    PERMISSIONS.ASSIGNMENT_CREATE,
+    PERMISSIONS.JOBPROGRESS_UPDATE,
+    PERMISSIONS.QCSTATUS_UPDATE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.SPAREPART_CREATE,
+    PERMISSIONS.SPAREPART_UPDATE,
+    PERMISSIONS.STOCK_READ,
+    PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.PURCHASEREQUEST_READ,
+    PERMISSIONS.PURCHASEREQUEST_CREATE,
+    PERMISSIONS.PURCHASEREQUEST_UPDATE,
+    PERMISSIONS.PARTISSUANCE_READ,
+    PERMISSIONS.PARTISSUANCE_CREATE,
+    PERMISSIONS.PARTRETURN_READ,
+    PERMISSIONS.PARTRETURN_CREATE,
+    PERMISSIONS.TRANSFER_READ,
+    PERMISSIONS.TRANSFER_CREATE,
+    PERMISSIONS.TRANSFER_UPDATE,
+    PERMISSIONS.TRANSFER_APPROVE,
+    PERMISSIONS.TRANSFER_DISPATCH,
+    PERMISSIONS.TRANSFER_RECEIVE,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.INVOICE_CREATE,
+    PERMISSIONS.INVOICE_UPDATE,
+    PERMISSIONS.PAYMENT_READ,
+    PERMISSIONS.PAYMENT_CREATE,
+    PERMISSIONS.RECEIPT_READ,
+    PERMISSIONS.RECEIPT_CREATE,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
@@ -117,60 +218,93 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
-    PERMISSIONS.INVENTORY_READ,
-    PERMISSIONS.INVENTORY_CREATE,
-    PERMISSIONS.INVENTORY_UPDATE,
-    PERMISSIONS.INVENTORY_DELETE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.SPAREPART_CREATE,
+    PERMISSIONS.SPAREPART_UPDATE,
+    PERMISSIONS.SPAREPART_DELETE,
+    PERMISSIONS.STOCK_READ,
+    PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.PURCHASEREQUEST_READ,
+    PERMISSIONS.PURCHASEREQUEST_CREATE,
+    PERMISSIONS.PURCHASEREQUEST_UPDATE,
+    PERMISSIONS.PARTISSUANCE_READ,
+    PERMISSIONS.PARTISSUANCE_CREATE,
+    PERMISSIONS.PARTRETURN_READ,
+    PERMISSIONS.PARTRETURN_CREATE,
     PERMISSIONS.TRANSFER_READ,
     PERMISSIONS.TRANSFER_CREATE,
     PERMISSIONS.TRANSFER_UPDATE,
     PERMISSIONS.TRANSFER_APPROVE,
     PERMISSIONS.TRANSFER_DISPATCH,
     PERMISSIONS.TRANSFER_RECEIVE,
-    PERMISSIONS.SERVICE_READ,
     PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.CUSTOMER_READ,
   ],
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
-    PERMISSIONS.INVENTORY_READ,
-    PERMISSIONS.INVENTORY_CREATE,
-    PERMISSIONS.INVENTORY_UPDATE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.SPAREPART_CREATE,
+    PERMISSIONS.SPAREPART_UPDATE,
+    PERMISSIONS.STOCK_READ,
+    PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.PURCHASEREQUEST_READ,
+    PERMISSIONS.PURCHASEREQUEST_CREATE,
+    PERMISSIONS.PARTISSUANCE_READ,
+    PERMISSIONS.PARTISSUANCE_CREATE,
+    PERMISSIONS.PARTRETURN_READ,
+    PERMISSIONS.PARTRETURN_CREATE,
     PERMISSIONS.TRANSFER_READ,
     PERMISSIONS.TRANSFER_CREATE,
     PERMISSIONS.TRANSFER_RECEIVE,
-    PERMISSIONS.SERVICE_READ,
     PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.CUSTOMER_READ,
   ],
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   [ROLES.WORKSHOP_MANAGER]: [
-    PERMISSIONS.SERVICE_READ,
-    PERMISSIONS.SERVICE_CREATE,
-    PERMISSIONS.SERVICE_UPDATE,
-    PERMISSIONS.SERVICE_DELETE,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_CREATE,
+    PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.APPOINTMENT_UPDATE,
+    PERMISSIONS.APPOINTMENT_DELETE,
+    PERMISSIONS.INSPECTION_READ,
+    PERMISSIONS.INSPECTION_CREATE,
+    PERMISSIONS.ESTIMATE_READ,
+    PERMISSIONS.ESTIMATE_CREATE,
+    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.WORKSHOP_READ,
-    PERMISSIONS.WORKSHOP_UPDATE,
-    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.ASSIGNMENT_CREATE,
+    PERMISSIONS.JOBPROGRESS_UPDATE,
+    PERMISSIONS.QCSTATUS_UPDATE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.STOCK_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_UPDATE,
     PERMISSIONS.CUSTOMER_READ,
-    PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.INVOICE_READ,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
     PERMISSIONS.SERVICES_DELETE,
   ],
 
-  // Oversees accounting: finance,  inventory
+  // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
-    PERMISSIONS.FINANCE_CREATE,
-    PERMISSIONS.FINANCE_READ,
-    PERMISSIONS.FINANCE_UPDATE,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.INVOICE_CREATE,
+    PERMISSIONS.INVOICE_UPDATE,
+    PERMISSIONS.PAYMENT_READ,
+    PERMISSIONS.PAYMENT_CREATE,
+    PERMISSIONS.RECEIPT_READ,
+    PERMISSIONS.RECEIPT_CREATE,
+    PERMISSIONS.FINANCE_REPORT_READ,
   ],
 
   // Handles estimates, approvals, customer liaison during service
@@ -178,40 +312,52 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_UPDATE,
+    PERMISSIONS.CUSTOMER_DOCUMENT_CREATE,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.VEHICLE_UPDATE,
-    PERMISSIONS.SERVICE_READ,
-    PERMISSIONS.SERVICE_CREATE,
-    PERMISSIONS.SERVICE_UPDATE,
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.APPOINTMENT_UPDATE,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_CREATE,
+    PERMISSIONS.INSPECTION_READ,
+    PERMISSIONS.ESTIMATE_READ,
+    PERMISSIONS.ESTIMATE_CREATE,
+    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.WORKSHOP_READ,
-    PERMISSIONS.INVENTORY_READ,
-    PERMISSIONS.FINANCE_READ,
-    PERMISSIONS.FINANCE_CREATE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.STOCK_READ,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.INVOICE_CREATE,
     PERMISSIONS.SERVICES_READ,
   ],
 
   // Executes repairs, updates job card progress
   [ROLES.TECHNICIAN]: [
     PERMISSIONS.VEHICLE_READ,
-    PERMISSIONS.SERVICE_READ,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.INSPECTION_READ,
+    PERMISSIONS.INSPECTION_CREATE,
+    PERMISSIONS.ESTIMATE_READ,
     PERMISSIONS.SERVICES_READ,
-    PERMISSIONS.SERVICE_UPDATE, // update job card progress / status
     PERMISSIONS.WORKSHOP_READ,
-    PERMISSIONS.WORKSHOP_UPDATE,
-    PERMISSIONS.INVENTORY_READ,
+    PERMISSIONS.JOBPROGRESS_UPDATE,
+    PERMISSIONS.SPAREPART_READ,
   ],
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.RECEPTIONIST]: [
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
+    PERMISSIONS.CUSTOMER_DOCUMENT_CREATE,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
-    PERMISSIONS.SERVICE_READ,
-    PERMISSIONS.SERVICE_CREATE, // create appointments
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
     PERMISSIONS.SERVICES_READ,
-    PERMISSIONS.FINANCE_READ,
+    PERMISSIONS.INVOICE_READ,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
@@ -220,14 +366,21 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_UPDATE,
     PERMISSIONS.CUSTOMER_DELETE,
+    PERMISSIONS.CUSTOMER_DOCUMENT_CREATE,
+    PERMISSIONS.CUSTOMER_HISTORY_CREATE,
+    PERMISSIONS.CUSTOMER_ACCOUNT_MANAGE,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.VEHICLE_UPDATE,
     PERMISSIONS.VEHICLE_DELETE,
-    PERMISSIONS.SERVICE_READ,
-    PERMISSIONS.SERVICE_CREATE,
-    PERMISSIONS.SERVICE_UPDATE,
-    PERMISSIONS.SERVICE_DELETE,
+    PERMISSIONS.VEHICLE_IMAGE_CREATE,
+    PERMISSIONS.VEHICLE_OWNERSHIP_CREATE,
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.APPOINTMENT_UPDATE,
+    PERMISSIONS.APPOINTMENT_DELETE,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.SERVICES_READ,
   ],
 };

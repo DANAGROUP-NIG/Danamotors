@@ -12,6 +12,7 @@ import { useInvoices } from "../hooks/use-invoices";
 import type { Invoice } from "../types/invoice.types";
 import { EditInvoiceModal } from "./EditInvoiceModal";
 import { RecordPaymentModal } from "./RecordPaymentModal";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const PAGE_SIZE = 10;
 
@@ -37,6 +38,9 @@ export function InvoicesTable() {
   const [page, setPage] = useState(1);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const { hasPermission } = useAuth();
+  const canRecordPayment = hasPermission("payment:create");
+  const canEdit = hasPermission("invoice:update");
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   useEffect(() => {
@@ -110,24 +114,28 @@ export function InvoicesTable() {
       header: "Actions",
       render: (inv) => (
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2"
-            onClick={() => setPayingInvoice(inv)}
-            title="Record payment"
-          >
-            <ReceiptText className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2"
-            onClick={() => setEditingInvoice(inv)}
-            title="Edit invoice"
-          >
-            <Pencil className="size-4" />
-          </Button>
+          {canRecordPayment && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setPayingInvoice(inv)}
+              title="Record payment"
+            >
+              <ReceiptText className="size-4" />
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => setEditingInvoice(inv)}
+              title="Edit invoice"
+            >
+              <Pencil className="size-4" />
+            </Button>
+          )}
         </div>
       ),
     },

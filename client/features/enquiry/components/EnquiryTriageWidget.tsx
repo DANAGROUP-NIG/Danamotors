@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useEnquiries } from "../hooks/use-enquires";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { ENQUIRY_READ_ROLES } from "@/features/auth/roles";
 import { formatDistanceToNow } from "date-fns";
 
 export default function EnquiryTriageWidget() {
   const { activeBranch } = useBranchStore();
-  const { hasAccess } = useAuth();
-  const canSee = hasAccess(ENQUIRY_READ_ROLES);
+  const { hasPermission } = useAuth();
+  const canSee = hasPermission("customer:read");
 
   const { data, isLoading } = useEnquiries({
     limit: 5,

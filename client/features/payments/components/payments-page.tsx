@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { FINANCE_ROLES } from "@/features/auth/roles";
 import { RecordPaymentModal } from "@/features/invoices/components/RecordPaymentModal";
 import { usePayments } from "../hooks/use-payments";
 import { PaymentsTable } from "./PaymentsTable";
@@ -14,8 +13,8 @@ import { PaymentsTable } from "./PaymentsTable";
 export function PaymentsPage() {
   const [showPayment, setShowPayment] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(FINANCE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("payment:create");
   const { data } = usePayments({ branchId: activeBranch?.id });
 
   const total = data?.payments?.length;

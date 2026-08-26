@@ -627,10 +627,10 @@ router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validate
  */
 router.get('/roles', requirePermission(PERMISSIONS.ROLE_READ), controller.getRoles);
 router.get('/roles/:id', requirePermission(PERMISSIONS.ROLE_READ), validateRequest(roleIdParamSchema), controller.getRole);
-router.post('/roles', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(createRoleSchema), controller.createRole);
+router.post('/roles', requirePermission(PERMISSIONS.ROLE_CREATE), validateRequest(createRoleSchema), controller.createRole);
 router.put('/roles/:id', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(updateRoleSchema), controller.updateRole);
-router.delete('/roles/:id', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(deleteRoleParamSchema), controller.deleteRole);
-router.put('/roles/:id/permissions', requirePermission(PERMISSIONS.ROLE_UPDATE), validateRequest(updateRolePermissionsSchema), controller.updateRolePermissions);
+router.delete('/roles/:id', requirePermission(PERMISSIONS.ROLE_DELETE), validateRequest(deleteRoleParamSchema), controller.deleteRole);
+router.put('/roles/:id/permissions', requirePermission(PERMISSIONS.ROLE_PERMISSION_UPDATE), validateRequest(updateRolePermissionsSchema), controller.updateRolePermissions);
 
 router.get('/permissions', requirePermission(PERMISSIONS.ROLE_READ), controller.getPermissions);
 

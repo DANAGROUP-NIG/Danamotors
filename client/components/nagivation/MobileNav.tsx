@@ -12,7 +12,7 @@ import { BOTTOM_NAV } from "@/constant";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 export default function () {
-  const { user, isHydrated, isSuperAdmin, isAdminOrAbove, hasAccess } =
+  const { user, isHydrated, isSuperAdmin, isAdminOrAbove, hasAccess, hasAnyPermission } =
     useAuth();
   const pathname = usePathname();
 
@@ -21,7 +21,11 @@ export default function () {
       className="flex h-16 shrink-0 items-center justify-around border-t border-[#e8edf3] bg-white px-2 lg:hidden"
       aria-label="Mobile navigation"
     >
-      {BOTTOM_NAV.filter((item) => hasAccess(item.roles ?? [])).map(
+      {BOTTOM_NAV.filter((item) =>
+        item.permissions?.length
+          ? hasAnyPermission(item.permissions)
+          : hasAccess(item.roles ?? []),
+      ).map(
         ({ label, href, icon: Icon }) => {
           const active = isActive(href, pathname);
           return (
