@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { AdminRepository } from './admin.repository';
-import { BadRequestError, NotFoundError, ConflictError } from '../../shared/errors/appError';
+import { BadRequestError, NotFoundError, ConflictError, ForbiddenError } from '../../shared/errors/appError';
+import { ROLES } from '../../shared/constants/roles';
 
 export class AdminService {
   private adminRepository: AdminRepository;
@@ -194,8 +195,94 @@ export class AdminService {
     return this.getRole(roleId);
   }
 
+  async updateRole(id: string, data: { name?: string; description?: string }) {
+    const role = await this.adminRepository.findRoleById(id);
+    if (!role) {
+      throw new NotFoundError('Role not found');
+    }
+
+    const systemRoles = Object.values(ROLES) as string[];
+    if (data.name && systemRoles.includes(role.name)) {
+      throw new ForbiddenError('System roles cannot be renamed');
+    }
+
+    if (data.name && data.name !== role.name) {
+      const existing = await this.adminRepository.findRoleByName(data.name);
+      if (existing) {
+        throw new ConflictError('A role with this name already exists');
+      }
+    }
+
+    await this.adminRepository.updateRole(id, data);
+    return this.getRole(id);
+  }
+
+  async deleteRole(id: string) {
+    const role = await this.adminRepository.findRoleById(id);
+    if (!role) {
+      throw new NotFoundError('Role not found');
+    }
+
+    const systemRoles = Object.values(ROLES) as string[];
+    if (systemRoles.includes(role.name)) {
+      throw new ForbiddenError('System roles cannot be deleted');
+    }
+
+    const usersCount = await this.adminRepository.countUsersByRole(id);
+    if (usersCount > 0) {
+      throw new ConflictError(
+        `Cannot delete role '${role.name}'. ${usersCount} user(s) are currently assigned to this role.`
+      );
+    }
+
+    await this.adminRepository.deleteRole(id);
+  }
+
   async getPermissions() {
-    return this.adminRepository.listPermissions();
+    const permissions = await this.adminRepository.listPermissions();
+
+    const MODULE_LABELS: Record<string, string> = {
+      user: 'User Management',
+      role: 'Role Management',
+      branch: 'Branch Management',
+      customer: 'Customer Management',
+      vehicle: 'Vehicle Management',
+      service: 'Service Management',
+      services: 'Services Catalog',
+      workshop: 'Workshop Management',
+      inventory: 'Inventory Management',
+      transfer: 'Transfer Management',
+      finance: 'Finance Management',
+      audit: 'Audit Management',
+    };
+
+    const groupsMap = new Map<string, typeof permissions>();
+    for (const permission of permissions) {
+      const prefix = permission.name.split(':')[0];
+      const module = MODULE_LABELS[prefix] || `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Management`;
+      if (!groupsMap.has(module)) {
+        groupsMap.set(module, []);
+      }
+      groupsMap.get(module)!.push(permission);
+    }
+
+    const groups = Array.from(groupsMap.entries()).map(([module, perms]) => ({
+      module,
+      permissions: perms.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+      })),
+    }));
+
+    return {
+      permissions: permissions.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+      })),
+      groups,
+    };
   }
 }
 export default AdminService;

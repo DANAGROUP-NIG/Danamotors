@@ -15,6 +15,7 @@ import notificationRoutes from '../modules/notification/notification.routes';
 import portalRoutes from '../modules/customer-portal/portal.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import enquiryRoutes from '../modules/enquiry/enquiry.routes';
+import auditRoutes from '../modules/audit/audit.routes';
 
 const router = Router();
 
@@ -72,5 +73,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/portal', portalRoutes);
 router.use('/credit', creditRoutes);
 router.use('/enquiries', enquiryRoutes);
+router.use('/audit', auditRoutes);
 
 export default router;
