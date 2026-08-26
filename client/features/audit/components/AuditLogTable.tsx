@@ -14,8 +14,13 @@ const PAGE_SIZE = 20;
 const selectClass = "h-10 min-w-36 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 const ACTION_TYPES = [
   "LOGIN",
+  "USER_LOGIN",
   "LOGOUT",
-  "PASSWORD_RESET",
+  "USER_LOGOUT",
+  "USER_LOGOUT_ALL",
+  "USER_REGISTERED",
+  "PASSWORD_RESET_REQUESTED",
+  "PASSWORD_RESET_COMPLETED",
   "USER_CREATE",
   "USER_UPDATE",
   "USER_DELETE",
@@ -34,6 +39,7 @@ const ACTION_TYPES = [
   "VEHICLE_CREATE",
   "VEHICLE_UPDATE",
   "VEHICLE_DELETE",
+  "USER_PROFILE_UPDATED",
 ];
 
 export const ACTION_COLORS: Record<string, string> = {

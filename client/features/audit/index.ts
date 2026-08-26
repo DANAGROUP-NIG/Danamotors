@@ -4,4 +4,11 @@ export { AuditLogDetailModal } from "./components/AuditLogDetailModal";
 export { AuditStatsCards } from "./components/AuditStatsCards";
 export { useAuditLog, useAuditLogs } from "./hooks/use-audit-logs";
 export { useAuditStats } from "./hooks/use-audit-stats";
-export type { AuditLog, AuditLogParams, AuditLogsResponse, AuditStats, AuditUser } from "./types/audit.types";
+export type {
+	AuditLog,
+	AuditLogDetailResponse,
+	AuditLogParams,
+	AuditLogsResponse,
+	AuditStats,
+	AuditUser,
+} from "./types/audit.types";

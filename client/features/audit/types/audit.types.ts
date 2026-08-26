@@ -31,6 +31,10 @@ export type AuditLogsResponse = {
   meta: { total: number; page: number; limit: number; totalPages: number };
 };
 
+export type AuditLogDetailResponse = {
+  log: AuditLog;
+};
+
 export type AuditStats = {
   totalLogs: number;
   todayCount: number;

@@ -1,6 +1,12 @@
 import { apiGet } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
-import type { AuditLog, AuditLogParams, AuditLogsResponse, AuditStats } from "../types/audit.types";
+import type {
+  AuditLog,
+  AuditLogDetailResponse,
+  AuditLogParams,
+  AuditLogsResponse,
+  AuditStats,
+} from "../types/audit.types";
 
 export async function getAuditLogs(params: AuditLogParams): Promise<AuditLogsResponse> {
   const query = new URLSearchParams();
@@ -11,7 +17,9 @@ export async function getAuditLogs(params: AuditLogParams): Promise<AuditLogsRes
 }
 
 export function getAuditLog(id: string): Promise<AuditLog> {
-  return apiGet<AuditLog>(API_ROUTES.audit.detail(id));
+  return apiGet<AuditLogDetailResponse>(API_ROUTES.audit.detail(id)).then(
+    ({ log }) => log,
+  );
 }
 
 export function getAuditStats(): Promise<AuditStats> {
