@@ -144,11 +144,11 @@ export function PermissionGrid({
                     />
                     <span className="flex flex-col">
                       <span>{humanize(perm.name)}</span>
-                      {perm.description && (
+                      {/* {perm.description && (
                         <span className="text-[11px] text-muted-foreground">
                           {perm.description}
                         </span>
-                      )}
+                      )} */}
                     </span>
                   </label>
                 ))}

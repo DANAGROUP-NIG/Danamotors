@@ -22,6 +22,7 @@ import type { Customer } from "@/features/customers/types/customer.types";
 interface CustomerSelectWithCreateProps {
   value?: string;
   onChange: (customerId: string, customerName?: string) => void;
+  initialCustomer?: Pick<CreateCustomerFormValues, "firstName" | "lastName" | "email" | "phoneNumber">;
   error?: string;
   branchId?: string;
   disabled?: boolean;
@@ -30,6 +31,7 @@ interface CustomerSelectWithCreateProps {
 export function CustomerSelectWithCreate({
   value,
   onChange,
+  initialCustomer,
   error,
   branchId,
   disabled = false,
@@ -130,6 +132,18 @@ export function CustomerSelectWithCreate({
       branchId: isSuperAdmin ? "" : (activeBranch?.id ?? ""),
     },
   });
+
+  useEffect(() => {
+    if (!showInlineCreate) return;
+    resetCustomerForm({
+      firstName: initialCustomer?.firstName ?? searchQuery.split(" ")[0] ?? "",
+      lastName: initialCustomer?.lastName ?? searchQuery.split(" ").slice(1).join(" ") ?? "",
+      email: initialCustomer?.email ?? "",
+      phoneNumber: initialCustomer?.phoneNumber ?? "",
+      address: "",
+      branchId: isSuperAdmin ? "" : (activeBranch?.id ?? ""),
+    });
+  }, [activeBranch?.id, initialCustomer?.email, initialCustomer?.firstName, initialCustomer?.lastName, initialCustomer?.phoneNumber, isSuperAdmin, resetCustomerForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineCustomer(values: CreateCustomerFormValues) {
     const payload = {

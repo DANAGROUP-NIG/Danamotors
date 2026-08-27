@@ -29,6 +29,7 @@ interface VehicleSelectWithCreateProps {
   value?: string;
   onChange: (vehicleId: string) => void;
   onVehicleSelect?: (vehicle: Vehicle) => void;
+  initialVehicle?: Pick<CreateVehicleFormValues, "registrationNumber" | "make" | "model" | "year">;
   customerId?: string;
   branchId?: string;
   error?: string;
@@ -39,6 +40,7 @@ export function VehicleSelectWithCreate({
   value,
   onChange,
   onVehicleSelect,
+  initialVehicle,
   customerId,
   branchId,
   error,
@@ -154,10 +156,22 @@ export function VehicleSelectWithCreate({
 
   // Keep customerId synced in form default
   useEffect(() => {
-    if (customerId) {
-      resetVehicleForm((prev) => ({ ...prev, customerId }));
-    }
-  }, [customerId, resetVehicleForm]);
+    if (!showInlineCreate) return;
+    resetVehicleForm({
+      customerId: customerId || "",
+      vin: "",
+      registrationNumber: initialVehicle?.registrationNumber ?? searchQuery.trim() ?? "",
+      make: initialVehicle?.make ?? searchQuery.split(" ")[0] ?? "",
+      model: initialVehicle?.model ?? searchQuery.split(" ").slice(1).join(" ") ?? "",
+      year: initialVehicle?.year,
+      trim: "",
+      color: "",
+      warrantyProvider: "",
+      warrantyStatus: "",
+      warrantyExpiresAt: "",
+      ownershipStatus: "",
+    });
+  }, [customerId, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineVehicle(values: CreateVehicleFormValues) {
     if (!customerId) return;
