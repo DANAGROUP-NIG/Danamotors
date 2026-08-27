@@ -7,7 +7,7 @@ import { ArrowLeft, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { useAdminRole, useDeleteRole, useUpdateRole, useUpdateRolePermissions } from "../hooks/use-admin-roles";
+import { useAdminPermissions, useAdminRole, useDeleteRole, useUpdateRole, useUpdateRolePermissions } from "../hooks/use-admin-roles";
 import { PermissionGrid } from "./permission-grid";
 
 const SYSTEM_ROLE_NAMES = new Set([
@@ -27,6 +27,7 @@ export function RoleDetailPage() {
   const params = useParams<{ id: string }>();
   const roleId = params?.id ?? "";
   const { data, isLoading } = useAdminRole(roleId);
+  const { data: permissionData, isLoading: permissionsLoading } = useAdminPermissions();
   const updateMeta = useUpdateRole(roleId);
   const updatePermissions = useUpdateRolePermissions(roleId);
   const deleteRole = useDeleteRole();
@@ -60,6 +61,10 @@ export function RoleDetailPage() {
 
   if (!role && !isLoading) {
     return <div className="p-6 text-sm text-red-500">Role not found.</div>;
+  }
+
+  if (!canView) {
+    return <div className="p-6 text-sm text-red-500">You do not have access to view this role.</div>;
   }
 
   if (!role) {
@@ -144,10 +149,15 @@ export function RoleDetailPage() {
                   </span>
                 </div>
                 <div className="mt-4 space-y-3">
-                <PermissionGrid
-                    selectedPermissions={permissions}
-                    onChange={setPermissions}
-                />
+                {permissionsLoading ? (
+                  <div className="h-40 animate-pulse rounded-lg bg-slate-100" />
+                ) : (
+                  <PermissionGrid
+                      groups={permissionData?.groups ?? []}
+                      selectedPermissions={permissions}
+                      onChange={setPermissions}
+                  />
+                )}
                 <Button onClick={handleSavePermissions} disabled={updatePermissions.isPending || !canEditRole}>
                     {updatePermissions.isPending ? "Saving…" : "Save Permissions"}
                 </Button>
