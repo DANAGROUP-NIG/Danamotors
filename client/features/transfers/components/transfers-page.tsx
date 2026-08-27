@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/headers/page-header";
 import { useTransfers } from "../hooks/use-transfers";
 import { useApproveTransfer, useDispatchTransfer, useReceiveTransfer, useRejectTransfer, useCancelTransfer } from "../hooks/use-transfer-mutations";
 import type { Transfer } from "../types/transfer.types";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const STATUS_FILTERS = ["", "Pending", "Approved", "Dispatched", "Received", "Rejected", "Cancelled"] as const;
 const STATUS_LABELS: Record<string, string> = {
@@ -41,6 +42,12 @@ export function TransfersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { hasPermission } = useAuth();
+  const canApprove = hasPermission("transfer:approve");
+  const canReject = hasPermission("transfer:reject");
+  const canCancel = hasPermission("transfer:cancel");
+  const canDispatch = hasPermission("transfer:dispatch");
+  const canReceive = hasPermission("transfer:receive");
   const approve = useApproveTransfer();
   const dispatch = useDispatchTransfer();
   const receive = useReceiveTransfer();
@@ -123,23 +130,29 @@ export function TransfersPage() {
         <div className="flex justify-end gap-1">
           {t.status === "Pending" && (
             <>
-              <Button size="sm" variant="ghost" onClick={() => approve.mutate(t.id)} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-blue-600 hover:bg-blue-50 hover:text-blue-700">
-                <CheckCircle className="size-4" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => reject.mutate({ id: t.id })} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-red-500 hover:bg-red-50 hover:text-red-700">
-                <XCircle className="size-4" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => cancel.mutate(t.id)} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-gray-400 hover:bg-gray-50 hover:text-gray-600">
-                <Ban className="size-4" />
-              </Button>
+              {canApprove && (
+                <Button size="sm" variant="ghost" onClick={() => approve.mutate(t.id)} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-blue-600 hover:bg-blue-50 hover:text-blue-700">
+                  <CheckCircle className="size-4" />
+                </Button>
+              )}
+              {canReject && (
+                <Button size="sm" variant="ghost" onClick={() => reject.mutate({ id: t.id })} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-red-500 hover:bg-red-50 hover:text-red-700">
+                  <XCircle className="size-4" />
+                </Button>
+              )}
+              {canCancel && (
+                <Button size="sm" variant="ghost" onClick={() => cancel.mutate(t.id)} disabled={approve.isPending || dispatch.isPending || receive.isPending} className="text-gray-400 hover:bg-gray-50 hover:text-gray-600">
+                  <Ban className="size-4" />
+                </Button>
+              )}
             </>
           )}
-          {t.status === "Approved" && (
+          {t.status === "Approved" && canDispatch && (
             <Button size="sm" variant="outline" onClick={() => dispatch.mutate({ id: t.id })} disabled={approve.isPending || dispatch.isPending || receive.isPending}>
               <Send className="mr-1 size-3" /> Dispatch
             </Button>
           )}
-          {t.status === "Dispatched" && (
+          {t.status === "Dispatched" && canReceive && (
             <Button size="sm" variant="outline" onClick={() => receive.mutate({ id: t.id })} disabled={approve.isPending || dispatch.isPending || receive.isPending}>
               <PackageCheck className="mr-1 size-3" /> Receive
             </Button>

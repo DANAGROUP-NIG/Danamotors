@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranches } from "../hooks/use-branches";
 import { BranchEditForm } from "./BranchEditForm";
 import { BranchDeleteButton } from "./BranchDeleteButton";
@@ -20,6 +21,10 @@ export function BranchesTable() {
   const [committedSearch, setCommittedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("branch:update");
+  const canDelete = hasPermission("branch:delete");
 
   const { data, isLoading, isError, isFetching } = useBranches({
     page,
@@ -99,24 +104,30 @@ export function BranchesTable() {
         </span>
       ),
     },
-    {
-      header: "Actions",
-      headerClassName: "text-right",
-      render: (b) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Edit ${b.name}`}
-            onClick={() => setEditingId(b.id)}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-          <BranchDeleteButton branch={b} />
-        </div>
-      ),
-    },
+    ...(canEdit || canDelete
+      ? [
+          {
+            header: "Actions",
+            headerClassName: "text-right",
+            render: (b: Branch) => (
+              <div className="flex items-center justify-end gap-1">
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label={`Edit ${b.name}`}
+                    onClick={() => setEditingId(b.id)}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                )}
+                {canDelete && <BranchDeleteButton branch={b} />}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   if (isError) {

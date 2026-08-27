@@ -22,11 +22,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import {
-  DELETE_ROLES,
-  SERVICE_UPDATE_ROLES,
-  APPOINTMENT_UPDATE_ROLES,
-} from "@/features/auth/roles";
 import { useAppointment } from "@/features/appointments";
 import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-appointment";
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
@@ -35,7 +30,6 @@ import { AppointmentEditForm } from "@/features/appointments/components/Appointm
 import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
-import type { AppRole } from "@/features/auth/roles";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 
 const NEXT_STATUS: Record<string, string | null> = {
@@ -50,31 +44,17 @@ const NEXT_STATUS: Record<string, string | null> = {
   Cancelled: null,
 };
 
-const STATUS_TRANSITION_ROLES: Record<string, AppRole[]> = {
-  "Checked In": ["superadmin", "admin", "receptionmanager"],
-  Inspection: ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Awaiting Approval": [
-    "technician",
-    "serviceadviser",
-    "superadmin",
-    "admin",
-    "workshopmanager",
-  ],
-  "In Repair": ["serviceadviser", "superadmin", "admin", "workshopmanager"],
-  "Quality Check": [
-    "technician",
-    "serviceadviser",
-    "superadmin",
-    "admin",
-    "workshopmanager",
-  ],
-  Ready: ["workshopmanager", "serviceadviser", "superadmin", "admin"],
-  Completed: ["serviceadviser", "superadmin", "admin", "receptionmanager"],
+const STATUS_TRANSITION_PERMISSIONS: Record<string, string> = {
+  "Checked In": "appointment:update",
+  Inspection: "appointment:update",
+  "Awaiting Approval": "appointment:update",
+  "In Repair": "appointment:update",
+  "Quality Check": "appointment:update",
+  Ready: "appointment:update",
+  Completed: "appointment:update",
 };
 
-const CANCEL_ROLES: AppRole[] = ["superadmin", "admin", "receptionmanager"];
 
-/** Icon tile + stacked label/value, matching the reference layout. */
 function DetailItem({
   icon,
   label,
@@ -103,7 +83,7 @@ export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data, isLoading, error } = useAppointment(id);
-  const { hasAccess } = useAuth();
+  const { hasPermission } = useAuth();
   const update = useUpdateAppointment(id);
   const del = useDeleteAppointment();
 
@@ -141,15 +121,16 @@ export default function AppointmentDetailPage() {
 
   const nextStatus = NEXT_STATUS[appointment.status];
   const canTransition =
-    nextStatus && hasAccess(STATUS_TRANSITION_ROLES[nextStatus] ?? []);
+    nextStatus &&
+    hasPermission(STATUS_TRANSITION_PERMISSIONS[nextStatus] ?? "");
   const canCancel =
-    hasAccess(CANCEL_ROLES) &&
+    hasPermission("appointment:update") &&
     appointment.status !== "Completed" &&
     appointment.status !== "Cancelled";
-  const canEdit = hasAccess(APPOINTMENT_UPDATE_ROLES);
-  const canDelete = hasAccess(DELETE_ROLES);
+  const canEdit = hasPermission("appointment:update");
+  const canDelete = hasPermission("appointment:delete");
   const canCreateJobCard =
-    hasAccess(SERVICE_UPDATE_ROLES) && appointment.status !== "Cancelled";
+    hasPermission("appointment:update") && appointment.status !== "Cancelled";
 
   function handleStatusTransition() {
     if (!nextStatus) return;
@@ -266,20 +247,12 @@ export default function AppointmentDetailPage() {
     <div className="min-h-screen bg-slate-50/60 px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-1.5 text-[15px] text-slate-500">
-            <Link
-              href="/appointments"
-              className="transition-colors hover:text-slate-700"
-            >
-              Appointments
-            </Link>
-            <ChevronRight className="size-4 text-slate-300" />
-            <span className="font-semibold text-slate-800">
-              {appointmentRef}
-            </span>
-          </nav>
-
+          <Link
+        href="/appointments"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+      >
+        <ArrowLeft className="size-4" /> Back to Service Appointments
+      </Link>
           {/* Title */}
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
             Appointment Details

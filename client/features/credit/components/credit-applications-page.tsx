@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { FINANCE_ROLES } from "@/features/auth/roles";
 import { useCreditApplications } from "../hooks/use-credit";
 import type { CreditApplication } from "../types/credit.types";
 import { CreateCreditApplicationModal } from "./CreateCreditApplicationModal";
@@ -32,8 +31,8 @@ function formatDate(dateStr?: string | null) {
 
 export function CreditApplicationsPage() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(FINANCE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("credit:application:create");
 
   const [tab, setTab] = useState<(typeof STATUS_TABS)[number]>("All");
   const [modalOpen, setModalOpen] = useState(false);

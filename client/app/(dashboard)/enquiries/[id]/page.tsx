@@ -21,7 +21,6 @@ import { useEnquiry } from "@/features/enquiry/hooks/use-enquiry";
 import { EnquiryReviewModal } from "@/features/enquiry/components/EnquiryReviewModal";
 import type { EnquiryStatus } from "@/features/enquiry/types/enquiry.types";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { ENQUIRY_REVIEW_ROLES } from "@/features/auth/roles";
 
 const STATUS_BADGE: Record<EnquiryStatus, string> = {
   Pending: "bg-amber-50 text-amber-700",
@@ -37,8 +36,8 @@ export default function EnquiryPage() {
   const [reviewAction, setReviewAction] = useState<
     "approve-form" | "reject-confirm" | null
   >(null);
-  const { hasAccess } = useAuth();
-  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES);
+  const { hasPermission } = useAuth();
+  const canReview = hasPermission("customer:update");
 
   if (isLoading) {
     return (
