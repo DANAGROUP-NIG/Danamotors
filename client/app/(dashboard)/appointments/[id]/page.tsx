@@ -245,14 +245,15 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 px-4 py-8 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-          <Link
+         <Link
         href="/appointments"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="size-4" /> Back to Service Appointments
       </Link>
+      <div className="mx-auto">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
+       
           {/* Title */}
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
             Appointment Details
