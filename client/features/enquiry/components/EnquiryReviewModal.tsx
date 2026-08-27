@@ -171,7 +171,7 @@ export function EnquiryReviewModal({
   return (
     <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-1">
       {/* ── Enquiry Details Summary ──────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3 ">
         <div className="grid grid-cols-2 gap-3 text-sm">
           {[
             ['Name',   `${enquiry.firstName} ${enquiry.lastName}`],
