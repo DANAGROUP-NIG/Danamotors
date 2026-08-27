@@ -50,7 +50,7 @@ export default function ModalFame({
       />
 
       {/* Modal */}
-      <div className="relative z-10 my-auto w-full max-w-lg rounded-2xl border border-white/20 bg-background/95 shadow-2xl backdrop-blur-xl sm:rounded-3xl">
+      <div className="relative z-10 my-auto w-full max-w-2xl rounded-2xl border border-white/20 bg-background/95 shadow-2xl backdrop-blur-xl sm:rounded-3xl">
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6 sm:py-5">

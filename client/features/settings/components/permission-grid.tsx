@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAdminPermissions } from "../hooks/use-admin-roles";
+import { PermissionGroup } from "../api/role.api";
 
 function humanize(name: string): string {
   const action = name.split(":")[1] ?? name;
@@ -17,6 +18,7 @@ export function PermissionGrid({
   selectedPermissions,
   onChange,
 }: {
+  groups: PermissionGroup[];
   selectedPermissions: string[];
   onChange: (permissions: string[]) => void;
 }) {
