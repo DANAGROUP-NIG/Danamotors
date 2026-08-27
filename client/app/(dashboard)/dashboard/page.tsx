@@ -86,14 +86,14 @@ export default function DashboardPage() {
   const canSeeAppointments = hasPermission("appointment:read");
   const canSeeCustomers = hasPermission("customer:read");
 
-  // Role-based routing
-  if (isReceptionManager) {
+  // Role-based routing — only redirect if the user has the matching permissions
+  if (isReceptionManager && canSeeAppointments) {
     return <ReceptionManagerDashboard />;
   }
-  if (isReceptionist) {
+  if (isReceptionist && canSeeAppointments) {
     return <ReceptionistDashboard />;
   }
-  if (isStoreManager) {
+  if (isStoreManager && (canSeeInventory || canSeeWorkshop)) {
     return <StoreManagerDashboard />;
   }
 
