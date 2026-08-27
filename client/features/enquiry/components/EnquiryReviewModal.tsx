@@ -1,5 +1,5 @@
 'use client';
-
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -113,6 +113,7 @@ export function EnquiryReviewModal({
   onClose,
   initialStep = 'details',
 }: EnquiryReviewModalProps) {
+  const router = useRouter();
   const [step, setStep] = useState<'details' | 'approve-form' | 'approve-confirm' | 'reject-confirm'>(initialStep);
   const [approveFormValues, setApproveFormValues] = useState<ApproveFormValues | null>(null);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
@@ -225,6 +226,15 @@ export function EnquiryReviewModal({
         <>
           {step === 'details' && (
             <div className="flex gap-3">
+              <Button
+                size="sm"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  router.push(`/appointments/new?enquiryId=${enquiry.id}`);
+                }}
+              >
+                📅 Book Appointment
+              </Button>
               <Button
                 id="enquiry-action-approve"
                 size="sm"

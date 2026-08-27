@@ -72,16 +72,34 @@ export type ReviewEnquiryResponse = {
 };
 
 export type EnquiryPrefillData = {
-  customerId: string;
+  customerId?: string;
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber?: string;
   vehicleMake: string;
   vehicleModel: string;
   vehicleRegNumber: string;
-  vehicleId: string;
-  preferredDate: string;
+  vehicleId?: string;
+  preferredDate: string | null;
   branchId: string;
   branchName: string;
   serviceDescription: string;
+};
+
+
+export type EnquiryPrefillApiResponse = {
+  prefill: {
+    customerName: string;
+    email: string;
+    phoneNumber: string;
+    vehicleMake: string;
+    vehicleModel: string;
+    vehicleYear: number | null;
+    vehicleRegNumber: string;
+    serviceDescription: string;
+    preferredDate: string | null;
+    branchId: string;
+    branchName: string;
+  };
 };

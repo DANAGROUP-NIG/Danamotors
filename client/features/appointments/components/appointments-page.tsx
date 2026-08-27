@@ -50,6 +50,7 @@
 // }
 
 import { useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
@@ -58,10 +59,20 @@ import { AppointmentsTable } from "./AppointmentsTable";
 import { AppointmentCreateForm } from "./AppointmentCreateForm";
 
 export function AppointmentsPage() {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
+  //const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const enquiryId = searchParams.get("enquiryId");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(!!enquiryId);
   const { hasPermission } = useAuth();
   const canCreate = hasPermission("appointment:create");
+
+  function closeCreateModal() {
+    setIsCreateModalOpen(false);
+    if (enquiryId) {
+      router.replace("/appointments");
+    }
+  }
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -93,10 +104,10 @@ export function AppointmentsPage() {
       {/* ── Walk-in Creation Modal ───────────────────────────────────────── */}
       <ModalFame
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Book Walk-in Appointment"
+        onClose={closeCreateModal}
+        title={enquiryId ? "Book Appointment from Enquiry" : "Book Walk-in Appointment"}
       >
-        <AppointmentCreateForm onSuccess={() => setIsCreateModalOpen(false)} />
+        <AppointmentCreateForm onSuccess={closeCreateModal} />
       </ModalFame>
     </div>
   );

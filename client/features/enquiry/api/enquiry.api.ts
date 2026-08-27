@@ -8,6 +8,7 @@ import type {
   ReviewEnquiryPayload,
   ReviewEnquiryResponse,
   EnquiryPrefillData, 
+  EnquiryPrefillApiResponse,
 } from '../types/enquiry.types';
 
 export async function createEnquiryRequest(
@@ -60,11 +61,20 @@ export async function deleteEnquiryRequest(id: string): Promise<void> {
   return apiDelete<void>(`${API_ROUTES.enquiries.base}/${id}`);
 }
 
-
 export async function getEnquiryPrefillRequest(
   enquiryId: string,
 ): Promise<EnquiryPrefillData> {
-  return apiGet<EnquiryPrefillData>(
-    `/api/enquiries/${enquiryId}/prefill`,
+  const response = await apiGet<EnquiryPrefillApiResponse>(
+    `${API_ROUTES.enquiries.base}/${enquiryId}/prefill`,
   );
+
+  const { customerName, ...rest } = response.prefill;
+  const [firstName = "", ...lastParts] = customerName.split(" ");
+  const lastName = lastParts.join(" ");
+
+  return {
+    ...rest,
+    firstName,
+    lastName,
+  };
 }
