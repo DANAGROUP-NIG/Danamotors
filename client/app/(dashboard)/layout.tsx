@@ -11,16 +11,17 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 import { NAV_GROUPS } from "@/constant";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
+  "/dashboard": ["dashboard:read"],
   "/customers": ["customer:read"],
   "/vehicles": ["vehicle:read"],
   "/appointments": ["appointment:read"],
-  "/enquiries": ["customer:read"],
+  "/enquiries": ["enquiry:read"],
   "/users": ["user:read"],
   "/branches": ["branch:read"],
   "/job-cards": ["jobcard:read"],
   "/inspections": ["inspection:read"],
   "/repairs": ["jobcard:update", "workshop:read"],
-  "/technicians": ["user:read"],
+  "/technicians": ["workshop:read"],
   "/inventory": ["sparepart:read", "stock:read"],
   "/transfers": ["transfer:read"],
   "/purchase-requests": ["purchaserequest:read"],

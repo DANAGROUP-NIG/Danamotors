@@ -34,7 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
       {
         label: "Customers",
         href: "/customers",
@@ -50,7 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         label: "Appointments",
         icon: CalendarDays,
-        permissions: ["appointment:read"],
+        permissions: ["appointment:read", "enquiry:read"],
         children: [
           {
             label: "Service Appointments",
@@ -62,7 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
             label: "Enquiry Appointments",
             href: "/enquiries",
             icon: ClipboardList,
-            permissions: ["customer:read"],
+            permissions: ["enquiry:read"],
           },
         ],
       },
@@ -112,7 +112,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Technicians",
         href: "/technicians",
         icon: UserCog,
-        permissions: ["user:read"],
+        permissions: ["workshop:read"],
       },
     ],
   },
@@ -183,7 +183,7 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV: NavItem[] = [
-  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
   {
     label: "Vehicles",
     href: "/vehicles",

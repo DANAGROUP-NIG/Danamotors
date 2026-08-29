@@ -35,7 +35,7 @@ export default function EnquiryPage() {
     "approve-form" | "reject-confirm" | null
   >(null);
   const { hasPermission } = useAuth();
-  const canReview = hasPermission("customer:update");
+  const canReview = hasPermission("enquiry:update");
 
   if (isLoading) {
     return (

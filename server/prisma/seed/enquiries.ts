@@ -103,3 +103,31 @@ export default async function seedEnquiries(
   }
   console.log(`✅ Seeded ${count} enquiries (Pending: 3, Approved: 1, Rejected: 1)`);
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/enquiries.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true },
+      });
+      const staffUsers = await prisma.user.findMany({
+        select: { id: true, firstName: true, lastName: true },
+      });
+      const customers = await prisma.customer.findMany({
+        select: { id: true, firstName: true, lastName: true, email: true },
+      });
+      const vehicles = await prisma.vehicle.findMany({
+        select: { id: true, customerId: true },
+      });
+      const services = await prisma.service.findMany({
+        select: { id: true },
+      });
+      await seedEnquiries(prisma, branches, staffUsers, customers, vehicles, services);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}
