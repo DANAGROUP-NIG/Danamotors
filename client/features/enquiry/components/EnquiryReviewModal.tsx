@@ -119,7 +119,7 @@ export function EnquiryReviewModal({
 
   const reviewEnquiry = useReviewEnquiry();
   const { hasPermission, isSuperAdmin } = useAuth();
-  const canReview = hasPermission("customer:update") && enquiry.status === 'Pending';
+  const canReview = hasPermission("enquiry:update") && enquiry.status === 'Pending';
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data: services } = useServices({ limit: 100 });
 

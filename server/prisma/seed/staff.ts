@@ -189,3 +189,19 @@ export default async function seedStaffUsers(
   console.log(`✅ Seeded ${result.length} staff users`);
   return result;
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/staff.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true },
+      });
+      await seedStaffUsers(prisma, branches);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

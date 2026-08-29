@@ -50,7 +50,7 @@ export function EnquiriesTable() {
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasPermission } = useAuth();
-  const canReview = hasPermission("customer:update");
+  const canReview = hasPermission("enquiry:update");
   const branchId = activeBranch?.id ?? undefined;
 
   const { data, isLoading, isError, isFetching } = useEnquiries({

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { DashboardController } from './dashboard.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
+import { requirePermission } from '../../middleware/authorize';
+import { PERMISSIONS } from '../../shared/constants/roles';
 import { dashboardStatsQuerySchema } from './dashboard.validation';
 
 const router = Router();
@@ -56,6 +58,7 @@ router.use(authMiddleware);
  */
 router.get(
   '/stats',
+  requirePermission(PERMISSIONS.DASHBOARD_READ),
   validateRequest(dashboardStatsQuerySchema),
   controller.getStats,
 );

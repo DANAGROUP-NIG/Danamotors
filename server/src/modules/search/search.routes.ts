@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { SearchController } from './search.controller';
 import { authMiddleware } from '../../middleware/authMiddleware';
+import { requirePermission } from '../../middleware/authorize';
+import { PERMISSIONS } from '../../shared/constants/roles';
 
 const router = Router();
 const controller = new SearchController();
@@ -62,7 +64,7 @@ router.use(authMiddleware);
  *                       items:
  *                         $ref: '#/components/schemas/SparePartDTO'
  */
-router.get('/', controller.search);
+router.get('/', requirePermission(PERMISSIONS.SEARCH_READ), controller.search);
 
 export default router;
 

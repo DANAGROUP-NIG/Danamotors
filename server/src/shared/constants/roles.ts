@@ -14,6 +14,16 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
+  // ── Dashboard ───────────────────────────────────────────────────────────────
+  DASHBOARD_READ: "dashboard:read",
+
+  // ── Notifications ───────────────────────────────────────────────────────────
+  NOTIFICATION_READ: "notification:read",
+  NOTIFICATION_UPDATE: "notification:update",
+
+  // ── Global Search ───────────────────────────────────────────────────────────
+  SEARCH_READ: "search:read",
+
   // ── Administration — Users ─────────────────────────────────────────────────
   USER_READ: "user:read",
   USER_CREATE: "user:create",
@@ -55,6 +65,12 @@ export const PERMISSIONS = {
   APPOINTMENT_CREATE: "appointment:create",
   APPOINTMENT_UPDATE: "appointment:update",
   APPOINTMENT_DELETE: "appointment:delete",
+
+  // ── Enquiries — Appointment Inquiries ─────────────────────────────────────
+  ENQUIRY_READ: "enquiry:read",
+  ENQUIRY_CREATE: "enquiry:create",
+  ENQUIRY_UPDATE: "enquiry:update",
+  ENQUIRY_DELETE: "enquiry:delete",
 
   // ── Service — Job Cards ───────────────────────────────────────────────────
   JOBCARD_READ: "jobcard:read",
@@ -155,6 +171,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.USER_READ,
     PERMISSIONS.USER_CREATE,
     PERMISSIONS.USER_UPDATE,
@@ -173,6 +193,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.APPOINTMENT_READ,
     PERMISSIONS.APPOINTMENT_CREATE,
     PERMISSIONS.APPOINTMENT_UPDATE,
+    PERMISSIONS.ENQUIRY_READ,
+    PERMISSIONS.ENQUIRY_CREATE,
+    PERMISSIONS.ENQUIRY_UPDATE,
+    PERMISSIONS.ENQUIRY_DELETE,
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
@@ -218,6 +242,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.SPAREPART_READ,
     PERMISSIONS.SPAREPART_CREATE,
     PERMISSIONS.SPAREPART_UPDATE,
@@ -245,6 +273,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.SPAREPART_READ,
     PERMISSIONS.SPAREPART_CREATE,
     PERMISSIONS.SPAREPART_UPDATE,
@@ -267,6 +299,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   [ROLES.WORKSHOP_MANAGER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
@@ -297,6 +333,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.INVOICE_READ,
     PERMISSIONS.INVOICE_CREATE,
     PERMISSIONS.INVOICE_UPDATE,
@@ -309,6 +349,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_UPDATE,
@@ -335,6 +379,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Executes repairs, updates job card progress
   [ROLES.TECHNICIAN]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_UPDATE,
@@ -349,6 +397,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.RECEPTIONIST]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_DOCUMENT_CREATE,
@@ -356,12 +408,18 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.APPOINTMENT_READ,
     PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.ENQUIRY_READ,
+    PERMISSIONS.ENQUIRY_CREATE,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.INVOICE_READ,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.RECEPTION_MANAGER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.CUSTOMER_CREATE,
     PERMISSIONS.CUSTOMER_UPDATE,
@@ -379,6 +437,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.APPOINTMENT_CREATE,
     PERMISSIONS.APPOINTMENT_UPDATE,
     PERMISSIONS.APPOINTMENT_DELETE,
+    PERMISSIONS.ENQUIRY_READ,
+    PERMISSIONS.ENQUIRY_CREATE,
+    PERMISSIONS.ENQUIRY_UPDATE,
+    PERMISSIONS.ENQUIRY_DELETE,
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.SERVICES_READ,

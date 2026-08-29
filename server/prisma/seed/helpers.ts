@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 export const hash = (p: string) => bcrypt.hash(p, 10);
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

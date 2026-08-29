@@ -42,3 +42,15 @@ export default async function seedBranches(prisma: PrismaClient) {
   console.log(`✅ Seeded ${result.length} branches`);
   return result;
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/branches.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      await seedBranches(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

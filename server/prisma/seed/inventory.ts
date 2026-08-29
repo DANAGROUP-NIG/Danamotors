@@ -47,3 +47,22 @@ export default async function seedInventoryStock(
   }
   console.log(`✅ Seeded inventory stock for ${branches.length} branches (${count} records)`);
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/inventory.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true },
+      });
+      const parts = await prisma.sparePart.findMany({
+        select: { id: true, category: true },
+      });
+      await seedInventoryStock(prisma, branches, parts);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

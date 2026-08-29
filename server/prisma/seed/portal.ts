@@ -201,3 +201,22 @@ export default async function seedCustomerPortal(
 
   console.log(`✅ Seeded customer portal demo data (password: ${CUSTOMER_PASSWORD})`);
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/portal.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true },
+      });
+      const services = await prisma.service.findMany({
+        select: { id: true, name: true, durationMins: true },
+      });
+      await seedCustomerPortal(prisma, branches, services);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}
