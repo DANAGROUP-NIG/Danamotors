@@ -74,7 +74,7 @@ export default function DashboardPage() {
     );
   }, []);
 
-  const { data: stats, isLoading, isError } = useDashboardStats();
+  const { data: stats, isLoading, isFetching, isError } = useDashboardStats();
 
   const canSeeFinance = hasPermission("invoice:read");
   const canSeeWorkshop = hasPermission("jobcard:read");
@@ -98,18 +98,28 @@ export default function DashboardPage() {
   }
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (isLoading) {
+  // Show the skeleton while the query is fetching and we don't have data yet
+  // (covers initial load AND background refetches that have no data).
+  if (isLoading || (isFetching && !stats)) {
     return <DashboardSkeleton />;
   }
 
   // ── API error state ────────────────────────────────────────────────────────
-  if (isError || !stats) {
+  // Only show the error card once the fetch has settled (not currently
+  // fetching) and we have no data to render.
+  if (isError && !isFetching && !stats) {
     return (
       <div className="flex flex-col gap-6 p-4 lg:p-6">
         <DashboardWelcomeHeader user={user} today={today} />
         <DashboardFallbackState user={user} />
       </div>
     );
+  }
+
+  // Fallback: if there is still no data to render (not an error, not fetching),
+  // keep showing the skeleton rather than crashing on undefined.
+  if (!stats) {
+    return <DashboardSkeleton />;
   }
 
   // ── Limited dashboard for users with minimal permissions ────────────────────
