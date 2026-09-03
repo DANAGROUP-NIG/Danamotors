@@ -36,7 +36,12 @@ export const createEnquirySchema = z.object({
     .optional(),
 
   vehicleRegNumber: z.string().max(20).optional(),
-
+  vin: z
+    .string()
+    .max(17, 'VIN must be 17 characters or less')
+    .optional()
+    .transform(val => val?.toUpperCase()),
+    
   serviceDescription: z
     .string()
     .min(10, 'Please describe the service you need (at least 10 characters)')
