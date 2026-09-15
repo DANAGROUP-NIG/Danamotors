@@ -2,7 +2,7 @@ import app from "./app";
 import { config } from "./config";
 import prisma from "./prisma/client";
 
-const server = app.listen(config.PORT, async () => {
+const server = app.listen(config.PORT, "127.0.0.1", async () => {
   console.log(
     `🚀 Dana Motors backend running on port ${config.PORT} in ${config.NODE_ENV} mode`,
   );

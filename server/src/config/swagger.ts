@@ -35,20 +35,26 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
         url: 'https://opensource.org/licenses/MIT',
       },
     },
+    // servers: [
+    //   {
+    //     url: 'http://localhost:8000/api',
+    //     description: 'Local Development Server',
+    //   },
+    //   {
+    //     url: 'https://staging-api.danamotors.com/api',
+    //     description: 'Staging Server',
+    //   },
+    //   {
+    //     url: 'https://api.danamotors.com/api',
+    //     description: 'Production Server',
+    //   },
+    // ],
     servers: [
-      {
-        url: 'http://localhost:8000/api',
-        description: 'Local Development Server',
-      },
-      {
-        url: 'https://staging-api.danamotors.com/api',
-        description: 'Staging Server',
-      },
-      {
-        url: 'https://api.danamotors.com/api',
-        description: 'Production Server',
-      },
-    ],
+    {
+    url: '/api',
+    description: 'Current Dana Motors API',
+  },
+],
     tags: [
       {
         name: 'Health',
