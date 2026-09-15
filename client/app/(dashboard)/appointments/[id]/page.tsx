@@ -28,6 +28,8 @@ import { AppointmentEditForm } from "@/features/appointments/components/Appointm
 import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
+import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
+
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-slate-100 text-slate-700",
@@ -175,20 +177,11 @@ export default function AppointmentDetailPage() {
           </span>
         </div>
 
-        {!isTerminal && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>Pending</span>
-              <div className="flex-1 h-1.5 rounded-full bg-slate-100">
-                <div
-                  className="h-1.5 rounded-full bg-primary transition-all"
-                  style={{ width: `${statusProgress(appointment.status)}%` }}
-                />
-              </div>
-              <span>Completed</span>
-            </div>
+        {/* Status Stepper */}
+          <div className="mt-8 mb-4">
+            <AppointmentStatusStepper currentStatus={appointment.status} />
           </div>
-        )}
+
 
         <div className="mb-6 flex flex-wrap gap-2">
           {canTransition && (

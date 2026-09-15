@@ -9,8 +9,10 @@ import { NotFoundError } from './shared/errors/appError';
 
 const app = express();
 
+app.set('trust proxy', 'loopback');
+
 // ── Global Middlewares ──────────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({ origin: 'https://danamotors.danagroup.net' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
