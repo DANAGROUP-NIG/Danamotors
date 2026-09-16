@@ -22,7 +22,7 @@ export class EnquiryService {
       type: 'APPOINTMENT_CREATE',
       title: 'New online booking enquiry',
       message: `${data.firstName} ${data.lastName} submitted a service enquiry at ${branch.name}.`,
-      link: `/appointments?tab=enquiries`,
+      link: `/enquiries/${enquiry.id}`,
       branchId: branch.id,
     };
 
@@ -91,7 +91,7 @@ export class EnquiryService {
         type: 'APPOINTMENT_REJECTED',
         title: 'Enquiry rejected',
         message: `The enquiry from ${enquiry.firstName} ${enquiry.lastName} has been rejected.`,
-        link: `/appointments?tab=enquiries`,
+        link: `/enquiries/${id}`,
         branchId: enquiry.branch.id,
       });
 
@@ -148,16 +148,51 @@ export class EnquiryService {
       type: 'APPOINTMENT_APPROVED',
       title: 'Enquiry approved & appointment created',
       message: `${enquiry.firstName} ${enquiry.lastName}'s enquiry has been approved. Appointment scheduled for ${new Date(appointment.scheduledAt).toLocaleString()}.`,
-      link: `/appointments/${appointment.id}`,
+      link: `/enquiries/${id}`,
       branchId: enquiry.branch.id,
     };
 
     await Promise.all([
       this.notificationService.notifyRole(ROLES.RECEPTIONIST,      enquiry.branch.id, approvedPayload),
       this.notificationService.notifyRole(ROLES.RECEPTION_MANAGER, enquiry.branch.id, approvedPayload),
+      this.notificationService.notifyRole(ROLES.WORKSHOP_MANAGER,  enquiry.branch.id, approvedPayload),
+      this.notificationService.notifyRole(ROLES.SERVICE_ADVISOR,   enquiry.branch.id, approvedPayload),
     ]);
 
     return { enquiry: updatedEnquiry, appointment };
+  }
+
+  /**
+   * Returns pre-filled appointment form data derived from an enquiry.
+   * Used by `GET /api/enquiries/:id/prefill`.
+   * If the enquiry has already been Approved or Rejected, the linked appointmentId
+   * (if any) is included so the frontend can redirect to the existing appointment.
+   */
+  async getPrefillData(id: string) {
+    const enquiry = await this.enquiryRepo.findById(id);
+    if (!enquiry) throw new NotFoundError('Enquiry not found');
+
+    const prefill: Record<string, unknown> = {
+      customerName:       `${enquiry.firstName} ${enquiry.lastName}`,
+      email:              enquiry.email,
+      phoneNumber:        enquiry.phoneNumber,
+      vehicleMake:        enquiry.vehicleMake ?? null,
+      vehicleModel:       enquiry.vehicleModel ?? null,
+      vehicleYear:        enquiry.vehicleYear ?? null,
+      vehicleRegNumber:   enquiry.vehicleRegNumber ?? null,
+      serviceDescription: enquiry.serviceDescription,
+      preferredDate:      enquiry.preferredDate ?? null,
+      branchId:           enquiry.branch.id,
+      branchName:         enquiry.branch.name,
+    };
+
+    // If the enquiry is already reviewed, surface the linked appointment ID
+    // so the frontend can redirect rather than creating a duplicate.
+    if (enquiry.status === 'Approved' || enquiry.status === 'Rejected') {
+      prefill.linkedAppointmentId = enquiry.appointmentId ?? null;
+    }
+
+    return prefill;
   }
 
   async deleteEnquiry(id: string) {

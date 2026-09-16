@@ -3,7 +3,6 @@
 import { TrendingUp, Wrench, Car, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { FINANCE_ROLES, WORKSHOP_ROLES, MANAGE_ROLES } from "@/features/auth/roles";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { useEffect, useState } from "react";
 
@@ -20,7 +19,7 @@ function fmtFull(n: number) {
 }
 
 export default function AdminDashboard() {
-  const { user, hasAccess } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { data, isLoading, isError } = useDashboardStats();
   const [today, setToday] = useState("");
 
@@ -32,11 +31,11 @@ export default function AdminDashboard() {
     }));
   }, []);
 
-  const canSeeFinance = hasAccess(FINANCE_ROLES);
-  const canSeeWorkshop = hasAccess(WORKSHOP_ROLES);
-  const canManage = hasAccess(MANAGE_ROLES);
-  const canSeeInventory = hasAccess(MANAGE_ROLES);
-  const canCreateJob = hasAccess(WORKSHOP_ROLES);
+  const canSeeFinance = hasPermission("invoice:read");
+  const canSeeWorkshop = hasPermission("jobcard:read");
+  const canManage = hasPermission("user:read");
+  const canSeeInventory = hasPermission("sparepart:read");
+  const canCreateJob = hasPermission("jobcard:create");
 
   const kpiCount = [
     canSeeFinance,

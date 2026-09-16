@@ -9,41 +9,29 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import {
-  FINANCE_ROLES,
-  WORKSHOP_ROLES,
-  CUSTOMER_ROLES,
-  VEHICLE_ROLES,
-  TECHNICIAN_ROLES,
-  BRANCH_ROLES,
-  TRANSFER_ROLES,
-  USER_ROLES,
-  MANAGE_ROLES,
-  SERVICES_MANAGE_ROLES,
-  type AppRole,
-} from "@/features/auth/roles";
 
-const ROUTE_ROLES: Record<string, AppRole[]> = {
-  "/customers": CUSTOMER_ROLES,
-  "/vehicles": VEHICLE_ROLES,
-  "/appointments": CUSTOMER_ROLES,
-  "/users": USER_ROLES,
-  "/branches": BRANCH_ROLES,
-  "/job-cards": WORKSHOP_ROLES,
-  "/inspections": TECHNICIAN_ROLES,
-  "/repairs": TECHNICIAN_ROLES,
-  "/technicians": MANAGE_ROLES,
-  "/inventory": [...MANAGE_ROLES, "workshopmanager"],
-  "/transfers": TRANSFER_ROLES,
-  "/purchase-requests": [...MANAGE_ROLES, "workshopmanager"],
-  "/purchasing": FINANCE_ROLES,
-  "/finance": FINANCE_ROLES,
-  "/credit-applications": FINANCE_ROLES,
-  "/reports": FINANCE_ROLES,
-  "/payments": FINANCE_ROLES,
-  "/quotations": WORKSHOP_ROLES,
-  "/services": SERVICES_MANAGE_ROLES,
-  "/settings": MANAGE_ROLES,
+const ROUTE_PERMISSIONS: Record<string, string[]> = {
+  "/customers": ["customer:read"],
+  "/vehicles": ["vehicle:read"],
+  "/appointments": ["appointment:read"],
+  "/enquiries": ["customer:read"],
+  "/users": ["user:read"],
+  "/branches": ["branch:read"],
+  "/job-cards": ["jobcard:read"],
+  "/inspections": ["inspection:read"],
+  "/repairs": ["jobcard:update", "workshop:read"],
+  "/technicians": ["user:read"],
+  "/inventory": ["sparepart:read", "stock:read"],
+  "/transfers": ["transfer:read"],
+  "/purchase-requests": ["purchaserequest:read"],
+  "/purchasing": ["invoice:read", "payment:read"],
+  "/finance": ["invoice:read"],
+  "/credit-applications": ["credit:application:create"],
+  "/reports": ["financereport:read"],
+  "/payments": ["payment:read"],
+  "/quotations": ["jobcard:read"],
+  "/services": ["services:read"],
+  "/settings": ["role:read"],
 };
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -81,7 +69,7 @@ export default function DashboardLayout({
 
         {/* ── Page content ────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto" id="main-content">
-          <RouteGuard routeRoles={ROUTE_ROLES}>{children}</RouteGuard>
+          <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
         </main>
 
         {/* ── Mobile bottom nav ───────────────────────────────────── */}

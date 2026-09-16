@@ -9,9 +9,12 @@ import ModalFame from "@/components/modals/ModalFame";
 import { useServices } from "../hooks/use-services";
 import { ServiceCreateForm } from "./ServiceCreateForm";
 import { ServicesTable } from "./ServicesTable";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 export function ServicesPage() {
   const [showForm, setShowForm] = useState(false);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("services:create");
   const { data } = useServices({ page: 1, limit: 1 });
 
   return (
@@ -24,10 +27,12 @@ export function ServicesPage() {
             : undefined
         }
         actions={
-          <Button onClick={() => setShowForm(true)} size="sm">
-            <Plus className="size-4" />
-            Add service
-          </Button>
+          canCreate && (
+            <Button onClick={() => setShowForm(true)} size="sm">
+              <Plus className="size-4" />
+              Add service
+            </Button>
+          )
         }
       />
 

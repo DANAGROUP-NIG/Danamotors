@@ -15,11 +15,40 @@ import notificationRoutes from '../modules/notification/notification.routes';
 import portalRoutes from '../modules/customer-portal/portal.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import enquiryRoutes from '../modules/enquiry/enquiry.routes';
+import auditRoutes from '../modules/audit/audit.routes';
 
 const router = Router();
 
 // Base health check
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: API health check
+ *     description: Returns the operational status and timestamp of the Dana Motors API.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: API is healthy and operational
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Dana Motors API is healthy
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
 router.get('/health', (_req, res) => {
+
   res.status(200).json({
     status: 'success',
     message: 'Dana Motors API is healthy',
@@ -44,5 +73,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/portal', portalRoutes);
 router.use('/credit', creditRoutes);
 router.use('/enquiries', enquiryRoutes);
+router.use('/audit', auditRoutes);
 
 export default router;

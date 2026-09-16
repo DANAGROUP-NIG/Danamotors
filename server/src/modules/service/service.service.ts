@@ -1,8 +1,26 @@
 import prisma from '../../prisma/client';
 import { ServiceRepository } from './service.repository';
-import { NotFoundError, ConflictError } from '../../shared/errors/appError';
+import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
 import { NotificationService } from '../notification/notification.service';
+
+/**
+ * Valid status transitions for a ServiceAppointment.
+ * Exported for unit-test coverage and import by other modules.
+ * - An empty array means the status is terminal (no further transitions allowed).
+ * - SuperAdmin users can bypass this map (see updateAppointment).
+ */
+export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
+  'Pending':           ['Checked In', 'Cancelled'],
+  'Checked In':        ['Inspection', 'Cancelled'],
+  'Inspection':        ['Awaiting Approval', 'Cancelled'],
+  'Awaiting Approval': ['In Repair', 'Cancelled'],
+  'In Repair':         ['Quality Check', 'Cancelled'],
+  'Quality Check':     ['Ready', 'In Repair'],
+  'Ready':             ['Completed'],
+  'Completed':         [],
+  'Cancelled':         [],
+};
 
 export class ServiceService {
   private serviceRepository: ServiceRepository;
@@ -73,10 +91,12 @@ export class ServiceService {
     };
 
     await Promise.all([
-      notificationService.notifyRole(ROLES.RECEPTIONIST,      branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.ADMIN,             undefined,  appointmentPayload),
-      notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined,  appointmentPayload),
+      notificationService.notifyRole(ROLES.RECEPTIONIST,       branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.RECEPTION_MANAGER,  branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.WORKSHOP_MANAGER,   branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.SERVICE_ADVISOR,    branch.id, appointmentPayload),
+      notificationService.notifyRole(ROLES.ADMIN,              undefined,  appointmentPayload),
+      notificationService.notifyRole(ROLES.SUPER_ADMIN,        undefined,  appointmentPayload),
     ]);
 
     return appointment;
@@ -133,18 +153,125 @@ export class ServiceService {
     durationMins?: number;
     notes?: string;
     status?: string;
+    requestingUserRole?: string;
   }) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
       throw new NotFoundError('Appointment not found');
     }
 
-    return this.serviceRepository.updateAppointment(id, {
+    const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
+
+    // ── Status transition validation ──────────────────────────────────────────
+    if (data.status && data.status !== appointment.status) {
+      const currentStatus = appointment.status;
+      const allowedTransitions = APPOINTMENT_STATUS_TRANSITIONS[currentStatus];
+
+      if (!isSuperAdmin) {
+        if (allowedTransitions === undefined) {
+          // Unknown current status — allow (forward-compat)
+        } else if (allowedTransitions.length === 0) {
+          throw new BadRequestError(
+            `Invalid status transition from '${currentStatus}' to '${data.status}'. Allowed transitions: none (terminal status).`,
+          );
+        } else if (!allowedTransitions.includes(data.status)) {
+          throw new BadRequestError(
+            `Invalid status transition from '${currentStatus}' to '${data.status}'. Allowed transitions: ${allowedTransitions.join(', ')}.`,
+          );
+        }
+      }
+    }
+
+    // ── Reschedule detection ──────────────────────────────────────────────────
+    const isRescheduled =
+      data.scheduledAt !== undefined &&
+      new Date(data.scheduledAt).toISOString() !== new Date(appointment.scheduledAt).toISOString();
+
+    const oldScheduledAt = appointment.scheduledAt;
+
+    // ── Persist update ────────────────────────────────────────────────────────
+    const updated = await this.serviceRepository.updateAppointment(id, {
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
       durationMins: data.durationMins,
       notes: data.notes,
       status: data.status,
     });
+
+    // ── Post-update notifications ─────────────────────────────────────────────
+    const notificationService = new NotificationService();
+
+    // Resolve customer + branch from the fetched appointment
+    const apptAny = appointment as any;
+    const customerName = apptAny.customer
+      ? `${apptAny.customer.firstName} ${apptAny.customer.lastName}`
+      : 'Customer';
+    const branchName = apptAny.branch?.name ?? 'branch';
+    const branchId: string = appointment.branchId;
+
+    // 1. Reschedule notification
+    if (isRescheduled) {
+      const rescheduledPayload = {
+        type: 'APPOINTMENT_RESCHEDULED',
+        title: 'Appointment rescheduled',
+        message: `Appointment for ${customerName} at ${branchName} rescheduled from ${new Date(oldScheduledAt).toLocaleString()} to ${new Date(data.scheduledAt!).toLocaleString()}.`,
+        link: `/appointments/${id}`,
+        branchId,
+      };
+      await Promise.all([
+        notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId, rescheduledPayload),
+        notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId, rescheduledPayload),
+      ]);
+    }
+
+    // 2. Status-change notifications
+    if (data.status && data.status !== appointment.status) {
+      const newStatus = data.status;
+
+      if (newStatus === 'Checked In') {
+        const payload = {
+          type: 'APPOINTMENT_CHECKED_IN',
+          title: 'Appointment checked in',
+          message: `${customerName} has checked in at ${branchName}.`,
+          link: `/appointments/${id}`,
+          branchId,
+        };
+        await Promise.all([
+          notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branchId, payload),
+          notificationService.notifyRole(ROLES.SERVICE_ADVISOR,  branchId, payload),
+        ]);
+      } else if (newStatus === 'Cancelled') {
+        const payload = {
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment cancelled',
+          message: `Appointment for ${customerName} at ${branchName} has been cancelled.`,
+          link: `/appointments/${id}`,
+          branchId,
+        };
+        await Promise.all([
+          notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId,  payload),
+          notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId,  payload),
+          notificationService.notifyRole(ROLES.WORKSHOP_MANAGER,  branchId,  payload),
+          notificationService.notifyRole(ROLES.ADMIN,             undefined, payload),
+          notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined, payload),
+        ]);
+      } else if (newStatus === 'Completed') {
+        const payload = {
+          type: 'APPOINTMENT_COMPLETED',
+          title: 'Appointment completed',
+          message: `Appointment for ${customerName} at ${branchName} has been completed.`,
+          link: `/appointments/${id}`,
+          branchId,
+        };
+        await Promise.all([
+          notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId,  payload),
+          notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId,  payload),
+          notificationService.notifyRole(ROLES.ADMIN,             undefined, payload),
+          notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined, payload),
+        ]);
+      }
+    }
+
+    return updated;
   }
 
   async deleteAppointment(id: string) {

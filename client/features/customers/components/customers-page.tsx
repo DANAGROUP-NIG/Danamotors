@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { CUSTOMER_CREATE_ROLES } from "@/features/auth/roles";
 import { useCustomers } from "../hooks/use-customers";
 import { CustomerCreateForm } from "./CustomerCreateForm";
 import { CustomersTable } from "./CustomersTable";
@@ -15,8 +14,8 @@ import { CustomersTable } from "./CustomersTable";
 export function CustomersPage() {
   const [showForm, setShowForm] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(CUSTOMER_CREATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("customer:create");
   const { data } = useCustomers({
     page: 1,
     limit: 1,

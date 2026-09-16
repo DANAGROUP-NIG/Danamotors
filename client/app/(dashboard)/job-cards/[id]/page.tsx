@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRef } from "react";
 import { useJobCard } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { SERVICE_UPDATE_ROLES } from "@/features/auth/roles";
 import {
   ArrowLeft,
   Loader2,
@@ -47,10 +46,10 @@ export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: jobCard, isLoading, error } = useJobCard(id);
-  const { hasAccess } = useAuth();
+  const { hasPermission } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
-  const canManage = hasAccess(SERVICE_UPDATE_ROLES);
+  const canManage = hasPermission("jobcard:update");
 
   function handlePrint() {
     window.print();

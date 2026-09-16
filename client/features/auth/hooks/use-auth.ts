@@ -16,6 +16,8 @@ export function useAuth() {
   const role = (user?.role?.toLowerCase().replace(/[\s-]/g, "_") ??
     null) as AppRole | null;
 
+  const permissions: string[] = user?.permissions ?? [];
+
   // Convenience booleans
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
@@ -35,6 +37,7 @@ export function useAuth() {
   const isAdminOrAbove = isSuperAdmin || isAdmin;
   const isManagerOrAbove = isStoreManager || isWorkshopManager;
   const isAdviserOrAbove = isManagerOrAbove || isAdviser;
+
   /**
    * hasAccess(["superadmin", "admin"])
    * Returns true when the current user's role matches ANY of the provided roles.
@@ -49,9 +52,33 @@ export function useAuth() {
     return allowedRoles.includes(role);
   }
 
+  /**
+   * hasPermission("customer:create")
+   * Returns true when the user's permissions array contains the given permission.
+   * SuperAdmin always has all permissions.
+   * Returns false if permissions haven't loaded yet (user not hydrated).
+   */
+  function hasPermission(permission: string): boolean {
+    if (!isHydrated) return false;
+    if (isSuperAdmin) return true;
+    return permissions.includes(permission);
+  }
+
+  /**
+   * hasAnyPermission(["customer:read", "customer:create"])
+   * Returns true when the user has ANY of the listed permissions.
+   */
+  function hasAnyPermission(perms: string[]): boolean {
+    if (!perms.length) return true;
+    if (!isHydrated) return false;
+    if (isSuperAdmin) return true;
+    return perms.some((p) => permissions.includes(p));
+  }
+
   return {
     user,
     role,
+    permissions,
     isAuthenticated,
     isHydrated,
     // individual role flags
@@ -73,7 +100,9 @@ export function useAuth() {
     isAdminOrAbove,
     isManagerOrAbove,
     isAdviserOrAbove,
-    // generic checker
+    // generic checkers
     hasAccess,
+    hasPermission,
+    hasAnyPermission,
   };
 }

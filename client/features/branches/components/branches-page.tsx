@@ -5,12 +5,15 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranches } from "../hooks/use-branches";
 import { BranchCreateForm } from "./BranchCreateForm";
 import { BranchesTable } from "./BranchesTable";
 
 export function BranchesPage() {
   const [showForm, setShowForm] = useState(false);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("branch:create");
   const { data } = useBranches({ page: 1, limit: 1 });
 
   return (
@@ -23,10 +26,12 @@ export function BranchesPage() {
             : undefined
         }
         actions={
-          <Button onClick={() => setShowForm(true)} size="sm">
-            <Plus className="size-4" />
-            Add branch
-          </Button>
+          canCreate && (
+            <Button onClick={() => setShowForm(true)} size="sm">
+              <Plus className="size-4" />
+              Add branch
+            </Button>
+          )
         }
       />
 

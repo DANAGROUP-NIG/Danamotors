@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, USER_UPDATE_ROLES } from "@/features/auth/roles";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable } from "@/components/ui/table-components/DataTable";
 import { useUsers } from "../hooks/use-users";
@@ -29,9 +28,9 @@ export function UsersTable() {
   const [roleFilter, setRoleFilter] = useState<string>("");
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canDelete = hasAccess(DELETE_ROLES);
-  const canUpdate = hasAccess(USER_UPDATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission("user:delete");
+  const canUpdate = hasPermission("user:update");
 
   // SuperAdmin: null activeBranch = all branches; everyone else: locked to their branch
   const branchId = activeBranch?.id ?? undefined;

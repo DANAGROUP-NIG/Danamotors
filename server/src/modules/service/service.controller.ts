@@ -88,7 +88,10 @@ export class ServiceController {
       const { id } = req.params;
       const appointment = await this.serviceService.getAppointment(id);
       assertBranchOwnership(req, (appointment as any).branchId);
-      const result = await this.serviceService.updateAppointment(id, req.body);
+      const result = await this.serviceService.updateAppointment(id, {
+        ...req.body,
+        requestingUserRole: req.user?.role,
+      });
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Appointment updated successfully', data: { appointment: result } });
     } catch (error) {
       next(error);

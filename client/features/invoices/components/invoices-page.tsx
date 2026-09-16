@@ -6,14 +6,13 @@ import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { FINANCE_ROLES } from "@/features/auth/roles";
 import { useInvoices } from "../hooks/use-invoices";
 import { InvoicesTable } from "./InvoicesTable";
 
 export function InvoicesPage() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(FINANCE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("invoice:create");
   const { data } = useInvoices({ branchId: activeBranch?.id });
 
   const total = data?.invoices?.length ?? 0;

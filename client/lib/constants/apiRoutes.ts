@@ -63,6 +63,11 @@ export const API_ROUTES = {
     base: "/service/appointments",
     detail: (id: string) => `/service/appointments/${id}`,
   },
+  enquiries: {
+    base: "/enquiries",
+    detail: (id: string) => `/enquiries/${id}`,
+    review: (id: string) => `/enquiries/${id}/review`,
+  },
   service: {
     jobCards: {
       base: "/service/job-cards",
@@ -111,6 +116,11 @@ export const API_ROUTES = {
     permissions: {
       base: "/admin/permissions",
     },
+  },
+  audit: {
+    logs: "/audit/logs",
+    detail: (id: string) => `/audit/logs/${id}`,
+    stats: "/audit/stats",
   },
   search: {
     base: "/search",

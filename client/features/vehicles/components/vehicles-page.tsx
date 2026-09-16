@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { VEHICLE_CREATE_ROLES } from "@/features/auth/roles";
 import { useVehicles } from "../hooks/use-vehicles";
 import { VehicleCreateForm } from "./VehicleCreateForm";
 import { VehiclesTable } from "./VehiclesTable";
@@ -15,8 +14,8 @@ import { VehiclesTable } from "./VehiclesTable";
 export function VehiclesPage() {
   const [showForm, setShowForm] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canCreate = hasAccess(VEHICLE_CREATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("vehicle:create");
   const { data } = useVehicles({
     page: 1,
     limit: 1,

@@ -257,7 +257,7 @@ export class CreditService {
           style: "currency",
           currency: "NGN",
         }).format(application.amount)} on invoice ${application.invoice.invoiceNumber}.`,
-        link: `/invoices/${application.invoiceId}`,
+        link: `/invoices`,
         branchId: application.customer?.branchId ?? null,
       });
 
@@ -343,7 +343,7 @@ export class CreditService {
         type: "CREDIT_APPLIED",
         title: "Credit applied to invoice",
         message: `${customer?.firstName ?? ""} ${customer?.lastName ?? ""} approved using credit on invoice ${application.invoice.invoiceNumber}.`,
-        link: `/invoices/${application.invoiceId}`,
+        link: `/invoices`,
       },
     );
     await this.notificationService.notifyRole(
@@ -353,7 +353,7 @@ export class CreditService {
         type: "CREDIT_APPLIED",
         title: "Credit applied to invoice",
         message: `${customer?.firstName ?? ""} ${customer?.lastName ?? ""} approved using credit on invoice ${application.invoice.invoiceNumber}.`,
-        link: `/invoices/${application.invoiceId}`,
+        link: `/invoices`,
       },
     );
 

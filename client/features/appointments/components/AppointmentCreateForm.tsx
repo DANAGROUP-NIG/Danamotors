@@ -18,9 +18,10 @@ import {
 
 interface AppointmentCreateFormProps {
   onSuccess?: () => void;
+  initialValues?: Partial<CreateAppointmentFormValues>;
 }
 
-export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps) {
+export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
@@ -41,6 +42,7 @@ export function AppointmentCreateForm({ onSuccess }: AppointmentCreateFormProps)
     resolver: zodResolver(createAppointmentSchema),
     defaultValues: {
       branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
+      ...initialValues,
     },
   });
 

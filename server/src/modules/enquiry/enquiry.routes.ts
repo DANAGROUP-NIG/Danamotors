@@ -9,6 +9,7 @@ import {
   createEnquirySchema,
   reviewEnquirySchema,
   enquiryIdParamSchema,
+  listEnquiriesQuerySchema,
 } from './enquiry.validation';
 
 const router = Router();
@@ -23,14 +24,410 @@ const enquiryLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * @openapi
+ * /enquiries:
+ *   post:
+ *     tags: [Enquiries]
+ *     summary: Submit a new online enquiry (public)
+ *     description: >
+ *       Rate-limited public endpoint for customers to submit a service enquiry.
+ *       Max 5 requests per 15 minutes per IP.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [firstName, lastName, email, phoneNumber, serviceDescription, branchId]
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Chukwuemeka
+ *               lastName:
+ *                 type: string
+ *                 example: Obi
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: emeka@example.com
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "+2348012345678"
+ *               vehicleMake:
+ *                 type: string
+ *                 example: Honda
+ *               vehicleModel:
+ *                 type: string
+ *                 example: Civic
+ *               vehicleYear:
+ *                 type: integer
+ *                 example: 2023
+ *               vehicleRegNumber:
+ *                 type: string
+ *                 example: ABC-123-DE
+ *               serviceDescription:
+ *                 type: string
+ *                 minLength: 10
+ *                 maxLength: 500
+ *                 example: Brake pads need replacement on front axle
+ *               preferredDate:
+ *                 type: string
+ *                 format: date-time
+ *               branchId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       201:
+ *         description: Enquiry submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         enquiry:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                               format: uuid
+ *                             status:
+ *                               type: string
+ *                               example: Pending
+ *                             createdAt:
+ *                               type: string
+ *                               format: date-time
+ *       429:
+ *         description: Rate limit exceeded
+ *       400:
+ *         $ref: '#/components/schemas/ValidationErrorResponse'
+ */
 router.post('/', enquiryLimiter, validateRequest(createEnquirySchema), controller.createEnquiry);
 
 // ── Authenticated staff endpoints ────────────────────────────────────────────
 router.use(authMiddleware);
 
-router.get('/',      requirePermission(PERMISSIONS.SERVICE_READ),   controller.listEnquiries);
-router.get('/:id',   requirePermission(PERMISSIONS.SERVICE_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
-router.patch('/:id/review', requirePermission(PERMISSIONS.SERVICE_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
-router.delete('/:id', requirePermission(PERMISSIONS.SERVICE_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
+/**
+ * @openapi
+ * /enquiries:
+ *   get:
+ *     tags: [Enquiries]
+ *     summary: List enquiries
+ *     description: >
+ *       Retrieve a paginated list of enquiries. Non-admin staff are scoped to their own branch.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           maximum: 100
+ *       - in: query
+ *         name: branchId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by branch (ignored for non-admin staff)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Pending, Approved, Rejected, Converted]
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name, email, or phone
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Paginated enquiry list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         enquiries:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                         pagination:
+ *                           $ref: '#/components/schemas/PaginationMeta'
+ *       401:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/',      requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(listEnquiriesQuerySchema), controller.listEnquiries);
+
+/**
+ * @openapi
+ * /enquiries/{id}/prefill:
+ *   get:
+ *     tags: [Enquiries]
+ *     summary: Get pre-filled appointment data from an enquiry
+ *     description: >
+ *       Returns a pre-mapped payload derived from an enquiry record that can be used
+ *       to pre-populate the service appointment creation form. Requires SERVICE_READ
+ *       permission. Branch ownership is enforced for non-admin staff.
+ *
+ *       If the enquiry is already `Approved` or `Rejected`, a `linkedAppointmentId`
+ *       field is included (may be `null`) so the frontend can redirect to an existing
+ *       appointment instead of creating a duplicate.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Enquiry ID to pre-fill from
+ *     responses:
+ *       200:
+ *         description: Pre-filled appointment form data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         prefill:
+ *                           type: object
+ *                           properties:
+ *                             customerName:
+ *                               type: string
+ *                               example: Chukwuemeka Obi
+ *                             email:
+ *                               type: string
+ *                               format: email
+ *                               example: emeka@example.com
+ *                             phoneNumber:
+ *                               type: string
+ *                               example: "+2348012345678"
+ *                             vehicleMake:
+ *                               type: string
+ *                               nullable: true
+ *                               example: Honda
+ *                             vehicleModel:
+ *                               type: string
+ *                               nullable: true
+ *                               example: Civic
+ *                             vehicleYear:
+ *                               type: integer
+ *                               nullable: true
+ *                               example: 2023
+ *                             vehicleRegNumber:
+ *                               type: string
+ *                               nullable: true
+ *                               example: ABC-123-DE
+ *                             serviceDescription:
+ *                               type: string
+ *                               example: Brake pads need replacement on front axle
+ *                             preferredDate:
+ *                               type: string
+ *                               format: date-time
+ *                               nullable: true
+ *                             branchId:
+ *                               type: string
+ *                               format: uuid
+ *                             branchName:
+ *                               type: string
+ *                               example: Dana Motors Abuja
+ *                             linkedAppointmentId:
+ *                               type: string
+ *                               format: uuid
+ *                               nullable: true
+ *                               description: >
+ *                                 Only present when the enquiry status is Approved or Rejected.
+ *                                 Non-null if an appointment was created from this enquiry.
+ *       401:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id/prefill', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(enquiryIdParamSchema), controller.prefillFromEnquiry);
+
+/**
+ * @openapi
+ * /enquiries/{id}:
+ *   get:
+ *     tags: [Enquiries]
+ *     summary: Get enquiry by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Enquiry details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         enquiry:
+ *                           type: object
+ *       404:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id',   requirePermission(PERMISSIONS.CUSTOMER_READ),   validateRequest(enquiryIdParamSchema), controller.getEnquiry);
+
+
+/**
+ * @openapi
+ * /enquiries/{id}/review:
+ *   patch:
+ *     tags: [Enquiries]
+ *     summary: Approve or reject an enquiry
+ *     description: >
+ *       Approving an enquiry converts it into a ServiceAppointment (source: OnlineBooking).
+ *       Rejecting marks the enquiry as Rejected. Only Pending enquiries can be reviewed.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [action]
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [approve, reject]
+ *               reviewNotes:
+ *                 type: string
+ *                 maxLength: 500
+ *               customerId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Required when action=approve
+ *               vehicleId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Required when action=approve
+ *               scheduledAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Required when action=approve
+ *               serviceId:
+ *                 type: string
+ *                 format: uuid
+ *               durationMins:
+ *                 type: integer
+ *                 example: 120
+ *               notes:
+ *                 type: string
+ *                 maxLength: 500
+ *     responses:
+ *       200:
+ *         description: Enquiry reviewed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         enquiry:
+ *                           type: object
+ *                         appointment:
+ *                           $ref: '#/components/schemas/JobCardDTO'
+ *       400:
+ *         $ref: '#/components/schemas/ValidationErrorResponse'
+ *       404:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.patch('/:id/review', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(reviewEnquirySchema), controller.reviewEnquiry);
+
+/**
+ * @openapi
+ * /enquiries/{id}:
+ *   delete:
+ *     tags: [Enquiries]
+ *     summary: Delete an enquiry
+ *     description: >
+ *       SuperAdmin/Admin only. Cannot delete enquiries that have already been approved.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Enquiry deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Enquiry deleted
+ *       403:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         $ref: '#/components/schemas/ErrorResponse'
+ */
+router.delete('/:id', requirePermission(PERMISSIONS.CUSTOMER_DELETE), validateRequest(enquiryIdParamSchema), controller.deleteEnquiry);
 
 export default router;
