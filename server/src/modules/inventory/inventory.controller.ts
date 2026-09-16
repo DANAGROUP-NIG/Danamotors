@@ -203,13 +203,20 @@ export class InventoryController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const branchId = this.isCrossBranchUser(req)
-        ? undefined
-        : req.user?.branchId;
-      assertInventoryBranchAccess(req, [branchId]);
-      const result = await this.inventoryService.listAllStock(
-        branchId ?? undefined,
-      );
+      const { branchId, partId, search } = req.query as {
+        branchId?: string;
+        partId?: string;
+        search?: string;
+      };
+      const scopedBranchId = this.isCrossBranchUser(req)
+        ? branchId
+        : (req.user?.branchId ?? undefined);
+      assertInventoryBranchAccess(req, [scopedBranchId]);
+      const result = await this.inventoryService.listAllStock({
+        branchId: scopedBranchId,
+        partId,
+        search,
+      });
       res.status(200).json({
         status: "success",
         statusCode: 200,

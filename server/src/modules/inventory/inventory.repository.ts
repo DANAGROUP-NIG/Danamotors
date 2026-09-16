@@ -132,9 +132,26 @@ export class InventoryRepository {
     });
   }
 
-  async listAllInventoryStock(branchId?: string): Promise<InventoryStock[]> {
+  async listAllInventoryStock(filters?: {
+    branchId?: string;
+    partId?: string;
+    search?: string;
+  }): Promise<InventoryStock[]> {
     return prisma.inventoryStock.findMany({
-      where: branchId ? { branchId } : undefined,
+      where: {
+        ...(filters?.branchId ? { branchId: filters.branchId } : {}),
+        ...(filters?.partId ? { partId: filters.partId } : {}),
+        ...(filters?.search
+          ? {
+              part: {
+                OR: [
+                  { name: { contains: filters.search, mode: 'insensitive' } },
+                  { partNumber: { contains: filters.search, mode: 'insensitive' } },
+                ],
+              },
+            }
+          : {}),
+      },
       include: { part: true, branch: true },
       orderBy: { updatedAt: "desc" },
     });

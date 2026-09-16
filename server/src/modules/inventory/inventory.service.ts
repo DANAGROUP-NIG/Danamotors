@@ -15,6 +15,10 @@ export class InventoryService {
     this.inventoryRepository = new InventoryRepository();
   }
 
+  private withAvailableQuantity<T extends { quantity: number; reservedQuantity: number }>(stock: T): T & { availableQuantity: number } {
+    return { ...stock, availableQuantity: stock.quantity - stock.reservedQuantity };
+  }
+
   private async notifyLowStock(
     branchId: string,
     part: { id: string; name: string },
@@ -171,15 +175,17 @@ export class InventoryService {
         "Stock record not found for this branch and part",
       );
     }
-    return stock;
+    return this.withAvailableQuantity(stock);
   }
 
   async listBranchStock(branchId: string) {
-    return this.inventoryRepository.listInventoryStockByBranch(branchId);
+    const stock = await this.inventoryRepository.listInventoryStockByBranch(branchId);
+    return stock.map((item) => this.withAvailableQuantity(item));
   }
 
-  async listAllStock(branchId?: string) {
-    return this.inventoryRepository.listAllInventoryStock(branchId);
+  async listAllStock(filters?: { branchId?: string; partId?: string; search?: string }) {
+    const stock = await this.inventoryRepository.listAllInventoryStock(filters);
+    return stock.map((item) => this.withAvailableQuantity(item));
   }
 
   async adjustStock(data: {
@@ -217,7 +223,7 @@ export class InventoryService {
       recordedById: data.recordedById,
     });
 
-    return stock;
+    return this.withAvailableQuantity(stock);
   }
 
   async listStockTransactions(branchId?: string, partId?: string) {
