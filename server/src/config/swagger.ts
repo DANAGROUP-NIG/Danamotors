@@ -305,6 +305,36 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
           },
           required: ['id', 'partNumber', 'name', 'unitPrice'],
         },
+        // ── Inventory Stock DTO ────────────────────────────────────
+        InventoryStockDTO: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            branchId: { type: 'string', format: 'uuid' },
+            partId: { type: 'string', format: 'uuid' },
+            quantity: { type: 'integer', example: 25 },
+            reservedQuantity: { type: 'integer', example: 3 },
+            availableQuantity: {
+              type: 'integer',
+              example: 22,
+              description: 'Available quantity calculated as quantity - reservedQuantity.',
+            },
+            minimumStock: { type: 'integer', example: 10 },
+            maximumStock: { type: 'integer', nullable: true, example: 100 },
+            rackLocation: { type: 'string', nullable: true, example: 'A-03-02' },
+            part: { $ref: '#/components/schemas/SparePartDTO' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+          required: [
+            'id',
+            'branchId',
+            'partId',
+            'quantity',
+            'reservedQuantity',
+            'availableQuantity',
+          ],
+        },
         // ── Invoice DTO ─────────────────────────────────────────────
         InvoiceDTO: {
           type: 'object',

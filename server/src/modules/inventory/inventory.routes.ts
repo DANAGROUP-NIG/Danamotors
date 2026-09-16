@@ -176,22 +176,52 @@ router.use(authMiddleware);
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List stock across all branches
+ *     summary: List inventory stock
+ *     description: Branch-scoped users are restricted to their assigned branch. Cross-branch results require the inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: branchId
+ *         schema: { type: string, format: uuid }
+ *         description: Filter by branch. Ignored for branch-scoped users, who are always restricted to their assigned branch.
+ *       - in: query
+ *         name: partId
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by part number or part name.
  *     responses:
  *       200:
  *         description: Stock overview
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stockItems:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Insufficient permission or unauthorized branch access
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  * /inventory/stock/adjust:
  *   post:
  *     tags:
  *       - Inventory & Parts
  *     summary: Adjust stock quantity
+ *     description: The branchId must be the authenticated user's branch unless the user has inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -200,54 +230,114 @@ router.use(authMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [branchId, partId, adjustment, reason]
+ *             required: [branchId, partId, quantity, type]
  *             properties:
- *               branchId: { type: string }
- *               partId: { type: string }
- *               adjustment: { type: integer, description: Positive to add, negative to deduct }
- *               reason: { type: string, example: Physical count correction }
+ *               branchId: { type: string, format: uuid }
+ *               partId: { type: string, format: uuid }
+ *               quantity: { type: integer, description: Positive to add, negative to deduct }
+ *               type: { type: string, example: ADJUSTMENT }
+ *               notes: { type: string, example: Physical count correction }
  *     responses:
  *       200:
  *         description: Stock adjusted
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stock:
+ *                           $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
  *
  * /inventory/stock/{branchId}:
  *   get:
  *     tags:
  *       - Inventory & Parts
  *     summary: List stock for a specific branch
+ *     description: Branch-scoped users may only request their assigned branch. Cross-branch access requires inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: branchId
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Branch stock
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stockItems:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
+ *
+ * /inventory/stock/{branchId}/{partId}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get stock details for a part at a branch
+ *     description: Branch-scoped users may only request stock from their assigned branch. Cross-branch access requires inventory:cross-branch permission.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: partId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Stock details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stock:
+ *                           $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
  *
  * /inventory/transactions:
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List all stock transactions
+ *     summary: List stock transactions
+ *     description: Branch-scoped users are restricted to their assigned branch. Cross-branch filtering requires inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
+ *         name: branchId
+ *         schema: { type: string, format: uuid }
  *       - in: query
- *         name: type
- *         schema: { type: string, enum: [ISSUANCE, RETURN, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT] }
+ *         name: partId
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Stock transactions
