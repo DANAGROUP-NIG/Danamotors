@@ -39,13 +39,13 @@ export default async function seedPermissionsAndRoles(prisma: PrismaClient) {
 }
 
 // Self-execute when run directly: `npx ts-node prisma/seed/roles.ts`
-if (require.main === module) {
-  (async () => {
-    const prisma = new PrismaClient();
-    try {
-      await seedPermissionsAndRoles(prisma);
-    } finally {
-      await prisma.$disconnect();
-    }
-  })();
-}
+// if (require.main === module) {
+//   (async () => {
+//     const prisma = new PrismaClient();
+//     try {
+//       await seedPermissionsAndRoles(prisma);
+//     } finally {
+//       await prisma.$disconnect();
+//     }
+//   })();
+// }

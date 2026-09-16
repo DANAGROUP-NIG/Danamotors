@@ -4,7 +4,7 @@ import { hash } from "./helpers";
 
 export default async function seedStaffUsers(
   prisma: PrismaClient,
-  branches: { id: string; name: string }[]
+  branches: { id: string; name: string }[],
 ) {
   const mainBranch = branches[0];
   const abujaBranch = branches[1];
@@ -15,8 +15,8 @@ export default async function seedStaffUsers(
 
   const staff = [
     {
-      email: process.env.SUPERADMIN_EMAIL ?? "superadmin@danamotors.com",
-      password: process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin@123",
+      email: "superadmin@danamotors.com",
+      password: "SuperAdmin@123",
       firstName: "Super",
       lastName: "Admin",
       role: ROLES.SUPER_ADMIN,

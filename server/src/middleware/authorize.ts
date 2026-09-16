@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ForbiddenError, UnauthorizedError } from "../shared/errors/appError";
-import { ROLES } from "../shared/constants/roles";
+import { PERMISSIONS, ROLES } from "../shared/constants/roles";
 
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -68,5 +68,33 @@ export function assertBranchOwnership(
     throw new ForbiddenError(
       "You can only manage resources within your own branch",
     );
+  }
+}
+
+/**
+ * Enforces inventory branch access. Cross-branch inventory access is explicit
+ * and is independent of a user's role name.
+ */
+export function assertInventoryBranchAccess(
+  req: Request,
+  resourceBranchIds: Array<string | null | undefined>,
+): void {
+  if (!req.user) {
+    throw new UnauthorizedError();
+  }
+
+  if (
+    req.user.role === ROLES.SUPER_ADMIN ||
+    req.user.permissions.includes(PERMISSIONS.INVENTORY_CROSS_BRANCH)
+  ) {
+    return;
+  }
+
+  if (!req.user.branchId || resourceBranchIds.some((branchId) => !branchId)) {
+    throw new ForbiddenError('Your account is not assigned to an authorized branch');
+  }
+
+  if (resourceBranchIds.some((branchId) => branchId !== req.user!.branchId)) {
+    throw new ForbiddenError('You can only access inventory within your own branch');
   }
 }

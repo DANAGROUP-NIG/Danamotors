@@ -113,6 +113,7 @@ export const PERMISSIONS = {
   // ── Inventory — Stock ─────────────────────────────────────────────────────
   STOCK_READ: "stock:read",
   STOCK_UPDATE: "stock:update",
+  INVENTORY_CROSS_BRANCH: "inventory:cross-branch",
 
   // ── Inventory — Purchase Requests ─────────────────────────────────────────
   PURCHASEREQUEST_READ: "purchaserequest:read",
@@ -252,6 +253,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SPAREPART_DELETE,
     PERMISSIONS.STOCK_READ,
     PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.INVENTORY_CROSS_BRANCH,
     PERMISSIONS.PURCHASEREQUEST_READ,
     PERMISSIONS.PURCHASEREQUEST_CREATE,
     PERMISSIONS.PURCHASEREQUEST_UPDATE,
