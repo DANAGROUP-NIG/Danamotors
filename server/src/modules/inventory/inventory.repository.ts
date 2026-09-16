@@ -1,4 +1,4 @@
-import prisma from '../../prisma/client';
+import prisma from "../../prisma/client";
 import {
   SparePart,
   PurchaseRequest,
@@ -8,20 +8,23 @@ import {
   StockTransaction,
   InterBranchTransfer,
   InterBranchTransferItem,
-} from '@prisma/client';
+} from "@prisma/client";
 
 export class InventoryRepository {
-  async listSpareParts(): Promise<SparePart[]> {
+  async listSpareParts(branchId?: string): Promise<SparePart[]> {
     return prisma.sparePart.findMany({
-      include: { inventoryStocks: true },
-      orderBy: { updatedAt: 'desc' },
+      include: { inventoryStocks: branchId ? { where: { branchId } } : true },
+      orderBy: { updatedAt: "desc" },
     });
   }
 
-  async findSparePartById(id: string): Promise<SparePart | null> {
+  async findSparePartById(
+    id: string,
+    branchId?: string,
+  ): Promise<SparePart | null> {
     return prisma.sparePart.findUnique({
       where: { id },
-      include: { inventoryStocks: true },
+      include: { inventoryStocks: branchId ? { where: { branchId } } : true },
     });
   }
 
@@ -35,7 +38,10 @@ export class InventoryRepository {
     return prisma.sparePart.create({ data });
   }
 
-  async updateSparePart(id: string, data: Partial<SparePart>): Promise<SparePart> {
+  async updateSparePart(
+    id: string,
+    data: Partial<SparePart>,
+  ): Promise<SparePart> {
     return prisma.sparePart.update({ where: { id }, data });
   }
 
@@ -54,7 +60,9 @@ export class InventoryRepository {
     maximumStock?: number;
   }): Promise<InventoryStock> {
     return prisma.inventoryStock.upsert({
-      where: { branchId_partId: { branchId: data.branchId, partId: data.partId } },
+      where: {
+        branchId_partId: { branchId: data.branchId, partId: data.partId },
+      },
       create: {
         branchId: data.branchId,
         partId: data.partId,
@@ -114,18 +122,38 @@ export class InventoryRepository {
     });
   }
 
-  async listInventoryStockByBranch(branchId: string): Promise<InventoryStock[]> {
+  async listInventoryStockByBranch(
+    branchId: string,
+  ): Promise<InventoryStock[]> {
     return prisma.inventoryStock.findMany({
       where: { branchId },
       include: { part: true },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
     });
   }
 
-  async listAllInventoryStock(): Promise<InventoryStock[]> {
+  async listAllInventoryStock(filters?: {
+    branchId?: string;
+    partId?: string;
+    search?: string;
+  }): Promise<InventoryStock[]> {
     return prisma.inventoryStock.findMany({
+      where: {
+        ...(filters?.branchId ? { branchId: filters.branchId } : {}),
+        ...(filters?.partId ? { partId: filters.partId } : {}),
+        ...(filters?.search
+          ? {
+              part: {
+                OR: [
+                  { name: { contains: filters.search, mode: 'insensitive' } },
+                  { partNumber: { contains: filters.search, mode: 'insensitive' } },
+                ],
+              },
+            }
+          : {}),
+      },
       include: { part: true, branch: true },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
     });
   }
 
@@ -152,16 +180,20 @@ export class InventoryRepository {
         ...(branchId ? { branchId } : {}),
         ...(partId ? { partId } : {}),
       },
-      include: { part: true, recordedBy: { select: { id: true, firstName: true, lastName: true } } },
-      orderBy: { createdAt: 'desc' },
+      include: {
+        part: true,
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: "desc" },
       take: 100,
     });
   }
 
   // ── Purchase Requests ──────────────────────────────────────────────────
 
-  async listPurchaseRequests(): Promise<PurchaseRequest[]> {
+  async listPurchaseRequests(branchId?: string): Promise<PurchaseRequest[]> {
     return prisma.purchaseRequest.findMany({
+      where: branchId ? { requestedBy: { branchId } } : undefined,
       include: {
         sparePart: true,
         requestedBy: {
@@ -173,7 +205,7 @@ export class InventoryRepository {
           },
         },
       },
-      orderBy: { requestDate: 'desc' },
+      orderBy: { requestDate: "desc" },
     });
   }
 
@@ -204,14 +236,18 @@ export class InventoryRepository {
     return prisma.purchaseRequest.create({ data });
   }
 
-  async updatePurchaseRequestStatus(id: string, data: Partial<PurchaseRequest>): Promise<PurchaseRequest> {
+  async updatePurchaseRequestStatus(
+    id: string,
+    data: Partial<PurchaseRequest>,
+  ): Promise<PurchaseRequest> {
     return prisma.purchaseRequest.update({ where: { id }, data });
   }
 
   // ── Part Issuances ─────────────────────────────────────────────────────
 
-  async listPartIssuances(): Promise<PartIssuance[]> {
+  async listPartIssuances(branchId?: string): Promise<PartIssuance[]> {
     return prisma.partIssuance.findMany({
+      where: branchId ? { branchId } : undefined,
       include: {
         sparePart: true,
         jobCard: true,
@@ -224,7 +260,7 @@ export class InventoryRepository {
           },
         },
       },
-      orderBy: { issuedAt: 'desc' },
+      orderBy: { issuedAt: "desc" },
     });
   }
 
@@ -248,6 +284,7 @@ export class InventoryRepository {
   }
 
   async createPartIssuance(data: {
+    branchId: string;
     sparePartId: string;
     jobCardId?: string;
     issuedById: string;
@@ -259,8 +296,9 @@ export class InventoryRepository {
 
   // ── Part Returns ───────────────────────────────────────────────────────
 
-  async listPartReturns(): Promise<PartReturn[]> {
+  async listPartReturns(branchId?: string): Promise<PartReturn[]> {
     return prisma.partReturn.findMany({
+      where: branchId ? { partIssuance: { branchId } } : undefined,
       include: {
         partIssuance: {
           include: {
@@ -276,7 +314,7 @@ export class InventoryRepository {
           },
         },
       },
-      orderBy: { returnedAt: 'desc' },
+      orderBy: { returnedAt: "desc" },
     });
   }
 
@@ -327,7 +365,7 @@ export class InventoryRepository {
         requestingBranchId: data.requestingBranchId,
         sourceBranchId: data.sourceBranchId,
         requestedById: data.requestedById,
-        status: data.status ?? 'Pending',
+        status: data.status ?? "Pending",
         notes: data.notes,
       },
       include: {
@@ -358,12 +396,25 @@ export class InventoryRepository {
     status?: string;
     requestingBranchId?: string;
     sourceBranchId?: string;
+    branchId?: string;
   }): Promise<InterBranchTransfer[]> {
     return prisma.interBranchTransfer.findMany({
       where: {
         ...(filters?.status ? { status: filters.status } : {}),
-        ...(filters?.requestingBranchId ? { requestingBranchId: filters.requestingBranchId } : {}),
-        ...(filters?.sourceBranchId ? { sourceBranchId: filters.sourceBranchId } : {}),
+        ...(filters?.requestingBranchId
+          ? { requestingBranchId: filters.requestingBranchId }
+          : {}),
+        ...(filters?.sourceBranchId
+          ? { sourceBranchId: filters.sourceBranchId }
+          : {}),
+        ...(filters?.branchId
+          ? {
+              OR: [
+                { requestingBranchId: filters.branchId },
+                { sourceBranchId: filters.branchId },
+              ],
+            }
+          : {}),
       },
       include: {
         requestingBranch: true,
@@ -371,7 +422,7 @@ export class InventoryRepository {
         requestedBy: { select: { id: true, firstName: true, lastName: true } },
         items: { include: { part: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -383,7 +434,9 @@ export class InventoryRepository {
     return prisma.interBranchTransferItem.create({ data });
   }
 
-  async findTransferItems(transferId: string): Promise<InterBranchTransferItem[]> {
+  async findTransferItems(
+    transferId: string,
+  ): Promise<InterBranchTransferItem[]> {
     return prisma.interBranchTransferItem.findMany({
       where: { transferId },
       include: { part: true },
@@ -451,11 +504,13 @@ export class InventoryRepository {
 
   async getNextTransferNumber(): Promise<string> {
     const last = await prisma.interBranchTransfer.findFirst({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       select: { transferNumber: true },
     });
-    const num = last ? parseInt(last.transferNumber.replace('TRF-', ''), 10) + 1 : 1;
-    return `TRF-${String(num).padStart(5, '0')}`;
+    const num = last
+      ? parseInt(last.transferNumber.replace("TRF-", ""), 10) + 1
+      : 1;
+    return `TRF-${String(num).padStart(5, "0")}`;
   }
 }
 

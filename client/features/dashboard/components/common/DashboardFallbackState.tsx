@@ -11,6 +11,7 @@ import {
   Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 
 interface DashboardFallbackStateProps {
   user?: {
@@ -26,7 +27,7 @@ const SUGGESTED_LINKS = [
   { label: "Customers", href: "/customers", icon: Users, permission: "customer:read" },
   { label: "Vehicles", href: "/vehicles", icon: Car, permission: "vehicle:read" },
   { label: "Job Cards", href: "/job-cards", icon: ClipboardList, permission: "jobcard:read" },
-  { label: "Inventory", href: "/inventory", icon: Package, permission: "sparepart:read" },
+  { label: "Inventory", href: "/inventory", icon: Package, permission: INVENTORY_PERMISSIONS.SPAREPART_READ },
 ];
 
 export function DashboardFallbackState({ user }: DashboardFallbackStateProps) {

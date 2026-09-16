@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/headers/page-header";
 import { usePurchaseRequests } from "../hooks/use-purchase-requests";
 import { useUpdatePurchaseRequestStatus } from "../hooks/use-update-purchase-request-status";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import type { PurchaseRequest } from "../types/purchase-request.types";
 
 const PAGE_SIZE = 10;
@@ -31,7 +32,7 @@ export function PurchaseRequestsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const update = useUpdatePurchaseRequestStatus();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission("purchaserequest:update");
+  const canManage = hasPermission(INVENTORY_PERMISSIONS.PURCHASEREQUEST_UPDATE);
 
   useEffect(() => {
     setPage(1);
@@ -120,13 +121,13 @@ export function PurchaseRequestsPage() {
       className: "text-right",
       headerClassName: "text-right",
       render: (pr) =>
-        pr.status === "Pending" ? (
+        pr.status === "Pending" && canManage ? (
           <div className="flex justify-end gap-1">
             <Button
               size="sm"
               variant="ghost"
               onClick={() => handleApprove(pr)}
-              disabled={update.isPending || !canManage}
+              disabled={update.isPending}
               className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
             >
               <CheckCircle className="size-4" />
@@ -135,7 +136,7 @@ export function PurchaseRequestsPage() {
               size="sm"
               variant="ghost"
               onClick={() => handleReject(pr)}
-              disabled={update.isPending || !canManage}
+              disabled={update.isPending}
               className="text-red-500 hover:bg-red-50 hover:text-red-700"
             >
               <XCircle className="size-4" />

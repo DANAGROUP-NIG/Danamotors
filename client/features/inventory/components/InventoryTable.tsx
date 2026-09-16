@@ -11,6 +11,7 @@ import { DataTableFilterChips } from "@/components/ui/table-components/DataTable
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useBranchStock } from "../hooks/use-branch-stock";
 import { InventoryDeleteButton } from "./InventoryDeleteButton";
@@ -28,8 +29,8 @@ export function InventoryTable() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { hasPermission } = useAuth();
-  const canEdit = hasPermission("sparepart:update");
-  const canDelete = hasPermission("sparepart:delete");
+  const canEdit = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_UPDATE);
+  const canDelete = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_DELETE);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   const { data: stockData, isLoading, isError, isFetching } = useBranchStock(activeBranch?.id ?? null);

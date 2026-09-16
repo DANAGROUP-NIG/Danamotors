@@ -9,6 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -22,9 +23,16 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/inspections": ["inspection:read"],
   "/repairs": ["jobcard:update", "workshop:read"],
   "/technicians": ["workshop:read"],
-  "/inventory": ["sparepart:read", "stock:read"],
-  "/transfers": ["transfer:read"],
-  "/purchase-requests": ["purchaserequest:read"],
+  "/inventory": [
+    INVENTORY_PERMISSIONS.SPAREPART_READ,
+    INVENTORY_PERMISSIONS.STOCK_READ,
+  ],
+  "/inventory/": [
+    INVENTORY_PERMISSIONS.SPAREPART_READ,
+    INVENTORY_PERMISSIONS.STOCK_READ,
+  ],
+  "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
+  "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],
