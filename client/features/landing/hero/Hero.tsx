@@ -2,9 +2,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
-import { Badge } from "@/components/ui/badge";
 import { HeroActions } from "./HeroActions";
 import { HeroStats } from "./HeroStats";
 
@@ -83,20 +81,7 @@ export default function Hero() {
             animate="visible"
             className="max-w-2xl"
           >
-           {/* Badge with pulse shimmer */}
-            <motion.div variants={itemVariants}>
-              {/* <Badge 
-                tone="blue" 
-                className="inline-flex items-center gap-2 backdrop-blur-sm bg-blue-500/10 border border-blue-500/20 text-blue-500 relative overflow-hidden"
-                aria-label="Service type"
-              >
-                <span className="absolute inset-0 animate-pulse bg-blue-500/10" />
-                <Sparkles className="size-3.5 relative z-10" aria-hidden="true" />
-                <span className="relative z-10">Premium Service</span>
-              </Badge> */}
-            </motion.div>
-
-            {/* Headline with gradient text on "Dana Motors" */}
+           {/* Headline with gradient text on "Dana Motors" */}
             <motion.h1 variants={itemVariants} className="mt-6 text-5xl font-black leading-[1.02] text-foreground tracking-tight lg:text-6xl">
               Expert Care for{" "}
               <span className="">
