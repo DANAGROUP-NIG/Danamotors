@@ -34,8 +34,6 @@ function LoginFormContent() {
             type="email"
             error={errors.email?.message}
             {...register("email")}
-            // name="username"
-            // autoComplete="username"
           />
 
           <label className="grid gap-2">

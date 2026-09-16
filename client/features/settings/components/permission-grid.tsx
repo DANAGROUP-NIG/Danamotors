@@ -142,7 +142,14 @@ export function PermissionGrid({
                       onChange={() => togglePermission(perm.name)}
                       className="h-4 w-4 rounded border-slate-300 text-primary shadow-sm focus:ring-primary"
                     />
-                    <span>{humanize(perm.name)}</span>
+                    <span className="flex flex-col">
+                      <span>{humanize(perm.name)}</span>
+                      {perm.description && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {perm.description}
+                        </span>
+                      )}
+                    </span>
                   </label>
                 ))}
               </div>
