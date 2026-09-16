@@ -248,6 +248,7 @@ export class InventoryRepository {
   }
 
   async createPartIssuance(data: {
+    branchId: string;
     sparePartId: string;
     jobCardId?: string;
     issuedById: string;
