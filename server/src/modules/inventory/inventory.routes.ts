@@ -21,6 +21,7 @@ import {
   transferIdParamSchema,
   branchIdParamSchema,
   branchPartParamSchema,
+  stockQuerySchema,
 } from './inventory.validation';
 
 const router = Router();
@@ -482,7 +483,7 @@ router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), valida
 router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partIdParamSchema), controller.deleteSparePart);
 
 // Branch Stock
-router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), controller.listAllStock);
+router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);
 router.get('/stock/:branchId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchIdParamSchema), controller.listBranchStock);
 router.get('/stock/:branchId/:partId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchPartParamSchema), controller.getBranchStock);
 router.post('/stock/adjust', requirePermission(PERMISSIONS.STOCK_UPDATE), validateRequest(adjustStockSchema), controller.adjustStock);
