@@ -1,4 +1,5 @@
 import { NavGroup, NavItem } from "./type";
+import { INVENTORY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -118,25 +119,33 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Operations",
-    permissions: ["invoice:read", "sparepart:read", "stock:read", "transfer:read"],
+    permissions: [
+      "invoice:read",
+      INVENTORY_PERMISSIONS.SPAREPART_READ,
+      INVENTORY_PERMISSIONS.STOCK_READ,
+      INVENTORY_PERMISSIONS.TRANSFER_READ,
+    ],
     items: [
       {
         label: "Inventory",
         href: "/inventory",
         icon: Package,
-        permissions: ["sparepart:read", "stock:read"],
+        permissions: [
+          INVENTORY_PERMISSIONS.SPAREPART_READ,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+        ],
       },
       {
         label: "Transfers",
         href: "/transfers",
         icon: ArrowLeftRight,
-        permissions: ["transfer:read"],
+        permissions: [INVENTORY_PERMISSIONS.TRANSFER_READ],
       },
       {
         label: "Purchase Requests",
         href: "/purchase-requests",
         icon: ClipboardList,
-        permissions: ["purchaserequest:read"],
+        permissions: [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
       },
       {
         label: "Purchasing",

@@ -14,6 +14,32 @@ export type AppRole =
   | "receptionmanager"
   | "customer";
 
+// Inventory permissions mirror server/src/shared/constants/roles.ts.
+export const INVENTORY_PERMISSIONS = {
+  SPAREPART_READ: "sparepart:read",
+  SPAREPART_CREATE: "sparepart:create",
+  SPAREPART_UPDATE: "sparepart:update",
+  SPAREPART_DELETE: "sparepart:delete",
+  STOCK_READ: "stock:read",
+  STOCK_UPDATE: "stock:update",
+  INVENTORY_CROSS_BRANCH: "inventory:cross-branch",
+  PURCHASEREQUEST_READ: "purchaserequest:read",
+  PURCHASEREQUEST_CREATE: "purchaserequest:create",
+  PURCHASEREQUEST_UPDATE: "purchaserequest:update",
+  PARTISSUANCE_READ: "partissuance:read",
+  PARTISSUANCE_CREATE: "partissuance:create",
+  PARTRETURN_READ: "partreturn:read",
+  PARTRETURN_CREATE: "partreturn:create",
+  TRANSFER_READ: "transfer:read",
+  TRANSFER_CREATE: "transfer:create",
+  TRANSFER_UPDATE: "transfer:update",
+  TRANSFER_APPROVE: "transfer:approve",
+  TRANSFER_REJECT: "transfer:reject",
+  TRANSFER_CANCEL: "transfer:cancel",
+  TRANSFER_DISPATCH: "transfer:dispatch",
+  TRANSFER_RECEIVE: "transfer:receive",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

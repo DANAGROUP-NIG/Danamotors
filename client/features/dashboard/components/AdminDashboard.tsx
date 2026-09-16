@@ -3,6 +3,7 @@
 import { TrendingUp, Wrench, Car, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { useEffect, useState } from "react";
 
@@ -34,7 +35,7 @@ export default function AdminDashboard() {
   const canSeeFinance = hasPermission("invoice:read");
   const canSeeWorkshop = hasPermission("jobcard:read");
   const canManage = hasPermission("user:read");
-  const canSeeInventory = hasPermission("sparepart:read");
+  const canSeeInventory = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_READ);
   const canCreateJob = hasPermission("jobcard:create");
 
   const kpiCount = [
