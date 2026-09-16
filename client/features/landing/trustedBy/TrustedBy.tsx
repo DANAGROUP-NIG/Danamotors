@@ -14,10 +14,9 @@ export default function TrustedBy() {
     <section className="border-y border-border bg-card/65 py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Badge tone="blue">Trusted by car owners</Badge>
+          <Badge className="text-black ">Trusted by car owners</Badge>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-            Built by Dana Group for car owners who want trusted service,
-            clear updates, and easier pickup.
+            Built by Kia Motors for car owners who want Professional care, Complete transparency, Total peace of mind.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

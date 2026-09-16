@@ -66,11 +66,11 @@ export default function BookingSection() {
             'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(59,130,246,0.12), transparent 60%)',
         }}
       />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,_rgba(15,23,42,0.02),_rgba(15,23,42,0.08))]" aria-hidden />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,rgba(15,23,42,0.02),rgba(15,23,42,0.08))]" aria-hidden />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-12 text-center">
-          <div className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
+          <div className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-gray-600">
             Book a Service
           </div>
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
@@ -89,23 +89,23 @@ export default function BookingSection() {
           
           </div>
 
-          <Card className="overflow-hidden rounded-[30px] border border-blue-500/20 bg-gradient-to-b from-card via-card to-background shadow-[0_35px_80px_-40px_rgba(37,99,235,0.5)]">
-            <div className="border-b border-border/70 bg-gradient-to-r from-blue-600/10 via-indigo-500/10 to-transparent px-6 py-5">
+          <Card className="overflow-hidden rounded-[30px] border border-blue-100/20 bg-linear-to-b from-card via-card to-background shadow-[0_35px_80px_-40px_rgba(37,99,235,0.5)]">
+            <div className="border-b border-border/70 bg-linear-to-r from-blue-300/10 via-blue-200/10 to-transparent px-6 py-5">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-600">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-900">
                     Service request
                   </p>
                   <CardTitle className="mt-2 font-display text-2xl text-foreground">
                     Send a Service Request
                   </CardTitle>
                 </div>
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-linear-to-br from-slate-800 to-blue-900/80 text-white shadow-lg shadow-blue-600/30">
                   <Calendar className="size-5" />
                 </div>
               </div>
               <CardDescription className="mt-2 text-sm text-muted-foreground">
-                Fill in your details below — no account required.
+                Fill in your details below no account required.
               </CardDescription>
             </div>
 
@@ -265,7 +265,7 @@ export default function BookingSection() {
                       type="submit"
                       size="lg"
                       disabled={createEnquiry.isPending}
-                      className="mt-1 w-full rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 text-base font-semibold text-white shadow-[0_16px_35px_-18px_rgba(37,99,235,0.8)] transition-all duration-200 hover:brightness-110"
+                      className="mt-1 w-full rounded-xl bg-linear-to-r from-slate-700/60 to-blue-800/20 text-base font-semibold text-white shadow-[0_16px_35px_-18px_rgba(37,99,235,0.8)] transition-all duration-200 hover:brightness-110"
                     >
                       {createEnquiry.isPending ? (
                         <>
@@ -297,8 +297,8 @@ export default function BookingSection() {
                 key={label}
                 className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/75 p-4 backdrop-blur-sm shadow-[0_15px_35px_-25px_rgba(15,23,42,0.7)]"
               >
-                <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 ring-1 ring-blue-500/15">
-                  <Icon className="size-4 text-blue-500" />
+                <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-300/10 ring-1 ring-blue-500/15">
+                  <Icon className="size-4 text-blue-950" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{label}</p>

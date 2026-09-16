@@ -29,7 +29,7 @@ export default function DashboardShowcase() {
                 "Quality checks before pickup",
               ].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
-                  <ShieldCheck className="size-5 text-emerald-400" />
+                  <ShieldCheck className="size-5 text-gray-200" />
                   <span className="text-sm font-semibold">{item}</span>
                 </div>
               ))}
@@ -61,10 +61,10 @@ function MetricTile({
     <div className="rounded-lg border border-white/10 bg-white/[0.06] p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-300">{title}</p>
-        <Icon className="size-5 text-blue-300" />
+        <Icon className="size-5 text-slate-300" />
       </div>
       <p className="mt-8 text-4xl font-black">{value}</p>
-      <p className="mt-2 text-sm font-semibold text-emerald-300">{delta}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-300">{delta}</p>
     </div>
   );
 }

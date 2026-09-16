@@ -85,35 +85,37 @@ export default function Hero() {
           >
            {/* Badge with pulse shimmer */}
             <motion.div variants={itemVariants}>
-              <Badge 
+              {/* <Badge 
                 tone="blue" 
                 className="inline-flex items-center gap-2 backdrop-blur-sm bg-blue-500/10 border border-blue-500/20 text-blue-500 relative overflow-hidden"
                 aria-label="Service type"
               >
                 <span className="absolute inset-0 animate-pulse bg-blue-500/10" />
                 <Sparkles className="size-3.5 relative z-10" aria-hidden="true" />
-                <span className="relative z-10">✨ Premium Service</span>
-              </Badge>
+                <span className="relative z-10">Premium Service</span>
+              </Badge> */}
             </motion.div>
 
             {/* Headline with gradient text on "Dana Motors" */}
             <motion.h1 variants={itemVariants} className="mt-6 text-5xl font-black leading-[1.02] text-foreground tracking-tight lg:text-6xl">
               Expert Care for{" "}
-              <span className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-400 bg-clip-text text-transparent">
+              <span className="">
                 Dana Motors
               </span>
             </motion.h1>
             
             {/* Subtitle */}
-            <motion.h2 variants={itemVariants} className="mt-2 text-2xl font-bold text-foreground/90">
+            <motion.h2 variants={itemVariants} className="mt-2 text-2xl font-bold text-gray-700">
               Workshop Service
             </motion.h2>
 
             {/* Body text - larger with more spacing */}
             <motion.p variants={itemVariants} className="mt-5 max-w-xl text-[1.125rem] leading-[1.75] text-muted-foreground">
-              Book trusted car service, track your repair progress, approve estimates,
-              and know exactly when your vehicle is ready for pickup. Dana Group handles
-              the service operations behind the scenes.
+              Book your vehicle in with confidence, track every stage of the repair, review and approve service estimates, and receive timely updates right through to completion.
+            </motion.p>
+
+            <motion.p variants={itemVariants} className="mt-5 max-w-xl text-[1.125rem] leading-[1.75] text-muted-foreground">
+              From routine maintenance to complex repairs, Dana Motors manages the service operation with the expertise, standards, and accountability your vehicle deserves.
             </motion.p>
 
             {/* CTA Buttons */}
