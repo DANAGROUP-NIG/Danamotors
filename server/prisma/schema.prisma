@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 prisma {
@@ -24,85 +24,109 @@ model Branch {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users          User[]
-  customers      Customer[]
-  jobCards       JobCard[]
-  appointments   ServiceAppointment[]
-  enquiries      Enquiry[]
-  inventoryStocks InventoryStock[]
+  users             User[]
+  customers         Customer[]
+  jobCards          JobCard[]
+  appointments      ServiceAppointment[]
+  enquiries         Enquiry[]
+  inventoryStocks   InventoryStock[]
+  partIssuances     PartIssuance[]
+  stockTransactions StockTransaction[]
+
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
-  notifications    Notification[]
+
+  notifications Notification[]
 }
 
+// ============================================================
+// USER / AUTH
+// ============================================================
+
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
+  id           String  @id @default(uuid())
+  email        String  @unique
   passwordHash String
   firstName    String
   lastName     String
   phoneNumber  String?
-  isActive     Boolean       @default(true)
-  resetTokenHash String?
+  isActive     Boolean @default(true)
+
+  resetTokenHash   String?
   resetTokenExpiry DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  
-  roleId       String
-  role         Role          @relation(fields: [roleId], references: [id])
-  branchId     String?
-  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   refreshTokens RefreshToken[]
-  auditLogs    AuditLog[]
+  auditLogs     AuditLog[]
+
   createdAppointments ServiceAppointment[] @relation("ReceptionistBookings")
-  createdCustomers    Customer[]            @relation("CreatedCustomers")
-  createdVehicles     Vehicle[]             @relation("CreatedVehicles")
-  createdJobCards     JobCard[]             @relation("CreatedJobCards")
-  technicianAssignments JobCard[] @relation("TechnicianAssignments")
+  createdCustomers    Customer[]           @relation("CreatedCustomers")
+  createdVehicles     Vehicle[]            @relation("CreatedVehicles")
+  createdJobCards     JobCard[]            @relation("CreatedJobCards")
+
+  technicianAssignments       JobCard[] @relation("TechnicianAssignments")
   qualityInspectorAssignments JobCard[] @relation("QualityInspectorAssignments")
+
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
+
   issuedPartIssuances PartIssuance[] @relation("UserPartIssuances")
-  returnedPartReturns PartReturn[] @relation("UserPartReturns")
+  returnedPartReturns PartReturn[]   @relation("UserPartReturns")
+
   recordedPayments Payment[] @relation("UserRecordedPayments")
-  issuedReceipts Receipt[] @relation("UserIssuedReceipts")
-  transferRequests InterBranchTransfer[] @relation("TransferRequestedBy")
-  transferApprovals InterBranchTransfer[] @relation("TransferApprovedBy")
+  issuedReceipts   Receipt[] @relation("UserIssuedReceipts")
+
+  transferRequests   InterBranchTransfer[] @relation("TransferRequestedBy")
+  transferApprovals  InterBranchTransfer[] @relation("TransferApprovedBy")
   transferDispatches InterBranchTransfer[] @relation("TransferDispatchedBy")
-  transferReceives InterBranchTransfer[] @relation("TransferReceivedBy")
+  transferReceives   InterBranchTransfer[] @relation("TransferReceivedBy")
+
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
+
   notifications Notification[]
+
   creditTransactions CustomerCreditTransaction[] @relation("UserCreditTransactions")
-  creditRequests CustomerCreditApplication[] @relation("AdvisorCreditRequests")
+  creditRequests     CustomerCreditApplication[] @relation("AdvisorCreditRequests")
+
   reviewedEnquiries Enquiry[] @relation("EnquiryReviewedBy")
 }
 
 model Role {
-  id          String       @id @default(uuid())
-  name        String       @unique
+  id          String  @id @default(uuid())
+  name        String  @unique
   description String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   users       User[]
   permissions RolePermission[]
 }
 
 model Permission {
-  id          String           @id @default(uuid())
-  name        String           @unique
+  id          String  @id @default(uuid())
+  name        String  @unique
   description String?
-  createdAt   DateTime         @default(now())
-  
-  roles       RolePermission[]
+
+  createdAt DateTime @default(now())
+
+  roles RolePermission[]
 }
 
 model RolePermission {
   roleId       String
   permissionId String
-  
-  role         Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
   @@id([roleId, permissionId])
 }
 
@@ -111,9 +135,9 @@ model RefreshToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -123,16 +147,20 @@ model AuditLog {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-  
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
+// ============================================================
+// CUSTOMER
+// ============================================================
+
 model Customer {
-  id                     String             @id @default(uuid())
+  id                     String    @id @default(uuid())
   firstName              String
   lastName               String
-  email                  String             @unique
+  email                  String    @unique
   phoneNumber            String?
   dateOfBirth            DateTime?
   driverLicenseNumber    String?
@@ -142,40 +170,49 @@ model Customer {
   postalCode             String?
   country                String?
   preferredContactMethod String?
-  creditBalance          Float              @default(0)
-  branchId               String
-  createdById            String?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
 
-  branch                 Branch             @relation(fields: [branchId], references: [id])
-  createdBy              User?              @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
-  account                CustomerAccount?
-  documents              CustomerDocument[]
-  serviceHistory         ServiceHistory[]
-  vehicles               Vehicle[]
-  vehicleOwnerships      VehicleOwnership[]
-  appointments           ServiceAppointment[]
-  jobCards               JobCard[]
-  approvals              CustomerApproval[]
-  invoices               Invoice[]
-  creditTransactions     CustomerCreditTransaction[]
-  creditApplications     CustomerCreditApplication[]
+  creditBalance Float @default(0)
+
+  branchId    String
+  createdById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch    Branch @relation(fields: [branchId], references: [id])
+  createdBy User?  @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
+
+  account           CustomerAccount?
+  documents         CustomerDocument[]
+  serviceHistory    ServiceHistory[]
+  vehicles          Vehicle[]
+  vehicleOwnerships VehicleOwnership[]
+  appointments      ServiceAppointment[]
+  jobCards          JobCard[]
+  approvals         CustomerApproval[]
+  invoices          Invoice[]
+
+  creditTransactions CustomerCreditTransaction[]
+  creditApplications CustomerCreditApplication[]
+
+  @@index([branchId])
 }
 
 model CustomerAccount {
-  id               String    @id @default(uuid())
-  customerId       String    @unique
-  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   passwordHash     String
   isActive         Boolean   @default(true)
   resetTokenHash   String?
   resetTokenExpiry DateTime?
   lastLoginAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
 
-  refreshTokens    CustomerRefreshToken[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens CustomerRefreshToken[]
 }
 
 model CustomerRefreshToken {
@@ -183,457 +220,804 @@ model CustomerRefreshToken {
   token             String          @unique
   customerAccountId String
   customerAccount   CustomerAccount @relation(fields: [customerAccountId], references: [id], onDelete: Cascade)
-  expiresAt         DateTime
-  createdAt         DateTime        @default(now())
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([customerAccountId])
 }
 
+// ============================================================
+// SERVICE / APPOINTMENT
+// ============================================================
+
 model Service {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  category    String?
+  id           String  @id @default(uuid())
+  name         String  @unique
+  description  String?
+  category     String?
   durationMins Int?
-  price       Float    @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  price        Float   @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   appointments ServiceAppointment[]
 }
 
 model ServiceAppointment {
-  id            String    @id @default(uuid())
-  customerId    String
-  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  vehicleId     String
-  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  branchId      String
-  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  serviceId     String?
-  service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-  createdById   String?
-  createdBy     User?     @relation("ReceptionistBookings", fields: [createdById], references: [id], onDelete: SetNull)
-  scheduledAt   DateTime
-  durationMins  Int?
-  notes         String?
-  status        String    @default("Pending")
-  source        String    @default("WalkIn") // WalkIn | OnlineBooking
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id String @id @default(uuid())
 
-  jobCards      JobCard[]
-  enquiry       Enquiry?
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("ReceptionistBookings", fields: [createdById], references: [id], onDelete: SetNull)
+
+  scheduledAt  DateTime
+  durationMins Int?
+  notes        String?
+
+  status String @default("Pending")
+  source String @default("WalkIn")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobCards JobCard[]
+  enquiry  Enquiry?
 
   @@index([serviceId])
+  @@index([branchId])
+  @@index([customerId])
+  @@index([vehicleId])
 }
+
+// ============================================================
+// JOB CARD
+// ============================================================
 
 model JobCard {
-  id             String              @id @default(uuid())
-  appointmentId  String?
-  appointment    ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  customerId     String?
-  customer       Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  vehicleId      String?
-  vehicle        Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  branchId       String
-  branch         Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  jobNumber      String              @unique
-  description    String
-  status         String              @default("Open")
+  id String @id @default(uuid())
+
+  appointmentId String?
+  appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  jobNumber   String @unique
+  description String
+
+  status         String @default("Open")
   estimatedHours Float?
   estimatedCost  Float?
-  assignedTo     String?
-  progress       Int?                @default(0)
-  qcStatus       String?             @default("Pending")
-  qcNotes        String?
-  qualityInspectorId String?
-  qualityInspector   User?           @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
-  technicianId   String?
-  technician     User?               @relation("TechnicianAssignments", fields: [technicianId], references: [id], onDelete: SetNull)
-  createdById    String?
-  createdBy      User?               @relation("CreatedJobCards", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
 
-  inspections    Inspection[]
-  estimates      Estimate[]
-  partIssuances  PartIssuance[]
-  invoices       Invoice[]
+  assignedTo String?
+  progress   Int?    @default(0)
+
+  qcStatus String? @default("Pending")
+  qcNotes  String?
+
+  qualityInspectorId String?
+  qualityInspector   User?   @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
+
+  technicianId String?
+  technician   User?   @relation("TechnicianAssignments", fields: [technicianId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("CreatedJobCards", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inspections   Inspection[]
+  estimates     Estimate[]
+  partIssuances PartIssuance[]
+  invoices      Invoice[]
+
+  @@index([branchId])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([appointmentId])
 }
+
+// ============================================================
+// INSPECTION
+// ============================================================
 
 model Inspection {
-  id          String   @id @default(uuid())
-  jobCardId   String
-  jobCard     JobCard  @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  jobCardId String
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
   inspectorId String?
-  findings    String
-  passed      Boolean?
-  status      String   @default("Pending")
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  findings String
+  passed   Boolean?
+  status   String   @default("Pending")
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobCardId])
 }
 
+// ============================================================
+// ESTIMATE / APPROVAL
+// ============================================================
+
 model Estimate {
-  id          String          @id @default(uuid())
-  jobCardId   String
-  jobCard     JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  jobCardId String
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
   description String
   amount      Float
-  currency    String          @default("USD")
-  status      String          @default("Pending")
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  currency    String @default("USD")
+  status      String @default("Pending")
 
-  approvals   CustomerApproval[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  approvals CustomerApproval[]
+
+  @@index([jobCardId])
 }
 
 model CustomerApproval {
-  id            String    @id @default(uuid())
-  estimateId    String
-  estimate      Estimate  @relation(fields: [estimateId], references: [id], onDelete: Cascade)
-  customerId    String
-  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  approved      Boolean?
-  decisionDate  DateTime?
-  comments      String?
-  status        String    @default("Pending")
-  createdAt     DateTime  @default(now())
+  id String @id @default(uuid())
+
+  estimateId String
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  approved     Boolean?
+  decisionDate DateTime?
+  comments     String?
+  status       String    @default("Pending")
+
+  createdAt DateTime @default(now())
+
+  @@index([estimateId])
+  @@index([customerId])
 }
 
+// ============================================================
+// VEHICLE
+// ============================================================
+
 model Vehicle {
-  id                String             @id @default(uuid())
-  customerId        String
-  customer          Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  vin               String             @unique
-  registrationNumber String?           @unique
-  make              String?
-  model             String?
-  year              Int?
-  trim              String?
-  color             String?
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  vin                String  @unique
+  registrationNumber String? @unique
+
+  make  String?
+  model String?
+  year  Int?
+  trim  String?
+  color String?
+
   warrantyProvider  String?
   warrantyStatus    String?
   warrantyExpiresAt DateTime?
-  ownershipStatus   String?
-  createdById       String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
 
-  createdBy         User?              @relation("CreatedVehicles", fields: [createdById], references: [id], onDelete: SetNull)
+  ownershipStatus String?
 
-  images            VehicleImage[]
-  ownerships        VehicleOwnership[]
-  appointments      ServiceAppointment[]
-  jobCards          JobCard[]
+  createdById String?
+  createdBy   User?   @relation("CreatedVehicles", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images       VehicleImage[]
+  ownerships   VehicleOwnership[]
+  appointments ServiceAppointment[]
+  jobCards     JobCard[]
+
+  @@index([customerId])
 }
 
 model VehicleImage {
-  id          String   @id @default(uuid())
-  vehicleId   String
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  url         String
-  type        String?
-  metadata    Json?
-  uploadedAt  DateTime @default(now())
+  id String @id @default(uuid())
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  url      String
+  type     String?
+  metadata Json?
+
+  uploadedAt DateTime @default(now())
+
+  @@index([vehicleId])
 }
+
+// ============================================================
+// SPARE PART MASTER
+// ============================================================
 
 model SparePart {
-  id            String            @id @default(uuid())
-  partNumber    String            @unique
-  name          String
-  description   String?
-  category      String?
-  unitPrice     Float             @default(0)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id String @id @default(uuid())
 
-  purchaseRequests PurchaseRequest[]
-  issuances        PartIssuance[]
-  inventoryStocks  InventoryStock[]
+  partNumber  String  @unique
+  name        String
+  description String?
+  category    String?
+
+  unitPrice Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseRequests  PurchaseRequest[]
+  issuances         PartIssuance[]
+  inventoryStocks   InventoryStock[]
   stockTransactions StockTransaction[]
-  transferItems    InterBranchTransferItem[]
+  transferItems     InterBranchTransferItem[]
 }
+
+// ============================================================
+// BRANCH INVENTORY
+// ============================================================
 
 model InventoryStock {
-  id              String   @id @default(uuid())
-  branchId        String
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  partId          String
-  part            SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
-  quantity        Int      @default(0)
-  reservedQuantity Int     @default(0)
-  minimumStock    Int      @default(0)
-  rackLocation    String?
-  maximumStock    Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id String @id @default(uuid())
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  partId String
+  part   SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  quantity         Int @default(0)
+  reservedQuantity Int @default(0)
+
+  minimumStock Int  @default(0)
+  maximumStock Int?
+
+  rackLocation String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([branchId, partId])
+  @@index([partId])
+  @@index([branchId])
 }
+
+// ============================================================
+// STOCK TRANSACTION / AUDIT TRAIL
+// ============================================================
 
 model StockTransaction {
-  id          String   @id @default(uuid())
-  branchId    String
-  partId      String
-  part        SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
-  type        String   // RECEIVED, ISSUED, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT, RESERVED, UNRESERVED
-  quantity    Int      // positive for increases, negative for decreases
-  referenceId String?  // link to transfer ID, issuance ID, etc.
+  id String @id @default(uuid())
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  partId String
+  part   SparePart @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  type String
+  // RECEIVED
+  // ISSUED
+  // ADJUSTMENT
+  // TRANSFER_IN
+  // TRANSFER_OUT
+  // RESERVED
+  // UNRESERVED
+  // RETURNED
+
+  quantity Int
+
+  referenceId String?
   notes       String?
-  recordedById  String?
-  recordedBy    User?   @relation("UserStockTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
+
+  recordedById String?
+  recordedBy   User?   @relation("UserStockTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([branchId])
+  @@index([partId])
+  @@index([type])
+  @@index([referenceId])
+  @@index([createdAt])
 }
+
+// ============================================================
+// INTER-BRANCH TRANSFER
+// ============================================================
 
 model InterBranchTransfer {
-  id                  String                     @id @default(uuid())
-  transferNumber      String                     @unique
-  requestingBranchId  String
-  requestingBranch    Branch                     @relation("RequestingBranch", fields: [requestingBranchId], references: [id])
-  sourceBranchId      String
-  sourceBranch        Branch                     @relation("SourceBranch", fields: [sourceBranchId], references: [id])
-  requestedById       String
-  requestedBy         User                       @relation("TransferRequestedBy", fields: [requestedById], references: [id])
-  approvedById        String?
-  approvedBy          User?                      @relation("TransferApprovedBy", fields: [approvedById], references: [id])
-  dispatchedById      String?
-  dispatchedBy        User?                      @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id])
-  receivedById        String?
-  receivedBy          User?                      @relation("TransferReceivedBy", fields: [receivedById], references: [id])
-  status              String                     @default("Pending") // Pending, Approved, Rejected, Dispatched, InTransit, Received, Completed, Cancelled
-  notes               String?
-  approvedAt          DateTime?
-  dispatchedAt        DateTime?
-  receivedAt          DateTime?
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  id String @id @default(uuid())
 
-  items               InterBranchTransferItem[]
+  transferNumber String @unique
+
+  requestingBranchId String
+  requestingBranch   Branch @relation("RequestingBranch", fields: [requestingBranchId], references: [id], onDelete: Restrict)
+
+  sourceBranchId String
+  sourceBranch   Branch @relation("SourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+
+  requestedById String
+  requestedBy   User   @relation("TransferRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  approvedById String?
+  approvedBy   User?   @relation("TransferApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  dispatchedById String?
+  dispatchedBy   User?   @relation("TransferDispatchedBy", fields: [dispatchedById], references: [id], onDelete: SetNull)
+
+  receivedById String?
+  receivedBy   User?   @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  status String @default("Pending")
+  // Pending
+  // Approved
+  // Rejected
+  // Dispatched
+  // InTransit
+  // Received
+  // Completed
+  // Cancelled
+
+  notes String?
+
+  approvedAt   DateTime?
+  dispatchedAt DateTime?
+  receivedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items InterBranchTransferItem[]
+
+  @@index([requestingBranchId])
+  @@index([sourceBranchId])
+  @@index([requestedById])
+  @@index([status])
 }
+
+// ============================================================
+// TRANSFER ITEMS
+// ============================================================
 
 model InterBranchTransferItem {
-  id                String             @id @default(uuid())
-  transferId        String
-  transfer          InterBranchTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
-  partId            String
-  part              SparePart          @relation(fields: [partId], references: [id])
-  requestedQuantity Int
+  id String @id @default(uuid())
+
+  transferId String
+  transfer   InterBranchTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  partId String
+  part   SparePart @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  requestedQuantity  Int
   dispatchedQuantity Int?
-  receivedQuantity  Int?
-  createdAt         DateTime           @default(now())
+  receivedQuantity   Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([transferId])
+  @@index([partId])
 }
+
+// ============================================================
+// PURCHASE REQUEST
+// ============================================================
 
 model PurchaseRequest {
-  id           String    @id @default(uuid())
-  sparePartId  String
-  sparePart    SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  sparePartId String
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+
   requestedById String
-  requestedBy  User      @relation("UserPurchaseRequests", fields: [requestedById], references: [id], onDelete: Cascade)
-  quantity     Int
-  status       String    @default("Pending")
-  requestDate  DateTime  @default(now())
+  requestedBy   User   @relation("UserPurchaseRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  quantity Int
+
+  status String @default("Pending")
+
+  requestDate   DateTime @default(now())
   approvalNotes String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sparePartId])
+  @@index([requestedById])
+  @@index([status])
 }
 
-model Invoice {
-  id             String      @id @default(uuid())
-  customerId     String
-  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  jobCardId      String?
-  jobCard        JobCard?    @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
-  invoiceNumber  String      @unique
-  issuedDate     DateTime    @default(now())
-  dueDate        DateTime?
-  subtotal       Float
-  tax            Float        @default(0)
-  total          Float
-  status         String       @default("Unpaid")
-  notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  payments       Payment[]
-  receipts       Receipt[]
-  creditApplications CustomerCreditApplication[]
-}
-
-model Payment {
-  id            String      @id @default(uuid())
-  invoiceId     String
-  invoice       Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  recordedById  String?
-  recordedBy    User?       @relation("UserRecordedPayments", fields: [recordedById], references: [id], onDelete: SetNull)
-  amount        Float
-  method        String
-  paymentDate   DateTime    @default(now())
-  reference     String?
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-}
-
-model Receipt {
-  id            String      @id @default(uuid())
-  invoiceId     String
-  invoice       Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  issuedById    String
-  issuedBy      User        @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Cascade)
-  amount        Float
-  issuedAt      DateTime    @default(now())
-  reference     String?
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-}
+// ============================================================
+// PART ISSUANCE
+// ============================================================
 
 model PartIssuance {
-  id             String      @id @default(uuid())
-  sparePartId    String
-  sparePart      SparePart   @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
-  jobCardId      String?
-  jobCard        JobCard?    @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
-  issuedById     String
-  issuedBy       User        @relation("UserPartIssuances", fields: [issuedById], references: [id], onDelete: Cascade)
-  quantity       Int
-  issuedAt       DateTime    @default(now())
-  notes          String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id String @id @default(uuid())
 
-  returns        PartReturn[]
+  // The branch whose inventory is being reduced
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  sparePartId String
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+
+  // The job card the part is being issued for
+  jobCardId String?
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+
+  issuedById String
+  issuedBy   User   @relation("UserPartIssuances", fields: [issuedById], references: [id], onDelete: Restrict)
+
+  quantity Int
+
+  issuedAt DateTime @default(now())
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  returns PartReturn[]
+
+  @@index([branchId])
+  @@index([sparePartId])
+  @@index([jobCardId])
+  @@index([issuedById])
+  @@index([issuedAt])
 }
+
+// ============================================================
+// PART RETURN
+// ============================================================
 
 model PartReturn {
-  id             String      @id @default(uuid())
+  id String @id @default(uuid())
+
   partIssuanceId String
-  partIssuance   PartIssuance @relation(fields: [partIssuanceId], references: [id], onDelete: Cascade)
-  returnedById   String
-  returnedBy     User        @relation("UserPartReturns", fields: [returnedById], references: [id], onDelete: Cascade)
-  quantity       Int
-  reason         String?
-  returnedAt     DateTime    @default(now())
-  status         String      @default("Pending")
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  partIssuance   PartIssuance @relation(fields: [partIssuanceId], references: [id], onDelete: Restrict)
+
+  returnedById String
+  returnedBy   User   @relation("UserPartReturns", fields: [returnedById], references: [id], onDelete: Restrict)
+
+  quantity Int
+
+  reason String?
+
+  returnedAt DateTime @default(now())
+
+  status String @default("Pending")
+  // Pending
+  // Approved
+  // Rejected
+  // Completed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partIssuanceId])
+  @@index([returnedById])
+  @@index([status])
 }
+
+// ============================================================
+// VEHICLE OWNERSHIP
+// ============================================================
 
 model VehicleOwnership {
-  id            String   @id @default(uuid())
-  vehicleId     String
-  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   ownershipType String?
-  purchaseDate  DateTime
-  saleDate      DateTime?
-  status        String?
-  createdAt     DateTime @default(now())
+
+  purchaseDate DateTime
+  saleDate     DateTime?
+
+  status String?
+
+  createdAt DateTime @default(now())
+
+  @@index([vehicleId])
+  @@index([customerId])
 }
+
+// ============================================================
+// CUSTOMER DOCUMENT
+// ============================================================
 
 model CustomerDocument {
-  id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  type        String
-  url         String
-  metadata    Json?
-  uploadedAt  DateTime @default(now())
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  type String
+  url  String
+
+  metadata Json?
+
+  uploadedAt DateTime @default(now())
+
+  @@index([customerId])
 }
 
+// ============================================================
+// SERVICE HISTORY
+// ============================================================
+
 model ServiceHistory {
-  id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   serviceDate DateTime
   description String
   vehicleInfo String?
   status      String
   amount      Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
 }
 
+// ============================================================
+// INVOICE
+// ============================================================
+
+model Invoice {
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  jobCardId String?
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+
+  invoiceNumber String @unique
+
+  issuedDate DateTime  @default(now())
+  dueDate    DateTime?
+
+  subtotal Float
+  tax      Float @default(0)
+  total    Float
+
+  status String @default("Unpaid")
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+  receipts Receipt[]
+
+  creditApplications CustomerCreditApplication[]
+
+  @@index([customerId])
+  @@index([jobCardId])
+}
+
+// ============================================================
+// PAYMENT
+// ============================================================
+
+model Payment {
+  id String @id @default(uuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  recordedById String?
+  recordedBy   User?   @relation("UserRecordedPayments", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  amount Float
+  method String
+
+  paymentDate DateTime @default(now())
+
+  reference String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([recordedById])
+}
+
+// ============================================================
+// RECEIPT
+// ============================================================
+
+model Receipt {
+  id String @id @default(uuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  issuedById String
+  issuedBy   User   @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Restrict)
+
+  amount Float
+
+  issuedAt DateTime @default(now())
+
+  reference String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([issuedById])
+}
+
+// ============================================================
+// CUSTOMER CREDIT
+// ============================================================
+
 model CustomerCreditTransaction {
-  id           String   @id @default(uuid())
-  customerId   String
-  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   amount       Float
   balanceAfter Float
-  type         String   // CREDIT_IN, ADJUSTMENT, USED
-  description  String?
-  referenceId  String?
+
+  type String
+  // CREDIT_IN
+  // ADJUSTMENT
+  // USED
+
+  description String?
+  referenceId String?
+
   recordedById String?
-  recordedBy   User?    @relation("UserCreditTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
+  recordedBy   User?   @relation("UserCreditTransactions", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
 
   @@index([customerId, createdAt])
+  @@index([referenceId])
 }
 
 model CustomerCreditApplication {
-  id           String   @id @default(uuid())
-  customerId   String
-  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  invoiceId    String
-  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  amount       Float
-  status       String   @default("Pending") // Pending, Approved, Declined
+  id String @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount Float
+
+  status String @default("Pending")
+  // Pending
+  // Approved
+  // Declined
+
   comments     String?
   decisionDate DateTime?
+
   requestedById String
-  requestedBy  User     @relation("AdvisorCreditRequests", fields: [requestedById], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  requestedBy   User   @relation("AdvisorCreditRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId, status])
   @@index([invoiceId])
+  @@index([requestedById])
 }
 
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
 model Notification {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String
-  title     String
-  message   String
-  link      String?
-  readAt    DateTime?
-  branchId  String?
-  branch    Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  createdAt DateTime  @default(now())
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    String
+  title   String
+  message String
+  link    String?
+
+  readAt DateTime?
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([branchId, readAt])
 }
 
+// ============================================================
+// ENQUIRY
+// ============================================================
+
 model Enquiry {
-  id              String    @id @default(uuid())
-  firstName       String
-  lastName        String
-  email           String
-  phoneNumber     String
-  vehicleMake     String?
-  vehicleModel    String?
-  vehicleYear     Int?
+  id String @id @default(uuid())
+
+  firstName String
+  lastName  String
+
+  email       String
+  phoneNumber String
+
+  vehicleMake      String?
+  vehicleModel     String?
+  vehicleYear      Int?
   vehicleRegNumber String?
+
   serviceDescription String
-  preferredDate   DateTime?
-  branchId        String
-  branch          Branch    @relation(fields: [branchId], references: [id])
-  status          String    @default("Pending") // Pending | Approved | Rejected | Converted
-  appointmentId   String?   @unique
-  appointment     ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  reviewedById    String?
-  reviewedBy      User?     @relation("EnquiryReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewNotes     String?
-  reviewedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+
+  preferredDate DateTime?
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  status String @default("Pending")
+  // Pending
+  // Approved
+  // Rejected
+  // Converted
+
+  appointmentId String?             @unique
+  appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  reviewedById String?
+  reviewedBy   User?   @relation("EnquiryReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  reviewNotes String?
+  reviewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([branchId, status])
   @@index([email])

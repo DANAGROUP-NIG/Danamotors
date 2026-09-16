@@ -302,6 +302,7 @@ export class InventoryService {
     await this.notifyLowStock(data.branchId, { id: sparePart.id, name: sparePart.name }, updatedStock.quantity, updatedStock.minimumStock);
 
     return this.inventoryRepository.createPartIssuance({
+      branchId: data.branchId,
       sparePartId: data.sparePartId,
       jobCardId: data.jobCardId,
       issuedById: data.issuedById,
