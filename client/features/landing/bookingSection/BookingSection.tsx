@@ -105,7 +105,7 @@ export default function BookingSection() {
                 </div>
               </div>
               <CardDescription className="mt-2 text-sm text-muted-foreground">
-                Fill in your details below no account required.
+                Fill in your details below — no account required.
               </CardDescription>
             </div>
 
