@@ -31,7 +31,8 @@ export default function BookingSection() {
     defaultValues: {
       firstName: '', lastName: '', email: '',
       phoneNumber: '', vehicleMake: '', vehicleModel: '',
-      vehicleRegNumber: '', serviceDescription: '', branchId: '',
+      vehicleRegNumber: '', vin: '',
+      serviceDescription: '', branchId: '',
     },
   });
 
@@ -43,6 +44,7 @@ export default function BookingSection() {
       vehicleMake: values.vehicleMake || undefined,
       vehicleModel: values.vehicleModel || undefined,
       vehicleRegNumber: values.vehicleRegNumber || undefined,
+      vin: values.vin || undefined,
     };
 
     createEnquiry.mutate(payload, {
@@ -220,7 +222,16 @@ export default function BookingSection() {
                         />
                       </Field>
                     </div>
-
+                    <Field label="VIN (Vehicle Identification Number)" error={errors.vin?.message}>
+                    <input
+                      id="enquiry-vin"
+                      className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30 uppercase`}
+                      placeholder="e.g. 1HGCM82633A123456"
+                      maxLength={17}
+                      {...register('vin')}
+                    />
+                    
+                  </Field>
                     <Field label="Preferred Branch *" error={errors.branchId?.message}>
                       <select
                         id="enquiry-branch"

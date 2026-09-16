@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Search, Loader2, Users, Car, Wrench, Package, UserCog } from "lucide-react";
 import { useGlobalSearch } from "@/features/search/hooks/use-global-search";
 import type { SearchResults } from "@/features/search/api/search.api";
@@ -32,10 +32,31 @@ const ICON_MAP: Record<keyof SearchResults, React.ReactNode> = {
 
 export default function HeaderSearch() {
   const router = useRouter();
+  const pathname = usePathname();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevPathRef = useRef(pathname);
+
+  // Clear the search box whenever the route changes. The header stays mounted
+  // across client-side navigation, so without this, the previously typed query
+  // would linger and appear "filled" on whatever page you land on.
+  // autoComplete="off" on the input prevents the browser from re-filling it.
+  useEffect(() => {
+    if (prevPathRef.current !== pathname) {
+      setQuery("");
+      setOpen(false);
+      // Re-clear after the browser has painted the new page, in case the
+      // browser injected a value (e.g. autofill) after the effect above ran.
+      const raf = requestAnimationFrame(() => {
+        setQuery("");
+        setOpen(false);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+    prevPathRef.current = pathname;
+  }, [pathname]);
 
   const { results, isLoading, hasResults, enabled } = useGlobalSearch(query);
 
@@ -92,6 +113,7 @@ export default function HeaderSearch() {
         ref={inputRef}
         type="text"
         value={query}
+        autoComplete="off"
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);

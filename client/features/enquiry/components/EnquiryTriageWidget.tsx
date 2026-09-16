@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 export default function EnquiryTriageWidget() {
   const { activeBranch } = useBranchStore();
   const { hasPermission } = useAuth();
-  const canSee = hasPermission("customer:read");
+  const canSee = hasPermission("enquiry:read");
 
   const { data, isLoading } = useEnquiries({
     limit: 5,

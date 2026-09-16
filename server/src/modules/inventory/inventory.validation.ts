@@ -148,3 +148,11 @@ export const branchPartParamSchema = z.object({
     partId: z.string().uuid('Invalid part ID'),
   }),
 });
+
+export const stockQuerySchema = z.object({
+  query: z.object({
+    branchId: z.string().uuid('Invalid branch ID').optional(),
+    partId: z.string().uuid('Invalid part ID').optional(),
+    search: z.string().trim().optional(),
+  }),
+});

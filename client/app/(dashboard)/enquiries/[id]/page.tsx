@@ -35,7 +35,7 @@ export default function EnquiryPage() {
     "approve-form" | "reject-confirm" | null
   >(null);
   const { hasPermission } = useAuth();
-  const canReview = hasPermission("customer:update");
+  const canReview = hasPermission("enquiry:update");
 
   if (isLoading) {
     return (
@@ -93,7 +93,7 @@ export default function EnquiryPage() {
                   className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
                 >
                   <CheckCircle className="size-4" />
-                  Approve &amp; Schedule
+                  Book Appointment
                 </Button>
                 <Button
                   size="sm"

@@ -4,7 +4,7 @@ import { hash } from "./helpers";
 
 export default async function seedStaffUsers(
   prisma: PrismaClient,
-  branches: { id: string; name: string }[]
+  branches: { id: string; name: string }[],
 ) {
   const mainBranch = branches[0];
   const abujaBranch = branches[1];
@@ -15,8 +15,8 @@ export default async function seedStaffUsers(
 
   const staff = [
     {
-      email: process.env.SUPERADMIN_EMAIL ?? "superadmin@danamotors.com",
-      password: process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin@123",
+      email: "superadmin@danamotors.com",
+      password: "SuperAdmin@123",
       firstName: "Super",
       lastName: "Admin",
       role: ROLES.SUPER_ADMIN,
@@ -188,4 +188,20 @@ export default async function seedStaffUsers(
   }
   console.log(`✅ Seeded ${result.length} staff users`);
   return result;
+}
+
+// Self-execute when run directly: `npx ts-node prisma/seed/staff.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true },
+      });
+      await seedStaffUsers(prisma, branches);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
 }

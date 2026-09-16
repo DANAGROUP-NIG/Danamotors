@@ -167,3 +167,15 @@ export default async function seedSpareParts(prisma: PrismaClient) {
   console.log(`✅ Seeded ${result.length} spare parts`);
   return result;
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/spareParts.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      await seedSpareParts(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

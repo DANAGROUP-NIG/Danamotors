@@ -23,3 +23,15 @@ export default async function seedServices(prisma: PrismaClient) {
   console.log(`✅ Seeded ${result.length} services`);
   return result;
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/services.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      await seedServices(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

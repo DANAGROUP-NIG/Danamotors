@@ -39,32 +39,34 @@ export default function ReceptionistDashboard() {
   const [aptFilter, setAptFilter] = useState<AptFilter>("Today");
   const router = useRouter();
 
-  if (isFetching) {
-    return (
-      <div className="flex flex-col gap-6 p-4 lg:p-6 animate-pulse">
-        <div className="h-6 w-48 rounded bg-slate-200" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-32 rounded-xl border border-[#e8edf3] bg-white p-5"
-            >
-              <div className="space-y-3">
-                <div className="h-3 w-20 rounded bg-slate-200" />
-                <div className="h-7 w-16 rounded bg-slate-200" />
-              </div>
+  const skeleton = (
+    <div className="flex flex-col gap-6 p-4 lg:p-6 animate-pulse">
+      <div className="h-6 w-48 rounded bg-slate-200" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-32 rounded-xl border border-[#e8edf3] bg-white p-5"
+          >
+            <div className="space-y-3">
+              <div className="h-3 w-20 rounded bg-slate-200" />
+              <div className="h-7 w-16 rounded bg-slate-200" />
             </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
-          <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
-          <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
-        </div>
+          </div>
+        ))}
       </div>
-    );
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
+        <div className="h-64 rounded-xl border border-[#e8edf3] bg-white p-5" />
+      </div>
+    </div>
+  );
+
+  if (isFetching) {
+    return skeleton;
   }
 
-  if (isError || !data) {
+  if (isError && !data) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-[#e8edf3] bg-white py-16 text-center shadow-sm m-4 lg:m-6">
         <AlertTriangle className="size-6 text-red-400" />
@@ -72,6 +74,8 @@ export default function ReceptionistDashboard() {
       </div>
     );
   }
+
+  if (!data) return skeleton;
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);

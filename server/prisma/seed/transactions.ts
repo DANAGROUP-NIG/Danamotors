@@ -35,3 +35,19 @@ export default async function seedStockTransactions(
   }
   console.log(`✅ Seeded ${count} stock transactions`);
 }
+
+// Self-execute when run directly: `npx ts-node prisma/seed/transactions.ts`
+if (require.main === module) {
+  (async () => {
+    const prisma = new PrismaClient();
+    try {
+      const branches = await prisma.branch.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      await seedStockTransactions(prisma, branches);
+    } finally {
+      await prisma.$disconnect();
+    }
+  })();
+}

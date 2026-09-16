@@ -242,12 +242,16 @@ export class AdminService {
     const permissions = await this.adminRepository.listPermissions();
 
     const MODULE_LABELS: Record<string, string> = {
+      dashboard: 'Dashboard',
+      notification: 'Notifications',
+      search: 'Search',
       user: 'User Management',
       role: 'Role Management',
       branch: 'Branch Management',
       customer: 'Customer Management',
       vehicle: 'Vehicle Management',
       appointment: 'Service — Appointments',
+      enquiry: 'Enquiries',
       jobcard: 'Service — Job Cards',
       inspection: 'Service — Inspections',
       estimate: 'Service — Estimates',

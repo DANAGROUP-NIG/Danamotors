@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import ModalFame from "@/components/modals/ModalFame";
 import { JobCardCreateForm } from "@/features/job-cards";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
@@ -47,7 +48,7 @@ const QUICK_LINKS = [
   { label: "Vehicles", href: "/vehicles", icon: Car, color: "bg-blue-50", iconColor: "text-blue-600", permission: "vehicle:read" },
   { label: "Appointments", href: "/appointments", icon: CalendarDays, color: "bg-violet-50", iconColor: "text-violet-600", permission: "appointment:read" },
   { label: "Job Cards", href: "/job-cards", icon: ClipboardList, color: "bg-orange-50", iconColor: "text-orange-600", permission: "jobcard:read" },
-  { label: "Inventory", href: "/inventory", icon: Package, color: "bg-amber-50", iconColor: "text-amber-600", permission: "sparepart:read" },
+  { label: "Inventory", href: "/inventory", icon: Package, color: "bg-amber-50", iconColor: "text-amber-600", permission: INVENTORY_PERMISSIONS.SPAREPART_READ },
   { label: "Finance", href: "/finance", icon: FileText, color: "bg-rose-50", iconColor: "text-rose-600", permission: "invoice:read" },
   { label: "Users", href: "/users", icon: Shield, color: "bg-slate-100", iconColor: "text-slate-600", permission: "user:read" },
 ];
@@ -74,42 +75,52 @@ export default function DashboardPage() {
     );
   }, []);
 
-  const { data: stats, isLoading, isError } = useDashboardStats();
+  const { data: stats, isLoading, isFetching, isError } = useDashboardStats();
 
   const canSeeFinance = hasPermission("invoice:read");
   const canSeeWorkshop = hasPermission("jobcard:read");
   const canManage = hasPermission("user:read");
-  const canSeeInventory = hasPermission("sparepart:read");
+  const canSeeInventory = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_READ);
   const canCreateJob = hasPermission("jobcard:create");
 
   // Permission checks for specialized dashboards
   const canSeeAppointments = hasPermission("appointment:read");
   const canSeeCustomers = hasPermission("customer:read");
 
-  // Role-based routing
-  if (isReceptionManager) {
+  // Role-based routing — only redirect if the user has the matching permissions
+  if (isReceptionManager && canSeeAppointments) {
     return <ReceptionManagerDashboard />;
   }
-  if (isReceptionist) {
+  if (isReceptionist && canSeeAppointments) {
     return <ReceptionistDashboard />;
   }
-  if (isStoreManager) {
+  if (isStoreManager && (canSeeInventory || canSeeWorkshop)) {
     return <StoreManagerDashboard />;
   }
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (isLoading) {
+  // Show the skeleton while the query is fetching and we don't have data yet
+  // (covers initial load AND background refetches that have no data).
+  if (isLoading || (isFetching && !stats)) {
     return <DashboardSkeleton />;
   }
 
   // ── API error state ────────────────────────────────────────────────────────
-  if (isError || !stats) {
+  // Only show the error card once the fetch has settled (not currently
+  // fetching) and we have no data to render.
+  if (isError && !isFetching && !stats) {
     return (
       <div className="flex flex-col gap-6 p-4 lg:p-6">
         <DashboardWelcomeHeader user={user} today={today} />
         <DashboardFallbackState user={user} />
       </div>
     );
+  }
+
+  // Fallback: if there is still no data to render (not an error, not fetching),
+  // keep showing the skeleton rather than crashing on undefined.
+  if (!stats) {
+    return <DashboardSkeleton />;
   }
 
   // ── Limited dashboard for users with minimal permissions ────────────────────

@@ -37,16 +37,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
     },
     servers: [
       {
-        url: 'http://localhost:8000/api',
-        description: 'Local Development Server',
-      },
-      {
-        url: 'https://staging-api.danamotors.com/api',
-        description: 'Staging Server',
-      },
-      {
-        url: 'https://api.danamotors.com/api',
-        description: 'Production Server',
+        url: '/api',
+        description: 'Current Dana Motors API',
       },
     ],
     tags: [

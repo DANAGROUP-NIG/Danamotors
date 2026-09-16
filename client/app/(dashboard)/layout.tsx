@@ -9,21 +9,30 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
+  "/dashboard": ["dashboard:read"],
   "/customers": ["customer:read"],
   "/vehicles": ["vehicle:read"],
   "/appointments": ["appointment:read"],
-  "/enquiries": ["customer:read"],
+  "/enquiries": ["enquiry:read"],
   "/users": ["user:read"],
   "/branches": ["branch:read"],
   "/job-cards": ["jobcard:read"],
   "/inspections": ["inspection:read"],
   "/repairs": ["jobcard:update", "workshop:read"],
-  "/technicians": ["user:read"],
-  "/inventory": ["sparepart:read", "stock:read"],
-  "/transfers": ["transfer:read"],
-  "/purchase-requests": ["purchaserequest:read"],
+  "/technicians": ["workshop:read"],
+  "/inventory": [
+    INVENTORY_PERMISSIONS.SPAREPART_READ,
+    INVENTORY_PERMISSIONS.STOCK_READ,
+  ],
+  "/inventory/": [
+    INVENTORY_PERMISSIONS.SPAREPART_READ,
+    INVENTORY_PERMISSIONS.STOCK_READ,
+  ],
+  "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
+  "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],

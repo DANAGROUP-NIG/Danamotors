@@ -12,6 +12,7 @@ import { useTransfers } from "../hooks/use-transfers";
 import { useApproveTransfer, useDispatchTransfer, useReceiveTransfer, useRejectTransfer, useCancelTransfer } from "../hooks/use-transfer-mutations";
 import type { Transfer } from "../types/transfer.types";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 
 const STATUS_FILTERS = ["", "Pending", "Approved", "Dispatched", "Received", "Rejected", "Cancelled"] as const;
 const STATUS_LABELS: Record<string, string> = {
@@ -43,11 +44,11 @@ export function TransfersPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { hasPermission } = useAuth();
-  const canApprove = hasPermission("transfer:approve");
-  const canReject = hasPermission("transfer:reject");
-  const canCancel = hasPermission("transfer:cancel");
-  const canDispatch = hasPermission("transfer:dispatch");
-  const canReceive = hasPermission("transfer:receive");
+  const canApprove = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_APPROVE);
+  const canReject = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_REJECT);
+  const canCancel = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_CANCEL);
+  const canDispatch = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH);
+  const canReceive = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_RECEIVE);
   const approve = useApproveTransfer();
   const dispatch = useDispatchTransfer();
   const receive = useReceiveTransfer();
