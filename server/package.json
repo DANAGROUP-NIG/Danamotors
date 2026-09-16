@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Dana Motors service backend",
   "main": "src/server.ts",
+  "prisma": {
+    "seed": "ts-node prisma/seed/seed.ts"
+  },
   "scripts": {
     "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
     "build": "tsc",

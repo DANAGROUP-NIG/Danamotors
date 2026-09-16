@@ -1,8 +1,12 @@
-import prisma from '../../prisma/client';
-import { InventoryRepository } from './inventory.repository';
-import { NotFoundError, BadRequestError, ConflictError } from '../../shared/errors/appError';
-import { ROLES } from '../../shared/constants/roles';
-import { NotificationService } from '../notification/notification.service';
+import prisma from "../../prisma/client";
+import { InventoryRepository } from "./inventory.repository";
+import {
+  NotFoundError,
+  BadRequestError,
+  ConflictError,
+} from "../../shared/errors/appError";
+import { ROLES } from "../../shared/constants/roles";
+import { NotificationService } from "../notification/notification.service";
 
 export class InventoryService {
   private inventoryRepository: InventoryRepository;
@@ -20,13 +24,21 @@ export class InventoryService {
     if (minimumStock <= 0 || quantity > minimumStock) return;
     const notificationService = new NotificationService();
     const payload = {
-      type: 'LOW_STOCK',
-      title: 'Low stock alert',
+      type: "LOW_STOCK",
+      title: "Low stock alert",
       message: `Stock for ${part.name} is low (${quantity} remaining, minimum ${minimumStock}).`,
       link: `/inventory/${part.id}`,
     };
-    await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, branchId, payload);
-    await notificationService.notifyRole(ROLES.GENERAL_STORE_MANAGER, undefined, payload);
+    await notificationService.notifyRole(
+      ROLES.BRANCH_STORE_MANAGER,
+      branchId,
+      payload,
+    );
+    await notificationService.notifyRole(
+      ROLES.GENERAL_STORE_MANAGER,
+      undefined,
+      payload,
+    );
   }
 
   private async getBranchNames(ids: string[]) {
@@ -39,14 +51,14 @@ export class InventoryService {
     return map;
   }
 
-  async listSpareParts() {
-    return this.inventoryRepository.listSpareParts();
+  async listSpareParts(branchId?: string) {
+    return this.inventoryRepository.listSpareParts(branchId);
   }
 
-  async getSparePart(id: string) {
-    const part = await this.inventoryRepository.findSparePartById(id);
+  async getSparePart(id: string, branchId?: string) {
+    const part = await this.inventoryRepository.findSparePartById(id, branchId);
     if (!part) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
     return part;
   }
@@ -57,12 +69,21 @@ export class InventoryService {
     description?: string;
     category?: string;
     unitPrice?: number;
-    branchStock?: { branchId: string; quantity: number; minimumStock?: number; rackLocation?: string }[];
+    branchStock?: {
+      branchId: string;
+      quantity: number;
+      minimumStock?: number;
+      rackLocation?: string;
+    }[];
     recordedById?: string;
   }) {
-    const existing = await prisma.sparePart.findUnique({ where: { partNumber: data.partNumber } });
+    const existing = await prisma.sparePart.findUnique({
+      where: { partNumber: data.partNumber },
+    });
     if (existing) {
-      throw new ConflictError('A spare part with this part number already exists');
+      throw new ConflictError(
+        "A spare part with this part number already exists",
+      );
     }
 
     const { branchStock, recordedById, ...partData } = data;
@@ -73,12 +94,16 @@ export class InventoryService {
 
     const branchIds = branchStock.map((b) => b.branchId);
     if (new Set(branchIds).size !== branchIds.length) {
-      throw new BadRequestError('Each branch can only be stocked once per part');
+      throw new BadRequestError(
+        "Each branch can only be stocked once per part",
+      );
     }
 
-    const branches = await prisma.branch.findMany({ where: { id: { in: branchIds } } });
+    const branches = await prisma.branch.findMany({
+      where: { id: { in: branchIds } },
+    });
     if (branches.length !== branchIds.length) {
-      throw new NotFoundError('One or more branches not found');
+      throw new NotFoundError("One or more branches not found");
     }
 
     return prisma.$transaction(async (tx) => {
@@ -97,9 +122,9 @@ export class InventoryService {
           data: {
             branchId: stock.branchId,
             partId: part.id,
-            type: 'STOCKED',
+            type: "STOCKED",
             quantity: stock.quantity,
-            notes: 'Initial stock across branches',
+            notes: "Initial stock across branches",
             recordedById,
           },
         });
@@ -108,15 +133,18 @@ export class InventoryService {
     });
   }
 
-  async updateSparePart(id: string, data: {
-    name?: string;
-    description?: string;
-    category?: string;
-    unitPrice?: number;
-  }) {
+  async updateSparePart(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      category?: string;
+      unitPrice?: number;
+    },
+  ) {
     const part = await this.inventoryRepository.findSparePartById(id);
     if (!part) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
 
     return this.inventoryRepository.updateSparePart(id, data);
@@ -125,7 +153,7 @@ export class InventoryService {
   async deleteSparePart(id: string) {
     const part = await this.inventoryRepository.findSparePartById(id);
     if (!part) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
 
     return this.inventoryRepository.deleteSparePart(id);
@@ -134,9 +162,14 @@ export class InventoryService {
   // ── Inventory Stock ────────────────────────────────────────────────────
 
   async getBranchStock(branchId: string, partId: string) {
-    const stock = await this.inventoryRepository.findInventoryStock(branchId, partId);
+    const stock = await this.inventoryRepository.findInventoryStock(
+      branchId,
+      partId,
+    );
     if (!stock) {
-      throw new NotFoundError('Stock record not found for this branch and part');
+      throw new NotFoundError(
+        "Stock record not found for this branch and part",
+      );
     }
     return stock;
   }
@@ -145,8 +178,8 @@ export class InventoryService {
     return this.inventoryRepository.listInventoryStockByBranch(branchId);
   }
 
-  async listAllStock() {
-    return this.inventoryRepository.listAllInventoryStock();
+  async listAllStock(branchId?: string) {
+    return this.inventoryRepository.listAllInventoryStock(branchId);
   }
 
   async adjustStock(data: {
@@ -159,12 +192,14 @@ export class InventoryService {
   }) {
     const part = await this.inventoryRepository.findSparePartById(data.partId);
     if (!part) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
 
-    const branch = await prisma.branch.findUnique({ where: { id: data.branchId } });
+    const branch = await prisma.branch.findUnique({
+      where: { id: data.branchId },
+    });
     if (!branch) {
-      throw new NotFoundError('Branch not found');
+      throw new NotFoundError("Branch not found");
     }
 
     const stock = await this.inventoryRepository.upsertInventoryStock({
@@ -198,52 +233,64 @@ export class InventoryService {
     status?: string;
     approvalNotes?: string;
   }) {
-    const sparePart = await this.inventoryRepository.findSparePartById(data.sparePartId);
+    const sparePart = await this.inventoryRepository.findSparePartById(
+      data.sparePartId,
+    );
     if (!sparePart) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
 
-    const user = await prisma.user.findUnique({ where: { id: data.requestedById } });
-    if (!user) {
-      throw new NotFoundError('Requesting user not found');
-    }
-
-    const purchaseRequest = await this.inventoryRepository.createPurchaseRequest({
-      sparePartId: data.sparePartId,
-      requestedById: data.requestedById,
-      quantity: data.quantity,
-      status: data.status,
-      approvalNotes: data.approvalNotes,
+    const user = await prisma.user.findUnique({
+      where: { id: data.requestedById },
     });
+    if (!user) {
+      throw new NotFoundError("Requesting user not found");
+    }
+
+    const purchaseRequest =
+      await this.inventoryRepository.createPurchaseRequest({
+        sparePartId: data.sparePartId,
+        requestedById: data.requestedById,
+        quantity: data.quantity,
+        status: data.status,
+        approvalNotes: data.approvalNotes,
+      });
 
     const notificationService = new NotificationService();
-    await notificationService.notifyRole(ROLES.GENERAL_STORE_MANAGER, undefined, {
-      type: 'PURCHASE_REQUEST_CREATED',
-      title: 'New purchase request',
-      message: `${sparePart.name} (${data.quantity}) has been requested for purchase.`,
-      link: `/purchase-requests`,
-    });
+    await notificationService.notifyRole(
+      ROLES.GENERAL_STORE_MANAGER,
+      undefined,
+      {
+        type: "PURCHASE_REQUEST_CREATED",
+        title: "New purchase request",
+        message: `${sparePart.name} (${data.quantity}) has been requested for purchase.`,
+        link: `/purchase-requests`,
+      },
+    );
 
     return purchaseRequest;
   }
 
-  async listPurchaseRequests() {
-    return this.inventoryRepository.listPurchaseRequests();
+  async listPurchaseRequests(branchId?: string) {
+    return this.inventoryRepository.listPurchaseRequests(branchId);
   }
 
   async getPurchaseRequest(id: string) {
     const request = await this.inventoryRepository.findPurchaseRequestById(id);
     if (!request) {
-      throw new NotFoundError('Purchase request not found');
+      throw new NotFoundError("Purchase request not found");
     }
 
     return request;
   }
 
-  async updatePurchaseRequestStatus(id: string, data: { status: string; approvalNotes?: string }) {
+  async updatePurchaseRequestStatus(
+    id: string,
+    data: { status: string; approvalNotes?: string },
+  ) {
     const request = await this.inventoryRepository.findPurchaseRequestById(id);
     if (!request) {
-      throw new NotFoundError('Purchase request not found');
+      throw new NotFoundError("Purchase request not found");
     }
 
     return this.inventoryRepository.updatePurchaseRequestStatus(id, {
@@ -262,44 +309,65 @@ export class InventoryService {
     quantity: number;
     notes?: string;
   }) {
-    const sparePart = await this.inventoryRepository.findSparePartById(data.sparePartId);
+    const sparePart = await this.inventoryRepository.findSparePartById(
+      data.sparePartId,
+    );
     if (!sparePart) {
-      throw new NotFoundError('Spare part not found');
+      throw new NotFoundError("Spare part not found");
     }
 
     if (data.quantity <= 0) {
-      throw new BadRequestError('Issued quantity must be greater than zero');
+      throw new BadRequestError("Issued quantity must be greater than zero");
     }
 
-    const stock = await this.inventoryRepository.findInventoryStock(data.branchId, data.sparePartId);
+    const stock = await this.inventoryRepository.findInventoryStock(
+      data.branchId,
+      data.sparePartId,
+    );
     if (!stock || stock.quantity < data.quantity) {
-      throw new BadRequestError('Insufficient stock at this branch');
+      throw new BadRequestError("Insufficient stock at this branch");
     }
 
-    const user = await prisma.user.findUnique({ where: { id: data.issuedById } });
+    const user = await prisma.user.findUnique({
+      where: { id: data.issuedById },
+    });
     if (!user) {
-      throw new NotFoundError('Issuing user not found');
+      throw new NotFoundError("Issuing user not found");
     }
 
     if (data.jobCardId) {
-      const jobCard = await prisma.jobCard.findUnique({ where: { id: data.jobCardId } });
+      const jobCard = await prisma.jobCard.findUnique({
+        where: { id: data.jobCardId },
+      });
       if (!jobCard) {
-        throw new NotFoundError('Job card not found');
+        throw new NotFoundError("Job card not found");
+      }
+      if (jobCard.branchId !== data.branchId) {
+        throw new BadRequestError("Job card belongs to a different branch");
       }
     }
 
-    const updatedStock = await this.inventoryRepository.decrementInventoryStock(data.branchId, data.sparePartId, data.quantity);
+    const updatedStock = await this.inventoryRepository.decrementInventoryStock(
+      data.branchId,
+      data.sparePartId,
+      data.quantity,
+    );
     await this.inventoryRepository.createStockTransaction({
       branchId: data.branchId,
       partId: data.sparePartId,
-      type: 'ISSUED',
+      type: "ISSUED",
       quantity: -data.quantity,
       referenceId: data.jobCardId,
       notes: data.notes,
       recordedById: data.issuedById,
     });
 
-    await this.notifyLowStock(data.branchId, { id: sparePart.id, name: sparePart.name }, updatedStock.quantity, updatedStock.minimumStock);
+    await this.notifyLowStock(
+      data.branchId,
+      { id: sparePart.id, name: sparePart.name },
+      updatedStock.quantity,
+      updatedStock.minimumStock,
+    );
 
     return this.inventoryRepository.createPartIssuance({
       branchId: data.branchId,
@@ -311,14 +379,14 @@ export class InventoryService {
     });
   }
 
-  async listPartIssuances() {
-    return this.inventoryRepository.listPartIssuances();
+  async listPartIssuances(branchId?: string) {
+    return this.inventoryRepository.listPartIssuances(branchId);
   }
 
   async getPartIssuance(id: string) {
     const issuance = await this.inventoryRepository.findPartIssuanceById(id);
     if (!issuance) {
-      throw new NotFoundError('Part issuance not found');
+      throw new NotFoundError("Part issuance not found");
     }
 
     return issuance;
@@ -332,13 +400,21 @@ export class InventoryService {
     reason?: string;
     status?: string;
   }) {
-    const issuance = await this.inventoryRepository.findPartIssuanceById(data.partIssuanceId);
+    const issuance = await this.inventoryRepository.findPartIssuanceById(
+      data.partIssuanceId,
+    );
     if (!issuance) {
-      throw new NotFoundError('Part issuance not found');
+      throw new NotFoundError("Part issuance not found");
     }
 
     if (data.quantity <= 0) {
-      throw new BadRequestError('Returned quantity must be greater than zero');
+      throw new BadRequestError("Returned quantity must be greater than zero");
+    }
+
+    if (issuance.branchId !== data.branchId) {
+      throw new BadRequestError(
+        "Part return branch does not match the issuance branch",
+      );
     }
 
     const totalReturned = await prisma.partReturn.aggregate({
@@ -348,19 +424,25 @@ export class InventoryService {
 
     const returnedSoFar = totalReturned._sum.quantity ?? 0;
     if (returnedSoFar + data.quantity > issuance.quantity) {
-      throw new BadRequestError('Returned quantity exceeds issued quantity');
+      throw new BadRequestError("Returned quantity exceeds issued quantity");
     }
 
-    const user = await prisma.user.findUnique({ where: { id: data.returnedById } });
+    const user = await prisma.user.findUnique({
+      where: { id: data.returnedById },
+    });
     if (!user) {
-      throw new NotFoundError('Returning user not found');
+      throw new NotFoundError("Returning user not found");
     }
 
-    await this.inventoryRepository.incrementInventoryStock(data.branchId, issuance.sparePartId, data.quantity);
+    await this.inventoryRepository.incrementInventoryStock(
+      data.branchId,
+      issuance.sparePartId,
+      data.quantity,
+    );
     await this.inventoryRepository.createStockTransaction({
       branchId: data.branchId,
       partId: issuance.sparePartId,
-      type: 'RETURNED',
+      type: "RETURNED",
       quantity: data.quantity,
       referenceId: data.partIssuanceId,
       notes: data.reason,
@@ -376,14 +458,14 @@ export class InventoryService {
     });
   }
 
-  async listPartReturns() {
-    return this.inventoryRepository.listPartReturns();
+  async listPartReturns(branchId?: string) {
+    return this.inventoryRepository.listPartReturns(branchId);
   }
 
   async getPartReturn(id: string) {
     const partReturn = await this.inventoryRepository.findPartReturnById(id);
     if (!partReturn) {
-      throw new NotFoundError('Part return not found');
+      throw new NotFoundError("Part return not found");
     }
 
     return partReturn;
@@ -399,29 +481,40 @@ export class InventoryService {
     items: { partId: string; requestedQuantity: number }[];
   }) {
     if (data.requestingBranchId === data.sourceBranchId) {
-      throw new BadRequestError('Source and requesting branch cannot be the same');
+      throw new BadRequestError(
+        "Source and requesting branch cannot be the same",
+      );
     }
 
     if (!data.items || data.items.length === 0) {
-      throw new BadRequestError('At least one item is required for a transfer');
+      throw new BadRequestError("At least one item is required for a transfer");
     }
 
-    const sourceBranch = await prisma.branch.findUnique({ where: { id: data.sourceBranchId } });
-    if (!sourceBranch) throw new NotFoundError('Source branch not found');
+    const sourceBranch = await prisma.branch.findUnique({
+      where: { id: data.sourceBranchId },
+    });
+    if (!sourceBranch) throw new NotFoundError("Source branch not found");
 
-    const reqBranch = await prisma.branch.findUnique({ where: { id: data.requestingBranchId } });
-    if (!reqBranch) throw new NotFoundError('Requesting branch not found');
+    const reqBranch = await prisma.branch.findUnique({
+      where: { id: data.requestingBranchId },
+    });
+    if (!reqBranch) throw new NotFoundError("Requesting branch not found");
 
     // Validate all parts exist
     for (const item of data.items) {
-      const part = await this.inventoryRepository.findSparePartById(item.partId);
+      const part = await this.inventoryRepository.findSparePartById(
+        item.partId,
+      );
       if (!part) throw new NotFoundError(`Spare part ${item.partId} not found`);
       if (item.requestedQuantity <= 0) {
-        throw new BadRequestError(`Invalid requested quantity for part ${item.partId}`);
+        throw new BadRequestError(
+          `Invalid requested quantity for part ${item.partId}`,
+        );
       }
     }
 
-    const transferNumber = await this.inventoryRepository.getNextTransferNumber();
+    const transferNumber =
+      await this.inventoryRepository.getNextTransferNumber();
 
     const transfer = await this.inventoryRepository.createTransfer({
       transferNumber,
@@ -440,15 +533,21 @@ export class InventoryService {
       });
     }
 
-    const createdTransfer = await this.inventoryRepository.findTransferById(transfer.id);
+    const createdTransfer = await this.inventoryRepository.findTransferById(
+      transfer.id,
+    );
 
     const notificationService = new NotificationService();
-    await notificationService.notifyRole(ROLES.GENERAL_STORE_MANAGER, undefined, {
-      type: 'TRANSFER_REQUESTED',
-      title: 'New transfer request',
-      message: `Transfer ${transfer.transferNumber} requested from ${sourceBranch.name} to ${reqBranch.name}.`,
-      link: `/transfers`,
-    });
+    await notificationService.notifyRole(
+      ROLES.GENERAL_STORE_MANAGER,
+      undefined,
+      {
+        type: "TRANSFER_REQUESTED",
+        title: "New transfer request",
+        message: `Transfer ${transfer.transferNumber} requested from ${sourceBranch.name} to ${reqBranch.name}.`,
+        link: `/transfers`,
+      },
+    );
 
     return createdTransfer;
   }
@@ -456,7 +555,7 @@ export class InventoryService {
   async getTransfer(id: string) {
     const transfer = await this.inventoryRepository.findTransferById(id);
     if (!transfer) {
-      throw new NotFoundError('Transfer not found');
+      throw new NotFoundError("Transfer not found");
     }
     return transfer;
   }
@@ -465,26 +564,33 @@ export class InventoryService {
     status?: string;
     requestingBranchId?: string;
     sourceBranchId?: string;
+    branchId?: string;
   }) {
     return this.inventoryRepository.listTransfers(filters);
   }
 
   async approveTransfer(id: string, approvedById: string) {
     const transfer = await this.inventoryRepository.findTransferById(id);
-    if (!transfer) throw new NotFoundError('Transfer not found');
-    if (transfer.status !== 'Pending') throw new BadRequestError('Transfer can only be approved from Pending status');
+    if (!transfer) throw new NotFoundError("Transfer not found");
+    if (transfer.status !== "Pending")
+      throw new BadRequestError(
+        "Transfer can only be approved from Pending status",
+      );
 
     const updated = await this.inventoryRepository.updateTransferStatus(id, {
-      status: 'Approved',
+      status: "Approved",
       approvedById,
       approvedAt: new Date(),
     });
 
-    const branchNames = await this.getBranchNames([transfer.sourceBranchId, transfer.requestingBranchId]);
+    const branchNames = await this.getBranchNames([
+      transfer.sourceBranchId,
+      transfer.requestingBranchId,
+    ]);
     const notificationService = new NotificationService();
     const payload = {
-      type: 'TRANSFER_APPROVED',
-      title: 'Transfer approved',
+      type: "TRANSFER_APPROVED",
+      title: "Transfer approved",
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) was approved.`,
       link: `/transfers`,
     };
@@ -492,17 +598,31 @@ export class InventoryService {
       ...payload,
       branchId: transfer.requestingBranchId,
     });
-    await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
+    await notificationService.notifyRole(
+      ROLES.BRANCH_STORE_MANAGER,
+      transfer.requestingBranchId,
+      payload,
+    );
 
     return updated;
   }
 
-  async dispatchTransfer(id: string, dispatchedById: string, items?: { id: string; dispatchedQuantity: number }[]) {
+  async dispatchTransfer(
+    id: string,
+    dispatchedById: string,
+    items?: { id: string; dispatchedQuantity: number }[],
+  ) {
     const transfer = await this.inventoryRepository.findTransferById(id);
-    if (!transfer) throw new NotFoundError('Transfer not found');
-    if (transfer.status !== 'Approved') throw new BadRequestError('Transfer can only be dispatched from Approved status');
+    if (!transfer) throw new NotFoundError("Transfer not found");
+    if (transfer.status !== "Approved")
+      throw new BadRequestError(
+        "Transfer can only be dispatched from Approved status",
+      );
 
     const transferItems = await this.inventoryRepository.findTransferItems(id);
+    if (items?.some((item) => !transferItems.some((transferItem) => transferItem.id === item.id))) {
+      throw new BadRequestError("One or more transfer items do not belong to this transfer");
+    }
     const parts = await prisma.sparePart.findMany({
       where: { id: { in: transferItems.map((i) => i.partId) } },
       select: { id: true, name: true },
@@ -511,21 +631,38 @@ export class InventoryService {
     for (const part of parts) partMap[part.id] = part.name;
 
     for (const item of transferItems) {
-      const dispatchedQty = items?.find(i => i.id === item.id)?.dispatchedQuantity ?? item.requestedQuantity;
-      const stock = await this.inventoryRepository.findInventoryStock(transfer.sourceBranchId, item.partId);
+      const dispatchedQty =
+        items?.find((i) => i.id === item.id)?.dispatchedQuantity ??
+        item.requestedQuantity;
+      const stock = await this.inventoryRepository.findInventoryStock(
+        transfer.sourceBranchId,
+        item.partId,
+      );
       if (!stock || stock.quantity < dispatchedQty) {
-        throw new BadRequestError(`Insufficient stock for part ${item.partId} at source branch`);
+        throw new BadRequestError(
+          `Insufficient stock for part ${item.partId} at source branch`,
+        );
       }
-      const updatedStock = await this.inventoryRepository.decrementInventoryStock(transfer.sourceBranchId, item.partId, dispatchedQty);
+      const updatedStock =
+        await this.inventoryRepository.decrementInventoryStock(
+          transfer.sourceBranchId,
+          item.partId,
+          dispatchedQty,
+        );
       await this.inventoryRepository.createStockTransaction({
         branchId: transfer.sourceBranchId,
         partId: item.partId,
-        type: 'TRANSFER_OUT',
+        type: "TRANSFER_OUT",
         quantity: -dispatchedQty,
         referenceId: id,
         recordedById: dispatchedById,
       });
-      await this.notifyLowStock(transfer.sourceBranchId, { id: item.partId, name: partMap[item.partId] ?? item.partId }, updatedStock.quantity, updatedStock.minimumStock);
+      await this.notifyLowStock(
+        transfer.sourceBranchId,
+        { id: item.partId, name: partMap[item.partId] ?? item.partId },
+        updatedStock.quantity,
+        updatedStock.minimumStock,
+      );
     }
 
     if (items) {
@@ -533,16 +670,19 @@ export class InventoryService {
     }
 
     const updated = await this.inventoryRepository.updateTransferStatus(id, {
-      status: 'Dispatched',
+      status: "Dispatched",
       dispatchedById,
       dispatchedAt: new Date(),
     });
 
-    const branchNames = await this.getBranchNames([transfer.sourceBranchId, transfer.requestingBranchId]);
+    const branchNames = await this.getBranchNames([
+      transfer.sourceBranchId,
+      transfer.requestingBranchId,
+    ]);
     const notificationService = new NotificationService();
     const payload = {
-      type: 'TRANSFER_DISPATCHED',
-      title: 'Transfer dispatched',
+      type: "TRANSFER_DISPATCHED",
+      title: "Transfer dispatched",
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been dispatched.`,
       link: `/transfers`,
     };
@@ -550,19 +690,35 @@ export class InventoryService {
       ...payload,
       branchId: transfer.requestingBranchId,
     });
-    await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
+    await notificationService.notifyRole(
+      ROLES.BRANCH_STORE_MANAGER,
+      transfer.requestingBranchId,
+      payload,
+    );
 
     return updated;
   }
 
-  async receiveTransfer(id: string, receivedById: string, items?: { id: string; receivedQuantity: number }[]) {
+  async receiveTransfer(
+    id: string,
+    receivedById: string,
+    items?: { id: string; receivedQuantity: number }[],
+  ) {
     const transfer = await this.inventoryRepository.findTransferById(id);
-    if (!transfer) throw new NotFoundError('Transfer not found');
-    if (transfer.status !== 'Dispatched') throw new BadRequestError('Transfer can only be received from Dispatched status');
+    if (!transfer) throw new NotFoundError("Transfer not found");
+    if (transfer.status !== "Dispatched")
+      throw new BadRequestError(
+        "Transfer can only be received from Dispatched status",
+      );
 
     const transferItems = await this.inventoryRepository.findTransferItems(id);
+    if (items?.some((item) => !transferItems.some((transferItem) => transferItem.id === item.id))) {
+      throw new BadRequestError("One or more transfer items do not belong to this transfer");
+    }
     for (const item of transferItems) {
-      const receivedQty = items?.find(i => i.id === item.id)?.receivedQuantity ?? item.requestedQuantity;
+      const receivedQty =
+        items?.find((i) => i.id === item.id)?.receivedQuantity ??
+        item.requestedQuantity;
       await this.inventoryRepository.upsertInventoryStock({
         branchId: transfer.requestingBranchId,
         partId: item.partId,
@@ -571,7 +727,7 @@ export class InventoryService {
       await this.inventoryRepository.createStockTransaction({
         branchId: transfer.requestingBranchId,
         partId: item.partId,
-        type: 'TRANSFER_IN',
+        type: "TRANSFER_IN",
         quantity: receivedQty,
         referenceId: id,
         recordedById: receivedById,
@@ -583,16 +739,19 @@ export class InventoryService {
     }
 
     const updated = await this.inventoryRepository.updateTransferStatus(id, {
-      status: 'Received',
+      status: "Received",
       receivedById,
       receivedAt: new Date(),
     });
 
-    const branchNames = await this.getBranchNames([transfer.sourceBranchId, transfer.requestingBranchId]);
+    const branchNames = await this.getBranchNames([
+      transfer.sourceBranchId,
+      transfer.requestingBranchId,
+    ]);
     const notificationService = new NotificationService();
     const payload = {
-      type: 'TRANSFER_RECEIVED',
-      title: 'Transfer received',
+      type: "TRANSFER_RECEIVED",
+      title: "Transfer received",
       message: `Transfer ${transfer.transferNumber} (${branchNames[transfer.sourceBranchId] ?? transfer.sourceBranchId} → ${branchNames[transfer.requestingBranchId] ?? transfer.requestingBranchId}) has been received.`,
       link: `/transfers`,
     };
@@ -600,18 +759,25 @@ export class InventoryService {
       ...payload,
       branchId: transfer.requestingBranchId,
     });
-    await notificationService.notifyRole(ROLES.BRANCH_STORE_MANAGER, transfer.requestingBranchId, payload);
+    await notificationService.notifyRole(
+      ROLES.BRANCH_STORE_MANAGER,
+      transfer.requestingBranchId,
+      payload,
+    );
 
     return updated;
   }
 
   async rejectTransfer(id: string, approvedById: string, notes?: string) {
     const transfer = await this.inventoryRepository.findTransferById(id);
-    if (!transfer) throw new NotFoundError('Transfer not found');
-    if (transfer.status !== 'Pending') throw new BadRequestError('Transfer can only be rejected from Pending status');
+    if (!transfer) throw new NotFoundError("Transfer not found");
+    if (transfer.status !== "Pending")
+      throw new BadRequestError(
+        "Transfer can only be rejected from Pending status",
+      );
 
     return this.inventoryRepository.updateTransferStatus(id, {
-      status: 'Rejected',
+      status: "Rejected",
       approvedById,
       approvedAt: new Date(),
       notes,
@@ -620,12 +786,16 @@ export class InventoryService {
 
   async cancelTransfer(id: string) {
     const transfer = await this.inventoryRepository.findTransferById(id);
-    if (!transfer) throw new NotFoundError('Transfer not found');
-    if (!['Pending', 'Approved'].includes(transfer.status)) {
-      throw new BadRequestError('Transfer can only be cancelled from Pending or Approved status');
+    if (!transfer) throw new NotFoundError("Transfer not found");
+    if (!["Pending", "Approved"].includes(transfer.status)) {
+      throw new BadRequestError(
+        "Transfer can only be cancelled from Pending or Approved status",
+      );
     }
 
-    return this.inventoryRepository.updateTransferStatus(id, { status: 'Cancelled' });
+    return this.inventoryRepository.updateTransferStatus(id, {
+      status: "Cancelled",
+    });
   }
 }
 
