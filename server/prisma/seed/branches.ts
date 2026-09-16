@@ -31,6 +31,7 @@ export default async function seedBranches(prisma: PrismaClient) {
     },
   ];
   const result = [];
+
   for (const b of branches) {
     const branch = await prisma.branch.upsert({
       where: { name: b.name },

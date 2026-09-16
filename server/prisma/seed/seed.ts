@@ -56,7 +56,14 @@ async function main() {
   const vehicles = await prisma.vehicle.findMany({
     select: { id: true, customerId: true },
   });
-  await seedEnquiries(prisma, branches, staffUsers, customers, vehicles, services);
+  await seedEnquiries(
+    prisma,
+    branches,
+    staffUsers,
+    customers,
+    vehicles,
+    services,
+  );
 
   // Summary
   console.log("\n── Summary ──");

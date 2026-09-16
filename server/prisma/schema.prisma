@@ -7,6 +7,10 @@ datasource db {
   url       = env("DATABASE_URL")
 }
 
+prisma {
+  seed = "ts-node prisma/seed/seed.ts"
+}
+
 model Branch {
   id          String   @id @default(uuid())
   name        String   @unique
