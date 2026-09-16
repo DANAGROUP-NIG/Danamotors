@@ -144,7 +144,7 @@ export class AuthService {
       branchId,
     });
 
-    const permissions = newUser.role.permissions.map((p: string[]) => p.permission.name);
+    const permissions = newUser.role.permissions.map((p) => p.permission.name);
 
     const jwtPayload: JWTPayload = {
       userId: newUser.id,
