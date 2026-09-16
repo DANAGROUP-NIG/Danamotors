@@ -77,6 +77,3 @@ The `doc/` folder contains everything you need:
 
 MIT (see `server/package.json` author field).
 
-## Author
-
-Built by **buildwithzeke** (Aye Oluwaseyi) — <ayeoluwaseyi@gmail.com>
