@@ -17,6 +17,8 @@ app.set("trust proxy", "loopback");
 // and localhost in non-production environments.
 const allowedOrigins = [
   "https://danamotors.danagroup.net",
+  "https://danamotors.vercel.app",
+  
   ...(config.CLIENT_URL
     ? config.CLIENT_URL.split(",")
         .map((origin) => origin.trim())
@@ -25,7 +27,7 @@ const allowedOrigins = [
 ];
 
 if (config.NODE_ENV !== "production") {
-  allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000", "https://danamotors.vercel.app");
+  allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
 }
 
 app.use(

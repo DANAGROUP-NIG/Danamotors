@@ -10,7 +10,7 @@ import {
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: "/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -72,7 +72,7 @@ api.interceptors.response.use(
 
     try {
       const { data } = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}${API_ROUTES.auth.refresh}`,
+        `/api${API_ROUTES.auth.refresh}`,
         { refreshToken }
       );
 
