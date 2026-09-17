@@ -130,9 +130,9 @@ router.use(customerAuthMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [plateNumber, make, model, year]
+ *             required: [vin, make, model, year]
  *             properties:
- *               plateNumber: { type: string }
+ *               registrationNumber: { type: string }
  *               make: { type: string }
  *               model: { type: string }
  *               year: { type: integer }
@@ -239,10 +239,10 @@ router.use(customerAuthMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [decision]
+ *             required: [approved]
  *             properties:
- *               decision: { type: string, enum: [APPROVED, REJECTED] }
- *               notes: { type: string }
+ *               approved: { type: boolean }
+ *               comments: { type: string }
  *     responses:
  *       200:
  *         description: Estimate decision submitted

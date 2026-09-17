@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const overviewItems = [
   ["Book with confidence", "Send your vehicle details and preferred service date before visiting."],
-  ["Approve before repair", "Review inspection findings and estimates before Kia proceeds."],
+  ["Approve before repair", "Review inspection findings and estimates before Dana proceeds."],
   ["Track every stage", "See service progress from check-in through repair and pickup."],
 ];
 

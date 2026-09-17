@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Inlined — middleware runs in the Edge runtime and cannot safely resolve
 // path aliases (@/) or import from app code.
-const ACCESS_TOKEN_COOKIE = "danamotors_access_token";
+const ACCESS_TOKEN_COOKIE = "DanaMotors_access_token";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -76,7 +76,9 @@ export function proxy(request: NextRequest) {
 
   // Authenticated user hitting any public route → redirect to their home
   if (token && isPublic) {
-    return NextResponse.redirect(new URL(roleHome(decodeJwtRole(token)), request.url));
+    return NextResponse.redirect(
+      new URL(roleHome(decodeJwtRole(token)), request.url),
+    );
   }
 
   return NextResponse.next();

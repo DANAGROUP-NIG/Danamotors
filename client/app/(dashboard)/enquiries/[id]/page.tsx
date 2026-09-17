@@ -12,8 +12,6 @@ import {
   FileText,
   CheckCircle,
   XCircle,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
@@ -21,6 +19,7 @@ import { useEnquiry } from "@/features/enquiry/hooks/use-enquiry";
 import { EnquiryReviewModal } from "@/features/enquiry/components/EnquiryReviewModal";
 import type { EnquiryStatus } from "@/features/enquiry/types/enquiry.types";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { ENQUIRY_REVIEW_ROLES } from "@/features/auth/roles";
 
 const STATUS_BADGE: Record<EnquiryStatus, string> = {
   Pending: "bg-amber-50 text-amber-700",
@@ -221,18 +220,11 @@ export default function EnquiryPage() {
         isOpen={reviewAction !== null}
         onClose={() => setReviewAction(null)}
         title={reviewAction === "reject-confirm" ? "Reject Enquiry" : "Approve & Schedule"}
-        isOpen={reviewAction !== null}
-        onClose={() => setReviewAction(null)}
-        title={reviewAction === "reject-confirm" ? "Reject Enquiry" : "Approve & Schedule"}
       >
-        {enquiry && reviewAction && (
         {enquiry && reviewAction && (
           <EnquiryReviewModal
             key={reviewAction}
-            key={reviewAction}
             enquiry={enquiry}
-            initialStep={reviewAction}
-            onClose={() => setReviewAction(null)}
             initialStep={reviewAction}
             onClose={() => setReviewAction(null)}
           />

@@ -2,7 +2,7 @@
 
 ## System overview
 
-Kia Motors is a two-part monorepo:
+Dana Motors is a two-part monorepo:
 
 - **`client/`** — Next.js 16 (App Router) single-page-style web app. Renders the
   workshop management UI (dashboard, customers, job cards, inventory, finance, etc.)
@@ -10,7 +10,7 @@ Kia Motors is a two-part monorepo:
 - **`server/`** — Express 4 REST API backed by PostgreSQL (via Prisma ORM). All data,
   authorization, and business rules live here.
 
-There is no customer-facing mobile app; "Kia Motors" the platform is the web client used
+There is no customer-facing mobile app; "Dana Motors" the platform is the web client used
 by workshop staff (reception, service advisers, workshop/store managers, accountants,
 technicians).
 

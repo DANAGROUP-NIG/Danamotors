@@ -71,9 +71,9 @@ router.use(authMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [plateNumber, make, model, year]
+ *             required: [vin, make, model, year]
  *             properties:
- *               plateNumber: { type: string, example: LSD-123-AB }
+ *               registrationNumber: { type: string, example: LSD-123-AB }
  *               make: { type: string, example: Toyota }
  *               model: { type: string, example: Camry }
  *               year: { type: integer, example: 2022 }
@@ -136,7 +136,7 @@ router.use(authMiddleware);
  *           schema:
  *             type: object
  *             properties:
- *               plateNumber: { type: string }
+ *               registrationNumber: { type: string }
  *               make: { type: string }
  *               model: { type: string }
  *               year: { type: integer }

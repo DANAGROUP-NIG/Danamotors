@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { AuthController } from "./auth.controller";
 import { validateRequest } from "../../middleware/requestValidator";
 import { authMiddleware } from "../../middleware/authMiddleware";
@@ -15,6 +16,19 @@ import {
 
 const router = Router();
 const controller = new AuthController();
+
+// Brute-force protection for public authentication endpoints.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: "error",
+    statusCode: 429,
+    message: "Too many authentication attempts, please try again later.",
+  },
+});
 
 /**
  * @openapi
@@ -81,7 +95,7 @@ const controller = new AuthController();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/register", validateRequest(registerSchema), controller.register);
+router.post("/register", authLimiter, validateRequest(registerSchema), controller.register);
 
 /**
  * @openapi
@@ -128,7 +142,7 @@ router.post("/register", validateRequest(registerSchema), controller.register);
  *             schema:
  *               $ref: '#/components/schemas/ValidationErrorResponse'
  */
-router.post("/customer/register", validateRequest(customerRegisterSchema), controller.registerCustomer);
+router.post("/customer/register", authLimiter, validateRequest(customerRegisterSchema), controller.registerCustomer);
 
 /**
  * @openapi
@@ -178,7 +192,7 @@ router.post("/customer/register", validateRequest(customerRegisterSchema), contr
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/login", validateRequest(loginSchema), controller.login);
+router.post("/login", authLimiter, validateRequest(loginSchema), controller.login);
 
 /**
  * @openapi
@@ -208,7 +222,7 @@ router.post("/login", validateRequest(loginSchema), controller.login);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.post("/forgot-password", validateRequest(forgotPasswordSchema), controller.forgotPassword);
+router.post("/forgot-password", authLimiter, validateRequest(forgotPasswordSchema), controller.forgotPassword);
 
 /**
  * @openapi
@@ -247,7 +261,7 @@ router.post("/forgot-password", validateRequest(forgotPasswordSchema), controlle
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post("/reset-password", validateRequest(resetPasswordSchema), controller.resetPassword);
+router.post("/reset-password", authLimiter, validateRequest(resetPasswordSchema), controller.resetPassword);
 
 /**
  * @openapi
@@ -289,6 +303,7 @@ router.post("/reset-password", validateRequest(resetPasswordSchema), controller.
  */
 router.post(
   "/refresh",
+  authLimiter,
   validateRequest(refreshTokenSchema),
   controller.refresh,
 );

@@ -47,7 +47,7 @@ const PORTAL_NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-const PORTAL_SIDEBAR_KEY = "Kiaotors-portal-sidebar-collapsed";
+const PORTAL_SIDEBAR_KEY = "DanaMotors-portal-sidebar-collapsed";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,7 +85,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <Menu className="size-5" />
             </button>
             <div>
-              <p className="text-sm font-bold">KiaMotors — Customer Portal</p>
+              <p className="text-sm font-bold">DanaMotors — Customer Portal</p>
               <p className="text-xs text-muted-foreground">
                 Your vehicles, service and invoices in one place
               </p>

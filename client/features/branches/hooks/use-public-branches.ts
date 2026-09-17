@@ -7,7 +7,7 @@ export function usePublicBranches() {
     queryKey: ['branches', 'public'],
     queryFn: async () => {
       const { data } = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api'}/branches`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api'}/branches`,
       );
       return data.data as { branches: { id: string; name: string; city?: string | null }[] };
     },

@@ -48,10 +48,10 @@ export default function Footer() {
             <div className="mt-6 grid gap-3 text-sm text-slate-300">
               <a
                 className="flex items-center gap-3 transition hover:text-white"
-                href="mailto:hello@Kiamotors.ng"
+                href="mailto:hello@danamotors.com"
               >
                 <Mail className="size-4 text-blue-300" />
-                hello@Kiamotors.ng
+                hello@danamotors.com
               </a>
               <div className="flex items-center gap-3">
                 <MapPin className="size-4 text-blue-300" />
@@ -84,10 +84,10 @@ export default function Footer() {
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-lg font-black">
-                Ready to service your car with Dana Motors Limiteds Limited?
+                Ready to service your car with Dana Motors Limited?
               </p>
               <p className="mt-1 text-sm text-slate-400">
-                Book a visit and let Dana Motors Limiteds Limited manage the inspection, repair
+                Book a visit and let Dana Motors Limited manage the inspection, repair
                 flow, and pickup updates.
               </p>
             </div>
@@ -107,7 +107,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 flex flex-col gap-5 border-t border-white/10 pt-8 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>(c) 2026 Dana Motors Limiteds Limited. All rights reserved.</p>
+          <p>(c) 2026 Dana Motors Limited. All rights reserved.</p>
           <div className="flex items-center gap-2">
             {[
               ["LinkedIn", Linkedin],

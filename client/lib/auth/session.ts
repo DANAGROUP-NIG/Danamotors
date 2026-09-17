@@ -12,7 +12,7 @@ export function setAccessToken(token: string) {
 export function getAccessTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(
-    new RegExp(`(?:^|; )${ACCESS_TOKEN_KEY}=([^;]*)`)
+    new RegExp(`(?:^|; )${ACCESS_TOKEN_KEY}=([^;]*)`),
   );
   return match ? decodeURIComponent(match[1]) : null;
 }
@@ -58,7 +58,11 @@ export function clearSession() {
   clearStoredUser();
 }
 
-export function setSession(accessToken: string, refreshToken: string, user: AuthUser) {
+export function setSession(
+  accessToken: string,
+  refreshToken: string,
+  user: AuthUser,
+) {
   setAccessToken(accessToken);
   setRefreshToken(refreshToken);
   setStoredUser(user);

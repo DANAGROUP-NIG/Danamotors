@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type {
   InventoryItem,
@@ -46,7 +46,7 @@ export async function updateInventoryItemRequest(
   id: string,
   payload: UpdateSparePartPayload,
 ): Promise<InventoryItem> {
-  const data = await apiPatch<{ sparePart: InventoryItem }, UpdateSparePartPayload>(
+  const data = await apiPut<{ sparePart: InventoryItem }, UpdateSparePartPayload>(
     API_ROUTES.inventory.parts.detail(id),
     payload,
   );

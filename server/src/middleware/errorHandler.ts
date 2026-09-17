@@ -21,8 +21,8 @@ export const errorHandler = (
     statusCode = err.statusCode;
     message = err.message;
   }
-  // Handle Prisma Database Errors
-  else if ('code' in err) {
+  // Handle Prisma Database Errors (codes are always P2xxx/P1xxx style)
+  else if ('code' in err && typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) {
     switch (err.code) {
       case 'P2002': {
         statusCode = 409;

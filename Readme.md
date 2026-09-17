@@ -1,6 +1,6 @@
-# Kia Motors Motors — Service Workshop Platform
+# Dana Motors Limited — Service Workshop Platform
 
-Kia Motors Motors is a web platform for running a car service workshop. It covers the full
+Dana Motors Limited is a web platform for running a car service workshop. It covers the full
 service lifecycle — booking appointments, job cards, inspections, estimates and customer
 approvals, repairs, parts inventory (including inter-branch transfers), invoicing,
 payments and receipts — with role-based access control and per-branch isolation.
@@ -8,7 +8,7 @@ payments and receipts — with role-based access control and per-branch isolatio
 ## Repository layout
 
 ```
-Kiamotors/
+Danamotors/
 ├── client/   # Next.js 16 (App Router) + React 19 + TypeScript frontend
 ├── server/   # Express 4 + Prisma 6 + PostgreSQL + TypeScript API
 ├── doc/      # Project documentation

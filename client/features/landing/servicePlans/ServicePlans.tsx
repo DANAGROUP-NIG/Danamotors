@@ -43,7 +43,7 @@ export default function ServicePlans() {
         {[
           ["Routine Service", careMode === "priority" ? "Priority slot" : "Scheduled visit", "Oil, filters, brakes, fluids, tires, and preventive checks."],
           ["Diagnostics", careMode === "priority" ? "Fast review" : "Guided check", "Identify warning lights, AC faults, noise, electrical issues, or performance concerns."],
-          ["Repair & Parts", "Kia estimate", "Approve repairs, replacement parts, and pickup timing before work proceeds."],
+          ["Repair & Parts", "Dana estimate", "Approve repairs, replacement parts, and pickup timing before work proceeds."],
         ].map(([name, price, copy], index) => (
           <Card key={name} className={cn(index === 1 && "border-primary shadow-xl shadow-blue-500/10") }>
             <CardHeader>

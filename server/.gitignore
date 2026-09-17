@@ -6,7 +6,6 @@ dist/
 build/
 
 # Local env files
-nul
 .env
 .env.local
 .env.development.local

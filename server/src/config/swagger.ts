@@ -246,8 +246,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            vin: { type: 'string', example: '1HGCM82633A123456', nullable: true },
-            plateNumber: { type: 'string', example: 'LSD-123-AB' },
+            vin: { type: 'string', example: '1HGCM82633A123456' },
+            registrationNumber: { type: 'string', example: 'LSD-123-AB', nullable: true },
             make: { type: 'string', example: 'Toyota' },
             model: { type: 'string', example: 'Camry' },
             year: { type: 'integer', example: 2022 },
@@ -258,7 +258,7 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
             branchId: { type: 'string', nullable: true },
             createdAt: { type: 'string', format: 'date-time' },
           },
-          required: ['id', 'plateNumber', 'make', 'model', 'year'],
+          required: ['id', 'vin', 'make', 'model', 'year'],
         },
         // ── Job Card DTO ────────────────────────────────────────────
         JobCardDTO: {
