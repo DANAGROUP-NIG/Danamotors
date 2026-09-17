@@ -46,12 +46,12 @@ function DashboardSkeleton() {
 
 export default function WorkshopManagerDashboard() {
   const { user } = useAuth();
-  const { data, isLoading, isError } = useDashboardStats();
+  const { data, isLoading, isFetching, isError } = useDashboardStats();
   const router = useRouter();
 
-  if (isLoading) return <DashboardSkeleton />;
+  if (isLoading || (isFetching && !data)) return <DashboardSkeleton />;
 
-  if (isError || !data) {
+  if (isError && !isFetching && !data) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-[#e8edf3] bg-white py-16 text-center shadow-sm m-4 lg:m-6">
         <AlertTriangle className="size-6 text-red-400" />
@@ -59,6 +59,8 @@ export default function WorkshopManagerDashboard() {
       </div>
     );
   }
+
+  if (!data) return <DashboardSkeleton />;
 
   const totalJobs = data.jobsByStatus.reduce((s, d) => s + d.value, 0);
   const jobsByStatus = data.jobsByStatus.length > 0

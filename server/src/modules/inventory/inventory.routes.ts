@@ -21,6 +21,7 @@ import {
   transferIdParamSchema,
   branchIdParamSchema,
   branchPartParamSchema,
+  stockQuerySchema,
 } from './inventory.validation';
 
 const router = Router();
@@ -175,22 +176,52 @@ router.use(authMiddleware);
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List stock across all branches
+ *     summary: List inventory stock
+ *     description: Branch-scoped users are restricted to their assigned branch. Cross-branch results require the inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: branchId
+ *         schema: { type: string, format: uuid }
+ *         description: Filter by branch. Ignored for branch-scoped users, who are always restricted to their assigned branch.
+ *       - in: query
+ *         name: partId
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Search by part number or part name.
  *     responses:
  *       200:
  *         description: Stock overview
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stockItems:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Insufficient permission or unauthorized branch access
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *
  * /inventory/stock/adjust:
  *   post:
  *     tags:
  *       - Inventory & Parts
  *     summary: Adjust stock quantity
+ *     description: The branchId must be the authenticated user's branch unless the user has inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -199,54 +230,114 @@ router.use(authMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [branchId, partId, adjustment, reason]
+ *             required: [branchId, partId, quantity, type]
  *             properties:
- *               branchId: { type: string }
- *               partId: { type: string }
- *               adjustment: { type: integer, description: Positive to add, negative to deduct }
- *               reason: { type: string, example: Physical count correction }
+ *               branchId: { type: string, format: uuid }
+ *               partId: { type: string, format: uuid }
+ *               quantity: { type: integer, description: Positive to add, negative to deduct }
+ *               type: { type: string, example: ADJUSTMENT }
+ *               notes: { type: string, example: Physical count correction }
  *     responses:
  *       200:
  *         description: Stock adjusted
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stock:
+ *                           $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
  *
  * /inventory/stock/{branchId}:
  *   get:
  *     tags:
  *       - Inventory & Parts
  *     summary: List stock for a specific branch
+ *     description: Branch-scoped users may only request their assigned branch. Cross-branch access requires inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: branchId
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Branch stock
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stockItems:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
+ *
+ * /inventory/stock/{branchId}/{partId}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get stock details for a part at a branch
+ *     description: Branch-scoped users may only request stock from their assigned branch. Cross-branch access requires inventory:cross-branch permission.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: branchId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: partId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Stock details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         stock:
+ *                           $ref: '#/components/schemas/InventoryStockDTO'
+ *       403:
+ *         description: Unauthorized branch access
  *
  * /inventory/transactions:
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List all stock transactions
+ *     summary: List stock transactions
+ *     description: Branch-scoped users are restricted to their assigned branch. Cross-branch filtering requires inventory:cross-branch permission.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
+ *         name: branchId
+ *         schema: { type: string, format: uuid }
  *       - in: query
- *         name: type
- *         schema: { type: string, enum: [ISSUANCE, RETURN, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT] }
+ *         name: partId
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Stock transactions
@@ -475,36 +566,36 @@ router.use(authMiddleware);
  *               $ref: '#/components/schemas/StandardResponse'
  */
 // Spare Parts
-router.get('/parts', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listSpareParts);
-router.get('/parts/:id', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(partIdParamSchema), controller.getSparePart);
-router.post('/parts', requirePermission(PERMISSIONS.INVENTORY_CREATE), validateRequest(createSparePartSchema), controller.createSparePart);
-router.put('/parts/:id', requirePermission(PERMISSIONS.INVENTORY_UPDATE), validateRequest(updateSparePartSchema), controller.updateSparePart);
-router.delete('/parts/:id', requirePermission(PERMISSIONS.INVENTORY_DELETE), validateRequest(partIdParamSchema), controller.deleteSparePart);
+router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listSpareParts);
+router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partIdParamSchema), controller.getSparePart);
+router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createSparePartSchema), controller.createSparePart);
+router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updateSparePartSchema), controller.updateSparePart);
+router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partIdParamSchema), controller.deleteSparePart);
 
 // Branch Stock
-router.get('/stock', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listAllStock);
-router.get('/stock/:branchId', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(branchIdParamSchema), controller.listBranchStock);
-router.get('/stock/:branchId/:partId', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(branchPartParamSchema), controller.getBranchStock);
-router.post('/stock/adjust', requirePermission(PERMISSIONS.INVENTORY_UPDATE), validateRequest(adjustStockSchema), controller.adjustStock);
+router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);
+router.get('/stock/:branchId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchIdParamSchema), controller.listBranchStock);
+router.get('/stock/:branchId/:partId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchPartParamSchema), controller.getBranchStock);
+router.post('/stock/adjust', requirePermission(PERMISSIONS.STOCK_UPDATE), validateRequest(adjustStockSchema), controller.adjustStock);
 
 // Stock Transactions
-router.get('/transactions', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listStockTransactions);
+router.get('/transactions', requirePermission(PERMISSIONS.STOCK_READ), controller.listStockTransactions);
 
 // Purchase Requests
-router.post('/purchase-requests', requirePermission(PERMISSIONS.INVENTORY_CREATE), validateRequest(createPurchaseRequestSchema), controller.createPurchaseRequest);
-router.get('/purchase-requests', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listPurchaseRequests);
-router.get('/purchase-requests/:id', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(purchaseRequestIdParamSchema), controller.getPurchaseRequest);
-router.patch('/purchase-requests/:id/status', requirePermission(PERMISSIONS.INVENTORY_UPDATE), validateRequest(updatePurchaseRequestStatusSchema), controller.updatePurchaseRequestStatus);
+router.post('/purchase-requests', requirePermission(PERMISSIONS.PURCHASEREQUEST_CREATE), validateRequest(createPurchaseRequestSchema), controller.createPurchaseRequest);
+router.get('/purchase-requests', requirePermission(PERMISSIONS.PURCHASEREQUEST_READ), controller.listPurchaseRequests);
+router.get('/purchase-requests/:id', requirePermission(PERMISSIONS.PURCHASEREQUEST_READ), validateRequest(purchaseRequestIdParamSchema), controller.getPurchaseRequest);
+router.patch('/purchase-requests/:id/status', requirePermission(PERMISSIONS.PURCHASEREQUEST_UPDATE), validateRequest(updatePurchaseRequestStatusSchema), controller.updatePurchaseRequestStatus);
 
 // Part Issuances
-router.post('/issuances', requirePermission(PERMISSIONS.INVENTORY_CREATE), validateRequest(createPartIssuanceSchema), controller.createPartIssuance);
-router.get('/issuances', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listPartIssuances);
-router.get('/issuances/:id', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(partIssuanceIdParamSchema), controller.getPartIssuance);
+router.post('/issuances', requirePermission(PERMISSIONS.PARTISSUANCE_CREATE), validateRequest(createPartIssuanceSchema), controller.createPartIssuance);
+router.get('/issuances', requirePermission(PERMISSIONS.PARTISSUANCE_READ), controller.listPartIssuances);
+router.get('/issuances/:id', requirePermission(PERMISSIONS.PARTISSUANCE_READ), validateRequest(partIssuanceIdParamSchema), controller.getPartIssuance);
 
 // Part Returns
-router.post('/returns', requirePermission(PERMISSIONS.INVENTORY_CREATE), validateRequest(createPartReturnSchema), controller.createPartReturn);
-router.get('/returns', requirePermission(PERMISSIONS.INVENTORY_READ), controller.listPartReturns);
-router.get('/returns/:id', requirePermission(PERMISSIONS.INVENTORY_READ), validateRequest(partReturnIdParamSchema), controller.getPartReturn);
+router.post('/returns', requirePermission(PERMISSIONS.PARTRETURN_CREATE), validateRequest(createPartReturnSchema), controller.createPartReturn);
+router.get('/returns', requirePermission(PERMISSIONS.PARTRETURN_READ), controller.listPartReturns);
+router.get('/returns/:id', requirePermission(PERMISSIONS.PARTRETURN_READ), validateRequest(partReturnIdParamSchema), controller.getPartReturn);
 
 // Inter-Branch Transfers
 router.post('/transfers', requirePermission(PERMISSIONS.TRANSFER_CREATE), validateRequest(createTransferSchema), controller.createTransfer);
@@ -513,8 +604,8 @@ router.get('/transfers/:id', requirePermission(PERMISSIONS.TRANSFER_READ), valid
 router.patch('/transfers/:id/approve', requirePermission(PERMISSIONS.TRANSFER_APPROVE), validateRequest(transferIdParamSchema), controller.approveTransfer);
 router.patch('/transfers/:id/dispatch', requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(updateTransferStatusSchema), controller.dispatchTransfer);
 router.patch('/transfers/:id/receive', requirePermission(PERMISSIONS.TRANSFER_RECEIVE), validateRequest(updateTransferStatusSchema), controller.receiveTransfer);
-router.patch('/transfers/:id/reject', requirePermission(PERMISSIONS.TRANSFER_APPROVE), validateRequest(updateTransferStatusSchema), controller.rejectTransfer);
-router.patch('/transfers/:id/cancel', requirePermission(PERMISSIONS.TRANSFER_UPDATE), validateRequest(transferIdParamSchema), controller.cancelTransfer);
+router.patch('/transfers/:id/reject', requirePermission(PERMISSIONS.TRANSFER_REJECT), validateRequest(updateTransferStatusSchema), controller.rejectTransfer);
+router.patch('/transfers/:id/cancel', requirePermission(PERMISSIONS.TRANSFER_CANCEL), validateRequest(transferIdParamSchema), controller.cancelTransfer);
 
 export default router;
 

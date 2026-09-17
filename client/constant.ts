@@ -1,4 +1,5 @@
 import { NavGroup, NavItem } from "./type";
+import { INVENTORY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -24,59 +25,45 @@ import {
   ListChecks,
 } from "lucide-react";
 
-//User roles
-import {
-  MANAGE_ROLES,
-  WORKSHOP_ROLES,
-  FINANCE_ROLES,
-  CUSTOMER_ROLES,
-  VEHICLE_ROLES,
-  TECHNICIAN_ROLES,
-  BRANCH_ROLES,
-  TRANSFER_ROLES,
-  USER_ROLES,
-  SERVICES_MANAGE_ROLES,
-  ENQUIRY_READ_ROLES,
-  type AppRole,
-} from "@/features/auth/roles";
-
-const INVENTORY_ROLES: AppRole[] = [...MANAGE_ROLES, "workshopmanager"];
-
 // ─── Nav structure ─────────────────────────────────────────────────────────────
+// Every item uses `permissions` — the backend permission strings from
+// `server/src/shared/constants/roles.ts`. When a permission is removed
+// from the user's role in the DB, the nav item disappears on next page load
+// (AuthProvider re-fetches /auth/me → updated permissions[]).
 
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
       {
         label: "Customers",
         href: "/customers",
         icon: Users,
-        roles: CUSTOMER_ROLES,
+        permissions: ["customer:read"],
       },
       {
         label: "Vehicles",
         href: "/vehicles",
         icon: Car,
-        roles: VEHICLE_ROLES,
+        permissions: ["vehicle:read"],
       },
       {
         label: "Appointments",
         icon: CalendarDays,
-        roles: CUSTOMER_ROLES,
+        permissions: ["appointment:read", "enquiry:read"],
         children: [
           {
             label: "Service Appointments",
             href: "/appointments",
             icon: CalendarDays,
-            roles: CUSTOMER_ROLES,
+            permissions: ["appointment:read"],
           },
           {
             label: "Enquiry Appointments",
             href: "/enquiries",
             icon: ClipboardList,
-            roles: ENQUIRY_READ_ROLES,
+            permissions: ["enquiry:read"],
           },
         ],
       },
@@ -84,98 +71,105 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Users",
         href: "/users",
         icon: Shield,
-        roles: USER_ROLES,
+        permissions: ["user:read"],
       },
       {
         label: "Branches",
         href: "/branches",
         icon: Building2,
-        roles: BRANCH_ROLES,
+        permissions: ["branch:read"],
       },
     ],
   },
   {
     label: "Workshop",
-    roles: WORKSHOP_ROLES,
+    permissions: ["jobcard:read", "inspection:read", "services:read"],
     items: [
       {
         label: "Job Cards",
         href: "/job-cards",
         icon: ClipboardList,
-        badge: 24,
-        roles: WORKSHOP_ROLES,
+        permissions: ["jobcard:read"],
       },
       {
         label: "Inspection",
         href: "/inspections",
         icon: ShieldCheck,
-        roles: TECHNICIAN_ROLES,
+        permissions: ["inspection:read"],
       },
       {
         label: "Repairs",
         href: "/repairs",
         icon: Wrench,
-        roles: TECHNICIAN_ROLES,
+        permissions: ["jobcard:update", "workshop:read"],
       },
       {
         label: "Services",
         href: "/services",
         icon: ListChecks,
-        roles: SERVICES_MANAGE_ROLES,
+        permissions: ["services:read"],
       },
       {
         label: "Technicians",
         href: "/technicians",
         icon: UserCog,
-        roles: MANAGE_ROLES,
+        permissions: ["workshop:read"],
       },
     ],
   },
   {
     label: "Operations",
-    roles: [...new Set([...FINANCE_ROLES, ...INVENTORY_ROLES])],
+    permissions: [
+      "invoice:read",
+      INVENTORY_PERMISSIONS.SPAREPART_READ,
+      INVENTORY_PERMISSIONS.STOCK_READ,
+      INVENTORY_PERMISSIONS.TRANSFER_READ,
+    ],
     items: [
       {
         label: "Inventory",
         href: "/inventory",
         icon: Package,
-        roles: INVENTORY_ROLES,
+        permissions: [
+          INVENTORY_PERMISSIONS.SPAREPART_READ,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+        ],
       },
       {
         label: "Transfers",
         href: "/transfers",
         icon: ArrowLeftRight,
-        roles: TRANSFER_ROLES,
+        permissions: [INVENTORY_PERMISSIONS.TRANSFER_READ],
       },
       {
         label: "Purchase Requests",
         href: "/purchase-requests",
         icon: ClipboardList,
-        roles: INVENTORY_ROLES,
+        permissions: [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
       },
       {
         label: "Purchasing",
         href: "/purchasing",
         icon: ReceiptText,
-        roles: FINANCE_ROLES,
+        permissions: ["invoice:read", "payment:read"],
       },
       {
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        roles: FINANCE_ROLES,
+        permissions: ["invoice:read"],
       },
       {
         label: "Credit Applications",
         href: "/credit-applications",
         icon: Wallet,
-        roles: FINANCE_ROLES,
+        permissions: ["credit:application:create"],
       },
       {
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        roles: FINANCE_ROLES,
+        permissions: ["financereport:read"],
       },
     ],
   },
@@ -186,7 +180,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Settings",
         href: "/settings",
         icon: Settings,
-        roles: MANAGE_ROLES,
+        permissions: ["role:read"],
       },
       {
         label: "Log out",
@@ -198,30 +192,30 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV: NavItem[] = [
-  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
   {
     label: "Vehicles",
     href: "/vehicles",
     icon: Car,
-    roles: VEHICLE_ROLES,
+    permissions: ["vehicle:read"],
   },
   {
     label: "Book",
     href: "/appointments",
     icon: CalendarDays,
-    roles: CUSTOMER_ROLES,
+    permissions: ["appointment:read"],
   },
   {
     label: "Jobs",
     href: "/job-cards",
     icon: Bell,
-    roles: WORKSHOP_ROLES,
+    permissions: ["jobcard:read"],
   },
   {
     label: "Settings",
     href: "/settings",
     icon: Settings,
-    roles: MANAGE_ROLES,
+    permissions: ["role:read"],
   },
 ];
 

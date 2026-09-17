@@ -117,6 +117,11 @@ export const API_ROUTES = {
       base: "/admin/permissions",
     },
   },
+  audit: {
+    logs: "/audit/logs",
+    detail: (id: string) => `/audit/logs/${id}`,
+    stats: "/audit/stats",
+  },
   search: {
     base: "/search",
   },

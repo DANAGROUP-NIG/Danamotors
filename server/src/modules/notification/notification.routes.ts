@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/authMiddleware';
+import { requirePermission } from '../../middleware/authorize';
+import { PERMISSIONS } from '../../shared/constants/roles';
 import { validateRequest } from '../../middleware/requestValidator';
 import { NotificationController } from './notification.controller';
 import { listNotificationsQuerySchema, notificationIdParamSchema } from './notification.validation';
@@ -94,10 +96,10 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.get('/', validateRequest(listNotificationsQuerySchema), controller.list);
-router.get('/unread-count', controller.getUnreadCount);
-router.patch('/read-all', controller.markAllRead);
-router.patch('/:id/read', validateRequest(notificationIdParamSchema), controller.markRead);
+router.get('/', requirePermission(PERMISSIONS.NOTIFICATION_READ), validateRequest(listNotificationsQuerySchema), controller.list);
+router.get('/unread-count', requirePermission(PERMISSIONS.NOTIFICATION_READ), controller.getUnreadCount);
+router.patch('/read-all', requirePermission(PERMISSIONS.NOTIFICATION_UPDATE), controller.markAllRead);
+router.patch('/:id/read', requirePermission(PERMISSIONS.NOTIFICATION_UPDATE), validateRequest(notificationIdParamSchema), controller.markRead);
 
 export default router;
 

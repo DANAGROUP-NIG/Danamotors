@@ -44,10 +44,10 @@ export function HeroImageSlider({
         </div>
       ))}
 
-      <div className="absolute inset-x-0 bottom-4 mx-auto flex max-w-md items-center justify-between rounded-full bg-black/40 px-4 py-3 text-white backdrop-blur-sm">
-        <p className="text-sm">
+      <div className="absolute inset-x-0 bottom-4 mx-auto flex max-w-md items-center justify-between rounded-full px-4 py-3 text-white  justify-self-start">
+        {/* <p className="text-sm">
           Slide {index + 1} of {images.length}
-        </p>
+        </p> */}
         <div className="flex gap-2">
           {images.map((_, dotIndex) => (
             <button

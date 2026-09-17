@@ -13,7 +13,6 @@ import { VehicleSelectWithCreate } from '@/features/vehicles/components/VehicleS
 import { useServices } from '@/features/services/hooks/use-services';
 import { useBranchStore } from '@/store/branch.store';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { ENQUIRY_REVIEW_ROLES } from '@/features/auth/roles';
 import { useReviewEnquiry } from '../hooks/use-review-enquiry';
 import type { Enquiry } from '../types/enquiry.types';
 
@@ -119,8 +118,8 @@ export function EnquiryReviewModal({
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
 
   const reviewEnquiry = useReviewEnquiry();
-  const { hasAccess, isSuperAdmin } = useAuth();
-  const canReview = hasAccess(ENQUIRY_REVIEW_ROLES) && enquiry.status === 'Pending';
+  const { hasPermission, isSuperAdmin } = useAuth();
+  const canReview = hasPermission("enquiry:update") && enquiry.status === 'Pending';
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data: services } = useServices({ limit: 100 });
 
@@ -172,7 +171,7 @@ export function EnquiryReviewModal({
   return (
     <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-1">
       {/* ── Enquiry Details Summary ──────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3 ">
         <div className="grid grid-cols-2 gap-3 text-sm">
           {[
             ['Name',   `${enquiry.firstName} ${enquiry.lastName}`],
@@ -258,6 +257,12 @@ export function EnquiryReviewModal({
                 <Field label="Customer *" error={errors.customerId?.message}>
                   <CustomerSelectWithCreate
                     value={selectedCustomerId}
+                    initialCustomer={{
+                      firstName: enquiry.firstName,
+                      lastName: enquiry.lastName,
+                      email: enquiry.email,
+                      phoneNumber: enquiry.phoneNumber,
+                    }}
                     onChange={(id, name) => {
                       setValue('customerId', id, { shouldValidate: true });
                       setValue('vehicleId', '', { shouldValidate: true });
@@ -270,6 +275,12 @@ export function EnquiryReviewModal({
                   <VehicleSelectWithCreate
                     value={watch('vehicleId')}
                     customerId={selectedCustomerId}
+                    initialVehicle={{
+                      registrationNumber: enquiry.vehicleRegNumber ?? undefined,
+                      make: enquiry.vehicleMake ?? undefined,
+                      model: enquiry.vehicleModel ?? undefined,
+                      year: enquiry.vehicleYear ?? undefined,
+                    }}
                     onChange={(id) => setValue('vehicleId', id, { shouldValidate: true })}
                     onVehicleSelect={(v) => {
                       const ownerId = v.customer?.id ?? '';

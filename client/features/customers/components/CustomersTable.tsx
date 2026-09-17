@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, CUSTOMER_UPDATE_ROLES } from "@/features/auth/roles";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
 import { useCustomers } from "../hooks/use-customers";
@@ -27,9 +26,9 @@ export function CustomersTable() {
 
   const router = useRouter();
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canDelete = hasAccess(DELETE_ROLES);
-  const canEdit = hasAccess(CUSTOMER_UPDATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission("customer:delete");
+  const canEdit = hasPermission("customer:update");
   const canManage = canEdit || canDelete;
 
   useEffect(() => {

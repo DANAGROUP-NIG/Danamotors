@@ -104,17 +104,18 @@ export class AdminRepository {
   }
 
   // roles repo
-  async listRoles(): Promise<(Role & { permissionsCount: number })[]> {
+  async listRoles(): Promise<(Role & { permissionsCount: number; usersCount: number })[]> {
     const roles = await prisma.role.findMany({
       include: {
         _count: {
-          select: { permissions: true },
+          select: { permissions: true, users: true },
         },
       },
     });
     return roles.map((role) => ({
       ...role,
       permissionsCount: role._count.permissions,
+      usersCount: role._count.users,
     }));
   }
 
@@ -161,6 +162,21 @@ export class AdminRepository {
     return prisma.role.create({
       data,
     });
+  }
+
+  async updateRole(id: string, data: { name?: string; description?: string }): Promise<Role> {
+    return prisma.role.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteRole(id: string): Promise<void> {
+    await prisma.role.delete({ where: { id } });
+  }
+
+  async countUsersByRole(roleId: string): Promise<number> {
+    return prisma.user.count({ where: { roleId } });
   }
 
   // permission repo

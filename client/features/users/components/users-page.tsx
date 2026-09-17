@@ -14,10 +14,9 @@ import { UsersTable } from "./UsersTable";
 export function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { isSuperAdmin } = useAuth();
-  const branchId = isSuperAdmin
-    ? (activeBranch?.id ?? undefined)
-    : (activeBranch?.id ?? undefined);
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("user:create");
+  const branchId = activeBranch?.id ?? undefined;
   const { data } = useUsers({ page: 1, limit: 1, branchId });
 
   return (
@@ -30,10 +29,12 @@ export function UsersPage() {
             : undefined
         }
         actions={
-          <Button onClick={() => setShowForm(true)} size="sm">
-            <Plus className="size-4" />
-            Add user
-          </Button>
+          canCreate && (
+            <Button onClick={() => setShowForm(true)} size="sm">
+              <Plus className="size-4" />
+              Add user
+            </Button>
+          )
         }
       />
 

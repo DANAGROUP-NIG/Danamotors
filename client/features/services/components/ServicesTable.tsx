@@ -12,6 +12,7 @@ import { useServices } from "../hooks/use-services";
 import { ServiceEditForm } from "./ServiceEditForm";
 import { ServiceDeleteButton } from "./ServiceDeleteButton";
 import type { ServiceItem } from "../types/service-catalog.types";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const PAGE_SIZE = 10;
 
@@ -27,6 +28,9 @@ export function ServicesTable() {
   const [committedSearch, setCommittedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("services:update");
+  const canDelete = hasPermission("services:delete");
 
   const { data, isLoading, isError, isFetching } = useServices({
     page,
@@ -102,16 +106,18 @@ export function ServicesTable() {
       headerClassName: "text-right",
       render: (s) => (
         <div className="flex items-center justify-end gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Edit ${s.name}`}
-            onClick={() => setEditingId(s.id)}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-          <ServiceDeleteButton service={s} />
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              aria-label={`Edit ${s.name}`}
+              onClick={() => setEditingId(s.id)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
+          {canDelete && <ServiceDeleteButton service={s} />}
         </div>
       ),
     },

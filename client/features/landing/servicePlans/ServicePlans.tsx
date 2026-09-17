@@ -21,7 +21,7 @@ export default function ServicePlans() {
     <section id="services" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
       <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
         <div className="max-w-2xl">
-          <Badge tone="green">Service options</Badge>
+          <Badge tone="blue">Service options</Badge>
           <h2 className="mt-4 text-3xl font-black sm:text-5xl">Choose the right care path for your vehicle.</h2>
         </div>
         <div className="flex rounded-lg border border-border bg-card p-1">
@@ -43,11 +43,11 @@ export default function ServicePlans() {
         {[
           ["Routine Service", careMode === "priority" ? "Priority slot" : "Scheduled visit", "Oil, filters, brakes, fluids, tires, and preventive checks."],
           ["Diagnostics", careMode === "priority" ? "Fast review" : "Guided check", "Identify warning lights, AC faults, noise, electrical issues, or performance concerns."],
-          ["Repair & Parts", "Dana estimate", "Approve repairs, replacement parts, and pickup timing before work proceeds."],
+          ["Repair & Parts", "Kia estimate", "Approve repairs, replacement parts, and pickup timing before work proceeds."],
         ].map(([name, price, copy], index) => (
           <Card key={name} className={cn(index === 1 && "border-primary shadow-xl shadow-blue-500/10") }>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between ">
                 <CardTitle>{name}</CardTitle>
                 {index === 1 && <Badge tone="blue">Most requested</Badge>}
               </div>

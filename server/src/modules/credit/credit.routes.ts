@@ -157,32 +157,32 @@ router.use(authMiddleware);
  */
 router.get(
   "/applications",
-  requirePermission(PERMISSIONS.FINANCE_READ),
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
   validateRequest(listApplicationsQuerySchema),
   controller.listApplications,
 );
 router.get(
   "/applications/:id",
-  requirePermission(PERMISSIONS.FINANCE_READ),
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
   validateRequest(applicationIdParamSchema),
   controller.getApplication,
 );
 router.post(
   "/applications",
-  requirePermission(PERMISSIONS.FINANCE_CREATE),
+  requirePermission(PERMISSIONS.CREDIT_APPLICATION_CREATE),
   validateRequest(createCreditApplicationSchema),
   controller.createApplication,
 );
 
 router.get(
   "/customers/:customerId/credit",
-  requirePermission(PERMISSIONS.FINANCE_READ),
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
   validateRequest(customerIdParamSchema),
   controller.getCustomerCredit,
 );
 router.post(
   "/customers/:customerId/credit",
-  requirePermission(PERMISSIONS.FINANCE_CREATE),
+  requirePermission(PERMISSIONS.CREDIT_ADJUST),
   validateRequest(adjustCreditSchema),
   controller.adjustCredit,
 );

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useBranchStock } from "../hooks/use-branch-stock";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
@@ -15,9 +16,10 @@ import BranchSwitcher from "@/features/branches/components/BranchSwitcher";
 
 export function InventoryPage() {
   const [showForm, setShowForm] = useState(false);
-  const { isGeneralStoreManager, isAdminOrAbove } = useAuth();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_CREATE);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const canSwitchBranch = isGeneralStoreManager || isAdminOrAbove;
+  const canSwitchBranch = hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
 
   useFetchBranches(canSwitchBranch);
 
@@ -36,10 +38,12 @@ export function InventoryPage() {
         actions={
           <div className="flex items-center gap-3">
             {canSwitchBranch && <div className="w-48"><BranchSwitcher /></div>}
-            <Button onClick={() => setShowForm(true)} size="sm">
-              <Plus className="size-4" />
-              Add part
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setShowForm(true)} size="sm">
+                <Plus className="size-4" />
+                Add part
+              </Button>
+            )}
           </div>
         }
       />

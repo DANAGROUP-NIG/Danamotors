@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import ModalFame from "@/components/modals/ModalFame";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DELETE_ROLES, VEHICLE_UPDATE_ROLES } from "@/features/auth/roles";
 import { useVehicles } from "../hooks/use-vehicles";
 import { VehicleDeleteButton } from "./VehicleDeleteButton";
 import { VehicleEditForm } from "./VehicleEditForm";
@@ -25,9 +24,9 @@ export function VehiclesTable() {
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasAccess } = useAuth();
-  const canDelete = hasAccess(DELETE_ROLES);
-  const canEdit = hasAccess(VEHICLE_UPDATE_ROLES);
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission("vehicle:delete");
+  const canEdit = hasPermission("vehicle:update");
   const canManage = canEdit || canDelete;
 
   useEffect(() => {

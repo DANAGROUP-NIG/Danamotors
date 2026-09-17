@@ -10,6 +10,8 @@ import { DataTable, Column } from "@/components/ui/table-components/DataTable";
 import { PageHeader } from "@/components/headers/page-header";
 import { usePurchaseRequests } from "../hooks/use-purchase-requests";
 import { useUpdatePurchaseRequestStatus } from "../hooks/use-update-purchase-request-status";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import type { PurchaseRequest } from "../types/purchase-request.types";
 
 const PAGE_SIZE = 10;
@@ -29,6 +31,8 @@ export function PurchaseRequestsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const update = useUpdatePurchaseRequestStatus();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission(INVENTORY_PERMISSIONS.PURCHASEREQUEST_UPDATE);
 
   useEffect(() => {
     setPage(1);
@@ -117,7 +121,7 @@ export function PurchaseRequestsPage() {
       className: "text-right",
       headerClassName: "text-right",
       render: (pr) =>
-        pr.status === "Pending" ? (
+        pr.status === "Pending" && canManage ? (
           <div className="flex justify-end gap-1">
             <Button
               size="sm"

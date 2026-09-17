@@ -20,12 +20,12 @@ export default function Home() {
       <LandingHeader />
       <Hero />
       <TrustedBy />
-      <ProductOverview />
-      <FeatureGrid />
+      {/* <ProductOverview /> */}
+      {/* <FeatureGrid /> */}
       <Workflow />
+      <BookingSection />
       <DashboardShowcase />
       <ServicePlans />
-      <BookingSection />
       <FAQ />
       <FinalCTA />
       <Footer />

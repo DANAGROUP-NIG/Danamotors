@@ -43,6 +43,7 @@ function LoginFormContent() {
                 type={showPassword ? "text" : "password"}
                 className="h-11 w-full rounded-md border border-border bg-background px-3 pr-10 outline-none focus:ring-2 focus:ring-ring"
                 {...register("password")}
+                autoComplete="current-password"
               />
               <button
                 type="button"

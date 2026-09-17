@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Dana Motors service backend",
   "main": "src/server.ts",
+  "prisma": {
+    "seed": "ts-node prisma/seed/seed.ts"
+  },
   "scripts": {
     "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
     "build": "tsc",
@@ -12,7 +15,7 @@
     "test": "echo \"No tests configured yet\" && exit 0",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed/index.ts",
+    "prisma:seed": "ts-node prisma/seed/seed.ts",
     "prisma:seed:branches": "ts-node prisma/seed/branches.ts",
     "prisma:seed:roles": "ts-node prisma/seed/roles.ts",
     "prisma:seed:staff": "ts-node prisma/seed/staff.ts",
@@ -31,13 +34,13 @@
     "@prisma/client": "6.16.2",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.2.0",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^8.6.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.9.13",
+    "nodemailer": "^9.0.5",
     "socket.io": "^4.7.5",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
@@ -56,7 +59,7 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "nodemon": "^3.1.2",
-    "prisma": "6.16.2",
+    "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   }

@@ -30,12 +30,12 @@ export const statusData = [
 export const features = [
   {
     title: "Easy Service Booking",
-    copy: "Choose a service, select a date, and send your vehicle details to Dana before you arrive.",
+    copy: "Choose a service, select a date, and send your vehicle details to Kia before you arrive.",
     icon: CalendarDays,
   },
   {
     title: "Vehicle Health Checks",
-    copy: "Dana technicians inspect key systems and share clear findings before repair work begins.",
+    copy: "Kia technicians inspect key systems and share clear findings before repair work begins.",
     icon: ShieldCheck,
   },
   {
@@ -45,7 +45,7 @@ export const features = [
   },
   {
     title: "Genuine Parts Support",
-    copy: "Get transparent part recommendations, availability updates, and replacement guidance from Dana.",
+    copy: "Get transparent part recommendations, availability updates, and replacement guidance from Kia.",
     icon: Package,
   },
   {

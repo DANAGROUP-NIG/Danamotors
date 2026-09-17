@@ -6,7 +6,7 @@ const stats = [
   { title: "Vehicles in service", value: "48", delta: "+9 today", icon: Car },
   { title: "Pending inspections", value: "13", delta: "5 priority", icon: ClipboardCheck },
   { title: "Awaiting approval", value: "18", delta: "owners notified", icon: FileText },
-  { title: "Parts requested", value: "7", delta: "Dana sourcing", icon: Package },
+  { title: "Parts requested", value: "7", delta: "Kia sourcing", icon: Package },
 ];
 
 export default function DashboardShowcase() {
@@ -15,21 +15,21 @@ export default function DashboardShowcase() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>
-            <Badge tone="blue">Dana managed operations</Badge>
-            <h2 className="mt-4 text-3xl font-black sm:text-5xl">Your service is handled by Dana Group from the inside.</h2>
+            <Badge tone="blue">Kia managed operations</Badge>
+            <h2 className="mt-4 text-3xl font-black sm:text-5xl">Your service is handled by Dana Motors from the inside.</h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              Customers get a simple tracking experience, while Dana&apos;s internal team manages bookings,
+              Customers get a simple tracking experience, while Dana Motors Limited&apos; internal team manages bookings,
               inspections, technician assignments, parts, approvals, quality checks, and pickup readiness.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {[
                 "Clear customer updates",
-                "Dana technician coordination",
+                "Kia technician coordination",
                 "Approval before major repairs",
                 "Quality checks before pickup",
               ].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-4">
-                  <ShieldCheck className="size-5 text-emerald-400" />
+                  <ShieldCheck className="size-5 text-gray-200" />
                   <span className="text-sm font-semibold">{item}</span>
                 </div>
               ))}
@@ -61,10 +61,10 @@ function MetricTile({
     <div className="rounded-lg border border-white/10 bg-white/[0.06] p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-300">{title}</p>
-        <Icon className="size-5 text-blue-300" />
+        <Icon className="size-5 text-slate-300" />
       </div>
       <p className="mt-8 text-4xl font-black">{value}</p>
-      <p className="mt-2 text-sm font-semibold text-emerald-300">{delta}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-300">{delta}</p>
     </div>
   );
 }
