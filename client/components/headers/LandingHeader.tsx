@@ -83,7 +83,7 @@ export default function LandingHeader() {
             <Link href="/login">Login</Link>
           </Button>
           <Button
-            className="hidden sm:inline-flex bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200 border-0"
+            className="hidden sm:inline-flex bg-gray-200 hover:bg-white text-black font-semibold shadow-lg shadow-blue-900/25 cursor-pointer transition-all duration-200 border-0"
             variant="default"
             onClick={scrollToBooking}
           >
@@ -168,7 +168,7 @@ export default function LandingHeader() {
                   </Link>
                 </Button>
                 <Button
-                  className="w-full justify-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200 border-0"
+                  className="w-full justify-center bg-gray-200 hover:bg-white text-black font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200 border-0"
                   variant="default"
                   onClick={scrollToBooking}
                 >

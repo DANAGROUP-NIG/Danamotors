@@ -257,6 +257,12 @@ export function EnquiryReviewModal({
                 <Field label="Customer *" error={errors.customerId?.message}>
                   <CustomerSelectWithCreate
                     value={selectedCustomerId}
+                    initialCustomer={{
+                      firstName: enquiry.firstName,
+                      lastName: enquiry.lastName,
+                      email: enquiry.email,
+                      phoneNumber: enquiry.phoneNumber,
+                    }}
                     onChange={(id, name) => {
                       setValue('customerId', id, { shouldValidate: true });
                       setValue('vehicleId', '', { shouldValidate: true });
@@ -269,6 +275,12 @@ export function EnquiryReviewModal({
                   <VehicleSelectWithCreate
                     value={watch('vehicleId')}
                     customerId={selectedCustomerId}
+                    initialVehicle={{
+                      registrationNumber: enquiry.vehicleRegNumber ?? undefined,
+                      make: enquiry.vehicleMake ?? undefined,
+                      model: enquiry.vehicleModel ?? undefined,
+                      year: enquiry.vehicleYear ?? undefined,
+                    }}
                     onChange={(id) => setValue('vehicleId', id, { shouldValidate: true })}
                     onVehicleSelect={(v) => {
                       const ownerId = v.customer?.id ?? '';

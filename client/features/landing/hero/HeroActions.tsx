@@ -27,7 +27,7 @@ export function HeroActions({ onBookClick, onTrackClick }: HeroActionsProps) {
         <Button 
           size="lg" 
           onClick={scrollToBooking}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200"
+          className="bg-linear-to-r from-slate-900/20 to-blue-950/60 hover:from-slate-900/90 hover:to-blue-900/60 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200"
         >
           Book Service
           <ArrowRight className="ml-2 size-4" />
@@ -36,7 +36,7 @@ export function HeroActions({ onBookClick, onTrackClick }: HeroActionsProps) {
         <Button 
           size="lg" 
           asChild
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200"
+          className="bg-linear-to-r from-slate-900/20 to-blue-950/60 hover:from-slate-900/90 hover:to-blue-900/60 text-white font-semibold shadow-lg shadow-blue-900/25 transition-all duration-200"
         >
           <Link href="/#book" onClick={scrollToBooking}>
             Book Service

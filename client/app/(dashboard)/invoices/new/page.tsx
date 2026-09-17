@@ -1,7 +1,7 @@
 import { InvoiceCreateForm } from "@/features/invoices/components/InvoiceCreateForm";
 import { PageHeader } from "@/components/headers/page-header";
 
-export const metadata = { title: "New Invoice - Dana Motors" };
+export const metadata = { title: "New Invoice - Dana Motors Limited" };
 
 export default function NewInvoicePage() {
   return (
