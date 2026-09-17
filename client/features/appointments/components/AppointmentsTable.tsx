@@ -174,10 +174,11 @@ export function AppointmentsTable() {
     },
     {
       header: "Source",
+      className: "whitespace-nowrap",
       render: (a) => (
         <span
           className={cn(
-            "rounded-full px-2.5 py-1 text-xs font-semibold",
+            "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
             SOURCE_COLORS[a.source],
           )}
         >
