@@ -25,7 +25,7 @@ const allowedOrigins = [
 ];
 
 if (config.NODE_ENV !== "production") {
-  allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000");
+  allowedOrigins.push("http://localhost:3000", "http://127.0.0.1:3000", "http://danamotors.vercel.app");
 }
 
 app.use(
