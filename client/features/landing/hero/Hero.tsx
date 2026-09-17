@@ -81,11 +81,11 @@ export default function Hero() {
             animate="visible"
             className="max-w-2xl"
           >
-           {/* Headline with gradient text on "Kia Motors" */}
+           {/* Headline with gradient text on "Dana Motors Limited" */}
             <motion.h1 variants={itemVariants} className="mt-6 text-5xl font-black leading-[1.02] text-foreground tracking-tight lg:text-6xl">
               Expert Care for{" "}
               <span className="">
-                Kia Motors
+                Dana Motors Limited
               </span>
             </motion.h1>
             
@@ -100,7 +100,7 @@ export default function Hero() {
             </motion.p>
 
             <motion.p variants={itemVariants} className="mt-5 max-w-xl text-[1.125rem] leading-[1.75] text-muted-foreground">
-              From routine maintenance to complex repairs, Kia Motors manages the service operation with the expertise, standards, and accountability your vehicle deserves.
+              From routine maintenance to complex repairs, Dana Motors Limited manages the service operation with the expertise, standards, and accountability your vehicle deserves.
             </motion.p>
 
             {/* CTA Buttons */}

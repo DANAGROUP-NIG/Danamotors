@@ -2,7 +2,7 @@ import { Activity, Bell, Car, Package, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const trustedLogos = [
-  { label: "Kia Motors", icon: Car },
+  { label: "Dana Motors Limited", icon: Car },
   { label: "Certified Technicians", icon: ShieldCheck },
   { label: "Genuine Parts", icon: Package },
   { label: "Service Tracking", icon: Activity },
@@ -16,7 +16,7 @@ export default function TrustedBy() {
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Badge className="text-black ">Trusted by car owners</Badge>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-            Built by Kia Motors for car owners who want Professional care, Complete transparency, Total peace of mind.
+            Built by Dana Motors Limited for car owners who want Professional care, Complete transparency, Total peace of mind.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">

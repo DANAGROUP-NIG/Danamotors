@@ -4,7 +4,7 @@ import HeaderLogo from "@/components/headers/HeaderLogo";
 
 const footerGroups = [
   {
-    title: "Kia Motors",
+    title: "Dana Motors",
     links: [
       ["Services", "#features"],
       ["How It Works", "#workflow"],
@@ -41,7 +41,7 @@ export default function Footer() {
             <HeaderLogo />
 
             <p className="mt-5 text-sm leading-7 text-slate-300">
-              Kia Motors car service platform for everyday drivers who
+              Dana Motors Limited car service platform for everyday drivers who
               want trusted inspections, transparent repair updates, service
               approvals, and a smoother pickup experience.
             </p>
@@ -84,10 +84,10 @@ export default function Footer() {
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-lg font-black">
-                Ready to service your car with Kia Motors?
+                Ready to service your car with Dana Motors Limiteds Limited?
               </p>
               <p className="mt-1 text-sm text-slate-400">
-                Book a visit and let Kia Motors manage the inspection, repair
+                Book a visit and let Dana Motors Limiteds Limited manage the inspection, repair
                 flow, and pickup updates.
               </p>
             </div>
@@ -107,7 +107,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 flex flex-col gap-5 border-t border-white/10 pt-8 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>(c) 2026 Kia Motors. All rights reserved.</p>
+          <p>(c) 2026 Dana Motors Limiteds Limited. All rights reserved.</p>
           <div className="flex items-center gap-2">
             {[
               ["LinkedIn", Linkedin],

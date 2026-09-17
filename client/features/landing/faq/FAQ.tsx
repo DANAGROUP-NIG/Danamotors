@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const faqItems = [
   [
-    "Is Kia Motors for car owners?",
-    "Yes. Kia Motors helps car users book service, follow repair progress, approve estimates, and know when the car is ready.",
+    "Is Dana Motors Limited for car owners?",
+    "Yes. Dana Motors Limited helps car users book service, follow repair progress, approve estimates, and know when the car is ready.",
   ],
   [
     "Who handles the administration and service management?",
-    "Kia Motors manages the internal operations, technician coordination, inspections, parts, quality checks, and service records.",
+    "Dana Motors Limited manages the internal operations, technician coordination, inspections, parts, quality checks, and service records.",
   ],
   [
     "Can I approve repairs before work starts?",

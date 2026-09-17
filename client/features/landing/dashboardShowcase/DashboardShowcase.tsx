@@ -16,9 +16,9 @@ export default function DashboardShowcase() {
         <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>
             <Badge tone="blue">Kia managed operations</Badge>
-            <h2 className="mt-4 text-3xl font-black sm:text-5xl">Your service is handled by Kia Motors from the inside.</h2>
+            <h2 className="mt-4 text-3xl font-black sm:text-5xl">Your service is handled by Dana Motors from the inside.</h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">
-              Customers get a simple tracking experience, while Kia Motors&apos; internal team manages bookings,
+              Customers get a simple tracking experience, while Dana Motors Limited&apos; internal team manages bookings,
               inspections, technician assignments, parts, approvals, quality checks, and pickup readiness.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">

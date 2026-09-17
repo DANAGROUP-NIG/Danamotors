@@ -4,9 +4,9 @@ import { Providers } from "@/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kia Motors | Car Service Platform",
+  title: "Dana Motors Limited | Car Service Platform",
   description:
-    "Book car service, track repairs, approve estimates, and get pickup updates through the Kia Motors platform.",
+    "Book car service, track repairs, approve estimates, and get pickup updates through the Dana Motors Limited platform.",
 };
 
 export default function RootLayout({

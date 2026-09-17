@@ -34,7 +34,7 @@ export function CustomerRegisterForm() {
     <>
       <p className="mb-4 text-sm text-muted-foreground">
         Register to view your vehicles, service history and invoices. Your email
-        must match the one Kia Motors has on file for you.
+        must match the one Dana Motors Limited has on file for you.
       </p>
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <div className="grid grid-cols-2 gap-3">
