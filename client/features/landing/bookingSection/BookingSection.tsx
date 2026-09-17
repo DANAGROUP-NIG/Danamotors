@@ -57,7 +57,7 @@ export default function BookingSection() {
   }
 
   return (
-    <section id="book" className="relative overflow-hidden py-20 sm:py-28">
+    <section id="book" className="relative overflow-hidden py-20 sm:py-28 lg:pb-28 lg:pt-0">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-20"

@@ -2,7 +2,7 @@ import { Activity, Bell, Car, Package, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const trustedLogos = [
-  { label: "Dana Motors", icon: Car },
+  { label: "Kia Motors", icon: Car },
   { label: "Certified Technicians", icon: ShieldCheck },
   { label: "Genuine Parts", icon: Package },
   { label: "Service Tracking", icon: Activity },
@@ -11,7 +11,7 @@ const trustedLogos = [
 
 export default function TrustedBy() {
   return (
-    <section className="border-y border-border bg-card/65 py-14">
+    <section className=" bg-card/65 py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Badge className="text-black ">Trusted by car owners</Badge>

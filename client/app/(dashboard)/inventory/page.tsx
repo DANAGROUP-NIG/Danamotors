@@ -1,6 +1,6 @@
 import { InventoryPage } from "@/features/inventory";
 
-export const metadata = { title: "Inventory - Dana Motors" };
+export const metadata = { title: "Inventory - Kia Motors" };
 
 export default function Page() {
   return <InventoryPage />;

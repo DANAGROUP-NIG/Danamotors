@@ -48,7 +48,7 @@ function RegisterFormContent() {
     <Card>
       <CardHeader>
         <CardTitle>Create an account</CardTitle>
-        <Badge className="mt-2">Get started with Dana Motors</Badge>
+        <Badge className="mt-2">Get started with Kia Motors</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1">

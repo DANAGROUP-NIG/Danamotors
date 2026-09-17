@@ -6,7 +6,7 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card text-card-foreground shadow-sm",
+        "rounded-lg border border-border bg-card text-card-foreground shadow-sm flex flex-col justify-between",
         className
       )}
       {...props}
@@ -21,7 +21,7 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 
 // Card Title
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("font-semibold leading-none", className)} {...props} />;
+  return <h3 className={cn("font-semibold leading-none py-2", className)} {...props} />;
 }
 
 // Card Description (optional but commonly used)
@@ -31,7 +31,7 @@ export function CardDescription({ className, ...props }: React.HTMLAttributes<HT
 
 // Card Content - main body
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-5 pt-0", className)} {...props} />;
+  return <div className={cn("p-5 pt-0 ", className)} {...props} />;
 }
 
 // Card Footer - for actions at the bottom

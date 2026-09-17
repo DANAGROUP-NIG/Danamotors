@@ -1,6 +1,6 @@
 import { QuotationsPage } from "@/features/quotations";
 
-export const metadata = { title: "Quotations - Dana Motors" };
+export const metadata = { title: "Quotations - Kia Motors" };
 
 export default function Page() {
   return <QuotationsPage />;

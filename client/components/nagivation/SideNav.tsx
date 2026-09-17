@@ -25,7 +25,7 @@ import SidebarSkeleton from "./SidebarSkeleton";
 import BranchDropdown from "@/features/branches/components/BranchDropdown";
 
 //default collapse key
-const DEFAULT_COLLAPSED_KEY = "danamotors-sidebar-collapsed";
+const DEFAULT_COLLAPSED_KEY = "Kiamotors-sidebar-collapsed";
 
 export interface SideNavBranchConfig {
   branches: { id: string; name: string }[];

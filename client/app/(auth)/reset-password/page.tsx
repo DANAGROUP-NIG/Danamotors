@@ -2,7 +2,7 @@ import LandingHeader from "@/components/headers/LandingHeader";
 import ResetPasswordForm from "@/features/auth/ResetPasswordForm";
 
 export const metadata = {
-  title: "Reset Password - Dana Motors",
+  title: "Reset Password - Kia Motors",
 };
 
 export default function ResetPasswordPage() {

@@ -34,10 +34,10 @@ const cardVariants = {
 
 export default function Workflow() {
   return (
-    <section id="workflow" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+    <section id="workflow" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 ">
       <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
         <div className="max-w-2xl">
-          <Badge tone="amber">How it works</Badge>
+          <Badge tone="blue">How it works</Badge>
           <h2 className="mt-4 text-3xl font-black sm:text-5xl">A clear service path for every car owner.</h2>
         </div>
         <a href="/#book" className="lg:ml-6">

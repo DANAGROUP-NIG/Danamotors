@@ -42,7 +42,7 @@ export default function PortalCreditPage() {
             {formatCurrency(balance)}
           </p>
           <p className="text-sm text-muted-foreground">
-            Credit approved by Dana Motors can be applied to your invoices.
+            Credit approved by KiaMotors can be applied to your invoices.
           </p>
         </CardContent>
       </Card>
