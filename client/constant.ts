@@ -23,6 +23,7 @@ import {
   ArrowLeftRight,
   Wallet,
   ListChecks,
+  BadgeCheck,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -164,6 +165,11 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/credit-applications",
         icon: Wallet,
         permissions: ["credit:application:create"],
+      },
+      {
+        label: "Warranty",
+        href: "#",
+        icon: BadgeCheck,
       },
       {
         label: "Reports",

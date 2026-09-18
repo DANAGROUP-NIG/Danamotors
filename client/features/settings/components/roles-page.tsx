@@ -2,15 +2,42 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  Eye,
+  FileSpreadsheet,
+  Link2,
+  Mail,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { PageHeader } from "@/components/headers/page-header";
 import { DataTable } from "@/components/ui/table-components/DataTable";
+import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
+import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
+import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
+import { useDataTableSelection } from "@/hooks/use-data-table-selection";
+import {
+  copyToClipboard,
+  downloadCsv,
+  downloadExcel,
+  openMailto,
+  openWhatsApp,
+  shareItems,
+} from "@/lib/table-actions";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { RoleCreateModal } from "./role-create-modal";
 import { useAdminRoles, useDeleteRole } from "../hooks/use-admin-roles";
+import type { RoleListItem } from "../api/role.api";
 
 const SYSTEM_ROLE_NAMES = new Set([
   "SuperAdmin",
@@ -27,34 +54,119 @@ const SYSTEM_ROLE_NAMES = new Set([
 
 const PAGE_SIZE = 10;
 
+function formatRoleText(role: RoleListItem) {
+  const permissions = role.permissionsCount ?? role._count?.permissions ?? 0;
+  return `*${role.name}*\nDescription: ${role.description ?? "N/A"}\nPermissions: ${permissions}\nUsers: ${role.usersCount ?? 0}\nType: ${SYSTEM_ROLE_NAMES.has(role.name) ? "System" : "Custom"}`;
+}
+
+function exportColumns() {
+  return [
+    { key: "name", label: "Role Name" },
+    { key: "description", label: "Description" },
+    { key: "permissionsCount", label: "Permissions" },
+    { key: "usersCount", label: "Users" },
+  ];
+}
+
+function toExportRows(items: RoleListItem[]) {
+  return items.map((role) => ({
+    name: role.name,
+    description: role.description ?? "",
+    permissionsCount: role.permissionsCount ?? role._count?.permissions ?? 0,
+    usersCount: role.usersCount ?? 0,
+  }));
+}
+
 export function RolesPage() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [committedSearch, setCommittedSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const { hasPermission } = useAuth();
   const canView = hasPermission("role:read");
   const canCreate = hasPermission("role:create");
+  const canUpdate = hasPermission("role:update");
   const canDelete = hasPermission("role:delete");
   const { data, isLoading, isError, isFetching } = useAdminRoles();
   const deleteRole = useDeleteRole();
 
   const roles = useMemo(() => data?.roles ?? [], [data]);
-  const totalPages = Math.max(1, Math.ceil(roles.length / PAGE_SIZE));
+  const filteredRoles = useMemo(() => {
+    if (!committedSearch) return roles;
+    const query = committedSearch.toLowerCase();
+    return roles.filter(
+      (role) =>
+        role.name.toLowerCase().includes(query) ||
+        role.description?.toLowerCase().includes(query),
+    );
+  }, [roles, committedSearch]);
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / PAGE_SIZE));
   const paginatedRoles = useMemo(
-    () => roles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [page, roles],
+    () => filteredRoles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, filteredRoles],
   );
+
+  const selection = useDataTableSelection<RoleListItem>({
+    data: paginatedRoles,
+    rowKey: (role) => role.id,
+  });
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+
+  function commitSearch() {
+    setPage(1);
+    setCommittedSearch(search);
+  }
+
+  function clearSearch() {
+    setSearch("");
+    setCommittedSearch("");
+    setPage(1);
+  }
 
   function handleDelete() {
     if (!deleteTarget) return;
     deleteRole.mutate(deleteTarget.id, {
       onSuccess: () => setDeleteTarget(null),
     });
+  }
+
+  function exportRolesCsv(items: RoleListItem[]) {
+    downloadCsv(
+      `roles-${new Date().toISOString().split("T")[0]}`,
+      toExportRows(items),
+      exportColumns(),
+    );
+  }
+
+  function exportRolesExcel(items: RoleListItem[]) {
+    downloadExcel(
+      `roles-${new Date().toISOString().split("T")[0]}`,
+      toExportRows(items),
+      exportColumns(),
+    );
+  }
+
+  function shareRoles(items: RoleListItem[]) {
+    shareItems({
+      title: `${items.length} Dana Motors Role${items.length === 1 ? "" : "s"}`,
+      text: items.map(formatRoleText).join("\n\n---\n\n"),
+    });
+  }
+
+  function emailRoles(items: RoleListItem[]) {
+    openMailto({
+      subject: `${items.length} Role${items.length === 1 ? "" : "s"} from Dana Motors`,
+      body: items.map(formatRoleText).join("\n\n---\n\n"),
+    });
+  }
+
+  function whatsappRoles(items: RoleListItem[]) {
+    openWhatsApp({ message: items.map(formatRoleText).join("\n\n---\n\n") });
   }
 
   if (!canView) {
@@ -79,10 +191,35 @@ export function RolesPage() {
         title="Roles & Permissions"
         description="Manage roles and their associated permissions"
         actions={
-          <Button onClick={() => setIsModalOpen(true)} size="sm" className="cursor-pointer" disabled={!canCreate}>
-            <Plus className="size-4" />
-            Create Role
-          </Button>
+          <div className="flex items-center gap-2">
+            <ActionMenu
+              align="end"
+              trigger={
+                <Button variant="outline" size="sm" className="cursor-pointer gap-1.5">
+                  <Download className="size-4" />
+                  Export
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              }
+            >
+              <ActionMenuItem
+                icon={<Download className="size-4" />}
+                onClick={() => exportRolesCsv(roles)}
+              >
+                Export CSV
+              </ActionMenuItem>
+              <ActionMenuItem
+                icon={<FileSpreadsheet className="size-4" />}
+                onClick={() => exportRolesExcel(roles)}
+              >
+                Export Excel
+              </ActionMenuItem>
+            </ActionMenu>
+            <Button onClick={() => setIsModalOpen(true)} size="sm" className="cursor-pointer" disabled={!canCreate}>
+              <Plus className="size-4" />
+              Create Role
+            </Button>
+          </div>
         }
       />
 
@@ -93,6 +230,8 @@ export function RolesPage() {
         isLoading={isLoading}
         isFetching={isFetching}
         rowKey={(role) => role.id}
+        searchQuery={committedSearch || undefined}
+        selection={selection}
         columns={[
           {
             header: "Role Name",
@@ -136,41 +275,140 @@ export function RolesPage() {
           },
           {
             header: "Actions",
+            headerClassName: "text-right",
+            className: "text-right",
             render: (role) => (
-              <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={`Edit ${role.name}`}
-                  disabled={!hasPermission("role:update")}
-                  onClick={() => router.push(`/settings/roles/${role.id}`)}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label={`Delete ${role.name}`}
-                  disabled={!canDelete || SYSTEM_ROLE_NAMES.has(role.name)}
-                  title={SYSTEM_ROLE_NAMES.has(role.name) ? "System roles cannot be deleted" : undefined}
-                  onClick={() => setDeleteTarget({ id: role.id, name: role.name })}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
+              <DataTableRowActions
+                item={role}
+                quickActions={[
+                  canUpdate && {
+                    id: "edit",
+                    label: `Edit ${role.name}`,
+                    icon: <Pencil className="size-3.5" />,
+                    onClick: () => router.push(`/settings/roles/${role.id}`),
+                  },
+                ]}
+                actions={[
+                  {
+                    id: "view",
+                    label: "View details",
+                    icon: <Eye className="size-4" />,
+                    onClick: () => router.push(`/settings/roles/${role.id}`),
+                  },
+                  {
+                    id: "download",
+                    label: "Download CSV",
+                    icon: <Download className="size-4" />,
+                    onClick: () => exportRolesCsv([role]),
+                  },
+                  {
+                    id: "share",
+                    label: "Share",
+                    icon: <Share2 className="size-4" />,
+                    onClick: () => shareRoles([role]),
+                  },
+                  {
+                    id: "email",
+                    label: "Email",
+                    icon: <Mail className="size-4" />,
+                    onClick: () => emailRoles([role]),
+                  },
+                  {
+                    id: "whatsapp",
+                    label: "WhatsApp",
+                    icon: <MessageCircle className="size-4" />,
+                    onClick: () => whatsappRoles([role]),
+                  },
+                  {
+                    id: "copy-link",
+                    label: "Copy link",
+                    icon: <Link2 className="size-4" />,
+                    shortcut: "⌘C",
+                    onClick: () =>
+                      copyToClipboard(
+                        `${window.location.origin}/settings/roles/${role.id}`,
+                        "Role link copied",
+                      ),
+                  },
+                  canDelete &&
+                    !SYSTEM_ROLE_NAMES.has(role.name) && {
+                      id: "delete",
+                      label: "Delete",
+                      icon: <Trash2 className="size-4" />,
+                      destructive: true,
+                      onClick: () => setDeleteTarget({ id: role.id, name: role.name }),
+                    },
+                ]}
+              />
             ),
           },
         ]}
         onRowClick={(role) => router.push(`/settings/roles/${role.id}`)}
-        emptyMessage="No roles found."
+        emptyMessage={
+          committedSearch ? "No roles match your search." : "No roles found."
+        }
         page={page}
         pageSize={PAGE_SIZE}
-        total={roles.length}
+        total={filteredRoles.length}
         totalPages={totalPages}
         onPageChange={setPage}
-      />
+      >
+        <div className="flex flex-col gap-4">
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            onSearch={commitSearch}
+            onClearSearch={clearSearch}
+            placeholder="Search roles…"
+            isLoading={isLoading}
+            isFetching={isFetching}
+          />
+
+          <DataTableBulkToolbar
+            selectedCount={selection.selectedIds.size}
+            totalCount={filteredRoles.length}
+            selectedItems={selection.selectedItems}
+            onClear={selection.clear}
+            actions={[
+              {
+                id: "export",
+                label: "CSV",
+                icon: <Download className="size-3.5" />,
+                variant: "ghost",
+                onClick: exportRolesCsv,
+              },
+              {
+                id: "excel",
+                label: "Excel",
+                icon: <FileSpreadsheet className="size-3.5" />,
+                variant: "ghost",
+                onClick: exportRolesExcel,
+              },
+              {
+                id: "share",
+                label: "Share",
+                icon: <Share2 className="size-3.5" />,
+                variant: "ghost",
+                onClick: shareRoles,
+              },
+              {
+                id: "email",
+                label: "Email",
+                icon: <Mail className="size-3.5" />,
+                variant: "ghost",
+                onClick: emailRoles,
+              },
+              {
+                id: "whatsapp",
+                label: "WhatsApp",
+                icon: <MessageCircle className="size-3.5" />,
+                variant: "ghost",
+                onClick: whatsappRoles,
+              },
+            ]}
+          />
+        </div>
+      </DataTable>
 
       <ModalFame isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete role">
         <div className="space-y-4">
