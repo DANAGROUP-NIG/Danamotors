@@ -368,7 +368,6 @@ export function QuotationsPage() {
         totalPages={data?.meta?.totalPages ?? 1}
         onPageChange={setPage}
         selection={selection}
-        onRowClick={(q) => router.push(`/job-cards/${q.jobCardId}`)}
       >
         <div className="flex flex-col gap-4">
           <DataTableToolbar

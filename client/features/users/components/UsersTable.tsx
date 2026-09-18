@@ -389,7 +389,6 @@ export function UsersTable() {
         }
         searchQuery={debouncedSearch}
         rowKey={(u) => u.id}
-        onRowClick={(u) => router.push(`/users/${u.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}

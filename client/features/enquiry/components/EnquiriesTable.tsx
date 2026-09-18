@@ -318,7 +318,6 @@ export function EnquiriesTable() {
           : `No ${statusFilter.toLowerCase()} enquiries found.`
       }
       rowKey={(e) => e.id}
-      onRowClick={(e) => router.push(`/enquiries/${e.id}`)}
       page={page}
       pageSize={PAGE_SIZE}
       total={total}

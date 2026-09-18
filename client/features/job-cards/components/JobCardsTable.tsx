@@ -312,7 +312,6 @@ export function JobCardsTable() {
           (isJobCardStatus(statusFilter) ? STATUS_LABELS[statusFilter] : undefined)
         }
         rowKey={(jc) => jc.id}
-        onRowClick={(jc) => router.push(`/job-cards/${jc.id}`)}
         selection={selection}
         page={page}
         pageSize={PAGE_SIZE}

@@ -416,7 +416,6 @@ export function AppointmentsTable() {
             : "No appointments yet. Book one above."
         }
         rowKey={(a) => a.id}
-        onRowClick={(a) => router.push(`/appointments/${a.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}

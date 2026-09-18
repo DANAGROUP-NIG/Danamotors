@@ -414,7 +414,6 @@ export function InvoicesTable() {
         totalPages={totalPages}
         onPageChange={setPage}
         selection={selection}
-        onRowClick={(inv) => router.push(`/invoices/${inv.id}`)}
       >
         <div className="flex flex-col gap-4">
           <DataTableToolbar

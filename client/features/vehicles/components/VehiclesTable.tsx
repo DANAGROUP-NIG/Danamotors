@@ -328,7 +328,6 @@ export function VehiclesTable() {
         }
         searchQuery={committedSearch}
         rowKey={(v) => v.id}
-        onRowClick={(v) => router.push(`/vehicles/${v.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}

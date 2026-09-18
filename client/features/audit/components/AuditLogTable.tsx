@@ -231,7 +231,6 @@ export function AuditLogTable() {
         isLoading={isLoading}
         isFetching={isFetching}
         rowKey={(log) => log.id}
-        onRowClick={(log) => setSelectedId(log.id)}
         emptyMessage="No audit entries match these filters."
         page={page}
         pageSize={PAGE_SIZE}
