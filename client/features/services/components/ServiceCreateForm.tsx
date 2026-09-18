@@ -12,9 +12,13 @@ import {
 
 interface ServiceCreateFormProps {
   onSuccess?: () => void;
+  defaultValues?: Partial<CreateServiceFormValues>;
 }
 
-export function ServiceCreateForm({ onSuccess }: ServiceCreateFormProps) {
+export function ServiceCreateForm({
+  onSuccess,
+  defaultValues,
+}: ServiceCreateFormProps) {
   const create = useCreateService();
 
   const {
@@ -25,7 +29,12 @@ export function ServiceCreateForm({ onSuccess }: ServiceCreateFormProps) {
   } = useForm<CreateServiceFormValues>({
     resolver: zodResolver(createServiceSchema),
     defaultValues: {
-      isActive: true,
+      name: defaultValues?.name ? `Copy of ${defaultValues.name}` : "",
+      description: defaultValues?.description ?? "",
+      category: defaultValues?.category ?? "",
+      durationMins: defaultValues?.durationMins ?? "",
+      price: defaultValues?.price ?? "",
+      isActive: defaultValues?.isActive ?? true,
     },
   });
 
