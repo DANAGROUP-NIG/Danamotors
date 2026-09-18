@@ -1,22 +1,43 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Pencil,
+  Download,
+  Share2,
+  Mail,
+  MessageCircle,
+  Link2,
+  Trash2,
+  Eye,
+  FileSpreadsheet,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import ModalFame from "@/components/modals/ModalFame";
+import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
+import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
+import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
+import { useDataTableSelection } from "@/hooks/use-data-table-selection";
+import {
+  downloadCsv,
+  downloadExcel,
+  shareItems,
+  openMailto,
+  openWhatsApp,
+  copyToClipboard,
+  pluralize,
+} from "@/lib/table-actions";
 import { DateInput } from "@/components/forms/DateInput";
 import { useAppointments } from "../hooks/use-appointments";
+import { useBulkDeleteAppointments } from "../hooks/use-bulk-delete-appointments";
 import { AppointmentEditForm } from "./AppointmentEditForm";
-import { AppointmentDeleteButton } from "./AppointmentDeleteButton";
 import type { Appointment, AppointmentStatus, AppointmentSource } from "../types/appointment.types";
 
 const PAGE_SIZE = 10;
@@ -65,6 +86,52 @@ const ALL_STATUSES = Object.keys(STATUS_LABELS) as AppointmentStatus[];
 
 const STATUS_OPTIONS = [{ label: "All", value: "" }, ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))];
 
+function customerName(a: Appointment) {
+  return a.customer ? `${a.customer.firstName} ${a.customer.lastName}` : "—";
+}
+
+function vehicleReg(a: Appointment) {
+  const vehicle = a.vehicle as Record<string, unknown> | null | undefined;
+  return vehicle?.registrationNumber ? String(vehicle.registrationNumber) : "—";
+}
+
+function scheduledLabel(a: Appointment) {
+  return new Date(a.scheduledAt).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatAppointmentText(a: Appointment) {
+  return `*Appointment: ${customerName(a)}*\nVehicle: ${vehicleReg(a)}\nBranch: ${a.branch?.name ?? "—"}\nScheduled: ${scheduledLabel(a)}\nStatus: ${STATUS_LABELS[a.status]}\nSource: ${SOURCE_LABELS[a.source]}\nNotes: ${a.notes ?? "—"}`;
+}
+
+function toExportRow(a: Appointment): Record<string, string | number | boolean | null | undefined> {
+  return {
+    customer: customerName(a),
+    vehicleRegNo: vehicleReg(a),
+    branch: a.branch?.name ?? "",
+    scheduledAt: scheduledLabel(a),
+    status: STATUS_LABELS[a.status],
+    source: SOURCE_LABELS[a.source],
+    notes: a.notes ?? "",
+    agent: a.createdBy ? `${a.createdBy.firstName} ${a.createdBy.lastName}` : "",
+  };
+}
+
+function exportColumns() {
+  return [
+    { key: "customer", label: "Customer" },
+    { key: "vehicleRegNo", label: "Vehicle Reg No" },
+    { key: "branch", label: "Branch" },
+    { key: "scheduledAt", label: "Scheduled" },
+    { key: "status", label: "Status" },
+    { key: "source", label: "Source" },
+    { key: "notes", label: "Notes" },
+    { key: "agent", label: "Agent" },
+  ];
+}
+
 export function AppointmentsTable() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
@@ -74,18 +141,14 @@ export function AppointmentsTable() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [deleteCandidates, setDeleteCandidates] = useState<Appointment[] | null>(null);
 
   const router = useRouter();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasPermission } = useAuth();
   const canDelete = hasPermission("appointment:delete");
   const canEdit = hasPermission("appointment:update");
-  const canManage = canEdit || canDelete;
   const branchId = activeBranch?.id ?? undefined;
-
-  useEffect(() => {
-    setPage(1);
-  }, [activeBranch?.id, statusFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     setPage(1);
@@ -102,12 +165,19 @@ export function AppointmentsTable() {
     dateTo: dateTo || undefined,
   });
 
+  const appointments = data?.appointments ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const selection = useDataTableSelection<Appointment>({
+    data: appointments,
+    rowKey: (a) => a.id,
+  });
+
+  const bulkDelete = useBulkDeleteAppointments();
+
   const editingAppointment =
-    data?.appointments?.find((a) => a.id === editingId) ?? null
-  ;
+    appointments.find((a) => a.id === editingId) ?? null;
 
   function changeSourceFilter(s: string) {
     setSourceFilter(s);
@@ -122,24 +192,68 @@ export function AppointmentsTable() {
   function commitSearch() { setDebouncedSearch(search); setPage(1); }
   function clearSearch() { setSearch(""); setDebouncedSearch(""); setPage(1); }
 
+  function exportSelected(items: Appointment[]) {
+    downloadCsv(
+      `appointments-${new Date().toISOString().split("T")[0]}`,
+      items.map(toExportRow),
+      exportColumns(),
+    );
+  }
+
+  function exportSelectedExcel(items: Appointment[]) {
+    downloadExcel(
+      `appointments-${new Date().toISOString().split("T")[0]}`,
+      items.map(toExportRow),
+      exportColumns(),
+    );
+  }
+
+  function shareSelected(items: Appointment[]) {
+    const text = items.map(formatAppointmentText).join("\n\n---\n\n");
+    shareItems({
+      title: `${items.length} Dana Motors Appointments`,
+      text,
+    });
+  }
+
+  function emailSelected(items: Appointment[]) {
+    const body = items.map(formatAppointmentText).join("\n\n---\n\n");
+    openMailto({
+      subject: `${items.length} Appointment${items.length === 1 ? "" : "s"} from Dana Motors`,
+      body,
+    });
+  }
+
+  function whatsappSelected(items: Appointment[]) {
+    const message = items.map(formatAppointmentText).join("\n\n---\n\n");
+    openWhatsApp({ message });
+  }
+
+  function confirmDeleteSelected(items: Appointment[]) {
+    setDeleteCandidates(items);
+  }
+
+  function handleConfirmDelete() {
+    if (!deleteCandidates) return;
+    bulkDelete.mutate(deleteCandidates, {
+      onSuccess: () => {
+        setDeleteCandidates(null);
+        selection.clear();
+      },
+    });
+  }
+
   const columns: Column<Appointment>[] = [
     {
       header: "Customer",
-      render: (a) => {
-        const name = a.customer
-          ? `${a.customer.firstName} ${a.customer.lastName}`
-          : "—";
-        return <span className="font-medium">{name}</span>;
-      },
+      render: (a) => (
+        <span className="font-medium">{customerName(a)}</span>
+      ),
     },
     {
       header: "Vehicle Reg No",
       render: (a) => (
-        <span className="text-muted-foreground">
-          {(a.vehicle as Record<string, unknown> | null | undefined)?.registrationNumber
-            ? String((a.vehicle as Record<string, unknown>).registrationNumber)
-            : "—"}
-        </span>
+        <span className="text-muted-foreground">{vehicleReg(a)}</span>
       ),
     },
     {
@@ -151,12 +265,7 @@ export function AppointmentsTable() {
     {
       header: "Scheduled",
       render: (a) => (
-        <span className="text-muted-foreground">
-          {new Date(a.scheduledAt).toLocaleString(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </span>
+        <span className="text-muted-foreground">{scheduledLabel(a)}</span>
       ),
     },
     {
@@ -204,30 +313,82 @@ export function AppointmentsTable() {
         </span>
       ),
     },
-    ...(canManage
-      ? [
-          {
-            header: "Actions",
-            headerClassName: "text-right",
-            render: (a: Appointment) => (
-              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                {canEdit && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                    aria-label="Edit appointment"
-                    onClick={() => setEditingId(a.id)}
-                  >
-                    <Pencil className="size-3.5" />
-                  </Button>
-                )}
-                {canDelete && <AppointmentDeleteButton appointment={a} />}
-              </div>
-            ),
-          },
-        ]
-      : []),
+    {
+      header: "Actions",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (a) => (
+        <DataTableRowActions
+          item={a}
+          quickActions={[
+            canEdit && {
+              id: "edit",
+              label: "Edit",
+              icon: <Pencil className="size-3.5" />,
+              onClick: () => setEditingId(a.id),
+            },
+          ]}
+          actions={[
+            {
+              id: "view",
+              label: "View details",
+              icon: <Eye className="size-4" />,
+              onClick: () => router.push(`/appointments/${a.id}`),
+            },
+            {
+              id: "download",
+              label: "Download CSV",
+              icon: <Download className="size-4" />,
+              onClick: () => exportSelected([a]),
+            },
+            {
+              id: "share",
+              label: "Share",
+              icon: <Share2 className="size-4" />,
+              onClick: () =>
+                shareItems({
+                  title: `Appointment: ${customerName(a)}`,
+                  text: formatAppointmentText(a),
+                }),
+            },
+            {
+              id: "email",
+              label: "Email",
+              icon: <Mail className="size-4" />,
+              onClick: () =>
+                openMailto({
+                  subject: `Appointment: ${customerName(a)}`,
+                  body: formatAppointmentText(a),
+                }),
+            },
+            {
+              id: "whatsapp",
+              label: "WhatsApp",
+              icon: <MessageCircle className="size-4" />,
+              onClick: () => openWhatsApp({ message: formatAppointmentText(a) }),
+            },
+            {
+              id: "copy-link",
+              label: "Copy link",
+              icon: <Link2 className="size-4" />,
+              shortcut: "⌘C",
+              onClick: () =>
+                copyToClipboard(
+                  `${window.location.origin}/appointments/${a.id}`,
+                  "Appointment link copied",
+                ),
+            },
+            canDelete && {
+              id: "delete",
+              label: "Delete",
+              icon: <Trash2 className="size-4" />,
+              destructive: true,
+              onClick: () => setDeleteCandidates([a]),
+            },
+          ]}
+        />
+      ),
+    },
   ];
 
   if (isError) {
@@ -246,7 +407,7 @@ export function AppointmentsTable() {
     <>
       <DataTable
         columns={columns}
-        data={data?.appointments ?? []}
+        data={appointments}
         isLoading={isLoading}
         isFetching={isFetching}
         emptyMessage={
@@ -261,37 +422,91 @@ export function AppointmentsTable() {
         total={total}
         totalPages={totalPages}
         onPageChange={setPage}
+        selection={selection}
       >
-        <DataTableToolbar
-          search={search}
-          onSearchChange={setSearch}
-          onSearch={commitSearch}
-          onClearSearch={clearSearch}
-          placeholder="Search by customer, vehicle, or job…"
-          filters={
-            <>
-              <div className="flex items-center gap-2">
-                <DateInput
-                  value={dateFrom}
-                  onChange={(v) => {
-                    setDateFrom(v);
-                    setPage(1);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">to</span>
-                <DateInput
-                  value={dateTo}
-                  onChange={(v) => {
-                    setDateTo(v);
-                    setPage(1);
-                  }}
-                />
-              </div>
-              <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />
-              <DataTableFilterChips options={SOURCE_OPTIONS} selected={sourceFilter} onChange={changeSourceFilter} />
-            </>
-          }
-        />
+        <div className="flex flex-col gap-4">
+          <DataTableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            onSearch={commitSearch}
+            onClearSearch={clearSearch}
+            placeholder="Search by customer, vehicle, or job…"
+            filters={
+              <>
+                <div className="flex items-center gap-2">
+                  <DateInput
+                    value={dateFrom}
+                    onChange={(v) => {
+                      setDateFrom(v);
+                      setPage(1);
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <DateInput
+                    value={dateTo}
+                    onChange={(v) => {
+                      setDateTo(v);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />
+                <DataTableFilterChips options={SOURCE_OPTIONS} selected={sourceFilter} onChange={changeSourceFilter} />
+              </>
+            }
+          />
+
+          <DataTableBulkToolbar
+            selectedCount={selection.selectedIds.size}
+            totalCount={total}
+            selectedItems={selection.selectedItems}
+            onClear={selection.clear}
+            actions={[
+              {
+                id: "export",
+                label: "CSV",
+                icon: <Download className="size-3.5" />,
+                variant: "ghost",
+                onClick: exportSelected,
+              },
+              {
+                id: "excel",
+                label: "Excel",
+                icon: <FileSpreadsheet className="size-3.5" />,
+                variant: "ghost",
+                onClick: exportSelectedExcel,
+              },
+              {
+                id: "share",
+                label: "Share",
+                icon: <Share2 className="size-3.5" />,
+                variant: "ghost",
+                onClick: shareSelected,
+              },
+              {
+                id: "email",
+                label: "Email",
+                icon: <Mail className="size-3.5" />,
+                variant: "ghost",
+                onClick: emailSelected,
+              },
+              {
+                id: "whatsapp",
+                label: "WhatsApp",
+                icon: <MessageCircle className="size-3.5" />,
+                variant: "ghost",
+                onClick: whatsappSelected,
+              },
+              canDelete && {
+                id: "delete",
+                label: "Delete",
+                icon: <Trash2 className="size-3.5" />,
+                variant: "destructive",
+                onClick: confirmDeleteSelected,
+              },
+            ]}
+          />
+        </div>
       </DataTable>
 
       <ModalFame
@@ -306,6 +521,23 @@ export function AppointmentsTable() {
           />
         )}
       </ModalFame>
+
+      <ConfirmDeleteModal
+        isOpen={!!deleteCandidates}
+        onClose={() => setDeleteCandidates(null)}
+        onConfirm={handleConfirmDelete}
+        title={
+          deleteCandidates && deleteCandidates.length > 1
+            ? `Delete ${pluralize(deleteCandidates.length, "appointment")}?`
+            : "Delete appointment?"
+        }
+        message={
+          deleteCandidates && deleteCandidates.length > 1
+            ? `This will permanently remove ${pluralize(deleteCandidates.length, "appointment")}. This cannot be undone.`
+            : "Are you sure you want to delete this appointment? This action cannot be undone."
+        }
+        isPending={bulkDelete.isPending}
+      />
     </>
   );
 }

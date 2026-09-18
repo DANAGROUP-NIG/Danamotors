@@ -7,6 +7,7 @@ type UseInspectionsParams = {
   limit?: number;
   status?: string;
   search?: string;
+  branchId?: string;
 };
 
 export function useInspections(params?: UseInspectionsParams) {

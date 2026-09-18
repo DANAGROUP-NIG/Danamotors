@@ -28,7 +28,7 @@ export type CreateBranchPayload = {
   email?: string;
 };
 
-export type UpdateBranchPayload = Partial<CreateBranchPayload>;
+export type UpdateBranchPayload = Partial<CreateBranchPayload & { isActive?: boolean }>;
 
 export type BranchListResponse = {
   branches: Branch[];
