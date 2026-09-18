@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
   Pencil,
   Eye,
@@ -90,7 +89,6 @@ function exportColumns() {
 }
 
 export function InventoryTable() {
-  const router = useRouter();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -330,7 +328,6 @@ export function InventoryTable() {
         isFetching={isFetching}
         emptyMessage={categoryFilter ? `No items in category "${categoryFilter}"` : "No inventory items yet. Add a part above."}
         rowKey={(s) => s.id}
-        onRowClick={(s) => router.push(`/inventory/${s.part.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={filtered.length}

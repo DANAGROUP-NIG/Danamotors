@@ -45,7 +45,7 @@ export function DataTableRowActions<T>({
   return (
     <div
       className={cn(
-        "flex items-center justify-end gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover/row:opacity-100",
+        "flex items-center justify-end gap-0.5 opacity-100",
         className,
       )}
       onClick={(e) => e.stopPropagation()}

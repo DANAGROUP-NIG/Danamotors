@@ -305,7 +305,6 @@ export function CustomersTable() {
             : "No customers yet. Add one above."
         }
         rowKey={(c) => c.id}
-        onRowClick={(c) => router.push(`/customers/${c.id}`)}
         page={page}
         pageSize={PAGE_SIZE}
         total={total}

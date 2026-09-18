@@ -343,7 +343,6 @@ export function RolesPage() {
             ),
           },
         ]}
-        onRowClick={(role) => router.push(`/settings/roles/${role.id}`)}
         emptyMessage={
           committedSearch ? "No roles match your search." : "No roles found."
         }

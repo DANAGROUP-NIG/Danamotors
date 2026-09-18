@@ -29,7 +29,6 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   searchQuery?: string;
   rowKey: (item: T) => string | number;
-  onRowClick?: (item: T) => void;
   skeletonRowCount?: number;
   page?: number;
   pageSize?: number;
@@ -48,7 +47,6 @@ export function DataTable<T>({
   emptyMessage,
   searchQuery,
   rowKey,
-  onRowClick,
   skeletonRowCount = 5,
   page,
   pageSize,
@@ -100,11 +98,7 @@ export function DataTable<T>({
                   return (
                     <tr
                       key={id}
-                      className={cn(
-                        "group/row border-t border-border transition-all duration-150 hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_rgba(5,20,31,0.04)]",
-                        onRowClick && "cursor-pointer",
-                      )}
-                      onClick={onRowClick ? () => onRowClick(item) : undefined}
+                      className="group/row border-t border-border transition-all duration-150 hover:bg-muted/30 hover:shadow-[inset_0_0_0_1px_rgba(5,20,31,0.04)]"
                     >
                       {effectiveColumns.map((col, i) => (
                         <td key={i} className={cn("px-4 py-3", col.className)}>

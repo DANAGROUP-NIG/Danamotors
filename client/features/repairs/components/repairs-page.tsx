@@ -389,7 +389,6 @@ export function RepairsPage() {
             : "No repair records yet."
         }
         rowKey={(jc) => jc.id}
-        onRowClick={(jc) => router.push(`/job-cards/${jc.id}`)}
         skeletonRowCount={5}
         page={page}
         pageSize={PAGE_SIZE}
