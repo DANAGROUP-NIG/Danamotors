@@ -3,12 +3,12 @@ name: CI — Dana Motors Monorepo
 on:
   push:
     branches:
-      - main
-      - master
+      - pull-request
+      - uat
   pull_request:
     branches:
-      - main
-      - master
+      - pull-request
+      - uat
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -115,7 +115,7 @@ jobs:
         env:
           # Prevent Next.js from failing on missing real API env vars during CI build.
           # Set any NEXT_PUBLIC_ vars your app requires here.
-          NEXT_PUBLIC_API_URL: http://localhost:8000/api
+          NEXT_PUBLIC_API_URL: http://localhost:5000/api
 
 # ─────────────────────────────────────────────────────────────
 # SECURITY & AUDIT JOB
