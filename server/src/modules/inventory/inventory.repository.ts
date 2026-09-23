@@ -8,6 +8,7 @@ import {
   StockTransaction,
   InterBranchTransfer,
   InterBranchTransferItem,
+  PartStatus,
 } from "@prisma/client";
 
 export class InventoryRepository {
@@ -46,6 +47,86 @@ export class InventoryRepository {
   }
 
   async deleteSparePart(id: string): Promise<SparePart> {
+    return prisma.sparePart.delete({ where: { id } });
+  }
+
+  // ── Part Master ────────────────────────────────────────────────────────
+
+  async createPart(data: {
+    partCode: string;
+    partNumber: string;
+    name: string;
+    category: string;
+    uom: string;
+    taxCategory?: string | null;
+    taxForm?: string | null;
+    minLevel?: number | null;
+    maxLevel?: number | null;
+    reorderQty?: number | null;
+    unitPrice: number;
+    binLocation?: string | null;
+    storeLocation?: string | null;
+    partStatus?: PartStatus;
+  }): Promise<SparePart> {
+    return prisma.sparePart.create({ data });
+  }
+
+  async findAllParts(filters?: {
+    partCode?: string;
+    partNumber?: string;
+    name?: string;
+    category?: string;
+    partStatus?: PartStatus;
+    skip?: number;
+    take?: number;
+  }): Promise<{ parts: SparePart[]; total: number }> {
+    const where: Record<string, unknown> = {};
+
+    if (filters?.partCode) {
+      where.partCode = { contains: filters.partCode, mode: 'insensitive' };
+    }
+    if (filters?.partNumber) {
+      where.partNumber = { contains: filters.partNumber, mode: 'insensitive' };
+    }
+    if (filters?.name) {
+      where.name = { contains: filters.name, mode: 'insensitive' };
+    }
+    if (filters?.category) {
+      where.category = { contains: filters.category, mode: 'insensitive' };
+    }
+    if (filters?.partStatus) {
+      where.partStatus = filters.partStatus;
+    }
+
+    const [parts, total] = await Promise.all([
+      prisma.sparePart.findMany({
+        where,
+        skip: filters?.skip,
+        take: filters?.take,
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.sparePart.count({ where }),
+    ]);
+
+    return { parts, total };
+  }
+
+  async findPartById(id: string): Promise<SparePart | null> {
+    return prisma.sparePart.findUnique({ where: { id } });
+  }
+
+  async findPartByCode(partCode: string): Promise<SparePart | null> {
+    return prisma.sparePart.findUnique({ where: { partCode } });
+  }
+
+  async updatePart(
+    id: string,
+    data: Partial<SparePart>,
+  ): Promise<SparePart> {
+    return prisma.sparePart.update({ where: { id }, data });
+  }
+
+  async deletePart(id: string): Promise<SparePart> {
     return prisma.sparePart.delete({ where: { id } });
   }
 

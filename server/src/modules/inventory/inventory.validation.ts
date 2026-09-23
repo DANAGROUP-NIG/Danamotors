@@ -58,6 +58,89 @@ export const updateSparePartSchema = z.object({
   }),
 });
 
+const partStatusEnum = z.enum(['ACTIVE', 'BLOCKED']);
+
+const basePartMasterFields = {
+  partCode: z.string().min(1, 'Part code is required').max(50, 'Part code must be 50 characters or less'),
+  partNumber: z.string().min(1, 'Part number is required'),
+  name: z.string().min(1, 'Name is required'),
+  category: z.string().min(1, 'Category is required'),
+  uom: z.string().min(1, 'Unit of measure is required'),
+  taxCategory: z.string().optional(),
+  taxForm: z.string().optional(),
+  minLevel: z.number().nonnegative('Minimum level must be 0 or more').optional(),
+  maxLevel: z.number().nonnegative('Maximum level must be 0 or more').optional(),
+  reorderQty: z.number().nonnegative('Reorder quantity must be 0 or more').optional(),
+  unitRate: z.number().positive('Unit rate must be greater than zero'),
+  binLocation: z.string().optional(),
+  storeLocation: z.string().optional(),
+};
+
+export const createPartMasterSchema = z.object({
+  body: z.object({
+    ...basePartMasterFields,
+    partStatus: partStatusEnum.optional(),
+  }).refine(
+    (data) => {
+      if (data.minLevel == null || data.maxLevel == null) return true;
+      return data.maxLevel >= data.minLevel;
+    },
+    {
+      message: 'Maximum level must be greater than or equal to minimum level',
+      path: ['maxLevel'],
+    },
+  ),
+});
+
+export const updatePartMasterSchema = z.object({
+  body: z.object({
+    partCode: basePartMasterFields.partCode.optional(),
+    partNumber: basePartMasterFields.partNumber.optional(),
+    name: basePartMasterFields.name.optional(),
+    category: basePartMasterFields.category.optional(),
+    uom: basePartMasterFields.uom.optional(),
+    taxCategory: basePartMasterFields.taxCategory,
+    taxForm: basePartMasterFields.taxForm,
+    minLevel: basePartMasterFields.minLevel,
+    maxLevel: basePartMasterFields.maxLevel,
+    reorderQty: basePartMasterFields.reorderQty,
+    unitRate: basePartMasterFields.unitRate.optional(),
+    binLocation: basePartMasterFields.binLocation,
+    storeLocation: basePartMasterFields.storeLocation,
+    partStatus: partStatusEnum.optional(),
+  }).refine(
+    (data) => {
+      if (data.minLevel == null || data.maxLevel == null) return true;
+      return data.maxLevel >= data.minLevel;
+    },
+    {
+      message: 'Maximum level must be greater than or equal to minimum level',
+      path: ['maxLevel'],
+    },
+  ),
+  params: z.object({
+    id: z.string().uuid('Invalid part ID'),
+  }),
+});
+
+export const partMasterIdParamSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid part ID'),
+  }),
+});
+
+export const listPartsQuerySchema = z.object({
+  query: z.object({
+    partCode: z.string().optional(),
+    partNumber: z.string().optional(),
+    name: z.string().optional(),
+    category: z.string().optional(),
+    partStatus: partStatusEnum.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  }),
+});
+
 export const createPurchaseRequestSchema = z.object({
   body: z.object({
     sparePartId: z.string().uuid('Invalid spare part ID'),
