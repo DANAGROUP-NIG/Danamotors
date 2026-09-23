@@ -18,6 +18,7 @@ app.set("trust proxy", "loopback");
 const allowedOrigins = [
   "https://danamotors.danagroup.net",
   "https://danamotors.vercel.app",
+  "http://localhost:3000",
   
   ...(config.CLIENT_URL
     ? config.CLIENT_URL.split(",")
