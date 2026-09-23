@@ -3,6 +3,7 @@ import { InventoryService } from "./inventory.service";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import prisma from "../../prisma/client";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
+import { PartStatus } from "@prisma/client";
 
 export class InventoryController {
   private inventoryService: InventoryService;
@@ -150,6 +151,123 @@ export class InventoryController {
         status: "success",
         statusCode: 200,
         message: "Spare part deleted successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Part Master ────────────────────────────────────────────────────────
+
+  listParts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const {
+        partCode,
+        partNumber,
+        name,
+        category,
+        partStatus,
+        page,
+        limit,
+      } = req.query as {
+        partCode?: string;
+        partNumber?: string;
+        name?: string;
+        category?: string;
+        partStatus?: string;
+        page?: string;
+        limit?: string;
+      };
+      const result = await this.inventoryService.getAllParts({
+        partCode,
+        partNumber,
+        name,
+        category,
+        partStatus: partStatus as PartStatus | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPart = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.getPartById(id);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createPart = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.createPart(req.body);
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Part created successfully",
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updatePart = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await this.inventoryService.updatePart(id, req.body);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Part updated successfully",
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deletePart = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await this.inventoryService.deletePart(id);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Part deleted successfully",
       });
     } catch (error) {
       next(error);

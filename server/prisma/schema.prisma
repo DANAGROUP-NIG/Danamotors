@@ -455,18 +455,36 @@ model VehicleImage {
 }
 
 // ============================================================
+enum PartStatus {
+  ACTIVE
+  BLOCKED
+}
+
 // SPARE PART MASTER
 // ============================================================
 
 model SparePart {
   id String @id @default(uuid())
 
-  partNumber  String  @unique
-  name        String
+  partCode   String @unique @default(uuid())
+  partNumber String @unique
+  name       String
+  // `unitPrice` is the legacy column name; it maps to Part Master `unitRate`.
   description String?
   category    String?
 
+  uom          String @default("UNIT")
+  taxCategory  String?
+  taxForm      String?
+  minLevel     Float?
+  maxLevel     Float?
+  reorderQty   Float?
+
   unitPrice Float @default(0)
+
+  binLocation   String?
+  storeLocation String?
+  partStatus    PartStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

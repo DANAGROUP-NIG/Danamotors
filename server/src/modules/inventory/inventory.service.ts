@@ -7,6 +7,7 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
+import { SparePart, PartStatus } from "@prisma/client";
 
 export class InventoryService {
   private inventoryRepository: InventoryRepository;
@@ -161,6 +162,145 @@ export class InventoryService {
     }
 
     return this.inventoryRepository.deleteSparePart(id);
+  }
+
+  // ── Part Master ────────────────────────────────────────────────────────
+
+  private mapToPartMasterDto(part: SparePart) {
+    const { unitPrice, ...rest } = part;
+    return { ...rest, unitRate: unitPrice };
+  }
+
+  async createPart(data: {
+    partCode: string;
+    partNumber: string;
+    name: string;
+    category: string;
+    uom: string;
+    taxCategory?: string;
+    taxForm?: string;
+    minLevel?: number;
+    maxLevel?: number;
+    reorderQty?: number;
+    unitRate: number;
+    binLocation?: string;
+    storeLocation?: string;
+    partStatus?: PartStatus;
+  }) {
+    const existing = await this.inventoryRepository.findPartByCode(
+      data.partCode,
+    );
+    if (existing) {
+      throw new ConflictError(
+        "A part with this part code already exists",
+      );
+    }
+
+    const { unitRate, ...rest } = data;
+    const part = await this.inventoryRepository.createPart({
+      ...rest,
+      unitPrice: unitRate,
+    });
+
+    return this.mapToPartMasterDto(part);
+  }
+
+  async getAllParts(filters?: {
+    partCode?: string;
+    partNumber?: string;
+    name?: string;
+    category?: string;
+    partStatus?: PartStatus;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { parts, total } = await this.inventoryRepository.findAllParts({
+      partCode: filters?.partCode,
+      partNumber: filters?.partNumber,
+      name: filters?.name,
+      category: filters?.category,
+      partStatus: filters?.partStatus,
+      skip,
+      take: limit,
+    });
+
+    return {
+      parts: parts.map((part) => this.mapToPartMasterDto(part)),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getPartById(id: string) {
+    const part = await this.inventoryRepository.findPartById(id);
+    if (!part) {
+      throw new NotFoundError("Part not found");
+    }
+
+    return this.mapToPartMasterDto(part);
+  }
+
+  async updatePart(
+    id: string,
+    data: {
+      partCode?: string;
+      partNumber?: string;
+      name?: string;
+      category?: string;
+      uom?: string;
+      taxCategory?: string;
+      taxForm?: string;
+      minLevel?: number;
+      maxLevel?: number;
+      reorderQty?: number;
+      unitRate?: number;
+      binLocation?: string;
+      storeLocation?: string;
+      partStatus?: PartStatus;
+    },
+  ) {
+    const part = await this.inventoryRepository.findPartById(id);
+    if (!part) {
+      throw new NotFoundError("Part not found");
+    }
+
+    if (data.partCode && data.partCode !== part.partCode) {
+      const existing = await this.inventoryRepository.findPartByCode(
+        data.partCode,
+      );
+      if (existing && existing.id !== id) {
+        throw new ConflictError(
+          "A part with this part code already exists",
+        );
+      }
+    }
+
+    const { unitRate, ...rest } = data;
+    const updateData: Partial<SparePart> = { ...rest };
+    if (unitRate !== undefined) {
+      updateData.unitPrice = unitRate;
+    }
+
+    const updated = await this.inventoryRepository.updatePart(id, updateData);
+    return this.mapToPartMasterDto(updated);
+  }
+
+  async deletePart(id: string) {
+    const part = await this.inventoryRepository.findPartById(id);
+    if (!part) {
+      throw new NotFoundError("Part not found");
+    }
+
+    await this.inventoryRepository.deletePart(id);
+    return { message: "Part deleted successfully" };
   }
 
   // ── Inventory Stock ────────────────────────────────────────────────────

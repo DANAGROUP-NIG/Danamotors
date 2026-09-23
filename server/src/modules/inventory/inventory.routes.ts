@@ -5,9 +5,10 @@ import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission } from '../../middleware/authorize';
 import { PERMISSIONS } from '../../shared/constants/roles';
 import {
-  createSparePartSchema,
-  updateSparePartSchema,
-  partIdParamSchema,
+  createPartMasterSchema,
+  updatePartMasterSchema,
+  partMasterIdParamSchema,
+  listPartsQuerySchema,
   createPurchaseRequestSchema,
   purchaseRequestIdParamSchema,
   updatePurchaseRequestStatusSchema,
@@ -35,7 +36,8 @@ router.use(authMiddleware);
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List all spare parts
+ *     summary: List all parts
+ *     description: Retrieve a paginated list of Part Master records with optional filters.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -46,12 +48,28 @@ router.use(authMiddleware);
  *         name: limit
  *         schema: { type: integer, default: 20 }
  *       - in: query
- *         name: search
+ *         name: partCode
  *         schema: { type: string }
- *         description: Search by part number or name
+ *         description: Filter by part code (case-insensitive partial match)
+ *       - in: query
+ *         name: partNumber
+ *         schema: { type: string }
+ *         description: Filter by part number (case-insensitive partial match)
+ *       - in: query
+ *         name: name
+ *         schema: { type: string }
+ *         description: Filter by part name (case-insensitive partial match)
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *         description: Filter by category (case-insensitive partial match)
+ *       - in: query
+ *         name: partStatus
+ *         schema: { type: string, enum: [ACTIVE, BLOCKED] }
+ *         description: Filter by part status
  *     responses:
  *       200:
- *         description: Paginated spare parts list
+ *         description: Paginated parts list
  *         content:
  *           application/json:
  *             schema:
@@ -65,13 +83,13 @@ router.use(authMiddleware);
  *                         parts:
  *                           type: array
  *                           items:
- *                             $ref: '#/components/schemas/SparePartDTO'
+ *                             $ref: '#/components/schemas/PartMasterDTO'
  *                         meta:
  *                           $ref: '#/components/schemas/PaginationMeta'
  *   post:
  *     tags:
  *       - Inventory & Parts
- *     summary: Create a spare part
+ *     summary: Create a Part Master record
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -79,18 +97,25 @@ router.use(authMiddleware);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [partNumber, name, unitPrice]
- *             properties:
- *               partNumber: { type: string, example: TYT-OIL-5W30 }
- *               name: { type: string, example: Toyota 5W-30 Engine Oil (4L) }
- *               description: { type: string }
- *               unitPrice: { type: number, example: 4500 }
- *               unit: { type: string, example: Litre }
- *               categoryId: { type: string }
+ *             $ref: '#/components/schemas/CreatePartMasterInput'
+ *           example:
+ *             partCode: TYT-OIL-5W30
+ *             partNumber: ENG-OIL-5W30
+ *             name: Toyota 5W-30 Engine Oil (4L)
+ *             category: Lubricants
+ *             uom: Litre
+ *             unitRate: 4500
+ *             taxCategory: VAT
+ *             taxForm: Form C
+ *             minLevel: 10
+ *             maxLevel: 100
+ *             reorderQty: 50
+ *             binLocation: A-12-3
+ *             storeLocation: Main Warehouse
+ *             partStatus: ACTIVE
  *     responses:
  *       201:
- *         description: Spare part created
+ *         description: Part created
  *         content:
  *           application/json:
  *             schema:
@@ -99,23 +124,26 @@ router.use(authMiddleware);
  *                 - type: object
  *                   properties:
  *                     data:
- *                       $ref: '#/components/schemas/SparePartDTO'
+ *                       type: object
+ *                       properties:
+ *                         part:
+ *                           $ref: '#/components/schemas/PartMasterDTO'
  *
  * /inventory/parts/{id}:
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: Get spare part by ID
+ *     summary: Get Part Master record by ID
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
- *         description: Spare part details
+ *         description: Part details
  *         content:
  *           application/json:
  *             schema:
@@ -124,46 +152,56 @@ router.use(authMiddleware);
  *                 - type: object
  *                   properties:
  *                     data:
- *                       $ref: '#/components/schemas/SparePartDTO'
+ *                       type: object
+ *                       properties:
+ *                         part:
+ *                           $ref: '#/components/schemas/PartMasterDTO'
  *   put:
  *     tags:
  *       - Inventory & Parts
- *     summary: Update spare part
+ *     summary: Update a Part Master record
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name: { type: string }
- *               description: { type: string }
- *               unitPrice: { type: number }
- *               unit: { type: string }
+ *             $ref: '#/components/schemas/UpdatePartMasterInput'
+ *           example:
+ *             name: Toyota 5W-30 Engine Oil (4L) - Updated
+ *             unitRate: 4600
+ *             partStatus: ACTIVE
  *     responses:
  *       200:
  *         description: Part updated
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         part:
+ *                           $ref: '#/components/schemas/PartMasterDTO'
  *   delete:
  *     tags:
  *       - Inventory & Parts
- *     summary: Delete spare part
+ *     summary: Delete a Part Master record
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string }
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Part deleted
@@ -565,12 +603,12 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-// Spare Parts
-router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listSpareParts);
-router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partIdParamSchema), controller.getSparePart);
-router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createSparePartSchema), controller.createSparePart);
-router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updateSparePartSchema), controller.updateSparePart);
-router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partIdParamSchema), controller.deleteSparePart);
+// Spare Parts / Part Master
+router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(listPartsQuerySchema), controller.listParts);
+router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
+router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
+router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updatePartMasterSchema), controller.updatePart);
+router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partMasterIdParamSchema), controller.deletePart);
 
 // Branch Stock
 router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);
