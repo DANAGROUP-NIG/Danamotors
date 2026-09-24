@@ -5,10 +5,12 @@ import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission } from '../../middleware/authorize';
 import { PERMISSIONS } from '../../shared/constants/roles';
 import {
+  createAlternatePartSchema,
   createPartMasterSchema,
   updatePartMasterSchema,
   partMasterIdParamSchema,
-  listPartsQuerySchema,
+  listPartsQueryWithFiltersSchema,
+  // listPartsQuerySchema,
   createPurchaseRequestSchema,
   purchaseRequestIdParamSchema,
   updatePurchaseRequestStatusSchema,
@@ -43,10 +45,12 @@ router.use(authMiddleware);
  *     parameters:
  *       - in: query
  *         name: page
- *         schema: { type: integer, default: 1 }
+ *         description: Page number, starting at 1.
+ *         schema: { type: integer, minimum: 1, default: 1, example: 1 }
  *       - in: query
  *         name: limit
- *         schema: { type: integer, default: 20 }
+ *         description: Maximum records returned per page.
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20, example: 20 }
  *       - in: query
  *         name: partCode
  *         schema: { type: string }
@@ -86,6 +90,12 @@ router.use(authMiddleware);
  *                             $ref: '#/components/schemas/PartMasterDTO'
  *                         meta:
  *                           $ref: '#/components/schemas/PaginationMeta'
+ *       400:
+ *         description: One or more query parameters is invalid.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationErrorResponse'
  *   post:
  *     tags:
  *       - Inventory & Parts
@@ -141,6 +151,7 @@ router.use(authMiddleware);
  *         name: id
  *         required: true
  *         schema: { type: string, format: uuid }
+ *         description: Generated ID of the existing main part to which this alternate belongs.
  *     responses:
  *       200:
  *         description: Part details
@@ -205,6 +216,77 @@ router.use(authMiddleware);
  *     responses:
  *       200:
  *         description: Part deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/parts/{id}/alternates:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Add an alternate part mapping
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [partNumber, name]
+ *             properties:
+ *               partNumber: { type: string, example: ENG-OIL-5W30-ALT }
+ *               name: { type: string, example: Toyota 5W-30 Engine Oil Alternative (4L) }
+ *               description: { type: string }
+ *               binLocation: { type: string, example: A-12-4 }
+ *     responses:
+ *       201:
+ *         description: Alternate part created. The response contains its generated `id` and the `mainPartId` from the path.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List alternate parts for a Part Master record
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Alternate parts list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/parts/{id}/replacement-options:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get replacement options for a part
+ *     description: Returns alternate parts, including their branch stock levels, that can substitute the given part.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Replacement options list
  *         content:
  *           application/json:
  *             schema:
@@ -429,6 +511,26 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  *
+ * /inventory/purchase-requests/{id}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get purchase request by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Purchase request details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
  * /inventory/purchase-requests/{id}/status:
  *   patch:
  *     tags:
@@ -497,6 +599,86 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  *
+ * /inventory/issuances/{id}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get part issuance by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Issuance details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/returns:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Create a part return
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [issuanceId, partId, quantity]
+ *             properties:
+ *               issuanceId: { type: string, format: uuid }
+ *               partId: { type: string, format: uuid }
+ *               quantity: { type: integer }
+ *               reason: { type: string }
+ *     responses:
+ *       201:
+ *         description: Part return created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List part returns
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Part return list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/returns/{id}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get part return by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Part return details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
  * /inventory/transfers:
  *   post:
  *     tags:
@@ -538,6 +720,26 @@ router.use(authMiddleware);
  *     responses:
  *       200:
  *         description: Transfer list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Get stock transfer by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Transfer details
  *         content:
  *           application/json:
  *             schema:
@@ -602,13 +804,58 @@ router.use(authMiddleware);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}/reject:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Reject a stock transfer
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Transfer rejected
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *
+ * /inventory/transfers/{id}/cancel:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Cancel a stock transfer
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Transfer cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
  */
 // Spare Parts / Part Master
-router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(listPartsQuerySchema), controller.listParts);
+// router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(listPartsQuerySchema), controller.listParts);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
 router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updatePartMasterSchema), controller.updatePart);
 router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partMasterIdParamSchema), controller.deletePart);
+// ----------Alt Part----------
+router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(listPartsQueryWithFiltersSchema), controller.listPartsWithFilters);
+router.post('/parts/:id/alternates', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createAlternatePartSchema), controller.createAlternatePart);
+router.get('/parts/:id/alternates', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.listAlternates);
+router.get('/parts/:id/replacement-options', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getReplacementOptions);
 
 // Branch Stock
 router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);

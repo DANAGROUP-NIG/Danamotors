@@ -316,10 +316,12 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
             binLocation: { type: 'string', nullable: true, example: 'A-12-3' },
             storeLocation: { type: 'string', nullable: true, example: 'Main Warehouse' },
             partStatus: { type: 'string', enum: ['ACTIVE', 'BLOCKED'], example: 'ACTIVE' },
+            role: { type: 'string', enum: ['MAIN', 'ALTERNATE'], example: 'MAIN' },
+            mainPartId: { type: 'string', format: 'uuid', nullable: true, description: 'The parent main part for an alternate part.' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
-          required: ['id', 'partCode', 'partNumber', 'name', 'category', 'uom', 'unitRate', 'partStatus', 'createdAt', 'updatedAt'],
+          required: ['id', 'partCode', 'partNumber', 'name', 'category', 'uom', 'unitRate', 'partStatus', 'role', 'createdAt', 'updatedAt'],
         },
         CreatePartMasterInput: {
           type: 'object',

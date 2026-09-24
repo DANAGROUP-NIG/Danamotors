@@ -1,7 +1,7 @@
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './inventory.repository';
 import { ConflictError, NotFoundError } from '../../shared/errors/appError';
-import { PartStatus, SparePart } from '@prisma/client';
+import { PartRole, PartStatus, SparePart } from '@prisma/client';
 
 const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -19,6 +19,8 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   unitPrice: 4500,
   binLocation: null,
   storeLocation: null,
+  role: PartRole.MAIN,
+  mainPartId: null,
   partStatus: PartStatus.ACTIVE,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),

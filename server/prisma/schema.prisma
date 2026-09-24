@@ -460,6 +460,11 @@ enum PartStatus {
   BLOCKED
 }
 
+enum PartRole {
+  MAIN
+  ALTERNATE
+}
+
 // SPARE PART MASTER
 // ============================================================
 
@@ -486,6 +491,12 @@ model SparePart {
   storeLocation String?
   partStatus    PartStatus @default(ACTIVE)
 
+  // --- new: main/alternate relationship ---
+  role PartRole @default(MAIN)
+  mainPartId String?
+  mainPart   SparePart? @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
+  alternateParts SparePart[] @relation("PartAlternates")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -494,6 +505,8 @@ model SparePart {
   inventoryStocks   InventoryStock[]
   stockTransactions StockTransaction[]
   transferItems     InterBranchTransferItem[]
+
+  @@index([mainPartId])
 }
 
 // ============================================================
