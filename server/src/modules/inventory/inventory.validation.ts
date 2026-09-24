@@ -1,4 +1,10 @@
+import { PartRole } from '@prisma/client/wasm';
 import { z } from 'zod';
+
+enum PartStatus {
+  ACTIVE,
+  BLOCKED
+}
 
 export const partIdParamSchema = z.object({
   params: z.object({
@@ -58,6 +64,27 @@ export const updateSparePartSchema = z.object({
   }),
 });
 
+export const createAlternatePartSchema = z.object({
+  body: z.object({
+    ...createSparePartSchema.shape.body.shape,
+  }),
+  params: z.object({
+    id: z.string().uuid('Invalid main part ID'),
+  }),
+});
+
+export const listPartsFilterQuerySchema = z.object({
+  query: z.object({
+    page: z.number().int().min(1).default(1).optional(),
+    pageSize: z.number().int().min(1).default(20).optional(),
+    partCode: z.string().optional(),
+    partNumber: z.string().optional(),
+    name: z.string().optional(),
+    category: z.string().optional(),
+    partStatus: z.nativeEnum(PartStatus).optional(),
+  }),
+});
+
 const partStatusEnum = z.enum(['ACTIVE', 'BLOCKED']);
 
 const basePartMasterFields = {
@@ -80,6 +107,7 @@ export const createPartMasterSchema = z.object({
   body: z.object({
     ...basePartMasterFields,
     partStatus: partStatusEnum.optional(),
+    role: z.literal('MAIN').optional(),
   }).refine(
     (data) => {
       if (data.minLevel == null || data.maxLevel == null) return true;
@@ -136,6 +164,21 @@ export const listPartsQuerySchema = z.object({
     name: z.string().optional(),
     category: z.string().optional(),
     partStatus: partStatusEnum.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  }),
+});
+
+export const listPartsQueryWithFiltersSchema = z.object({
+  query: z.object({
+    partCode: z.string().optional(),
+    partNumber: z.string().optional(),
+    name: z.string().optional(),
+    category: z.string().optional(),
+    partStatus: partStatusEnum.optional(),
+    role: z.nativeEnum(PartRole).optional(),
+    mainPartId: z.string().uuid().optional(), // add
+    search: z.string().optional(),        // add
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
   }),

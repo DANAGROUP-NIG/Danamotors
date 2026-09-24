@@ -157,6 +157,102 @@ export class InventoryController {
     }
   };
 
+  createAlternatePart = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const branchId = this.isCrossBranchUser(req)
+        ? undefined
+        : req.user?.branchId;
+      assertInventoryBranchAccess(req, [branchId]);
+
+      const result = await this.inventoryService.createAlternatePart({
+        ...req.body,
+        mainPartId: req.params.id,
+      });
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Alternate part created successfully",
+        data: { alternatePart: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listAlternates = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const branchId = this.isCrossBranchUser(req)
+        ? undefined
+        : req.user?.branchId;
+      assertInventoryBranchAccess(req, [branchId]);
+
+      const result = await this.inventoryService.listAlternates(id, branchId);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listPartsWithFilters = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const branchId = this.isCrossBranchUser(req)
+        ? undefined
+        : req.user?.branchId;
+      assertInventoryBranchAccess(req, [branchId]);
+      const result = await this.inventoryService.listPartsWithFilters({
+        ...req.query,
+        branchId: branchId,
+      });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getReplacementOptions = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const branchId = this.isCrossBranchUser(req)
+        ? undefined
+        : req.user?.branchId;
+      assertInventoryBranchAccess(req, [branchId]);
+
+      const result = await this.inventoryService.getReplacementOptions(id, branchId);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { replacementOptions: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // ── Part Master ────────────────────────────────────────────────────────
 
   listParts = async (
