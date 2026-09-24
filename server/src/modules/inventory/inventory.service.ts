@@ -7,8 +7,73 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
-import { SparePart, PartStatus } from "@prisma/client";
+import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 
+
+const INHERITABLE_FIELDS = [
+  'category',
+  'uom',
+  'taxCategory',
+  'taxForm',
+  'minLevel',
+  'maxLevel',
+  'reorderQty',
+  'unitPrice',
+  'storeLocation',
+] as const;
+
+type InheritableField = (typeof INHERITABLE_FIELDS)[number];
+type InheritedDefaults = Pick<SparePart, InheritableField>;
+
+interface CreateMainPartInput {
+  partNumber: string;
+  name: string;
+  description?: string;
+  category?: string;
+  uom?: string;
+  taxCategory?: string;
+  taxForm?: string;
+  minLevel?: number;
+  maxLevel?: number;
+  mainPartId?: string;
+  reorderQty?: number;
+  unitPrice?: number;
+  binLocation?: string;
+  storeLocation?: string;
+  branchStock?: {
+    branchId: string;
+    quantity: number;
+    minimumStock?: number;
+    rackLocation?: string;
+  }[];
+  recordedById?: string;
+}
+
+interface CreateAlternatePartInput {
+  mainPartId: string;
+  partNumber: string;
+  name: string;
+  description?: string;
+  binLocation?: string;
+  // Any of these, if provided, OVERRIDE the inherited value from main.
+  overrides?: Partial<InheritedDefaults>;
+}
+
+
+interface ListPartsQuery {
+  branchId?: string | null;
+  partCode?: string;
+  partNumber?: string;
+  name?: string;
+  category?: string;
+  partStatus?: PartStatus | string;
+  role?: PartRole | string;
+  mainPartId?: string;
+  search?: string;
+  page?: number ;
+  pageSize?: number ;
+  limit?: number ;
+}
 export class InventoryService {
   private inventoryRepository: InventoryRepository;
 
@@ -68,20 +133,7 @@ export class InventoryService {
     return part;
   }
 
-  async createSparePart(data: {
-    partNumber: string;
-    name: string;
-    description?: string;
-    category?: string;
-    unitPrice?: number;
-    branchStock?: {
-      branchId: string;
-      quantity: number;
-      minimumStock?: number;
-      rackLocation?: string;
-    }[];
-    recordedById?: string;
-  }) {
+  async createSparePart(data: CreateMainPartInput) {
     const existing = await prisma.sparePart.findUnique({
       where: { partNumber: data.partNumber },
     });
@@ -156,12 +208,137 @@ export class InventoryService {
   }
 
   async deleteSparePart(id: string) {
+    const alternatePartsCount = await prisma.sparePart.count({
+      where: { mainPartId: id },
+    });
+    if (alternatePartsCount > 0) {
+      throw new Error("Cannot delete a main part that has alternate parts");
+    }
+
     const part = await this.inventoryRepository.findSparePartById(id);
     if (!part) {
       throw new NotFoundError("Spare part not found");
     }
 
     return this.inventoryRepository.deleteSparePart(id);
+  }
+
+  async createAlternatePart(data: CreateAlternatePartInput) {
+    const mainPart = await prisma.sparePart.findUnique({
+      where: { id: data.mainPartId },
+    });
+
+    if (!mainPart) {
+      throw new NotFoundError("Main part not found");
+    }
+
+    if (mainPart.role !== PartRole.MAIN) {
+      // Prevents alternates being chained off other alternates —
+      // keeps the hierarchy exactly one level deep, matching one-to-many.
+      throw new Error(
+      `Part ${data.mainPartId} is not a MAIN part and cannot have alternates`
+      )
+    }
+
+    const inherited: InheritedDefaults = INHERITABLE_FIELDS.reduce(
+      (acc, field) => {
+        acc[field] = mainPart[field] as never;
+        return acc;
+      },
+      {} as InheritedDefaults,
+    );
+
+    const { mainPartId, partNumber, name, description, binLocation, overrides } = data;
+
+    return prisma.sparePart.create({
+      data: {
+        mainPartId,
+        partNumber,
+        name,
+        description,
+        binLocation,
+        role: PartRole.ALTERNATE,
+        ...inherited,
+        ...overrides,
+      },
+    });
+  }
+
+  // ---------- GET /inventory/parts/:id/alternates ----------
+  async listAlternates(mainPartId: string, branchId?: string | null) {
+    const mainPart = await prisma.sparePart.findUnique({ where: { id: mainPartId } });
+    if (!mainPart) throw new NotFoundError(`Part ${mainPartId} not found`);
+
+    return prisma.sparePart.findMany({
+      where: {
+        mainPartId,
+        ...(branchId && { inventoryStocks: { some: { branchId } } }),
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // ---------- GET /inventory/parts?role=ALTERNATE&... ----------
+  async listPartsWithFilters(query: ListPartsQuery) {
+    const {branchId, role, name, partCode, partNumber, category, partStatus, mainPartId, search } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? query.pageSize ?? 25;
+
+    const where: Prisma.SparePartWhereInput = {
+      ...(partCode && { partCode }),
+    ...(partNumber && { partNumber }),
+    ...(name && { name: { contains: name, mode: 'insensitive' } }),
+      ...(category && { category: { contains: category, mode: 'insensitive' } }),
+    ...(partStatus && { partStatus: partStatus as PartStatus }),
+    ...(role && { role: role as PartRole }),
+    ...(mainPartId && { mainPartId }),
+    ...(branchId && { inventoryStocks: { some: { branchId } } }),
+    ...(search && {
+        OR: [
+          { partNumber: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.sparePart.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.sparePart.count({ where }),
+    ]);
+
+    return { items, total, page: page, pageSize: limit };
+  }
+
+
+  // ---------- GET /inventory/parts/:id/replacement-options ----------
+  async getReplacementOptions(mainPartId: string, branchId?: string | null) {
+    const mainPart = await prisma.sparePart.findUnique({ where: { id: mainPartId } });
+    if (!mainPart) throw new NotFoundError(`Part ${mainPartId} not found`);
+
+    const alternates = await prisma.sparePart.findMany({
+      where: {
+        mainPartId,
+        partStatus: 'ACTIVE' as never,
+        ...(branchId && { inventoryStocks: { some: { branchId } } }),
+      },
+      include: {
+        inventoryStocks: true,
+      },
+    });
+
+    // Only surface alternates that actually have usable stock right now.
+    return alternates
+      .map((alt) => ({
+        ...alt,
+        totalAvailableQty: alt.inventoryStocks.reduce((sum, s) => sum + (s.quantity ?? 0), 0),
+      }))
+      .filter((alt) => alt.totalAvailableQty > 0)
+      .sort((a, b) => b.totalAvailableQty - a.totalAvailableQty);
   }
 
   // ── Part Master ────────────────────────────────────────────────────────
