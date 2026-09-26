@@ -88,6 +88,15 @@ const ACTION_MAP: Record<string, string> = {
   'PATCH /api/inventory/transfers/receive': 'TRANSFER_RECEIVE',
   'PATCH /api/inventory/transfers/reject': 'TRANSFER_REJECT',
   'PATCH /api/inventory/transfers/cancel': 'TRANSFER_CANCEL',
+  // ── Inventory — Stock transfer workflow (indent → STN → SRN) ──────────────
+  'POST /api/inventory/indents': 'INDENT_CREATE',
+  'PATCH /api/inventory/indents/submit': 'INDENT_SUBMIT',
+  'PATCH /api/inventory/indents/approve': 'INDENT_APPROVE',
+  'PATCH /api/inventory/indents/pick': 'INDENT_PICK',
+  'PATCH /api/inventory/indents/reject': 'INDENT_REJECT',
+  'PATCH /api/inventory/indents/cancel': 'INDENT_CANCEL',
+  'PATCH /api/inventory/indents/dispatch': 'INDENT_DISPATCH',
+  'PATCH /api/inventory/indents/receive': 'INDENT_RECEIVE',
 
   // ── Finance ──────────────────────────────────────────────────────────────
   'POST /api/finance/invoices': 'INVOICE_CREATE',

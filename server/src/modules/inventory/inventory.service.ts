@@ -647,8 +647,9 @@ export class InventoryService {
       data.branchId,
       data.sparePartId,
     );
-    if (!stock || stock.quantity < data.quantity) {
-      throw new BadRequestError("Insufficient stock at this branch");
+    // Reserved stock is held for picked transfers and cannot be issued.
+    if (!stock || stock.quantity - stock.reservedQuantity < data.quantity) {
+      throw new BadRequestError("Insufficient available stock at this branch");
     }
 
     const user = await prisma.user.findUnique({
@@ -961,7 +962,7 @@ export class InventoryService {
         transfer.sourceBranchId,
         item.partId,
       );
-      if (!stock || stock.quantity < dispatchedQty) {
+      if (!stock || stock.quantity - stock.reservedQuantity < dispatchedQty) {
         throw new BadRequestError(
           `Insufficient stock for part ${item.partId} at source branch`,
         );
