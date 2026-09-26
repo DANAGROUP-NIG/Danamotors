@@ -153,6 +153,16 @@ describeDb("Stock transfer workflow (database)", () => {
     expect(alerts.map((a) => a.type).sort()).toEqual(["INDENT_APPROVED", "STN_DISPATCHED"]);
   });
 
+  it("finds parts the requesting branch does not stock yet", async () => {
+    const results = await service.searchParts({
+      search: `2630035505-${run}`,
+      requestingBranchId: branch.id,
+      sourceBranchId: cpd.id,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ id: filter.id, sourceAvailable: 52, requestingStock: 0, unitRate: 9056.34 });
+  });
+
   it("fills vehicle details from the job card", async () => {
     const customer = await prisma.customer.create({
       data: { firstName: "Ade", lastName: `Oye${run}`, email: `ade.${run}@test.local`, branchId: branch.id },

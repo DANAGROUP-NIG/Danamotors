@@ -31,6 +31,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,
   ],
+  // More specific paths must come first: the guard uses the first prefix that matches.
+  "/transfers/new": [INVENTORY_PERMISSIONS.TRANSFER_CREATE],
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],

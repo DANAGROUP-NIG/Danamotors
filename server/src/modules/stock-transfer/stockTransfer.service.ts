@@ -413,6 +413,50 @@ export class StockTransferService {
     };
   }
 
+  /**
+   * Part picker for the indent form. Searches the whole Part Master (a branch
+   * may request parts it does not stock yet) and returns stock at both branches.
+   */
+  async searchParts(params: {
+    search: string;
+    requestingBranchId?: string;
+    sourceBranchId?: string;
+    limit?: number;
+  }) {
+    const parts = await prisma.sparePart.findMany({
+      where: {
+        partStatus: PartStatus.ACTIVE,
+        OR: [
+          { partNumber: { contains: params.search, mode: "insensitive" } },
+          { partCode: { contains: params.search, mode: "insensitive" } },
+          { name: { contains: params.search, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { partNumber: "asc" },
+      take: params.limit ?? 15,
+      ...partSelect,
+    });
+    const branchIds = [params.requestingBranchId, params.sourceBranchId].filter(Boolean) as string[];
+    const stocks =
+      parts.length && branchIds.length
+        ? await prisma.inventoryStock.findMany({
+            where: { branchId: { in: branchIds }, partId: { in: parts.map((p) => p.id) } },
+          })
+        : [];
+    const find = (branchId: string | undefined, partId: string) =>
+      stocks.find((s) => s.branchId === branchId && s.partId === partId);
+    return parts.map((part) => {
+      const source = find(params.sourceBranchId, part.id);
+      const requesting = find(params.requestingBranchId, part.id);
+      return {
+        ...part,
+        unitRate: part.unitPrice,
+        sourceAvailable: source ? source.quantity - source.reservedQuantity : 0,
+        requestingStock: requesting?.quantity ?? 0,
+      };
+    });
+  }
+
   // ── 1. Create / submit ────────────────────────────────────────────────────
 
   async createIndent(input: CreateIndentInput, actorId: string) {

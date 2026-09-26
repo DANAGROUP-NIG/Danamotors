@@ -16,6 +16,7 @@ import {
   listPickingListsSchema,
   listStnsSchema,
   partLookupSchema,
+  partSearchSchema,
   pickIndentSchema,
   receiveIndentSchema,
   rejectIndentSchema,
@@ -130,6 +131,30 @@ const read = requirePermission(PERMISSIONS.TRANSFER_READ);
  *                 alternates: [{ part: { partNumber: "2630035504" }, sourceBranchStock: { available: 12 } }]
  */
 router.get("/indents/part-lookup", read, validateRequest(partLookupSchema), controller.lookupPart);
+
+/**
+ * @openapi
+ * /inventory/indents/part-search:
+ *   get:
+ *     tags: [Stock Transfers]
+ *     summary: Search parts for the indent form
+ *     description: Searches all active parts by part number, code or name, including parts the requesting branch does not stock yet.
+ *     parameters:
+ *       - { in: query, name: search, required: true, schema: { type: string, minLength: 2, example: "2630035505" } }
+ *       - { in: query, name: requestingBranchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: sourceBranchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 15, maximum: 50 } }
+ *     responses:
+ *       200:
+ *         description: Matching parts
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 parts: [{ id: "5b6c...", partNumber: "2630035505", name: "FILTER ASSY-ENGINE OIL", uom: "UNIT", unitRate: 9056.34, sourceAvailable: 290, requestingStock: 52 }]
+ */
+router.get("/indents/part-search", read, validateRequest(partSearchSchema), controller.searchParts);
 
 /**
  * @openapi

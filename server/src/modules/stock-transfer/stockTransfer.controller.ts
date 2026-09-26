@@ -59,6 +59,11 @@ export class StockTransferController {
     ok(res, result);
   });
 
+  searchParts = handle(async (req, res) => {
+    const q = req.query as unknown as { search: string; requestingBranchId?: string; sourceBranchId?: string; limit?: number };
+    ok(res, { parts: await this.service.searchParts(q) });
+  });
+
   createIndent = handle(async (req, res) => {
     assertInventoryBranchAccess(req, [req.body.requestingBranchId]);
     const indent = await this.service.createIndent(req.body, req.user!.userId);

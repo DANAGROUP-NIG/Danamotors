@@ -156,6 +156,15 @@ export const partLookupSchema = z.object({
     .refine((q) => q.partId || q.partNumber, { message: "Give a partId or a partNumber", path: ["partId"] }),
 });
 
+export const partSearchSchema = z.object({
+  query: z.object({
+    search: z.string().trim().min(2, "Type at least 2 characters").max(40),
+    requestingBranchId: uuid("requesting branch ID").optional(),
+    sourceBranchId: uuid("supplying branch ID").optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+  }),
+});
+
 export const listPickingListsSchema = z.object({
   query: z.object({ status: z.nativeEnum(PickingListStatus).optional() }),
 });
