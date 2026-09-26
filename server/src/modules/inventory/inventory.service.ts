@@ -74,6 +74,13 @@ interface ListPartsQuery {
   pageSize?: number ;
   limit?: number ;
 }
+/** Prisma reports RESTRICT violations as P2003 or as a raw Postgres 23001/23503 error. */
+function isForeignKeyViolation(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") return true;
+  const message = error instanceof Error ? error.message : "";
+  return /violates (RESTRICT setting of )?foreign key constraint|23001|23503/.test(message);
+}
+
 export class InventoryService {
   private inventoryRepository: InventoryRepository;
 
@@ -296,6 +303,7 @@ export class InventoryService {
     ...(search && {
         OR: [
           { partNumber: { contains: search, mode: 'insensitive' } },
+          { partCode: { contains: search, mode: 'insensitive' } },
           { name: { contains: search, mode: 'insensitive' } },
         ],
       }),
@@ -476,7 +484,24 @@ export class InventoryService {
       throw new NotFoundError("Part not found");
     }
 
-    await this.inventoryRepository.deletePart(id);
+    const alternates = await prisma.sparePart.count({ where: { mainPartId: id } });
+    if (alternates > 0) {
+      throw new ConflictError(
+        `This part has ${alternates} alternate part(s). Delete or reassign them first, or block the part instead.`,
+      );
+    }
+
+    try {
+      await this.inventoryRepository.deletePart(id);
+    } catch (error) {
+      // Stock transactions, transfers, issuances and similar records keep the part (onDelete: Restrict).
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictError(
+          "This part is used by stock transactions, transfers, issuances or purchase requests, so it cannot be deleted. Block it instead.",
+        );
+      }
+      throw error;
+    }
     return { message: "Part deleted successfully" };
   }
 

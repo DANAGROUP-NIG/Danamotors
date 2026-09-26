@@ -1,26 +1,53 @@
 import { z } from "zod";
 
-export const branchStockEntrySchema = z.object({
-  branchId: z.string().uuid("Invalid branch"),
-  quantity: z.coerce.number().int("Quantity must be a whole number").nonnegative("Quantity must be 0 or more"),
-  minimumStock: z.coerce.number().int().nonnegative().optional(),
-  rackLocation: z.string().trim().max(100, "Max 100 characters").optional(),
+/** Empty inputs become undefined so optional numbers are simply left out. */
+const optionalNumber = (label: string) =>
+  z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+    z
+      .number({ invalid_type_error: `${label} must be a number` })
+      .nonnegative(`${label} must be 0 or more`)
+      .optional(),
+  );
+
+const optionalText = (max: number) => z.string().trim().max(max, `Max ${max} characters`).optional();
+
+/** Mirrors the backend Part Master validation (createPartMasterSchema). */
+export const partMasterSchema = z
+  .object({
+    partCode: z.string().trim().min(1, "Part code is required").max(50, "Part code must be 50 characters or less"),
+    partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
+    name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
+    category: z.string().trim().min(1, "Category is required").max(100, "Max 100 characters"),
+    uom: z.string().trim().min(1, "Unit of measure is required").max(20, "Max 20 characters"),
+    taxCategory: optionalText(50),
+    taxForm: optionalText(10),
+    minLevel: optionalNumber("Minimum level"),
+    maxLevel: optionalNumber("Maximum level"),
+    reorderQty: optionalNumber("Reorder quantity"),
+    unitRate: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+      z
+        .number({ required_error: "Unit rate is required", invalid_type_error: "Unit rate must be a number" })
+        .positive("Unit rate must be greater than zero"),
+    ),
+    binLocation: optionalText(40),
+    storeLocation: optionalText(40),
+    partStatus: z.enum(["ACTIVE", "BLOCKED"]),
+  })
+  .refine((d) => d.minLevel == null || d.maxLevel == null || d.maxLevel >= d.minLevel, {
+    message: "Maximum level must be greater than or equal to minimum level",
+    path: ["maxLevel"],
+  });
+
+/** Parsed values (numbers) and raw input values (number inputs give strings). */
+export type PartMasterFormValues = z.infer<typeof partMasterSchema>;
+export type PartMasterFormInput = z.input<typeof partMasterSchema>;
+
+export const alternatePartSchema = z.object({
+  partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
+  name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
+  description: optionalText(500),
 });
 
-export const createInventoryItemSchema = z.object({
-  partNumber: z.string().min(1, "Part number is required"),
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-  category: z.string().min(1, "Category is required"),
-  unitPrice: z.coerce.number().nonnegative("Unit price must be 0 or more"),
-  branchStock: z.array(branchStockEntrySchema).optional(),
-});
-
-export const updateInventoryItemSchema = createInventoryItemSchema.partial();
-
-export type CreateInventoryItemFormValues = z.infer<
-  typeof createInventoryItemSchema
->;
-export type UpdateInventoryItemFormValues = z.infer<
-  typeof updateInventoryItemSchema
->;
+export type AlternatePartFormValues = z.infer<typeof alternatePartSchema>;

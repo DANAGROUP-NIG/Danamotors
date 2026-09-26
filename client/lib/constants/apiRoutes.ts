@@ -84,10 +84,12 @@ export const API_ROUTES = {
     stock: {
       base: "/inventory/stock",
       byBranch: (branchId: string) => `/inventory/stock/${branchId}`,
+      adjust: "/inventory/stock/adjust",
     },
     parts: {
       base: "/inventory/parts",
       detail: (id: string) => `/inventory/parts/${id}`,
+      alternates: (id: string) => `/inventory/parts/${id}/alternates`,
     },
   },
   finance: {
