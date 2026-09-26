@@ -8,6 +8,7 @@ import {
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
+import { buildPartQuery } from "./partQuery";
 
 
 const INHERITABLE_FIELDS = [
@@ -19,6 +20,9 @@ const INHERITABLE_FIELDS = [
   'maxLevel',
   'reorderQty',
   'unitPrice',
+  'retailRate',
+  'taxable',
+  'partFlag',
   'storeLocation',
 ] as const;
 
@@ -368,6 +372,9 @@ export class InventoryService {
     maxLevel?: number;
     reorderQty?: number;
     unitRate: number;
+    retailRate?: number;
+    taxable?: boolean;
+    partFlag?: string;
     binLocation?: string;
     storeLocation?: string;
     partStatus?: PartStatus;
@@ -447,6 +454,9 @@ export class InventoryService {
       maxLevel?: number;
       reorderQty?: number;
       unitRate?: number;
+      retailRate?: number;
+      taxable?: boolean;
+      partFlag?: string;
       binLocation?: string;
       storeLocation?: string;
       partStatus?: PartStatus;
@@ -566,6 +576,60 @@ export class InventoryService {
     });
 
     return this.withAvailableQuantity(stock);
+  }
+
+  /** Sets where a part is kept at one branch (rack, bin card) and its branch stock levels. */
+  async updateStockLocation(
+    branchId: string,
+    partId: string,
+    data: { rackLocation?: string | null; binCard?: string | null; minimumStock?: number; maximumStock?: number | null },
+  ) {
+    const [branch, part] = await Promise.all([
+      prisma.branch.findUnique({ where: { id: branchId }, select: { id: true } }),
+      prisma.sparePart.findUnique({ where: { id: partId }, select: { id: true } }),
+    ]);
+    if (!branch) throw new NotFoundError("Branch not found");
+    if (!part) throw new NotFoundError("Part not found");
+    if (data.maximumStock != null && data.minimumStock != null && data.maximumStock < data.minimumStock) {
+      throw new BadRequestError("Maximum stock must be greater than or equal to minimum stock");
+    }
+    const stock = await prisma.inventoryStock.upsert({
+      where: { branchId_partId: { branchId, partId } },
+      create: { branchId, partId, quantity: 0, ...data, minimumStock: data.minimumStock ?? 0 },
+      update: data,
+      include: { branch: true, part: true },
+    });
+    return this.withAvailableQuantity(stock);
+  }
+
+  /** Legacy Part Query: stock at the home premises, alternates, and other branches. */
+  async partQuery(partNumber: string, homeBranchId?: string | null) {
+    const part = await prisma.sparePart.findFirst({
+      where: {
+        OR: [
+          { partNumber: { equals: partNumber, mode: "insensitive" } },
+          { partCode: { equals: partNumber, mode: "insensitive" } },
+        ],
+      },
+    });
+    if (!part) throw new NotFoundError(`Part ${partNumber} not found`);
+
+    const rootId = part.mainPartId ?? part.id;
+    const alternates = await prisma.sparePart.findMany({
+      where: { id: { not: part.id }, OR: [{ id: rootId }, { mainPartId: rootId }] },
+      orderBy: { partNumber: "asc" },
+    });
+    const [branches, stocks] = await Promise.all([
+      prisma.branch.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, code: true, parentBranchId: true },
+      }),
+      prisma.inventoryStock.findMany({
+        where: { partId: { in: [part.id, ...alternates.map((a) => a.id)] } },
+        select: { branchId: true, partId: true, quantity: true, reservedQuantity: true, rackLocation: true, binCard: true },
+      }),
+    ]);
+    return buildPartQuery({ part, alternates, branches, stocks, homeBranchId });
   }
 
   async listStockTransactions(branchId?: string, partId?: string) {

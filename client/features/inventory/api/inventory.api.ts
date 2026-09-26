@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type {
   AlternatePartPayload,
@@ -8,7 +8,9 @@ import type {
   PartListResponse,
   PartMaster,
   PartMasterPayload,
+  PartQueryResult,
   PartStockItem,
+  StockLocationPayload,
   UpdatePartMasterPayload,
 } from "../types/inventory.types";
 
@@ -84,6 +86,19 @@ export async function getBranchStockRequest(branchId: string): Promise<BranchSto
 export async function getPartStockRequest(partId: string): Promise<PartStockItem[]> {
   const data = await apiGet<{ stockItems: PartStockItem[] }>(`${API_ROUTES.inventory.stock.base}${qs({ partId })}`);
   return data.stockItems;
+}
+
+export async function updateStockLocationRequest(branchId: string, partId: string, payload: StockLocationPayload) {
+  const data = await apiPatch<{ stock: PartStockItem }, StockLocationPayload>(
+    API_ROUTES.inventory.stock.location(branchId, partId),
+    payload,
+  );
+  return data.stock;
+}
+
+/** Legacy Part Query: premises locations, alternates and other branches for one part number. */
+export function partQueryRequest(partNumber: string, branchId?: string) {
+  return apiGet<PartQueryResult>(`${API_ROUTES.inventory.parts.query}${qs({ partNumber, branchId })}`);
 }
 
 export async function adjustStockRequest(payload: {

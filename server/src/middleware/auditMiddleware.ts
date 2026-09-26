@@ -72,6 +72,7 @@ const ACTION_MAP: Record<string, string> = {
 
   // ── Inventory — Stock ────────────────────────────────────────────────────
   'POST /api/inventory/stock/adjust': 'STOCK_ADJUST',
+  'PATCH /api/inventory/stock': 'STOCK_LOCATION_UPDATE',
 
   // ── Inventory — Purchase Requests ────────────────────────────────────────
   'POST /api/inventory/purchase-requests': 'PURCHASE_REQUEST_CREATE',

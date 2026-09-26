@@ -6,6 +6,7 @@ export type BranchStockItem = {
   reservedQuantity: number;
   minimumStock: number;
   rackLocation: string | null;
+  binCard?: string | null;
   maximumStock: number | null;
   /** Raw Part Master row as returned by the stock endpoints (price is `unitPrice`). */
   part: Omit<PartMaster, "unitRate"> & { unitPrice: number };
@@ -37,7 +38,14 @@ export type PartMaster = {
   minLevel: number | null;
   maxLevel: number | null;
   reorderQty: number | null;
+  /** Dealer rate (legacy dlrrate). */
   unitRate: number;
+  /** Retail (selling) rate (legacy rtlrate). */
+  retailRate: number | null;
+  /** Legacy tax status. */
+  taxable: boolean;
+  /** Legacy part flag, for example O for original. */
+  partFlag: string;
   binLocation: string | null;
   storeLocation: string | null;
   partStatus: PartStatus;
@@ -59,6 +67,9 @@ export type PartMasterPayload = {
   maxLevel?: number;
   reorderQty?: number;
   unitRate: number;
+  retailRate?: number;
+  taxable?: boolean;
+  partFlag?: string;
   binLocation?: string;
   storeLocation?: string;
   partStatus?: PartStatus;
@@ -100,4 +111,60 @@ export type PartStockItem = {
   minimumStock: number;
   maximumStock: number | null;
   rackLocation: string | null;
+  binCard: string | null;
+};
+
+export type StockLocationPayload = {
+  rackLocation?: string | null;
+  binCard?: string | null;
+  minimumStock?: number;
+  maximumStock?: number | null;
+};
+
+// ── Part Query (legacy Master > Part Query) ───────────────────────────────────
+
+export type PartQueryRow = {
+  branchId: string;
+  branchName: string;
+  branchCode: string | null;
+  partFlag: string;
+  taxable: boolean;
+  currentStock: number;
+  qtyBlocked: number;
+  available: number;
+  location: string | null;
+  binCard: string | null;
+  dealerRate: number;
+  retailRate: number | null;
+  hasStockRecord: boolean;
+};
+
+export type PartQueryAlternateRow = PartQueryRow & {
+  partId: string;
+  partNumber: string;
+  description: string;
+  partStatus: PartStatus;
+};
+
+export type PartQueryResult = {
+  part: {
+    id: string;
+    partNumber: string;
+    partCode: string;
+    name: string;
+    description: string | null;
+    uom: string;
+    partFlag: string;
+    taxable: boolean;
+    dealerRate: number;
+    retailRate: number | null;
+    partStatus: PartStatus;
+    role: PartRole;
+    mainPartId: string | null;
+  };
+  premises: { id: string; name: string; code: string | null }[];
+  locations: PartQueryRow[];
+  alternates: PartQueryAlternateRow[];
+  otherBranches: PartQueryRow[];
+  totals: { premisesStock: number; otherBranchesStock: number };
 };

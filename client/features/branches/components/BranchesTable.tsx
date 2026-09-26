@@ -278,7 +278,15 @@ export function BranchesTable() {
   const columns: Column<Branch>[] = [
     {
       header: "Name",
-      render: (b) => <span className="font-medium">{b.name}</span>,
+      render: (b) => (
+        <div>
+          <span className="font-medium">{b.name}</span>
+          {b.code && <span className="ml-1.5 font-mono text-xs text-muted-foreground">{b.code}</span>}
+          {b.parentBranch && (
+            <p className="text-xs text-muted-foreground">Sub-location of {b.parentBranch.name}</p>
+          )}
+        </div>
+      ),
     },
     {
       header: "City",

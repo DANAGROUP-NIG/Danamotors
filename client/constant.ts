@@ -24,6 +24,7 @@ import {
   Wallet,
   ListChecks,
   BadgeCheck,
+  PackageSearch,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -135,6 +136,12 @@ export const NAV_GROUPS: NavGroup[] = [
           INVENTORY_PERMISSIONS.SPAREPART_READ,
           INVENTORY_PERMISSIONS.STOCK_READ,
         ],
+      },
+      {
+        label: "Part Query",
+        href: "/inventory/part-query",
+        icon: PackageSearch,
+        permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ, INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
         label: "Transfers",

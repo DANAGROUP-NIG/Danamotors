@@ -31,6 +31,9 @@ export const partMasterSchema = z
         .number({ required_error: "Unit rate is required", invalid_type_error: "Unit rate must be a number" })
         .positive("Unit rate must be greater than zero"),
     ),
+    retailRate: optionalNumber("Retail rate"),
+    taxable: z.boolean(),
+    partFlag: z.string().trim().min(1, "Part flag is required").max(2, "Part flag must be 1 or 2 characters"),
     binLocation: optionalText(40),
     storeLocation: optionalText(40),
     partStatus: z.enum(["ACTIVE", "BLOCKED"]),

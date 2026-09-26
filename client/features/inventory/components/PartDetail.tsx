@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Receipt,
+  Search,
   Tag,
   Trash2,
 } from "lucide-react";
@@ -31,6 +32,9 @@ import { usePart, usePartAlternates, usePartStock } from "../hooks/use-parts";
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
 import { PartForm } from "./PartForm";
+import { StockLocationForm } from "./StockLocationForm";
+import { useBranchStore } from "@/store/branch.store";
+import type { PartStockItem } from "../types/inventory.types";
 import { PartRoleBadge, PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster } from "../types/inventory.types";
 
@@ -133,6 +137,12 @@ export function PartDetail({ id }: { id: string }) {
   const canDelete = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_DELETE);
   const canCreate = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_CREATE);
   const canReadStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_READ);
+  const canUpdateStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
+  const { user } = useAuth();
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const [editingStock, setEditingStock] = useState<
+    { branchId: string; branchName: string; stock?: PartStockItem } | null
+  >(null);
   const [editing, setEditing] = useState(false);
   const [addingAlt, setAddingAlt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -175,6 +185,13 @@ export function PartDetail({ id }: { id: string }) {
           <ArrowLeft className="size-4" /> Back to Inventory
         </Link>
         <div className="flex flex-wrap gap-2">
+          {canReadStock && (
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link href={`/inventory/part-query?part=${encodeURIComponent(part.partNumber)}`}>
+                <Search className="size-4" /> Part query
+              </Link>
+            </Button>
+          )}
           {canEdit &&
             (part.partStatus === "ACTIVE" ? (
               <Button
@@ -242,7 +259,10 @@ export function PartDetail({ id }: { id: string }) {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
-            <DetailField label="Unit rate" value={fmtNaira(part.unitRate)} />
+            <DetailField label="Part flag" value={part.partFlag} />
+            <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
+            <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
+            <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />
             <DetailField label="Description" value={part.description} />
           </div>
         </div>
@@ -277,7 +297,25 @@ export function PartDetail({ id }: { id: string }) {
         </SectionCard>
 
         {canReadStock && (
-          <SectionCard icon={<Boxes className="size-4" />} title="Stock by branch">
+          <SectionCard
+            icon={<Boxes className="size-4" />}
+            title="Stock by branch"
+            action={(() => {
+              const homeId = user?.branchId ?? activeBranch?.id;
+              const homeName = activeBranch?.id === homeId ? activeBranch?.name : "your branch";
+              if (!canUpdateStock || !homeId || stockLoading || stock?.some((x) => x.branchId === homeId)) return null;
+              return (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setEditingStock({ branchId: homeId, branchName: homeName ?? "your branch" })}
+                >
+                  <MapPin className="size-4" /> Set location at {homeName}
+                </Button>
+              );
+            })()}
+          >
             {stockLoading ? (
               <Loader2 className="size-5 animate-spin text-slate-400" />
             ) : stockError ? (
@@ -294,7 +332,9 @@ export function PartDetail({ id }: { id: string }) {
                       <th className="px-3 py-2 text-right">Reserved</th>
                       <th className="px-3 py-2 text-right">Available</th>
                       <th className="px-3 py-2 text-right">Min stock</th>
-                      <th className="px-3 py-2">Rack</th>
+                      <th className="px-3 py-2">Location</th>
+                      <th className="px-3 py-2">Bin card</th>
+                      {canUpdateStock && <th className="px-3 py-2" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -313,6 +353,19 @@ export function PartDetail({ id }: { id: string }) {
                         </td>
                         <td className="px-3 py-2 text-right text-slate-500">{s.minimumStock}</td>
                         <td className="px-3 py-2 text-slate-500">{s.rackLocation ?? "—"}</td>
+                        <td className="px-3 py-2 text-slate-500">{s.binCard ?? "—"}</td>
+                        {canUpdateStock && (
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              className="rounded-md p-1.5 text-slate-400 hover:bg-muted hover:text-slate-700"
+                              aria-label={`Edit location at ${s.branch.name}`}
+                              onClick={() => setEditingStock({ branchId: s.branchId, branchName: s.branch.name, stock: s })}
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -347,7 +400,7 @@ export function PartDetail({ id }: { id: string }) {
                   <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     <th className="px-3 py-2">Part</th>
                     <th className="px-3 py-2">Role</th>
-                    <th className="px-3 py-2">Unit rate</th>
+                    <th className="px-3 py-2">Dealer rate</th>
                     <th className="px-3 py-2">Status</th>
                   </tr>
                 </thead>
@@ -370,6 +423,22 @@ export function PartDetail({ id }: { id: string }) {
 
       <ModalFame isOpen={editing} onClose={() => setEditing(false)} title={`Edit ${part.partNumber}`}>
         {editing && <PartForm part={part} onSuccess={() => setEditing(false)} />}
+      </ModalFame>
+
+      <ModalFame
+        isOpen={!!editingStock}
+        onClose={() => setEditingStock(null)}
+        title={`Location at ${editingStock?.branchName ?? ""}`}
+      >
+        {editingStock && (
+          <StockLocationForm
+            branchId={editingStock.branchId}
+            branchName={editingStock.branchName}
+            partId={part.id}
+            initial={editingStock.stock}
+            onDone={() => setEditingStock(null)}
+          />
+        )}
       </ModalFame>
 
       <ModalFame isOpen={addingAlt} onClose={() => setAddingAlt(false)} title={`Add alternate for ${part.partNumber}`}>

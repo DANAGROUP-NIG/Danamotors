@@ -39,7 +39,7 @@ interface PartFormProps {
 }
 
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
-  if (!part) return { uom: "UNIT", partStatus: "ACTIVE" };
+  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O" };
   return {
     partCode: part.partCode,
     partNumber: part.partNumber,
@@ -52,6 +52,9 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     maxLevel: part.maxLevel ?? undefined,
     reorderQty: part.reorderQty ?? undefined,
     unitRate: part.unitRate,
+    retailRate: part.retailRate ?? undefined,
+    taxable: part.taxable,
+    partFlag: part.partFlag,
     binLocation: part.binLocation ?? "",
     storeLocation: part.storeLocation ?? "",
     partStatus: part.partStatus,
@@ -153,6 +156,9 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               ))}
             </datalist>
           </Field>
+          <Field label="Part flag" error={errors.partFlag?.message}>
+            <input className={inputCls} maxLength={2} placeholder="O" {...register("partFlag")} />
+          </Field>
           <Field label="Status" error={errors.partStatus?.message}>
             <select className={inputCls} {...register("partStatus")}>
               <option value="ACTIVE">Active</option>
@@ -173,8 +179,11 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               ))}
             </datalist>
           </Field>
-          <Field label="Unit rate (₦)" error={errors.unitRate?.message}>
+          <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
+          </Field>
+          <Field label="Retail rate (₦, optional)" error={errors.retailRate?.message}>
+            <input type="number" step="0.01" min={0} className={inputCls} {...register("retailRate")} />
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
             <input className={inputCls} {...register("taxCategory")} />
@@ -182,6 +191,10 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           <Field label="Tax form (optional)" error={errors.taxForm?.message}>
             <input className={inputCls} placeholder="e.g. X" {...register("taxForm")} />
           </Field>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold">
+            <input type="checkbox" className="size-4" {...register("taxable")} />
+            Taxable
+          </label>
         </div>
       </div>
 

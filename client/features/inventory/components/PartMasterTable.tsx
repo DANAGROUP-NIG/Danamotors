@@ -44,7 +44,10 @@ export const PART_EXPORT_COLUMNS = [
   { key: "minLevel", label: "Min Level" },
   { key: "maxLevel", label: "Max Level" },
   { key: "reorderQty", label: "Reorder Qty" },
-  { key: "unitRate", label: "Unit Rate" },
+  { key: "partFlag", label: "Part Flag" },
+  { key: "taxable", label: "Taxable" },
+  { key: "unitRate", label: "Dealer Rate" },
+  { key: "retailRate", label: "Retail Rate" },
   { key: "binLocation", label: "Bin Location" },
   { key: "storeLocation", label: "Store Location" },
   { key: "partStatus", label: "Status" },
@@ -63,7 +66,10 @@ export function partExportRow(p: PartMaster): Record<string, string | number> {
     minLevel: p.minLevel ?? "",
     maxLevel: p.maxLevel ?? "",
     reorderQty: p.reorderQty ?? "",
+    partFlag: p.partFlag,
+    taxable: p.taxable ? "Yes" : "No",
     unitRate: p.unitRate,
+    retailRate: p.retailRate ?? "",
     binLocation: p.binLocation ?? "",
     storeLocation: p.storeLocation ?? "",
     partStatus: p.partStatus,
@@ -140,7 +146,15 @@ export function PartMasterTable() {
     },
     { header: "Category", render: (p) => <span className="text-muted-foreground">{p.category || "—"}</span> },
     { header: "UOM", render: (p) => <span className="text-muted-foreground">{p.uom}</span> },
-    { header: "Unit rate", render: (p) => <span className="text-muted-foreground">{fmtNaira(p.unitRate)}</span> },
+    {
+      header: "Dealer / Retail",
+      render: (p) => (
+        <span className="text-muted-foreground">
+          {fmtNaira(p.unitRate)}
+          <span className="block text-xs">{p.retailRate != null ? fmtNaira(p.retailRate) : "—"}</span>
+        </span>
+      ),
+    },
     {
       header: "Min / Max",
       render: (p) => (

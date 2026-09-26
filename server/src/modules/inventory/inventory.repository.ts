@@ -64,6 +64,9 @@ export class InventoryRepository {
     maxLevel?: number | null;
     reorderQty?: number | null;
     unitPrice: number;
+    retailRate?: number | null;
+    taxable?: boolean;
+    partFlag?: string;
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;

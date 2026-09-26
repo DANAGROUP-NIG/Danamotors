@@ -10,6 +10,12 @@ datasource db {
 model Branch {
   id          String   @id @default(uuid())
   name        String   @unique
+  // Legacy store-location code (e.g. A, QS, DH, VI).
+  code        String?  @unique
+  // Set when this is a sub-location (store, godown) at another branch's premises.
+  parentBranchId String?
+  parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
+  subLocations   Branch[] @relation("BranchSubLocations")
   address     String?
   city        String?
   state       String?
@@ -514,6 +520,12 @@ model SparePart {
   reorderQty   Float?
 
   unitPrice Float @default(0)
+  // Legacy dealer rate is unitPrice; retail rate is the selling price.
+  retailRate Float?
+  // Legacy tax status (partmast.taxable).
+  taxable    Boolean @default(true)
+  // Legacy part flag, for example O for original.
+  partFlag   String  @default("O")
 
   binLocation   String?
   storeLocation String?
@@ -566,6 +578,8 @@ model InventoryStock {
   maximumStock Int?
 
   rackLocation String?
+  // Legacy bin card reference per store location (PARTBAL.bincard).
+  binCard      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

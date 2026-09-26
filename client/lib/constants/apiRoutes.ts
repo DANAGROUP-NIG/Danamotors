@@ -85,11 +85,13 @@ export const API_ROUTES = {
       base: "/inventory/stock",
       byBranch: (branchId: string) => `/inventory/stock/${branchId}`,
       adjust: "/inventory/stock/adjust",
+      location: (branchId: string, partId: string) => `/inventory/stock/${branchId}/${partId}`,
     },
     parts: {
       base: "/inventory/parts",
       detail: (id: string) => `/inventory/parts/${id}`,
       alternates: (id: string) => `/inventory/parts/${id}/alternates`,
+      query: "/inventory/parts/query",
     },
   },
   finance: {

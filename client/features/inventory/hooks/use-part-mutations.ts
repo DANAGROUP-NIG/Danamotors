@@ -7,8 +7,15 @@ import {
   createPartRequest,
   deletePartRequest,
   updatePartRequest,
+  updateStockLocationRequest,
 } from "../api/inventory.api";
-import type { AlternatePartPayload, PartMaster, PartMasterPayload, UpdatePartMasterPayload } from "../types/inventory.types";
+import type {
+  AlternatePartPayload,
+  PartMaster,
+  PartMasterPayload,
+  StockLocationPayload,
+  UpdatePartMasterPayload,
+} from "../types/inventory.types";
 
 type ApiError = {
   response?: { status?: number; data?: { message?: string; errors?: { field?: string; message: string }[] } };
@@ -117,5 +124,18 @@ export function useOpeningStock() {
     },
     onError: (error) =>
       toast.error(partErrorMessage(error, "The part was created, but opening stock could not be recorded")),
+  });
+}
+
+export function useUpdateStockLocation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ branchId, partId, payload }: { branchId: string; partId: string; payload: StockLocationPayload }) =>
+      updateStockLocationRequest(branchId, partId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      toast.success("Stock location updated");
+    },
+    onError: (error) => toast.error(partErrorMessage(error, "Failed to update stock location")),
   });
 }

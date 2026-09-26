@@ -3,7 +3,8 @@ export { InventoryTable } from "./components/InventoryTable";
 export { PartMasterTable } from "./components/PartMasterTable";
 export { PartForm } from "./components/PartForm";
 export { PartDetail } from "./components/PartDetail";
-export { useParts, usePart, usePartAlternates, usePartStock } from "./hooks/use-parts";
+export { PartQueryPage } from "./components/PartQueryPage";
+export { useParts, usePart, usePartAlternates, usePartStock, usePartQuery } from "./hooks/use-parts";
 export {
   useCreatePart,
   useUpdatePart,

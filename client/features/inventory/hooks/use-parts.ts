@@ -1,6 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { inventoryKeys } from "../api/inventory.keys";
-import { getAlternatesRequest, getPartRequest, getPartStockRequest, getPartsRequest } from "../api/inventory.api";
+import {
+  getAlternatesRequest,
+  getPartRequest,
+  getPartStockRequest,
+  getPartsRequest,
+  partQueryRequest,
+} from "../api/inventory.api";
 import type { PartListParams } from "../types/inventory.types";
 
 export function useParts(params: PartListParams = {}) {
@@ -32,5 +38,15 @@ export function usePartStock(partId: string, enabled = true) {
     queryKey: inventoryKeys.partStock(partId),
     queryFn: () => getPartStockRequest(partId),
     enabled: !!partId && enabled,
+  });
+}
+
+/** Runs only once a part number has been submitted. */
+export function usePartQuery(partNumber: string, branchId?: string) {
+  return useQuery({
+    queryKey: inventoryKeys.partQuery(partNumber, branchId),
+    queryFn: () => partQueryRequest(partNumber, branchId),
+    enabled: partNumber.trim().length > 0,
+    retry: false,
   });
 }

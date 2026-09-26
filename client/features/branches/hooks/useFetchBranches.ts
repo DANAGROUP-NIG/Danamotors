@@ -28,7 +28,8 @@ export function useFetchBranches(enabled = true) {
 
     setLoading(true);
 
-    apiGet<BranchListResponse>("/branches")
+    // The API pages at 10 by default; store locations push the count past that.
+    apiGet<BranchListResponse>("/branches?limit=100")
       .then((data) => setBranches(data.branches))
       .catch((err) => {
         const status = err?.response?.status;
