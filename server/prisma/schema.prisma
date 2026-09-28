@@ -10,6 +10,12 @@ datasource db {
 model Branch {
   id          String   @id @default(uuid())
   name        String   @unique
+  // Legacy store-location code (e.g. A, QS, DH, VI).
+  code        String?  @unique
+  // Set when this is a sub-location (store, godown) at another branch's premises.
+  parentBranchId String?
+  parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
+  subLocations   Branch[] @relation("BranchSubLocations")
   address     String?
   city        String?
   state       String?
@@ -31,6 +37,19 @@ model Branch {
 
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
+
+  indentRequests BranchIndent[]      @relation("IndentRequestingBranch")
+  indentSources  BranchIndent[]      @relation("IndentSourceBranch")
+  pickingLists   PickingList[]       @relation("PickingListBranch")
+  stnsOut        StockTransferNote[] @relation("StnSourceBranch")
+  stnsIn         StockTransferNote[] @relation("StnDestinationBranch")
+  transferCases  TransferCase[]      @relation("TransferCaseBranch")
+  packingLists   PackingList[]       @relation("PackingListBranch")
+  mitsOut        MaterialInTransit[] @relation("MitSourceBranch")
+  mitsIn         MaterialInTransit[] @relation("MitDestinationBranch")
+  srnsReceived   StockReceiptNote[]  @relation("SrnReceivingBranch")
+  mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
+  srnsSourced    StockReceiptNote[]  @relation("SrnSourceBranch")
 
   notifications Notification[]
 }
@@ -83,6 +102,21 @@ model User {
   transferApprovals  InterBranchTransfer[] @relation("TransferApprovedBy")
   transferDispatches InterBranchTransfer[] @relation("TransferDispatchedBy")
   transferReceives   InterBranchTransfer[] @relation("TransferReceivedBy")
+
+  indentsRequested     BranchIndent[]          @relation("IndentRequestedBy")
+  indentsApproved      BranchIndent[]          @relation("IndentApprovedBy")
+  indentsRejected      BranchIndent[]          @relation("IndentRejectedBy")
+  indentsCancelled     BranchIndent[]          @relation("IndentCancelledBy")
+  transferStatusEvents TransferStatusHistory[] @relation("TransferStatusActor")
+  pickingListsCreated  PickingList[]           @relation("PickingListCreatedBy")
+  pickingListsDone     PickingList[]           @relation("PickingListCompletedBy")
+  stnsCreated          StockTransferNote[]     @relation("StnCreatedBy")
+  stnsDispatched       StockTransferNote[]     @relation("StnDispatchedBy")
+  transferCasesCreated TransferCase[]          @relation("TransferCaseCreatedBy")
+  packingListsCreated  PackingList[]           @relation("PackingListCreatedBy")
+  mitsCreated          MaterialInTransit[]     @relation("MitCreatedBy")
+  srnsReceived         StockReceiptNote[]      @relation("SrnReceivedBy")
+  mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
 
@@ -328,6 +362,8 @@ model JobCard {
   partIssuances PartIssuance[]
   invoices      Invoice[]
 
+  indentLines   BranchIndentLine[] @relation("IndentLineJobCard")
+
   @@index([branchId])
   @@index([customerId])
   @@index([vehicleId])
@@ -486,6 +522,15 @@ model SparePart {
   reorderQty   Float?
 
   unitPrice Float @default(0)
+  // Legacy dealer rate is unitPrice; retail rate is the selling price.
+  retailRate Float?
+  // Legacy tax status (partmast.taxable).
+  taxable    Boolean @default(true)
+  // Legacy part flag, for example O for original.
+  partFlag   String  @default("O")
+  // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
+  priceCategoryCode String?
+  priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
 
   binLocation   String?
   storeLocation String?
@@ -505,6 +550,16 @@ model SparePart {
   inventoryStocks   InventoryStock[]
   stockTransactions StockTransaction[]
   transferItems     InterBranchTransferItem[]
+
+  indentLines       BranchIndentLine[]      @relation("IndentLinePart")
+  pickingRequested  PickingListLine[]       @relation("PickingRequestedPart")
+  pickingSupplied   PickingListLine[]       @relation("PickingSuppliedPart")
+  stnRequested      StockTransferNoteLine[] @relation("StnRequestedPart")
+  stnSupplied       StockTransferNoteLine[] @relation("StnSuppliedPart")
+  mitLines          MaterialInTransitLine[] @relation("MitLinePart")
+  mitRequestedLines MaterialInTransitLine[] @relation("MitLineRequestedPart")
+  srnLines          StockReceiptLine[]      @relation("SrnLinePart")
+  mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
 
   @@index([mainPartId])
 }
@@ -529,6 +584,8 @@ model InventoryStock {
   maximumStock Int?
 
   rackLocation String?
+  // Legacy bin card reference per store location (PARTBAL.bincard).
+  binCard      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1048,4 +1105,660 @@ model Enquiry {
 
   @@index([branchId, status])
   @@index([email])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stock transfer workflow (issue #62, Process A)
+//
+// Branch Indent → Picking List → STN → Cases + Packing List → MIT → SRN
+//
+// Only four user actions drive the flow: create/submit the indent, approve it,
+// dispatch it and receive it. Every intermediate document is generated by the
+// system from data already captured, so nothing is typed in twice.
+// Document numbers follow the legacy format YYYY + 6-digit sequence
+// (e.g. 2026000132), so migrated legacy numbers fit the same columns.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum IndentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PICKING
+  PICKED
+  STN_CREATED
+  PACKED
+  DISPATCHED
+  IN_TRANSIT
+  SRN_CREATED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PickingListStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum StnStatus {
+  CREATED
+  DISPATCHED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum TransferCaseStatus {
+  PACKED
+  DISPATCHED
+  RECEIVED
+}
+
+enum PackingListStatus {
+  PACKED
+  DISPATCHED
+}
+
+enum TransportMode {
+  ROAD
+  AIR
+  SEA
+  COURIER
+  HAND_DELIVERY
+  DOOR_DELIVERY
+}
+
+enum MobisOrderMode {
+  AIR
+  COURIER
+}
+
+// Legacy pricing categories (Category table): retail rate = dealer rate × markupMultiplier.
+model PartCategory {
+  code             String   @id
+  description      String
+  markupMultiplier Float    @default(1)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  parts SparePart[]
+}
+
+enum MitSourceType {
+  INTERNAL_TRANSFER
+  EXTERNAL_VENDOR
+}
+
+enum MitStatus {
+  IN_TRANSIT
+  VERIFIED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum SrnStatus {
+  COMPLETED
+  CANCELLED
+}
+
+// Atomic per-document, per-year counters used to generate document numbers.
+model DocumentSequence {
+  docType   String
+  year      Int
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([docType, year])
+}
+
+model BranchIndent {
+  id           String @id @default(uuid())
+  indentNumber String @unique
+
+  requestingBranchId String
+  requestingBranch   Branch @relation("IndentRequestingBranch", fields: [requestingBranchId], references: [id], onDelete: Restrict)
+
+  sourceBranchId String
+  sourceBranch   Branch @relation("IndentSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+
+  status    IndentStatus @default(DRAFT)
+  orderDate DateTime     @default(now())
+  remarks   String?
+
+  // Requesting-branch authorisation (legacy AuthorisedBy / ApprovalDate, e.g. "SM").
+  authorisedBy String?
+  authorisedAt DateTime?
+
+  requestedById String
+  requestedBy   User   @relation("IndentRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  submittedAt DateTime?
+
+  approvedById    String?
+  approvedBy      User?     @relation("IndentApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  approvalRemarks String?
+
+  rejectedById    String?
+  rejectedBy      User?     @relation("IndentRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  cancelledById      String?
+  cancelledBy        User?     @relation("IndentCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines         BranchIndentLine[]
+  statusHistory TransferStatusHistory[]
+  pickingList   PickingList?
+  stn           StockTransferNote?
+
+  @@index([requestingBranchId])
+  @@index([sourceBranchId])
+  @@index([status])
+  @@index([requestedById])
+  @@index([createdAt])
+}
+
+model BranchIndentLine {
+  id         String       @id @default(uuid())
+  indentId   String
+  indent     BranchIndent @relation(fields: [indentId], references: [id], onDelete: Cascade)
+  lineNumber Int
+
+  partId String
+  part   SparePart @relation("IndentLinePart", fields: [partId], references: [id], onDelete: Restrict)
+
+  // Legacy part flag, for example O for original.
+  partFlag String?
+
+  // Legacy XLS: "Urgent required for Vehicle", "Urgent required for Stock",
+  // and "Stock Order (15 days consumption)".
+  urgentQuantity     Int @default(0)
+  stockQuantity      Int @default(0)
+  stockOrderQuantity Int @default(0)
+  requestedQuantity Int
+
+  approvedQuantity  Int?
+  backOrderQuantity Int  @default(0)
+
+  // Snapshots taken from Part Master and branch stock when the line is created.
+  unitRate     Float
+  amount       Float
+  currentStock Int?
+
+  // Urgent vehicle order context (legacy Jobno, JobDate, VIN, Registrationno, Model).
+  jobCardId          String?
+  jobCard            JobCard?  @relation("IndentLineJobCard", fields: [jobCardId], references: [id], onDelete: SetNull)
+  jobNumber          String?
+  jobDate            DateTime?
+  vin                String?
+  registrationNumber String?
+  vehicleModel       String?
+
+  // How an urgent part should be ordered from Mobis if it is not available (authorised by the SM).
+  mobisOrderMode MobisOrderMode?
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  pickingLines PickingListLine[]
+  stnLines     StockTransferNoteLine[]
+
+  @@unique([indentId, lineNumber])
+  @@index([partId])
+  @@index([jobCardId])
+}
+
+model TransferStatusHistory {
+  id       String       @id @default(uuid())
+  indentId String
+  indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Cascade)
+
+  fromStatus IndentStatus?
+  toStatus   IndentStatus
+
+  actorId String?
+  actor   User?   @relation("TransferStatusActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  remarks   String?
+  createdAt DateTime @default(now())
+
+  @@index([indentId, createdAt])
+}
+
+model PickingList {
+  id            String @id @default(uuid())
+  pickingNumber String @unique
+
+  indentId String       @unique
+  indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation("PickingListBranch", fields: [branchId], references: [id], onDelete: Restrict)
+
+  status PickingListStatus @default(OPEN)
+
+  createdById   String?
+  createdBy     User?     @relation("PickingListCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  completedById String?
+  completedBy   User?     @relation("PickingListCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines PickingListLine[]
+  stn   StockTransferNote?
+
+  @@index([branchId])
+  @@index([status])
+}
+
+model PickingListLine {
+  id            String      @id @default(uuid())
+  pickingListId String
+  pickingList   PickingList @relation(fields: [pickingListId], references: [id], onDelete: Cascade)
+
+  indentLineId String
+  indentLine   BranchIndentLine @relation(fields: [indentLineId], references: [id], onDelete: Cascade)
+
+  // The part originally requested and the part actually supplied (alternate traceability).
+  requestedPartId String
+  requestedPart   SparePart @relation("PickingRequestedPart", fields: [requestedPartId], references: [id], onDelete: Restrict)
+  partId          String
+  part            SparePart @relation("PickingSuppliedPart", fields: [partId], references: [id], onDelete: Restrict)
+  isAlternate     Boolean   @default(false)
+
+  // Source stock available when picked, and the quantity reserved for this line.
+  availableQuantity Int
+  pickedQuantity    Int
+  binLocation       String?
+
+  createdAt DateTime @default(now())
+
+  stnLine StockTransferNoteLine?
+
+  @@unique([pickingListId, indentLineId])
+  @@index([partId])
+}
+
+model StockTransferNote {
+  id        String @id @default(uuid())
+  stnNumber String @unique
+
+  indentId String       @unique
+  indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Restrict)
+
+  pickingListId String      @unique
+  pickingList   PickingList @relation(fields: [pickingListId], references: [id], onDelete: Restrict)
+
+  sourceBranchId String
+  sourceBranch   Branch @relation("StnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+
+  destinationBranchId String
+  destinationBranch   Branch @relation("StnDestinationBranch", fields: [destinationBranchId], references: [id], onDelete: Restrict)
+
+  status        StnStatus      @default(CREATED)
+  documentDate  DateTime       @default(now())
+  taxForm       String?
+  transportMode TransportMode?
+  remarks       String?
+
+  // Guards the single stock deduction for this STN.
+  stockDeducted Boolean @default(false)
+  totalQuantity Int     @default(0)
+  totalValue    Float   @default(0)
+
+  createdById    String?
+  createdBy      User?     @relation("StnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dispatchedById String?
+  dispatchedBy   User?     @relation("StnDispatchedBy", fields: [dispatchedById], references: [id], onDelete: SetNull)
+  dispatchedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines       StockTransferNoteLine[]
+  cases       TransferCase[]
+  packingList PackingList?
+  mit         MaterialInTransit?
+  srns        StockReceiptNote[]
+
+  @@index([sourceBranchId])
+  @@index([destinationBranchId])
+  @@index([status])
+}
+
+model StockTransferNoteLine {
+  id    String            @id @default(uuid())
+  stnId String
+  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
+
+  indentLineId  String
+  indentLine    BranchIndentLine @relation(fields: [indentLineId], references: [id], onDelete: Restrict)
+  pickingLineId String           @unique
+  pickingLine   PickingListLine  @relation(fields: [pickingLineId], references: [id], onDelete: Restrict)
+
+  requestedPartId String
+  requestedPart   SparePart @relation("StnRequestedPart", fields: [requestedPartId], references: [id], onDelete: Restrict)
+  partId          String
+  part            SparePart @relation("StnSuppliedPart", fields: [partId], references: [id], onDelete: Restrict)
+  isAlternate     Boolean   @default(false)
+
+  quantity Int
+  unitRate Float
+  amount   Float
+
+  createdAt DateTime @default(now())
+
+  caseLines TransferCaseLine[]
+  mitLine   MaterialInTransitLine?
+
+  @@index([stnId])
+  @@index([partId])
+}
+
+model TransferCase {
+  id         String @id @default(uuid())
+  caseNumber String @unique
+
+  stnId String
+  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
+
+  packingListId String?
+  packingList   PackingList? @relation(fields: [packingListId], references: [id], onDelete: SetNull)
+
+  branchId String
+  branch   Branch @relation("TransferCaseBranch", fields: [branchId], references: [id], onDelete: Restrict)
+
+  status        TransferCaseStatus @default(PACKED)
+  packerName    String?
+  weight        Float?
+  totalQuantity Int                @default(0)
+
+  createdById String?
+  createdBy   User?   @relation("TransferCaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines TransferCaseLine[]
+
+  @@index([stnId])
+  @@index([packingListId])
+}
+
+model TransferCaseLine {
+  id     String       @id @default(uuid())
+  caseId String
+  case   TransferCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  stnLineId String
+  stnLine   StockTransferNoteLine @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
+
+  quantity Int
+
+  @@unique([caseId, stnLineId])
+  @@index([stnLineId])
+}
+
+model PackingList {
+  id            String @id @default(uuid())
+  packingNumber String @unique
+
+  stnId String            @unique
+  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation("PackingListBranch", fields: [branchId], references: [id], onDelete: Restrict)
+
+  status            PackingListStatus @default(PACKED)
+  dispatchMode      TransportMode?
+  waybillNumber     String?
+  courierName       String?
+  consignmentWeight Float?
+  packingDate       DateTime          @default(now())
+  dispatchedAt      DateTime?
+  remarks           String?
+
+  createdById String?
+  createdBy   User?   @relation("PackingListCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases TransferCase[]
+
+  @@index([branchId])
+}
+
+// MIT covers both internal transfers (from an STN) and, later, external
+// vendor (Mobis) shipments. Vendor fields stay null for internal transfers.
+model MaterialInTransit {
+  id         String        @id @default(uuid())
+  mitNumber  String        @unique
+  sourceType MitSourceType
+  status     MitStatus     @default(IN_TRANSIT)
+
+  stnId String?            @unique
+  stn   StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: Restrict)
+
+  sourceBranchId String?
+  sourceBranch   Branch? @relation("MitSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+
+  destinationBranchId String
+  destinationBranch   Branch @relation("MitDestinationBranch", fields: [destinationBranchId], references: [id], onDelete: Restrict)
+
+  // External vendor fields (Process B).
+  vendor         String?
+  invoiceNumber  String?
+  invoiceDate    DateTime?
+  conversionRate Float?
+  receivedMode   TransportMode?
+  // Legacy "Material phy rec date" and the imported file's name.
+  physicalReceiptDate DateTime?
+  sourceFileName      String?
+  cancelledAt         DateTime?
+
+  dispatchMode  TransportMode?
+  waybillNumber String?
+  transitDate   DateTime       @default(now())
+  totalCases    Int            @default(0)
+  totalQuantity Int            @default(0)
+  totalAmount   Float          @default(0)
+  remarks       String?
+
+  createdById String?
+  createdBy   User?   @relation("MitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines MaterialInTransitLine[]
+  srns  StockReceiptNote[]
+  mrn   MaterialReceiptNote?
+
+  @@index([sourceType])
+  @@index([vendor, invoiceNumber])
+  @@index([status])
+  @@index([destinationBranchId])
+  @@index([sourceBranchId])
+}
+
+model MaterialInTransitLine {
+  id    String            @id @default(uuid())
+  mitId String
+  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Cascade)
+
+  stnLineId String?                @unique
+  stnLine   StockTransferNoteLine? @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
+
+  partId          String
+  part            SparePart  @relation("MitLinePart", fields: [partId], references: [id], onDelete: Restrict)
+  requestedPartId String?
+  requestedPart   SparePart? @relation("MitLineRequestedPart", fields: [requestedPartId], references: [id], onDelete: SetNull)
+
+  caseNumbers String?
+  quantity    Int
+  unitPrice   Float
+  amount      Float
+
+  // External vendor line details (Process B), as printed on the Mobis invoice.
+  orderNumber     String?
+  lineNumber      Int?
+  weight          Float?
+  hsCode          String?
+  orderedQuantity Int?
+  intRef          String?
+  filePartNumber  String?
+  filePartName    String?
+  // True when the part was created in Part Master from this invoice.
+  newPart         Boolean @default(false)
+
+  // Running receipt tallies, updated by each SRN posted against this line.
+  receivedQuantity Int @default(0)
+  damagedQuantity  Int @default(0)
+  shortQuantity    Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  srnLines StockReceiptLine[]
+  mrnLines MaterialReceiptLine[]
+
+  @@index([mitId])
+  @@index([partId])
+}
+
+model StockReceiptNote {
+  id        String @id @default(uuid())
+  srnNumber String @unique
+
+  mitId String
+  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
+
+  stnId String
+  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Restrict)
+
+  receivingBranchId String
+  receivingBranch   Branch @relation("SrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
+
+  sourceBranchId String
+  sourceBranch   Branch @relation("SrnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+
+  status        SrnStatus      @default(COMPLETED)
+  receiptDate   DateTime       @default(now())
+  taxForm       String?
+  transportMode TransportMode?
+  remarks       String?
+
+  totalReceived Int @default(0)
+  totalDamaged  Int @default(0)
+  totalShort    Int @default(0)
+
+  receivedById String?
+  receivedBy   User?   @relation("SrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  lines StockReceiptLine[]
+
+  @@index([mitId])
+  @@index([stnId])
+  @@index([receivingBranchId])
+}
+
+model StockReceiptLine {
+  id    String           @id @default(uuid())
+  srnId String
+  srn   StockReceiptNote @relation(fields: [srnId], references: [id], onDelete: Cascade)
+
+  mitLineId String
+  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+
+  partId String
+  part   SparePart @relation("SrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
+
+  receivedQuantity Int     @default(0)
+  damagedQuantity  Int     @default(0)
+  shortQuantity    Int     @default(0)
+  remarks          String?
+
+  @@index([srnId])
+  @@index([mitLineId])
+}
+
+// Material Receipt Note: receipt of externally purchased (Mobis) material into
+// CPD stock. Distinct from the SRN, which receives internal transfers.
+// One MRN per MIT, so stock from an invoice can only be posted once.
+model MaterialReceiptNote {
+  id        String @id @default(uuid())
+  mrnNumber String @unique
+
+  mitId String            @unique
+  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
+
+  receivingBranchId String
+  receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
+
+  vendor         String
+  invoiceNumber  String?
+  // Legacy MRN tax form for purchases is P.
+  taxForm        String   @default("P")
+  conversionRate Float
+  receiptDate    DateTime @default(now())
+  remarks        String?
+
+  totalReceived Int   @default(0)
+  totalDamaged  Int   @default(0)
+  totalShort    Int   @default(0)
+  // Value of accepted stock in local currency (unit price x conversion rate).
+  totalValue    Float @default(0)
+
+  receivedById String?
+  receivedBy   User?   @relation("MrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  lines MaterialReceiptLine[]
+
+  @@index([receivingBranchId])
+}
+
+model MaterialReceiptLine {
+  id    String              @id @default(uuid())
+  mrnId String
+  mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
+
+  mitLineId String
+  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+
+  partId String
+  part   SparePart @relation("MrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
+
+  receivedQuantity Int @default(0)
+  damagedQuantity  Int @default(0)
+  shortQuantity    Int @default(0)
+
+  // Vendor unit price (foreign currency) and its local value.
+  unitPrice Float
+  unitCost  Float
+  amount    Float
+
+  remarks String?
+
+  @@index([mrnId])
+  @@index([mitLineId])
 }

@@ -8,6 +8,8 @@ export const createBranchSchema = z.object({
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
   email: z.string().email("Enter a valid email").optional(),
+  code: z.string().trim().max(10, "Code must be 10 characters or less").optional(),
+  parentBranchId: z.string().optional(),
 });
 
 export const updateBranchSchema = z.object({
@@ -18,6 +20,8 @@ export const updateBranchSchema = z.object({
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
   email: z.string().email("Enter a valid email").optional(),
+  code: z.string().trim().max(10, "Code must be 10 characters or less").optional(),
+  parentBranchId: z.string().optional(),
 });
 
 export type CreateBranchFormValues = z.infer<typeof createBranchSchema>;

@@ -1,7 +1,8 @@
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './inventory.repository';
 import { ConflictError, NotFoundError } from '../../shared/errors/appError';
-import { PartRole, PartStatus, SparePart } from '@prisma/client';
+import { PartRole, PartStatus, Prisma, SparePart } from '@prisma/client';
+import prisma from '../../prisma/client';
 
 const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -17,6 +18,10 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   maxLevel: null,
   reorderQty: null,
   unitPrice: 4500,
+  retailRate: null,
+  taxable: true,
+  partFlag: 'O',
+  priceCategoryCode: null,
   binLocation: null,
   storeLocation: null,
   role: PartRole.MAIN,
@@ -164,6 +169,10 @@ describe('InventoryService - Part Master', () => {
   });
 
   describe('deletePart', () => {
+    beforeEach(() => {
+      jest.spyOn(prisma.sparePart, 'count').mockResolvedValue(0);
+    });
+
     it('should delete a part successfully', async () => {
       jest
         .spyOn(InventoryRepository.prototype, 'findPartById')
@@ -181,6 +190,37 @@ describe('InventoryService - Part Master', () => {
       await expect(
         service.deletePart('00000000-0000-0000-0000-000000000000'),
       ).rejects.toThrow(NotFoundError);
+    });
+
+    it('should refuse to delete a main part that has alternates', async () => {
+      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(mockSparePart());
+      jest.spyOn(prisma.sparePart, 'count').mockResolvedValue(2);
+      const del = jest.spyOn(InventoryRepository.prototype, 'deletePart');
+
+      await expect(service.deletePart('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow(/2 alternate part/);
+      expect(del).not.toHaveBeenCalled();
+    });
+
+    it('should return a conflict instead of a database error when the part is in use', async () => {
+      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(mockSparePart());
+      jest
+        .spyOn(InventoryRepository.prototype, 'deletePart')
+        .mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', { code: 'P2003', clientVersion: 'test' }),
+        );
+
+      await expect(service.deletePart('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow(ConflictError);
+    });
+
+    it('should also recognise a raw RESTRICT violation from Postgres', async () => {
+      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(mockSparePart());
+      jest
+        .spyOn(InventoryRepository.prototype, 'deletePart')
+        .mockRejectedValue(
+          new Error('update or delete on table "SparePart" violates RESTRICT setting of foreign key constraint'),
+        );
+
+      await expect(service.deletePart('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow(/Block it instead/);
     });
   });
 });

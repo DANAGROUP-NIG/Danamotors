@@ -1,5 +1,5 @@
-import { TransfersPage } from "@/features/transfers";
+import { IndentsPage } from "@/features/stock-transfers";
 
 export default function Page() {
-  return <TransfersPage />;
+  return <IndentsPage />;
 }

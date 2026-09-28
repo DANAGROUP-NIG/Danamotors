@@ -138,6 +138,8 @@ Express 4 + Prisma 6 + PostgreSQL + TypeScript. All routes are mounted under `/a
 | PATCH | `/transfers/:id/reject` | `transfer:approve` | Reject transfer |
 | PATCH | `/transfers/:id/cancel` | `transfer:update` | Cancel transfer |
 
+The `/transfers` endpoints above are the original simple flow and still work. New work should use the indent workflow at `/indents`, which creates the picking list, STN, cases, packing list, MIT and SRN. See [stock-transfers.md](./stock-transfers.md).
+
 ## Finance (`/api/finance`)
 
 | Method | Path | Permission | Description |
