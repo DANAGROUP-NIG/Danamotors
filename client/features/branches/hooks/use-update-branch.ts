@@ -17,7 +17,7 @@ export function useUpdateBranch(id: string) {
       queryClient.invalidateQueries({ queryKey: branchKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: branchKeys.lists() });
       try {
-        const data = await apiGet<{ branches: Branch[] }>("/branches");
+        const data = await apiGet<{ branches: Branch[] }>("/branches?limit=100");
         setBranches(data.branches);
       } catch {}
       toast.success("Branch updated");

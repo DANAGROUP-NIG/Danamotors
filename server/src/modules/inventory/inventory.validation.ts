@@ -99,6 +99,10 @@ const basePartMasterFields = {
   maxLevel: z.number().nonnegative('Maximum level must be 0 or more').optional(),
   reorderQty: z.number().nonnegative('Reorder quantity must be 0 or more').optional(),
   unitRate: z.number().positive('Unit rate must be greater than zero'),
+  retailRate: z.number().nonnegative('Retail rate must be 0 or more').optional(),
+  taxable: z.boolean().optional(),
+  partFlag: z.string().trim().min(1, 'Part flag is required').max(2, 'Part flag must be 1 or 2 characters').optional(),
+  priceCategoryCode: z.string().trim().toUpperCase().max(2, 'Price category must be 1 or 2 characters').optional(),
   binLocation: z.string().optional(),
   storeLocation: z.string().optional(),
 };
@@ -133,6 +137,10 @@ export const updatePartMasterSchema = z.object({
     maxLevel: basePartMasterFields.maxLevel,
     reorderQty: basePartMasterFields.reorderQty,
     unitRate: basePartMasterFields.unitRate.optional(),
+    retailRate: basePartMasterFields.retailRate,
+    taxable: basePartMasterFields.taxable,
+    partFlag: basePartMasterFields.partFlag,
+    priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
     binLocation: basePartMasterFields.binLocation,
     storeLocation: basePartMasterFields.storeLocation,
     partStatus: partStatusEnum.optional(),
@@ -273,6 +281,31 @@ export const branchPartParamSchema = z.object({
     branchId: z.string().uuid('Invalid branch ID'),
     partId: z.string().uuid('Invalid part ID'),
   }),
+});
+
+export const partQueryQuerySchema = z.object({
+  query: z.object({
+    partNumber: z.string().trim().min(1, 'Enter a part number').max(40),
+    branchId: z.string().uuid('Invalid branch ID').optional(),
+  }),
+});
+
+const optionalLocationText = (max: number) =>
+  z.string().trim().max(max, `Max ${max} characters`).transform((v) => v || null).nullable().optional();
+
+export const updateStockLocationSchema = z.object({
+  params: z.object({
+    branchId: z.string().uuid('Invalid branch ID'),
+    partId: z.string().uuid('Invalid part ID'),
+  }),
+  body: z
+    .object({
+      rackLocation: optionalLocationText(40),
+      binCard: optionalLocationText(20),
+      minimumStock: z.number().int().nonnegative('Minimum stock must be 0 or more').optional(),
+      maximumStock: z.number().int().nonnegative('Maximum stock must be 0 or more').nullable().optional(),
+    })
+    .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update' }),
 });
 
 export const stockQuerySchema = z.object({

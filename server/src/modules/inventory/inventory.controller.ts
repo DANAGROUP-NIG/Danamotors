@@ -370,6 +370,47 @@ export class InventoryController {
     }
   };
 
+  listPartCategories = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const categories = await this.inventoryService.listPartCategories();
+      res.status(200).json({ status: "success", statusCode: 200, data: { categories } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Part Query (legacy Master > Part Query) ────────────────────────────
+
+  partQuery = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { partNumber, branchId } = req.query as { partNumber: string; branchId?: string };
+      // Branch users always query from their own premises; cross-branch users may choose.
+      const crossBranch = this.isCrossBranchUser(req);
+      const homeBranchId = crossBranch ? (branchId ?? req.user?.branchId ?? null) : req.user?.branchId;
+      if (!crossBranch) assertInventoryBranchAccess(req, [homeBranchId]);
+      const result = await this.inventoryService.partQuery(partNumber, homeBranchId);
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateStockLocation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { branchId, partId } = req.params;
+      assertInventoryBranchAccess(req, [branchId]);
+      const result = await this.inventoryService.updateStockLocation(branchId, partId, req.body);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Stock location updated",
+        data: { stock: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // ── Branch Stock ───────────────────────────────────────────────────────
 
   getBranchStock = async (
