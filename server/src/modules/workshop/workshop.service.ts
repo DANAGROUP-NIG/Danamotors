@@ -1,7 +1,8 @@
 import { WorkshopRepository } from './workshop.repository';
-import { NotFoundError } from '../../shared/errors/appError';
+import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
 import prisma from '../../prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import { ServiceService } from '../service/service.service';
 
 export class WorkshopService {
   private workshopRepository: WorkshopRepository;
@@ -60,16 +61,19 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
-    const technician = await prisma.user.findUnique({ where: { id: technicianId } });
-    if (!technician) {
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
+    const technician = await prisma.user.findUnique({ where: { id: technicianId }, include: { role: true } });
+    if (!technician || !technician.isActive || technician.role.name !== 'Technician') {
       throw new NotFoundError('Technician not found');
     }
+    if (technician.branchId !== jobCard.branchId) throw new BadRequestError('Technician must belong to the job card branch');
 
     if (qualityInspectorId) {
       const inspector = await prisma.user.findUnique({ where: { id: qualityInspectorId } });
-      if (!inspector) {
+      if (!inspector || !inspector.isActive) {
         throw new NotFoundError('Quality inspector not found');
       }
+      if (inspector.branchId !== jobCard.branchId) throw new BadRequestError('Quality inspector must belong to the job card branch');
     }
 
     const updatedJobCard = await this.workshopRepository.assignTechnician(id, technicianId, qualityInspectorId);
@@ -92,7 +96,8 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
-    return this.workshopRepository.updateProgress(id, progress, status);
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
+    return new ServiceService().updateJobCard(id, { progress, ...(status ? { status } : {}) });
   }
 
   async updateQC(id: string, qcStatus: string, qcNotes?: string) {
@@ -101,6 +106,7 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
     return this.workshopRepository.updateQC(id, qcStatus, qcNotes);
   }
 }
