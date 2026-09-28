@@ -77,7 +77,10 @@ export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, place
               >
                 <span className="min-w-0">
                   <span className="block font-mono text-xs font-medium">{part.partNumber}</span>
-                  <span className="block truncate text-muted-foreground">{part.name}</span>
+                  <span className="block truncate text-muted-foreground">
+                    {part.name}
+                    {part.priceCategoryCode ? ` · Cat. ${part.priceCategoryCode}` : ""}
+                  </span>
                 </span>
                 <span className="shrink-0 text-right text-xs">
                   <span className={cn("block font-medium", part.sourceAvailable > 0 ? "text-emerald-700" : "text-red-600")}>

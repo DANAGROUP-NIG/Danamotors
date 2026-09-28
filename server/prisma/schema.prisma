@@ -48,6 +48,7 @@ model Branch {
   mitsOut        MaterialInTransit[] @relation("MitSourceBranch")
   mitsIn         MaterialInTransit[] @relation("MitDestinationBranch")
   srnsReceived   StockReceiptNote[]  @relation("SrnReceivingBranch")
+  mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
   srnsSourced    StockReceiptNote[]  @relation("SrnSourceBranch")
 
   notifications Notification[]
@@ -115,6 +116,7 @@ model User {
   packingListsCreated  PackingList[]           @relation("PackingListCreatedBy")
   mitsCreated          MaterialInTransit[]     @relation("MitCreatedBy")
   srnsReceived         StockReceiptNote[]      @relation("SrnReceivedBy")
+  mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
 
@@ -526,6 +528,9 @@ model SparePart {
   taxable    Boolean @default(true)
   // Legacy part flag, for example O for original.
   partFlag   String  @default("O")
+  // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
+  priceCategoryCode String?
+  priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
 
   binLocation   String?
   storeLocation String?
@@ -554,6 +559,7 @@ model SparePart {
   mitLines          MaterialInTransitLine[] @relation("MitLinePart")
   mitRequestedLines MaterialInTransitLine[] @relation("MitLineRequestedPart")
   srnLines          StockReceiptLine[]      @relation("SrnLinePart")
+  mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
 
   @@index([mainPartId])
 }
@@ -1162,6 +1168,24 @@ enum TransportMode {
   SEA
   COURIER
   HAND_DELIVERY
+  DOOR_DELIVERY
+}
+
+enum MobisOrderMode {
+  AIR
+  COURIER
+}
+
+// Legacy pricing categories (Category table): retail rate = dealer rate × markupMultiplier.
+model PartCategory {
+  code             String   @id
+  description      String
+  markupMultiplier Float    @default(1)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  parts SparePart[]
 }
 
 enum MitSourceType {
@@ -1259,8 +1283,11 @@ model BranchIndentLine {
   // Legacy part flag, for example O for original.
   partFlag String?
 
-  urgentQuantity    Int @default(0)
-  stockQuantity     Int @default(0)
+  // Legacy XLS: "Urgent required for Vehicle", "Urgent required for Stock",
+  // and "Stock Order (15 days consumption)".
+  urgentQuantity     Int @default(0)
+  stockQuantity      Int @default(0)
+  stockOrderQuantity Int @default(0)
   requestedQuantity Int
 
   approvedQuantity  Int?
@@ -1279,6 +1306,9 @@ model BranchIndentLine {
   vin                String?
   registrationNumber String?
   vehicleModel       String?
+
+  // How an urgent part should be ordered from Mobis if it is not available (authorised by the SM).
+  mobisOrderMode MobisOrderMode?
 
   remarks String?
 
@@ -1538,6 +1568,10 @@ model MaterialInTransit {
   invoiceDate    DateTime?
   conversionRate Float?
   receivedMode   TransportMode?
+  // Legacy "Material phy rec date" and the imported file's name.
+  physicalReceiptDate DateTime?
+  sourceFileName      String?
+  cancelledAt         DateTime?
 
   dispatchMode  TransportMode?
   waybillNumber String?
@@ -1555,8 +1589,10 @@ model MaterialInTransit {
 
   lines MaterialInTransitLine[]
   srns  StockReceiptNote[]
+  mrn   MaterialReceiptNote?
 
   @@index([sourceType])
+  @@index([vendor, invoiceNumber])
   @@index([status])
   @@index([destinationBranchId])
   @@index([sourceBranchId])
@@ -1580,12 +1616,17 @@ model MaterialInTransitLine {
   unitPrice   Float
   amount      Float
 
-  // External vendor line details (Process B).
+  // External vendor line details (Process B), as printed on the Mobis invoice.
   orderNumber     String?
   lineNumber      Int?
   weight          Float?
   hsCode          String?
   orderedQuantity Int?
+  intRef          String?
+  filePartNumber  String?
+  filePartName    String?
+  // True when the part was created in Part Master from this invoice.
+  newPart         Boolean @default(false)
 
   // Running receipt tallies, updated by each SRN posted against this line.
   receivedQuantity Int @default(0)
@@ -1595,6 +1636,7 @@ model MaterialInTransitLine {
   createdAt DateTime @default(now())
 
   srnLines StockReceiptLine[]
+  mrnLines MaterialReceiptLine[]
 
   @@index([mitId])
   @@index([partId])
@@ -1655,5 +1697,68 @@ model StockReceiptLine {
   remarks          String?
 
   @@index([srnId])
+  @@index([mitLineId])
+}
+
+// Material Receipt Note: receipt of externally purchased (Mobis) material into
+// CPD stock. Distinct from the SRN, which receives internal transfers.
+// One MRN per MIT, so stock from an invoice can only be posted once.
+model MaterialReceiptNote {
+  id        String @id @default(uuid())
+  mrnNumber String @unique
+
+  mitId String            @unique
+  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
+
+  receivingBranchId String
+  receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
+
+  vendor         String
+  invoiceNumber  String?
+  // Legacy MRN tax form for purchases is P.
+  taxForm        String   @default("P")
+  conversionRate Float
+  receiptDate    DateTime @default(now())
+  remarks        String?
+
+  totalReceived Int   @default(0)
+  totalDamaged  Int   @default(0)
+  totalShort    Int   @default(0)
+  // Value of accepted stock in local currency (unit price x conversion rate).
+  totalValue    Float @default(0)
+
+  receivedById String?
+  receivedBy   User?   @relation("MrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  lines MaterialReceiptLine[]
+
+  @@index([receivingBranchId])
+}
+
+model MaterialReceiptLine {
+  id    String              @id @default(uuid())
+  mrnId String
+  mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
+
+  mitLineId String
+  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+
+  partId String
+  part   SparePart @relation("MrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
+
+  receivedQuantity Int @default(0)
+  damagedQuantity  Int @default(0)
+  shortQuantity    Int @default(0)
+
+  // Vendor unit price (foreign currency) and its local value.
+  unitPrice Float
+  unitCost  Float
+  amount    Float
+
+  remarks String?
+
+  @@index([mrnId])
   @@index([mitLineId])
 }

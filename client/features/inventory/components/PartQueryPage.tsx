@@ -235,10 +235,11 @@ export function PartQueryPage() {
               </div>
               <PartStatusBadge status={data.part.partStatus} />
             </div>
-            <div className="mt-4 grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-4 grid gap-4 text-sm sm:grid-cols-4 lg:grid-cols-7">
               {[
                 ["Part code", data.part.partCode],
                 ["Flag", data.part.partFlag],
+                ["Price category", data.part.priceCategoryCode ?? "—"],
                 ["Taxable", data.part.taxable ? "Yes" : "No"],
                 ["UOM", data.part.uom],
                 ["Dealer rate", fmtNaira(data.part.dealerRate)],

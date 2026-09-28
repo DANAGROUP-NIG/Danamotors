@@ -11,6 +11,7 @@ import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { useCreatePart, useOpeningStock, useUpdatePart } from "../hooks/use-part-mutations";
+import { usePriceCategories } from "../hooks/use-parts";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 
@@ -55,6 +56,7 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     retailRate: part.retailRate ?? undefined,
     taxable: part.taxable,
     partFlag: part.partFlag,
+    priceCategoryCode: part.priceCategoryCode ?? "",
     binLocation: part.binLocation ?? "",
     storeLocation: part.storeLocation ?? "",
     partStatus: part.partStatus,
@@ -77,10 +79,14 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
 
   useFetchBranches(canSeedStock);
 
+  const { data: priceCategories } = usePriceCategories();
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
+    getValues,
     formState: { errors, isDirty, dirtyFields },
   } = useForm<PartMasterFormInput, unknown, PartMasterFormValues>({
     resolver: zodResolver(partMasterSchema),
@@ -89,16 +95,31 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
 
   const pending = create.isPending || update.isPending || openingStock.isPending;
 
+  // Legacy retail rate = dealer rate x the price category's multiplier.
+  const selectedCategory = priceCategories?.find((c) => c.code === watch("priceCategoryCode"));
+  const dealerRate = Number(watch("unitRate"));
+  const derivedRetail =
+    selectedCategory && Number.isFinite(dealerRate) && dealerRate > 0
+      ? Math.round(dealerRate * selectedCategory.markupMultiplier * 100) / 100
+      : null;
+  const retailDirty = !!dirtyFields.retailRate;
+
   function onSubmit(values: PartMasterFormValues) {
     // Optional text fields: send the trimmed value, or omit when empty on create.
     const text = (v?: string) => (v && v.trim() ? v.trim() : isEdit ? "" : undefined);
     const payload: PartMasterPayload = {
       ...values,
+      // Blank means "no category" (null clears it on edit).
+      priceCategoryCode: values.priceCategoryCode ? values.priceCategoryCode : isEdit ? null : undefined,
+      // Leave retail blank to let the server derive it from the category.
+      retailRate: values.retailRate,
       taxCategory: text(values.taxCategory),
       taxForm: text(values.taxForm),
       binLocation: text(values.binLocation),
       storeLocation: text(values.storeLocation),
     };
+
+    if (!isEdit && (payload.retailRate === undefined || Number.isNaN(payload.retailRate))) delete payload.retailRate;
 
     if (isEdit) {
       // Send only what changed, but keep min and max together so the server can compare them.
@@ -139,11 +160,20 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       <div className={sectionCls}>
         <p className={sectionTitle}>Identification</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Part code" error={errors.partCode?.message}>
-            <input className={inputCls} placeholder="e.g. KIA-OIL-001" {...register("partCode")} />
-          </Field>
           <Field label="Part number" error={errors.partNumber?.message}>
-            <input className={inputCls} placeholder="e.g. 2630035505" {...register("partNumber")} />
+            <input
+              className={inputCls}
+              placeholder="e.g. 2630035505"
+              {...register("partNumber", {
+                // The legacy system keys parts by number; default the code to it.
+                onBlur: (e) => {
+                  if (!isEdit && !getValues("partCode")) setValue("partCode", e.target.value.trim(), { shouldValidate: true });
+                },
+              })}
+            />
+          </Field>
+          <Field label="Part code" error={errors.partCode?.message}>
+            <input className={inputCls} placeholder="Defaults to the part number" {...register("partCode")} />
           </Field>
           <Field label="Name" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />
@@ -182,8 +212,33 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
           </Field>
-          <Field label="Retail rate (₦, optional)" error={errors.retailRate?.message}>
-            <input type="number" step="0.01" min={0} className={inputCls} {...register("retailRate")} />
+          <Field label="Price category" error={errors.priceCategoryCode?.message}>
+            <select className={inputCls} {...register("priceCategoryCode")}>
+              <option value="">None</option>
+              {(priceCategories ?? [])
+                .filter((c) => c.isActive || c.code === part?.priceCategoryCode)
+                .map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} · {c.description} (×{c.markupMultiplier})
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Field label="Retail rate (₦)" error={errors.retailRate?.message}>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              className={inputCls}
+              placeholder={derivedRetail != null ? String(derivedRetail) : "Optional"}
+              {...register("retailRate")}
+            />
+            {derivedRetail != null && !retailDirty && (
+              <span className="text-xs text-muted-foreground">
+                {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from category {selectedCategory?.code} when
+                the dealer rate or category changes. Type a value to override.
+              </span>
+            )}
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
             <input className={inputCls} {...register("taxCategory")} />

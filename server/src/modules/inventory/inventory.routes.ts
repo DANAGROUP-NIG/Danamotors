@@ -886,6 +886,26 @@ router.use(authMiddleware);
  *       404:
  *         description: Part not found
  */
+/**
+ * @openapi
+ * /inventory/part-categories:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List price categories (legacy Category master)
+ *     description: Each category's multiplier derives a part's retail rate from its dealer rate, e.g. category A x 2.07.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Categories
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data: { categories: [{ code: "A", description: "Co-op parts", markupMultiplier: 2.07, isActive: true }] }
+ */
+router.get('/part-categories', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listPartCategories);
 router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);

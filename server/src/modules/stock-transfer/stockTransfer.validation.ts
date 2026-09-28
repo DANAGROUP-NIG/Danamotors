@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IndentStatus, MitSourceType, MitStatus, PickingListStatus, StnStatus, TransportMode } from "@prisma/client";
+import { IndentStatus, MitSourceType, MitStatus, MobisOrderMode, PickingListStatus, StnStatus, TransportMode } from "@prisma/client";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const qty = z.number().int("Quantity must be a whole number");
@@ -15,6 +15,8 @@ const indentLineSchema = z
     partFlag: optionalText(2),
     urgentQuantity: qty.nonnegative().optional(),
     stockQuantity: qty.nonnegative().optional(),
+    stockOrderQuantity: qty.nonnegative().optional(),
+    mobisOrderMode: z.nativeEnum(MobisOrderMode).optional(),
     jobCardId: uuid("job card ID").optional(),
     jobNumber: optionalText(20),
     jobDate: z.coerce.date().optional(),
@@ -23,8 +25,8 @@ const indentLineSchema = z
     vehicleModel: optionalText(40),
     remarks: optionalText(200),
   })
-  .refine((line) => (line.urgentQuantity ?? 0) + (line.stockQuantity ?? 0) > 0, {
-    message: "Enter an urgent or a stock quantity greater than zero",
+  .refine((line) => (line.urgentQuantity ?? 0) + (line.stockQuantity ?? 0) + (line.stockOrderQuantity ?? 0) > 0, {
+    message: "Enter an urgent (vehicle), urgent (stock) or stock order quantity greater than zero",
     path: ["urgentQuantity"],
   });
 

@@ -15,7 +15,8 @@ export type IndentStatus =
   | "REJECTED"
   | "CANCELLED";
 
-export type TransportMode = "ROAD" | "AIR" | "SEA" | "COURIER" | "HAND_DELIVERY";
+export type TransportMode = "ROAD" | "AIR" | "SEA" | "COURIER" | "HAND_DELIVERY" | "DOOR_DELIVERY";
+export type MobisOrderMode = "AIR" | "COURIER";
 
 export type PersonRef = { id: string; firstName: string; lastName: string };
 export type BranchRef = { id: string; name: string };
@@ -33,6 +34,9 @@ export type PartRef = {
   role: "MAIN" | "ALTERNATE";
   mainPartId?: string | null;
   partStatus: "ACTIVE" | "BLOCKED";
+  partFlag?: string;
+  priceCategoryCode?: string | null;
+  retailRate?: number | null;
 };
 
 export type LineSummary = {
@@ -55,9 +59,16 @@ export type IndentLine = {
   partId: string;
   part: PartRef;
   partFlag?: string | null;
+  /** Legacy "Urgent required for Vehicle". */
   urgentQuantity: number;
+  /** Legacy "Urgent required for Stock". */
   stockQuantity: number;
+  /** Legacy "Stock Order (15 days consumption)". */
+  stockOrderQuantity: number;
   requestedQuantity: number;
+  mobisOrderMode?: MobisOrderMode | null;
+  /** Legacy supply code: EP = exact part, APN = alternate part supplied. */
+  supplyCode: "EP" | "APN";
   approvedQuantity: number | null;
   backOrderQuantity: number;
   unitRate: number;
@@ -307,6 +318,8 @@ export type CreateIndentPayload = {
     partFlag?: string;
     urgentQuantity?: number;
     stockQuantity?: number;
+    stockOrderQuantity?: number;
+    mobisOrderMode?: MobisOrderMode;
     jobCardId?: string;
     jobNumber?: string;
     vin?: string;

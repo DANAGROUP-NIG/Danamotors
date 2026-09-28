@@ -5,6 +5,7 @@ import {
   getPartRequest,
   getPartStockRequest,
   getPartsRequest,
+  getPriceCategoriesRequest,
   partQueryRequest,
 } from "../api/inventory.api";
 import type { PartListParams } from "../types/inventory.types";
@@ -48,5 +49,14 @@ export function usePartQuery(partNumber: string, branchId?: string) {
     queryFn: () => partQueryRequest(partNumber, branchId),
     enabled: partNumber.trim().length > 0,
     retry: false,
+  });
+}
+
+/** Legacy price categories; they rarely change, so cache them for the session. */
+export function usePriceCategories() {
+  return useQuery({
+    queryKey: inventoryKeys.priceCategories(),
+    queryFn: getPriceCategoriesRequest,
+    staleTime: Infinity,
   });
 }

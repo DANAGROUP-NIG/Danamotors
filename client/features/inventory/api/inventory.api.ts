@@ -10,6 +10,7 @@ import type {
   PartMasterPayload,
   PartQueryResult,
   PartStockItem,
+  PriceCategory,
   StockLocationPayload,
   UpdatePartMasterPayload,
 } from "../types/inventory.types";
@@ -94,6 +95,11 @@ export async function updateStockLocationRequest(branchId: string, partId: strin
     payload,
   );
   return data.stock;
+}
+
+export async function getPriceCategoriesRequest(): Promise<PriceCategory[]> {
+  const data = await apiGet<{ categories: PriceCategory[] }>(API_ROUTES.inventory.parts.categories);
+  return data.categories;
 }
 
 /** Legacy Part Query: premises locations, alternates and other branches for one part number. */

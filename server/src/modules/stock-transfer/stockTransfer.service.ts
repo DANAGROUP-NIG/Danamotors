@@ -17,6 +17,7 @@
 import {
   IndentStatus,
   MitSourceType,
+  MobisOrderMode,
   MitStatus,
   PartStatus,
   PickingListStatus,
@@ -83,6 +84,9 @@ const partSelect = {
     role: true,
     mainPartId: true,
     partStatus: true,
+    partFlag: true,
+    priceCategoryCode: true,
+    retailRate: true,
   },
 } as const;
 
@@ -135,6 +139,8 @@ export interface CreateIndentInput {
     partFlag?: string;
     urgentQuantity?: number;
     stockQuantity?: number;
+    stockOrderQuantity?: number;
+    mobisOrderMode?: MobisOrderMode;
     jobCardId?: string;
     jobNumber?: string;
     jobDate?: Date;
@@ -294,8 +300,12 @@ export class StockTransferService {
       const damaged = lineMit.reduce((sum, m) => sum + m.damagedQuantity, 0);
       const short = lineMit.reduce((sum, m) => sum + m.shortQuantity, 0);
       const approved = line.approvedQuantity;
+      const suppliedWithAlternate =
+        lineStn.some((s) => s.isAlternate) || pickingLines.some((p) => p.indentLineId === line.id && p.isAlternate);
       return {
         ...line,
+        // Legacy supply code: EP = exact part, APN = alternate part supplied.
+        supplyCode: suppliedWithAlternate ? "APN" : "EP",
         summary: {
           requested: line.requestedQuantity,
           approved,
@@ -510,18 +520,22 @@ export class StockTransferService {
       const part = partMap.get(line.partId)!;
       const urgent = line.urgentQuantity ?? 0;
       const normal = line.stockQuantity ?? 0;
-      const requested = urgent + normal;
+      const stockOrder = line.stockOrderQuantity ?? 0;
+      const requested = urgent + normal + stockOrder;
       if (requested <= 0) {
-        throw new BadRequestError(`Line ${index + 1}: enter an urgent or a stock quantity`);
+        throw new BadRequestError(`Line ${index + 1}: enter an urgent or a stock order quantity`);
       }
       const jobCard = line.jobCardId ? jobCardMap.get(line.jobCardId) : undefined;
       return {
         lineNumber: index + 1,
         partId: part.id,
-        partFlag: line.partFlag ?? null,
+        partFlag: line.partFlag ?? part.partFlag,
         urgentQuantity: urgent,
         stockQuantity: normal,
+        stockOrderQuantity: stockOrder,
         requestedQuantity: requested,
+        // The part flag defaults from Part Master (legacy partmast.partflag).
+        mobisOrderMode: line.mobisOrderMode ?? null,
         unitRate: part.unitPrice,
         amount: roundMoney(part.unitPrice * requested),
         currentStock: stockMap.get(part.id) ?? 0,
@@ -1308,6 +1322,8 @@ export class StockTransferService {
         sourceBranch: branchSelect,
         destinationBranch: branchSelect,
         stn: { select: { id: true, stnNumber: true, indentId: true } },
+        mrn: { select: { id: true, mrnNumber: true, receiptDate: true } },
+        createdBy: userSelect,
         _count: { select: { lines: true, srns: true } },
       },
       take: 200,
@@ -1322,8 +1338,9 @@ export class StockTransferService {
         destinationBranch: branchSelect,
         createdBy: userSelect,
         stn: { select: { id: true, stnNumber: true, indentId: true } },
-        lines: { include: { part: partSelect, requestedPart: partSelect } },
+        lines: { orderBy: [{ orderNumber: "asc" }, { lineNumber: "asc" }], include: { part: partSelect, requestedPart: partSelect } },
         srns: { select: { id: true, srnNumber: true, receiptDate: true } },
+        mrn: { include: { receivedBy: userSelect, lines: true } },
       },
     });
     if (!doc) throw new NotFoundError("MIT not found");

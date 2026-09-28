@@ -90,6 +90,38 @@ describeDb('Part Query (database)', () => {
     expect(result.otherBranches.some((b) => b.branchId === ids.kp || b.branchId === ids.qs)).toBe(false);
   });
 
+  it('derives the retail rate from the legacy price category', async () => {
+    const part = await inventory.createPart({
+      partCode: `RR-${run}`,
+      partNumber: `RR${run}`,
+      name: 'FILTER ASSY-ENGINE OIL',
+      category: 'Filters',
+      uom: 'NOS',
+      unitRate: 9056.34,
+      priceCategoryCode: 'A',
+    });
+    // Legacy: 9056.34 x 2.07 = 18746.62
+    expect(part).toMatchObject({ priceCategoryCode: 'A', retailRate: 18746.62 });
+
+    const dealerChanged = await inventory.updatePart(part.id, { unitRate: 10000 });
+    expect(dealerChanged.retailRate).toBe(20700);
+    const explicit = await inventory.updatePart(part.id, { unitRate: 11000, retailRate: 25000 });
+    expect(explicit.retailRate).toBe(25000);
+    const recategorised = await inventory.updatePart(part.id, { priceCategoryCode: 'C' });
+    expect(recategorised.retailRate).toBe(36630);
+    await expect(inventory.updatePart(part.id, { priceCategoryCode: 'ZZ' })).rejects.toThrow(/Unknown price category/);
+  });
+
+  it('gives alternates a readable part code', async () => {
+    const alt = await prisma.sparePart.findUniqueOrThrow({ where: { id: ids.alt } });
+    expect(alt.partCode).toBe(`PQ${run}A`);
+    // Force a clash: another part already uses the would-be code.
+    await prisma.sparePart.update({ where: { id: ids.main }, data: { partCode: `PQ${run}B` } });
+    const clash = await inventory.createAlternatePart({ mainPartId: ids.main, partNumber: `PQ${run}B`, name: 'FILTER 2' });
+    expect(clash.partCode).toBe(`PQ${run}B-2`);
+    await prisma.sparePart.update({ where: { id: ids.main }, data: { partCode: `PQ-${run}` } });
+  });
+
   it('finds a part by part code and reports unknown parts', async () => {
     const byCode = await inventory.partQuery(`PQ-${run}`, ids.kp);
     expect(byCode.part.id).toBe(ids.main);

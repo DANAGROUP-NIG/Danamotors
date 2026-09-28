@@ -45,6 +45,7 @@ export const PART_EXPORT_COLUMNS = [
   { key: "maxLevel", label: "Max Level" },
   { key: "reorderQty", label: "Reorder Qty" },
   { key: "partFlag", label: "Part Flag" },
+  { key: "priceCategoryCode", label: "Price Category" },
   { key: "taxable", label: "Taxable" },
   { key: "unitRate", label: "Dealer Rate" },
   { key: "retailRate", label: "Retail Rate" },
@@ -67,6 +68,7 @@ export function partExportRow(p: PartMaster): Record<string, string | number> {
     maxLevel: p.maxLevel ?? "",
     reorderQty: p.reorderQty ?? "",
     partFlag: p.partFlag,
+    priceCategoryCode: p.priceCategoryCode ?? "",
     taxable: p.taxable ? "Yes" : "No",
     unitRate: p.unitRate,
     retailRate: p.retailRate ?? "",
@@ -144,7 +146,15 @@ export function PartMasterTable() {
       header: "Part code",
       render: (p) => <span className="font-mono text-xs text-muted-foreground">{p.partCode}</span>,
     },
-    { header: "Category", render: (p) => <span className="text-muted-foreground">{p.category || "—"}</span> },
+    {
+      header: "Category",
+      render: (p) => (
+        <span className="text-muted-foreground">
+          {p.category || "—"}
+          {p.priceCategoryCode && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{p.priceCategoryCode}</span>}
+        </span>
+      ),
+    },
     { header: "UOM", render: (p) => <span className="text-muted-foreground">{p.uom}</span> },
     {
       header: "Dealer / Retail",

@@ -28,7 +28,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
-import { usePart, usePartAlternates, usePartStock } from "../hooks/use-parts";
+import { usePart, usePartAlternates, usePartStock, usePriceCategories } from "../hooks/use-parts";
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
 import { PartForm } from "./PartForm";
@@ -147,6 +147,7 @@ export function PartDetail({ id }: { id: string }) {
   const [addingAlt, setAddingAlt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const setStatus = useSetPartStatus();
+  const { data: priceCategories } = usePriceCategories();
   const del = useDeletePart();
 
   // For a main part, list its alternates; for an alternate, list its main part's family.
@@ -260,6 +261,17 @@ export function PartDetail({ id }: { id: string }) {
             <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
             <DetailField label="Part flag" value={part.partFlag} />
+            <DetailField
+              label="Price category"
+              value={
+                part.priceCategoryCode
+                  ? (() => {
+                      const c = priceCategories?.find((x) => x.code === part.priceCategoryCode);
+                      return c ? `${c.code} · ${c.description} (×${c.markupMultiplier})` : part.priceCategoryCode;
+                    })()
+                  : null
+              }
+            />
             <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
             <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
             <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />

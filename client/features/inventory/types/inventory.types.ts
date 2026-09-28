@@ -46,6 +46,8 @@ export type PartMaster = {
   taxable: boolean;
   /** Legacy part flag, for example O for original. */
   partFlag: string;
+  /** Legacy pricing category (A, C, E…); its multiplier derives the retail rate. */
+  priceCategoryCode: string | null;
   binLocation: string | null;
   storeLocation: string | null;
   partStatus: PartStatus;
@@ -70,9 +72,17 @@ export type PartMasterPayload = {
   retailRate?: number;
   taxable?: boolean;
   partFlag?: string;
+  priceCategoryCode?: string | null;
   binLocation?: string;
   storeLocation?: string;
   partStatus?: PartStatus;
+};
+
+export type PriceCategory = {
+  code: string;
+  description: string;
+  markupMultiplier: number;
+  isActive: boolean;
 };
 
 export type UpdatePartMasterPayload = Partial<PartMasterPayload>;
@@ -161,6 +171,7 @@ export type PartQueryResult = {
     partStatus: PartStatus;
     role: PartRole;
     mainPartId: string | null;
+    priceCategoryCode: string | null;
   };
   premises: { id: string; name: string; code: string | null }[];
   locations: PartQueryRow[];

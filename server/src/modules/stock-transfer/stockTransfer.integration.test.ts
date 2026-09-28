@@ -163,6 +163,36 @@ describeDb("Stock transfer workflow (database)", () => {
     expect(results[0]).toMatchObject({ id: filter.id, sourceAvailable: 52, requestingStock: 0, unitRate: 9056.34 });
   });
 
+  it("records the three legacy quantities, Mobis order mode, part flag and supply code", async () => {
+    await prisma.sparePart.update({ where: { id: filter.id }, data: { partFlag: "L" } });
+    const indent = await service.createIndent(
+      {
+        requestingBranchId: branch.id,
+        sourceBranchId: cpd.id,
+        lines: [
+          { partId: filter.id, urgentQuantity: 2, stockQuantity: 1, stockOrderQuantity: 3, mobisOrderMode: "AIR" },
+          { partId: horn.id, urgentQuantity: 1 },
+        ],
+      },
+      requester.id,
+    );
+    expect(indent.lines[0]).toMatchObject({
+      urgentQuantity: 2,
+      stockQuantity: 1,
+      stockOrderQuantity: 3,
+      requestedQuantity: 6,
+      mobisOrderMode: "AIR",
+      partFlag: "L",
+      supplyCode: "EP",
+    });
+    const approved = await service.approveIndent(indent.id, cpdManager.id, {
+      lines: [{ lineId: indent.lines[1].id, supplyPartId: hornAlt.id }],
+    });
+    expect(approved.lines.map((l) => l.supplyCode)).toEqual(["EP", "APN"]);
+    await service.cancelIndent(indent.id, cpdManager.id);
+    await prisma.sparePart.update({ where: { id: filter.id }, data: { partFlag: "O" } });
+  });
+
   it("fills vehicle details from the job card", async () => {
     const customer = await prisma.customer.create({
       data: { firstName: "Ade", lastName: `Oye${run}`, email: `ade.${run}@test.local`, branchId: branch.id },

@@ -99,6 +99,12 @@ const ACTION_MAP: Record<string, string> = {
   'PATCH /api/inventory/indents/dispatch': 'INDENT_DISPATCH',
   'PATCH /api/inventory/indents/receive': 'INDENT_RECEIVE',
 
+  // ── Inventory — Mobis purchase receiving (MIT -> MRN) ─────────────────────
+  'POST /api/inventory/mobis/mit': 'MOBIS_MIT_IMPORT',
+  'POST /api/inventory/mobis/mit/match-parts': 'MOBIS_MIT_MATCH_PARTS',
+  'POST /api/inventory/mobis/mit/mrn': 'MRN_CREATE',
+  'PATCH /api/inventory/mobis/mit/cancel': 'MOBIS_MIT_CANCEL',
+
   // ── Finance ──────────────────────────────────────────────────────────────
   'POST /api/finance/invoices': 'INVOICE_CREATE',
   'PUT /api/finance/invoices': 'INVOICE_UPDATE',

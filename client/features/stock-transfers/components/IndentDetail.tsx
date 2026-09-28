@@ -35,6 +35,7 @@ import {
   fmtCurrency,
   fmtDate,
   fmtDateTime,
+  MOBIS_ORDER_MODE_LABELS,
   personName,
 } from "../lib/indent-status";
 import type { Indent } from "../types/indent.types";
@@ -255,8 +256,9 @@ export function IndentDetail({ id }: { id: string }) {
                   <th className={thCls}>#</th>
                   <th className={thCls}>Part</th>
                   <th className={thCls}>Vehicle / job</th>
-                  <th className={cn(thCls, "text-right")}>Urgent</th>
-                  <th className={cn(thCls, "text-right")}>Stock</th>
+                  <th className={cn(thCls, "text-right")} title="Urgent required for vehicle">Urg. veh.</th>
+                  <th className={cn(thCls, "text-right")} title="Urgent required for stock">Urg. stock</th>
+                  <th className={cn(thCls, "text-right")} title="Stock order (15 days consumption)">Stock order</th>
                   <th className={cn(thCls, "text-right")}>Approved</th>
                   <th className={cn(thCls, "text-right")}>Back order</th>
                   <th className={cn(thCls, "text-right")}>Sent</th>
@@ -277,6 +279,15 @@ export function IndentDetail({ id }: { id: string }) {
                         <p className="font-mono text-xs font-medium text-slate-800">
                           {l.part.partNumber}
                           {l.partFlag && <span className="ml-1.5 text-slate-400">({l.partFlag})</span>}
+                          <span
+                            className={cn(
+                              "ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold",
+                              l.supplyCode === "APN" ? "bg-purple-50 text-purple-700" : "bg-slate-100 text-slate-500",
+                            )}
+                            title={l.supplyCode === "APN" ? "Alternate part supplied" : "Exact part"}
+                          >
+                            {l.supplyCode}
+                          </span>
                         </p>
                         <p className="text-xs text-slate-500">{l.part.name}</p>
                         {supplied && (
@@ -285,6 +296,7 @@ export function IndentDetail({ id }: { id: string }) {
                           </p>
                         )}
                         <p className="text-[11px] text-slate-400">
+                          {l.part.priceCategoryCode ? `Cat. ${l.part.priceCategoryCode} · ` : ""}
                           {fmtCurrency(l.unitRate)} / {l.part.uom} · stock at request {l.currentStock ?? 0}
                         </p>
                       </td>
@@ -296,7 +308,13 @@ export function IndentDetail({ id }: { id: string }) {
                             {l.vin && <p className="font-mono">{l.vin}</p>}
                             {l.jobNumber && (
                               <p>
-                                Job {l.jobNumber}
+                                {l.jobCardId ? (
+                                  <Link href={`/job-cards/${l.jobCardId}`} className="text-primary hover:underline">
+                                    Job {l.jobNumber}
+                                  </Link>
+                                ) : (
+                                  <>Job {l.jobNumber}</>
+                                )}
                                 {l.jobDate ? ` · ${fmtDate(l.jobDate)}` : ""}
                               </p>
                             )}
@@ -304,9 +322,13 @@ export function IndentDetail({ id }: { id: string }) {
                         ) : (
                           "—"
                         )}
+                        {l.mobisOrderMode && (
+                          <p className="mt-1 text-amber-700">Mobis order by {MOBIS_ORDER_MODE_LABELS[l.mobisOrderMode]}</p>
+                        )}
                       </td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.urgentQuantity} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.stockQuantity} /></td>
+                      <td className={cn(tdCls, "text-right")}><Qty n={l.stockOrderQuantity} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.approved} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.backOrder} tone="amber" /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.dispatched} /></td>

@@ -201,7 +201,8 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
   const [transportMode, setTransportMode] = useState<TransportMode | "">("ROAD");
   const [waybillNumber, setWaybill] = useState("");
   const [courierName, setCourier] = useState("");
-  const [taxForm, setTaxForm] = useState("");
+  // Legacy STNs between branches use tax form X.
+  const [taxForm, setTaxForm] = useState("X");
   const [packerName, setPacker] = useState("");
   const [remarks, setRemarks] = useState("");
   const [splitCases, setSplitCases] = useState(false);

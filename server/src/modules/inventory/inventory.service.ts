@@ -23,6 +23,7 @@ const INHERITABLE_FIELDS = [
   'retailRate',
   'taxable',
   'partFlag',
+  'priceCategoryCode',
   'storeLocation',
 ] as const;
 
@@ -92,6 +93,32 @@ export class InventoryService {
     this.inventoryRepository = new InventoryRepository();
   }
 
+  /**
+   * Parts created without an explicit code use their part number, which is
+   * already unique; a numbered suffix covers the rare clash with another code.
+   */
+  private async generatePartCode(partNumber: string): Promise<string> {
+    for (let i = 0; i < 50; i++) {
+      const candidate = i === 0 ? partNumber : `${partNumber}-${i + 1}`;
+      const taken = await prisma.sparePart.findUnique({ where: { partCode: candidate }, select: { id: true } });
+      if (!taken) return candidate;
+    }
+    throw new ConflictError(`Could not generate a part code for ${partNumber}`);
+  }
+
+  /** Legacy retail rate: dealer rate x the price category's multiplier, rounded to kobo. */
+  private async retailFromCategory(dealerRate: number, code: string | null | undefined): Promise<number | null> {
+    if (!code) return null;
+    const category = await prisma.partCategory.findUnique({ where: { code } });
+    if (!category) throw new BadRequestError(`Unknown price category ${code}`);
+    if (!category.isActive) throw new BadRequestError(`Price category ${code} is inactive`);
+    return Math.round(dealerRate * category.markupMultiplier * 100) / 100;
+  }
+
+  async listPartCategories() {
+    return prisma.partCategory.findMany({ orderBy: { code: 'asc' } });
+  }
+
   private withAvailableQuantity<T extends { quantity: number; reservedQuantity: number }>(stock: T): T & { availableQuantity: number } {
     return { ...stock, availableQuantity: stock.quantity - stock.reservedQuantity };
   }
@@ -154,7 +181,8 @@ export class InventoryService {
       );
     }
 
-    const { branchStock, recordedById, ...partData } = data;
+    const { branchStock, recordedById, ...rest } = data;
+    const partData = { ...rest, partCode: await this.generatePartCode(rest.partNumber) };
 
     if (!branchStock || branchStock.length === 0) {
       return this.inventoryRepository.createSparePart(partData);
@@ -264,6 +292,7 @@ export class InventoryService {
     return prisma.sparePart.create({
       data: {
         mainPartId,
+        partCode: await this.generatePartCode(partNumber),
         partNumber,
         name,
         description,
@@ -375,10 +404,16 @@ export class InventoryService {
     retailRate?: number;
     taxable?: boolean;
     partFlag?: string;
+    priceCategoryCode?: string;
     binLocation?: string;
     storeLocation?: string;
     partStatus?: PartStatus;
   }) {
+    if (data.retailRate === undefined && data.priceCategoryCode) {
+      data = { ...data, retailRate: (await this.retailFromCategory(data.unitRate, data.priceCategoryCode)) ?? undefined };
+    } else if (data.priceCategoryCode) {
+      await this.retailFromCategory(data.unitRate, data.priceCategoryCode); // validates the code
+    }
     const existing = await this.inventoryRepository.findPartByCode(
       data.partCode,
     );
@@ -457,6 +492,7 @@ export class InventoryService {
       retailRate?: number;
       taxable?: boolean;
       partFlag?: string;
+      priceCategoryCode?: string | null;
       binLocation?: string;
       storeLocation?: string;
       partStatus?: PartStatus;
@@ -482,6 +518,14 @@ export class InventoryService {
     const updateData: Partial<SparePart> = { ...rest };
     if (unitRate !== undefined) {
       updateData.unitPrice = unitRate;
+    }
+
+    // Keep the retail rate in step with the dealer rate and price category unless it was sent explicitly.
+    const category = data.priceCategoryCode !== undefined ? data.priceCategoryCode : part.priceCategoryCode;
+    const dealer = unitRate ?? part.unitPrice;
+    if (data.priceCategoryCode) await this.retailFromCategory(dealer, data.priceCategoryCode);
+    if (data.retailRate === undefined && (unitRate !== undefined || data.priceCategoryCode !== undefined) && category) {
+      updateData.retailRate = await this.retailFromCategory(dealer, category);
     }
 
     const updated = await this.inventoryRepository.updatePart(id, updateData);

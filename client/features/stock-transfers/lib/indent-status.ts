@@ -1,5 +1,5 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import type { IndentStatus, TransportMode } from "../types/indent.types";
+import type { IndentStatus, MobisOrderMode, TransportMode } from "../types/indent.types";
 
 export const INDENT_STATUS_LABELS: Record<IndentStatus, string> = {
   DRAFT: "Draft",
@@ -50,12 +50,19 @@ export const INDENT_FILTER_STATUSES: IndentStatus[] = [
   "CANCELLED",
 ];
 
+// Legacy dispatch modes: Courier / Air / Logistics vehicle / Hand / Door delivery.
 export const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
-  ROAD: "Road",
-  AIR: "Air",
-  SEA: "Sea",
+  ROAD: "Logistics vehicle (road)",
   COURIER: "Courier",
+  AIR: "Air",
   HAND_DELIVERY: "Hand delivery",
+  DOOR_DELIVERY: "Door delivery",
+  SEA: "Sea",
+};
+
+export const MOBIS_ORDER_MODE_LABELS: Record<MobisOrderMode, string> = {
+  AIR: "Air",
+  COURIER: "Courier",
 };
 
 export function fmtDate(iso?: string | null) {

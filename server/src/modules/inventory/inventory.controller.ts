@@ -370,6 +370,15 @@ export class InventoryController {
     }
   };
 
+  listPartCategories = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const categories = await this.inventoryService.listPartCategories();
+      res.status(200).json({ status: "success", statusCode: 200, data: { categories } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   // ── Part Query (legacy Master > Part Query) ────────────────────────────
 
   partQuery = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

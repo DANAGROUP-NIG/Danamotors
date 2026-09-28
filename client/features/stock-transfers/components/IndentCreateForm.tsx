@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { PartPicker } from "./PartPicker";
 import { useCreateIndent } from "../hooks/use-indent-mutations";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
-import { fmtCurrency } from "../lib/indent-status";
+import { MOBIS_ORDER_MODE_LABELS, fmtCurrency } from "../lib/indent-status";
 import type { CreateIndentPayload, PartSearchResult } from "../types/indent.types";
 
 type DraftLine = {
@@ -24,6 +24,8 @@ type DraftLine = {
   partFlag: string;
   urgentQuantity: string;
   stockQuantity: string;
+  stockOrderQuantity: string;
+  mobisOrderMode: "" | "AIR" | "COURIER";
   jobCardId: string;
   jobNumber: string;
   registrationNumber: string;
@@ -70,12 +72,14 @@ export function IndentCreateForm() {
     let qty = 0;
     let amount = 0;
     for (const l of lines) {
-      const q = toInt(l.urgentQuantity) + toInt(l.stockQuantity);
+      const q = lineQty(l);
       qty += q;
       amount += q * l.part.unitRate;
     }
     return { qty, amount };
   }, [lines]);
+
+  const lineQty = (l: DraftLine) => toInt(l.urgentQuantity) + toInt(l.stockQuantity) + toInt(l.stockOrderQuantity);
 
   function update(key: string, patch: Partial<DraftLine>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -87,9 +91,11 @@ export function IndentCreateForm() {
       {
         key: `${part.id}-${Date.now()}`,
         part,
-        partFlag: "O",
+        partFlag: part.partFlag ?? "O",
         urgentQuantity: "",
-        stockQuantity: "1",
+        stockQuantity: "",
+        stockOrderQuantity: "1",
+        mobisOrderMode: "",
         jobCardId: "",
         jobNumber: "",
         registrationNumber: "",
@@ -120,7 +126,7 @@ export function IndentCreateForm() {
       e.sourceBranchId = "The supplying branch must be different";
     if (lines.length === 0) e.lines = "Add at least one part";
     for (const l of lines) {
-      if (toInt(l.urgentQuantity) + toInt(l.stockQuantity) === 0) e[l.key] = "Enter an urgent or stock quantity";
+      if (lineQty(l) === 0) e[l.key] = "Enter an urgent (vehicle), urgent (stock) or stock order quantity";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -140,6 +146,8 @@ export function IndentCreateForm() {
         partFlag: opt(l.partFlag),
         urgentQuantity: toInt(l.urgentQuantity) || undefined,
         stockQuantity: toInt(l.stockQuantity) || undefined,
+        stockOrderQuantity: toInt(l.stockOrderQuantity) || undefined,
+        mobisOrderMode: l.mobisOrderMode || undefined,
         jobCardId: l.jobCardId || undefined,
         jobNumber: opt(l.jobNumber),
         registrationNumber: opt(l.registrationNumber),
@@ -253,7 +261,7 @@ export function IndentCreateForm() {
         ) : (
           <div className="space-y-3">
             {lines.map((l, index) => {
-              const qty = toInt(l.urgentQuantity) + toInt(l.stockQuantity);
+              const qty = lineQty(l);
               const short = sourceBranchId && qty > l.part.sourceAvailable;
               return (
                 <div key={l.key} className="rounded-lg border border-slate-200 p-4">
@@ -263,6 +271,7 @@ export function IndentCreateForm() {
                       <p className="font-mono text-sm font-medium text-slate-800">{l.part.partNumber}</p>
                       <p className="text-sm text-slate-500">{l.part.name}</p>
                       <p className="mt-1 text-xs text-slate-400">
+                        {l.part.priceCategoryCode ? `Category ${l.part.priceCategoryCode} · ` : ""}
                         {l.part.uom} · {fmtCurrency(l.part.unitRate)} each
                         {l.part.binLocation ? ` · Bin ${l.part.binLocation}` : ""}
                         {` · Your stock ${l.part.requestingStock}`}
@@ -279,8 +288,8 @@ export function IndentCreateForm() {
                     </button>
                   </div>
 
-                  <div className="mt-3 grid gap-3 sm:grid-cols-4">
-                    <Field label="Urgent qty (vehicle)">
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <Field label="Urgent (vehicle)">
                       <input
                         type="number"
                         min={0}
@@ -289,13 +298,22 @@ export function IndentCreateForm() {
                         onChange={(e) => update(l.key, { urgentQuantity: e.target.value })}
                       />
                     </Field>
-                    <Field label="Stock qty">
+                    <Field label="Urgent (stock)">
                       <input
                         type="number"
                         min={0}
                         className={inputCls}
                         value={l.stockQuantity}
                         onChange={(e) => update(l.key, { stockQuantity: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Stock order (15 days)">
+                      <input
+                        type="number"
+                        min={0}
+                        className={inputCls}
+                        value={l.stockOrderQuantity}
+                        onChange={(e) => update(l.key, { stockOrderQuantity: e.target.value })}
                       />
                     </Field>
                     <Field label="Part flag">
@@ -305,6 +323,20 @@ export function IndentCreateForm() {
                         value={l.partFlag}
                         onChange={(e) => update(l.key, { partFlag: e.target.value.toUpperCase() })}
                       />
+                    </Field>
+                    <Field label="If unavailable, order from Mobis by">
+                      <select
+                        className={inputCls}
+                        value={l.mobisOrderMode}
+                        onChange={(e) => update(l.key, { mobisOrderMode: e.target.value as DraftLine["mobisOrderMode"] })}
+                      >
+                        <option value="">Not set</option>
+                        {Object.entries(MOBIS_ORDER_MODE_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
                     </Field>
                     <div className="grid gap-1.5">
                       <span className="text-sm font-semibold">Amount</span>

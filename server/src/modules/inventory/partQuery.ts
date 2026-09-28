@@ -26,6 +26,7 @@ export interface QueryPart {
   partStatus: string;
   role: string;
   mainPartId: string | null;
+  priceCategoryCode?: string | null;
 }
 
 export interface QueryBranch {
@@ -156,6 +157,7 @@ export function buildPartQuery(input: {
       partStatus: part.partStatus,
       role: part.role,
       mainPartId: part.mainPartId,
+      priceCategoryCode: part.priceCategoryCode ?? null,
     },
     premises: premises.map((b) => ({ id: b.id, name: b.name, code: b.code })),
     locations,

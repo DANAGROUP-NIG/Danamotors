@@ -102,6 +102,7 @@ const basePartMasterFields = {
   retailRate: z.number().nonnegative('Retail rate must be 0 or more').optional(),
   taxable: z.boolean().optional(),
   partFlag: z.string().trim().min(1, 'Part flag is required').max(2, 'Part flag must be 1 or 2 characters').optional(),
+  priceCategoryCode: z.string().trim().toUpperCase().max(2, 'Price category must be 1 or 2 characters').optional(),
   binLocation: z.string().optional(),
   storeLocation: z.string().optional(),
 };
@@ -139,6 +140,7 @@ export const updatePartMasterSchema = z.object({
     retailRate: basePartMasterFields.retailRate,
     taxable: basePartMasterFields.taxable,
     partFlag: basePartMasterFields.partFlag,
+    priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
     binLocation: basePartMasterFields.binLocation,
     storeLocation: basePartMasterFields.storeLocation,
     partStatus: partStatusEnum.optional(),

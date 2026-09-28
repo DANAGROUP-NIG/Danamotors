@@ -25,6 +25,7 @@ import {
   ListChecks,
   BadgeCheck,
   PackageSearch,
+  Ship,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -142,6 +143,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/inventory/part-query",
         icon: PackageSearch,
         permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ, INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Mobis Receipts",
+        href: "/inventory/mobis-receipts",
+        icon: Ship,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
         label: "Transfers",

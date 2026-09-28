@@ -92,6 +92,7 @@ export const API_ROUTES = {
       detail: (id: string) => `/inventory/parts/${id}`,
       alternates: (id: string) => `/inventory/parts/${id}/alternates`,
       query: "/inventory/parts/query",
+      categories: "/inventory/part-categories",
     },
   },
   finance: {

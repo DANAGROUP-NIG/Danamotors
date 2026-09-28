@@ -34,6 +34,7 @@ export const partMasterSchema = z
     retailRate: optionalNumber("Retail rate"),
     taxable: z.boolean(),
     partFlag: z.string().trim().min(1, "Part flag is required").max(2, "Part flag must be 1 or 2 characters"),
+    priceCategoryCode: z.string().optional(),
     binLocation: optionalText(40),
     storeLocation: optionalText(40),
     partStatus: z.enum(["ACTIVE", "BLOCKED"]),
