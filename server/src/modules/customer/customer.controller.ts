@@ -3,13 +3,32 @@ import { CustomerService } from './customer.service';
 import { assertBranchOwnership } from '../../middleware/authorize';
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
+import { TallyService } from '../finance/tally.service';
+import { ForbiddenError } from '../../shared/errors/appError';
 
 export class CustomerController {
   private customerService: CustomerService;
+  private tallyService: TallyService;
 
   constructor() {
     this.customerService = new CustomerService();
+    this.tallyService = new TallyService();
   }
+
+  updateCustomerTallyLedger = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const customer = await prisma.customer.findUnique({ where: { id }, select: { branchId: true } });
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId) {
+        throw new ForbiddenError('Your account must be assigned to a branch');
+      }
+      assertBranchOwnership(req, customer?.branchId);
+      const updated = await this.tallyService.setCustomerLedger(id, req.body.tallyLedgerCode);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { customer: updated } });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   getCustomers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

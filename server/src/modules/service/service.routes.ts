@@ -8,6 +8,7 @@ import {
   createAppointmentSchema,
   updateAppointmentSchema,
   createJobCardSchema,
+  listJobCardsSchema,
   updateJobCardSchema,
   createInspectionSchema,
   createEstimateSchema,
@@ -15,12 +16,77 @@ import {
   serviceIdParamSchema,
   jobCardIdParamSchema,
   estimateIdParamSchema,
+  labourLineIdParamSchema,
+  createLabourItemSchema,
+  updateLabourItemSchema,
+  createJobCardLabourSchema,
+  updateJobCardLabourSchema,
 } from './service.validation';
 
 const router = Router();
 const controller = new ServiceController();
 
 router.use(authMiddleware);
+
+/**
+ * @openapi
+ * /service/labour-items:
+ *   get:
+ *     tags: [Service & Job Cards]
+ *     summary: List active labour items
+ *     responses:
+ *       200: { description: Labour catalogue }
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Create a labour catalogue item
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { code: 'LAB-001', description: 'Engine diagnostic', defaultHours: 1, rate: 25000 }
+ *     responses:
+ *       201: { description: Labour item created }
+ * /service/labour-items/{id}:
+ *   put:
+ *     tags: [Service & Job Cards]
+ *     summary: Update a labour catalogue item
+ *     responses:
+ *       200: { description: Labour item updated }
+ * /service/job-cards/{id}/labour:
+ *   get:
+ *     tags: [Service & Job Cards]
+ *     summary: List labour recorded on a job card
+ *     responses:
+ *       200: { description: Job-card labour lines }
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Add a labour line to an open job card
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { labourItemId: '550e8400-e29b-41d4-a716-446655440000', hours: 2, technicianId: '550e8400-e29b-41d4-a716-446655440001' }
+ *     responses:
+ *       201: { description: Job-card labour line created with a rate snapshot }
+ * /service/job-card-labour/{lineId}:
+ *   put:
+ *     tags: [Service & Job Cards]
+ *     summary: Update an unbilled job-card labour line
+ *     responses:
+ *       200: { description: Job-card labour line updated }
+ *   delete:
+ *     tags: [Service & Job Cards]
+ *     summary: Remove an unbilled job-card labour line
+ *     responses:
+ *       200: { description: Job-card labour line removed }
+ */
+router.get('/labour-items', requirePermission(PERMISSIONS.LABOUR_ITEM_READ), controller.listLabourItems);
+router.post('/labour-items', requirePermission(PERMISSIONS.LABOUR_ITEM_CREATE), validateRequest(createLabourItemSchema), controller.createLabourItem);
+router.put('/labour-items/:id', requirePermission(PERMISSIONS.LABOUR_ITEM_UPDATE), validateRequest(updateLabourItemSchema), controller.updateLabourItem);
+router.get('/job-cards/:id/labour', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(jobCardIdParamSchema), controller.listJobCardLabour);
+router.post('/job-cards/:id/labour', requirePermission(PERMISSIONS.JOBLABOUR_UPDATE), validateRequest(createJobCardLabourSchema), controller.addJobCardLabour);
+router.put('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOUR_UPDATE), validateRequest(updateJobCardLabourSchema), controller.updateJobCardLabour);
+router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOUR_UPDATE), validateRequest(labourLineIdParamSchema), controller.removeJobCardLabour);
 
 /**
  * @openapi
@@ -403,7 +469,7 @@ router.put('/appointments/:id', requirePermission(PERMISSIONS.APPOINTMENT_UPDATE
 router.delete('/appointments/:id', requirePermission(PERMISSIONS.APPOINTMENT_DELETE), validateRequest(serviceIdParamSchema), controller.deleteAppointment);
 
 router.post('/job-cards', requirePermission(PERMISSIONS.JOBCARD_CREATE), validateRequest(createJobCardSchema), controller.createJobCard);
-router.get('/job-cards', requirePermission(PERMISSIONS.JOBCARD_READ), controller.listJobCards);
+router.get('/job-cards', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(listJobCardsSchema), controller.listJobCards);
 router.get('/job-cards/:id', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(jobCardIdParamSchema), controller.getJobCard);
 router.put('/job-cards/:id', requirePermission(PERMISSIONS.JOBCARD_UPDATE), validateRequest(updateJobCardSchema), controller.updateJobCard);
 

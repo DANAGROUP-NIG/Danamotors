@@ -54,6 +54,7 @@ export class CustomerRepository {
             createdAt: true,
           },
         },
+        tallyLedger: true,
       },
     });
   }

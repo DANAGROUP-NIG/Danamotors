@@ -6,6 +6,11 @@ export const customerIdParamSchema = z.object({
   }),
 });
 
+export const customerTallyLedgerSchema = z.object({
+  params: z.object({ id: z.string().uuid('Invalid customer ID') }),
+  body: z.object({ tallyLedgerCode: z.string().trim().min(1).max(100).nullable() }).strict(),
+});
+
 export const createCustomerSchema = z.object({
   body: z.object({
     firstName: z.string().min(1, 'First name is required'),

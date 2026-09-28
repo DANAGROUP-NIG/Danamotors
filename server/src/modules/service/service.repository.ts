@@ -249,7 +249,7 @@ export class ServiceRepository {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     return prisma.jobCard.findMany({
@@ -269,6 +269,9 @@ export class ServiceRepository {
         },
         vehicle: true,
         createdBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        technician: {
           select: { id: true, firstName: true, lastName: true },
         },
         inspections: true,

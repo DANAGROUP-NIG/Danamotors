@@ -1,4 +1,5 @@
 "use client";
+import { JOB_CARD_STATUS_LABELS, JOB_CARD_STATUS_TONES } from "@/features/job-cards/types/job-card-status";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,7 @@ import { DataTableSearchHeader } from "@/components/ui/table-components/DataTabl
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DateInput } from "@/components/forms/DateInput";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
-import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
 import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
 import { useDataTableSelection } from "@/hooks/use-data-table-selection";
@@ -34,21 +35,9 @@ import type { JobCard, JobCardStatus } from "../types/job-card.types";
 
 const PAGE_SIZE = 10;
 
-const STATUS_LABELS: Record<JobCardStatus, string> = {
-  pending: "Pending",
-  in_progress: "In Progress",
-  completed: "Completed",
-  on_hold: "On Hold",
-  cancelled: "Cancelled",
-};
+const STATUS_LABELS = JOB_CARD_STATUS_LABELS;
 
-const STATUS_TONES: Record<JobCardStatus, StatusTone> = {
-  pending: "amber",
-  in_progress: "blue",
-  completed: "emerald",
-  on_hold: "gray",
-  cancelled: "red",
-};
+const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS).filter(isJobCardStatus);
 

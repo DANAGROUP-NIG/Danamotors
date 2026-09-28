@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCustomer } from "@/features/customers";
 import { CustomerPortalAccessCard } from "@/features/customers/components/CustomerPortalAccessCard";
 import { CustomerCreditCard } from "@/features/customers/components/CustomerCreditCard";
+import { CustomerTallyLedgerCard } from "@/features/customers/components/CustomerTallyLedgerCard";
 import { useVehicles } from "@/features/vehicles/hooks/use-vehicles";
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
@@ -112,6 +113,8 @@ export default function CustomerDetailPage() {
       <CustomerPortalAccessCard customer={customer} />
 
       <CustomerCreditCard customer={customer} />
+
+      <CustomerTallyLedgerCard customer={customer} />
 
       <Section
         icon={<CalendarCheck className="size-4" />}
@@ -299,7 +302,7 @@ export default function CustomerDetailPage() {
               </thead>
               <tbody>
                 {invoices.map((inv) => {
-                  const paid = inv.payments.reduce((s, p) => s + p.amount, 0);
+                  const paid = Math.max(inv.total - inv.outstandingAmount, 0);
                   return (
                     <tr key={inv.id} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-mono text-xs text-slate-700">

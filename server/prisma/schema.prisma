@@ -78,6 +78,13 @@ model User {
 
   recordedPayments Payment[] @relation("UserRecordedPayments")
   issuedReceipts   Receipt[] @relation("UserIssuedReceipts")
+  jobCardLabourLines JobCardLabour[]
+  serviceAdvisorInvoices Invoice[] @relation("InvoiceServiceAdvisor")
+  cancelledInvoices Invoice[] @relation("InvoiceCancelledBy")
+  tallyPostedInvoices Invoice[] @relation("InvoiceTallyPostedBy")
+  tallyPostedReceipts Receipt[] @relation("ReceiptTallyPostedBy")
+  receiptEditLogs ReceiptEditLog[]
+  tallyPostingLogs TallyPostingLog[] @relation("TallyPostingUser")
 
   transferRequests   InterBranchTransfer[] @relation("TransferRequestedBy")
   transferApprovals  InterBranchTransfer[] @relation("TransferApprovedBy")
@@ -187,6 +194,9 @@ model Customer {
   jobCards          JobCard[]
   approvals         CustomerApproval[]
   invoices          Invoice[]
+  receipts          Receipt[]
+  tallyLedgerId     String?
+  tallyLedger       TallyLedger? @relation(fields: [tallyLedgerId], references: [id], onDelete: SetNull)
 
   creditTransactions CustomerCreditTransaction[]
   creditApplications CustomerCreditApplication[]
@@ -327,6 +337,8 @@ model JobCard {
   estimates     Estimate[]
   partIssuances PartIssuance[]
   invoices      Invoice[]
+  labourLines   JobCardLabour[]
+  billedAt      DateTime?
 
   @@index([branchId])
   @@index([customerId])
@@ -505,6 +517,7 @@ model SparePart {
   inventoryStocks   InventoryStock[]
   stockTransactions StockTransaction[]
   transferItems     InterBranchTransferItem[]
+  invoiceLines      InvoiceLine[]
 
   @@index([mainPartId])
 }
@@ -845,6 +858,30 @@ model Invoice {
   tax      Float @default(0)
   total    Float
 
+  partsTotal             Float @default(0)
+  labourTotal            Float @default(0)
+  partsDiscountPercent   Float @default(0)
+  labourDiscountPercent  Float @default(0)
+  partsDiscountAmount    Float @default(0)
+  labourDiscountAmount   Float @default(0)
+  vatRate                Float @default(7.5)
+  vatAmount              Float @default(0)
+  roundOff               Float @default(0)
+  outstandingAmount      Float @default(0)
+
+  serviceAdvisorId String?
+  serviceAdvisor   User?   @relation("InvoiceServiceAdvisor", fields: [serviceAdvisorId], references: [id], onDelete: SetNull)
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
+
+  tallyVoucherNo  String?
+  tallyPostedAt   DateTime?
+  tallyPostedById String?
+  tallyPostedBy   User?     @relation("InvoiceTallyPostedBy", fields: [tallyPostedById], references: [id], onDelete: SetNull)
+
   status String @default("Unpaid")
 
   notes String?
@@ -854,11 +891,72 @@ model Invoice {
 
   payments Payment[]
   receipts Receipt[]
+  lines    InvoiceLine[]
+  allocations ReceiptAllocation[]
 
   creditApplications CustomerCreditApplication[]
 
   @@index([customerId])
   @@index([jobCardId])
+}
+
+model LabourItem {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  description  String
+  defaultHours Float    @default(1)
+  rate         Float
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobCardLines JobCardLabour[]
+}
+
+model JobCardLabour {
+  id           String     @id @default(uuid())
+  jobCardId    String
+  jobCard      JobCard    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  labourItemId String
+  labourItem   LabourItem @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  description  String
+  hours        Float
+  rate         Float
+  amount       Float
+  technicianId String?
+  technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  invoiceLines InvoiceLine[]
+
+  @@index([jobCardId])
+  @@index([labourItemId])
+}
+
+model InvoiceLine {
+  id               String        @id @default(uuid())
+  invoiceId        String
+  invoice          Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  type             String
+  partId           String?
+  part             SparePart?    @relation(fields: [partId], references: [id], onDelete: Restrict)
+  jobCardLabourId  String?
+  jobCardLabour    JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: Restrict)
+  description      String
+  quantity         Float
+  rate             Float
+  amount           Float
+  customerPaid     Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+
+  @@index([invoiceId])
+}
+
+model DocumentSequence {
+  key       String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================
@@ -882,6 +980,9 @@ model Payment {
   reference String?
   notes     String?
 
+  receiptId String?
+  receipt   Receipt? @relation("PaymentReceiptLink", fields: [receiptId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -896,13 +997,31 @@ model Payment {
 model Receipt {
   id String @id @default(uuid())
 
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receiptNumber String  @unique
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  issuedById String
-  issuedBy   User   @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Restrict)
+  issuedById String?
+  issuedBy   User?  @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Restrict)
 
   amount Float
+
+  mode          String   @default("BANK_TRANSFER")
+  category      String   @default("SERVICE_PARTS")
+  bankId        String?
+  bank          Bank?    @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  chequeNumber  String?
+  chequeDate    DateTime?
+  advanceAmount Float    @default(0)
+  status        String   @default("ACTIVE")
+  cancelRemark  String?
+
+  tallyVoucherNo  String?
+  tallyPostedAt   DateTime?
+  tallyPostedById String?
+  tallyPostedBy   User?     @relation("ReceiptTallyPostedBy", fields: [tallyPostedById], references: [id], onDelete: SetNull)
 
   issuedAt DateTime @default(now())
 
@@ -912,8 +1031,93 @@ model Receipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  allocations ReceiptAllocation[]
+  editLogs    ReceiptEditLog[]
+  payments    Payment[] @relation("PaymentReceiptLink")
+
   @@index([invoiceId])
+  @@index([customerId, issuedAt])
   @@index([issuedById])
+}
+
+model Bank {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  accountNumber String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  receipts Receipt[]
+}
+
+model ReceiptAllocation {
+  id        String   @id @default(uuid())
+  receiptId String
+  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amount    Float
+  createdAt DateTime @default(now())
+
+  @@unique([receiptId, invoiceId])
+  @@index([invoiceId])
+}
+
+model ReceiptEditLog {
+  id          String   @id @default(uuid())
+  receiptId   String
+  receipt     Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  editedById  String
+  editedBy    User     @relation(fields: [editedById], references: [id], onDelete: Restrict)
+  oldAmount   Float
+  newAmount   Float
+  oldNarration String?
+  newNarration String?
+  createdAt   DateTime @default(now())
+
+  @@index([receiptId, createdAt])
+}
+
+model TallyLedger {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  active     Boolean  @default(true)
+  importedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customers Customer[]
+}
+
+model TallyAccountMapping {
+  id              String   @id @default(uuid())
+  documentType    String
+  accountType     String
+  tallyLedgerCode String
+  tallyLedgerName String
+  updatedAt       DateTime @updatedAt
+
+  @@unique([documentType, accountType])
+}
+
+model TallyPostingLog {
+  id             String   @id @default(uuid())
+  documentType   String
+  documentId     String
+  status         String   @default("EXPORTED")
+  voucherNumber  String?
+  batchId        String
+  payload        String?
+  postedAt       DateTime?
+  postedById     String?
+  postedBy       User?    @relation("TallyPostingUser", fields: [postedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  @@unique([documentType, documentId])
+  @@index([batchId])
+  @@index([status, createdAt])
 }
 
 // ============================================================

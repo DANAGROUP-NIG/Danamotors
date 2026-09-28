@@ -1,200 +1,155 @@
 "use client";
 
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { DateInput } from "@/components/forms/DateInput";
 import { useBranchStore } from "@/store/branch.store";
-import { useCustomers } from "@/features/customers/hooks/use-customers";
-import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
+import {
+  getBillableJobCardsRequest,
+  getServiceAdvisorsRequest,
+  previewJobBillRequest,
+} from "../api/invoice.api";
+import { invoiceKeys } from "../api/invoice.keys";
 import { useCreateInvoice } from "../hooks/use-create-invoice";
 
-const createInvoiceSchema = z
-  .object({
-    customerId: z.string().min(1, "Select a customer"),
-    jobCardId: z.string().optional(),
-    invoiceNumber: z.string().min(1, "Invoice number is required"),
-    issuedDate: z.string().optional(),
-    dueDate: z.string().optional(),
-    subtotal: z.coerce.number().min(0, "Subtotal must be non-negative"),
-    tax: z.coerce.number().min(0, "Tax must be non-negative").optional(),
-    total: z.coerce.number().min(0, "Total must be non-negative"),
-    status: z.string().optional(),
-    notes: z.string().optional(),
-  })
-  .refine((d) => d.total >= d.subtotal + (d.tax ?? 0), {
-    path: ["total"],
-    message: "Total must be at least subtotal + tax",
-  });
-
-type CreateInvoiceFormValues = z.infer<typeof createInvoiceSchema>;
+const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 
 interface InvoiceCreateFormProps {
   onSuccess?: () => void;
 }
 
 export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
+  const searchParams = useSearchParams();
+  const branchId = useBranchStore((state) => state.activeBranch?.id);
   const create = useCreateInvoice();
-  const activeBranch = useBranchStore((s) => s.activeBranch);
-  const customers = useCustomers({
-    page: 1,
-    limit: 500,
-    branchId: activeBranch?.id,
-  });
-  const jobCards = useJobCards({
-    page: 1,
-    limit: 500,
-    branchId: activeBranch?.id,
-  });
+  const [jobCardId, setJobCardId] = useState(searchParams.get("jobCardId") ?? "");
+  const [partsDiscountPercent, setPartsDiscountPercent] = useState(0);
+  const [labourDiscountPercent, setLabourDiscountPercent] = useState(0);
+  const [serviceAdvisorId, setServiceAdvisorId] = useState("");
+  const [notes, setNotes] = useState("");
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<CreateInvoiceFormValues>({
-    resolver: zodResolver(createInvoiceSchema),
-    defaultValues: {
-      invoiceNumber: `INV-${Date.now()}`,
-      subtotal: 0,
-      tax: 0,
-      total: 0,
-      status: "Unpaid",
-    },
+  const jobCards = useQuery({
+    queryKey: [...invoiceKeys.billableJobCards(), branchId],
+    queryFn: getBillableJobCardsRequest,
+  });
+  const advisors = useQuery({
+    queryKey: ["finance", "service-advisors", branchId],
+    queryFn: getServiceAdvisorsRequest,
+  });
+  const preview = useQuery({
+    queryKey: invoiceKeys.jobBillPreview(jobCardId, partsDiscountPercent, labourDiscountPercent),
+    queryFn: () => previewJobBillRequest({ jobCardId, partsDiscountPercent, labourDiscountPercent }),
+    enabled: Boolean(jobCardId),
   });
 
-  const selectedJobCardId = watch("jobCardId");
-  const selectedJobCard = jobCards.data?.jobCards.find(
-    (j) => j.id === selectedJobCardId,
-  );
+  const bill = preview.data?.preview;
+  const hasParts = Boolean(bill?.totals.partsTotal);
 
-  function onCustomerChange(customerId: string) {
-    setValue("customerId", customerId, { shouldValidate: true });
-    setValue("jobCardId", "");
+  function selectJobCard(id: string) {
+    setJobCardId(id);
+    setPartsDiscountPercent(0);
+    setLabourDiscountPercent(0);
   }
 
-  function onJobCardChange(jobCardId: string) {
-    setValue("jobCardId", jobCardId);
-    const jobCard = jobCards.data?.jobCards.find((j) => j.id === jobCardId);
-    if (jobCard) {
-      setValue("subtotal", jobCard.estimatedCost ?? 0);
-      setValue("total", jobCard.estimatedCost ?? 0);
-    }
-  }
-
-  function onSubmit(values: CreateInvoiceFormValues) {
-    create.mutate(
-      {
-        customerId: values.customerId,
-        jobCardId: values.jobCardId || undefined,
-        invoiceNumber: values.invoiceNumber,
-        issuedDate: values.issuedDate ? new Date(values.issuedDate).toISOString() : undefined,
-        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
-        subtotal: values.subtotal,
-        tax: values.tax ?? 0,
-        total: values.total,
-        status: values.status || "Unpaid",
-        notes: values.notes || undefined,
-      },
-      { onSuccess: () => onSuccess?.() },
-    );
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!jobCardId || !serviceAdvisorId || !bill) return;
+    create.mutate({
+      jobCardId,
+      partsDiscountPercent,
+      labourDiscountPercent,
+      serviceAdvisorId,
+      notes: notes.trim() || undefined,
+    }, { onSuccess });
   }
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Customer" error={errors.customerId?.message}>
-          <select
-            className={inputCls}
-            {...register("customerId")}
-            onChange={(e) => onCustomerChange(e.target.value)}
-          >
-            <option value="">Select customer</option>
-            {customers.data?.customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.firstName} {c.lastName}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Job card (optional)" error={errors.jobCardId?.message}>
-          <select className={inputCls} {...register("jobCardId")} onChange={(e) => onJobCardChange(e.target.value)}>
-            <option value="">No job card</option>
-            {jobCards.data?.jobCards.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.jobNumber}
-                {j.customer ? ` — ${j.customer.firstName} ${j.customer.lastName}` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Invoice number" error={errors.invoiceNumber?.message}>
-          <input className={inputCls} {...register("invoiceNumber")} />
-        </Field>
-        <Field label="Status" error={errors.status?.message}>
-          <select className={inputCls} {...register("status")}>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Partially Paid">Partially Paid</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-          </select>
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Issued date (optional)" error={errors.issuedDate?.message}>
-          <Controller
-            control={control}
-            name="issuedDate"
-            render={({ field }) => (
-              <DateInput value={field.value} onChange={field.onChange} />
-            )}
-          />
-        </Field>
-        <Field label="Due date (optional)" error={errors.dueDate?.message}>
-          <Controller
-            control={control}
-            name="dueDate"
-            render={({ field }) => (
-              <DateInput value={field.value} onChange={field.onChange} />
-            )}
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Subtotal (₦)" error={errors.subtotal?.message}>
-          <input type="number" step="0.01" className={inputCls} {...register("subtotal")} />
-        </Field>
-        <Field label="Tax (₦)" error={errors.tax?.message}>
-          <input type="number" step="0.01" className={inputCls} {...register("tax")} />
-        </Field>
-        <Field label="Total (₦)" error={errors.total?.message}>
-          <input type="number" step="0.01" className={inputCls} {...register("total")} />
-        </Field>
-      </div>
-
-      {selectedJobCard && (
-        <p className="text-xs text-muted-foreground">
-          Subtotal/Total pre-filled from {selectedJobCard.jobNumber} (
-          {selectedJobCard.estimatedCost?.toLocaleString("en-NG")} ₦). Adjust if needed.
-        </p>
-      )}
-
-      <Field label="Notes (optional)" error={errors.notes?.message}>
-        <textarea className={inputCls} rows={3} {...register("notes")} />
+    <form className="grid gap-5" onSubmit={submit}>
+      <Field label="Completed job card">
+        <select className={inputCls} value={jobCardId} onChange={(event) => selectJobCard(event.target.value)} required>
+          <option value="">Select a job card</option>
+          {jobCards.data?.jobCards.map((jobCard) => (
+            <option key={jobCard.id} value={jobCard.id}>
+              {jobCard.jobNumber} - {jobCard.customer ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}` : "Customer missing"}
+            </option>
+          ))}
+        </select>
+        {jobCards.isLoading && <span className="text-xs text-muted-foreground">Loading billable job cards...</span>}
+        {jobCards.isError && <span className="text-xs text-destructive">Could not load billable job cards.</span>}
+        {!jobCards.isLoading && !jobCards.isError && jobCards.data?.jobCards.length === 0 && (
+          <span className="text-xs text-muted-foreground">No completed job cards are ready to bill.</span>
+        )}
       </Field>
 
-      <Button type="submit" disabled={create.isPending} className="mt-1">
-        {create.isPending ? "Creating…" : "Create invoice"}
+      {bill && (
+        <section className="grid gap-4 border-y py-4" aria-label="Job bill details">
+          <div>
+            <p className="font-semibold">{bill.jobCard.jobNumber}</p>
+            <p className="text-sm text-muted-foreground">
+              {bill.jobCard.customer ? `${bill.jobCard.customer.firstName} ${bill.jobCard.customer.lastName}` : "Customer"}
+              {bill.jobCard.vehicle?.registrationNumber ? ` - ${bill.jobCard.vehicle.registrationNumber}` : ""}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
+              <thead className="border-b text-left text-muted-foreground">
+                <tr><th className="py-2 font-medium">Type</th><th className="py-2 font-medium">Description</th><th className="py-2 text-right font-medium">Qty / hours</th><th className="py-2 text-right font-medium">Rate</th><th className="py-2 text-right font-medium">Amount</th></tr>
+              </thead>
+              <tbody>
+                {bill.lines.map((line, index) => (
+                  <tr key={`${line.type}-${index}`} className="border-b last:border-0">
+                    <td className="py-2">{line.type === "PART" ? "Part" : "Labour"}</td>
+                    <td className="py-2">{line.description}</td>
+                    <td className="py-2 text-right">{line.quantity}</td>
+                    <td className="py-2 text-right">{currency.format(line.rate)}</td>
+                    <td className="py-2 text-right">{currency.format(line.amount)}</td>
+                  </tr>
+                ))}
+                {bill.lines.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">No parts or labour have been recorded.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          <dl className="ml-auto grid w-full max-w-sm grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <dt>Parts</dt><dd className="text-right">{currency.format(bill.totals.partsTotal)}</dd>
+            <dt>Parts discount</dt><dd className="text-right">-{currency.format(bill.totals.partsDiscountAmount)}</dd>
+            <dt>Labour</dt><dd className="text-right">{currency.format(bill.totals.labourTotal)}</dd>
+            <dt>Labour discount</dt><dd className="text-right">-{currency.format(bill.totals.labourDiscountAmount)}</dd>
+            <dt>VAT ({bill.totals.vatRate}%)</dt><dd className="text-right">{currency.format(bill.totals.vatAmount)}</dd>
+            <dt>Round-off</dt><dd className="text-right">{currency.format(bill.totals.roundOff)}</dd>
+            <dt className="border-t pt-2 font-semibold">Total</dt><dd className="border-t pt-2 text-right font-semibold">{currency.format(bill.totals.total)}</dd>
+          </dl>
+        </section>
+      )}
+
+      {jobCardId && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Parts discount (%)">
+            <input type="number" min="0" max="100" step="0.01" className={inputCls} disabled={Boolean(bill && !hasParts)} value={partsDiscountPercent} onChange={(event) => setPartsDiscountPercent(Number(event.target.value))} />
+          </Field>
+          <Field label="Labour discount (%)">
+            <input type="number" min="0" max="100" step="0.01" className={inputCls} value={labourDiscountPercent} onChange={(event) => setLabourDiscountPercent(Number(event.target.value))} />
+          </Field>
+          <Field label="Service advisor">
+            <select className={inputCls} value={serviceAdvisorId} onChange={(event) => setServiceAdvisorId(event.target.value)} required>
+              <option value="">Select advisor</option>
+              {advisors.data?.advisors.map((advisor) => (
+                <option key={advisor.id} value={advisor.id}>{advisor.firstName} {advisor.lastName}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      )}
+
+      {jobCardId && preview.isFetching && <p className="text-sm text-muted-foreground">Recalculating from job-card lines...</p>}
+      {jobCardId && preview.isError && <p role="alert" className="text-sm text-destructive">The bill preview could not be calculated. Check the job-card lines and discount values.</p>}
+      <Field label="Notes (optional)">
+        <textarea className={inputCls} rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} />
+      </Field>
+      <Button type="submit" disabled={!bill || preview.isFetching || create.isPending || !serviceAdvisorId}>
+        {create.isPending ? "Creating bill..." : "Create job bill"}
       </Button>
     </form>
   );

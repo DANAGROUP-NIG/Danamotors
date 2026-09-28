@@ -13,6 +13,8 @@ export type Customer = {
   country?: string;
   preferredContactMethod?: string;
   branchId: string;
+  tallyLedgerId?: string | null;
+  tallyLedger?: { id: string; code: string; name: string; active: boolean } | null;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
   hasAccount?: boolean;
   account?: {

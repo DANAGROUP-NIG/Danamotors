@@ -4,13 +4,87 @@ import { assertBranchOwnership } from '../../middleware/authorize';
 import { ROLES } from '../../shared/constants/roles';
 import prisma from '../../prisma/client';
 import { ForbiddenError } from '../../shared/errors/appError';
+import { LabourService } from './labour.service';
 
 export class ServiceController {
   private serviceService: ServiceService;
+  private labourService: LabourService;
 
   constructor() {
     this.serviceService = new ServiceService();
+    this.labourService = new LabourService();
   }
+
+  listLabourItems = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const labourItems = await this.labourService.listItems();
+      res.status(200).json({ status: 'success', statusCode: 200, data: { labourItems } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createLabourItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const labourItem = await this.labourService.createItem(req.body);
+      res.status(201).json({ status: 'success', statusCode: 201, data: { labourItem } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateLabourItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const labourItem = await this.labourService.updateItem(req.params.id, req.body);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { labourItem } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const jobCard = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      assertBranchOwnership(req, jobCard?.branchId);
+      const labourLines = await this.labourService.listJobCardLines(req.params.id);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { labourLines } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  addJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const jobCard = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      assertBranchOwnership(req, jobCard?.branchId);
+      const labourLine = await this.labourService.addJobCardLine(req.params.id, req.body);
+      res.status(201).json({ status: 'success', statusCode: 201, data: { labourLine } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const existing = await prisma.jobCardLabour.findUnique({ where: { id: req.params.lineId }, select: { jobCard: { select: { branchId: true } } } });
+      assertBranchOwnership(req, existing?.jobCard.branchId);
+      const labourLine = await this.labourService.updateJobCardLine(req.params.lineId, req.body);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { labourLine } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  removeJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const existing = await prisma.jobCardLabour.findUnique({ where: { id: req.params.lineId }, select: { jobCard: { select: { branchId: true } } } });
+      assertBranchOwnership(req, existing?.jobCard.branchId);
+      await this.labourService.removeJobCardLine(req.params.lineId);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Labour line removed' });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   createAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -116,6 +190,9 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can create job cards');
       }
       const createdById = req.user?.userId;
+      const branch = await prisma.branch.findUnique({ where: { name: req.body.branchName }, select: { id: true } });
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId) throw new ForbiddenError('Your account is not assigned to a branch');
+      assertBranchOwnership(req, branch?.id);
       const result = await this.serviceService.createJobCard({ ...req.body, createdById });
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Job card created successfully', data: { jobCard: result } });
     } catch (error) {

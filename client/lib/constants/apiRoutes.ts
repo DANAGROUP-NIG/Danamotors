@@ -15,6 +15,7 @@ export const API_ROUTES = {
     base: "/customers",
     detail: (id: string) => `/customers/${id}`,
     account: (id: string) => `/customers/${id}/account`,
+    tallyLedger: (id: string) => `/customers/${id}/tally-ledger`,
   },
   portal: {
     me: "/portal/me",
@@ -73,6 +74,9 @@ export const API_ROUTES = {
       base: "/service/job-cards",
       detail: (id: string) => `/service/job-cards/${id}`,
     },
+    labourItems: "/service/labour-items",
+    jobCardLabour: (jobCardId: string) => `/service/job-cards/${jobCardId}/labour`,
+    jobCardLabourLine: (lineId: string) => `/service/job-card-labour/${lineId}`,
   },
   services: {
     base: "/services",
@@ -102,6 +106,21 @@ export const API_ROUTES = {
     payments: {
       base: "/finance/payments",
       detail: (id: string) => `/finance/payments/${id}`,
+    },
+    jobCardsBillable: "/finance/job-cards/billable",
+    jobBillPreview: "/finance/job-bills/preview",
+    jobBills: "/finance/job-bills",
+    serviceAdvisors: "/finance/service-advisors",
+    receipts: "/finance/receipts",
+    banks: "/finance/banks",
+    receiptRegister: "/finance/reports/receipt-register",
+    tally: {
+      ledgers: "/finance/tally/ledgers",
+      importLedgers: "/finance/tally/ledgers/import",
+      documents: "/finance/tally/documents",
+      export: "/finance/tally/post",
+      confirm: "/finance/tally/post/confirm",
+      accountMappings: "/finance/tally/account-mappings",
     },
   },
   administration: {

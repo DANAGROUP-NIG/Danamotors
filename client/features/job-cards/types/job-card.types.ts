@@ -1,4 +1,5 @@
-export type JobCardStatus = "pending" | "in_progress" | "completed" | "on_hold" | "cancelled";
+import type { JobCardStatus } from "./job-card-status";
+export type { JobCardStatus } from "./job-card-status";
 
 export type Inspection = {
   id: string;
@@ -119,6 +120,7 @@ export type JobCard = {
   qualityInspector?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
+  billedAt?: string | null;
   appointment?: JobCardAppointment;
   branch: JobCardBranch;
   customer: JobCardCustomer;

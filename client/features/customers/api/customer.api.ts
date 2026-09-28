@@ -64,3 +64,11 @@ export async function manageCustomerAccountRequest(
   );
   return result;
 }
+
+export async function updateCustomerTallyLedgerRequest(id: string, tallyLedgerCode: string | null) {
+  const result = await apiPut<{ customer: Customer }, { tallyLedgerCode: string | null }>(
+    API_ROUTES.customers.tallyLedger(id),
+    { tallyLedgerCode },
+  );
+  return result.customer;
+}

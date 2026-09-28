@@ -298,6 +298,10 @@ export class ServiceService {
     if (data.appointmentId) {
       const appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
       if (!appointment) throw new NotFoundError('Appointment not found');
+      if (appointment.branch.name !== data.branchName) throw new BadRequestError('Appointment must belong to the job card branch');
+      if (data.customerId && data.customerId !== appointment.customerId) throw new BadRequestError('Customer does not match appointment');
+      if (data.vehicleId && data.vehicleId !== appointment.vehicleId) throw new BadRequestError('Vehicle does not match appointment');
+      data = { ...data, customerId: appointment.customerId, vehicleId: appointment.vehicleId };
     }
 
     if (data.customerId) {
@@ -308,6 +312,8 @@ export class ServiceService {
     if (data.vehicleId) {
       const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
       if (!vehicle) throw new NotFoundError('Vehicle not found');
+      if (data.customerId && vehicle.customerId !== data.customerId) throw new BadRequestError('Vehicle does not belong to this customer');
+      data = { ...data, customerId: data.customerId ?? vehicle.customerId ?? undefined };
     }
 
     const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
@@ -361,7 +367,7 @@ export class ServiceService {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     const [jobCards, total] = await Promise.all([
@@ -390,6 +396,7 @@ export class ServiceService {
   }
 
   async updateJobCard(id: string, data: {
+    progress?: number;
     appointmentId?: string;
     customerId?: string;
     vehicleId?: string;
@@ -404,7 +411,41 @@ export class ServiceService {
       throw new NotFoundError('Job card not found');
     }
 
-    return this.serviceRepository.updateJobCard(id, data);
+    if (card.billedAt || card.invoices?.some((invoice) => !['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase()))) throw new BadRequestError('Billed job cards cannot be edited');
+    const appointmentId = data.appointmentId ?? card.appointmentId;
+    let customerId = data.customerId ?? card.customerId;
+    let vehicleId = data.vehicleId ?? card.vehicleId;
+    if (appointmentId) {
+      const appointment = await prisma.serviceAppointment.findUnique({ where: { id: appointmentId } });
+      if (!appointment) throw new NotFoundError('Appointment not found');
+      if (appointment.branchId !== card.branchId) throw new BadRequestError('Appointment must belong to the job card branch');
+      if ((customerId && customerId !== appointment.customerId) || (vehicleId && vehicleId !== appointment.vehicleId)) {
+        throw new BadRequestError('Customer and vehicle must match the appointment');
+      }
+      customerId = appointment.customerId;
+      vehicleId = appointment.vehicleId;
+    }
+    if (vehicleId) {
+      const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+      if (!vehicle) throw new NotFoundError('Vehicle not found');
+      if (customerId && vehicle.customerId !== customerId) throw new BadRequestError('Vehicle does not belong to this customer');
+      customerId = customerId ?? vehicle.customerId;
+    }
+    if (customerId && !await prisma.customer.findUnique({ where: { id: customerId } })) throw new NotFoundError('Customer not found');
+    data = { ...data, customerId: customerId ?? undefined, vehicleId: vehicleId ?? undefined };
+
+    const updated = await this.serviceRepository.updateJobCard(id, data);
+    if (data.status && ['Ready', 'Completed'].includes(data.status) && !['Ready', 'Completed'].includes(card.status)) {
+      const notificationService = new NotificationService();
+      await notificationService.notifyRole(ROLES.BILLING_OFFICER, card.branchId, {
+        type: 'JOB_CARD_READY_FOR_BILLING',
+        title: 'Job card ready for billing',
+        message: `Job card ${card.jobNumber} is ready to be billed.`,
+        link: '/invoices/new',
+        branchId: card.branchId,
+      });
+    }
+    return updated;
   }
 
   async addInspection(jobCardId: string, data: {

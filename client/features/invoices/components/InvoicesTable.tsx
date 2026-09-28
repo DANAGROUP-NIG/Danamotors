@@ -37,7 +37,8 @@ import { useBranchStore } from "@/store/branch.store";
 import { useInvoices } from "../hooks/use-invoices";
 import type { Invoice } from "../types/invoice.types";
 import { EditInvoiceModal } from "./EditInvoiceModal";
-import { RecordPaymentModal } from "./RecordPaymentModal";
+import { PaymentReceiptModal } from "./PaymentReceiptModal";
+import { CancelJobBillModal } from "./CancelJobBillModal";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const PAGE_SIZE = 10;
@@ -47,9 +48,10 @@ const STATUS_STYLES: Record<string, string> = {
   Unpaid: "bg-amber-100 text-amber-700",
   "Partially Paid": "bg-blue-100 text-blue-700",
   Overdue: "bg-red-100 text-red-600",
+  Cancelled: "bg-gray-100 text-gray-600",
 };
 
-const STATUS_OPTIONS = ["Paid", "Unpaid", "Partially Paid", "Overdue"] as const;
+const STATUS_OPTIONS = ["Paid", "Unpaid", "Partially Paid", "Overdue", "Cancelled"] as const;
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount);
@@ -95,15 +97,13 @@ function invoiceToExportable(
 }
 
 function formatInvoiceText(inv: Invoice) {
-  const paid = inv.payments.reduce((sum, p) => sum + p.amount, 0);
-  const outstanding = inv.total - paid;
   return [
     `*Invoice ${inv.invoiceNumber}*`,
     `Customer: ${inv.customer.firstName} ${inv.customer.lastName}`,
     `Job card: ${inv.jobCard?.jobNumber ?? "—"}`,
     `Amount: ${formatCurrency(inv.total)}`,
     `Status: ${inv.status}`,
-    `Outstanding: ${formatCurrency(outstanding)}`,
+    `Outstanding: ${formatCurrency(inv.outstandingAmount)}`,
   ].join("\n");
 }
 
@@ -124,12 +124,14 @@ export function InvoicesTable() {
   const [page, setPage] = useState(1);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
+  const [cancellingInvoice, setCancellingInvoice] = useState<Invoice | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const { hasPermission } = useAuth();
-  const canRecordPayment = hasPermission("payment:create");
+  const canRecordPayment = hasPermission("receipt:create");
+  const canCancel = hasPermission("invoice:cancel");
   const canEdit = hasPermission("invoice:update");
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
@@ -265,9 +267,9 @@ export function InvoicesTable() {
         <DataTableRowActions
           item={inv}
           quickActions={[
-            canRecordPayment && {
-              id: "record-payment",
-              label: "Record payment",
+            canRecordPayment && inv.outstandingAmount > 0 && inv.status !== "Cancelled" && {
+              id: "record-receipt",
+              label: "Record receipt",
               icon: <ReceiptText className="size-3.5" />,
               onClick: () => setPayingInvoice(inv),
             },
@@ -276,6 +278,12 @@ export function InvoicesTable() {
               label: "Edit",
               icon: <Pencil className="size-3.5" />,
               onClick: () => setEditingInvoice(inv),
+            },
+            canCancel && Boolean(inv.jobCardId) && inv.status !== "Cancelled" && {
+              id: "cancel-bill",
+              label: "Cancel bill",
+              icon: <X className="size-4" />,
+              onClick: () => setCancellingInvoice(inv),
             },
           ]}
           actions={[
@@ -290,6 +298,12 @@ export function InvoicesTable() {
               label: "Edit",
               icon: <Pencil className="size-4" />,
               onClick: () => setEditingInvoice(inv),
+            },
+            canCancel && Boolean(inv.jobCardId) && inv.status !== "Cancelled" && {
+              id: "cancel-bill",
+              label: "Cancel bill",
+              icon: <X className="size-4" />,
+              onClick: () => setCancellingInvoice(inv),
             },
             {
               id: "download",
@@ -497,11 +511,18 @@ export function InvoicesTable() {
         </div>
       </DataTable>
 
-      <RecordPaymentModal
+      <PaymentReceiptModal
         isOpen={payingInvoice !== null}
         onClose={() => setPayingInvoice(null)}
         invoiceId={payingInvoice?.id}
       />
+      {cancellingInvoice && (
+        <CancelJobBillModal
+          invoice={cancellingInvoice}
+          isOpen={true}
+          onClose={() => setCancellingInvoice(null)}
+        />
+      )}
       {editingInvoice && (
         <EditInvoiceModal
           isOpen={true}

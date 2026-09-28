@@ -1,4 +1,6 @@
 "use client";
+import { JOB_CARD_STATUS_TONES } from "@/features/job-cards/types/job-card-status";
+import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -23,16 +25,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import type { JobCardStatus, PartIssuance, JobCardInvoice } from "@/features/job-cards/types/job-card.types";
+import { JobCardLabourSection } from "@/features/job-cards/components/JobCardLabourSection";
 
-const STATUS_TONES: Record<JobCardStatus, StatusTone> = {
-  pending: "amber",
-  in_progress: "blue",
-  completed: "emerald",
-  on_hold: "gray",
-  cancelled: "red",
-};
+const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -50,6 +47,7 @@ export default function JobCardDetailPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const canManage = hasPermission("jobcard:update");
+  const canCreateBill = hasPermission("invoice:job-bill:create");
 
   function handlePrint() {
     window.print();
@@ -107,14 +105,16 @@ export default function JobCardDetailPage() {
           <Button size="sm" variant="outline" onClick={handlePrint} className="gap-1.5">
             <Printer className="size-4" /> Print
           </Button>
-          {canManage && (
+          {(canManage || canCreateBill) && (
             <>
-              <Button size="sm" variant="outline" onClick={handleGenerateInvoice} className="gap-1.5">
-                <Receipt className="size-4" /> Generate Invoice
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleRequestParts} className="gap-1.5">
+              {canCreateBill && !jobCard.billedAt && !(jobCard.invoices ?? []).some((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) && ["Ready", "Completed"].includes(jobCard.status) && (
+                <Button size="sm" variant="outline" onClick={handleGenerateInvoice} className="gap-1.5">
+                  <Receipt className="size-4" /> Create Job Bill
+                </Button>
+              )}
+              {canManage && <Button size="sm" variant="outline" onClick={handleRequestParts} className="gap-1.5">
                 <Package className="size-4" /> Request Parts
-              </Button>
+              </Button>}
             </>
           )}
         </div>
@@ -228,6 +228,9 @@ export default function JobCardDetailPage() {
             </div>
           )}
         </SectionCard>
+
+        {canManage && !jobCard.billedAt && !(jobCard.invoices ?? []).some((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) && <JobCardEditForm key={jobCard.updatedAt} jobCard={jobCard} />}
+        <JobCardLabourSection jobCardId={jobCard.id} status={jobCard.status} branchId={jobCard.branchId} billedAt={jobCard.billedAt} />
 
         {/* ── Technician & QC Assignments ── */}
         <div className="grid gap-5 md:grid-cols-2">

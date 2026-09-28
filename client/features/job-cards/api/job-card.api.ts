@@ -50,5 +50,11 @@ export interface CreateJobCardPayload {
 export async function createJobCardRequest(
   data: CreateJobCardPayload,
 ): Promise<JobCard> {
-  return apiPost<JobCard>(API_ROUTES.service.jobCards.base, data);
+  const result = await apiPost<{ jobCard: JobCard }>(API_ROUTES.service.jobCards.base, {
+    ...data,
+    appointmentId: data.appointmentId || undefined,
+    customerId: data.customerId || undefined,
+    vehicleId: data.vehicleId || undefined,
+  });
+  return result.jobCard;
 }

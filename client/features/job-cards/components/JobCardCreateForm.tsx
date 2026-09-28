@@ -122,6 +122,7 @@ export function JobCardCreateForm({ onSuccess, defaultValues }: JobCardCreateFor
         </Field>
       </div>
 
+      {create.isError && <p role="alert" className="text-sm text-red-600">Could not create the job card. Check the details and use a unique job number.</p>}
       <Button type="submit" disabled={create.isPending} className="mt-1">
         {create.isPending ? "Creating..." : "Create job card"}
       </Button>

@@ -5,6 +5,7 @@ export const ROLES = {
   BRANCH_STORE_MANAGER: "BranchStoreManager",
   WORKSHOP_MANAGER: "WorkshopManager",
   ACCOUNTANT: "Accountant",
+  BILLING_OFFICER: "BillingOfficer",
   SERVICE_ADVISOR: "ServiceAdviser",
   TECHNICIAN: "Technician",
   RECEPTIONIST: "Receptionist",
@@ -76,6 +77,10 @@ export const PERMISSIONS = {
   JOBCARD_READ: "jobcard:read",
   JOBCARD_CREATE: "jobcard:create",
   JOBCARD_UPDATE: "jobcard:update",
+  JOBLABOUR_UPDATE: "jobcard:labour:update",
+  LABOUR_ITEM_READ: "labour-item:read",
+  LABOUR_ITEM_CREATE: "labour-item:create",
+  LABOUR_ITEM_UPDATE: "labour-item:update",
 
   // ── Service — Inspections ─────────────────────────────────────────────────
   INSPECTION_READ: "inspection:read",
@@ -143,6 +148,8 @@ export const PERMISSIONS = {
   INVOICE_CREATE: "invoice:create",
   INVOICE_UPDATE: "invoice:update",
   INVOICE_DELETE: "invoice:delete",
+  JOB_BILL_CREATE: "invoice:job-bill:create",
+  INVOICE_CANCEL: "invoice:cancel",
 
   // ── Finance — Payments ────────────────────────────────────────────────────
   PAYMENT_READ: "payment:read",
@@ -151,9 +158,17 @@ export const PERMISSIONS = {
   // ── Finance — Receipts ────────────────────────────────────────────────────
   RECEIPT_READ: "receipt:read",
   RECEIPT_CREATE: "receipt:create",
+  RECEIPT_UPDATE: "receipt:update",
+  RECEIPT_CANCEL: "receipt:cancel",
 
   // ── Finance — Reports ─────────────────────────────────────────────────────
   FINANCE_REPORT_READ: "financereport:read",
+  RECEIPT_REGISTER_READ: "report:receipt-register",
+
+  // ── Tally ─────────────────────────────────────────────────────────────────
+  TALLY_POST: "tally:post",
+  TALLY_IMPORT: "tally:import",
+  CUSTOMER_TALLY_MAPPING: "customer:tally-mapping",
 
   // ── Credit ────────────────────────────────────────────────────────────────
   CREDIT_APPLICATION_CREATE: "credit:application:create",
@@ -201,6 +216,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.JOBLABOUR_UPDATE,
+    PERMISSIONS.LABOUR_ITEM_READ,
+    PERMISSIONS.LABOUR_ITEM_CREATE,
+    PERMISSIONS.LABOUR_ITEM_UPDATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.INSPECTION_CREATE,
     PERMISSIONS.ESTIMATE_READ,
@@ -231,12 +250,11 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TRANSFER_DISPATCH,
     PERMISSIONS.TRANSFER_RECEIVE,
     PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.INVOICE_CREATE,
     PERMISSIONS.INVOICE_UPDATE,
-    PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_CREATE,
     PERMISSIONS.RECEIPT_READ,
-    PERMISSIONS.RECEIPT_CREATE,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
@@ -331,10 +349,15 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_UPDATE,
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
     PERMISSIONS.SERVICES_DELETE,
+    PERMISSIONS.JOBLABOUR_UPDATE,
+    PERMISSIONS.LABOUR_ITEM_READ,
+    PERMISSIONS.LABOUR_ITEM_CREATE,
+    PERMISSIONS.LABOUR_ITEM_UPDATE,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
@@ -349,8 +372,26 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.PAYMENT_CREATE,
     PERMISSIONS.RECEIPT_READ,
-    PERMISSIONS.RECEIPT_CREATE,
     PERMISSIONS.FINANCE_REPORT_READ,
+  ],
+
+  [ROLES.BILLING_OFFICER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
+    PERMISSIONS.CUSTOMER_READ,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.JOB_BILL_CREATE,
+    PERMISSIONS.INVOICE_CANCEL,
+    PERMISSIONS.RECEIPT_READ,
+    PERMISSIONS.RECEIPT_CREATE,
+    PERMISSIONS.RECEIPT_UPDATE,
+    PERMISSIONS.RECEIPT_CANCEL,
+    PERMISSIONS.RECEIPT_REGISTER_READ,
+    PERMISSIONS.TALLY_POST,
+    PERMISSIONS.TALLY_IMPORT,
+    PERMISSIONS.CUSTOMER_TALLY_MAPPING,
   ],
 
   // Handles estimates, approvals, customer liaison during service
@@ -380,6 +421,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.STOCK_READ,
     PERMISSIONS.INVOICE_READ,
     PERMISSIONS.INVOICE_CREATE,
+    PERMISSIONS.JOBLABOUR_UPDATE,
+    PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.SERVICES_READ,
   ],
 

@@ -11,6 +11,7 @@ import {
   createServiceHistorySchema,
   customerIdParamSchema,
   customerAccountSchema,
+  customerTallyLedgerSchema,
 } from './customer.validation';
 
 const router = Router();
@@ -290,6 +291,21 @@ router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), controller.getCust
 router.get('/:id', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomer);
 router.post('/', requirePermission(PERMISSIONS.CUSTOMER_CREATE), validateRequest(createCustomerSchema), controller.createCustomer);
 router.put('/:id', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(updateCustomerSchema), controller.updateCustomer);
+/**
+ * @openapi
+ * /customers/{id}/tally-ledger:
+ *   put:
+ *     tags: [Customers]
+ *     summary: Link a customer to an imported Tally ledger
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { tallyLedgerCode: 'LEDGER-001' }
+ *     responses:
+ *       200: { description: Customer ledger mapping saved }
+ */
+router.put('/:id/tally-ledger', requirePermission(PERMISSIONS.CUSTOMER_TALLY_MAPPING), validateRequest(customerTallyLedgerSchema), controller.updateCustomerTallyLedger);
 
 router.post('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_DOCUMENT_CREATE), validateRequest(createCustomerDocumentSchema), controller.addCustomerDocument);
 router.get('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomerDocuments);
