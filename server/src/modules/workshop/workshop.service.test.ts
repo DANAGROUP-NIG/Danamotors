@@ -8,11 +8,11 @@ import { ServiceService } from '../service/service.service';
 describe('JobCard workshop actions', () => {
   beforeEach(() => { jest.restoreAllMocks(); jest.clearAllMocks(); });
 
-  it('saves progress and status together through the billing-aware service', async () => {
+  it('routes legacy status actions through the audited lifecycle', async () => {
     jest.spyOn(WorkshopRepository.prototype, 'findJobCardById').mockResolvedValue({ id: 'card', billedAt: null } as any);
     const update = jest.spyOn(ServiceService.prototype, 'updateJobCard').mockResolvedValue({ id: 'card' } as any);
-    await new WorkshopService().updateProgress('card', 100, 'Ready');
-    expect(update).toHaveBeenCalledWith('card', { progress: 100, status: 'Ready' });
+    await new WorkshopService().updateProgress('card', 100, 'Ready', 'actor');
+    expect(update).toHaveBeenCalledWith('card', { status: 'READY' }, 'actor');
   });
 
   it('blocks progress, QC and assignment after billing', async () => {
