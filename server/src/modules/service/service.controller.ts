@@ -15,9 +15,9 @@ export class ServiceController {
     this.labourService = new LabourService();
   }
 
-  listLabourItems = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listLabourItems = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const labourItems = await this.labourService.listItems();
+      const labourItems = await this.labourService.listItems(req.query.search as string | undefined, req.query.includeInactive === 'true');
       res.status(200).json({ status: 'success', statusCode: 200, data: { labourItems } });
     } catch (error) {
       next(error);
@@ -57,6 +57,7 @@ export class ServiceController {
     try {
       const jobCard = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
       assertBranchOwnership(req, jobCard?.branchId);
+      if (req.body.rate !== undefined && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may override labour rates');
       const labourLine = await this.labourService.addJobCardLine(req.params.id, req.body);
       res.status(201).json({ status: 'success', statusCode: 201, data: { labourLine } });
     } catch (error) {
@@ -68,6 +69,7 @@ export class ServiceController {
     try {
       const existing = await prisma.jobCardLabour.findUnique({ where: { id: req.params.lineId }, select: { jobCard: { select: { branchId: true } } } });
       assertBranchOwnership(req, existing?.jobCard.branchId);
+      if (req.body.rate !== undefined && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may override labour rates');
       const labourLine = await this.labourService.updateJobCardLine(req.params.lineId, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, data: { labourLine } });
     } catch (error) {
@@ -241,7 +243,7 @@ export class ServiceController {
       const { id } = req.params;
       const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
       assertBranchOwnership(req, card?.branchId);
-      const result = await this.serviceService.updateJobCard(id, req.body);
+      const result = await this.serviceService.updateJobCard(id, req.body, req.user?.userId);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Job card updated successfully', data: { jobCard: result } });
     } catch (error) {
       next(error);

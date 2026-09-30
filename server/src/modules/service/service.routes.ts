@@ -1,3 +1,10 @@
+import { ConflictError } from '../../shared/errors/appError';
+import { z } from 'zod';
+import prisma from '../../prisma/client';
+import { assertBranchOwnership, requireRole } from '../../middleware/authorize';
+import { ROLES } from '../../shared/constants/roles';
+import { repeatWindowStart } from './job-card-workflow.service';
+import { requireMaster } from '../workshop/workshop-master.service';
 import { Router } from 'express';
 import { ServiceController } from './service.controller';
 import { validateRequest } from '../../middleware/requestValidator';
@@ -27,6 +34,43 @@ const router = Router();
 const controller = new ServiceController();
 
 router.use(authMiddleware);
+router.get('/staff', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(z.object({ query: z.object({ branchId: z.string().uuid(), role: z.enum(['ServiceAdviser', 'Technician']), search: z.string().optional(), limit: z.coerce.number().int().positive().max(100).default(50) }) })), async (req, res, next) => {
+  try {
+    const q = req.query; assertBranchOwnership(req, String(q.branchId));
+    const users = await prisma.user.findMany({ where: { branchId: String(q.branchId), role: { name: String(q.role) }, isActive: true, ...(q.search ? { AND: String(q.search).trim().split(/\s+/).filter(Boolean).map(term => ({ OR: [{ firstName: { contains: term, mode: 'insensitive' as const } }, { lastName: { contains: term, mode: 'insensitive' as const } }] })) } : {}) }, take: Number(q.limit), orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }], select: { id: true, firstName: true, lastName: true } });
+    res.json({ status: 'success', data: { users } });
+  } catch (error) { next(error); }
+});
+router.get('/vehicles/:id/recent-jobs', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(jobCardIdParamSchema), async (req, res, next) => {
+  try {
+    const jobs = await prisma.jobCard.findMany({ where: { vehicleId: req.params.id, createdAt: { gte: repeatWindowStart() }, status: { notIn: ['Cancelled', 'CANCELLED'] } }, select: { id: true, jobNumber: true, createdAt: true, technician: { select: { firstName: true, lastName: true } } }, orderBy: { createdAt: 'desc' }, take: 50 });
+    res.json({ status: 'success', data: { jobs } });
+  } catch (error) { next(error); }
+});
+router.get('/labour-rates', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(z.object({ query: z.object({ modelId: z.string().uuid().optional() }) })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: { rates: await prisma.labourRate.findMany({ where: { modelId: req.query.modelId as string | undefined }, include: { labourItem: true, model: true }, take: 100 }) } }); } catch (error) { next(error); }
+});
+router.post('/labour-rates', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ body: z.object({ labourItemId: z.string().uuid(), modelId: z.string().uuid(), pricing: z.enum(['FIXED', 'TIME']), hours: z.number().positive(), rate: z.number().nonnegative(), active: z.boolean().optional() }).strict() })), async (req, res, next) => {
+  try {
+    await requireMaster(prisma, req.body.modelId, 'MODEL');
+    const { labourItemId, modelId } = req.body;
+    const rate = await prisma.labourRate.upsert({ where: { labourItemId_modelId: { labourItemId, modelId } }, create: req.body, update: req.body });
+    res.json({ status: 'success', data: { rate } });
+  } catch (error) { next(error); }
+});
+router.post('/job-cards/:id/credit-approval', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ remarks: z.string().trim().min(1).max(2000) }).strict() })), async (req, res, next) => {
+  try {
+    const card = await prisma.jobCard.findUniqueOrThrow({ where: { id: req.params.id } }); assertBranchOwnership(req, card.branchId);
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.jobCard.updateMany({ where: { id: card.id, status: 'READY', creditApprovedById: null }, data: { creditApprovedById: req.user!.userId } });
+      if (!updated.count) throw new ConflictError('Credit approval requires a READY job without an existing approval');
+      await tx.auditLog.create({ data: { userId: req.user!.userId, action: 'JOB_CREDIT_APPROVED', details: JSON.stringify({ jobCardId: card.id, remarks: req.body.remarks }) } });
+      return updated;
+    });
+    res.json({ status: 'success', data: result });
+  } catch (error) { next(error); }
+});
+
 
 /**
  * @openapi
@@ -80,7 +124,7 @@ router.use(authMiddleware);
  *     responses:
  *       200: { description: Job-card labour line removed }
  */
-router.get('/labour-items', requirePermission(PERMISSIONS.LABOUR_ITEM_READ), controller.listLabourItems);
+router.get('/labour-items', requirePermission(PERMISSIONS.LABOUR_ITEM_READ), validateRequest(z.object({ query: z.object({ search: z.string().max(100).optional(), includeInactive: z.enum(['true', 'false']).optional() }) })), controller.listLabourItems);
 router.post('/labour-items', requirePermission(PERMISSIONS.LABOUR_ITEM_CREATE), validateRequest(createLabourItemSchema), controller.createLabourItem);
 router.put('/labour-items/:id', requirePermission(PERMISSIONS.LABOUR_ITEM_UPDATE), validateRequest(updateLabourItemSchema), controller.updateLabourItem);
 router.get('/job-cards/:id/labour', requirePermission(PERMISSIONS.JOBCARD_READ), validateRequest(jobCardIdParamSchema), controller.listJobCardLabour);
@@ -220,12 +264,56 @@ router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOU
  *         application/json:
  *           schema:
  *             type: object
- *             required: [vehicleId, complaint]
+ *             required: [branchName, customerId, vehicleId, description, serviceTypeId, mileage, bayId, serviceAdvisorId, promisedAt, complaints]
  *             properties:
- *               vehicleId: { type: string }
- *               customerId: { type: string }
- *               complaint: { type: string, example: Engine overheating }
- *               appointmentId: { type: string }
+ *               branchName: { type: string, example: Ikeja }
+ *               customerId: { type: string, format: uuid }
+ *               vehicleId: { type: string, format: uuid }
+ *               appointmentId: { type: string, format: uuid }
+ *               description: { type: string, example: Brake inspection }
+ *               serviceTypeId: { type: string, format: uuid }
+ *               bayId: { type: string, format: uuid }
+ *               serviceAdvisorId: { type: string, format: uuid }
+ *               technicianId: { type: string, format: uuid, description: Required when teamId is absent }
+ *               teamId: { type: string, format: uuid }
+ *               mileage: { type: integer, minimum: 0, example: 12500 }
+ *               promisedAt: { type: string, format: date-time }
+ *               checklist: { type: string, maxLength: 5000 }
+ *               acType: { type: string, enum: [FACTORY, DEALER, NONE] }
+ *               batteryMakeId: { type: string, format: uuid }
+ *               batteryNumber: { type: string, maxLength: 100 }
+ *               customField1: { type: string, maxLength: 500 }
+ *               tyres:
+ *                 type: array
+ *                 minItems: 5
+ *                 maxItems: 5
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     makeId: { type: string, format: uuid }
+ *                     number: { type: string, maxLength: 100 }
+ *               estimatedParts: { type: number, minimum: 0, description: "Indicative parts estimate in NGN" }
+ *               estimatedOil: { type: number, minimum: 0 }
+ *               estimatedLabour: { type: number, minimum: 0 }
+ *               serviceCharge: { type: number, minimum: 0 }
+ *               complaints:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     complaintCodeId: { type: string, format: uuid }
+ *                     defectCode: { type: string, maxLength: 50 }
+ *                     spare: { type: number, minimum: 0 }
+ *                     oil: { type: number, minimum: 0 }
+ *                     labour: { type: number, minimum: 0 }
+ *                     description: { type: string, example: Brake noise }
+ *               isRepeat: { type: boolean }
+ *               previousJobId: { type: string, format: uuid }
+ *               repeatReason: { type: string }
+ *               acFitted: { type: boolean }
+ *               inHouse: { type: boolean }
+ *               remarks: { type: string }
  *     responses:
  *       201:
  *         description: Job card created
@@ -253,7 +341,7 @@ router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOU
  *         schema: { type: integer, default: 20 }
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [PENDING, IN_PROGRESS, COMPLETED, CANCELLED, ON_HOLD] }
+ *         schema: { type: string, enum: [OPEN, IN_PROGRESS, QC, READY, BILLED, DELIVERED, CANCELLED] }
  *     responses:
  *       200:
  *         description: Paginated job card list
@@ -303,9 +391,12 @@ router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOU
  *           schema:
  *             type: object
  *             properties:
- *               status: { type: string, enum: [PENDING, IN_PROGRESS, COMPLETED, CANCELLED, ON_HOLD] }
- *               diagnosis: { type: string }
- *               notes: { type: string }
+ *               status: { type: string, enum: [OPEN, IN_PROGRESS, QC, READY, BILLED, DELIVERED, CANCELLED] }
+ *               observations: { type: string }
+ *               workDone: { type: string }
+ *               remarks: { type: string, description: Required when cancelling }
+ *               deliveryAdvisorId: { type: string, format: uuid }
+ *               lateReasonIds: { type: array, maxItems: 6, items: { type: string, format: uuid } }
  *     responses:
  *       200:
  *         description: Job card updated
@@ -394,16 +485,18 @@ router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOU
  *         application/json:
  *           schema:
  *             type: object
- *             required: [items]
+ *             required: [description, lines]
  *             properties:
- *               items:
+ *               description: { type: string, example: Workshop estimate }
+ *               lines:
  *                 type: array
  *                 items:
  *                   type: object
  *                   properties:
  *                     description: { type: string }
  *                     quantity: { type: integer }
- *                     unitPrice: { type: number }
+ *                     type: { type: string, enum: [COMPLAINT, PART, LABOUR] }
+ *                     referenceId: { type: string, format: uuid }
  *               notes: { type: string }
  *     responses:
  *       201:
@@ -432,10 +525,11 @@ router.delete('/job-card-labour/:lineId', requirePermission(PERMISSIONS.JOBLABOU
  *         application/json:
  *           schema:
  *             type: object
- *             required: [decision]
+ *             required: [customerId, approved]
  *             properties:
- *               decision: { type: string, enum: [APPROVED, REJECTED] }
- *               notes: { type: string }
+ *               customerId: { type: string, format: uuid }
+ *               approved: { type: boolean }
+ *               comments: { type: string }
  *     responses:
  *       200:
  *         description: Approval decision recorded
