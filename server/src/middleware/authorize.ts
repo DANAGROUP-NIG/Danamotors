@@ -62,7 +62,6 @@ export function assertBranchOwnership(
 
   if (
     resourceBranchId &&
-    req.user.branchId &&
     resourceBranchId !== req.user.branchId
   ) {
     throw new ForbiddenError(

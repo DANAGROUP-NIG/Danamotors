@@ -26,6 +26,7 @@ export type UpdateInvoicePayload = {
 };
 
 export type BillableJobCard = {
+  serviceAdvisorId?: string | null;
   id: string;
   jobNumber: string;
   status: string;

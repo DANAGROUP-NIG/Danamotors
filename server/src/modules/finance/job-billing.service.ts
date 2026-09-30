@@ -6,7 +6,7 @@ import { config } from '../../config';
 import { calculateJobBillTotals } from './job-bill-calculator';
 import { nextDocumentNumber } from './document-number';
 
-const BILLABLE_STATUSES = ['Ready', 'Completed'];
+const BILLABLE_STATUSES = ['READY', 'Ready', 'Completed'];
 const VAT_RATE = config.JOB_BILL_VAT_RATE;
 
 function isActiveBillStatus(status: string) {
@@ -19,6 +19,7 @@ export class JobBillingService {
       where: { id: jobCardId },
       include: {
         customer: true,
+        serviceType: true,
         appointment: { include: { customer: true } },
         vehicle: true,
         branch: true,
@@ -42,7 +43,7 @@ export class JobBillingService {
 
   private getBillLines(jobCard: Awaited<ReturnType<JobBillingService['loadJobCard']>>) {
     const partLines = jobCard.partIssuances.flatMap((issuance) => {
-      const quantity = issuance.quantity - issuance.returns.reduce((sum, partReturn) => sum + partReturn.quantity, 0);
+      const quantity = issuance.quantity - issuance.returns.reduce((sum, partReturn) => sum + (partReturn.status.toUpperCase() === 'REJECTED' ? 0 : partReturn.quantity), 0);
       if (quantity <= 0) return [];
       return [{
         type: 'PART',
@@ -51,7 +52,7 @@ export class JobBillingService {
         quantity,
         rate: issuance.sparePart.unitPrice,
         amount: quantity * issuance.sparePart.unitPrice,
-        customerPaid: true,
+        customerPaid: jobCard.serviceType?.chargedTo !== 'COMPANY',
       }];
     });
     const labourLines = jobCard.labourLines.map((line) => ({
@@ -61,7 +62,7 @@ export class JobBillingService {
       quantity: line.hours,
       rate: line.rate,
       amount: line.amount,
-      customerPaid: true,
+      customerPaid: jobCard.serviceType?.chargedTo !== 'COMPANY',
     }));
     return [...partLines, ...labourLines];
   }
@@ -113,6 +114,7 @@ export class JobBillingService {
     labourDiscountPercent: number;
     serviceAdvisorId: string;
     notes?: string;
+    actorId?: string;
   }) {
     try {
       return await prisma.$transaction(async (transaction) => {
@@ -170,7 +172,7 @@ export class JobBillingService {
         });
         await transaction.jobCard.update({
           where: { id: jobCard.id },
-          data: { billedAt: new Date() },
+          data: { billedAt: new Date(), status: 'BILLED', statusHistory: { create: { fromStatus: jobCard.status, toStatus: 'BILLED', actorId: input.actorId ?? input.serviceAdvisorId } } },
         });
         return invoice;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -209,9 +211,13 @@ export class JobBillingService {
         data: { status: 'Cancelled', cancelledAt: new Date(), cancelledById, cancelRemark: remark },
       });
       if (invoice.jobCardId) {
+        await transaction.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${invoice.jobCardId} FOR UPDATE`);
+        const card = await transaction.jobCard.findUnique({ where: { id: invoice.jobCardId } });
+        if (card?.deliveredAt) throw new ConflictError('A delivered job bill cannot be cancelled');
+        await transaction.jobCardStatusHistory.create({ data: { jobCardId: invoice.jobCardId, fromStatus: 'BILLED', toStatus: 'READY', actorId: cancelledById, remarks: remark } });
         await transaction.jobCard.updateMany({
           where: { id: invoice.jobCardId, billedAt: { not: null } },
-          data: { billedAt: null },
+          data: { billedAt: null, status: 'READY' },
         });
       }
       return cancelled;

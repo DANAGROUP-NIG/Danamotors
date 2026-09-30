@@ -46,21 +46,23 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   const bill = preview.data?.preview;
   const hasParts = Boolean(bill?.totals.partsTotal);
+  const effectiveAdvisorId = serviceAdvisorId || bill?.jobCard.serviceAdvisorId || "";
 
   function selectJobCard(id: string) {
     setJobCardId(id);
+    setServiceAdvisorId("");
     setPartsDiscountPercent(0);
     setLabourDiscountPercent(0);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!jobCardId || !serviceAdvisorId || !bill) return;
+    if (!jobCardId || !effectiveAdvisorId || !bill) return;
     create.mutate({
       jobCardId,
       partsDiscountPercent,
       labourDiscountPercent,
-      serviceAdvisorId,
+      serviceAdvisorId: effectiveAdvisorId,
       notes: notes.trim() || undefined,
     }, { onSuccess });
   }
@@ -133,7 +135,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
             <input type="number" min="0" max="100" step="0.01" className={inputCls} value={labourDiscountPercent} onChange={(event) => setLabourDiscountPercent(Number(event.target.value))} />
           </Field>
           <Field label="Service advisor">
-            <select className={inputCls} value={serviceAdvisorId} onChange={(event) => setServiceAdvisorId(event.target.value)} required>
+            <select className={inputCls} value={effectiveAdvisorId} onChange={(event) => setServiceAdvisorId(event.target.value)} required>
               <option value="">Select advisor</option>
               {advisors.data?.advisors.map((advisor) => (
                 <option key={advisor.id} value={advisor.id}>{advisor.firstName} {advisor.lastName}</option>
@@ -148,7 +150,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
       <Field label="Notes (optional)">
         <textarea className={inputCls} rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
-      <Button type="submit" disabled={!bill || preview.isFetching || create.isPending || !serviceAdvisorId}>
+      <Button type="submit" disabled={!bill || preview.isFetching || create.isPending || !effectiveAdvisorId}>
         {create.isPending ? "Creating bill..." : "Create job bill"}
       </Button>
     </form>

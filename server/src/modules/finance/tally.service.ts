@@ -48,7 +48,7 @@ export class TallyService {
     if (tallyLedgerCode && !ledger) throw new NotFoundError('Active Tally ledger not found');
     return prisma.customer.update({
       where: { id: customerId },
-      data: { tallyLedgerId: ledger?.id ?? null },
+      data: { tallyLedgerId: ledger?.id ?? null, tallyPartyCode: ledger?.code ?? null },
       include: { tallyLedger: true },
     });
   }

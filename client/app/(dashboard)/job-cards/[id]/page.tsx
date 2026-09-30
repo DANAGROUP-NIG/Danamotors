@@ -1,5 +1,7 @@
 "use client";
 import { JOB_CARD_STATUS_TONES } from "@/features/job-cards/types/job-card-status";
+import { JobCardPartsSection } from "@/features/job-cards/components/JobCardPartsSection";
+import { JobCardEstimateSection } from "@/features/job-cards/components/JobCardEstimateSection";
 import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
 
 import { useParams, useRouter } from "next/navigation";
@@ -58,7 +60,7 @@ export default function JobCardDetailPage() {
   }
 
   function handleRequestParts() {
-    router.push(`/inventory/issuances/new?jobCardId=${id}`);
+    document.getElementById("job-parts")?.scrollIntoView({ behavior: "smooth" });
   }
 
   if (isLoading) {
@@ -107,7 +109,7 @@ export default function JobCardDetailPage() {
           </Button>
           {(canManage || canCreateBill) && (
             <>
-              {canCreateBill && !jobCard.billedAt && !(jobCard.invoices ?? []).some((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) && ["Ready", "Completed"].includes(jobCard.status) && (
+              {canCreateBill && !jobCard.billedAt && !(jobCard.invoices ?? []).some((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) && ["READY", "Ready", "Completed"].includes(jobCard.status) && (
                 <Button size="sm" variant="outline" onClick={handleGenerateInvoice} className="gap-1.5">
                   <Receipt className="size-4" /> Create Job Bill
                 </Button>
@@ -137,24 +139,10 @@ export default function JobCardDetailPage() {
             </div>
           </div>
 
-          <div className="mb-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>0%</span>
-              <div className="flex-1 h-2 rounded-full bg-slate-100">
-                <div
-                  className="h-2 rounded-full bg-primary transition-all"
-                  style={{ width: `${jobCard.progress ?? 0}%` }}
-                />
-              </div>
-              <span>100%</span>
-            </div>
-            <p className="mt-1 text-right text-xs font-medium text-primary">{jobCard.progress ?? 0}% complete</p>
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <DetailField icon={<Building2 className="size-4" />} label="Branch" value={jobCard.branch?.name} />
             <DetailField icon={<User className="size-4" />} label="Created By" value={jobCard.createdBy?.firstName} />
-            <DetailField icon={<Wrench className="size-4" />} label="Assigned To" value={jobCard.assignedTo} />
+            <DetailField icon={<Wrench className="size-4" />} label="Mechanic / team" value={jobCard.technician ? `${jobCard.technician.firstName} ${jobCard.technician.lastName}` : jobCard.team?.description} />
             <DetailField icon={<Clock className="size-4" />} label="Updated" value={fmtDate(jobCard.updatedAt)} />
           </div>
         </div>
@@ -208,7 +196,7 @@ export default function JobCardDetailPage() {
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Estimated Cost</p>
-              <p className="mt-0.5 text-sm text-slate-800">{jobCard.estimatedCost ? fmtCurrency(jobCard.estimatedCost) : "—"}</p>
+              <p className="mt-0.5 text-sm text-slate-800">{jobCard.estimatedCost != null ? fmtCurrency(jobCard.estimatedCost) : "—"}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-slate-400">QC Status</p>
@@ -229,7 +217,30 @@ export default function JobCardDetailPage() {
           )}
         </SectionCard>
 
-        {canManage && !jobCard.billedAt && !(jobCard.invoices ?? []).some((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) && <JobCardEditForm key={jobCard.updatedAt} jobCard={jobCard} />}
+        <SectionCard icon={<ClipboardCheck className="size-4" />} title="Opening details">
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {([['Estimated parts', jobCard.estimatedParts], ['Estimated oil', jobCard.estimatedOil], ['Estimated labour', jobCard.estimatedLabour], ['Service charge', jobCard.serviceCharge]] as const).map(([label, amount]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-medium">{amount == null ? 'Not recorded' : fmtCurrency(amount)}</dd></div>)}
+            <div><dt className="text-xs text-muted-foreground">Received by</dt><dd className="text-sm">{jobCard.serviceAdvisor ? `${jobCard.serviceAdvisor.firstName} ${jobCard.serviceAdvisor.lastName}` : 'Not recorded'}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">Delivered by</dt><dd className="text-sm">{jobCard.deliveryAdvisor ? `${jobCard.deliveryAdvisor.firstName} ${jobCard.deliveryAdvisor.lastName}` : 'Awaiting delivery'}</dd></div>
+          </dl>
+          {(jobCard.tyres?.some(tyre => tyre.make || tyre.number) || jobCard.batteryMake || jobCard.batteryNumber || jobCard.customField1) && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{jobCard.tyres?.map((tyre, index) => (tyre.make || tyre.number) && <div key={index}><p className="text-xs text-muted-foreground">Tyre {index + 1}</p><p className="text-sm">{tyre.make || 'Make not recorded'} / {tyre.number || 'Number not recorded'}</p></div>)}{(jobCard.batteryMake || jobCard.batteryNumber) && <div><p className="text-xs text-muted-foreground">Battery</p><p className="text-sm">{jobCard.batteryMake || 'Make not recorded'} / {jobCard.batteryNumber || 'Number not recorded'}</p></div>}{jobCard.customField1 && <div><p className="text-xs text-muted-foreground">Custom field</p><p className="text-sm">{jobCard.customField1}</p></div>}</div>}
+          {jobCard.checklist && <div className="mt-4"><h3 className="text-sm font-semibold">Checklist to be followed</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{jobCard.checklist}</p></div>}
+          {jobCard.remarks && <div className="mt-4"><h3 className="text-sm font-semibold">Remarks</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{jobCard.remarks}</p></div>}
+        </SectionCard>
+
+        {canManage && <JobCardEditForm key={jobCard.updatedAt} jobCard={jobCard} />}
+        <section className="rounded-xl border bg-white p-5 space-y-2">
+          <h2 className="font-semibold">Workshop record</h2>
+          <p>Service: {jobCard.serviceType?.description ?? "Legacy record"} ? Bay: {jobCard.bay?.description ?? "?"} ? Mileage: {jobCard.mileage ?? "?"} km</p>
+          <p>Promised: {jobCard.promisedAt ? fmtDate(jobCard.promisedAt) : "?"} ? Ready: {jobCard.readyAt ? fmtDate(jobCard.readyAt) : "?"}</p>
+          {jobCard.complaints?.map((complaint) => <p key={complaint.id}>{complaint.description}</p>)}
+          {jobCard.isRepeat && <p>Repeat job: {jobCard.repeatReason} {jobCard.previousJob && <Link className="text-primary underline" href={`/job-cards/${jobCard.previousJob.id}`}>{jobCard.previousJob.jobNumber} ({jobCard.previousJob.technician?.firstName} {jobCard.previousJob.technician?.lastName})</Link>}</p>}
+          <p>{jobCard.observations}</p><p>{jobCard.workDone}</p>
+          {jobCard.gatePassNumber && <div className="border-2 p-4"><h2 className="text-lg font-semibold">Gate pass {jobCard.gatePassNumber}</h2><p>{customerName} ? {jobCard.vehicle?.registrationNumber || jobCard.vehicle?.vin}</p><p>Delivered {jobCard.deliveredAt ? fmtDate(jobCard.deliveredAt) : ""}</p></div>}
+          {jobCard.statusHistory?.map((entry) => <p className="text-xs text-slate-500" key={entry.id}>{fmtDate(entry.createdAt)} ? {entry.toStatus} ? {entry.actor.firstName} {entry.actor.lastName} ? {entry.remarks}</p>)}
+        </section>
+        <JobCardPartsSection jobCard={jobCard} />
+        <JobCardEstimateSection jobCard={jobCard} />
         <JobCardLabourSection jobCardId={jobCard.id} status={jobCard.status} branchId={jobCard.branchId} billedAt={jobCard.billedAt} />
 
         {/* ── Technician & QC Assignments ── */}

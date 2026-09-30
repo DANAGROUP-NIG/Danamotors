@@ -46,7 +46,7 @@ export class FinanceController {
     try {
       const preview = await this.jobBillingService.previewJobBill(req.body);
       assertBillingBranch(req, preview.jobCard.branchId);
-      const invoice = await this.jobBillingService.createJobBill(req.body);
+      const invoice = await this.jobBillingService.createJobBill({ ...req.body, actorId: req.user?.userId });
       if (invoice.serviceAdvisorId) {
         void new NotificationService().notifyUsers([invoice.serviceAdvisorId], {
           type: 'JOB_BILL_CREATED',

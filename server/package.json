@@ -26,7 +26,9 @@
     "prisma:seed:transactions": "ts-node prisma/seed/transactions.ts",
     "prisma:seed:portal": "ts-node prisma/seed/portal.ts",
     "prisma:seed:enquiries": "ts-node prisma/seed/enquiries.ts",
-    "prisma:fix:notification-links": "ts-node prisma/migrate-notification-links.ts"
+    "prisma:fix:notification-links": "ts-node prisma/migrate-notification-links.ts",
+    "prisma:seed:vehicles": "ts-node prisma/seed/vehicle-catalog.ts",
+    "vehicles:review-custom": "ts-node prisma/seed/review-custom-vehicles.ts"
   },
   "author": "buildwithzeke <ayeoluwaseyi@gmail.com>",
   "license": "MIT",

@@ -3,6 +3,7 @@ import authRoutes from '../modules/auth/auth.routes';
 import adminRoutes from '../modules/administration/admin.routes';
 import customerRoutes from '../modules/customer/customer.routes';
 import vehicleRoutes from '../modules/vehicle/vehicle.routes';
+import vehicleCatalogRoutes from '../modules/vehicle-catalog/vehicle-catalog.routes';
 import serviceRoutes from '../modules/service/service.routes';
 import servicesRoutes from '../modules/services/services.routes';
 import workshopRoutes from '../modules/workshop/workshop.routes';
@@ -17,7 +18,10 @@ import creditRoutes from '../modules/credit/credit.routes';
 import enquiryRoutes from '../modules/enquiry/enquiry.routes';
 import auditRoutes from '../modules/audit/audit.routes';
 
+import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
+
 const router = Router();
+router.use('/workshop-masters', workshopMasterRoutes);
 
 // Base health check
 /**
@@ -61,6 +65,7 @@ router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/customers', customerRoutes);
 router.use('/vehicles', vehicleRoutes);
+router.use('/vehicle-catalog', vehicleCatalogRoutes);
 router.use('/service', serviceRoutes);
 router.use('/services', servicesRoutes);
 router.use('/workshop', workshopRoutes);

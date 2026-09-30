@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { CustomerMergeCard } from "@/features/customers/components/CustomerMergeCard";
 import { useCustomer } from "@/features/customers";
 import { CustomerPortalAccessCard } from "@/features/customers/components/CustomerPortalAccessCard";
 import { CustomerCreditCard } from "@/features/customers/components/CustomerCreditCard";
@@ -73,6 +74,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-6">
+      <CustomerMergeCard customer={customer} />
       <Link
         href="/customers"
         className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
@@ -88,7 +90,7 @@ export default function CustomerDetailPage() {
           </span>
           <div>
             <h1 className="text-xl font-semibold text-slate-800">
-              {customer.firstName} {customer.lastName}
+              {customer.companyName || `${customer.firstName} ${customer.lastName}`}
             </h1>
             <p className="text-sm text-slate-500">{customer.email}</p>
           </div>

@@ -11,8 +11,8 @@ import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
-type LabourItem = { id: string; code: string; description: string; defaultHours: number; rate: number; active: boolean };
-type LabourForm = { code: string; description: string; defaultHours: string; rate: string };
+type LabourItem = { id: string; code: string; description: string; defaultHours: number; rate: number; active: boolean; vehicleSystem?: string; group?: string };
+type LabourForm = { code: string; description: string; defaultHours: string; rate: string; vehicleSystem?: string; group?: string };
 const emptyForm: LabourForm = { code: "", description: "", defaultHours: "1", rate: "" };
 const money = (value: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(value);
 
@@ -21,11 +21,12 @@ export function LabourCataloguePage() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission("labour-item:create");
   const canUpdate = hasPermission("labour-item:update");
+  const [search, setSearch] = useState("");
   const [form, setForm] = useState<LabourForm>(emptyForm);
   const [editing, setEditing] = useState<Record<string, LabourForm>>({});
   const catalogue = useQuery({
-    queryKey: ["labour-items", "all"],
-    queryFn: async () => apiGet<{ labourItems: LabourItem[] }>(API_ROUTES.service.labourItems),
+    queryKey: ["labour-items", "all", search],
+    queryFn: async () => apiGet<{ labourItems: LabourItem[] }>(`${API_ROUTES.service.labourItems}?includeInactive=true&search=${encodeURIComponent(search)}`),
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["labour-items"] });
   const create = useMutation({
@@ -34,6 +35,8 @@ export function LabourCataloguePage() {
       description: form.description.trim(),
       defaultHours: Number(form.defaultHours),
       rate: Number(form.rate),
+      vehicleSystem: form.vehicleSystem || undefined,
+      group: form.group || undefined,
     }),
     onSuccess: () => { toast.success("Labour item created"); setForm(emptyForm); refresh(); },
     onError: () => toast.error("Could not create labour item"),
@@ -53,9 +56,12 @@ export function LabourCataloguePage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader title="Labour Catalogue" description="Standard labour codes, descriptions, hours, and rates." />
+      <input aria-label="Search labour operations" className={inputCls} placeholder="Search code or description" value={search} onChange={(e) => setSearch(e.target.value)} />
       {canCreate && <form className="grid gap-4 border-y py-4 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_120px_160px_auto] lg:items-end" onSubmit={submit}>
         <Field label="Code"><input className={inputCls} maxLength={50} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} required /></Field>
         <Field label="Description"><input className={inputCls} maxLength={300} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required /></Field>
+        <Field label="Vehicle system"><input className={inputCls} value={form.vehicleSystem ?? ""} onChange={(event) => setForm({ ...form, vehicleSystem: event.target.value })} /></Field>
+        <Field label="Group"><input className={inputCls} value={form.group ?? ""} onChange={(event) => setForm({ ...form, group: event.target.value })} /></Field>
         <Field label="Default hours"><input type="number" min="0.01" step="0.25" className={inputCls} value={form.defaultHours} onChange={(event) => setForm({ ...form, defaultHours: event.target.value })} required /></Field>
         <Field label="Rate (NGN)"><input type="number" min="0" step="0.01" className={inputCls} value={form.rate} onChange={(event) => setForm({ ...form, rate: event.target.value })} required /></Field>
         <Button type="submit" disabled={create.isPending}><Plus className="size-4" />Add item</Button>
@@ -68,7 +74,7 @@ export function LabourCataloguePage() {
         <div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="border-b text-left text-muted-foreground"><tr><th className="px-3 py-3">Code</th><th className="px-3 py-3">Description</th><th className="px-3 py-3 text-right">Default hours</th><th className="px-3 py-3 text-right">Rate</th>{canUpdate && <th className="px-3 py-3">Actions</th>}</tr></thead><tbody>
           {catalogue.data?.labourItems.map((item) => {
             const draft = editing[item.id] ?? { code: item.code, description: item.description, defaultHours: String(item.defaultHours), rate: String(item.rate) };
-            return <tr key={item.id} className="border-b last:border-0"><td className="px-3 py-3"><input className={inputCls} value={draft.code} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, code: event.target.value } })} /></td><td className="px-3 py-3"><input className={inputCls} value={draft.description} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, description: event.target.value } })} /></td><td className="px-3 py-3"><input type="number" min="0.01" step="0.25" className={`${inputCls} text-right`} value={draft.defaultHours} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, defaultHours: event.target.value } })} /></td><td className="px-3 py-3"><input type="number" min="0" step="0.01" className={`${inputCls} text-right`} value={draft.rate} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, rate: event.target.value } })} /><span className="sr-only">Current rate {money(item.rate)}</span></td>{canUpdate && <td className="px-3 py-3"><div className="flex items-center gap-2"><Button type="button" size="icon" variant="outline" aria-label={`Save ${item.code}`} disabled={update.isPending} onClick={() => update.mutate({ id: item.id, payload: { code: draft.code.trim(), description: draft.description.trim(), defaultHours: Number(draft.defaultHours), rate: Number(draft.rate) } })}><Save className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Deactivate ${item.code}`} disabled={update.isPending} onClick={() => update.mutate({ id: item.id, payload: { active: false } })}><X className="size-4" /></Button></div></td>}</tr>;
+            return <tr key={item.id} className="border-b last:border-0"><td className="px-3 py-3"><input className={inputCls} value={draft.code} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, code: event.target.value } })} /></td><td className="px-3 py-3"><input aria-label="Vehicle system" placeholder="Vehicle system" className={inputCls} value={draft.vehicleSystem ?? item.vehicleSystem ?? ""} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, vehicleSystem: event.target.value } })} /><input aria-label="Labour group" placeholder="Group" className={inputCls} value={draft.group ?? item.group ?? ""} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, group: event.target.value } })} /><input className={inputCls} value={draft.description} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, description: event.target.value } })} /></td><td className="px-3 py-3"><input type="number" min="0.01" step="0.25" className={`${inputCls} text-right`} value={draft.defaultHours} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, defaultHours: event.target.value } })} /></td><td className="px-3 py-3"><input type="number" min="0" step="0.01" className={`${inputCls} text-right`} value={draft.rate} disabled={!canUpdate} onChange={(event) => setEditing({ ...editing, [item.id]: { ...draft, rate: event.target.value } })} /><span className="sr-only">Current rate {money(item.rate)}</span></td>{canUpdate && <td className="px-3 py-3"><div className="flex items-center gap-2"><Button type="button" size="icon" variant="outline" aria-label={`Save ${item.code}`} disabled={update.isPending} onClick={() => update.mutate({ id: item.id, payload: { code: draft.code.trim(), description: draft.description.trim(), vehicleSystem: draft.vehicleSystem ?? item.vehicleSystem, group: draft.group ?? item.group, defaultHours: Number(draft.defaultHours), rate: Number(draft.rate) } })}><Save className="size-4" /></Button><Button type="button" size="icon" variant="ghost" aria-label={`Deactivate ${item.code}`} disabled={update.isPending} onClick={() => update.mutate({ id: item.id, payload: { active: !item.active } })}><X className="size-4" /></Button></div></td>}</tr>;
           })}
         </tbody></table></div>
       )}
