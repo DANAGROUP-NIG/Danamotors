@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   PackageSearch,
   Ship,
+  Landmark,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
