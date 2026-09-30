@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { WorkshopMasterService } from '../workshop/workshop-master.service';
 import { Router } from 'express';
 import { PortalController } from './portal.controller';
 import { validateRequest } from '../../middleware/requestValidator';
@@ -17,6 +19,9 @@ const router = Router();
 const controller = new PortalController();
 
 router.use(customerAuthMiddleware);
+router.get('/catalogue', validateRequest(z.object({ query: z.object({ kind: z.enum(['MAKE', 'PRODUCT', 'MODEL', 'VARIANT', 'COLOUR']), search: z.string().optional() }) })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: await new WorkshopMasterService().list({ kind: req.query.kind as 'VARIANT', search: req.query.search as string | undefined, page: 1, limit: 50 }) }); } catch (error) { next(error); }
+});
 
 /**
  * @openapi
