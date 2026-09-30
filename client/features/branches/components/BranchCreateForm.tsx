@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useCreateBranch } from "../hooks/use-create-branch";
+import { BranchPlacementFields } from "./BranchPlacementFields";
 import {
   createBranchSchema,
   type CreateBranchFormValues,
@@ -27,7 +28,12 @@ export function BranchCreateForm({ onSuccess }: BranchCreateFormProps) {
   });
 
   function onSubmit(values: CreateBranchFormValues) {
-    create.mutate(values, {
+    const payload = {
+      ...values,
+      code: values.code?.trim() ? values.code.trim().toUpperCase() : undefined,
+      parentBranchId: values.parentBranchId || undefined,
+    };
+    create.mutate(payload, {
       onSuccess: () => {
         reset();
         onSuccess?.();
@@ -82,6 +88,8 @@ export function BranchCreateForm({ onSuccess }: BranchCreateFormProps) {
           />
         </Field>
       </div>
+
+      <BranchPlacementFields register={register} errors={errors} />
 
       <Button type="submit" disabled={create.isPending} className="mt-1">
         {create.isPending ? "Adding…" : "Add branch"}

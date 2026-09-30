@@ -20,6 +20,7 @@ export class BranchRepository {
         take: params.take,
         include: {
           _count: { select: { users: true } },
+          parentBranch: { select: { id: true, name: true, code: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -34,12 +35,22 @@ export class BranchRepository {
       where: { id },
       include: {
         _count: { select: { users: true, jobCards: true, appointments: true } },
+        parentBranch: { select: { id: true, name: true, code: true } },
+        subLocations: { select: { id: true, name: true, code: true }, orderBy: { name: 'asc' } },
       },
     });
   }
 
   async findBranchByName(name: string): Promise<Branch | null> {
     return prisma.branch.findUnique({ where: { name } });
+  }
+
+  async findBranchByCode(code: string): Promise<Branch | null> {
+    return prisma.branch.findUnique({ where: { code } });
+  }
+
+  async countSubLocations(id: string): Promise<number> {
+    return prisma.branch.count({ where: { parentBranchId: id } });
   }
 
   async createBranch(data: {
@@ -50,6 +61,8 @@ export class BranchRepository {
     country?: string;
     phoneNumber?: string;
     email?: string;
+    code?: string;
+    parentBranchId?: string;
   }): Promise<Branch> {
     return prisma.branch.create({ data });
   }
@@ -62,6 +75,8 @@ export class BranchRepository {
     country: string;
     phoneNumber: string;
     email: string;
+    code: string | null;
+    parentBranchId: string | null;
   }>): Promise<Branch> {
     return prisma.branch.update({ where: { id }, data });
   }

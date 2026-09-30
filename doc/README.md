@@ -24,6 +24,8 @@ danamotors/
 | [vehicle-catalog.md](./vehicle-catalog.md) | Kia catalogue seed, vehicle search, data assumptions and verification |
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
+| [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MIT, SRN |
+| [mobis-receiving.md](./mobis-receiving.md) | Receiving Mobis purchases: MIT file upload, MRN, CPD stock |
 
 ## Quick start
 
