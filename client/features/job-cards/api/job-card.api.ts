@@ -36,15 +36,36 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 
 export interface CreateJobCardPayload {
   branchName: string;
-  jobNumber: string;
+  serviceTypeId: string;
+  bayId: string;
+  serviceAdvisorId: string;
+  technicianId?: string;
+  teamId?: string;
+  mileage: number;
+  promisedAt: string;
+  complaints: { complaintCodeId?: string; defectCode?: string; description?: string; spare?: number; oil?: number; labour?: number }[];
+  isRepeat?: boolean;
+  previousJobId?: string;
+  repeatReason?: string;
   description: string;
   appointmentId?: string;
   customerId?: string;
   vehicleId?: string;
-  status?: string;
+  tyres?: { makeId?: string; number?: string }[];
+  batteryMakeId?: string;
+  batteryNumber?: string;
+  customField1?: string;
+  acType?: "FACTORY" | "DEALER" | "NONE";
+  checklist?: string;
+  estimatedParts?: number;
+  estimatedOil?: number;
+  estimatedLabour?: number;
+  serviceCharge?: number;
+  acFitted?: boolean;
+  inHouse?: boolean;
+  remarks?: string;
   estimatedHours?: number;
   estimatedCost?: number;
-  assignedTo?: string;
 }
 
 export async function createJobCardRequest(

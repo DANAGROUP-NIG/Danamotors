@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
-import { getUsersRequest } from "@/features/users/api/user.api";
 import { jobCardKeys } from "../api/job-card.keys";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
@@ -28,8 +27,8 @@ const formatMoney = (amount: number) => new Intl.NumberFormat("en-NG", { style: 
 
 export function JobCardLabourSection({ jobCardId, status, branchId, billedAt }: { jobCardId: string; status: string; branchId: string; billedAt?: string | null }) {
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
-  const canEdit = !billedAt && hasPermission("jobcard:labour:update") && !["ready", "completed", "closed", "billed", "cancelled"].includes(status.toLowerCase());
+  const { hasPermission, isAdminOrAbove } = useAuth();
+  const canEdit = !billedAt && hasPermission("jobcard:labour:update") && !["ready", "completed", "closed", "delivered", "billed", "cancelled"].includes(status.toLowerCase());
   const [labourItemId, setLabourItemId] = useState("");
   const [hours, setHours] = useState("");
   const [technicianId, setTechnicianId] = useState("");
@@ -45,10 +44,10 @@ export function JobCardLabourSection({ jobCardId, status, branchId, billedAt }: 
   });
   const users = useQuery({
     queryKey: ["job-card-technicians", branchId],
-    queryFn: () => getUsersRequest({ page: 1, limit: 500, branchId }),
-    enabled: canEdit && hasPermission("user:read"),
+    queryFn: () => apiGet<{ technicians: { id: string; firstName: string; lastName: string }[] }>(`/workshop/technicians?branchId=${branchId}&limit=100`),
+    enabled: canEdit,
   });
-  const technicians = (users.data?.users ?? []).filter((user) => user.isActive && user.role.name.toLowerCase() === "technician");
+  const technicians = users.data?.technicians ?? [];
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ["job-card-labour", jobCardId] });
@@ -64,7 +63,7 @@ export function JobCardLabourSection({ jobCardId, status, branchId, billedAt }: 
     onError: () => toast.error("Could not add labour line"),
   });
   const saveLine = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: { hours: number; rate: number; technicianId: string | null } }) => apiPut(API_ROUTES.service.jobCardLabourLine(id), values),
+    mutationFn: ({ id, values }: { id: string; values: { hours: number; rate: number; technicianId: string | null } }) => apiPut(API_ROUTES.service.jobCardLabourLine(id), { ...values, rate: isAdminOrAbove ? values.rate : undefined }),
     onSuccess: () => { toast.success("Labour line updated"); refresh(); },
     onError: () => toast.error("Could not update labour line"),
   });
@@ -87,7 +86,7 @@ export function JobCardLabourSection({ jobCardId, status, branchId, billedAt }: 
         return <div key={line.id} className="grid gap-3 border-t pt-3 md:grid-cols-[minmax(160px,1fr)_100px_140px_1fr_auto] md:items-end">
           <div className="min-w-0"><p className="truncate text-sm font-medium">{line.description}</p><p className="text-xs text-slate-500">{formatMoney(line.amount)}</p></div>
           <Field label="Hours"><input type="number" min="0.01" step="0.25" className={inputCls} value={form.hours} disabled={!canEdit} onChange={(event) => setEditing((current) => ({ ...current, [line.id]: { ...form, hours: event.target.value } }))} /></Field>
-          <Field label="Rate"><input type="number" min="0" step="0.01" className={inputCls} value={form.rate} disabled={!canEdit} onChange={(event) => setEditing((current) => ({ ...current, [line.id]: { ...form, rate: event.target.value } }))} /></Field>
+          <Field label="Rate"><input type="number" min="0" step="0.01" className={inputCls} value={form.rate} disabled={!canEdit || !isAdminOrAbove} onChange={(event) => setEditing((current) => ({ ...current, [line.id]: { ...form, rate: event.target.value } }))} /></Field>
           <Field label="Technician"><select className={inputCls} value={form.technicianId} disabled={!canEdit} onChange={(event) => setEditing((current) => ({ ...current, [line.id]: { ...form, technicianId: event.target.value } }))}><option value="">Unassigned</option>{technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.firstName} {technician.lastName}</option>)}</select></Field>
           {canEdit && <div className="flex gap-1"><Button type="button" size="sm" variant="outline" disabled={saveLine.isPending} onClick={() => saveLine.mutate({ id: line.id, values: { hours: Number(form.hours), rate: Number(form.rate), technicianId: form.technicianId || null } })}>Save</Button><Button type="button" size="icon" variant="ghost" aria-label={`Remove ${line.description}`} disabled={removeLine.isPending} onClick={() => removeLine.mutate(line.id)}><Trash2 className="size-4" /></Button></div>}
         </div>;

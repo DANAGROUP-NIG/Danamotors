@@ -49,7 +49,7 @@ function formatJobCardText(jobCard: JobCard) {
   const customer = jobCard.customer
     ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
     : "N/A";
-  return `*Job Card ${jobCard.jobNumber}*\nCustomer: ${customer}\nVehicle: ${jobCard.vehicle?.registrationNumber ?? "N/A"}\nBranch: ${jobCard.branch?.name ?? "N/A"}\nProgress: ${jobCard.progress}%\nStatus: ${STATUS_LABELS[jobCard.status]}`;
+  return `*Job Card ${jobCard.jobNumber}*\nCustomer: ${customer}\nVehicle: ${jobCard.vehicle?.registrationNumber ?? "N/A"}\nBranch: ${jobCard.branch?.name ?? "N/A"}\nStatus: ${STATUS_LABELS[jobCard.status]}`;
 }
 
 function exportRows(jobCards: JobCard[]) {
@@ -63,7 +63,6 @@ function exportRows(jobCards: JobCard[]) {
     agent: jobCard.createdBy
       ? `${jobCard.createdBy.firstName} ${jobCard.createdBy.lastName}`
       : "",
-    progress: jobCard.progress,
     status: STATUS_LABELS[jobCard.status],
     createdAt: jobCard.createdAt,
   }));
@@ -76,7 +75,6 @@ function exportColumns() {
     { key: "customer", label: "Customer" },
     { key: "branch", label: "Branch" },
     { key: "agent", label: "Agent" },
-    { key: "progress", label: "Progress (%)" },
     { key: "status", label: "Status" },
     { key: "createdAt", label: "Created At" },
   ];
@@ -206,17 +204,6 @@ export function JobCardsTable() {
         <span className="text-muted-foreground">
           {jc.createdBy ? jc.createdBy.firstName : <span className="text-border">—</span>}
         </span>
-      ),
-    },
-    {
-      header: "Progress",
-      render: (jc) => (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${jc.progress}%` }} />
-          </div>
-          <span className="text-xs text-muted-foreground">{jc.progress}%</span>
-        </div>
       ),
     },
     {
