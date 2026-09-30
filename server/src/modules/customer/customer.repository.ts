@@ -3,23 +3,20 @@ import { Customer, CustomerDocument, ServiceHistory, Prisma } from '@prisma/clie
 
 export class CustomerRepository {
   async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
-    const where: Record<string, any> = {};
+    const where: Prisma.CustomerWhereInput = { mergedIntoId: null };
 
     if (params.search) {
+      const nameParts = params.search.trim().split(/\s+/);
       where.OR = [
+        ...(nameParts.length > 1 ? [{ firstName: { contains: nameParts[0], mode: 'insensitive' as const }, lastName: { contains: nameParts.slice(1).join(' '), mode: 'insensitive' as const } }] : []),
+        { code: { contains: params.search, mode: 'insensitive' } },
+        { companyName: { contains: params.search, mode: 'insensitive' } },
+        { vehicles: { some: { OR: [{ vin: { contains: params.search, mode: 'insensitive' } }, { registrationNumber: { contains: params.search, mode: 'insensitive' } }] } } },
         { email: { contains: params.search, mode: 'insensitive' } },
         { firstName: { contains: params.search, mode: 'insensitive' } },
         { lastName: { contains: params.search, mode: 'insensitive' } },
         { phoneNumber: { contains: params.search, mode: 'insensitive' } },
       ];
-    }
-
-    if (params.branchId) {
-      where.branchId = params.branchId;
-    }
-
-    if (params.createdById) {
-      where.createdById = params.createdById;
     }
 
     const [customers, total] = await Promise.all([
@@ -44,6 +41,7 @@ export class CustomerRepository {
     return prisma.customer.findUnique({
       where: { id },
       include: {
+        vehicles: true,
         documents: true,
         serviceHistory: true,
         account: {
