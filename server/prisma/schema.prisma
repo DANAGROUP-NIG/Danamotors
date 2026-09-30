@@ -1408,6 +1408,162 @@ model Enquiry {
   @@index([email])
 }
 
+// Typed master families share search, activation and legacy-code handling.
+model WorkshopMaster {
+  id               String           @id @default(uuid())
+  kind             String
+  code             String
+  description      String
+  active           Boolean          @default(true)
+  category         String?
+  chargedTo        String           @default("CUSTOMER")
+  freeService      Boolean          @default(false)
+  parentId         String?
+  parent           WorkshopMaster?  @relation("MasterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children         WorkshopMaster[] @relation("MasterHierarchy")
+  fuel             String?
+  gearbox          String?
+  acFitted         Boolean          @default(false)
+  warrantyDays     Int?
+  warrantyKm       Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  serviceJobs      JobCard[]        @relation("JobServiceType")
+  bayJobs          JobCard[]        @relation("JobBay")
+  teamJobs         JobCard[]        @relation("JobTeam")
+  complaints       JobComplaint[]
+  vehicles         Vehicle[]        @relation("VehicleCatalogue")
+  colouredVehicles Vehicle[]        @relation("VehicleColour")
+  labourRates      LabourRate[]
+
+  @@unique([kind, code])
+  @@index([kind, active])
+  @@index([parentId])
+}
+
+model JobComplaint {
+  id              String          @id @default(uuid())
+  jobCardId       String
+  jobCard         JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  complaintCodeId String?
+  complaintCode   WorkshopMaster? @relation(fields: [complaintCodeId], references: [id], onDelete: Restrict)
+  description     String
+  defectCode      String?
+  spare           Float           @default(0)
+  oil             Float           @default(0)
+  labour          Float           @default(0)
+
+  @@index([jobCardId])
+}
+
+model JobCardStatusHistory {
+  id         String   @id @default(uuid())
+  jobCardId  String
+  jobCard    JobCard  @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  remarks    String?
+  createdAt  DateTime @default(now())
+
+  @@index([jobCardId, createdAt])
+}
+
+model LabourRate {
+  id           String         @id @default(uuid())
+  labourItemId String
+  labourItem   LabourItem     @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  modelId      String
+  model        WorkshopMaster @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  pricing      String         @default("TIME")
+  hours        Float          @default(1)
+  rate         Float
+  active       Boolean        @default(true)
+
+  @@unique([labourItemId, modelId])
+}
+
+model EstimateLine {
+  id          String   @id @default(uuid())
+  estimateId  String
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  type        String
+  referenceId String?
+  description String
+  quantity    Float    @default(1)
+  rate        Float    @default(0)
+  amount      Float    @default(0)
+
+  @@index([estimateId])
+}
+
+model VehicleCatalogMake {
+  id     String               @id @default(uuid())
+  name   String               @unique
+  models VehicleCatalogModel[]
+}
+
+model VehicleCatalogModel {
+  id          String                    @id @default(uuid())
+  makeId      String
+  make        VehicleCatalogMake        @relation(fields: [makeId], references: [id], onDelete: Restrict)
+  name        String
+  searchName  String
+  aliases     String[]
+  yearStart   Int
+  yearEnd     Int?
+  generations VehicleCatalogGeneration[]
+  vehicles    Vehicle[]
+
+  @@unique([makeId, name])
+  @@index([makeId, searchName])
+}
+
+model VehicleCatalogGeneration {
+  id            String                 @id @default(uuid())
+  modelId       String
+  model         VehicleCatalogModel    @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  name          String
+  yearStart     Int
+  yearEnd       Int?
+  bodyType      String?
+  sourceOrdinal Int                    @default(0)
+  engines       VehicleCatalogEngine[]
+  vehicles      Vehicle[]
+
+  @@unique([modelId, name, yearStart, sourceOrdinal])
+  @@index([modelId])
+}
+
+model VehicleCatalogEngine {
+  id                    String                  @id @default(uuid())
+  generationId          String
+  generation            VehicleCatalogGeneration @relation(fields: [generationId], references: [id], onDelete: Restrict)
+  label                 String
+  sourceOrdinal         Int                     @default(0)
+  fuelType              String?
+  cylinders             Int?
+  displacementCc        Int?
+  powerHp               Float?
+  torqueNm              Float?
+  transmission          String?
+  drivetrain            String?
+  zeroToHundredKmhS      Float?
+  topSpeedKmh           Float?
+  fuelEconomyCombinedL100 Float?
+  lengthMm              Int?
+  widthMm               Int?
+  heightMm              Int?
+  wheelbaseMm           Int?
+  curbWeightKg          Int?
+  specs                 Json
+  vehicles              Vehicle[]
+
+  @@unique([generationId, label, sourceOrdinal])
+  @@index([generationId])
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock transfer workflow (issue #62, Process A)
 //
@@ -1505,16 +1661,6 @@ enum MitStatus {
 enum SrnStatus {
   COMPLETED
   CANCELLED
-}
-
-// Atomic per-document, per-year counters used to generate document numbers.
-model DocumentSequence {
-  docType   String
-  year      Int
-  lastValue Int      @default(0)
-  updatedAt DateTime @updatedAt
-
-  @@id([docType, year])
 }
 
 model BranchIndent {
