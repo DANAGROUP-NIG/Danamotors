@@ -1,6 +1,7 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 
 export const JOB_CARD_STATUS_TONES = {
+  OPEN: "amber", IN_PROGRESS: "blue", QC: "blue", READY: "emerald", BILLED: "emerald", DELIVERED: "gray", CANCELLED: "red",
   Open: "amber",
   Pending: "amber",
   "In Progress": "blue",
