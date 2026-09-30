@@ -802,13 +802,42 @@ export class InventoryService {
       if (jobCard.branchId !== data.branchId) {
         throw new BadRequestError("Job card belongs to a different branch");
       }
-      const updated = await tx.inventoryStock.updateMany({ where: { branchId: data.branchId, partId: data.sparePartId, quantity: { gte: data.quantity } }, data: { quantity: { decrement: data.quantity } } });
-      if (updated.count !== 1) throw new BadRequestError('Insufficient stock at this branch');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.inventoryStock.updateMany({
+        where: {
+          branchId: data.branchId,
+          partId: data.sparePartId,
+          quantity: { gte: data.quantity },
+        },
+        data: { quantity: { decrement: data.quantity } },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestError("Insufficient stock at this branch");
+      }
+
       const issuance = await tx.partIssuance.create({ data });
-      await tx.stockTransaction.create({ data: { branchId: data.branchId, partId: data.sparePartId, type: 'ISSUED', quantity: -data.quantity, referenceId: issuance.id, notes: data.notes, recordedById: data.issuedById } });
-      const stock = await tx.inventoryStock.findUniqueOrThrow({ where: { branchId_partId: { branchId: data.branchId, partId: data.sparePartId } }, include: { part: { select: { id: true, name: true } } } });
+      await tx.stockTransaction.create({
+        data: {
+          branchId: data.branchId,
+          partId: data.sparePartId,
+          type: "ISSUED",
+          quantity: -data.quantity,
+          referenceId: issuance.id,
+          notes: data.notes,
+          recordedById: data.issuedById,
+        },
+      });
+      const stock = await tx.inventoryStock.findUniqueOrThrow({
+        where: {
+          branchId_partId: { branchId: data.branchId, partId: data.sparePartId },
+        },
+        include: { part: { select: { id: true, name: true } } },
+      });
       return { issuance, stock };
     });
+
     // The stock mutation has committed; notification failure must not invite a duplicate issue.
     await this.notifyLowStock(data.branchId, result.stock.part, result.stock.quantity, result.stock.minimumStock)
       .catch(() => console.error('Low-stock notification could not be recorded'));
