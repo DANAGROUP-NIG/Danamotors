@@ -98,8 +98,9 @@ export function WarrantyCoverageCard({ check, isLoading }: { check?: WarrantyChe
               <Gauge className="size-4 text-slate-500" /> Distance
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              {c.mileage != null ? fmtKm(c.mileage) : "No reading"}
-              {c.kmLimit != null && ` of ${fmtKm(c.kmLimit)}`}
+              {c.mileage != null
+                ? `${fmtKm(c.mileage)}${c.kmLimit != null ? ` of ${fmtKm(c.kmLimit)}` : ""}`
+                : `No reading yet${c.kmLimit != null ? ` · limit ${fmtKm(c.kmLimit)}` : ""}`}
             </p>
             {c.kmUsedPercent != null ? (
               <>

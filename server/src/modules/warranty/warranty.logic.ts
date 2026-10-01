@@ -49,7 +49,7 @@ export const COVERAGE_REASON_TEXT: Record<CoverageReason, string> = {
   MODEL_NOT_COVERED: "This model is not covered by manufacturer warranty",
   NO_START_DATE: "No warranty start (sale) date is recorded for this vehicle",
   START_DATE_IN_FUTURE: "The recorded warranty start date is in the future",
-  NO_MILEAGE: "No odometer reading is available",
+  NO_MILEAGE: "No odometer reading yet — it is recorded at check-in or when a job card is opened",
   DATE_LIMIT_PASSED: "The warranty period has ended",
   KM_LIMIT_PASSED: "The warranty km limit has been exceeded",
 };

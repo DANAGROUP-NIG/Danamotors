@@ -309,13 +309,38 @@ ones and you'll get **403**.
 
 *Super admin or warranty officer (setting the sale date needs `warranty:update`).*
 
-1. Open **Vehicles** and click a vehicle. Option A: use the Sportage `KNAPU81BDP7123456`.
-2. Option B: click **Edit**, choose **Model (warranty policy)** = Sportage and **Sale date** = 12/03/2023. Save.
-3. ✅ The **Warranty Coverage** card shows:
+> **Where is the card?** The **Vehicles list** has no warranty column. Click a vehicle **row** to open its detail page;
+> the **Warranty Coverage** card is under the header.
+>
+> **Coverage needs three things.** If any one is missing, the card shows 🟠 **Unknown**, and Unknown is never "covered":
+>
+> | Input | Where it comes from | Can you type it? |
+> |---|---|---|
+> | Model policy | **Edit** vehicle → *Model (warranty policy)* | Yes |
+> | Sale date | **Edit** vehicle → *Sale date (warranty start)* (needs `warranty:update`) | Yes |
+> | Odometer reading | Recorded at **check-in** (T4) or when a **job card** is opened (T5) | **No, on purpose**: nobody can edit the mileage to fake coverage |
+
+1. Open **Vehicles** and click a vehicle **row**. Option A (seeded data): the Sportage `KNAPU81BDP7123456` already has a
+   reading of 58,210 km, so it shows **Active** straight away.
+2. Option B (your own vehicle): click **Edit**, choose **Model (warranty policy)** = Sportage and **Sale date** =
+   12/03/2023. Save.
+   - ✅ The card shows 🟠 **Unknown**, "Coverage could not be confirmed — No odometer reading yet — it is recorded at
+     check-in or when a job card is opened".
+   - The **Time** box already works (e.g. "Started 12/03/2023 · Expires 10/03/2028 · 526 days left").
+   - The **Distance** box says "No reading yet · limit 100,000 km".
+
+   **This is correct behaviour.** The km limit can't be checked without a reading.
+3. **Record a first reading.** Create an appointment for this vehicle and **check it in** with a mileage (T4 steps 1–5),
+   or open a **New job card** for it (T5). Then reopen the vehicle page.
+   ✅ The **Warranty Coverage** card now shows:
    - a green **Active** badge
    - "Under manufacturer warranty — X or Y km remaining, whichever comes first"
-   - **Time** and **Distance** meters
-   - the policy text, the last recorded mileage and Source = Manufacturer
+   - both **Time** and **Distance** meters filled
+   - **Last recorded mileage** = the reading you entered, with its date
+   - Source = Manufacturer
+
+   On the check-in and job card screens, coverage is already worked out from the mileage you type, so the green
+   "under warranty" banner appears there even before the first reading is saved.
 4. **Try each status.** Change the data and refresh:
 
    | Change | Expected |
