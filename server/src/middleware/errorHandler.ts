@@ -15,11 +15,15 @@ export const errorHandler = (
 ): void => {
   let statusCode = 500;
   let message = 'Internal Server Error';
+  let code: string | undefined;
+  let details: unknown;
 
   // Handle Custom AppError
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
+    code = err.code;
+    details = err.details;
   }
   // Handle Prisma Database Errors (codes are always P2xxx/P1xxx style)
   else if ('code' in err && typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) {
@@ -59,6 +63,8 @@ export const errorHandler = (
     status: 'error',
     statusCode,
     message,
+    ...(code && { code }),
+    ...(details !== undefined && { details }),
   };
 
   if (config.NODE_ENV === 'development') {

@@ -66,11 +66,16 @@ aside a {
   color: inherit;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+/* In the base layer so Tailwind text utilities (text-sm, text-xs…) on buttons and
+   inputs win. Unlayered, this rule overrode every utility and all buttons inherited
+   the parent's font size. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 @keyframes shimmer {

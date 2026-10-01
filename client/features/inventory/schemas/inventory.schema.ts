@@ -38,6 +38,8 @@ export const partMasterSchema = z
     binLocation: optionalText(40),
     storeLocation: optionalText(40),
     partStatus: z.enum(["ACTIVE", "BLOCKED"]),
+    warrantyApplicable: z.boolean(),
+    warrantyRate: optionalNumber("Warranty rate"),
   })
   .refine((d) => d.minLevel == null || d.maxLevel == null || d.maxLevel >= d.minLevel, {
     message: "Maximum level must be greater than or equal to minimum level",

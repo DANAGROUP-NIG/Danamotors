@@ -19,8 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
-import ModalFame from "@/components/modals/ModalFame";
-import { JobCardCreateForm } from "@/features/job-cards";
+import { useRouter } from "next/navigation";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
 import ReceptionManagerDashboard from "@/features/dashboard/components/ReceptionManagerDashboard";
 import StoreManagerDashboard from "@/features/dashboard/components/StoreManagerDashboard";
@@ -62,7 +61,7 @@ export default function DashboardPage() {
     isReceptionManager,
     isStoreManager,
   } = useAuth();
-  const [showNewJobCard, setShowNewJobCard] = useState(false);
+  const router = useRouter();
   const [today, setToday] = useState("");
 
   useEffect(() => {
@@ -214,7 +213,7 @@ export default function DashboardPage() {
           user={user}
           today={today}
           canCreateJob={canCreateJob}
-          onNewJobCard={() => setShowNewJobCard(true)}
+          onNewJobCard={() => router.push("/job-cards/new")}
         />
 
         {/* Inventory Alert Banner */}
@@ -326,13 +325,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <ModalFame
-        isOpen={showNewJobCard}
-        onClose={() => setShowNewJobCard(false)}
-        title="Create Job Card"
-      >
-        <JobCardCreateForm onSuccess={() => setShowNewJobCard(false)} />
-      </ModalFame>
     </>
   );
 }

@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import { MAX_MILEAGE } from '../warranty/warranty.logic';
+
+const mileageField = z.number().int('Mileage must be a whole number').min(0, 'Mileage cannot be negative').max(MAX_MILEAGE);
+const acknowledgementFields = {
+  warrantyAcknowledged: z.boolean().optional(),
+  acknowledgedCampaignIds: z.array(z.string().uuid('Invalid campaign ID')).max(50).optional(),
+};
 
 export const serviceIdParamSchema = z.object({
   params: z.object({
@@ -39,6 +46,9 @@ export const updateAppointmentSchema = z.object({
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
+    // Odometer reading taken at check-in (status 'Checked In').
+    mileage: mileageField.optional(),
+    ...acknowledgementFields,
   }),
   params: z.object({
     id: z.string().uuid('Invalid appointment ID'),
@@ -57,6 +67,14 @@ export const createJobCardSchema = z.object({
     estimatedHours: z.number().optional(),
     estimatedCost: z.number().optional(),
     assignedTo: z.string().optional(),
+    // Required when the job card is for a vehicle (checked in the service, which may take the vehicle from the appointment).
+    mileage: mileageField.optional(),
+    odometerReplaced: z.boolean().optional(),
+    odometerReplacedReason: z.string().trim().max(300).optional(),
+    ...acknowledgementFields,
+  }).refine((b) => !b.odometerReplaced || Boolean(b.odometerReplacedReason?.trim()), {
+    message: 'Give a reason for the odometer replacement',
+    path: ['odometerReplacedReason'],
   }),
 });
 

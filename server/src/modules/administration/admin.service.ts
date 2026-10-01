@@ -272,6 +272,8 @@ export class AdminService {
       financereport: 'Finance — Reports',
       credit: 'Credit Management',
       audit: 'Audit Management',
+      warranty: 'Warranty',
+      campaign: 'Campaigns (Recall / Free Fix)',
     };
 
     const groupsMap = new Map<string, typeof permissions>();

@@ -21,6 +21,7 @@ const SYSTEM_ROLE_NAMES = new Set([
   "Technician",
   "Receptionist",
   "ReceptionManager",
+  "WarrantyOfficer",
 ]);
 
 export function RoleDetailPage() {

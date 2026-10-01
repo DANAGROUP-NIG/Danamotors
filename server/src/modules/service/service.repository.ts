@@ -1,5 +1,6 @@
 import prisma from '../../prisma/client';
 import {
+  Prisma,
   ServiceAppointment,
   JobCard,
   Inspection,
@@ -325,11 +326,26 @@ export class ServiceRepository {
             receipts: true,
           },
         },
+        warrantyAcknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        warrantyCase: {
+          select: { id: true, caseNumber: true, status: true },
+        },
+        campaigns: {
+          select: {
+            campaignId: true,
+            campaignCode: true,
+            campaignTitle: true,
+            campaignType: true,
+            campaign: { select: { status: true } },
+          },
+        },
       },
     });
   }
 
-  async updateJobCard(id: string, data: Partial<JobCard>): Promise<JobCard> {
+  async updateJobCard(id: string, data: Prisma.JobCardUncheckedUpdateInput): Promise<JobCard> {
     return prisma.jobCard.update({
       where: { id },
       data,

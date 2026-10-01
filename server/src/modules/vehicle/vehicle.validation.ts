@@ -9,7 +9,12 @@ export const vehicleIdParamSchema = z.object({
 export const createVehicleSchema = z.object({
   body: z.object({
     customerId: z.string().uuid('Invalid customer ID'),
-    vin: z.string().min(1, 'VIN is required'),
+    vin: z
+      .string()
+      .trim()
+      .min(1, 'VIN is required')
+      .max(30)
+      .transform((v) => v.toUpperCase().replace(/[\s-]/g, '')),
     registrationNumber: z
       .string()
       .trim()
@@ -21,9 +26,11 @@ export const createVehicleSchema = z.object({
     year: z.number().int().optional(),
     trim: z.string().optional(),
     color: z.string().optional(),
-    warrantyProvider: z.string().optional(),
-    warrantyStatus: z.string().optional(),
-    warrantyExpiresAt: z.string().datetime().optional(),
+    // Warranty coverage is calculated from the model policy and sale date; the old
+    // free-text warrantyProvider/Status/ExpiresAt fields are no longer accepted.
+    vehicleModelId: z.string().uuid('Invalid vehicle model').nullable().optional(),
+    // Sale / delivery date that starts the warranty (needs warranty:update).
+    warrantyStartDate: z.coerce.date().nullable().optional(),
     ownershipStatus: z.string().optional(),
   }),
 });
@@ -41,9 +48,11 @@ export const updateVehicleSchema = z.object({
     year: z.number().int().optional(),
     trim: z.string().optional(),
     color: z.string().optional(),
-    warrantyProvider: z.string().optional(),
-    warrantyStatus: z.string().optional(),
-    warrantyExpiresAt: z.string().datetime().optional(),
+    // Warranty coverage is calculated from the model policy and sale date; the old
+    // free-text warrantyProvider/Status/ExpiresAt fields are no longer accepted.
+    vehicleModelId: z.string().uuid('Invalid vehicle model').nullable().optional(),
+    // Sale / delivery date that starts the warranty (needs warranty:update).
+    warrantyStartDate: z.coerce.date().nullable().optional(),
     ownershipStatus: z.string().optional(),
   }),
   params: z.object({

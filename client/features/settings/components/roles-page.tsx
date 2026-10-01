@@ -50,6 +50,7 @@ const SYSTEM_ROLE_NAMES = new Set([
   "Technician",
   "Receptionist",
   "ReceptionManager",
+  "WarrantyOfficer",
 ]);
 
 const PAGE_SIZE = 10;

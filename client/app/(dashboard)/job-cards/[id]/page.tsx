@@ -1,8 +1,8 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useJobCard } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
@@ -25,6 +25,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
 import type { JobCardStatus, PartIssuance, JobCardInvoice } from "@/features/job-cards/types/job-card.types";
+import { JobCardLinesCard } from "@/features/job-cards/components/JobCardLinesCard";
+import { LinkedCampaignsCard, WarrantySnapshotCard } from "@/features/job-cards/components/JobCardWarrantyCards";
+import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { fmtKm } from "@/features/warranty/lib/warranty-format";
 
 const STATUS_TONES: Record<JobCardStatus, StatusTone> = {
   pending: "amber",
@@ -44,23 +48,16 @@ function fmtCurrency(n: number) {
 
 export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { data: jobCard, isLoading, error } = useJobCard(id);
-  const { hasPermission } = useAuth();
+  const { hasPermission, isSuperAdmin } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
+  const [invoiceRequest, setInvoiceRequest] = useState(0);
 
-  const canManage = hasPermission("jobcard:update");
+  const canInvoice = isSuperAdmin || hasPermission("invoice:create");
+  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   function handlePrint() {
     window.print();
-  }
-
-  function handleGenerateInvoice() {
-    router.push(`/invoices/new?jobCardId=${id}&customerId=${jobCard?.customerId}`);
-  }
-
-  function handleRequestParts() {
-    router.push(`/inventory/issuances/new?jobCardId=${id}`);
   }
 
   if (isLoading) {
@@ -107,15 +104,10 @@ export default function JobCardDetailPage() {
           <Button size="sm" variant="outline" onClick={handlePrint} className="gap-1.5">
             <Printer className="size-4" /> Print
           </Button>
-          {canManage && (
-            <>
-              <Button size="sm" variant="outline" onClick={handleGenerateInvoice} className="gap-1.5">
-                <Receipt className="size-4" /> Generate Invoice
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleRequestParts} className="gap-1.5">
-                <Package className="size-4" /> Request Parts
-              </Button>
-            </>
+          {canInvoice && jobCard.customerId && !(jobCard.invoices ?? []).some((inv) => !/cancel|void/i.test(inv.status)) && (
+            <Button size="sm" onClick={() => setInvoiceRequest((n) => n + 1)} className="gap-1.5">
+              <Receipt className="size-4" /> Generate Invoice
+            </Button>
           )}
         </div>
       </div>
@@ -126,15 +118,36 @@ export default function JobCardDetailPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-6 print:border print:shadow-none">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-xl font-semibold text-slate-800">{jobCard.jobNumber}</h1>
-              <p className="mt-1 text-sm text-slate-500">{jobCard.description}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400 print:text-xs">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Job card</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="font-mono text-2xl font-bold text-slate-900">{jobCard.jobNumber}</h1>
+                <StatusBadge status={jobCard.status.replace("_", " ")} tone={tone} />
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
                 Created {fmtDate(jobCard.createdAt)}
-              </span>
-              <StatusBadge status={jobCard.status.replace("_", " ")} tone={tone} />
+                {jobCard.createdBy && ` by ${jobCard.createdBy.firstName} ${jobCard.createdBy.lastName}`}
+                {jobCard.branch?.name && ` · ${jobCard.branch.name}`}
+              </p>
             </div>
+          </div>
+
+          <div className="mb-6 grid gap-4 border-b border-slate-100 pb-6 sm:grid-cols-2 lg:grid-cols-5">
+            <HeaderField label="Customer" value={customerName} />
+            <HeaderField
+              label="Vehicle"
+              value={
+                <>
+                  {vehicleLabel}
+                  {jobCard.vehicle?.vin && <span className="block font-mono text-xs text-slate-500">{jobCard.vehicle.vin}</span>}
+                </>
+              }
+            />
+            <HeaderField label="Mileage at check-in" value={jobCard.mileage != null ? fmtKm(jobCard.mileage) : "—"} />
+            <HeaderField
+              label="Technician"
+              value={jobCard.technician ? `${jobCard.technician.firstName} ${jobCard.technician.lastName}` : "Not assigned"}
+            />
+            <HeaderField label="Complaint" value={<span className="line-clamp-2">{jobCard.description}</span>} />
           </div>
 
           <div className="mb-4">
@@ -158,6 +171,22 @@ export default function JobCardDetailPage() {
             <DetailField icon={<Clock className="size-4" />} label="Updated" value={fmtDate(jobCard.updatedAt)} />
           </div>
         </div>
+
+        {/* ── Warranty snapshot & campaigns ── */}
+        {canSeeWarranty && jobCard.vehicleId && (
+          <div className="grid gap-5 md:grid-cols-2">
+            <WarrantySnapshotCard jobCard={jobCard} />
+            <LinkedCampaignsCard jobCard={jobCard} />
+          </div>
+        )}
+
+        {/* ── Parts & labour, who pays, customer invoice ── */}
+        <JobCardLinesCard
+          jobCardId={jobCard.id}
+          branchId={jobCard.branchId}
+          hasCustomer={Boolean(jobCard.customerId)}
+          invoiceRequest={invoiceRequest}
+        />
 
         {/* ── Customer & Vehicle ── */}
         <div className="grid gap-5 md:grid-cols-2">
@@ -519,5 +548,14 @@ function InvoiceRow({ invoice }: { invoice: JobCardInvoice }) {
       </td>
       <td className="px-3 py-2 text-slate-600">{totalPaid > 0 ? fmtCurrency(totalPaid) : "—"}</td>
     </tr>
+  );
+}
+
+function HeaderField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0 sm:border-l sm:border-slate-100 sm:pl-4 first:border-0 first:pl-0">
+      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <div className="mt-0.5 text-sm text-slate-800">{value}</div>
+    </div>
   );
 }

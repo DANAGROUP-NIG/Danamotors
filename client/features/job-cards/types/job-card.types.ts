@@ -1,3 +1,11 @@
+import type {
+  CampaignType,
+  CampaignVehicleStatus,
+  CaseStatus,
+  Coverage,
+  CoverageStatus,
+} from "@/features/warranty/types/warranty.types";
+
 export type JobCardStatus = "pending" | "in_progress" | "completed" | "on_hold" | "cancelled";
 
 export type Inspection = {
@@ -127,6 +135,32 @@ export type JobCard = {
   estimates: Estimate[];
   partIssuances?: PartIssuance[];
   invoices?: JobCardInvoice[];
+
+  // Warranty snapshot taken at creation (never rewritten).
+  mileage?: number | null;
+  warrantyStatusAtCreation?: CoverageStatus | null;
+  warrantyReasonsAtCreation?: string[];
+  warrantyExpiresOnAtCreation?: string | null;
+  warrantyKmLimitAtCreation?: number | null;
+  warrantySnapshot?: {
+    coverage?: Coverage;
+    reasonText?: string[];
+    odometerReplaced?: boolean;
+    odometerReplacedReason?: string | null;
+    previousMileage?: number | null;
+  } | null;
+  warrantyAcknowledgedBy?: { id: string; firstName: string; lastName: string } | null;
+  warrantyAcknowledgedAt?: string | null;
+  completedAt?: string | null;
+  warrantyCase?: { id: string; caseNumber: string; status: CaseStatus } | null;
+  campaigns?: {
+    campaignId: string;
+    campaignCode: string;
+    campaignTitle: string;
+    campaignType: CampaignType;
+    vehicleStatus: CampaignVehicleStatus | null;
+    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED" };
+  }[];
 };
 
 export type JobCardListResponse = {

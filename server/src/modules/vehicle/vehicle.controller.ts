@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { VehicleService } from './vehicle.service';
 import { assertBranchOwnership } from '../../middleware/authorize';
 import prisma from '../../prisma/client';
-import { ROLES } from '../../shared/constants/roles';
+import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
+import { ForbiddenError } from '../../shared/errors/appError';
 
 export class VehicleController {
   private vehicleService: VehicleService;
@@ -63,6 +64,7 @@ export class VehicleController {
 
   createVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      assertCanSetWarrantyStart(req);
       const createdById = req.user?.userId;
       const result = await this.vehicleService.createVehicle({ ...req.body, createdById });
 
@@ -87,6 +89,7 @@ export class VehicleController {
         select: { customer: { select: { branchId: true } } },
       });
       assertBranchOwnership(req, vehicle?.customer?.branchId);
+      assertCanSetWarrantyStart(req);
       const result = await this.vehicleService.updateVehicle(id, req.body);
 
       res.status(200).json({
@@ -214,3 +217,10 @@ export class VehicleController {
 }
 
 export default VehicleController;
+
+/** The sale date starts the warranty clock, so only warranty:update holders may set it. */
+function assertCanSetWarrantyStart(req: Request) {
+  if (req.body?.warrantyStartDate === undefined) return;
+  if (req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(PERMISSIONS.WARRANTY_UPDATE)) return;
+  throw new ForbiddenError('Setting the warranty start (sale) date needs warranty:update');
+}

@@ -1,8 +1,35 @@
+import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { ServiceRepository } from './service.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
-import { NotificationService } from '../notification/notification.service';
+import { NOTIFICATION_TYPES, NotificationService } from '../notification/notification.service';
+import { assertMileage } from '../warranty/warranty.logic';
+import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
+import { WarrantyCaseService, notifyWarrantyOfficers } from '../warranty/warrantyCase.service';
+import { completeCampaignVehiclesForJobCard, markCampaignVehiclesInWorkshop } from '../campaign/campaign.hooks';
+import { isCompletedStatus } from '../job-card-line/jobCardLine.logic';
+
+/**
+ * Updates a job card and, when it becomes completed, marks the campaign work it was
+ * opened for as completed — in one transaction. Shared by the service and workshop modules
+ * so every path that completes a job card runs the hook.
+ */
+export async function applyJobCardUpdate(
+  id: string,
+  previousStatus: string,
+  data: Prisma.JobCardUncheckedUpdateInput & { status?: string },
+) {
+  const completing = data.status !== undefined && isCompletedStatus(data.status) && !isCompletedStatus(previousStatus);
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.jobCard.update({
+      where: { id },
+      data: { ...data, ...(completing && { completedAt: new Date() }) },
+    });
+    if (completing) await completeCampaignVehiclesForJobCard(tx, id);
+    return updated;
+  });
+}
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -154,10 +181,16 @@ export class ServiceService {
     notes?: string;
     status?: string;
     requestingUserRole?: string;
+    mileage?: number;
+    warrantyAcknowledged?: boolean;
+    acknowledgedCampaignIds?: string[];
   }) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
       throw new NotFoundError('Appointment not found');
+    }
+    if (data.mileage !== undefined && data.status !== 'Checked In') {
+      throw new BadRequestError('Mileage is recorded when the vehicle is checked in');
     }
 
     const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
@@ -190,11 +223,41 @@ export class ServiceService {
     const oldScheduledAt = appointment.scheduledAt;
 
     // ── Persist update ────────────────────────────────────────────────────────
-    const updated = await this.serviceRepository.updateAppointment(id, {
-      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
-      durationMins: data.durationMins,
-      notes: data.notes,
-      status: data.status,
+    // Check-in with an odometer reading records it and runs the warranty & campaign check;
+    // a covered vehicle or open campaign must be acknowledged, like on the job card form.
+    let checkInCampaigns: { code: string; title: string }[] = [];
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.status === 'Checked In' && data.mileage !== undefined) {
+        await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${appointment.vehicleId} FOR UPDATE`;
+        const vehicle = await loadVehicleForWarranty(tx, appointment.vehicleId);
+        assertMileage(data.mileage, vehicle.lastRecordedMileage);
+        const openCampaigns = await findOpenCampaigns(tx, vehicle);
+        const check = buildCheck(vehicle, data.mileage, openCampaigns);
+        const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
+        const missing =
+          (check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged) ||
+          openCampaigns.some((c) => !acknowledged.has(c.campaignId));
+        if (missing) {
+          throw new ConflictError('Inform the customer and acknowledge the warranty status and open campaigns before check-in.').withCode(
+            'WARRANTY_ACK_REQUIRED',
+            check,
+          );
+        }
+        await tx.vehicle.update({
+          where: { id: vehicle.id },
+          data: { lastRecordedMileage: Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage), lastMileageAt: new Date() },
+        });
+        checkInCampaigns = openCampaigns.map((c) => ({ code: c.code, title: c.title }));
+      }
+      return tx.serviceAppointment.update({
+        where: { id },
+        data: {
+          scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+          durationMins: data.durationMins,
+          notes: data.notes,
+          status: data.status,
+        },
+      });
     });
 
     // ── Post-update notifications ─────────────────────────────────────────────
@@ -230,8 +293,12 @@ export class ServiceService {
       if (newStatus === 'Checked In') {
         const payload = {
           type: 'APPOINTMENT_CHECKED_IN',
-          title: 'Appointment checked in',
-          message: `${customerName} has checked in at ${branchName}.`,
+          title: checkInCampaigns.length > 0 ? 'Checked in — open campaign' : 'Appointment checked in',
+          message:
+            `${customerName} has checked in at ${branchName}.` +
+            (checkInCampaigns.length > 0
+              ? ` Open campaign work: ${checkInCampaigns.map((c) => `${c.code} ${c.title}`).join('; ')}.`
+              : ''),
           link: `/appointments/${id}`,
           branchId,
         };
@@ -282,6 +349,13 @@ export class ServiceService {
     await this.serviceRepository.deleteAppointment(id);
   }
 
+  /**
+   * Creates a job card. For a vehicle it runs the warranty & campaign check inside the
+   * transaction: the server recomputes coverage from today's mileage and refuses to
+   * create the card (409 WARRANTY_ACK_REQUIRED) unless the adviser acknowledged a covered
+   * vehicle and every open campaign. It then snapshots coverage, links the campaigns and,
+   * for a covered vehicle, opens a warranty case. Notifications go out after commit.
+   */
   async createJobCard(data: {
     appointmentId?: string;
     customerId?: string;
@@ -294,38 +368,189 @@ export class ServiceService {
     estimatedCost?: number;
     assignedTo?: string;
     createdById?: string;
+    mileage?: number;
+    odometerReplaced?: boolean;
+    odometerReplacedReason?: string;
+    warrantyAcknowledged?: boolean;
+    acknowledgedCampaignIds?: string[];
   }) {
+    let appointment: Awaited<ReturnType<ServiceRepository['findAppointmentById']>> = null;
     if (data.appointmentId) {
-      const appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
+      appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
       if (!appointment) throw new NotFoundError('Appointment not found');
     }
 
-    if (data.customerId) {
-      const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-      if (!customer) throw new NotFoundError('Customer not found');
+    // A job card for an appointment is for that appointment's customer and vehicle.
+    const vehicleId = data.vehicleId ?? appointment?.vehicleId;
+    const customerId = data.customerId ?? appointment?.customerId;
+    if (appointment && data.vehicleId && data.vehicleId !== appointment.vehicleId) {
+      throw new BadRequestError('The vehicle does not match the linked appointment');
     }
 
-    if (data.vehicleId) {
-      const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-      if (!vehicle) throw new NotFoundError('Vehicle not found');
+    if (customerId) {
+      const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+      if (!customer) throw new NotFoundError('Customer not found');
     }
 
     const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
     if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
-    return this.serviceRepository.createJobCard({
-      appointmentId: data.appointmentId,
-      customerId: data.customerId,
-      vehicleId: data.vehicleId,
-      branchId: branch.id,
-      jobNumber: data.jobNumber,
-      description: data.description,
-      status: data.status,
-      estimatedHours: data.estimatedHours,
-      estimatedCost: data.estimatedCost,
-      assignedTo: data.assignedTo,
-      createdById: data.createdById,
+    if (!vehicleId) {
+      const card = await this.serviceRepository.createJobCard({
+        appointmentId: data.appointmentId,
+        customerId,
+        branchId: branch.id,
+        jobNumber: data.jobNumber,
+        description: data.description,
+        status: data.status,
+        estimatedHours: data.estimatedHours,
+        estimatedCost: data.estimatedCost,
+        assignedTo: data.assignedTo,
+        createdById: data.createdById,
+      });
+      // Same response shape as the vehicle path: no vehicle, so no warranty check.
+      return { ...card, warrantyCase: null, warrantyCheck: null };
+    }
+
+    if (data.mileage === undefined) {
+      throw new BadRequestError('Enter the current mileage (km) so warranty can be checked');
+    }
+    if (data.odometerReplaced && !data.odometerReplacedReason?.trim()) {
+      throw new BadRequestError('Give a reason for the odometer replacement');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Serialise job cards and mileage updates for the same vehicle.
+      await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${vehicleId} FOR UPDATE`;
+      const vehicle = await loadVehicleForWarranty(tx, vehicleId);
+      if (customerId && vehicle.customerId !== customerId) {
+        throw new BadRequestError('The vehicle does not belong to this customer');
+      }
+      assertMileage(data.mileage!, vehicle.lastRecordedMileage, data.odometerReplaced);
+
+      const openCampaigns = await findOpenCampaigns(tx, vehicle);
+      const check = buildCheck(vehicle, data.mileage, openCampaigns);
+      const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
+      const unacknowledgedCampaigns = openCampaigns.filter((c) => !acknowledged.has(c.campaignId));
+      const coverageNeedsAck = check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged;
+      if (coverageNeedsAck || unacknowledgedCampaigns.length > 0) {
+        throw new ConflictError(
+          coverageNeedsAck
+            ? 'This vehicle is under warranty. Inform the customer and acknowledge the warranty before creating the job card.'
+            : `This vehicle has open campaigns (${unacknowledgedCampaigns.map((c) => c.code).join(', ')}). Acknowledge them before creating the job card.`,
+        ).withCode('WARRANTY_ACK_REQUIRED', check);
+      }
+
+      const now = new Date();
+      const card = await tx.jobCard.create({
+        data: {
+          appointmentId: data.appointmentId,
+          customerId: customerId ?? vehicle.customerId,
+          vehicleId,
+          branchId: branch.id,
+          jobNumber: data.jobNumber,
+          description: data.description,
+          status: data.status,
+          estimatedHours: data.estimatedHours,
+          estimatedCost: data.estimatedCost,
+          assignedTo: data.assignedTo,
+          createdById: data.createdById,
+          mileage: data.mileage,
+          warrantyStatusAtCreation: check.coverage.status,
+          warrantyReasonsAtCreation: check.coverage.reasons,
+          warrantyExpiresOnAtCreation: check.coverage.expiresOn ? new Date(`${check.coverage.expiresOn}T00:00:00Z`) : null,
+          warrantyKmLimitAtCreation: check.coverage.kmLimit,
+          warrantySnapshot: {
+            coverage: check.coverage,
+            policy: check.policy,
+            override: check.override,
+            reasonText: check.reasonText,
+            openCampaigns: openCampaigns.map((c) => ({ id: c.campaignId, code: c.code, type: c.type, title: c.title })),
+            odometerReplaced: Boolean(data.odometerReplaced),
+            odometerReplacedReason: data.odometerReplaced ? data.odometerReplacedReason!.trim() : null,
+            previousMileage: vehicle.lastRecordedMileage,
+          } as unknown as Prisma.InputJsonValue,
+          ...(check.requiresAcknowledgement && { warrantyAcknowledgedById: data.createdById, warrantyAcknowledgedAt: now }),
+        },
+      });
+
+      // Odometer only moves forward, except for an audited replacement.
+      const newMileage = data.odometerReplaced ? data.mileage! : Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage!);
+      await tx.vehicle.update({ where: { id: vehicleId }, data: { lastRecordedMileage: newMileage, lastMileageAt: now } });
+
+      if (openCampaigns.length > 0) {
+        await tx.jobCardCampaign.createMany({
+          data: openCampaigns.map((c) => ({
+            jobCardId: card.id,
+            campaignId: c.campaignId,
+            campaignCode: c.code,
+            campaignTitle: c.title,
+            campaignType: c.type,
+          })),
+        });
+        await markCampaignVehiclesInWorkshop(tx, openCampaigns.map((c) => c.campaignVehicleId), vehicleId);
+      }
+
+      const warrantyCase =
+        check.coverage.status === WarrantyCoverageStatus.ACTIVE
+          ? await new WarrantyCaseService().openForJobCard(tx, {
+              jobCardId: card.id,
+              vehicleId,
+              customerId: card.customerId,
+              branchId: branch.id,
+              complaint: data.description,
+              mileage: data.mileage!,
+              coverageStatus: check.coverage.status,
+              actorId: data.createdById ?? null,
+              automatic: true,
+            })
+          : null;
+
+      return { card, check, openCampaigns, warrantyCase, vehicle };
     });
+
+    await this.notifyWarrantyJob(result, branch);
+    return { ...result.card, warrantyCase: result.warrantyCase, warrantyCheck: result.check };
+  }
+
+  private async notifyWarrantyJob(
+    result: {
+      card: { id: string; jobNumber: string; description: string; mileage: number | null; createdById: string | null };
+      warrantyCase: { id: string; caseNumber: string } | null;
+      openCampaigns: { code: string; title: string; type: string }[];
+      vehicle: { vin: string; make: string | null; model: string | null; customerId: string };
+    },
+    branch: { id: string; name: string },
+  ) {
+    const { card, warrantyCase, openCampaigns, vehicle } = result;
+    const customer = await prisma.customer.findUnique({
+      where: { id: vehicle.customerId },
+      select: { firstName: true, lastName: true, phoneNumber: true },
+    });
+    const who = customer ? `${customer.firstName} ${customer.lastName}${customer.phoneNumber ? ` (${customer.phoneNumber})` : ''}` : 'Customer';
+    const car = [vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
+    const km = card.mileage != null ? `${card.mileage.toLocaleString('en-NG')} km` : 'mileage not recorded';
+
+    if (warrantyCase) {
+      await notifyWarrantyOfficers(branch.id, {
+        type: NOTIFICATION_TYPES.WARRANTY_JOB_CREATED,
+        title: 'Warranty job opened',
+        message: `${who} · ${car} · VIN ${vehicle.vin} · ${km} · job card ${card.jobNumber} at ${branch.name}. Complaint: ${card.description}. Case ${warrantyCase.caseNumber} opened.`,
+        link: `/warranty/${warrantyCase.id}`,
+        branchId: branch.id,
+      });
+    }
+    if (openCampaigns.length > 0 && card.createdById) {
+      await new NotificationService().notifyUsers([card.createdById], {
+        type: NOTIFICATION_TYPES.CAMPAIGN_VEHICLE_CHECKED_IN,
+        title: 'Open campaign on this vehicle',
+        message: `Job card ${card.jobNumber} (${car}, VIN ${vehicle.vin}) has open campaign work: ${openCampaigns
+          .map((c) => `${c.code} ${c.title}`)
+          .join('; ')}. Include it in the job.`,
+        link: `/job-cards/${card.id}`,
+        branchId: branch.id,
+      });
+    }
   }
 
   async listJobCards(params?: {
@@ -386,7 +611,24 @@ export class ServiceService {
       throw new NotFoundError('Job card not found');
     }
 
-    return card;
+    // This vehicle's progress in each campaign the job card was opened for.
+    const campaignVehicles =
+      card.campaigns.length > 0 && card.vehicle
+        ? await prisma.campaignVehicle.findMany({
+            where: {
+              campaignId: { in: card.campaigns.map((c) => c.campaignId) },
+              OR: [{ vehicleId: card.vehicle.id }, { vin: card.vehicle.vin.toUpperCase() }],
+            },
+            select: { campaignId: true, status: true, completedJobCardId: true },
+          })
+        : [];
+    return {
+      ...card,
+      campaigns: card.campaigns.map((c) => ({
+        ...c,
+        vehicleStatus: campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ?? null,
+      })),
+    };
   }
 
   async updateJobCard(id: string, data: {
@@ -403,8 +645,12 @@ export class ServiceService {
     if (!card) {
       throw new NotFoundError('Job card not found');
     }
+    // The warranty snapshot, campaign links and case belong to the original vehicle.
+    if (data.vehicleId !== undefined && data.vehicleId !== card.vehicleId && card.warrantyStatusAtCreation) {
+      throw new BadRequestError('The vehicle cannot be changed after the warranty check. Open a new job card instead.');
+    }
 
-    return this.serviceRepository.updateJobCard(id, data);
+    return applyJobCardUpdate(id, card.status, data);
   }
 
   async addInspection(jobCardId: string, data: {
