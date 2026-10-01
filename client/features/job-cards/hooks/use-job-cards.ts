@@ -13,9 +13,10 @@ type UseJobCardsParams = {
   dateTo?: string;
 };
 
-export function useJobCards(params?: UseJobCardsParams) {
+export function useJobCards(params?: UseJobCardsParams, enabled = true) {
   return useQuery({
     queryKey: jobCardKeys.list(params),
     queryFn: () => getJobCardsRequest(params),
+    enabled,
   });
 }

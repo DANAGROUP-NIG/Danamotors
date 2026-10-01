@@ -1,6 +1,6 @@
 import prisma from '../../prisma/client';
 import { FinanceRepository } from './finance.repository';
-import { NotFoundError } from '../../shared/errors/appError';
+import { ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
 import { NotificationService } from '../notification/notification.service';
 
@@ -32,6 +32,11 @@ export class FinanceService {
       const jobCard = await prisma.jobCard.findUnique({ where: { id: data.jobCardId } });
       if (!jobCard) {
         throw new NotFoundError('Job card not found');
+      }
+      // Job cards with priced lines are billed from their CUSTOMER lines only, never a typed-in total.
+      const lines = await prisma.jobCardLine.count({ where: { jobCardId: data.jobCardId } });
+      if (lines > 0) {
+        throw new ConflictError('This job card has priced lines. Use "Generate invoice" on the job card so only customer lines are billed.');
       }
     }
 

@@ -51,6 +51,10 @@ export type PartMaster = {
   binLocation: string | null;
   storeLocation: string | null;
   partStatus: PartStatus;
+  /** Legacy partmast.WTYAPPLICABLE: only these parts can be claimed under warranty. */
+  warrantyApplicable: boolean;
+  /** Legacy warrrate: rate charged to the manufacturer on a warranty claim. */
+  warrantyRate: number | null;
   role: PartRole;
   mainPartId: string | null;
   createdAt: string;
@@ -76,6 +80,8 @@ export type PartMasterPayload = {
   binLocation?: string;
   storeLocation?: string;
   partStatus?: PartStatus;
+  warrantyApplicable?: boolean;
+  warrantyRate?: number | null;
 };
 
 export type PriceCategory = {

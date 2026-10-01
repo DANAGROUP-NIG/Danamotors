@@ -1,6 +1,10 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  /** Optional machine-readable code the client can branch on, e.g. WARRANTY_ACK_REQUIRED. */
+  public code?: string;
+  /** Optional structured payload returned with the error. */
+  public details?: unknown;
 
   constructor(message: string, statusCode: number, isOperational = true) {
     super(message);
@@ -8,6 +12,12 @@ export class AppError extends Error {
     this.isOperational = isOperational;
     Object.setPrototypeOf(this, new.target.prototype);
     Error.captureStackTrace(this, this.constructor);
+  }
+
+  withCode(code: string, details?: unknown): this {
+    this.code = code;
+    this.details = details;
+    return this;
   }
 }
 

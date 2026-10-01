@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -19,6 +19,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/enquiries": ["enquiry:read"],
   "/users": ["user:read"],
   "/branches": ["branch:read"],
+  "/job-cards/new": ["jobcard:create"],
   "/job-cards": ["jobcard:read"],
   "/inspections": ["inspection:read"],
   "/repairs": ["jobcard:update", "workshop:read"],
@@ -45,6 +46,10 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
+  "/warranty/settings": [WARRANTY_PERMISSIONS.SETTINGS],
+  "/warranty": [WARRANTY_PERMISSIONS.READ],
+  "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
+  "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
   "/settings": ["role:read"],
 };
 

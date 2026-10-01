@@ -60,7 +60,6 @@ export const createPortalVehicleSchema = z.object({
     year: z.number().int().optional(),
     trim: z.string().optional(),
     color: z.string().optional(),
-    warrantyStatus: z.string().optional(),
     ownershipStatus: z.string().optional(),
   }),
 });

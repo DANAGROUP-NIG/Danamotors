@@ -1,6 +1,8 @@
 "use client";
 
-import { Download, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
+import { Download, FileSpreadsheet, Plus } from "lucide-react";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -79,6 +81,7 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
 
 export function JobCardsPage() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
+  const { hasPermission } = useAuth();
   const { data } = useJobCards({
     page: 1,
     limit: 1,
@@ -94,7 +97,18 @@ export function JobCardsPage() {
             ? `${data.meta.total} ${data.meta.total === 1 ? "job card" : "job cards"} on record`
             : undefined
         }
-        actions={<ExportJobCardsButton branchId={activeBranch?.id} />}
+        actions={
+          <div className="flex gap-2">
+            <ExportJobCardsButton branchId={activeBranch?.id} />
+            {hasPermission("jobcard:create") && (
+              <Button asChild size="sm" className="h-9 gap-1.5">
+                <Link href="/job-cards/new">
+                  <Plus className="size-4" /> New job card
+                </Link>
+              </Button>
+            )}
+          </div>
+        }
       />
       <JobCardsTable />
     </div>

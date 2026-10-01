@@ -40,7 +40,7 @@ interface PartFormProps {
 }
 
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
-  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O" };
+  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", warrantyApplicable: false };
   return {
     partCode: part.partCode,
     partNumber: part.partNumber,
@@ -60,6 +60,8 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     binLocation: part.binLocation ?? "",
     storeLocation: part.storeLocation ?? "",
     partStatus: part.partStatus,
+    warrantyApplicable: part.warrantyApplicable ?? false,
+    warrantyRate: part.warrantyRate ?? undefined,
   };
 }
 
@@ -113,6 +115,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       priceCategoryCode: values.priceCategoryCode ? values.priceCategoryCode : isEdit ? null : undefined,
       // Leave retail blank to let the server derive it from the category.
       retailRate: values.retailRate,
+      // Blank warranty rate falls back to the retail rate on claims.
+      warrantyRate: values.warrantyRate ?? (isEdit ? null : undefined),
       taxCategory: text(values.taxCategory),
       taxForm: text(values.taxForm),
       binLocation: text(values.binLocation),
@@ -250,6 +254,32 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             <input type="checkbox" className="size-4" {...register("taxable")} />
             Taxable
           </label>
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <p className={sectionTitle}>Warranty</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" className="mt-0.5 size-4" {...register("warrantyApplicable")} />
+            <span>
+              <span className="font-semibold">Warranty applicable</span>
+              <span className="block text-xs text-muted-foreground">
+                Only warranty-applicable parts can be charged to warranty or claimed from the manufacturer.
+              </span>
+            </span>
+          </label>
+          <Field label="Warranty rate (₦, optional)" error={errors.warrantyRate?.message}>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              className={inputCls}
+              placeholder="Uses the retail rate when blank"
+              disabled={!watch("warrantyApplicable")}
+              {...register("warrantyRate")}
+            />
+          </Field>
         </div>
       </div>
 

@@ -25,7 +25,7 @@ import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-a
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
 import ModalFame from "@/components/modals/ModalFame";
 import { AppointmentEditForm } from "@/features/appointments/components/AppointmentEditForm";
-import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
+import { CheckInDialog } from "@/features/warranty/components/CheckInDialog";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
@@ -86,7 +86,7 @@ export default function AppointmentDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [showJobCardCreate, setShowJobCardCreate] = useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
 
   if (isLoading) {
     return (
@@ -134,6 +134,11 @@ export default function AppointmentDetailPage() {
 
   function handleStatusTransition() {
     if (!nextStatus) return;
+    // Check-in records the odometer and runs the warranty & campaign check.
+    if (nextStatus === "Checked In") {
+      setShowCheckIn(true);
+      return;
+    }
     update.mutate({ status: nextStatus as Appointment["status"] });
   }
 
@@ -207,14 +212,11 @@ export default function AppointmentDetailPage() {
             </Button>
           )}
           {canCreateJobCard && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowJobCardCreate(true)}
-              className="gap-1.5"
-            >
-              <Wrench className="size-4" />
-              Create Job Card
+            <Button size="sm" variant="outline" asChild className="gap-1.5">
+              <Link href={`/job-cards/new?appointmentId=${appointment.id}`}>
+                <Wrench className="size-4" />
+                Create Job Card
+              </Link>
             </Button>
           )}
           {canCancel && (
@@ -424,21 +426,7 @@ export default function AppointmentDetailPage() {
         />
       </ModalFame>
 
-      <ModalFame
-        isOpen={showJobCardCreate}
-        onClose={() => setShowJobCardCreate(false)}
-        title="Create Job Card"
-      >
-        <JobCardCreateForm
-          onSuccess={() => setShowJobCardCreate(false)}
-          defaultValues={{
-            appointmentId: appointment.id,
-            customerId: appointment.customerId,
-            vehicleId: appointment.vehicleId,
-            branchName: (branch?.name as string) ?? "",
-          }}
-        />
-      </ModalFame>
+      {showCheckIn && <CheckInDialog appointment={appointment} onClose={() => setShowCheckIn(false)} />}
 
       <ConfirmDeleteModal
         isOpen={showDelete}

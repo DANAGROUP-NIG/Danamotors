@@ -2,7 +2,11 @@ import { z } from "zod";
 
 export const createVehicleSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
-  vin: z.string().min(1, "VIN is required"),
+  vin: z
+    .string()
+    .trim()
+    .min(1, "VIN is required")
+    .transform((v) => v.toUpperCase().replace(/[\s-]/g, "")),
   registrationNumber: z
     .string()
     .trim()
@@ -14,9 +18,8 @@ export const createVehicleSchema = z.object({
   year: z.coerce.number().int().optional(),
   trim: z.string().optional(),
   color: z.string().optional(),
-  warrantyProvider: z.string().optional(),
-  warrantyStatus: z.string().optional(),
-  warrantyExpiresAt: z.string().optional(),
+  vehicleModelId: z.string().optional(),
+  warrantyStartDate: z.string().optional(),
   ownershipStatus: z.string().optional(),
 });
 
@@ -32,9 +35,8 @@ export const updateVehicleSchema = z.object({
   year: z.coerce.number().int().optional(),
   trim: z.string().optional(),
   color: z.string().optional(),
-  warrantyProvider: z.string().optional(),
-  warrantyStatus: z.string().optional(),
-  warrantyExpiresAt: z.string().optional(),
+  vehicleModelId: z.string().optional(),
+  warrantyStartDate: z.string().optional(),
   ownershipStatus: z.string().optional(),
 });
 

@@ -3,6 +3,7 @@ export type VehicleCustomer = {
   email: string;
   firstName: string;
   lastName: string;
+  phoneNumber?: string | null;
 };
 
 export type Vehicle = {
@@ -14,9 +15,12 @@ export type Vehicle = {
   year: number | null;
   trim: string | null;
   color: string | null;
-  warrantyProvider: string | null;
-  warrantyStatus: string | null;
-  warrantyExpiresAt: string | null;
+  /** Model master the warranty policy comes from. Coverage itself is calculated by the server. */
+  vehicleModelId?: string | null;
+  vehicleModel?: { id: string; code: string; make: string; name: string } | null;
+  /** Sale / delivery date that starts the warranty. */
+  warrantyStartDate?: string | null;
+  lastRecordedMileage?: number | null;
   ownershipStatus: string | null;
   customer: VehicleCustomer;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
@@ -35,9 +39,9 @@ export type CreateVehiclePayload = {
   year?: number;
   trim?: string;
   color?: string;
-  warrantyProvider?: string;
-  warrantyStatus?: string;
-  warrantyExpiresAt?: string;
+  vehicleModelId?: string | null;
+  /** YYYY-MM-DD; needs warranty:update. */
+  warrantyStartDate?: string | null;
   ownershipStatus?: string;
 };
 

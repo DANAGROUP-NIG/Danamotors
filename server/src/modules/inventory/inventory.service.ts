@@ -408,6 +408,8 @@ export class InventoryService {
     binLocation?: string;
     storeLocation?: string;
     partStatus?: PartStatus;
+    warrantyApplicable?: boolean;
+    warrantyRate?: number | null;
   }) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
       data = { ...data, retailRate: (await this.retailFromCategory(data.unitRate, data.priceCategoryCode)) ?? undefined };
@@ -496,6 +498,8 @@ export class InventoryService {
       binLocation?: string;
       storeLocation?: string;
       partStatus?: PartStatus;
+      warrantyApplicable?: boolean;
+      warrantyRate?: number | null;
     },
   ) {
     const part = await this.inventoryRepository.findPartById(id);

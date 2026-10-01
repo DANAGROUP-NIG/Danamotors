@@ -2,6 +2,7 @@ import { WorkshopRepository } from './workshop.repository';
 import { NotFoundError } from '../../shared/errors/appError';
 import prisma from '../../prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import { applyJobCardUpdate } from '../service/service.service';
 
 export class WorkshopService {
   private workshopRepository: WorkshopRepository;
@@ -92,7 +93,8 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
-    return this.workshopRepository.updateProgress(id, progress, status);
+    // Shared with the job card update so completing a job card always completes its campaign work.
+    return applyJobCardUpdate(id, jobCard.status, { progress, ...(status !== undefined && { status }) });
   }
 
   async updateQC(id: string, qcStatus: string, qcNotes?: string) {

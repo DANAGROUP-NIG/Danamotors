@@ -52,6 +52,8 @@ model Branch {
   srnsSourced    StockReceiptNote[]  @relation("SrnSourceBranch")
 
   notifications Notification[]
+
+  warrantyCases WarrantyCase[]
 }
 
 // ============================================================
@@ -126,6 +128,15 @@ model User {
   creditRequests     CustomerCreditApplication[] @relation("AdvisorCreditRequests")
 
   reviewedEnquiries Enquiry[] @relation("EnquiryReviewedBy")
+
+  warrantyAcknowledgedJobCards JobCard[]                   @relation("JobCardWarrantyAcknowledgedBy")
+  jobCardLinesCreated          JobCardLine[]               @relation("JobCardLineCreatedBy")
+  jobCardLineChargeChanges     JobCardLine[]               @relation("JobCardLineChargeChangedBy")
+  warrantyCasesAssigned        WarrantyCase[]              @relation("WarrantyCaseOfficer")
+  warrantyCasesCreated         WarrantyCase[]              @relation("WarrantyCaseCreatedBy")
+  warrantyCaseStatusEvents     WarrantyCaseStatusHistory[] @relation("WarrantyCaseStatusActor")
+  campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
+  campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
 }
 
 model Role {
@@ -225,6 +236,8 @@ model Customer {
   creditTransactions CustomerCreditTransaction[]
   creditApplications CustomerCreditApplication[]
 
+  warrantyCases WarrantyCase[]
+
   @@index([branchId])
 }
 
@@ -307,6 +320,8 @@ model ServiceAppointment {
   jobCards JobCard[]
   enquiry  Enquiry?
 
+  campaignVehicles CampaignVehicle[]
+
   @@index([serviceId])
   @@index([branchId])
   @@index([customerId])
@@ -354,6 +369,21 @@ model JobCard {
   createdById String?
   createdBy   User?   @relation("CreatedJobCards", fields: [createdById], references: [id], onDelete: SetNull)
 
+  // Odometer reading taken when the job card was opened.
+  mileage Int?
+
+  // Warranty snapshot taken at creation. Later policy or vehicle changes never rewrite it.
+  warrantyStatusAtCreation    WarrantyCoverageStatus?
+  warrantyReasonsAtCreation   String[]                @default([])
+  warrantyExpiresOnAtCreation DateTime?
+  warrantyKmLimitAtCreation   Int?
+  warrantySnapshot            Json?
+  warrantyAcknowledgedById    String?
+  warrantyAcknowledgedBy      User?                   @relation("JobCardWarrantyAcknowledgedBy", fields: [warrantyAcknowledgedById], references: [id], onDelete: SetNull)
+  warrantyAcknowledgedAt      DateTime?
+
+  completedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -363,6 +393,11 @@ model JobCard {
   invoices      Invoice[]
 
   indentLines   BranchIndentLine[] @relation("IndentLineJobCard")
+
+  lines                     JobCardLine[]
+  campaigns                 JobCardCampaign[]
+  warrantyCase              WarrantyCase?
+  completedCampaignVehicles CampaignVehicle[] @relation("CampaignVehicleCompletedBy")
 
   @@index([branchId])
   @@index([customerId])
@@ -455,9 +490,28 @@ model Vehicle {
   trim  String?
   color String?
 
+  // Deprecated free-text warranty fields. No longer read or written by the app:
+  // coverage is calculated (see modules/warranty). Kept until a follow-up
+  // migration drops them, because migrations here are additive only.
   warrantyProvider  String?
   warrantyStatus    String?
   warrantyExpiresAt DateTime?
+
+  // Warranty policy comes from the vehicle model.
+  vehicleModelId String?
+  vehicleModel   VehicleModel? @relation(fields: [vehicleModelId], references: [id], onDelete: SetNull)
+
+  // Sale or delivery date; warranty runs from here.
+  warrantyStartDate   DateTime?
+  // Highest odometer reading seen. Only ever increases (except an audited odometer replacement).
+  lastRecordedMileage Int?
+  lastMileageAt       DateTime?
+
+  // Extended warranty or goodwill that replaces the model policy limits.
+  warrantyOverrideType   WarrantyOverrideType?
+  warrantyOverrideUntil  DateTime?
+  warrantyOverrideKm     Int?
+  warrantyOverrideReason String?
 
   ownershipStatus String?
 
@@ -467,12 +521,15 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  images       VehicleImage[]
-  ownerships   VehicleOwnership[]
-  appointments ServiceAppointment[]
-  jobCards     JobCard[]
+  images           VehicleImage[]
+  ownerships       VehicleOwnership[]
+  appointments     ServiceAppointment[]
+  jobCards         JobCard[]
+  warrantyCases    WarrantyCase[]
+  campaignVehicles CampaignVehicle[]
 
   @@index([customerId])
+  @@index([vehicleModelId])
 }
 
 model VehicleImage {
@@ -536,6 +593,10 @@ model SparePart {
   storeLocation String?
   partStatus    PartStatus @default(ACTIVE)
 
+  // Legacy partmast.WTYAPPLICABLE / warrrate: only these parts can be claimed under warranty.
+  warrantyApplicable Boolean @default(false)
+  warrantyRate       Float?
+
   // --- new: main/alternate relationship ---
   role PartRole @default(MAIN)
   mainPartId String?
@@ -560,6 +621,9 @@ model SparePart {
   mitRequestedLines MaterialInTransitLine[] @relation("MitLineRequestedPart")
   srnLines          StockReceiptLine[]      @relation("SrnLinePart")
   mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
+
+  jobCardLines      JobCardLine[]
+  warrantyCaseLines WarrantyCaseLine[]
 
   @@index([mainPartId])
 }
@@ -772,6 +836,8 @@ model PartIssuance {
 
   returns PartReturn[]
 
+  jobCardLine JobCardLine?
+
   @@index([branchId])
   @@index([sparePartId])
   @@index([jobCardId])
@@ -913,6 +979,9 @@ model Invoice {
   receipts Receipt[]
 
   creditApplications CustomerCreditApplication[]
+
+  // Present on invoices generated from a job card: the CUSTOMER lines that were billed.
+  lines InvoiceLine[]
 
   @@index([customerId])
   @@index([jobCardId])
@@ -1761,4 +1830,499 @@ model MaterialReceiptLine {
 
   @@index([mrnId])
   @@index([mitLineId])
+}
+
+// ============================================================
+// WARRANTY, CHARGE TYPES & CAMPAIGNS
+// ============================================================
+
+enum WarrantyCoverageStatus {
+  ACTIVE
+  EXPIRED_DATE
+  EXPIRED_MILEAGE
+  NOT_COVERED
+  UNKNOWN
+}
+
+enum WarrantyOverrideType {
+  EXTENDED
+  GOODWILL
+}
+
+// Who pays for a job card line. Legacy requisitionpartdetail.warranty: N, W, G, F.
+enum ChargeType {
+  CUSTOMER
+  WARRANTY
+  GOODWILL
+  FREE
+}
+
+enum JobCardLineKind {
+  PART
+  LABOUR
+}
+
+enum WarrantyCaseStatus {
+  OPEN
+  IN_REVIEW
+  SUBMITTED
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  RETURNED
+  SETTLED
+  CLOSED
+}
+
+enum WarrantyLineRole {
+  CAUSAL
+  CONSEQUENTIAL
+}
+
+enum CampaignType {
+  RECALL
+  FREE_FIX
+  SERVICE_CAMPAIGN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum CampaignVehicleStatus {
+  PENDING
+  CONTACTED
+  SCHEDULED
+  COMPLETED
+  NOT_REACHABLE
+  NOT_APPLICABLE
+}
+
+enum ContactChannel {
+  PHONE
+  SMS
+  WHATSAPP
+  EMAIL
+  VISIT
+}
+
+enum ContactOutcome {
+  REACHED
+  NO_ANSWER
+  WRONG_NUMBER
+  CALL_BACK
+  DECLINED
+}
+
+// Vehicle model master with its warranty policy (legacy `model`: warrdays, warrMileage).
+model VehicleModel {
+  id   String @id @default(uuid())
+  code String @unique
+  make String @default("Kia")
+  name String
+
+  warrantyDays    Int?
+  warrantyKm      Int?
+  warrantyCovered Boolean @default(true)
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles  Vehicle[]
+  campaigns CampaignModel[]
+
+  @@unique([make, name])
+}
+
+// A priced part or labour line on a job card, with who pays for it.
+model JobCardLine {
+  id String @id @default(uuid())
+
+  jobCardId String
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  kind JobCardLineKind
+
+  sparePartId String?
+  sparePart   SparePart? @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+
+  // Set for part lines created from a stock issuance (one line per issuance).
+  partIssuanceId String?       @unique
+  partIssuance   PartIssuance? @relation(fields: [partIssuanceId], references: [id], onDelete: SetNull)
+
+  operationCode String?
+  description   String
+  // Quantity for parts, hours for labour.
+  quantity      Float
+  rate          Float
+  amount        Float
+  taxable       Boolean @default(true)
+
+  chargeType ChargeType @default(CUSTOMER)
+
+  // Set when the line is charged to a campaign (FREE).
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  chargeTypeChangedById String?
+  chargeTypeChangedBy   User?     @relation("JobCardLineChargeChangedBy", fields: [chargeTypeChangedById], references: [id], onDelete: SetNull)
+  chargeTypeChangedAt   DateTime?
+  chargeTypeReason      String?
+
+  createdById String?
+  createdBy   User?   @relation("JobCardLineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoiceLines      InvoiceLine[]
+  warrantyCaseLines WarrantyCaseLine[]
+
+  @@index([jobCardId])
+  @@index([campaignId])
+  @@index([sparePartId])
+}
+
+// Snapshot of a billed job card line on a customer invoice.
+model InvoiceLine {
+  id String @id @default(uuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  jobCardLineId String?
+  jobCardLine   JobCardLine? @relation(fields: [jobCardLineId], references: [id], onDelete: SetNull)
+
+  kind        JobCardLineKind
+  description String
+  quantity    Float
+  rate        Float
+  amount      Float
+  taxable     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([jobCardLineId])
+}
+
+// ── Warranty claim codes (legacy warrcomp, warrdef, warrpos, warrrej) ──
+
+model WarrantyComplaintCode {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  description String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases WarrantyCase[]
+}
+
+model WarrantyDefectCode {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  description String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines WarrantyCaseLine[]
+}
+
+model WarrantyPositionCode {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  description String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines WarrantyCaseLine[]
+}
+
+model WarrantyRejectReason {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  description String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases WarrantyCase[]
+}
+
+// A warranty claim, from the job card to manufacturer settlement.
+model WarrantyCase {
+  id         String @id @default(uuid())
+  caseNumber String @unique
+
+  // One case per job card, so the automatic open is idempotent.
+  jobCardId String?  @unique
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  status              WarrantyCaseStatus @default(OPEN)
+  openedAutomatically Boolean            @default(false)
+
+  complaintCodeId String?
+  complaintCode   WarrantyComplaintCode? @relation(fields: [complaintCodeId], references: [id], onDelete: SetNull)
+  complaint       String?
+
+  // Mileage and coverage when the case was opened.
+  mileage        Int?
+  coverageStatus WarrantyCoverageStatus?
+
+  manufacturerClaimNo   String?
+  manufacturerClaimDate DateTime?
+  submittedAt           DateTime?
+  decisionAt            DateTime?
+
+  rejectReasonId String?
+  rejectReason   WarrantyRejectReason? @relation(fields: [rejectReasonId], references: [id], onDelete: SetNull)
+
+  claimedAmount  Float  @default(0)
+  approvedAmount Float?
+
+  settledAt     DateTime?
+  settlementRef String?
+  settledAmount Float?
+  closedAt      DateTime?
+
+  assignedOfficerId String?
+  assignedOfficer   User?   @relation("WarrantyCaseOfficer", fields: [assignedOfficerId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("WarrantyCaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines         WarrantyCaseLine[]
+  statusHistory WarrantyCaseStatusHistory[]
+
+  @@index([branchId, status])
+  @@index([status, createdAt])
+  @@index([vehicleId])
+  @@index([manufacturerClaimNo])
+}
+
+model WarrantyCaseLine {
+  id String @id @default(uuid())
+
+  caseId String
+  case   WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  seq  Int
+  kind JobCardLineKind
+  // Parts only: the failed (causal) part or a part damaged as a result (consequential).
+  role WarrantyLineRole?
+
+  sparePartId String?
+  sparePart   SparePart? @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+
+  partNumber    String?
+  operationCode String?
+  description   String
+
+  defectCodeId String?
+  defectCode   WarrantyDefectCode? @relation(fields: [defectCodeId], references: [id], onDelete: SetNull)
+
+  positionCodeId String?
+  positionCode   WarrantyPositionCode? @relation(fields: [positionCodeId], references: [id], onDelete: SetNull)
+
+  batchNo String?
+
+  // Quantity for parts, hours for labour.
+  quantity        Float
+  rate            Float
+  claimedAmount   Float
+  approvalPercent Float  @default(100)
+  approvedAmount  Float?
+
+  jobCardLineId String?
+  jobCardLine   JobCardLine? @relation(fields: [jobCardLineId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([caseId, seq])
+  @@index([jobCardLineId])
+}
+
+model WarrantyCaseStatusHistory {
+  id     String       @id @default(uuid())
+  caseId String
+  case   WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  fromStatus WarrantyCaseStatus?
+  toStatus   WarrantyCaseStatus
+
+  actorId String?
+  actor   User?   @relation("WarrantyCaseStatusActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  remarks   String?
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+// Recall, free fix or service campaign targeted by VIN.
+model Campaign {
+  id     String         @id @default(uuid())
+  code   String         @unique
+  title  String
+  type   CampaignType
+  status CampaignStatus @default(DRAFT)
+
+  description       String?
+  defectDescription String?
+
+  startDate DateTime
+  endDate   DateTime?
+
+  labourCovered Boolean @default(true)
+  partsCovered  Boolean @default(true)
+
+  activatedAt DateTime?
+  closedAt    DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("CampaignCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  models       CampaignModel[]
+  coveredItems CampaignCoveredItem[]
+  vehicles     CampaignVehicle[]
+  jobCards     JobCardCampaign[]
+  jobCardLines JobCardLine[]
+
+  @@index([status, type])
+}
+
+model CampaignModel {
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vehicleModelId String
+  vehicleModel   VehicleModel @relation(fields: [vehicleModelId], references: [id], onDelete: Cascade)
+
+  yearFrom Int?
+  yearTo   Int?
+
+  @@id([campaignId, vehicleModelId])
+  @@index([vehicleModelId])
+}
+
+// Part or labour covered by a campaign. `partNumber` may end in x or * to match a prefix (91200-D3xxx).
+model CampaignCoveredItem {
+  id String @id @default(uuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  kind          JobCardLineKind
+  partNumber    String?
+  operationCode String?
+  description   String
+  maxQuantity   Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([campaignId])
+}
+
+// An affected vehicle. Keyed by VIN so manufacturer lists can include vehicles not yet in the system.
+model CampaignVehicle {
+  id String @id @default(uuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vin       String
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  status CampaignVehicleStatus @default(PENDING)
+
+  contactAttempts    Int             @default(0)
+  lastContactAt      DateTime?
+  lastContactOutcome ContactOutcome?
+  nextFollowUpAt     DateTime?
+
+  contactedAt DateTime?
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  appointmentId String?
+  appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  completedJobCardId String?
+  completedJobCard   JobCard? @relation("CampaignVehicleCompletedBy", fields: [completedJobCardId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contactLogs CampaignContactLog[]
+
+  @@unique([campaignId, vin])
+  @@index([vehicleId])
+  @@index([vin])
+  @@index([campaignId, status])
+}
+
+model CampaignContactLog {
+  id String @id @default(uuid())
+
+  campaignVehicleId String
+  campaignVehicle   CampaignVehicle @relation(fields: [campaignVehicleId], references: [id], onDelete: Cascade)
+
+  channel        ContactChannel
+  outcome        ContactOutcome
+  notes          String?
+  nextFollowUpAt DateTime?
+
+  actorId String?
+  actor   User?   @relation("CampaignContactActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([campaignVehicleId, createdAt])
+}
+
+// Campaigns a job card was opened for, snapshotted at creation.
+model JobCardCampaign {
+  jobCardId String
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+
+  campaignCode  String
+  campaignTitle String
+  campaignType  CampaignType
+
+  createdAt DateTime @default(now())
+
+  @@id([jobCardId, campaignId])
+  @@index([campaignId])
 }

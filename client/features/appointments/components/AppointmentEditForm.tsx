@@ -85,12 +85,18 @@ export function AppointmentEditForm({
         </Field>
         <Field label="Status" error={errors.status?.message}>
           <select className={inputCls} {...register("status")}>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
+            {STATUS_OPTIONS
+              // Checking in records the odometer and runs the warranty check, so it has its own dialog.
+              .filter((s) => s.value !== "Checked In" || appointment.status === "Checked In")
+              .map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
           </select>
+          {appointment.status === "Pending" && (
+            <span className="text-xs text-muted-foreground">Use “Mark as Checked In” to check the vehicle in.</span>
+          )}
         </Field>
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
           <input

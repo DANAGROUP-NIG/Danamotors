@@ -275,6 +275,14 @@ export function PartDetail({ id }: { id: string }) {
             <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
             <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
             <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />
+            <DetailField
+              label="Warranty"
+              value={
+                part.warrantyApplicable
+                  ? `Applicable${part.warrantyRate != null ? ` · ${fmtNaira(part.warrantyRate)}` : ""}`
+                  : "Not applicable"
+              }
+            />
             <DetailField label="Description" value={part.description} />
           </div>
         </div>

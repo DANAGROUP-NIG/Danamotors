@@ -1,7 +1,8 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { VehicleRepository } from './vehicle.repository';
-import { NotFoundError, ConflictError } from '../../shared/errors/appError';
+import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
+import { linkCampaignVehiclesByVin } from '../campaign/campaign.hooks';
 
 export class VehicleService {
   private vehicleRepository: VehicleRepository;
@@ -31,9 +32,9 @@ export class VehicleService {
         year: vehicle.year,
         trim: vehicle.trim,
         color: vehicle.color,
-        warrantyProvider: vehicle.warrantyProvider,
-        warrantyStatus: vehicle.warrantyStatus,
-        warrantyExpiresAt: vehicle.warrantyExpiresAt,
+        vehicleModelId: vehicle.vehicleModelId,
+        warrantyStartDate: vehicle.warrantyStartDate,
+        lastRecordedMileage: vehicle.lastRecordedMileage,
         ownershipStatus: vehicle.ownershipStatus,
         customer: {
           id: vehicle.customer.id,
@@ -70,15 +71,22 @@ export class VehicleService {
       year: vehicle.year,
       trim: vehicle.trim,
       color: vehicle.color,
-      warrantyProvider: vehicle.warrantyProvider,
-      warrantyStatus: vehicle.warrantyStatus,
-      warrantyExpiresAt: vehicle.warrantyExpiresAt,
+      vehicleModelId: vehicle.vehicleModelId,
+      vehicleModel: vehicle.vehicleModel,
+      warrantyStartDate: vehicle.warrantyStartDate,
+      lastRecordedMileage: vehicle.lastRecordedMileage,
+      lastMileageAt: vehicle.lastMileageAt,
+      warrantyOverrideType: vehicle.warrantyOverrideType,
+      warrantyOverrideUntil: vehicle.warrantyOverrideUntil,
+      warrantyOverrideKm: vehicle.warrantyOverrideKm,
+      warrantyOverrideReason: vehicle.warrantyOverrideReason,
       ownershipStatus: vehicle.ownershipStatus,
       customer: {
         id: vehicle.customer.id,
         email: vehicle.customer.email,
         firstName: vehicle.customer.firstName,
         lastName: vehicle.customer.lastName,
+        phoneNumber: vehicle.customer.phoneNumber,
         branchId: vehicle.customer.branchId,
       },
       images: vehicle.images,
@@ -97,9 +105,8 @@ export class VehicleService {
     year?: number;
     trim?: string;
     color?: string;
-    warrantyProvider?: string;
-    warrantyStatus?: string;
-    warrantyExpiresAt?: string;
+    vehicleModelId?: string | null;
+    warrantyStartDate?: Date | null;
     ownershipStatus?: string;
     createdById?: string;
   }) {
@@ -122,7 +129,8 @@ export class VehicleService {
       }
     }
 
-    return this.vehicleRepository.createVehicle({
+    await this.assertWarrantyInputs(data);
+    const created = await this.vehicleRepository.createVehicle({
       customerId: data.customerId,
       vin: data.vin,
       registrationNumber: data.registrationNumber
@@ -133,12 +141,14 @@ export class VehicleService {
       year: data.year,
       trim: data.trim,
       color: data.color,
-      warrantyProvider: data.warrantyProvider,
-      warrantyStatus: data.warrantyStatus,
-      warrantyExpiresAt: data.warrantyExpiresAt ? new Date(data.warrantyExpiresAt) : undefined,
+      vehicleModelId: data.vehicleModelId ?? undefined,
+      warrantyStartDate: data.warrantyStartDate ?? undefined,
       ownershipStatus: data.ownershipStatus,
       createdById: data.createdById,
     });
+    // Campaign rows added by VIN before the vehicle was registered now point to it.
+    await linkCampaignVehiclesByVin(prisma, created);
+    return created;
   }
 
   async updateVehicle(id: string, data: {
@@ -148,9 +158,8 @@ export class VehicleService {
     year?: number;
     trim?: string;
     color?: string;
-    warrantyProvider?: string;
-    warrantyStatus?: string;
-    warrantyExpiresAt?: string;
+    vehicleModelId?: string | null;
+    warrantyStartDate?: Date | null;
     ownershipStatus?: string;
   }) {
     const vehicle = await this.vehicleRepository.findVehicleById(id);
@@ -158,6 +167,7 @@ export class VehicleService {
       throw new NotFoundError('Vehicle not found');
     }
 
+    await this.assertWarrantyInputs(data);
     return this.vehicleRepository.updateVehicle(id, {
       registrationNumber: data.registrationNumber
         ? data.registrationNumber.toUpperCase()
@@ -167,11 +177,20 @@ export class VehicleService {
       year: data.year,
       trim: data.trim,
       color: data.color,
-      warrantyProvider: data.warrantyProvider,
-      warrantyStatus: data.warrantyStatus,
-      warrantyExpiresAt: data.warrantyExpiresAt ? new Date(data.warrantyExpiresAt) : undefined,
+      vehicleModelId: data.vehicleModelId,
+      warrantyStartDate: data.warrantyStartDate,
       ownershipStatus: data.ownershipStatus,
     });
+  }
+
+  private async assertWarrantyInputs(data: { vehicleModelId?: string | null; warrantyStartDate?: Date | null }) {
+    if (data.vehicleModelId) {
+      const model = await prisma.vehicleModel.findUnique({ where: { id: data.vehicleModelId }, select: { isActive: true } });
+      if (!model?.isActive) throw new BadRequestError('Choose an active vehicle model');
+    }
+    if (data.warrantyStartDate && data.warrantyStartDate.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+      throw new BadRequestError('The sale date cannot be in the future');
+    }
   }
 
   async deleteVehicle(id: string) {
