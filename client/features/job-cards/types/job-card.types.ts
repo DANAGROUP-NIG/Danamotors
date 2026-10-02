@@ -1,4 +1,5 @@
-export type JobCardStatus = "pending" | "in_progress" | "completed" | "on_hold" | "cancelled";
+import type { JobCardStatus } from "./job-card-status";
+export type { JobCardStatus } from "./job-card-status";
 
 export type Inspection = {
   id: string;
@@ -98,7 +99,37 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  labourLines?: { labourItem: { description: string } }[];
+  tyres?: { make: string; number: string }[] | null;
+  batteryMake?: string | null;
+  batteryNumber?: string | null;
+  customField1?: string | null;
+  checklist?: string | null;
+  remarks?: string | null;
+  serviceAdvisor?: { firstName: string; lastName: string } | null;
+  deliveryAdvisor?: { firstName: string; lastName: string } | null;
+  estimatedParts?: number | null;
+  estimatedOil?: number | null;
+  estimatedLabour?: number | null;
+  serviceCharge?: number | null;
   id: string;
+  mileage?: number | null;
+  promisedAt?: string | null;
+  readyAt?: string | null;
+  deliveredAt?: string | null;
+  gatePassNumber?: string | null;
+  serviceType?: { description: string } | null;
+  bay?: { description: string } | null;
+  team?: { description: string } | null;
+  serviceAdvisorId?: string | null;
+  creditApprovedById?: string | null;
+  observations?: string | null;
+  workDone?: string | null;
+  previousJob?: { id: string; jobNumber: string; technician?: { firstName: string; lastName: string } | null } | null;
+  isRepeat?: boolean;
+  repeatReason?: string | null;
+  complaints?: { id: string; description: string; defectCode?: string | null; spare?: number; oil?: number; labour?: number }[];
+  statusHistory?: { id: string; fromStatus?: string; toStatus: string; createdAt: string; remarks?: string; actor: { firstName: string; lastName: string } }[];
   jobNumber: string;
   description: string;
   status: JobCardStatus;
@@ -119,6 +150,7 @@ export type JobCard = {
   qualityInspector?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
+  billedAt?: string | null;
   appointment?: JobCardAppointment;
   branch: JobCardBranch;
   customer: JobCardCustomer;

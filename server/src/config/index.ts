@@ -21,6 +21,7 @@ const envSchema = z.object({
     .min(8, "JWT_REFRESH_SECRET must be at least 8 characters long"),
   JWT_ACCESS_EXPIRATION: z.string().default("15m"),
   JWT_REFRESH_EXPIRATION: z.string().default("7d"),
+  JOB_BILL_VAT_RATE: z.coerce.number().min(0).max(100).default(7.5),
 });
 
 const parsed = envSchema.safeParse(process.env);

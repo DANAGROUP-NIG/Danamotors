@@ -1,11 +1,12 @@
 "use client";
+import { VehicleCustomerField } from "./VehicleCustomerField";
+import { VehicleModelFields } from "./VehicleModelFields";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Search,
   Plus,
   Check,
   ChevronDown,
@@ -15,8 +16,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { useQueryClient } from "@tanstack/react-query";
-import { vehicleKeys } from "@/features/vehicles/api/vehicle.keys";
 import { useAllVehicles } from "@/features/appointments/hooks/use-all-vehicles";
 import { useCreateVehicle } from "@/features/vehicles/hooks/use-create-vehicle";
 import {
@@ -62,7 +61,6 @@ export function VehicleSelectWithCreate({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     setMounted(true);
@@ -79,11 +77,11 @@ export function VehicleSelectWithCreate({
   const selectedVehicle = useMemo(() => {
     return (
       vehicles.find((v) => v.id === value) ??
-      (lastCreatedVehicleRef.current?.id === value
+      (lastCreatedVehicleRef.current?.id === value && (!customerId || lastCreatedVehicleRef.current?.customer?.id === customerId)
         ? lastCreatedVehicleRef.current
         : null)
     );
-  }, [vehicles, value]);
+  }, [vehicles, value, customerId]);
 
   // Filtered vehicle list based on typing
   const filteredVehicles = useMemo(() => {
@@ -141,6 +139,8 @@ export function VehicleSelectWithCreate({
   // Inline Vehicle Form setup
   const {
     register: registerVehicle,
+    setValue,
+    watch: watchVehicle,
     handleSubmit: handleSubmitVehicle,
     reset: resetVehicleForm,
     formState: { errors: vehicleErrors },
@@ -162,7 +162,9 @@ export function VehicleSelectWithCreate({
       vin: "",
       registrationNumber: initialVehicle?.registrationNumber ?? searchQuery.trim() ?? "",
       make: initialVehicle?.make ?? searchQuery.split(" ")[0] ?? "",
-      model: initialVehicle?.model ?? searchQuery.split(" ").slice(1).join(" ") ?? "",
+      model: initialVehicle?.model ?? "",
+      customModel: initialVehicle?.model ?? "",
+      customMake: initialVehicle?.make ?? "",
       year: initialVehicle?.year,
       trim: "",
       color: "",
@@ -174,14 +176,14 @@ export function VehicleSelectWithCreate({
   }, [customerId, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineVehicle(values: CreateVehicleFormValues) {
-    if (!customerId) return;
+    if (!customerId || values.customerId !== customerId) return;
     const payload = {
       ...values,
       customerId,
     };
     createVehicleMutation.mutate(payload, {
-      onSuccess: async (res: any) => {
-        const createdVehicle: Vehicle = res?.vehicle || res;
+      onSuccess: (res) => {
+        const createdVehicle = res.vehicle;
         if (createdVehicle?.id) {
           const formattedVehicle: Vehicle = {
             ...createdVehicle,
@@ -193,32 +195,9 @@ export function VehicleSelectWithCreate({
             },
           };
 
-          queryClient.setQueriesData(
-            { queryKey: [...vehicleKeys.all, "all"] },
-            (old: any) => {
-              if (!old) return [formattedVehicle];
-              if (Array.isArray(old)) {
-                if (old.some((v) => v?.id === formattedVehicle.id)) return old;
-                return [formattedVehicle, ...old];
-              }
-              if (typeof old === "object" && Array.isArray(old.vehicles)) {
-                if (
-                  old.vehicles.some((v: any) => v?.id === formattedVehicle.id)
-                )
-                  return old;
-                return {
-                  ...old,
-                  vehicles: [formattedVehicle, ...old.vehicles],
-                };
-              }
-              return [formattedVehicle];
-            },
-          );
-
-          await queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
-
           lastCreatedVehicleRef.current = formattedVehicle;
           onChange(createdVehicle.id);
+          onVehicleSelect?.(formattedVehicle);
         }
         setShowInlineCreate(false);
         setIsOpen(false);
@@ -453,6 +432,7 @@ export function VehicleSelectWithCreate({
               </div>
 
               <div className="grid gap-3.5">
+                <VehicleCustomerField value={customerId} readOnly branchId={branchId} />
                 <Field
                   label="Registration number (Reg No)"
                   error={vehicleErrors.registrationNumber?.message}
@@ -464,58 +444,13 @@ export function VehicleSelectWithCreate({
                   />
                 </Field>
 
+                <div><VehicleModelFields value={{ modelId: watchVehicle("modelId"), customModel: watchVehicle("customModel"), customMake: watchVehicle("customMake"), generationId: watchVehicle("generationId"), engineId: watchVehicle("engineId") }} onChange={next => { for (const key of ["modelId", "customModel", "customMake", "generationId", "engineId"] as const) setValue(key, next[key], { shouldDirty: true, shouldValidate: true }); }} error={vehicleErrors.customModel?.message || vehicleErrors.modelId?.message} /></div>
                 <Field label="VIN" error={vehicleErrors.vin?.message}>
-                  <input
-                    className={inputCls}
-                    placeholder="Vehicle Identification Number"
-                    {...registerVehicle("vin")}
-                  />
+                  <input className={inputCls} placeholder="Vehicle identification number" {...registerVehicle("vin")} />
                 </Field>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Make" error={vehicleErrors.make?.message}>
-                    <input
-                      className={inputCls}
-                      placeholder="Toyota"
-                      {...registerVehicle("make")}
-                    />
-                  </Field>
-                  <Field label="Model" error={vehicleErrors.model?.message}>
-                    <input
-                      className={inputCls}
-                      placeholder="Corolla"
-                      {...registerVehicle("model")}
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label="Year" error={vehicleErrors.year?.message}>
-                    <input
-                      type="number"
-                      className={inputCls}
-                      placeholder="2022"
-                      {...registerVehicle("year")}
-                    />
-                  </Field>
-                  <Field
-                    label="Trim (optional)"
-                    error={vehicleErrors.trim?.message}
-                  >
-                    <input
-                      className={inputCls}
-                      placeholder="SE"
-                      {...registerVehicle("trim")}
-                    />
-                  </Field>
-                  <Field label="Color" error={vehicleErrors.color?.message}>
-                    <input
-                      className={inputCls}
-                      placeholder="Silver"
-                      {...registerVehicle("color")}
-                    />
-                  </Field>
-                </div>
+                <Field label="Year" error={vehicleErrors.year?.message}>
+                  <input type="number" className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
+                </Field>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-border mt-2">
                   <Button

@@ -21,6 +21,7 @@ danamotors/
 | [architecture.md](./architecture.md) | System overview, monorepo structure, backend layering, frontend structure |
 | [backend.md](./backend.md) | Backend modules, REST API routes, auth model, branch isolation, error handling |
 | [frontend.md](./frontend.md) | Frontend routes, feature folders, data fetching, state, auth flow |
+| [vehicle-catalog.md](./vehicle-catalog.md) | Kia catalogue seed, vehicle search, data assumptions and verification |
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MIT, SRN |
@@ -48,3 +49,5 @@ Open [http://localhost:3000](http://localhost:3000). The API health check is at
 ## Author
 
 Built by **buildwithzeke** (Aye Oluwaseyi) — <ayeoluwaseyi@gmail.com>
+
+- [Workshop: customers, vehicles and job cards](workshop.md) ? workflow, migration, APIs and #64 dependency.

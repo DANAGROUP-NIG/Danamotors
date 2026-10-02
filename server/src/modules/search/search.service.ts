@@ -3,7 +3,7 @@ import prisma from '../../prisma/client';
 const TAKE_PER_CATEGORY = 5;
 
 export interface SearchResult {
-  customers: { id: string; name: string; email: string }[];
+  customers: { id: string; name: string; email: string | null }[];
   vehicles: { id: string; label: string; sublabel: string }[];
   jobCards: { id: string; label: string; sublabel: string }[];
   spareParts: { id: string; label: string; sublabel: string }[];

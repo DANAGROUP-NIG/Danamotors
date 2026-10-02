@@ -25,7 +25,7 @@ import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-a
 import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-appointment";
 import ModalFame from "@/components/modals/ModalFame";
 import { AppointmentEditForm } from "@/features/appointments/components/AppointmentEditForm";
-import { JobCardCreateForm } from "@/features/job-cards/components/JobCardCreateForm";
+import { JobCardOpeningModal } from "@/features/job-cards/components/JobCardOpeningModal";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
@@ -424,21 +424,9 @@ export default function AppointmentDetailPage() {
         />
       </ModalFame>
 
-      <ModalFame
-        isOpen={showJobCardCreate}
-        onClose={() => setShowJobCardCreate(false)}
-        title="Create Job Card"
-      >
-        <JobCardCreateForm
-          onSuccess={() => setShowJobCardCreate(false)}
-          defaultValues={{
-            appointmentId: appointment.id,
-            customerId: appointment.customerId,
-            vehicleId: appointment.vehicleId,
-            branchName: (branch?.name as string) ?? "",
-          }}
-        />
-      </ModalFame>
+      <JobCardOpeningModal isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} defaultValues={{
+        appointmentId: appointment.id, customerId: appointment.customerId, vehicleId: appointment.vehicleId, branchName: (branch?.name as string) ?? "",
+      }} />
 
       <ConfirmDeleteModal
         isOpen={showDelete}

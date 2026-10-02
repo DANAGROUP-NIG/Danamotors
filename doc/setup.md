@@ -20,6 +20,7 @@
 | `JWT_REFRESH_SECRET` | Secret used to sign refresh tokens | *(required, ≥ 8 chars)* |
 | `JWT_ACCESS_EXPIRATION` | Access token lifetime | `15m` |
 | `JWT_REFRESH_EXPIRATION` | Refresh token lifetime | `7d` |
+| `JOB_BILL_VAT_RATE` | VAT percentage applied to discounted job-card labour | `7.5` |
 | `CLIENT_URL` | Frontend origin used when building password-reset links | `http://localhost:3000` |
 
 The environment is validated on boot by a Zod schema in `server/src/config/index.ts`;

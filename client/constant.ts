@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   PackageSearch,
   Ship,
+  Landmark,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -175,6 +176,18 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: ["invoice:read"],
       },
       {
+        label: "Tally",
+        href: "/finance/tally",
+        icon: Landmark,
+        permissions: ["tally:post", "tally:import"],
+      },
+      {
+        label: "Labour Catalogue",
+        href: "/labour-catalogue",
+        icon: ListChecks,
+        permissions: ["labour-item:read"],
+      },
+      {
         label: "Credit Applications",
         href: "/credit-applications",
         icon: Wallet,
@@ -189,7 +202,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read"],
+        permissions: ["financereport:read", "report:receipt-register"],
       },
     ],
   },

@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { VehicleHistoryCard } from "@/features/vehicles/components/VehicleHistoryCard";
 import { useVehicle } from "@/features/vehicles";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -57,6 +58,7 @@ export default function VehicleDetailPage() {
           )}
         </div>
       </div>
+      <VehicleHistoryCard vehicle={vehicle} />
     </div>
   );
 }

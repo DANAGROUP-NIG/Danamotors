@@ -8,6 +8,7 @@ export type AppRole =
   | "branchstoremanager"
   | "workshopmanager"
   | "accountant"
+  | "billingofficer"
   | "serviceadviser"
   | "technician"
   | "receptionist"
@@ -48,6 +49,7 @@ export const FINANCE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "accountant",
+  "billingofficer",
   "serviceadviser",
 ];
 
@@ -74,6 +76,7 @@ export const MANAGE_ROLES: AppRole[] = [
 export const CUSTOMER_ROLES: AppRole[] = [
   "superadmin",
   "admin",
+  "billingofficer",
   "serviceadviser",
   "receptionist",
   "receptionmanager",

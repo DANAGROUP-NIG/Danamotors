@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import ModalFame from "@/components/modals/ModalFame";
-import { JobCardCreateForm } from "@/features/job-cards";
+import { JobCardOpeningModal } from "@/features/job-cards/components/JobCardOpeningModal";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
 import ReceptionManagerDashboard from "@/features/dashboard/components/ReceptionManagerDashboard";
 import StoreManagerDashboard from "@/features/dashboard/components/StoreManagerDashboard";
@@ -326,13 +326,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <ModalFame
-        isOpen={showNewJobCard}
-        onClose={() => setShowNewJobCard(false)}
-        title="Create Job Card"
-      >
-        <JobCardCreateForm onSuccess={() => setShowNewJobCard(false)} />
-      </ModalFame>
+      <JobCardOpeningModal isOpen={showNewJobCard} onClose={() => setShowNewJobCard(false)} />
     </>
   );
 }

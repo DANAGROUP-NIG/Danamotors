@@ -1,3 +1,8 @@
+import { Prisma } from '@prisma/client';
+import { canonicalJobStatus } from './job-card-workflow.service';
+import { z } from 'zod';
+import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
+import { JobCardWorkflowService } from './job-card-workflow.service';
 import prisma from '../../prisma/client';
 import { ServiceRepository } from './service.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
@@ -282,50 +287,8 @@ export class ServiceService {
     await this.serviceRepository.deleteAppointment(id);
   }
 
-  async createJobCard(data: {
-    appointmentId?: string;
-    customerId?: string;
-    vehicleId?: string;
-    branchName: string;
-    jobNumber: string;
-    description: string;
-    status?: string;
-    estimatedHours?: number;
-    estimatedCost?: number;
-    assignedTo?: string;
-    createdById?: string;
-  }) {
-    if (data.appointmentId) {
-      const appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
-      if (!appointment) throw new NotFoundError('Appointment not found');
-    }
-
-    if (data.customerId) {
-      const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-      if (!customer) throw new NotFoundError('Customer not found');
-    }
-
-    if (data.vehicleId) {
-      const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-      if (!vehicle) throw new NotFoundError('Vehicle not found');
-    }
-
-    const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
-    if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
-
-    return this.serviceRepository.createJobCard({
-      appointmentId: data.appointmentId,
-      customerId: data.customerId,
-      vehicleId: data.vehicleId,
-      branchId: branch.id,
-      jobNumber: data.jobNumber,
-      description: data.description,
-      status: data.status,
-      estimatedHours: data.estimatedHours,
-      estimatedCost: data.estimatedCost,
-      assignedTo: data.assignedTo,
-      createdById: data.createdById,
-    });
+  async createJobCard(data: z.infer<typeof jobOpeningBody> & { createdById?: string }) {
+    return new JobCardWorkflowService().open(data);
   }
 
   async listJobCards(params?: {
@@ -349,6 +312,8 @@ export class ServiceService {
     if (params?.search) {
       where.OR = [
         { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { description: { contains: params.search, mode: 'insensitive' } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
@@ -361,7 +326,7 @@ export class ServiceService {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     const [jobCards, total] = await Promise.all([
@@ -389,22 +354,8 @@ export class ServiceService {
     return card;
   }
 
-  async updateJobCard(id: string, data: {
-    appointmentId?: string;
-    customerId?: string;
-    vehicleId?: string;
-    description?: string;
-    status?: string;
-    estimatedHours?: number;
-    estimatedCost?: number;
-    assignedTo?: string;
-  }) {
-    const card = await this.serviceRepository.findJobCardById(id);
-    if (!card) {
-      throw new NotFoundError('Job card not found');
-    }
-
-    return this.serviceRepository.updateJobCard(id, data);
+  async updateJobCard(id: string, data: z.infer<typeof jobUpdateBody>, actorId?: string) {
+    return new JobCardWorkflowService().update(id, data, actorId);
   }
 
   async addInspection(jobCardId: string, data: {
@@ -429,36 +380,39 @@ export class ServiceService {
     });
   }
 
-  async addEstimate(jobCardId: string, data: {
-    description: string;
-    amount: number;
-    currency?: string;
-    status?: string;
-  }) {
-    const card = await this.serviceRepository.findJobCardById(jobCardId);
-    if (!card) {
-      throw new NotFoundError('Job card not found');
-    }
-
-    const estimate = await this.serviceRepository.addEstimate({
-      jobCardId,
-      description: data.description,
-      amount: data.amount,
-      currency: data.currency,
-      status: data.status,
+  async addEstimate(jobCardId: string, input: z.infer<typeof estimateBody>) {
+    const data = estimateBody.parse(input);
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
+      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { vehicle: { include: { catalogue: true } } } });
+      if (!card) throw new NotFoundError('Job card not found');
+      if (card.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to open jobs');
+      const lines = [];
+      for (const line of data.lines) {
+        let description = line.description ?? '';
+        let rate = 0;
+        let quantity = line.quantity;
+        if (line.type === 'PART') {
+          const part = line.referenceId ? await tx.sparePart.findUnique({ where: { id: line.referenceId } }) : null;
+          if (!part) throw new BadRequestError('Select a part');
+          description = part.name; rate = part.unitPrice;
+        } else if (line.type === 'LABOUR') {
+          const item = line.referenceId ? await tx.labourItem.findFirst({ where: { id: line.referenceId, active: true } }) : null;
+          if (!item) throw new BadRequestError('Select an active labour operation');
+          const modelId = card.vehicle?.catalogue?.parentId;
+          const modelRate = modelId ? await tx.labourRate.findFirst({ where: { labourItemId: item.id, modelId, active: true } }) : null;
+          description = item.description; rate = modelRate?.rate ?? item.rate;
+          quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
+        } else if (line.referenceId) {
+          const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
+          if (!complaint) throw new BadRequestError('Complaint must belong to this job');
+          description = complaint.description;
+        }
+        if (!description) throw new BadRequestError('Complaint description is required');
+        lines.push({ ...line, description, rate, quantity, amount: Math.round(quantity * rate * 100) / 100 });
+      }
+      return tx.estimate.create({ data: { jobCardId, description: data.description, currency: 'NGN', amount: lines.reduce((sum, line) => sum + line.amount, 0), lines: { create: lines } }, include: { lines: true } });
     });
-
-    const notificationService = new NotificationService();
-    const payload = {
-      type: 'ESTIMATE_CREATED',
-      title: 'New estimate created',
-      message: `An estimate for job card ${card.jobNumber} was created (${data.currency ?? 'NGN'} ${data.amount}).`,
-      link: `/job-cards/${jobCardId}`,
-    };
-    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, card.branchId, payload);
-    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, card.branchId, payload);
-
-    return estimate;
   }
 
   async addApproval(estimateId: string, data: {
@@ -468,30 +422,15 @@ export class ServiceService {
     comments?: string;
     status?: string;
   }) {
-    const estimate = await prisma.estimate.findUnique({ where: { id: estimateId } });
-    if (!estimate) {
-      throw new NotFoundError('Estimate not found');
-    }
-
-    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-    if (!customer) {
-      throw new NotFoundError('Customer not found');
-    }
-
-    const existingApproval = await prisma.customerApproval.findFirst({
-      where: { estimateId, customerId: data.customerId },
-    });
-    if (existingApproval) {
-      throw new ConflictError('Approval already exists for this customer and estimate');
-    }
-
-    return this.serviceRepository.addApproval({
-      estimateId,
-      customerId: data.customerId,
-      approved: data.approved,
-      decisionDate: data.decisionDate ? new Date(data.decisionDate) : undefined,
-      comments: data.comments,
-      status: data.status,
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "Estimate" WHERE id = ${estimateId} FOR UPDATE`);
+      const estimate = await tx.estimate.findUnique({ where: { id: estimateId }, include: { jobCard: true } });
+      if (!estimate) throw new NotFoundError('Estimate not found');
+      if (estimate.jobCard.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
+      if (await tx.customerApproval.count({ where: { estimateId } })) throw new ConflictError('An approval decision has already been recorded');
+      const status = data.approved ? 'Approved' : 'Declined';
+      await tx.estimate.update({ where: { id: estimateId }, data: { status } });
+      return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
     });
   }
 

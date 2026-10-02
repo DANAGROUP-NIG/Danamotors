@@ -804,36 +804,44 @@ export class InventoryService {
       }
     }
 
-    const updatedStock = await this.inventoryRepository.decrementInventoryStock(
-      data.branchId,
-      data.sparePartId,
-      data.quantity,
-    );
-    await this.inventoryRepository.createStockTransaction({
-      branchId: data.branchId,
-      partId: data.sparePartId,
-      type: "ISSUED",
-      quantity: -data.quantity,
-      referenceId: data.jobCardId,
-      notes: data.notes,
-      recordedById: data.issuedById,
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.inventoryStock.updateMany({
+        where: {
+          branchId: data.branchId,
+          partId: data.sparePartId,
+          quantity: { gte: data.quantity },
+        },
+        data: { quantity: { decrement: data.quantity } },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestError("Insufficient stock at this branch");
+      }
+
+      const issuance = await tx.partIssuance.create({ data });
+      await tx.stockTransaction.create({
+        data: {
+          branchId: data.branchId,
+          partId: data.sparePartId,
+          type: "ISSUED",
+          quantity: -data.quantity,
+          referenceId: issuance.id,
+          notes: data.notes,
+          recordedById: data.issuedById,
+        },
+      });
+      const stock = await tx.inventoryStock.findUniqueOrThrow({
+        where: {
+          branchId_partId: { branchId: data.branchId, partId: data.sparePartId },
+        },
+        include: { part: { select: { id: true, name: true } } },
+      });
+      return { issuance, stock };
     });
 
-    await this.notifyLowStock(
-      data.branchId,
-      { id: sparePart.id, name: sparePart.name },
-      updatedStock.quantity,
-      updatedStock.minimumStock,
-    );
-
-    return this.inventoryRepository.createPartIssuance({
-      branchId: data.branchId,
-      sparePartId: data.sparePartId,
-      jobCardId: data.jobCardId,
-      issuedById: data.issuedById,
-      quantity: data.quantity,
-      notes: data.notes,
-    });
+    // The stock mutation has committed; notification failure must not invite a duplicate issue.
+    await this.notifyLowStock(data.branchId, result.stock.part, result.stock.quantity, result.stock.minimumStock)
+      .catch(() => console.error('Low-stock notification could not be recorded'));
+    return result.issuance;
   }
 
   async listPartIssuances(branchId?: string) {
@@ -857,61 +865,22 @@ export class InventoryService {
     reason?: string;
     status?: string;
   }) {
-    const issuance = await this.inventoryRepository.findPartIssuanceById(
-      data.partIssuanceId,
-    );
-    if (!issuance) {
-      throw new NotFoundError("Part issuance not found");
-    }
-
-    if (data.quantity <= 0) {
-      throw new BadRequestError("Returned quantity must be greater than zero");
-    }
-
-    if (issuance.branchId !== data.branchId) {
-      throw new BadRequestError(
-        "Part return branch does not match the issuance branch",
-      );
-    }
-
-    const totalReturned = await prisma.partReturn.aggregate({
-      where: { partIssuanceId: data.partIssuanceId },
-      _sum: { quantity: true },
-    });
-
-    const returnedSoFar = totalReturned._sum.quantity ?? 0;
-    if (returnedSoFar + data.quantity > issuance.quantity) {
-      throw new BadRequestError("Returned quantity exceeds issued quantity");
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: data.returnedById },
-    });
-    if (!user) {
-      throw new NotFoundError("Returning user not found");
-    }
-
-    await this.inventoryRepository.incrementInventoryStock(
-      data.branchId,
-      issuance.sparePartId,
-      data.quantity,
-    );
-    await this.inventoryRepository.createStockTransaction({
-      branchId: data.branchId,
-      partId: issuance.sparePartId,
-      type: "RETURNED",
-      quantity: data.quantity,
-      referenceId: data.partIssuanceId,
-      notes: data.reason,
-      recordedById: data.returnedById,
-    });
-
-    return this.inventoryRepository.createPartReturn({
-      partIssuanceId: data.partIssuanceId,
-      returnedById: data.returnedById,
-      quantity: data.quantity,
-      reason: data.reason,
-      status: data.status,
+    if (!Number.isInteger(data.quantity) || data.quantity <= 0) throw new BadRequestError('Returned quantity must be a positive integer');
+    return prisma.$transaction(async (tx) => {
+      const initial = await tx.partIssuance.findUnique({ where: { id: data.partIssuanceId } });
+      if (!initial) throw new NotFoundError('Part issuance not found');
+      if (initial.jobCardId) {
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`);
+        const card = await tx.jobCard.findUniqueOrThrow({ where: { id: initial.jobCardId } });
+        if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'].includes(card.status)) throw new BadRequestError('Cannot return parts on a billed or closed job');
+      }
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "PartIssuance" WHERE id = ${initial.id} FOR UPDATE`);
+      if (initial.branchId !== data.branchId) throw new BadRequestError('Return branch must match issuance');
+      const returned = await tx.partReturn.aggregate({ where: { partIssuanceId: initial.id, status: { notIn: ['Rejected', 'REJECTED'] } }, _sum: { quantity: true } });
+      if ((returned._sum.quantity ?? 0) + data.quantity > initial.quantity) throw new BadRequestError('Returned quantity exceeds issued quantity');
+      await tx.inventoryStock.updateMany({ where: { branchId: data.branchId, partId: initial.sparePartId }, data: { quantity: { increment: data.quantity } } });
+      await tx.stockTransaction.create({ data: { branchId: data.branchId, partId: initial.sparePartId, type: 'RETURNED', quantity: data.quantity, referenceId: initial.id, notes: data.reason, recordedById: data.returnedById } });
+      return tx.partReturn.create({ data: { partIssuanceId: initial.id, returnedById: data.returnedById, quantity: data.quantity, reason: data.reason, status: 'Completed' } });
     });
   }
 
