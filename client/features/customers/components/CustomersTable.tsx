@@ -169,7 +169,7 @@ export function CustomersTable() {
             {getCustomerInitials(c)}
           </span>
           <span className="font-medium">
-            {c.firstName} {c.lastName}
+            {c.companyName || `${c.firstName} ${c.lastName}`}
           </span>
         </div>
       ),

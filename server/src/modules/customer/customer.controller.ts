@@ -1,33 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerService } from './customer.service';
-import { assertBranchOwnership } from '../../middleware/authorize';
-import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
+import { TallyService } from '../finance/tally.service';
+import { ForbiddenError } from '../../shared/errors/appError';
 
 export class CustomerController {
   private customerService: CustomerService;
+  private tallyService: TallyService;
 
   constructor() {
     this.customerService = new CustomerService();
+    this.tallyService = new TallyService();
   }
+
+  updateCustomerTallyLedger = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId) {
+        throw new ForbiddenError('Your account must be assigned to a branch');
+      }
+
+      const updated = await this.tallyService.setCustomerLedger(id, req.body.tallyLedgerCode);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { customer: updated } });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   getCustomers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
-      let branchId = req.query.branchId as string | undefined;
-      let createdById: string | undefined;
-
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
-      }
-
-      if (req.user && req.user.role === ROLES.RECEPTIONIST) {
-        createdById = req.user.userId;
-      }
-
-      const result = await this.customerService.listCustomers({ page, limit, search, branchId, createdById });
+      const result = await this.customerService.listCustomers({ page, limit, search });
 
       res.status(200).json({
         status: 'success',
@@ -46,7 +51,6 @@ export class CustomerController {
     try {
       const { id } = req.params;
       const result = await this.customerService.getCustomer(id);
-      assertBranchOwnership(req, (result as any).branchId);
 
       res.status(200).json({
         status: 'success',
@@ -63,6 +67,7 @@ export class CustomerController {
   createCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const createdById = req.user?.userId;
+      if (req.body.code && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may supply customer codes');
       const result = await this.customerService.createCustomer({ ...req.body, createdById });
 
       res.status(201).json({
@@ -81,11 +86,8 @@ export class CustomerController {
   updateCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
+      if (req.body.code && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may change customer codes');
       const result = await this.customerService.updateCustomer(id, req.body);
 
       res.status(200).json({
@@ -104,11 +106,7 @@ export class CustomerController {
   addCustomerDocument = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
       const result = await this.customerService.addCustomerDocument(id, req.body);
 
       res.status(201).json({
@@ -127,11 +125,7 @@ export class CustomerController {
   getCustomerDocuments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
       const result = await this.customerService.getCustomerDocuments(id);
 
       res.status(200).json({
@@ -149,11 +143,7 @@ export class CustomerController {
   addServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
       const result = await this.customerService.addServiceHistory(id, req.body);
 
       res.status(201).json({
@@ -172,11 +162,7 @@ export class CustomerController {
   getServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
       const result = await this.customerService.getServiceHistory(id);
 
       res.status(200).json({
@@ -194,11 +180,7 @@ export class CustomerController {
   manageCustomerAccount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, customer?.branchId);
+
       const result = await this.customerService.upsertCustomerAccount(id, req.body);
 
       res.status(200).json({

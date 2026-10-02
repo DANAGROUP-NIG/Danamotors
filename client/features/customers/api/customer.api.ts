@@ -7,6 +7,12 @@ import type {
   UpdateCustomerPayload,
 } from "../types/customer.types";
 
+function customerPayload(payload: CreateCustomerPayload | UpdateCustomerPayload) {
+  return Object.fromEntries(Object.entries(payload).map(([key, value]) => [key,
+    ["anniversaryDate", "preferredFollowupDay", "preferredFollowupTime"].includes(key) && value === "" ? null : value,
+  ]));
+}
+
 export async function getCustomersRequest(params?: {
   page?: number;
   limit?: number;
@@ -34,20 +40,22 @@ export async function getCustomerRequest(id: string): Promise<Customer> {
 export async function createCustomerRequest(
   payload: CreateCustomerPayload,
 ): Promise<Customer> {
-  return apiPost<Customer, CreateCustomerPayload>(
+  const result = await apiPost<{ customer: Customer }>(
     API_ROUTES.customers.base,
-    payload,
+    customerPayload(payload),
   );
+  return result.customer;
 }
 
 export async function updateCustomerRequest(
   id: string,
   payload: UpdateCustomerPayload,
 ): Promise<Customer> {
-  return apiPut<Customer, UpdateCustomerPayload>(
+  const result = await apiPut<{ customer: Customer }>(
     API_ROUTES.customers.detail(id),
-    payload,
+    customerPayload(payload),
   );
+  return result.customer;
 }
 
 export async function deleteCustomerRequest(id: string): Promise<void> {
@@ -63,4 +71,12 @@ export async function manageCustomerAccountRequest(
     { password: payload.password, isActive: payload.isActive },
   );
   return result;
+}
+
+export async function updateCustomerTallyLedgerRequest(id: string, tallyLedgerCode: string | null) {
+  const result = await apiPut<{ customer: Customer }, { tallyLedgerCode: string | null }>(
+    API_ROUTES.customers.tallyLedger(id),
+    { tallyLedgerCode },
+  );
+  return result.customer;
 }

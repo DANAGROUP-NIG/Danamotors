@@ -3,6 +3,7 @@ export type InvoiceCustomer = {
   email: string;
   firstName: string;
   lastName: string;
+  branchId?: string;
 };
 
 export type InvoiceJobCard = {
@@ -23,9 +24,28 @@ export type InvoicePayment = {
 
 export type InvoiceReceipt = {
   id: string;
+  receiptNumber?: string;
   amount: number;
   issuedAt: string;
   reference?: string;
+  mode?: string;
+  status?: string;
+};
+
+export type InvoiceLine = {
+  id: string;
+  type: "PART" | "LABOUR";
+  description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+  customerPaid: boolean;
+};
+
+export type InvoiceReceiptAllocation = {
+  id: string;
+  amount: number;
+  receipt: InvoiceReceipt;
 };
 
 export type Invoice = {
@@ -38,7 +58,21 @@ export type Invoice = {
   subtotal: number;
   tax: number;
   total: number;
+  outstandingAmount: number;
+  partsTotal: number;
+  labourTotal: number;
+  partsDiscountPercent: number;
+  labourDiscountPercent: number;
+  partsDiscountAmount: number;
+  labourDiscountAmount: number;
+  vatRate: number;
+  vatAmount: number;
+  roundOff: number;
   status: string;
+  cancelledAt?: string | null;
+  cancelRemark?: string | null;
+  tallyVoucherNo?: string | null;
+  tallyPostedAt?: string | null;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -46,6 +80,9 @@ export type Invoice = {
   jobCard?: InvoiceJobCard;
   payments: InvoicePayment[];
   receipts: InvoiceReceipt[];
+  allocations: InvoiceReceiptAllocation[];
+  lines: InvoiceLine[];
+  serviceAdvisor?: { id: string; firstName: string; lastName: string } | null;
 };
 
 export type InvoiceListResponse = {

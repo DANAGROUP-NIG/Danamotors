@@ -1,33 +1,74 @@
 import { Request, Response, NextFunction } from 'express';
 import { FinanceService } from './finance.service';
-import { assertBranchOwnership } from '../../middleware/authorize';
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
+import { JobBillingService } from './job-billing.service';
+import { ReceiptService } from './receipt.service';
+import { TallyService } from './tally.service';
+import { NotificationService } from '../notification/notification.service';
+import { ForbiddenError } from '../../shared/errors/appError';
 
 export class FinanceController {
   private financeService: FinanceService;
+  private jobBillingService: JobBillingService;
+  private receiptService: ReceiptService;
+  private tallyService: TallyService;
 
   constructor() {
     this.financeService = new FinanceService();
+    this.jobBillingService = new JobBillingService();
+    this.receiptService = new ReceiptService();
+    this.tallyService = new TallyService();
   }
 
-  createInvoice = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listBillableJobCards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const customer = await prisma.customer.findUnique({
-        where: { id: req.body.customerId },
-        select: { branchId: true },
-      });
-      let branchId = customer?.branchId ?? undefined;
-      if (req.body.jobCardId) {
-        const jobCard = await prisma.jobCard.findUnique({
-          where: { id: req.body.jobCardId },
-          select: { branchId: true },
-        });
-        branchId = jobCard?.branchId ?? branchId;
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const jobCards = await this.jobBillingService.listBillableJobCards(branchId);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { jobCards } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  previewJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const preview = await this.jobBillingService.previewJobBill(req.body);
+      assertBillingBranch(req, preview.jobCard.branchId);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { preview } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const preview = await this.jobBillingService.previewJobBill(req.body);
+      assertBillingBranch(req, preview.jobCard.branchId);
+      const invoice = await this.jobBillingService.createJobBill({ ...req.body, actorId: req.user?.userId });
+      if (invoice.serviceAdvisorId) {
+        void new NotificationService().notifyUsers([invoice.serviceAdvisorId], {
+          type: 'JOB_BILL_CREATED',
+          title: 'Job bill created',
+          message: `Job bill ${invoice.invoiceNumber} was created for ${preview.jobCard.jobNumber}.`,
+          link: `/invoices`,
+          branchId: preview.jobCard.branchId,
+        }).catch(() => undefined);
       }
-      assertBranchOwnership(req, branchId);
-      const result = await this.financeService.createInvoice(req.body);
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Invoice created successfully', data: { invoice: result } });
+      res.status(201).json({ status: 'success', statusCode: 201, message: 'Job bill created', data: { invoice } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancelJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const invoice = await this.financeService.getInvoice(req.params.id);
+      const branchId = (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
+      assertBillingBranch(req, branchId);
+      const result = await this.jobBillingService.cancelJobBill(req.params.id, req.user!.userId, req.body.remark);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Job bill cancelled', data: { invoice: result } });
     } catch (error) {
       next(error);
     }
@@ -39,6 +80,7 @@ export class FinanceController {
       const customerId = req.query.customerId as string | undefined;
       if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
         branchId = req.user.branchId ?? undefined;
+        if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
       const result = await this.financeService.listInvoices({ branchId, customerId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { invoices: result } });
@@ -52,7 +94,7 @@ export class FinanceController {
       const { id } = req.params;
       const result = await this.financeService.getInvoice(id);
       const branchId = (result as any).jobCard?.branchId ?? (result as any).customer?.branchId;
-      assertBranchOwnership(req, branchId);
+      assertBillingBranch(req, branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { invoice: result } });
     } catch (error) {
       next(error);
@@ -64,45 +106,9 @@ export class FinanceController {
       const { id } = req.params;
       const invoice = await this.financeService.getInvoice(id);
       const branchId = (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
-      assertBranchOwnership(req, branchId);
+      assertBillingBranch(req, branchId);
       const result = await this.financeService.updateInvoice(id, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Invoice updated successfully', data: { invoice: result } });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  deleteInvoice = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const invoice = await this.financeService.getInvoice(id);
-      const branchId = (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
-      assertBranchOwnership(req, branchId);
-      await this.financeService.deleteInvoice(id);
-      res.status(200).json({ status: 'success', statusCode: 200, message: 'Invoice deleted successfully' });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  createPayment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const invoice = await prisma.invoice.findUnique({
-        where: { id: req.body.invoiceId },
-        select: {
-          jobCard: { select: { branchId: true } },
-          customer: { select: { branchId: true } },
-        },
-      });
-      assertBranchOwnership(
-        req,
-        invoice?.jobCard?.branchId ?? invoice?.customer?.branchId,
-      );
-      const result = await this.financeService.createPayment({
-        ...req.body,
-        recordedById: req.user!.userId,
-      });
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Payment recorded successfully', data: { payment: result } });
     } catch (error) {
       next(error);
     }
@@ -113,6 +119,7 @@ export class FinanceController {
       let branchId = req.query.branchId as string | undefined;
       if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
         branchId = req.user.branchId ?? undefined;
+        if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
       const result = await this.financeService.listPayments({ branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { payments: result } });
@@ -136,10 +143,7 @@ export class FinanceController {
           },
         },
       });
-      assertBranchOwnership(
-        req,
-        payment?.invoice?.jobCard?.branchId ?? payment?.invoice?.customer?.branchId,
-      );
+      assertBillingBranch(req, payment?.invoice?.jobCard?.branchId ?? payment?.invoice?.customer?.branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { payment: result } });
     } catch (error) {
       next(error);
@@ -148,18 +152,16 @@ export class FinanceController {
 
   createReceipt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const invoice = await prisma.invoice.findUnique({
-        where: { id: req.body.invoiceId },
-        select: {
-          jobCard: { select: { branchId: true } },
-          customer: { select: { branchId: true } },
-        },
-      });
-      assertBranchOwnership(
-        req,
-        invoice?.jobCard?.branchId ?? invoice?.customer?.branchId,
-      );
-      const result = await this.financeService.createReceipt({
+      const customer = await prisma.customer.findUnique({ where: { id: req.body.customerId }, select: { branchId: true } });
+      assertBillingBranch(req, customer?.branchId);
+      for (const allocation of req.body.allocations as Array<{ invoiceId: string }>) {
+        const invoice = await prisma.invoice.findUnique({
+          where: { id: allocation.invoiceId },
+          select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } },
+        });
+        assertBillingBranch(req, invoice?.jobCard?.branchId ?? invoice?.customer.branchId);
+      }
+      const result = await this.receiptService.createReceipt({
         ...req.body,
         issuedById: req.user!.userId,
       });
@@ -174,9 +176,15 @@ export class FinanceController {
       let branchId = req.query.branchId as string | undefined;
       if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
         branchId = req.user.branchId ?? undefined;
+        if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
-      const result = await this.financeService.listReceipts({ branchId });
-      res.status(200).json({ status: 'success', statusCode: 200, data: { receipts: result } });
+      const result = await this.receiptService.listReceipts({
+        branchId,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        category: req.query.category as 'ALL' | 'SERVICE_PARTS' | 'SALES_ENQUIRY' | undefined,
+      });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
@@ -185,23 +193,156 @@ export class FinanceController {
   getReceipt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.financeService.getReceipt(id);
-      const receipt = await prisma.receipt.findUnique({
-        where: { id },
-        select: {
-          invoice: {
-            select: {
-              jobCard: { select: { branchId: true } },
-              customer: { select: { branchId: true } },
-            },
-          },
-        },
-      });
-      assertBranchOwnership(
-        req,
-        receipt?.invoice?.jobCard?.branchId ?? receipt?.invoice?.customer?.branchId,
-      );
+      const result = await this.receiptService.getReceipt(id);
+      assertBillingBranch(req, result.customer.branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { receipt: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateReceipt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const existing = await this.receiptService.getReceipt(req.params.id);
+      assertBillingBranch(req, existing.customer.branchId);
+      const result = await this.receiptService.updateReceipt(req.params.id, {
+        ...req.body,
+        editedById: req.user!.userId,
+      });
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Receipt updated', data: { receipt: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancelReceipt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const existing = await this.receiptService.getReceipt(req.params.id);
+      assertBillingBranch(req, existing.customer.branchId);
+      const result = await this.receiptService.cancelReceipt(req.params.id, req.body.remark);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Receipt cancelled', data: { receipt: result } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listBanks = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const banks = await this.receiptService.listBanks();
+      res.status(200).json({ status: 'success', statusCode: 200, data: { banks } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listTallyLedgers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ledgers = await this.tallyService.listLedgers(req.query.search as string | undefined);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { ledgers } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listServiceAdvisors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const advisors = await prisma.user.findMany({
+        where: { isActive: true, role: { name: ROLES.SERVICE_ADVISOR }, ...(branchId ? { branchId } : {}) },
+        select: { id: true, firstName: true, lastName: true, email: true, branchId: true },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      });
+      res.status(200).json({ status: 'success', statusCode: 200, data: { advisors } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  importTallyLedgers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.tallyService.importLedgers(req.body.ledgers);
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  listTallyDocuments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const documents = await this.tallyService.listDocuments({
+        date: req.query.date as string,
+        type: req.query.type as 'JOB_BILL' | 'RECEIPT',
+        branchId,
+      });
+      res.status(200).json({ status: 'success', statusCode: 200, data: { documents } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  exportTallyBatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const documents = req.body.documents as Array<{ type: 'JOB_BILL' | 'RECEIPT'; id: string }>;
+      if (req.user?.role !== ROLES.SUPER_ADMIN) {
+        for (const document of documents) {
+          const branchId = document.type === 'JOB_BILL'
+            ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
+              ?? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId
+            : (await prisma.receipt.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId;
+          assertBillingBranch(req, branchId);
+        }
+      }
+      const result = await this.tallyService.exportBatch({ documents, postedById: req.user!.userId });
+      if (result.skipped.length > 0) {
+        const skippedList = result.skipped.map((document) => `${document.documentNumber ?? document.id}: ${document.reason}`).join('; ');
+        void new NotificationService().notifyUsers([req.user!.userId], {
+          type: 'TALLY_BATCH_SKIPPED_DOCUMENTS',
+          title: 'Tally export has skipped documents',
+          message: skippedList,
+          link: '/finance/tally',
+        }).catch(() => undefined);
+      }
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmTallyBatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const documents = req.body.documents as Array<{ type: 'JOB_BILL' | 'RECEIPT'; id: string; voucherNumber: string }>;
+      if (req.user?.role !== ROLES.SUPER_ADMIN) {
+        for (const document of documents) {
+          const branchId = document.type === 'JOB_BILL'
+            ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
+              ?? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId
+            : (await prisma.receipt.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId;
+          assertBillingBranch(req, branchId);
+        }
+      }
+      const result = await this.tallyService.confirmBatch({ ...req.body, postedById: req.user!.userId });
+      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getTallyAccountMappings = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const mappings = await this.tallyService.listAccountMappings();
+      res.status(200).json({ status: 'success', statusCode: 200, data: { mappings } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  saveTallyAccountMappings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const mappings = await this.tallyService.saveAccountMappings(req.body.mappings);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { mappings } });
     } catch (error) {
       next(error);
     }
@@ -209,7 +350,9 @@ export class FinanceController {
 
   getSummaryReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.getSummaryReport(req.query as any);
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const result = await this.financeService.getSummaryReport({ ...(req.query as any), branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { summary: result } });
     } catch (error) {
       next(error);
@@ -218,21 +361,33 @@ export class FinanceController {
 
   getInvoiceReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.getInvoiceReport(req.query as any);
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const result = await this.financeService.getInvoiceReport({ ...(req.query as any), branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { report: result } });
     } catch (error) {
       next(error);
     }
   };
 
-  getDashboardOverview = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getDashboardOverview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.financeService.getDashboardOverview();
+      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? undefined : req.user?.branchId ?? undefined;
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const result = await this.financeService.getDashboardOverview(branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { overview: result } });
     } catch (error) {
       next(error);
     }
   };
+}
+
+function assertBillingBranch(req: Request, branchId?: string | null): void {
+  if (!req.user) throw new ForbiddenError('Authentication is required');
+  if (req.user.role === ROLES.SUPER_ADMIN) return;
+  if (!req.user.branchId || !branchId || req.user.branchId !== branchId) {
+    throw new ForbiddenError('Billing access is restricted to your assigned branch');
+  }
 }
 
 export default FinanceController;

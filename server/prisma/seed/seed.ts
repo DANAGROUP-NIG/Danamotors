@@ -10,6 +10,7 @@ import seedSpareParts from "./spareParts";
 import seedInventoryStock from "./inventory";
 import seedStockTransactions from "./transactions";
 import seedCustomerPortal from "./portal";
+import seedWorkshop from "./workshop";
 import seedEnquiries from "./enquiries";
 
 const prisma = new PrismaClient();
@@ -31,6 +32,8 @@ async function main() {
   // 4. Services catalog
   console.log("\nSeeding services catalog...");
   const services = await seedServices(prisma);
+
+  await seedWorkshop(prisma);
 
   // 5. Spare parts
   console.log("\nSeeding spare parts...");

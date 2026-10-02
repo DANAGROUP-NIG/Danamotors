@@ -1,5 +1,6 @@
 import prisma from '../../prisma/client';
 import {
+  Prisma,
   ServiceAppointment,
   JobCard,
   Inspection,
@@ -85,6 +86,9 @@ export class ServiceRepository {
     if (params.search) {
       where.OR = [
         { notes: { contains: params.search, mode: 'insensitive' } },
+        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { email: { contains: params.search, mode: 'insensitive' } } },
@@ -237,6 +241,8 @@ export class ServiceRepository {
     if (params?.search) {
       where.OR = [
         { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { description: { contains: params.search, mode: 'insensitive' } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
@@ -249,7 +255,7 @@ export class ServiceRepository {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     return prisma.jobCard.findMany({
@@ -257,6 +263,14 @@ export class ServiceRepository {
       skip: params?.skip,
       take: params?.take,
       include: {
+        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        serviceType: true,
+        bay: true,
+        team: true,
+        complaints: { include: { complaintCode: true } },
+        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
         appointment: true,
         branch: true,
         customer: {
@@ -271,6 +285,9 @@ export class ServiceRepository {
         createdBy: {
           select: { id: true, firstName: true, lastName: true },
         },
+        technician: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         inspections: true,
         estimates: true,
       },
@@ -282,6 +299,15 @@ export class ServiceRepository {
     return prisma.jobCard.findUnique({
       where: { id },
       include: {
+        labourLines: { include: { labourItem: true } },
+        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        serviceType: true,
+        bay: true,
+        team: true,
+        complaints: { include: { complaintCode: true } },
+        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
         appointment: true,
         branch: true,
         customer: {
@@ -305,7 +331,8 @@ export class ServiceRepository {
         inspections: true,
         estimates: {
           include: {
-            approvals: true,
+            approvals: { orderBy: { createdAt: 'desc' } },
+            lines: true,
           },
         },
         partIssuances: {
@@ -329,7 +356,7 @@ export class ServiceRepository {
     });
   }
 
-  async updateJobCard(id: string, data: Partial<JobCard>): Promise<JobCard> {
+  async updateJobCard(id: string, data: Prisma.JobCardUncheckedUpdateInput): Promise<JobCard> {
     return prisma.jobCard.update({
       where: { id },
       data,
@@ -463,6 +490,7 @@ export class ServiceRepository {
       skip: params.skip,
       take: params.take,
       include: {
+        lines: true,
         jobCard: {
           select: {
             id: true,

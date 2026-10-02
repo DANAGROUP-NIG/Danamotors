@@ -52,7 +52,7 @@ export class AuthService {
 
   private generateCustomerAccessToken(payload: {
     customerId: string;
-    email: string;
+    email: string | null;
     branchId?: string | null;
   }): string {
     return jwt.sign(
@@ -428,7 +428,7 @@ export class AuthService {
     phoneNumber?: string;
   }): Promise<LoginResponse> {
     const customer = await this.authRepository.findCustomerByEmail(data.email);
-    if (!customer) {
+    if (!customer || customer.mergedIntoId) {
       throw new BadRequestError(
         "No customer record matches this email. Contact the workshop to be registered.",
       );

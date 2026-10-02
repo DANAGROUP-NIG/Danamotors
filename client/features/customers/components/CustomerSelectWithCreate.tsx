@@ -72,7 +72,7 @@ export function CustomerSelectWithCreate({
     if (!searchQuery.trim()) return customers;
     const q = searchQuery.toLowerCase();
     return customers.filter((c) => {
-      const fullName = `${c.firstName} ${c.lastName}`.toLowerCase();
+      const fullName = `${c.companyName ?? ""} ${c.code ?? ""} ${c.firstName} ${c.lastName}`.toLowerCase();
       const email = c.email?.toLowerCase() ?? "";
       const phone = c.phoneNumber?.toLowerCase() ?? "";
       return fullName.includes(q) || email.includes(q) || phone.includes(q);
@@ -290,7 +290,7 @@ export function CustomerSelectWithCreate({
                       <User className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="truncate">
                         <span className="font-medium">
-                          {c.firstName} {c.lastName}
+                          {c.companyName || `${c.firstName} ${c.lastName}`}
                         </span>
                         <span className="ml-2 text-xs text-muted-foreground">
                           {c.email} {c.phoneNumber ? `• ${c.phoneNumber}` : ""}

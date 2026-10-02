@@ -6,7 +6,25 @@ export type VehicleCustomer = {
 };
 
 export type Vehicle = {
+  modelId?: string | null;
+  generationId?: string | null;
+  engineId?: string | null;
+  customMake?: string | null;
+  customModel?: string | null;
+
+  catalogue?: { acFitted: boolean; description: string; parent?: { description: string } | null } | null;
+  ownerships?: { id: string; purchaseDate: string; saleDate?: string | null; customer?: { firstName: string; lastName: string; companyName?: string | null } }[];
+  jobCards?: { id: string; jobNumber: string; createdAt: string; status: string; mileage?: number | null; description: string; workDone?: string | null }[];
   id: string;
+  catalogueId?: string | null;
+  colourId?: string | null;
+  engineNumber?: string | null;
+  keyNumber?: string | null;
+  pdiDone?: boolean;
+  pdiDate?: string | null;
+  saleDate?: string | null;
+  sellingDealer?: string | null;
+  lastRecordedMileage?: number | null;
   vin: string;
   registrationNumber: string | null;
   make: string | null;
@@ -18,7 +36,7 @@ export type Vehicle = {
   warrantyStatus: string | null;
   warrantyExpiresAt: string | null;
   ownershipStatus: string | null;
-  customer: VehicleCustomer;
+  customer: VehicleCustomer | null;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
   imagesCount: number;
   ownershipsCount: number;
@@ -27,7 +45,22 @@ export type Vehicle = {
 };
 
 export type CreateVehiclePayload = {
-  customerId: string;
+  modelId?: string | null;
+  generationId?: string | null;
+  engineId?: string | null;
+  customMake?: string | null;
+  customModel?: string | null;
+
+  customerId?: string;
+  catalogueId?: string | null;
+  colourId?: string | null;
+  engineNumber?: string | null;
+  keyNumber?: string | null;
+  pdiDone?: boolean;
+  pdiDate?: string | null;
+  saleDate?: string | null;
+  sellingDealer?: string | null;
+  lastRecordedMileage?: number | null;
   vin: string;
   registrationNumber?: string;
   make?: string;

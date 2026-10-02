@@ -2,9 +2,11 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { CustomerMergeCard } from "@/features/customers/components/CustomerMergeCard";
 import { useCustomer } from "@/features/customers";
 import { CustomerPortalAccessCard } from "@/features/customers/components/CustomerPortalAccessCard";
 import { CustomerCreditCard } from "@/features/customers/components/CustomerCreditCard";
+import { CustomerTallyLedgerCard } from "@/features/customers/components/CustomerTallyLedgerCard";
 import { useVehicles } from "@/features/vehicles/hooks/use-vehicles";
 import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import { useJobCards } from "@/features/job-cards/hooks/use-job-cards";
@@ -72,6 +74,7 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-6">
+      <CustomerMergeCard customer={customer} />
       <Link
         href="/customers"
         className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
@@ -87,7 +90,7 @@ export default function CustomerDetailPage() {
           </span>
           <div>
             <h1 className="text-xl font-semibold text-slate-800">
-              {customer.firstName} {customer.lastName}
+              {customer.companyName || `${customer.firstName} ${customer.lastName}`}
             </h1>
             <p className="text-sm text-slate-500">{customer.email}</p>
           </div>
@@ -112,6 +115,8 @@ export default function CustomerDetailPage() {
       <CustomerPortalAccessCard customer={customer} />
 
       <CustomerCreditCard customer={customer} />
+
+      <CustomerTallyLedgerCard customer={customer} />
 
       <Section
         icon={<CalendarCheck className="size-4" />}
@@ -299,7 +304,7 @@ export default function CustomerDetailPage() {
               </thead>
               <tbody>
                 {invoices.map((inv) => {
-                  const paid = inv.payments.reduce((s, p) => s + p.amount, 0);
+                  const paid = Math.max(inv.total - inv.outstandingAmount, 0);
                   return (
                     <tr key={inv.id} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-mono text-xs text-slate-700">

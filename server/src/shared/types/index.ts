@@ -8,7 +8,7 @@ export interface JWTPayload {
 
 export interface CustomerJWTPayload {
   customerId: string;
-  email: string;
+  email: string | null;
   role: 'customer';
   permissions: string[];
   branchId?: string | null;

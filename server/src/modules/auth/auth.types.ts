@@ -3,7 +3,7 @@ export interface LoginResponse {
   refreshToken: string;
   user: {
     id: string;
-    email: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     phoneNumber?: string;

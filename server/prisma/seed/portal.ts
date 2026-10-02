@@ -112,6 +112,8 @@ export default async function seedCustomerPortal(
           registrationNumber: v.registrationNumber,
           make: v.make,
           model: v.model,
+          customModel: v.model,
+          customMake: v.make,
           year: v.year,
           color: v.color,
           ownershipStatus: "Owned",

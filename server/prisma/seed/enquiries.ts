@@ -5,8 +5,8 @@ export default async function seedEnquiries(
   prisma: PrismaClient,
   branches: { id: string; name: string }[],
   staffUsers: { id: string; firstName: string; lastName: string }[],
-  customers: { id: string; firstName: string; lastName: string; email: string }[],
-  vehicles: { id: string; customerId: string }[],
+  customers: { id: string; firstName: string; lastName: string; email: string | null }[],
+  vehicles: { id: string; customerId: string | null }[],
   services: { id: string }[],
 ) {
   const mainBranch = branches[0];

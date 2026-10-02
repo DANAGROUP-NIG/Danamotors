@@ -1,6 +1,9 @@
 "use client";
 
-import { Download, FileSpreadsheet } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { JobCardOpeningModal } from "./JobCardOpeningModal";
+import { Download, FileSpreadsheet, Plus } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -22,7 +25,6 @@ function exportRows(jobCards: JobCard[]) {
     agent: jobCard.createdBy
       ? `${jobCard.createdBy.firstName} ${jobCard.createdBy.lastName}`
       : "",
-    progress: jobCard.progress,
     status: jobCard.status,
     createdAt: jobCard.createdAt,
   }));
@@ -35,7 +37,6 @@ function exportColumns() {
     { key: "customer", label: "Customer" },
     { key: "branch", label: "Branch" },
     { key: "agent", label: "Agent" },
-    { key: "progress", label: "Progress (%)" },
     { key: "status", label: "Status" },
     { key: "createdAt", label: "Created At" },
   ];
@@ -78,6 +79,8 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
 }
 
 export function JobCardsPage() {
+  const [opening, setOpening] = useState(false);
+  const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data } = useJobCards({
     page: 1,
@@ -94,9 +97,10 @@ export function JobCardsPage() {
             ? `${data.meta.total} ${data.meta.total === 1 ? "job card" : "job cards"} on record`
             : undefined
         }
-        actions={<ExportJobCardsButton branchId={activeBranch?.id} />}
+        actions={<div className="flex flex-wrap items-center gap-2"><ExportJobCardsButton branchId={activeBranch?.id} />{hasPermission("jobcard:create") && <Button onClick={() => setOpening(true)}><Plus className="mr-2 h-4 w-4" />Open job card</Button>}</div>}
       />
       <JobCardsTable />
+      <JobCardOpeningModal isOpen={opening} onClose={() => setOpening(false)} />
     </div>
   );
 }
