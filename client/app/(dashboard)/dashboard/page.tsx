@@ -148,7 +148,7 @@ export default function DashboardPage() {
               </h2>
               <p className="text-sm capitalize text-muted-foreground">{user?.role}</p>
               {user?.email && (
-                <p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
               )}
             </div>
           </div>

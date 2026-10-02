@@ -23,7 +23,7 @@ export function IndentProgress({ steps, stopped }: { steps: ProgressStep[]; stop
             )}
             <span
               className={cn(
-                "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
                 step.completed && "border-primary bg-primary text-primary-foreground",
                 isCurrent && "border-primary bg-white text-primary",
                 !step.completed && !isCurrent && "border-slate-200 bg-white text-slate-400",
@@ -32,7 +32,7 @@ export function IndentProgress({ steps, stopped }: { steps: ProgressStep[]; stop
               {step.completed ? <Check className="size-3.5" /> : index + 1}
             </span>
             <div className="min-w-0">
-              <p className={cn("text-xs font-semibold", step.completed || isCurrent ? "text-slate-800" : "text-slate-400")}>
+              <p className={cn("text-sm font-semibold", step.completed || isCurrent ? "text-slate-800" : "text-slate-400")}>
                 {step.label}
               </p>
               {step.completed && (

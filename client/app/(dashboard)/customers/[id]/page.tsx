@@ -129,7 +129,7 @@ export default function CustomerDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase tracking-wider text-slate-400">
+                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-4">Date</th>
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 pr-4">Notes</th>
@@ -144,7 +144,7 @@ export default function CustomerDetailPage() {
                     </td>
                     <td className="py-2 pr-4">
                       <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
                           a.status === "Completed"
                             ? "bg-green-100 text-green-700"
                             : a.status === "Cancelled"
@@ -161,7 +161,7 @@ export default function CustomerDetailPage() {
                     <td className="py-2 pr-4">
                       <Link
                         href={`/appointments/${a.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                       >
                         View <ExternalLink className="size-3" />
                       </Link>
@@ -185,7 +185,7 @@ export default function CustomerDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase tracking-wider text-slate-400">
+                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-4">VIN</th>
                   <th className="py-2 pr-4">Make</th>
                   <th className="py-2 pr-4">Model</th>
@@ -198,7 +198,7 @@ export default function CustomerDetailPage() {
               <tbody>
                 {vehicles.map((v) => (
                   <tr key={v.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs text-slate-700">
+                    <td className="py-2 pr-4 font-mono text-sm text-slate-700">
                       {v.vin}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
@@ -219,7 +219,7 @@ export default function CustomerDetailPage() {
                     <td className="py-2 pr-4">
                       <Link
                         href={`/vehicles/${v.id}`}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                       >
                         View <ExternalLink className="size-3" />
                       </Link>
@@ -243,7 +243,7 @@ export default function CustomerDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase tracking-wider text-slate-400">
+                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-4">Job #</th>
                   <th className="py-2 pr-4">Description</th>
                   <th className="py-2 pr-4">Status</th>
@@ -254,7 +254,7 @@ export default function CustomerDetailPage() {
               <tbody>
                 {jobCards.map((j) => (
                   <tr key={j.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs text-slate-700">
+                    <td className="py-2 pr-4 font-mono text-sm text-slate-700">
                       {j.jobNumber}
                     </td>
                     <td className="max-w-xs truncate py-2 pr-4 text-slate-700">
@@ -262,7 +262,7 @@ export default function CustomerDetailPage() {
                     </td>
                     <td className="py-2 pr-4">
                       <span
-                        className="inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize
+                        className="inline-block rounded-full px-2 py-0.5 text-sm font-medium capitalize
                         bg-slate-100 text-slate-700"
                       >
                         {j.status.replace(/_/g, " ")}
@@ -293,7 +293,7 @@ export default function CustomerDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase tracking-wider text-slate-400">
+                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-4">Invoice #</th>
                   <th className="py-2 pr-4">Issued</th>
                   <th className="py-2 pr-4">Due</th>
@@ -307,7 +307,7 @@ export default function CustomerDetailPage() {
                   const paid = Math.max(inv.total - inv.outstandingAmount, 0);
                   return (
                     <tr key={inv.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono text-xs text-slate-700">
+                      <td className="py-2 pr-4 font-mono text-sm text-slate-700">
                         {inv.invoiceNumber}
                       </td>
                       <td className="py-2 pr-4 text-slate-700">
@@ -326,7 +326,7 @@ export default function CustomerDetailPage() {
                       </td>
                       <td className="py-2 pr-4">
                         <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                          className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
                             inv.status === "Paid"
                               ? "bg-green-100 text-green-700"
                               : inv.status === "Overdue"
@@ -358,7 +358,7 @@ function DetailField({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
         {label}
       </p>
       <p className="mt-0.5 text-sm text-slate-700">{value || "—"}</p>

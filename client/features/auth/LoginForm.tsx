@@ -55,7 +55,7 @@ function LoginFormContent() {
               </button>
             </div>
             {errors.password?.message && (
-              <span className="text-xs text-red-500">{errors.password.message}</span>
+              <span className="text-sm text-red-500">{errors.password.message}</span>
             )}
           </label>
 

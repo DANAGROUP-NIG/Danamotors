@@ -77,7 +77,7 @@ export default function TechnicianDashboard() {
         {/* My Assigned Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">My Assigned Jobs</p>
+            <p className="text-sm font-medium text-muted-foreground">My Assigned Jobs</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
               <Wrench className="size-4 text-blue-600" />
             </span>
@@ -88,7 +88,7 @@ export default function TechnicianDashboard() {
         {/* Completed */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Completed</p>
+            <p className="text-sm font-medium text-muted-foreground">Completed</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
               <CheckCircle2 className="size-4 text-green-600" />
             </span>
@@ -99,7 +99,7 @@ export default function TechnicianDashboard() {
         {/* Completion Rate */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Completion Rate</p>
+            <p className="text-sm font-medium text-muted-foreground">Completion Rate</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-emerald-50">
               <TrendingUp className="size-4 text-emerald-600" />
             </span>

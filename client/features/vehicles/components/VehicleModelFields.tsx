@@ -154,7 +154,7 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
                 onClick={() => commit(model)}>
                 <span>
                   <span className="block font-medium">{model.name}</span>
-                  <span className="text-xs text-muted-foreground">{model.make} / {model.yearStart} - {model.yearEnd ?? "present"}</span>
+                  <span className="text-sm text-muted-foreground">{model.make} / {model.yearStart} - {model.yearEnd ?? "present"}</span>
                 </span>
                 {model.id === value.modelId && <Check className="h-4 w-4" />}
               </li>
@@ -174,12 +174,12 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
           </ul>
         )}
         {models.isError && (
-          <p role="status" className="text-xs text-muted-foreground">
+          <p role="status" className="text-sm text-muted-foreground">
             Catalogue unavailable. Type your model to save it as a custom entry.{" "}
             <button type="button" className="underline" onClick={() => models.refetch()}>Retry catalogue</button>
           </p>
         )}
-        {error && <p role="alert" id={`${id}-error`} className="text-xs text-destructive">{error}</p>}
+        {error && <p role="alert" id={`${id}-error`} className="text-sm text-destructive">{error}</p>}
       </div>
       {!value.modelId && (
         <Field label="Make (optional)">
@@ -214,7 +214,7 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
             </select>
           </Field>
           {options.isError && (
-            <p role="alert" className="text-xs text-destructive sm:col-span-2">
+            <p role="alert" className="text-sm text-destructive sm:col-span-2">
               Could not load optional generation and engine choices. You can save the model alone.{" "}
               <button type="button" className="underline" onClick={() => options.refetch()}>Retry</button>
             </p>

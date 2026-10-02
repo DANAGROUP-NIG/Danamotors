@@ -93,7 +93,7 @@ export function CreditApplicationsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr className="border-b border-border text-left text-sm uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-3 font-semibold">Customer</th>
                     <th className="px-4 py-3 font-semibold">Invoice</th>
                     <th className="px-4 py-3 font-semibold">Amount</th>
@@ -136,11 +136,11 @@ function CreditApplicationRow({
         <p className="font-medium">
           {application.customer.firstName} {application.customer.lastName}
         </p>
-        <p className="text-xs text-muted-foreground">{application.customer.email}</p>
+        <p className="text-sm text-muted-foreground">{application.customer.email}</p>
       </td>
       <td className="px-4 py-3 text-muted-foreground">
         {application.invoice.invoiceNumber}
-        <p className="text-xs">
+        <p className="text-sm">
           status: {application.invoice.status} · {formatCurrency(application.invoice.total)}
         </p>
       </td>
@@ -156,7 +156,7 @@ function CreditApplicationRow({
       <td className="px-4 py-3">
         <span
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            "inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium",
             statusClass,
           )}
         >

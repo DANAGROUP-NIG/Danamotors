@@ -312,6 +312,7 @@ model Service {
   updatedAt DateTime @updatedAt
 
   appointments ServiceAppointment[]
+  jobCards     JobCard[]
 }
 
 model ServiceAppointment {
@@ -360,6 +361,9 @@ model JobCard {
 
   appointmentId String?
   appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)

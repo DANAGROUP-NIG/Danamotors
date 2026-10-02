@@ -57,7 +57,7 @@ export function BookingDatePicker({
           />
         </div>
 
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-100">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-sm font-medium text-blue-100">
           <span className="size-2 rounded-full bg-white" aria-hidden />
           {selectedDate ? selectedDate.toLocaleDateString(undefined, {
             weekday: 'short',

@@ -127,7 +127,7 @@ export function IndentsPage() {
       render: (i) => (
         <Link href={`/transfers/indents/${i.id}`} className="flex items-center gap-2 hover:underline">
           <ArrowLeftRight className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium">{i.indentNumber}</span>
+          <span className="font-mono text-sm font-medium">{i.indentNumber}</span>
         </Link>
       ),
     },
@@ -145,7 +145,7 @@ export function IndentsPage() {
         if (crossBranch) return <span className="text-muted-foreground">—</span>;
         const outgoing = i.sourceBranchId === myBranchId;
         return (
-          <span className={outgoing ? "text-xs font-medium text-purple-700" : "text-xs font-medium text-blue-700"}>
+          <span className={outgoing ? "text-sm font-medium text-purple-700" : "text-sm font-medium text-blue-700"}>
             {outgoing ? "To supply" : "Requested"}
           </span>
         );
@@ -161,7 +161,7 @@ export function IndentsPage() {
     },
     {
       header: "STN #",
-      render: (i) => <span className="font-mono text-xs text-muted-foreground">{i.stn?.stnNumber ?? "—"}</span>,
+      render: (i) => <span className="font-mono text-sm text-muted-foreground">{i.stn?.stnNumber ?? "—"}</span>,
     },
     {
       header: "Requested By",

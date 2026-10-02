@@ -85,13 +85,13 @@ export function PaymentReceiptModal({ isOpen, onClose, invoiceId }: PaymentRecei
               <option key={customer.id} value={customer.id}>{customer.firstName} {customer.lastName}</option>
             ))}
           </select>
-          {customers.isError && <span className="text-xs text-destructive">Could not load customers.</span>}
+          {customers.isError && <span className="text-sm text-destructive">Could not load customers.</span>}
         </Field>
 
         <section className="grid gap-2">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Unpaid bills</h3>
-            {invoiceQuery.isFetching && <span className="text-xs text-muted-foreground">Refreshing...</span>}
+            {invoiceQuery.isFetching && <span className="text-sm text-muted-foreground">Refreshing...</span>}
           </div>
           {invoiceQuery.isError && <p role="alert" className="text-sm text-destructive">Could not load unpaid bills.</p>}
           {!invoiceQuery.isLoading && customerInvoices.length === 0 && (
@@ -101,7 +101,7 @@ export function PaymentReceiptModal({ isOpen, onClose, invoiceId }: PaymentRecei
             <div key={invoice.id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b py-2 last:border-0">
               <label htmlFor={`allocation-${invoice.id}`} className="min-w-0">
                 <span className="block truncate text-sm font-medium">{invoice.invoiceNumber}</span>
-                <span className="text-xs text-muted-foreground">Outstanding {currency.format(invoice.outstandingAmount)}</span>
+                <span className="text-sm text-muted-foreground">Outstanding {currency.format(invoice.outstandingAmount)}</span>
               </label>
               <input
                 id={`allocation-${invoice.id}`}
@@ -137,7 +137,7 @@ export function PaymentReceiptModal({ isOpen, onClose, invoiceId }: PaymentRecei
               <option value="">Select bank</option>
               {banks.data?.banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
             </select>
-            {banks.isError && <span className="text-xs text-destructive">Could not load receiving banks.</span>}
+            {banks.isError && <span className="text-sm text-destructive">Could not load receiving banks.</span>}
           </Field>
         )}
 

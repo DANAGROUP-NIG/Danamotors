@@ -98,7 +98,7 @@ export function NotificationsPage() {
             onChange={handleFilterChange}
           />
           {isFetching && (
-            <span className="text-xs text-muted-foreground">Refreshing…</span>
+            <span className="text-sm text-muted-foreground">Refreshing…</span>
           )}
         </div>
 
@@ -126,7 +126,7 @@ export function NotificationsPage() {
             <p className="mt-3 text-sm font-medium text-slate-600">
               {unreadOnly ? "No unread notifications" : "You're all caught up"}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-sm text-slate-400">
               {unreadOnly
                 ? "Unread notifications will appear here."
                 : "New notifications will appear here."}
@@ -178,7 +178,7 @@ export function NotificationsPage() {
                       <span className="mt-0.5 line-clamp-2 block text-sm text-slate-500">
                         {notification.message}
                       </span>
-                      <span className="mt-1 block text-xs text-slate-400">
+                      <span className="mt-1 block text-sm text-slate-400">
                         {formatRelativeTime(notification.createdAt)} ·{" "}
                         {new Date(notification.createdAt).toLocaleString(undefined, {
                           dateStyle: "medium",

@@ -138,20 +138,20 @@ export function PartMasterTable() {
       render: (p) => (
         <Link href={`/inventory/${p.id}`} className="block hover:underline">
           <p className="font-medium">{p.name}</p>
-          <p className="font-mono text-xs text-muted-foreground">{p.partNumber}</p>
+          <p className="font-mono text-sm text-muted-foreground">{p.partNumber}</p>
         </Link>
       ),
     },
     {
       header: "Part code",
-      render: (p) => <span className="font-mono text-xs text-muted-foreground">{p.partCode}</span>,
+      render: (p) => <span className="font-mono text-sm text-muted-foreground">{p.partCode}</span>,
     },
     {
       header: "Category",
       render: (p) => (
         <span className="text-muted-foreground">
           {p.category || "—"}
-          {p.priceCategoryCode && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{p.priceCategoryCode}</span>}
+          {p.priceCategoryCode && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-sm">{p.priceCategoryCode}</span>}
         </span>
       ),
     },
@@ -161,7 +161,7 @@ export function PartMasterTable() {
       render: (p) => (
         <span className="text-muted-foreground">
           {fmtNaira(p.unitRate)}
-          <span className="block text-xs">{p.retailRate != null ? fmtNaira(p.retailRate) : "—"}</span>
+          <span className="block text-sm">{p.retailRate != null ? fmtNaira(p.retailRate) : "—"}</span>
         </span>
       ),
     },
@@ -298,7 +298,7 @@ export function PartMasterTable() {
               {filtersActive && (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setStatus("");
                     setRole("");

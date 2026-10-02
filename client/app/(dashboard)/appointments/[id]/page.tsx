@@ -171,7 +171,7 @@ export default function AppointmentDetailPage() {
             </p>
           </div>
           <span
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[appointment.status] ?? "bg-slate-100 text-slate-600"}`}
+            className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${STATUS_COLORS[appointment.status] ?? "bg-slate-100 text-slate-600"}`}
           >
             {appointment.status}
           </span>
@@ -257,7 +257,7 @@ export default function AppointmentDetailPage() {
                 <div className="sm:col-span-2">
                   <Link
                     href={`/customers/${customer.id}`}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                   >
                     View customer profile <ExternalLink className="size-3" />
                   </Link>
@@ -380,14 +380,14 @@ export default function AppointmentDetailPage() {
                       href={`/job-cards/${jc.id}`}
                       className="flex items-center gap-3 rounded-lg border border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50"
                     >
-                      <span className="font-mono text-xs font-medium text-slate-800">
+                      <span className="font-mono text-sm font-medium text-slate-800">
                         {jc.jobNumber as string}
                       </span>
                       <span className="text-slate-300">|</span>
                       <span className="flex-1 text-slate-500">
                         {(jc.description as string) || "—"}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-sm capitalize text-slate-600">
                         {String(jc.status ?? "").replace(/_/g, " ")}
                       </span>
                       <ExternalLink className="size-3.5 shrink-0 text-slate-300" />
@@ -456,7 +456,7 @@ function DetailField({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
         {label}
       </p>
       <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>

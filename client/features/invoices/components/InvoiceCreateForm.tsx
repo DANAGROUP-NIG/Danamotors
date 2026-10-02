@@ -78,10 +78,10 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
             </option>
           ))}
         </select>
-        {jobCards.isLoading && <span className="text-xs text-muted-foreground">Loading billable job cards...</span>}
-        {jobCards.isError && <span className="text-xs text-destructive">Could not load billable job cards.</span>}
+        {jobCards.isLoading && <span className="text-sm text-muted-foreground">Loading billable job cards...</span>}
+        {jobCards.isError && <span className="text-sm text-destructive">Could not load billable job cards.</span>}
         {!jobCards.isLoading && !jobCards.isError && jobCards.data?.jobCards.length === 0 && (
-          <span className="text-xs text-muted-foreground">No completed job cards are ready to bill.</span>
+          <span className="text-sm text-muted-foreground">No completed job cards are ready to bill.</span>
         )}
       </Field>
 

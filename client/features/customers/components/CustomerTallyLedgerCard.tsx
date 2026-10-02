@@ -73,10 +73,10 @@ export function CustomerTallyLedgerCard({ customer }: { customer: Customer }) {
           </select>
         </Field>
       </div>
-      {ledgers.isFetching && <p className="text-xs text-muted-foreground">Searching ledgers...</p>}
-      {ledgers.isError && <p role="alert" className="text-xs text-destructive">Ledger search failed.</p>}
+      {ledgers.isFetching && <p className="text-sm text-muted-foreground">Searching ledgers...</p>}
+      {ledgers.isError && <p role="alert" className="text-sm text-destructive">Ledger search failed.</p>}
       {committedSearch && !ledgers.isFetching && ledgers.data?.ledgers.length === 0 && (
-        <p className="text-xs text-muted-foreground">No matching Tally ledgers.</p>
+        <p className="text-sm text-muted-foreground">No matching Tally ledgers.</p>
       )}
       <div>
         <Button type="button" size="sm" disabled={update.isPending} onClick={() => update.mutate()}>

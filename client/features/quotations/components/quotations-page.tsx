@@ -220,7 +220,7 @@ export function QuotationsPage() {
           className="flex items-center gap-2 text-blue-600 hover:underline"
         >
           <FileText className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium">{q.jobCard.jobNumber}</span>
+          <span className="font-mono text-sm font-medium">{q.jobCard.jobNumber}</span>
         </Link>
       ),
     },
@@ -253,7 +253,7 @@ export function QuotationsPage() {
     {
       header: "Status",
       render: (q) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[q.status] || ""}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[q.status] || ""}`}>
           {q.status}
         </span>
       ),

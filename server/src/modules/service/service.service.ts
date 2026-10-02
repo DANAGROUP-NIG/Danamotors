@@ -403,6 +403,10 @@ export class ServiceService {
           const modelRate = modelId ? await tx.labourRate.findFirst({ where: { labourItemId: item.id, modelId, active: true } }) : null;
           description = item.description; rate = modelRate?.rate ?? item.rate;
           quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
+        } else if (line.type === 'SERVICE') {
+          const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
+          if (!service) throw new BadRequestError('Select an active service');
+          description = service.name; rate = service.price;
         } else if (line.referenceId) {
           const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
           if (!complaint) throw new BadRequestError('Complaint must belong to this job');

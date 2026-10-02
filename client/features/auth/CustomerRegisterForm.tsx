@@ -46,7 +46,7 @@ export function CustomerRegisterForm() {
               {...field("firstName")}
             />
             {errors.firstName && (
-              <span className="text-xs text-red-500">
+              <span className="text-sm text-red-500">
                 {errors.firstName.message}
               </span>
             )}
@@ -60,7 +60,7 @@ export function CustomerRegisterForm() {
               {...field("lastName")}
             />
             {errors.lastName && (
-              <span className="text-xs text-red-500">
+              <span className="text-sm text-red-500">
                 {errors.lastName.message}
               </span>
             )}
@@ -75,7 +75,7 @@ export function CustomerRegisterForm() {
             {...field("email")}
           />
           {errors.email && (
-            <span className="text-xs text-red-500">{errors.email.message}</span>
+            <span className="text-sm text-red-500">{errors.email.message}</span>
           )}
         </label>
 
@@ -92,7 +92,7 @@ export function CustomerRegisterForm() {
             {...field("phoneNumber")}
           />
           {errors.phoneNumber && (
-            <span className="text-xs text-red-500">
+            <span className="text-sm text-red-500">
               {errors.phoneNumber.message}
             </span>
           )}
@@ -106,7 +106,7 @@ export function CustomerRegisterForm() {
             {...field("password")}
           />
           {errors.password && (
-            <span className="text-xs text-red-500">
+            <span className="text-sm text-red-500">
               {errors.password.message}
             </span>
           )}
@@ -120,7 +120,7 @@ export function CustomerRegisterForm() {
             {...field("confirmPassword")}
           />
           {errors.confirmPassword && (
-            <span className="text-xs text-red-500">
+            <span className="text-sm text-red-500">
               {errors.confirmPassword.message}
             </span>
           )}

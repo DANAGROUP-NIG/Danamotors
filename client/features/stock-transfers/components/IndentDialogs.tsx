@@ -20,7 +20,7 @@ import type { DispatchIndentPayload, Indent, IndentLine, TransportMode } from ".
 const textareaCls =
   "min-h-20 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 const numCls = cn(inputCls, "h-9 w-20 text-right");
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400";
 const tdCls = "px-3 py-2 align-top";
 
 const toInt = (v: string) => {
@@ -68,11 +68,11 @@ function ApproveRow({
   return (
     <tr className="border-t border-slate-100">
       <td className={tdCls}>
-        <p className="font-mono text-xs font-medium">{line.part.partNumber}</p>
-        <p className="text-xs text-slate-500">{line.part.name}</p>
+        <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
+        <p className="text-sm text-slate-500">{line.part.name}</p>
         {alternates.length > 0 && (
           <select
-            className={cn(inputCls, "mt-2 h-8 text-xs")}
+            className={cn(inputCls, "mt-2 h-8 text-sm")}
             value={value.supplyPartId}
             onChange={(e) => onChange({ ...value, supplyPartId: e.target.value })}
           >
@@ -176,7 +176,7 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
         <Field label="Approval remarks (optional)">
           <textarea className={textareaCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
         </Field>
-        {allZero && <p className="text-xs text-red-500">Approve at least one unit, or reject the indent instead.</p>}
+        {allZero && <p className="text-sm text-red-500">Approve at least one unit, or reject the indent instead.</p>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             Close
@@ -284,13 +284,13 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
               {pickLines.map((l) => (
                 <tr key={l.id} className="border-t border-slate-100">
                   <td className={tdCls}>
-                    <p className="font-mono text-xs font-medium">{l.part.partNumber}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="font-mono text-sm font-medium">{l.part.partNumber}</p>
+                    <p className="text-sm text-slate-500">
                       {l.part.name}
                       {l.isAlternate && ` · alternate for ${l.requestedPart.partNumber}`}
                     </p>
                   </td>
-                  <td className={cn(tdCls, "text-xs text-slate-500")}>{l.binLocation ?? "—"}</td>
+                  <td className={cn(tdCls, "text-sm text-slate-500")}>{l.binLocation ?? "—"}</td>
                   <td className={cn(tdCls, "text-right")}>{l.pickedQuantity}</td>
                   <td className={cn(tdCls, "text-right")}>
                     <input
@@ -308,7 +308,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
           </table>
         </div>
         {pickLines.some((l) => shipQty(l.id) < l.pickedQuantity) && !shipInvalid && (
-          <p className="text-xs text-amber-700">Units not shipped are released back to stock and put on back order.</p>
+          <p className="text-sm text-amber-700">Units not shipped are released back to stock and put on back order.</p>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -350,7 +350,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
             Split into several cases
           </label>
           {!splitCases ? (
-            <p className="mt-1 text-xs text-muted-foreground">Everything will be packed into one case.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Everything will be packed into one case.</p>
           ) : (
             <div className="mt-3 grid gap-3">
               <div className="flex items-center gap-2 text-sm">
@@ -381,7 +381,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                       const ok = caseSum(l.id) === shipQty(l.id);
                       return (
                         <tr key={l.id} className="border-t border-slate-100">
-                          <td className={cn(tdCls, "font-mono text-xs")}>{l.part.partNumber}</td>
+                          <td className={cn(tdCls, "font-mono text-sm")}>{l.part.partNumber}</td>
                           {Array.from({ length: caseCount }, (_, c) => (
                             <td key={c} className={cn(tdCls, "text-right")}>
                               <input
@@ -393,14 +393,14 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                               />
                             </td>
                           ))}
-                          <td className={cn(tdCls, "text-right text-xs font-medium", ok ? "text-emerald-700" : "text-red-600")}>
+                          <td className={cn(tdCls, "text-right text-sm font-medium", ok ? "text-emerald-700" : "text-red-600")}>
                             {caseSum(l.id)} / {shipQty(l.id)}
                           </td>
                         </tr>
                       );
                     })}
                     <tr className="border-t border-slate-100">
-                      <td className={cn(tdCls, "text-xs text-slate-500")}>Weight (kg)</td>
+                      <td className={cn(tdCls, "text-sm text-slate-500")}>Weight (kg)</td>
                       {Array.from({ length: caseCount }, (_, c) => (
                         <td key={c} className={cn(tdCls, "text-right")}>
                           <input
@@ -424,8 +424,8 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                   </tbody>
                 </table>
               </div>
-              {casesInvalid && <p className="text-xs text-red-500">Each part’s cases must add up to the quantity shipped.</p>}
-              {emptyCase && !casesInvalid && <p className="text-xs text-red-500">Every case needs at least one part.</p>}
+              {casesInvalid && <p className="text-sm text-red-500">Each part’s cases must add up to the quantity shipped.</p>}
+              {emptyCase && !casesInvalid && <p className="text-sm text-red-500">Every case needs at least one part.</p>}
             </div>
           )}
         </div>
@@ -517,10 +517,10 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
               {values.map(({ line, ok, left }) => (
                 <tr key={line.id} className="border-t border-slate-100">
                   <td className={tdCls}>
-                    <p className="font-mono text-xs font-medium">{line.part.partNumber}</p>
-                    <p className="text-xs text-slate-500">{line.part.name}</p>
+                    <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
+                    <p className="text-sm text-slate-500">{line.part.name}</p>
                   </td>
-                  <td className={cn(tdCls, "text-xs text-slate-500")}>{line.caseNumbers || "—"}</td>
+                  <td className={cn(tdCls, "text-sm text-slate-500")}>{line.caseNumbers || "—"}</td>
                   <td className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
                   {(["received", "damaged"] as const).map((field) => (
                     <td key={field} className={cn(tdCls, "text-right")}>
@@ -543,7 +543,7 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
             </tbody>
           </table>
         </div>
-        {invalid && <p className="text-xs text-red-500">Received plus damaged cannot exceed what is outstanding.</p>}
+        {invalid && <p className="text-sm text-red-500">Received plus damaged cannot exceed what is outstanding.</p>}
 
         {leftTotal > 0 && (
           <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

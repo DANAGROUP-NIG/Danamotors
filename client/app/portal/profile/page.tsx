@@ -38,7 +38,7 @@ function Field({
         )}
       </span>
       {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-sm text-red-500">{error}</span>}
     </label>
   );
 }
@@ -248,7 +248,7 @@ export default function PortalProfilePage() {
                 />
               </Field>
 
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 After changing your password you will be signed out and asked to
                 sign in again.
               </p>

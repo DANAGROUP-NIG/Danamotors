@@ -162,10 +162,10 @@ export function AuditLogTable() {
 
   const columns: Column<AuditLog>[] = [
     { header: "Timestamp", className: "whitespace-nowrap", render: (log) => <span className="text-muted-foreground">{new Date(log.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }).replace(",", " ·")}</span> },
-    { header: "User", render: (log) => log.user ? <div><p className="font-medium">{log.user.firstName} {log.user.lastName}</p><p className="text-xs text-muted-foreground">{log.user.email}</p></div> : <span className="font-medium">System</span> },
-    { header: "Action", className: "whitespace-nowrap", render: (log) => <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", actionColor(log.action))}>{log.action.replaceAll("_", " ")}</span> },
+    { header: "User", render: (log) => log.user ? <div><p className="font-medium">{log.user.firstName} {log.user.lastName}</p><p className="text-sm text-muted-foreground">{log.user.email}</p></div> : <span className="font-medium">System</span> },
+    { header: "Action", className: "whitespace-nowrap", render: (log) => <span className={cn("inline-flex rounded-full px-2.5 py-1 text-sm font-semibold", actionColor(log.action))}>{log.action.replaceAll("_", " ")}</span> },
     { header: "Details", render: (log) => <span className="block max-w-sm truncate text-muted-foreground" title={log.details ?? ""}>{log.details || "—"}</span> },
-    { header: "IP Address", className: "whitespace-nowrap font-mono text-xs text-muted-foreground", render: (log) => log.ipAddress || "—" },
+    { header: "IP Address", className: "whitespace-nowrap font-mono text-sm text-muted-foreground", render: (log) => log.ipAddress || "—" },
     {
       header: "Actions",
       headerClassName: "text-right",
@@ -250,8 +250,8 @@ export function AuditLogTable() {
             isFetching={isFetching}
             filters={
               <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">From <DateInput value={dateFrom} onChange={setDateFrom} /></label>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">To <DateInput value={dateTo} onChange={setDateTo} /></label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">From <DateInput value={dateFrom} onChange={setDateFrom} /></label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">To <DateInput value={dateTo} onChange={setDateTo} /></label>
                 <select aria-label="Action type" className={selectClass} value={action} onChange={(e) => setAction(e.target.value)}><option value="">All actions</option>{ACTION_TYPES.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
                 <select aria-label="User" className={selectClass} value={userId} onChange={(e) => setUserId(e.target.value)}><option value="">All users</option>{usersData?.users.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName}</option>)}</select>
               </div>

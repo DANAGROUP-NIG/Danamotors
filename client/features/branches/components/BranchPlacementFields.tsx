@@ -42,7 +42,7 @@ export function BranchPlacementFields({ register, errors, selfId, hasSubLocation
           ))}
         </select>
         {hasSubLocations && (
-          <span className="text-xs text-muted-foreground">This branch has its own sub-locations, so it stays a main branch.</span>
+          <span className="text-sm text-muted-foreground">This branch has its own sub-locations, so it stays a main branch.</span>
         )}
       </Field>
     </div>

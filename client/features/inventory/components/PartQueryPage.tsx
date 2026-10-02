@@ -16,7 +16,7 @@ import { usePartQuery } from "../hooks/use-parts";
 import { PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartQueryAlternateRow, PartQueryRow } from "../types/inventory.types";
 
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
 
 function errorMessage(error: unknown) {
@@ -33,7 +33,7 @@ function Grid({ icon, title, subtitle, children }: { icon: ReactNode; title: str
           {icon}
           {title}
         </div>
-        {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        {subtitle && <p className="text-sm text-slate-400">{subtitle}</p>}
       </div>
       <div className="overflow-x-auto">{children}</div>
     </div>
@@ -89,7 +89,7 @@ function StoreRows({ rows, empty }: { rows: PartQueryRow[]; empty: string }) {
         <tr key={r.branchId} className="border-t border-slate-100">
           <td className={cn(tdCls, "font-medium text-slate-700")}>
             {r.branchName}
-            {r.branchCode && <span className="ml-1.5 text-xs text-slate-400">{r.branchCode}</span>}
+            {r.branchCode && <span className="ml-1.5 text-sm text-slate-400">{r.branchCode}</span>}
           </td>
           <StockCells r={r} />
         </tr>
@@ -113,10 +113,10 @@ function AlternateRows({ rows }: { rows: PartQueryAlternateRow[] }) {
       {rows.map((r) => (
         <tr key={`${r.partId}-${r.branchId}`} className="border-t border-slate-100">
           <td className={tdCls}>
-            <Link href={`/inventory/${r.partId}`} className="font-mono text-xs font-medium text-primary hover:underline">
+            <Link href={`/inventory/${r.partId}`} className="font-mono text-sm font-medium text-primary hover:underline">
               {r.partNumber}
             </Link>
-            {r.partStatus === "BLOCKED" && <span className="ml-1.5 text-xs text-red-600">blocked</span>}
+            {r.partStatus === "BLOCKED" && <span className="ml-1.5 text-sm text-red-600">blocked</span>}
           </td>
           <td className={cn(tdCls, "max-w-56 truncate text-slate-600")}>{r.description}</td>
           <td className={cn(tdCls, "text-slate-700")}>{r.branchName}</td>
@@ -246,7 +246,7 @@ export function PartQueryPage() {
                 ["Retail rate", data.part.retailRate != null ? fmtNaira(data.part.retailRate) : "—"],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+                  <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
                   <p className="mt-0.5 text-slate-700">{value}</p>
                 </div>
               ))}

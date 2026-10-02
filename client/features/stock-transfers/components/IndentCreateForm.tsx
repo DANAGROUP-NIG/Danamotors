@@ -249,9 +249,9 @@ export function IndentCreateForm() {
             />
           </div>
         </div>
-        {errors.lines && <p className="mb-3 text-xs text-red-500">{errors.lines}</p>}
+        {errors.lines && <p className="mb-3 text-sm text-red-500">{errors.lines}</p>}
         {branchesLocked && (
-          <p className="mb-3 text-xs text-muted-foreground">Remove all parts to change the branches.</p>
+          <p className="mb-3 text-sm text-muted-foreground">Remove all parts to change the branches.</p>
         )}
 
         {lines.length === 0 ? (
@@ -267,10 +267,10 @@ export function IndentCreateForm() {
                 <div key={l.key} className="rounded-lg border border-slate-200 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-slate-400">Line {index + 1}</p>
+                      <p className="text-sm text-slate-400">Line {index + 1}</p>
                       <p className="font-mono text-sm font-medium text-slate-800">{l.part.partNumber}</p>
                       <p className="text-sm text-slate-500">{l.part.name}</p>
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="mt-1 text-sm text-slate-400">
                         {l.part.priceCategoryCode ? `Category ${l.part.priceCategoryCode} · ` : ""}
                         {l.part.uom} · {fmtCurrency(l.part.unitRate)} each
                         {l.part.binLocation ? ` · Bin ${l.part.binLocation}` : ""}
@@ -345,16 +345,16 @@ export function IndentCreateForm() {
                       </p>
                     </div>
                   </div>
-                  {errors[l.key] && <p className="mt-2 text-xs text-red-500">{errors[l.key]}</p>}
+                  {errors[l.key] && <p className="mt-2 text-sm text-red-500">{errors[l.key]}</p>}
                   {short && (
-                    <p className="mt-2 text-xs text-amber-700">
+                    <p className="mt-2 text-sm text-amber-700">
                       The supplier has {l.part.sourceAvailable} available. The rest will go on back order.
                     </p>
                   )}
 
                   <button
                     type="button"
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                     onClick={() => update(l.key, { showVehicle: !l.showVehicle })}
                   >
                     <Car className="size-3.5" />

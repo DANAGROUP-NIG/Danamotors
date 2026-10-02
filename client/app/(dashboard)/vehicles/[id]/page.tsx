@@ -66,7 +66,7 @@ export default function VehicleDetailPage() {
 function DetailField({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
       <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>
     </div>
   );

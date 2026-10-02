@@ -14,7 +14,7 @@ export function Field({ label, error, children }: FieldProps) {
     <label className="grid gap-1.5 min-w-0">
       <span className="text-sm font-semibold">{label}</span>
       {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-sm text-red-500">{error}</span>}
     </label>
   );
 }

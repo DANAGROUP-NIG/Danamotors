@@ -132,7 +132,7 @@ export default function JobCardDetailPage() {
               <p className="mt-1 text-sm text-slate-500">{jobCard.description}</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400 print:text-xs">
+              <span className="text-sm text-slate-400 print:text-sm">
                 Created {fmtDate(jobCard.createdAt)}
               </span>
               <StatusBadge status={jobCard.status.replace("_", " ")} tone={tone} />
@@ -154,7 +154,7 @@ export default function JobCardDetailPage() {
               <p className="font-medium text-slate-800">{customerName}</p>
               <p className="text-slate-500">{jobCard.customer?.email ?? "—"}</p>
               {jobCard.customer && (
-                <Link href={`/customers/${jobCard.customer.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                <Link href={`/customers/${jobCard.customer.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
                   View full profile
                 </Link>
               )}
@@ -164,23 +164,23 @@ export default function JobCardDetailPage() {
           <SectionCard icon={<Car className="size-4" />} title="Vehicle">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Reg No</p>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Reg No</p>
                 <p className="text-slate-800">{jobCard.vehicle?.registrationNumber ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Make / Model</p>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Make / Model</p>
                 <p className="text-slate-800">{vehicleLabel}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">VIN</p>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">VIN</p>
                 <p className="text-slate-800">{jobCard.vehicle?.vin ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Color</p>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Color</p>
                 <p className="text-slate-800">{jobCard.vehicle?.color ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Year</p>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Year</p>
                 <p className="text-slate-800">{jobCard.vehicle?.year ?? "—"}</p>
               </div>
             </div>
@@ -191,19 +191,19 @@ export default function JobCardDetailPage() {
         <SectionCard icon={<Gauge className="size-4" />} title="Job Specs">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Estimated Hours</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Estimated Hours</p>
               <p className="mt-0.5 text-sm text-slate-800">{jobCard.estimatedHours ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Estimated Cost</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Estimated Cost</p>
               <p className="mt-0.5 text-sm text-slate-800">{jobCard.estimatedCost != null ? fmtCurrency(jobCard.estimatedCost) : "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">QC Status</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">QC Status</p>
               <p className="mt-0.5 text-sm text-slate-800 capitalize">{jobCard.qcStatus?.replace("_", " ") ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Appointment</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Appointment</p>
               <p className="mt-0.5 text-sm text-slate-800">
                 {jobCard.appointment ? fmtDate(jobCard.appointment.scheduledAt) : "—"}
               </p>
@@ -211,7 +211,7 @@ export default function JobCardDetailPage() {
           </div>
           {jobCard.qcNotes && (
             <div className="mt-3">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">QC Notes</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">QC Notes</p>
               <p className="mt-0.5 text-sm text-slate-600">{jobCard.qcNotes}</p>
             </div>
           )}
@@ -219,11 +219,11 @@ export default function JobCardDetailPage() {
 
         <SectionCard icon={<ClipboardCheck className="size-4" />} title="Opening details">
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {([['Estimated parts', jobCard.estimatedParts], ['Estimated oil', jobCard.estimatedOil], ['Estimated labour', jobCard.estimatedLabour], ['Service charge', jobCard.serviceCharge]] as const).map(([label, amount]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-medium">{amount == null ? 'Not recorded' : fmtCurrency(amount)}</dd></div>)}
-            <div><dt className="text-xs text-muted-foreground">Received by</dt><dd className="text-sm">{jobCard.serviceAdvisor ? `${jobCard.serviceAdvisor.firstName} ${jobCard.serviceAdvisor.lastName}` : 'Not recorded'}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Delivered by</dt><dd className="text-sm">{jobCard.deliveryAdvisor ? `${jobCard.deliveryAdvisor.firstName} ${jobCard.deliveryAdvisor.lastName}` : 'Awaiting delivery'}</dd></div>
+            {([['Estimated parts', jobCard.estimatedParts], ['Estimated oil', jobCard.estimatedOil], ['Estimated labour', jobCard.estimatedLabour], ['Service charge', jobCard.serviceCharge]] as const).map(([label, amount]) => <div key={label}><dt className="text-sm text-muted-foreground">{label}</dt><dd className="mt-1 text-sm font-medium">{amount == null ? 'Not recorded' : fmtCurrency(amount)}</dd></div>)}
+            <div><dt className="text-sm text-muted-foreground">Received by</dt><dd className="text-sm">{jobCard.serviceAdvisor ? `${jobCard.serviceAdvisor.firstName} ${jobCard.serviceAdvisor.lastName}` : 'Not recorded'}</dd></div>
+            <div><dt className="text-sm text-muted-foreground">Delivered by</dt><dd className="text-sm">{jobCard.deliveryAdvisor ? `${jobCard.deliveryAdvisor.firstName} ${jobCard.deliveryAdvisor.lastName}` : 'Awaiting delivery'}</dd></div>
           </dl>
-          {(jobCard.tyres?.some(tyre => tyre.make || tyre.number) || jobCard.batteryMake || jobCard.batteryNumber || jobCard.customField1) && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{jobCard.tyres?.map((tyre, index) => (tyre.make || tyre.number) && <div key={index}><p className="text-xs text-muted-foreground">Tyre {index + 1}</p><p className="text-sm">{tyre.make || 'Make not recorded'} / {tyre.number || 'Number not recorded'}</p></div>)}{(jobCard.batteryMake || jobCard.batteryNumber) && <div><p className="text-xs text-muted-foreground">Battery</p><p className="text-sm">{jobCard.batteryMake || 'Make not recorded'} / {jobCard.batteryNumber || 'Number not recorded'}</p></div>}{jobCard.customField1 && <div><p className="text-xs text-muted-foreground">Custom field</p><p className="text-sm">{jobCard.customField1}</p></div>}</div>}
+          {(jobCard.tyres?.some(tyre => tyre.make || tyre.number) || jobCard.batteryMake || jobCard.batteryNumber || jobCard.customField1) && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{jobCard.tyres?.map((tyre, index) => (tyre.make || tyre.number) && <div key={index}><p className="text-sm text-muted-foreground">Tyre {index + 1}</p><p className="text-sm">{tyre.make || 'Make not recorded'} / {tyre.number || 'Number not recorded'}</p></div>)}{(jobCard.batteryMake || jobCard.batteryNumber) && <div><p className="text-sm text-muted-foreground">Battery</p><p className="text-sm">{jobCard.batteryMake || 'Make not recorded'} / {jobCard.batteryNumber || 'Number not recorded'}</p></div>}{jobCard.customField1 && <div><p className="text-sm text-muted-foreground">Custom field</p><p className="text-sm">{jobCard.customField1}</p></div>}</div>}
           {jobCard.checklist && <div className="mt-4"><h3 className="text-sm font-semibold">Checklist to be followed</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{jobCard.checklist}</p></div>}
           {jobCard.remarks && <div className="mt-4"><h3 className="text-sm font-semibold">Remarks</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{jobCard.remarks}</p></div>}
         </SectionCard>
@@ -237,7 +237,7 @@ export default function JobCardDetailPage() {
           {jobCard.isRepeat && <p>Repeat job: {jobCard.repeatReason} {jobCard.previousJob && <Link className="text-primary underline" href={`/job-cards/${jobCard.previousJob.id}`}>{jobCard.previousJob.jobNumber} ({jobCard.previousJob.technician?.firstName} {jobCard.previousJob.technician?.lastName})</Link>}</p>}
           <p>{jobCard.observations}</p><p>{jobCard.workDone}</p>
           {jobCard.gatePassNumber && <div className="border-2 p-4"><h2 className="text-lg font-semibold">Gate pass {jobCard.gatePassNumber}</h2><p>{customerName} ? {jobCard.vehicle?.registrationNumber || jobCard.vehicle?.vin}</p><p>Delivered {jobCard.deliveredAt ? fmtDate(jobCard.deliveredAt) : ""}</p></div>}
-          {jobCard.statusHistory?.map((entry) => <p className="text-xs text-slate-500" key={entry.id}>{fmtDate(entry.createdAt)} ? {entry.toStatus} ? {entry.actor.firstName} {entry.actor.lastName} ? {entry.remarks}</p>)}
+          {jobCard.statusHistory?.map((entry) => <p className="text-sm text-slate-500" key={entry.id}>{fmtDate(entry.createdAt)} ? {entry.toStatus} ? {entry.actor.firstName} {entry.actor.lastName} ? {entry.remarks}</p>)}
         </section>
         <JobCardPartsSection jobCard={jobCard} />
         <JobCardEstimateSection jobCard={jobCard} />
@@ -287,7 +287,7 @@ export default function JobCardDetailPage() {
                     <span className="text-sm font-medium text-slate-700 capitalize">{insp.status.replace("_", " ")}</span>
                   </div>
                   <p className="mt-1.5 text-sm text-slate-600">{insp.findings}</p>
-                  {insp.notes && <p className="mt-1 text-xs text-slate-400">{insp.notes}</p>}
+                  {insp.notes && <p className="mt-1 text-sm text-slate-400">{insp.notes}</p>}
                 </div>
               ))}
             </div>
@@ -305,7 +305,7 @@ export default function JobCardDetailPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-slate-700">{est.description}</p>
                       {approval && (
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="mt-0.5 text-sm text-slate-400">
                           Customer approval:{" "}
                           {approval.approved === true ? (
                             <span className="font-medium text-emerald-600">Approved</span>
@@ -318,7 +318,7 @@ export default function JobCardDetailPage() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-xs font-medium text-slate-500 capitalize">{est.status}</span>
+                      <span className="text-sm font-medium text-slate-500 capitalize">{est.status}</span>
                       <span className="text-sm font-semibold text-slate-800">
                         {est.currency} {est.amount.toLocaleString()}
                       </span>
@@ -337,12 +337,12 @@ export default function JobCardDetailPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Part #</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Name</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Qty</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Unit Price</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Total</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Issued By</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Part #</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Name</th>
+                    <th className="px-3 py-2 text-right text-sm font-semibold text-slate-500">Qty</th>
+                    <th className="px-3 py-2 text-right text-sm font-semibold text-slate-500">Unit Price</th>
+                    <th className="px-3 py-2 text-right text-sm font-semibold text-slate-500">Total</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Issued By</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,7 +352,7 @@ export default function JobCardDetailPage() {
                 </tbody>
                 <tfoot className="border-t border-slate-200">
                   <tr>
-                    <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold text-slate-600">
+                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-semibold text-slate-600">
                       Total Parts Cost
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-slate-800">
@@ -373,11 +373,11 @@ export default function JobCardDetailPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Invoice #</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Date</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Total</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Status</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Paid</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Invoice #</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Date</th>
+                    <th className="px-3 py-2 text-right text-sm font-semibold text-slate-500">Total</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Status</th>
+                    <th className="px-3 py-2 text-left text-sm font-semibold text-slate-500">Paid</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -387,7 +387,7 @@ export default function JobCardDetailPage() {
                 </tbody>
                 <tfoot className="border-t border-slate-200">
                   <tr>
-                    <td colSpan={2} className="px-3 py-2 text-right text-xs font-semibold text-slate-600">
+                    <td colSpan={2} className="px-3 py-2 text-right text-sm font-semibold text-slate-600">
                       Total Invoiced
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-slate-800">
@@ -489,7 +489,7 @@ function DetailField({ icon, label, value }: { icon?: React.ReactNode; label: st
   return (
     <div>
       {icon && <span className="inline-flex items-center gap-1.5">{icon}</span>}
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
       <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>
     </div>
   );
@@ -504,7 +504,7 @@ function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
       <td className="px-3 py-2 text-slate-600">{issuance.sparePart?.name ?? "—"}</td>
       <td className="px-3 py-2 text-right text-slate-700">
         {issuance.quantity}
-        {returnedQty > 0 && <span className="ml-1 text-xs text-slate-400">(-{returnedQty})</span>}
+        {returnedQty > 0 && <span className="ml-1 text-sm text-slate-400">(-{returnedQty})</span>}
       </td>
       <td className="px-3 py-2 text-right text-slate-600">{(issuance.sparePart?.unitPrice ?? 0).toLocaleString()}</td>
       <td className="px-3 py-2 text-right font-medium text-slate-800">{lineTotal.toLocaleString()}</td>
@@ -521,7 +521,7 @@ function InvoiceRow({ invoice }: { invoice: JobCardInvoice }) {
       <td className="px-3 py-2 text-slate-600">{new Date(invoice.issuedDate).toLocaleDateString()}</td>
       <td className="px-3 py-2 text-right font-medium text-slate-800">{invoice.total.toLocaleString()}</td>
       <td className="px-3 py-2">
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${
           invoice.status === "Paid"
             ? "bg-emerald-50 text-emerald-700"
             : invoice.status === "Unpaid"

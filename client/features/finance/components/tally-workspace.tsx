@@ -268,7 +268,7 @@ export function TallyWorkspace() {
         <Field label="Find ledger by code/name"><input className={inputCls} value={ledgerSearch} onChange={(event) => { setLedgerSearch(event.target.value); setSelectedLedgerCode(""); }} /></Field>
         <Field label="Selected ledger"><select className={inputCls} value={selectedLedgerCode} onChange={(event) => setSelectedLedgerCode(event.target.value)}><option value="">Choose a matching ledger</option>{ledgers.data?.ledgers.map((ledger) => <option key={ledger.id} value={ledger.code}>{ledger.code} - {ledger.name}</option>)}</select></Field>
         <div className="flex items-end"><Button variant="outline" onClick={saveMapping} disabled={!selectedLedgerCode}>Save mapping</Button></div>
-        <div className="md:col-span-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">{mappings.data?.mappings.map((mapping) => <span key={`${mapping.documentType}-${mapping.accountType}`}>{mapping.documentType} / {mapping.accountType}: {mapping.tallyLedgerCode} - {mapping.tallyLedgerName}</span>)}</div>
+        <div className="md:col-span-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">{mappings.data?.mappings.map((mapping) => <span key={`${mapping.documentType}-${mapping.accountType}`}>{mapping.documentType} / {mapping.accountType}: {mapping.tallyLedgerCode} - {mapping.tallyLedgerName}</span>)}</div>
       </section>
     </div>
   );

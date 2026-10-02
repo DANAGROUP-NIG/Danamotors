@@ -43,13 +43,17 @@ export default async function seedWorkshop(prisma: PrismaClient) {
 
   await master('SERVICE_TYPE', 'RR', 'Running repair');
 
-  await master('BAY', 'S01', 'Service bay', {
-    category: 'SERVICE',
+  await prisma.workshopMaster.updateMany({
+    where: { kind: 'BAY', code: { in: ['S01', 'E01'] } },
+    data: { active: false },
   });
 
-  await master('BAY', 'E01', 'Electrical bay', {
-    category: 'ELECTRICAL',
-  });
+  for (const group of ['A', 'B', 'C', 'D', 'E']) {
+    for (let number = 1; number <= 5; number++) {
+      const code = `${group}${number}`;
+      await master('BAY', code, `Bay ${code}`, { category: group });
+    }
+  }
 
   await master('COMPLAINT', 'SG', 'Service and general check-up');
   await master('COMPLAINT', 'BN', 'Brake noise');

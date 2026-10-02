@@ -302,7 +302,7 @@ export function VehicleSelectWithCreate({
         </div>
       )}
 
-      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+      {error && <p className="mt-1 text-sm text-destructive">{error}</p>}
 
       {/* Floating Dropdown Portal - position: fixed at z-[99999] floating above ALL text & inputs */}
       {isOpen &&
@@ -320,7 +320,7 @@ export function VehicleSelectWithCreate({
             className="z-[99999] max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-900 shadow-2xl ring-1 ring-black/10 focus:outline-none"
           >
             {loadingVehicles ? (
-              <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
+              <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading customer vehicles…
               </div>
@@ -349,7 +349,7 @@ export function VehicleSelectWithCreate({
                             {v.registrationNumber ?? v.vin}
                           </span>
                           {!v.registrationNumber && v.vin && (
-                            <span className="ml-2 text-xs text-muted-foreground">
+                            <span className="ml-2 text-sm text-muted-foreground">
                               (no reg no)
                             </span>
                           )}
@@ -366,7 +366,7 @@ export function VehicleSelectWithCreate({
                     <button
                       type="button"
                       onClick={() => setShowInlineCreate(true)}
-                      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                      className="flex w-full items-center justify-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Add new vehicle for this customer
@@ -376,7 +376,7 @@ export function VehicleSelectWithCreate({
               </div>
             ) : (
               <div className="p-4 text-center">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   No vehicle found matching &quot;{searchQuery}&quot;
                 </p>
                 {customerId ? (
@@ -384,14 +384,14 @@ export function VehicleSelectWithCreate({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="mt-2.5 w-full text-xs font-semibold gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+                    className="mt-2.5 w-full text-sm font-semibold gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
                     onClick={() => setShowInlineCreate(true)}
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Add new vehicle
                   </Button>
                 ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Select a customer first to add a new vehicle.
                   </p>
                 )}

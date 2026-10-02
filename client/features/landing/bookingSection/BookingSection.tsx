@@ -70,7 +70,7 @@ export default function BookingSection() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-12 text-center">
-          <div className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-gray-600">
+          <div className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-sm font-semibold uppercase tracking-[0.22em] text-gray-600">
             Book a Service
           </div>
           <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
@@ -129,7 +129,7 @@ export default function BookingSection() {
                     <p className="max-w-xs text-sm text-muted-foreground">
                       Your service request has been submitted successfully. Our customer care team will contact you within 24 hours to confirm your appointment.
                     </p>
-                    <p className="mt-1 rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground ring-1 ring-border">
+                    <p className="mt-1 rounded-full bg-muted px-3 py-1.5 font-mono text-sm text-muted-foreground ring-1 ring-border">
                       Reference: {confirmedId.slice(0, 8).toUpperCase()}
                     </p>
                     <Button
@@ -277,7 +277,7 @@ export default function BookingSection() {
                       )}
                     </Button>
 
-                    <p className="text-center text-xs text-muted-foreground">
+                    <p className="text-center text-sm text-muted-foreground">
                       No account required. We&apos;ll contact you to confirm the details.
                     </p>
                   </motion.form>
@@ -302,7 +302,7 @@ export default function BookingSection() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
+                  <p className="text-sm text-muted-foreground">{desc}</p>
                 </div>
               </div>
             ))}

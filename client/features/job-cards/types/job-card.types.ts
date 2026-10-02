@@ -151,6 +151,15 @@ export type JobCard = {
   createdAt: string;
   updatedAt: string;
   billedAt?: string | null;
+  serviceId?: string | null;
+  service?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    durationMins?: number | null;
+    price: number;
+  } | null;
   appointment?: JobCardAppointment;
   branch: JobCardBranch;
   customer: JobCardCustomer;

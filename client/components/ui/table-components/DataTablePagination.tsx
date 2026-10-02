@@ -32,7 +32,7 @@ export function DataTablePagination({
         isFetching && "opacity-60"
       )}
     >
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Showing {start}–{end} of {total}
       </p>
       <div className="flex gap-1">

@@ -20,7 +20,7 @@ export function OtherDetailsTab() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <div className="lg:col-span-2"><OpeningCard title="Tyre details" description="Record the make and identification number for each tyre."><div className="space-y-4">{openingLabels.tyres.map(
-              (label, index) => <div key={label} className="rounded-lg border border-border p-3"><h4 className="mb-3 text-xs font-semibold text-muted-foreground">{label}</h4><div className="grid gap-3 sm:grid-cols-2"><Controller
+              (label, index) => <div key={label} className="rounded-lg border border-border p-3"><h4 className="mb-3 text-sm font-semibold text-muted-foreground">{label}</h4><div className="grid gap-3 sm:grid-cols-2"><Controller
                     name={`tyres.${index}.makeId`}
                     control={control}
                     render={(
@@ -38,7 +38,7 @@ export function OtherDetailsTab() {
                       maxLength={100}
                       {...register(`tyres.${index}.number`, {
                         setValueAs: value => value.toUpperCase(),
-                      })} /></OpeningField></div>{tyres[index]?.number && !tyres[index]?.makeId && <p role="status" className="mt-2 text-xs text-muted-foreground">Select a tyre make.</p>}</div>,
+                      })} /></OpeningField></div>{tyres[index]?.number && !tyres[index]?.makeId && <p role="status" className="mt-2 text-sm text-muted-foreground">Select a tyre make.</p>}</div>,
             )}</div></OpeningCard></div>
       <div className="space-y-5"><OpeningCard title="Battery details"><div className="space-y-4"><Controller
               name="batteryMakeId"

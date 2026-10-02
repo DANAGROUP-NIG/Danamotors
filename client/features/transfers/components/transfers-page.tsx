@@ -184,7 +184,7 @@ export function TransfersPage() {
       render: (t) => (
         <div className="flex items-center gap-2">
           <ArrowLeftRight className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium">{t.transferNumber}</span>
+          <span className="font-mono text-sm font-medium">{t.transferNumber}</span>
         </div>
       ),
     },
@@ -218,7 +218,7 @@ export function TransfersPage() {
     {
       header: "Status",
       render: (t) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[t.status] || ""}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[t.status] || ""}`}>
           {t.status}
         </span>
       ),

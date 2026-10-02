@@ -98,7 +98,7 @@ export function CustomerRequestsTab(
           }}>
           {fields.length === 0 && <p className="rounded-lg bg-muted/40 p-6 text-center text-sm text-muted-foreground">No customer requests yet. Add the first request.</p>}
           {fields.map(
-            (row, index) => <div key={row.id} className="rounded-xl border border-border p-3 md:p-4"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">Request {index + 1}</span><button
+            (row, index) => <div key={row.id} className="rounded-xl border border-border p-3 md:p-4"><div className="mb-3 flex items-center justify-between"><span className="text-sm font-medium text-muted-foreground">Request {index + 1}</span><button
                   type="button"
                   aria-label={`Delete request ${index + 1}`}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
@@ -159,12 +159,12 @@ export function CustomerRequestsTab(
                         shouldDirty: true,
                         shouldValidate: true,
                       });
-                    }} />} /><label className="grid content-start gap-1.5 text-xs font-medium"><span>Description <span className="text-destructive">*</span></span><input
+                    }} />} /><label className="grid content-start gap-1.5 text-sm font-medium"><span>Description <span className="text-destructive">*</span></span><input
                     aria-label={`Request ${index + 1} description`}
                     className={openingInput}
-                    {...register(`complaints.${index}.description`)} />{errors.complaints?.[index]?.description && <span role="alert" className="text-xs text-destructive">{errors.complaints[index]?.description?.message}</span>}</label></div>
+                    {...register(`complaints.${index}.description`)} />{errors.complaints?.[index]?.description && <span role="alert" className="text-sm text-destructive">{errors.complaints[index]?.description?.message}</span>}</label></div>
               <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">{(["spare", "oil", "labour"] as const).map(
-                  key => <div key={key} className="space-y-1.5"><span className="text-xs font-medium capitalize">{key}</span><Controller
+                  key => <div key={key} className="space-y-1.5"><span className="text-sm font-medium capitalize">{key}</span><Controller
                       name={`complaints.${index}.${key}`}
                       control={control}
                       render={(
@@ -177,7 +177,7 @@ export function CustomerRequestsTab(
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         error={errors.complaints?.[index]?.[key]?.message} />} /></div>,
-                )}<div className="space-y-1.5"><p className="text-xs font-medium">Total</p><p
+                )}<div className="space-y-1.5"><p className="text-sm font-medium">Total</p><p
                     className="flex h-10 items-center justify-end rounded-lg bg-muted/50 px-3 text-sm font-semibold tabular-nums">{money(
                       (Math.round((rows[index]?.spare || 0) * 100) + Math.round((rows[index]?.oil || 0) * 100) + Math.round((rows[index]?.labour || 0) * 100)) / 100,
                     )}</p></div></div>
@@ -191,9 +191,9 @@ export function CustomerRequestsTab(
             ["Total labour", totals.labour],
             ["Grand total", totals.spare + totals.oil + totals.labour],
           ].map(
-            ([label, amount]) => <div key={String(label)}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
+            ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
           )}</div>
-        {errors.complaints?.message && <p role="alert" className="mt-3 text-xs text-destructive">{errors.complaints.message}</p>}
+        {errors.complaints?.message && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints.message}</p>}
       </OpeningCard><LastVisitCard id={lastJobId} /></div>
   );
 }
@@ -214,12 +214,13 @@ function LastVisitCard(
   const job = query.data;
 
   return (
-    <details className="rounded-xl border border-border bg-background p-4 shadow-sm md:p-6" open><summary className="cursor-pointer text-sm font-semibold">Last visit</summary><div className="mt-4">{!id && <p className="text-sm text-muted-foreground">No previous visits found.</p>}{id && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading previous visit...</p>}{query.isError && <p role="alert" className="text-sm text-destructive">Could not load previous visit. <button type="button" className="underline" onClick={() => query.refetch()}>Retry</button></p>}{job && <div className="grid gap-6 md:grid-cols-2"><div className="space-y-4"><div><h4 className="mb-2 text-xs font-medium">Customer requests</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.complaints?.map(row => row.description).join("\n") || job.description}</p></div><div><h4 className="mb-2 text-xs font-medium">Labour details</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.labourLines?.map(row => row.labourItem.description).join("\n") || "No labour details recorded"}</p></div></div><dl className="grid grid-cols-2 content-start gap-4 text-sm"><div><dt className="text-xs text-muted-foreground">Job no.</dt><dd><Link
+    <details className="rounded-xl border border-border bg-background p-4 shadow-sm md:p-6" open><summary className="cursor-pointer text-sm font-semibold">Last visit</summary><div className="mt-4">{!id && <p className="text-sm text-muted-foreground">No previous visits found.</p>}{id && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading previous visit...</p>}{query.isError && <p role="alert" className="text-sm text-destructive">Could not load previous visit. <button type="button" className="underline" onClick={() => query.refetch()}>Retry</button></p>}{job && <div className="grid gap-6 md:grid-cols-2"><div className="space-y-4"><div><h4 className="mb-2 text-sm font-medium">Customer requests</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.complaints?.map(row => row.description).join("\n") || job.description}</p></div><div><h4 className="mb-2 text-sm font-medium">Labour details</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.labourLines?.map(row => row.labourItem.description).join("\n") || "No labour details recorded"}</p></div></div><dl className="grid grid-cols-2 content-start gap-4 text-sm"><div><dt className="text-sm text-muted-foreground">Job no.</dt><dd><Link
                   target="_blank"
                   rel="noopener noreferrer"
                   href={`/job-cards/${job.id}`}
                   className="font-medium text-primary underline">{job.jobNumber}</Link></dd></div>{[
-              ["Service", job.serviceType?.description],
+              ["Service", job.service?.name],
+              ["Service type", job.serviceType?.description],
               ["Attended by", job.technician ? `${job.technician.firstName} ${job.technician.lastName}` : null],
               ["Delivery date", formatDate(job.deliveredAt)],
               ["Mileage", job.mileage == null ? null : `${job.mileage.toLocaleString()} km`],
@@ -228,7 +229,7 @@ function LastVisitCard(
                 job.deliveryAdvisor ? `${job.deliveryAdvisor.firstName} ${job.deliveryAdvisor.lastName}` : null,
               ],
             ].map(
-              ([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1">{value || "Not recorded"}</dd></div>,
+              ([label, value]) => <div key={label}><dt className="text-sm text-muted-foreground">{label}</dt><dd className="mt-1">{value || "Not recorded"}</dd></div>,
             )}</dl></div>}</div></details>
   );
 }
