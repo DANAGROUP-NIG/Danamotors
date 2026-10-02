@@ -53,7 +53,6 @@ export class InventoryRepository {
   // ── Part Master ────────────────────────────────────────────────────────
 
   async createPart(data: {
-    partCode: string;
     partNumber: string;
     name: string;
     category: string;
@@ -117,10 +116,6 @@ export class InventoryRepository {
 
   async findPartById(id: string): Promise<SparePart | null> {
     return prisma.sparePart.findUnique({ where: { id } });
-  }
-
-  async findPartByCode(partCode: string): Promise<SparePart | null> {
-    return prisma.sparePart.findUnique({ where: { partCode } });
   }
 
   async updatePart(

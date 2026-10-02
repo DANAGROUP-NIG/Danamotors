@@ -23,7 +23,7 @@ danamotors/
 | [frontend.md](./frontend.md) | Frontend routes, feature folders, data fetching, state, auth flow |
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
-| [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MIT, SRN |
+| [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving Mobis purchases: MIT file upload, MRN, CPD stock |
 
 ## Quick start

@@ -93,19 +93,6 @@ export class InventoryService {
     this.inventoryRepository = new InventoryRepository();
   }
 
-  /**
-   * Parts created without an explicit code use their part number, which is
-   * already unique; a numbered suffix covers the rare clash with another code.
-   */
-  private async generatePartCode(partNumber: string): Promise<string> {
-    for (let i = 0; i < 50; i++) {
-      const candidate = i === 0 ? partNumber : `${partNumber}-${i + 1}`;
-      const taken = await prisma.sparePart.findUnique({ where: { partCode: candidate }, select: { id: true } });
-      if (!taken) return candidate;
-    }
-    throw new ConflictError(`Could not generate a part code for ${partNumber}`);
-  }
-
   /** Legacy retail rate: dealer rate x the price category's multiplier, rounded to kobo. */
   private async retailFromCategory(dealerRate: number, code: string | null | undefined): Promise<number | null> {
     if (!code) return null;
@@ -181,8 +168,8 @@ export class InventoryService {
       );
     }
 
-    const { branchStock, recordedById, ...rest } = data;
-    const partData = { ...rest, partCode: await this.generatePartCode(rest.partNumber) };
+    // partCode is not set here: the database generates it.
+    const { branchStock, recordedById, ...partData } = data;
 
     if (!branchStock || branchStock.length === 0) {
       return this.inventoryRepository.createSparePart(partData);
@@ -292,7 +279,6 @@ export class InventoryService {
     return prisma.sparePart.create({
       data: {
         mainPartId,
-        partCode: await this.generatePartCode(partNumber),
         partNumber,
         name,
         description,
@@ -336,7 +322,6 @@ export class InventoryService {
     ...(search && {
         OR: [
           { partNumber: { contains: search, mode: 'insensitive' } },
-          { partCode: { contains: search, mode: 'insensitive' } },
           { name: { contains: search, mode: 'insensitive' } },
         ],
       }),
@@ -390,7 +375,6 @@ export class InventoryService {
   }
 
   async createPart(data: {
-    partCode: string;
     partNumber: string;
     name: string;
     category: string;
@@ -414,15 +398,6 @@ export class InventoryService {
     } else if (data.priceCategoryCode) {
       await this.retailFromCategory(data.unitRate, data.priceCategoryCode); // validates the code
     }
-    const existing = await this.inventoryRepository.findPartByCode(
-      data.partCode,
-    );
-    if (existing) {
-      throw new ConflictError(
-        "A part with this part code already exists",
-      );
-    }
-
     const { unitRate, ...rest } = data;
     const part = await this.inventoryRepository.createPart({
       ...rest,
@@ -478,7 +453,6 @@ export class InventoryService {
   async updatePart(
     id: string,
     data: {
-      partCode?: string;
       partNumber?: string;
       name?: string;
       category?: string;
@@ -501,17 +475,6 @@ export class InventoryService {
     const part = await this.inventoryRepository.findPartById(id);
     if (!part) {
       throw new NotFoundError("Part not found");
-    }
-
-    if (data.partCode && data.partCode !== part.partCode) {
-      const existing = await this.inventoryRepository.findPartByCode(
-        data.partCode,
-      );
-      if (existing && existing.id !== id) {
-        throw new ConflictError(
-          "A part with this part code already exists",
-        );
-      }
     }
 
     const { unitRate, ...rest } = data;
@@ -649,12 +612,7 @@ export class InventoryService {
   /** Legacy Part Query: stock at the home premises, alternates, and other branches. */
   async partQuery(partNumber: string, homeBranchId?: string | null) {
     const part = await prisma.sparePart.findFirst({
-      where: {
-        OR: [
-          { partNumber: { equals: partNumber, mode: "insensitive" } },
-          { partCode: { equals: partNumber, mode: "insensitive" } },
-        ],
-      },
+      where: { partNumber: { equals: partNumber, mode: "insensitive" } },
     });
     if (!part) throw new NotFoundError(`Part ${partNumber} not found`);
 

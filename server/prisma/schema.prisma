@@ -8,23 +8,23 @@ datasource db {
 }
 
 model Branch {
-  id          String   @id @default(uuid())
-  name        String   @unique
+  id             String   @id @default(uuid())
+  name           String   @unique
   // Legacy store-location code (e.g. A, QS, DH, VI).
-  code        String?  @unique
+  code           String?  @unique
   // Set when this is a sub-location (store, godown) at another branch's premises.
   parentBranchId String?
   parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
   subLocations   Branch[] @relation("BranchSubLocations")
-  address     String?
-  city        String?
-  state       String?
-  country     String?
-  phoneNumber String?
-  email       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  phoneNumber    String?
+  email          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   users             User[]
   customers         Customer[]
@@ -38,18 +38,16 @@ model Branch {
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
 
-  indentRequests BranchIndent[]      @relation("IndentRequestingBranch")
-  indentSources  BranchIndent[]      @relation("IndentSourceBranch")
-  pickingLists   PickingList[]       @relation("PickingListBranch")
-  stnsOut        StockTransferNote[] @relation("StnSourceBranch")
-  stnsIn         StockTransferNote[] @relation("StnDestinationBranch")
-  transferCases  TransferCase[]      @relation("TransferCaseBranch")
-  packingLists   PackingList[]       @relation("PackingListBranch")
-  mitsOut        MaterialInTransit[] @relation("MitSourceBranch")
-  mitsIn         MaterialInTransit[] @relation("MitDestinationBranch")
-  srnsReceived   StockReceiptNote[]  @relation("SrnReceivingBranch")
+  indentRequests BranchIndent[]        @relation("IndentRequestingBranch")
+  indentSources  BranchIndent[]        @relation("IndentSourceBranch")
+  pickingLists   PickingList[]         @relation("PickingListBranch")
+  stnsOut        StockTransferNote[]   @relation("StnSourceBranch")
+  stnsIn         StockTransferNote[]   @relation("StnDestinationBranch")
+  transferCases  TransferCase[]        @relation("TransferCaseBranch")
+  packingLists   PackingList[]         @relation("PackingListBranch")
+  mitsIn         MaterialInTransit[]   @relation("MitDestinationBranch")
   mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
-  srnsSourced    StockReceiptNote[]  @relation("SrnSourceBranch")
+  mrnsSourced    MaterialReceiptNote[] @relation("MrnSourceBranch")
 
   notifications Notification[]
 }
@@ -115,7 +113,6 @@ model User {
   transferCasesCreated TransferCase[]          @relation("TransferCaseCreatedBy")
   packingListsCreated  PackingList[]           @relation("PackingListCreatedBy")
   mitsCreated          MaterialInTransit[]     @relation("MitCreatedBy")
-  srnsReceived         StockReceiptNote[]      @relation("SrnReceivedBy")
   mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
@@ -362,7 +359,7 @@ model JobCard {
   partIssuances PartIssuance[]
   invoices      Invoice[]
 
-  indentLines   BranchIndentLine[] @relation("IndentLineJobCard")
+  indentLines BranchIndentLine[] @relation("IndentLineJobCard")
 
   @@index([branchId])
   @@index([customerId])
@@ -507,27 +504,27 @@ enum PartRole {
 model SparePart {
   id String @id @default(uuid())
 
-  partCode   String @unique @default(uuid())
-  partNumber String @unique
-  name       String
+  partCode    String  @unique @default(uuid())
+  partNumber  String  @unique
+  name        String
   // `unitPrice` is the legacy column name; it maps to Part Master `unitRate`.
   description String?
   category    String?
 
-  uom          String @default("UNIT")
-  taxCategory  String?
-  taxForm      String?
-  minLevel     Float?
-  maxLevel     Float?
-  reorderQty   Float?
+  uom         String  @default("UNIT")
+  taxCategory String?
+  taxForm     String?
+  minLevel    Float?
+  maxLevel    Float?
+  reorderQty  Float?
 
-  unitPrice Float @default(0)
+  unitPrice         Float         @default(0)
   // Legacy dealer rate is unitPrice; retail rate is the selling price.
-  retailRate Float?
+  retailRate        Float?
   // Legacy tax status (partmast.taxable).
-  taxable    Boolean @default(true)
+  taxable           Boolean       @default(true)
   // Legacy part flag, for example O for original.
-  partFlag   String  @default("O")
+  partFlag          String        @default("O")
   // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
   priceCategoryCode String?
   priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
@@ -537,9 +534,9 @@ model SparePart {
   partStatus    PartStatus @default(ACTIVE)
 
   // --- new: main/alternate relationship ---
-  role PartRole @default(MAIN)
-  mainPartId String?
-  mainPart   SparePart? @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
+  role           PartRole    @default(MAIN)
+  mainPartId     String?
+  mainPart       SparePart?  @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
   alternateParts SparePart[] @relation("PartAlternates")
 
   createdAt DateTime @default(now())
@@ -551,15 +548,13 @@ model SparePart {
   stockTransactions StockTransaction[]
   transferItems     InterBranchTransferItem[]
 
-  indentLines       BranchIndentLine[]      @relation("IndentLinePart")
-  pickingRequested  PickingListLine[]       @relation("PickingRequestedPart")
-  pickingSupplied   PickingListLine[]       @relation("PickingSuppliedPart")
-  stnRequested      StockTransferNoteLine[] @relation("StnRequestedPart")
-  stnSupplied       StockTransferNoteLine[] @relation("StnSuppliedPart")
-  mitLines          MaterialInTransitLine[] @relation("MitLinePart")
-  mitRequestedLines MaterialInTransitLine[] @relation("MitLineRequestedPart")
-  srnLines          StockReceiptLine[]      @relation("SrnLinePart")
-  mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
+  indentLines      BranchIndentLine[]      @relation("IndentLinePart")
+  pickingRequested PickingListLine[]       @relation("PickingRequestedPart")
+  pickingSupplied  PickingListLine[]       @relation("PickingSuppliedPart")
+  stnRequested     StockTransferNoteLine[] @relation("StnRequestedPart")
+  stnSupplied      StockTransferNoteLine[] @relation("StnSuppliedPart")
+  mitLines         MaterialInTransitLine[] @relation("MitLinePart")
+  mrnLines         MaterialReceiptLine[]   @relation("MrnLinePart")
 
   @@index([mainPartId])
 }
@@ -1129,7 +1124,7 @@ enum IndentStatus {
   PACKED
   DISPATCHED
   IN_TRANSIT
-  SRN_CREATED
+  MRN_CREATED
   PARTIALLY_RECEIVED
   RECEIVED
   COMPLETED
@@ -1188,11 +1183,6 @@ model PartCategory {
   parts SparePart[]
 }
 
-enum MitSourceType {
-  INTERNAL_TRANSFER
-  EXTERNAL_VENDOR
-}
-
 enum MitStatus {
   IN_TRANSIT
   VERIFIED
@@ -1201,9 +1191,10 @@ enum MitStatus {
   CANCELLED
 }
 
-enum SrnStatus {
-  COMPLETED
-  CANCELLED
+// Where the stock on an MRN came from: a Mobis invoice (MIT) or a branch transfer (STN).
+enum MrnSource {
+  MOBIS
+  BRANCH_TRANSFER
 }
 
 // Atomic per-document, per-year counters used to generate document numbers.
@@ -1288,7 +1279,7 @@ model BranchIndentLine {
   urgentQuantity     Int @default(0)
   stockQuantity      Int @default(0)
   stockOrderQuantity Int @default(0)
-  requestedQuantity Int
+  requestedQuantity  Int
 
   approvedQuantity  Int?
   backOrderQuantity Int  @default(0)
@@ -1434,8 +1425,8 @@ model StockTransferNote {
   lines       StockTransferNoteLine[]
   cases       TransferCase[]
   packingList PackingList?
-  mit         MaterialInTransit?
-  srns        StockReceiptNote[]
+  // Goods received notes raised by the receiving branch; more than one when received in parts.
+  mrns        MaterialReceiptNote[]
 
   @@index([sourceBranchId])
   @@index([destinationBranchId])
@@ -1462,10 +1453,15 @@ model StockTransferNoteLine {
   unitRate Float
   amount   Float
 
+  // Running receipt tallies, updated by each MRN the receiving branch posts against this line.
+  receivedQuantity Int @default(0)
+  damagedQuantity  Int @default(0)
+  shortQuantity    Int @default(0)
+
   createdAt DateTime @default(now())
 
   caseLines TransferCaseLine[]
-  mitLine   MaterialInTransitLine?
+  mrnLines  MaterialReceiptLine[]
 
   @@index([stnId])
   @@index([partId])
@@ -1547,38 +1543,31 @@ model PackingList {
 
 // MIT covers both internal transfers (from an STN) and, later, external
 // vendor (Mobis) shipments. Vendor fields stay null for internal transfers.
+// Material in transit from Mobis only: one record per imported Mobis invoice.
+// Branch-to-branch transfers do not use MIT; they travel on the STN and are received with an MRN.
 model MaterialInTransit {
-  id         String        @id @default(uuid())
-  mitNumber  String        @unique
-  sourceType MitSourceType
-  status     MitStatus     @default(IN_TRANSIT)
-
-  stnId String?            @unique
-  stn   StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: Restrict)
-
-  sourceBranchId String?
-  sourceBranch   Branch? @relation("MitSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+  id        String    @id @default(uuid())
+  mitNumber String    @unique
+  status    MitStatus @default(IN_TRANSIT)
 
   destinationBranchId String
   destinationBranch   Branch @relation("MitDestinationBranch", fields: [destinationBranchId], references: [id], onDelete: Restrict)
 
-  // External vendor fields (Process B).
-  vendor         String?
-  invoiceNumber  String?
-  invoiceDate    DateTime?
-  conversionRate Float?
-  receivedMode   TransportMode?
+  // Mobis invoice fields.
+  vendor              String?
+  invoiceNumber       String?
+  invoiceDate         DateTime?
+  conversionRate      Float?
+  receivedMode        TransportMode?
   // Legacy "Material phy rec date" and the imported file's name.
   physicalReceiptDate DateTime?
   sourceFileName      String?
   cancelledAt         DateTime?
 
-  dispatchMode  TransportMode?
-  waybillNumber String?
-  transitDate   DateTime       @default(now())
-  totalCases    Int            @default(0)
-  totalQuantity Int            @default(0)
-  totalAmount   Float          @default(0)
+  transitDate   DateTime @default(now())
+  totalCases    Int      @default(0)
+  totalQuantity Int      @default(0)
+  totalAmount   Float    @default(0)
   remarks       String?
 
   createdById String?
@@ -1588,14 +1577,11 @@ model MaterialInTransit {
   updatedAt DateTime @updatedAt
 
   lines MaterialInTransitLine[]
-  srns  StockReceiptNote[]
   mrn   MaterialReceiptNote?
 
-  @@index([sourceType])
   @@index([vendor, invoiceNumber])
   @@index([status])
   @@index([destinationBranchId])
-  @@index([sourceBranchId])
 }
 
 model MaterialInTransitLine {
@@ -1603,20 +1589,15 @@ model MaterialInTransitLine {
   mitId String
   mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Cascade)
 
-  stnLineId String?                @unique
-  stnLine   StockTransferNoteLine? @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
-
-  partId          String
-  part            SparePart  @relation("MitLinePart", fields: [partId], references: [id], onDelete: Restrict)
-  requestedPartId String?
-  requestedPart   SparePart? @relation("MitLineRequestedPart", fields: [requestedPartId], references: [id], onDelete: SetNull)
+  partId String
+  part   SparePart @relation("MitLinePart", fields: [partId], references: [id], onDelete: Restrict)
 
   caseNumbers String?
   quantity    Int
   unitPrice   Float
   amount      Float
 
-  // External vendor line details (Process B), as printed on the Mobis invoice.
+  // Line details as printed on the Mobis invoice.
   orderNumber     String?
   lineNumber      Int?
   weight          Float?
@@ -1628,96 +1609,50 @@ model MaterialInTransitLine {
   // True when the part was created in Part Master from this invoice.
   newPart         Boolean @default(false)
 
-  // Running receipt tallies, updated by each SRN posted against this line.
+  // Receipt tallies, set when the MRN is posted against this line.
   receivedQuantity Int @default(0)
   damagedQuantity  Int @default(0)
   shortQuantity    Int @default(0)
 
   createdAt DateTime @default(now())
 
-  srnLines StockReceiptLine[]
   mrnLines MaterialReceiptLine[]
 
   @@index([mitId])
   @@index([partId])
 }
 
-model StockReceiptNote {
-  id        String @id @default(uuid())
-  srnNumber String @unique
-
-  mitId String
-  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
-
-  stnId String
-  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Restrict)
-
-  receivingBranchId String
-  receivingBranch   Branch @relation("SrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
-
-  sourceBranchId String
-  sourceBranch   Branch @relation("SrnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
-
-  status        SrnStatus      @default(COMPLETED)
-  receiptDate   DateTime       @default(now())
-  taxForm       String?
-  transportMode TransportMode?
-  remarks       String?
-
-  totalReceived Int @default(0)
-  totalDamaged  Int @default(0)
-  totalShort    Int @default(0)
-
-  receivedById String?
-  receivedBy   User?   @relation("SrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-
-  lines StockReceiptLine[]
-
-  @@index([mitId])
-  @@index([stnId])
-  @@index([receivingBranchId])
-}
-
-model StockReceiptLine {
-  id    String           @id @default(uuid())
-  srnId String
-  srn   StockReceiptNote @relation(fields: [srnId], references: [id], onDelete: Cascade)
-
-  mitLineId String
-  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
-
-  partId String
-  part   SparePart @relation("SrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
-
-  receivedQuantity Int     @default(0)
-  damagedQuantity  Int     @default(0)
-  shortQuantity    Int     @default(0)
-  remarks          String?
-
-  @@index([srnId])
-  @@index([mitLineId])
-}
-
 // Material Receipt Note: receipt of externally purchased (Mobis) material into
 // CPD stock. Distinct from the SRN, which receives internal transfers.
 // One MRN per MIT, so stock from an invoice can only be posted once.
+// Material receipt note: posts received stock to the receiving branch.
+// A Mobis MRN closes one MIT. A branch-transfer MRN is raised by the receiving branch against
+// the STN; a transfer received in parts has one MRN per receipt.
 model MaterialReceiptNote {
-  id        String @id @default(uuid())
-  mrnNumber String @unique
+  id        String    @id @default(uuid())
+  mrnNumber String    @unique
+  source    MrnSource
 
-  mitId String            @unique
-  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
+  // Set when source = MOBIS.
+  mitId String?            @unique
+  mit   MaterialInTransit? @relation(fields: [mitId], references: [id], onDelete: Restrict)
+
+  // Set when source = BRANCH_TRANSFER.
+  stnId          String?
+  stn            StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: Restrict)
+  sourceBranchId String?
+  sourceBranch   Branch?            @relation("MrnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
 
   receivingBranchId String
   receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
 
-  vendor         String
+  // Mobis only.
+  vendor         String?
   invoiceNumber  String?
-  // Legacy MRN tax form for purchases is P.
-  taxForm        String   @default("P")
-  conversionRate Float
+  // Legacy tax form: P for Mobis purchases; a transfer MRN takes the STN's form, if any.
+  taxForm        String?
+  // Invoice currency to naira; 1 for branch transfers, which are already in naira.
+  conversionRate Float    @default(1)
   receiptDate    DateTime @default(now())
   remarks        String?
 
@@ -1735,6 +1670,8 @@ model MaterialReceiptNote {
   lines MaterialReceiptLine[]
 
   @@index([receivingBranchId])
+  @@index([stnId])
+  @@index([source])
 }
 
 model MaterialReceiptLine {
@@ -1742,8 +1679,11 @@ model MaterialReceiptLine {
   mrnId String
   mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
 
-  mitLineId String
-  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+  // Exactly one of these is set, matching the MRN's source.
+  mitLineId String?
+  mitLine   MaterialInTransitLine? @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+  stnLineId String?
+  stnLine   StockTransferNoteLine? @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
 
   partId String
   part   SparePart @relation("MrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
@@ -1752,7 +1692,7 @@ model MaterialReceiptLine {
   damagedQuantity  Int @default(0)
   shortQuantity    Int @default(0)
 
-  // Vendor unit price (foreign currency) and its local value.
+  // Unit price as sent (Mobis: invoice currency; transfer: naira) and its naira cost.
   unitPrice Float
   unitCost  Float
   amount    Float
@@ -1761,4 +1701,5 @@ model MaterialReceiptLine {
 
   @@index([mrnId])
   @@index([mitLineId])
+  @@index([stnLineId])
 }

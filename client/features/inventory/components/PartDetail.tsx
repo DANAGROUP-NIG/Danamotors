@@ -57,12 +57,23 @@ function SectionCard({ icon, title, action, children }: { icon: ReactNode; title
   );
 }
 
-function DetailField({ label, value, mono }: { label: string; value?: ReactNode; mono?: boolean }) {
+function DetailField({
+  label,
+  value,
+  mono,
+  wide,
+}: {
+  label: string;
+  value?: ReactNode;
+  mono?: boolean;
+  /** Takes the full row on phones, for long text such as descriptions. */
+  wide?: boolean;
+}) {
   const empty = value === null || value === undefined || value === "";
   return (
-    <div>
+    <div className={cn("min-w-0", wide && "col-span-2")}>
       <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={cn("mt-0.5 text-sm text-slate-700", mono && "font-mono")}>{empty ? "—" : value}</p>
+      <p className={cn("mt-0.5 break-words text-sm text-slate-700", mono && "font-mono")}>{empty ? "—" : value}</p>
     </div>
   );
 }
@@ -234,9 +245,7 @@ export function PartDetail({ id }: { id: string }) {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-xl font-semibold text-slate-800">{part.name}</h1>
-              <p className="mt-1 font-mono text-sm text-slate-500">
-                {part.partNumber} · {part.partCode}
-              </p>
+              <p className="mt-1 font-mono text-sm text-slate-500">{part.partNumber}</p>
               {part.role === "ALTERNATE" && mainPart && (
                 <p className="mt-1 text-xs text-slate-500">
                   Alternate for{" "}
@@ -257,7 +266,7 @@ export function PartDetail({ id }: { id: string }) {
               This part is blocked. It cannot be requested on new indents or supplied as an alternate.
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
             <DetailField label="Part flag" value={part.partFlag} />
@@ -275,7 +284,7 @@ export function PartDetail({ id }: { id: string }) {
             <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
             <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
             <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />
-            <DetailField label="Description" value={part.description} />
+            <DetailField label="Description" value={part.description} wide />
           </div>
         </div>
 
@@ -352,7 +361,7 @@ export function PartDetail({ id }: { id: string }) {
                   <tbody>
                     {stock.map((s) => (
                       <tr key={s.id} className="border-t border-slate-100">
-                        <td className="px-3 py-2 text-slate-700">{s.branch.name}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-700">{s.branch.name}</td>
                         <td className="px-3 py-2 text-right font-medium">{s.quantity}</td>
                         <td className="px-3 py-2 text-right text-slate-500">{s.reservedQuantity}</td>
                         <td

@@ -56,7 +56,6 @@ describeDb("Mobis purchase receiving (database)", () => {
   it("imports the invoice, creating missing parts at unit price x conversion rate", async () => {
     const mit = await service.importMit({ ...invoice(), createMissingParts: true }, user.id);
     expect(mit).toMatchObject({
-      sourceType: "EXTERNAL_VENDOR",
       vendor: "MOBIS",
       status: "IN_TRANSIT",
       conversionRate: 2700,
@@ -71,7 +70,8 @@ describeDb("Mobis purchase receiving (database)", () => {
       [`92101Q${run}`, true],
     ]);
     const created = await prisma.sparePart.findUniqueOrThrow({ where: { partNumber: `92101Q${run}` } });
-    expect(created).toMatchObject({ partCode: `92101Q${run}`, name: "LAMP ASSY-HEAD,LH", unitPrice: 881793, category: "Mobis import" });
+    expect(created).toMatchObject({ name: "LAMP ASSY-HEAD,LH", unitPrice: 881793, category: "Mobis import" });
+    expect(created.partCode).not.toBe(created.partNumber);
   });
 
   it("does not import the same invoice twice", async () => {
