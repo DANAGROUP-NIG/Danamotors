@@ -210,13 +210,12 @@ async function lockStock(tx: Tx, branchId: string, partId: string): Promise<Lock
 
 export async function nextDocumentNumber(tx: Tx, docType: DocType, at = new Date()): Promise<string> {
   const year = at.getFullYear();
-  const rows = await tx.$queryRaw<{ lastValue: number }[]>`
-    INSERT INTO "DocumentSequence" ("docType", "year", "lastValue", "updatedAt")
-    VALUES (${docType}, ${year}, 1, NOW())
-    ON CONFLICT ("docType", "year")
-    DO UPDATE SET "lastValue" = "DocumentSequence"."lastValue" + 1, "updatedAt" = NOW()
-    RETURNING "lastValue"`;
-  return formatDocumentNumber(year, Number(rows[0].lastValue));
+  const sequence = await tx.documentSequence.upsert({
+    where: { key: `${docType}_${year}` },
+    create: { key: `${docType}_${year}`, value: 1 },
+    update: { value: { increment: 1 } },
+  });
+  return formatDocumentNumber(year, sequence.value);
 }
 
 /** Atomically move an indent from one of the allowed statuses to a new one. */
