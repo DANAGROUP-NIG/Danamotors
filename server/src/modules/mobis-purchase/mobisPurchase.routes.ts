@@ -30,7 +30,7 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  *       Receiving parts bought from Mobis (issue #62, Process B). The Mobis invoice file in MIT format is the
  *       only file ever uploaded in the app; everything else is shared through the single database.
  *
- *       1. Upload the invoice file (parsed in the browser) → MIT with `sourceType = EXTERNAL_VENDOR`.
+ *       1. Upload the invoice file (parsed in the browser) → MIT (MIT is used for Mobis invoices only).
  *       2. Generate the MRN → accepted quantities are posted to the receiving branch (CPD) once.
  *
  * /inventory/mobis/mit/match-parts:

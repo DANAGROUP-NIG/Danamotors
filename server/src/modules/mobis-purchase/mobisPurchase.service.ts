@@ -8,13 +8,13 @@
  * (and, if asked, any parts missing from Part Master). Generating the MRN
  * records what physically arrived and posts accepted stock exactly once.
  */
-import { MitSourceType, MitStatus, PartStatus, Prisma, TransportMode } from "@prisma/client";
+import { MitStatus, MrnSource, PartStatus, TransportMode } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
 import { nextDocumentNumber } from "../stock-transfer/stockTransfer.service";
-import { DOC_TYPES, planReceipt, ReceiptInputLine } from "../stock-transfer/stockTransfer.logic";
+import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
 import {
   DEFAULT_CONVERSION_RATE,
   ImportLineInput,
@@ -26,7 +26,6 @@ import {
   unitCost,
 } from "./mobisPurchase.logic";
 
-type Tx = Prisma.TransactionClient;
 const TX_OPTIONS = { timeout: 60_000, maxWait: 10_000 };
 
 export const MOBIS_NOTIFICATION_TYPES = {
@@ -52,19 +51,11 @@ export interface CreateMrnInput {
   receiptDate?: Date;
   remarks?: string;
   /** Per-line received/damaged. Anything not accounted for is recorded as short. */
-  lines?: ReceiptInputLine[];
+  lines?: { mitLineId: string; receivedQuantity: number; damagedQuantity?: number; remarks?: string }[];
 }
 
 const userSelect = { select: { id: true, firstName: true, lastName: true } } as const;
 const branchSelect = { select: { id: true, name: true, code: true } } as const;
-
-async function uniquePartCode(tx: Tx, partNumber: string): Promise<string> {
-  for (let i = 0; i < 50; i++) {
-    const candidate = i === 0 ? partNumber : `${partNumber}-${i + 1}`;
-    if (!(await tx.sparePart.findUnique({ where: { partCode: candidate }, select: { id: true } }))) return candidate;
-  }
-  throw new ConflictError(`Could not generate a part code for ${partNumber}`);
-}
 
 export class MobisPurchaseService {
   private notifications = new NotificationService();
@@ -91,7 +82,6 @@ export class MobisPurchaseService {
 
     const duplicate = await prisma.materialInTransit.findFirst({
       where: {
-        sourceType: MitSourceType.EXTERNAL_VENDOR,
         vendor: MOBIS_VENDOR,
         invoiceNumber: { equals: invoiceNumber, mode: "insensitive" },
         status: { not: MitStatus.CANCELLED },
@@ -124,7 +114,6 @@ export class MobisPurchaseService {
         const line = lines.find((l) => l.partNumber === partNumber)!;
         const part = await tx.sparePart.create({
           data: {
-            partCode: await uniquePartCode(tx, partNumber),
             partNumber,
             name: line.partName ?? partNumber,
             description: `Created from Mobis invoice ${invoiceNumber}`,
@@ -143,7 +132,6 @@ export class MobisPurchaseService {
       return tx.materialInTransit.create({
         data: {
           mitNumber,
-          sourceType: MitSourceType.EXTERNAL_VENDOR,
           status: MitStatus.IN_TRANSIT,
           destinationBranchId: branch.id,
           vendor: MOBIS_VENDOR,
@@ -210,14 +198,13 @@ export class MobisPurchaseService {
         mrn: { include: { receivedBy: userSelect, lines: true } },
       },
     });
-    if (!mit || mit.sourceType !== MitSourceType.EXTERNAL_VENDOR) throw new NotFoundError("Mobis MIT not found");
+    if (!mit) throw new NotFoundError("Mobis MIT not found");
     return mit;
   }
 
   async listMobisMits(filters: { status?: MitStatus; branchId?: string; search?: string }) {
     return prisma.materialInTransit.findMany({
       where: {
-        sourceType: MitSourceType.EXTERNAL_VENDOR,
         ...(filters.status && { status: filters.status }),
         ...(filters.branchId && { destinationBranchId: filters.branchId }),
         ...(filters.search && {
@@ -260,9 +247,9 @@ export class MobisPurchaseService {
   async createMrn(mitId: string, actorId: string, input: CreateMrnInput = {}) {
     const result = await prisma.$transaction(async (tx) => {
       // Lock the MIT so two MRN attempts queue here; the unique MRN.mitId is the final guard.
-      const locked = await tx.$queryRaw<{ status: MitStatus; sourceType: MitSourceType }[]>`
-        SELECT "status", "sourceType" FROM "MaterialInTransit" WHERE "id" = ${mitId} FOR UPDATE`;
-      if (!locked[0] || locked[0].sourceType !== MitSourceType.EXTERNAL_VENDOR) throw new NotFoundError("Mobis MIT not found");
+      const locked = await tx.$queryRaw<{ status: MitStatus }[]>`
+        SELECT "status" FROM "MaterialInTransit" WHERE "id" = ${mitId} FOR UPDATE`;
+      if (!locked[0]) throw new NotFoundError("Mobis MIT not found");
       if (locked[0].status !== MitStatus.IN_TRANSIT && locked[0].status !== MitStatus.VERIFIED) {
         throw new ConflictError(`Cannot generate an MRN for an MIT in ${locked[0].status} status`);
       }
@@ -273,17 +260,21 @@ export class MobisPurchaseService {
       if (mit.mrn) throw new ConflictError(`MIT ${mit.mitNumber} already has MRN ${mit.mrn.mrnNumber}`);
 
       // One MRN closes the MIT: anything not received or damaged is recorded as short.
-      const plan = planReceipt(mit.lines, input.lines, true);
+      const plan = planReceipt(
+        mit.lines,
+        input.lines?.map(({ mitLineId, ...rest }) => ({ lineId: mitLineId, ...rest })),
+        true,
+      );
       const rate = mit.conversionRate ?? DEFAULT_CONVERSION_RATE;
       const lineById = new Map(mit.lines.map((l) => [l.id, l]));
       const now = new Date();
       const mrnNumber = await nextDocumentNumber(tx, DOC_TYPES.MRN, now);
 
       const mrnLines = plan.lines.map((p) => {
-        const mitLine = lineById.get(p.mitLineId)!;
+        const mitLine = lineById.get(p.lineId)!;
         const cost = unitCost(mitLine.unitPrice, rate);
         return {
-          mitLineId: p.mitLineId,
+          mitLineId: p.lineId,
           partId: mitLine.partId,
           receivedQuantity: p.receivedQuantity,
           damagedQuantity: p.damagedQuantity,
@@ -299,6 +290,7 @@ export class MobisPurchaseService {
       const mrn = await tx.materialReceiptNote.create({
         data: {
           mrnNumber,
+          source: MrnSource.MOBIS,
           mitId: mit.id,
           receivingBranchId: mit.destinationBranchId,
           vendor: mit.vendor ?? MOBIS_VENDOR,
@@ -365,8 +357,9 @@ export class MobisPurchaseService {
   }
 
   async listMrns(branchId?: string) {
+    // Transfer MRNs share the table; this register lists Mobis receipts only.
     return prisma.materialReceiptNote.findMany({
-      where: branchId ? { receivingBranchId: branchId } : undefined,
+      where: { source: MrnSource.MOBIS, ...(branchId && { receivingBranchId: branchId }) },
       orderBy: { createdAt: "desc" },
       include: {
         receivingBranch: branchSelect,
@@ -392,7 +385,7 @@ export class MobisPurchaseService {
         },
       },
     });
-    if (!mrn) throw new NotFoundError("MRN not found");
+    if (!mrn || mrn.source !== MrnSource.MOBIS) throw new NotFoundError("MRN not found");
     return mrn;
   }
 

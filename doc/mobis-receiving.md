@@ -57,7 +57,8 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
 `POST /api/inventory/mobis/mit/match-parts`, `POST /api/inventory/mobis/mit`,
 `GET /api/inventory/mobis/mit`, `GET /api/inventory/mobis/mit/:id`,
 `POST /api/inventory/mobis/mit/:id/mrn`, `PATCH /api/inventory/mobis/mit/:id/cancel`,
-`GET /api/inventory/mrn`, `GET /api/inventory/mrn/:id`. Request and response examples are in
+`GET /api/inventory/mrn`, `GET /api/inventory/mrn/:id`. These list Mobis MRNs only; MRNs for
+branch transfers are under `/api/inventory/transfer-mrns`. Request and response examples are in
 Swagger under "Mobis Purchase".
 
 ## Not yet built

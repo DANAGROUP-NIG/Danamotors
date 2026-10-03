@@ -60,7 +60,7 @@ export function MobisReceiptsPage() {
       ),
     },
     { header: "Mobis invoice", render: (m) => <span className="font-mono text-xs">{m.invoiceNumber}</span> },
-    { header: "Received", render: (m) => <span className="text-muted-foreground">{fmtDate(m.physicalReceiptDate)}</span> },
+    { header: "Received", className: "whitespace-nowrap", render: (m) => <span className="text-muted-foreground">{fmtDate(m.physicalReceiptDate)}</span> },
     {
       header: "Mode",
       render: (m) => <span className="text-muted-foreground">{m.receivedMode ? RECEIVED_MODE_LABELS[m.receivedMode] : "—"}</span>,

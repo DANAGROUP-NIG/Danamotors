@@ -124,6 +124,7 @@ export function IndentsPage() {
   const columns: Column<IndentListItem>[] = [
     {
       header: "Indent #",
+      className: "whitespace-nowrap",
       render: (i) => (
         <Link href={`/transfers/indents/${i.id}`} className="flex items-center gap-2 hover:underline">
           <ArrowLeftRight className="size-4 text-muted-foreground" />
@@ -133,6 +134,7 @@ export function IndentsPage() {
     },
     {
       header: "From → To",
+      className: "min-w-52",
       render: (i) => (
         <span className="text-muted-foreground">
           {i.sourceBranch.name} → {i.requestingBranch.name}
@@ -169,6 +171,7 @@ export function IndentsPage() {
     },
     {
       header: "Order Date",
+      className: "whitespace-nowrap",
       render: (i) => <span className="text-muted-foreground">{fmtDate(i.orderDate)}</span>,
     },
     {

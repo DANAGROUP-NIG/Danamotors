@@ -74,7 +74,7 @@ export function DataTable<T>({
                   <th
                     key={i}
                     className={cn(
-                      "px-4 py-3 text-left text-xs font-semibold text-muted-foreground",
+                      "whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-muted-foreground",
                       col.headerClassName,
                     )}
                   >
