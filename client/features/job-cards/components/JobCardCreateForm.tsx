@@ -85,7 +85,7 @@ export function JobCardCreateForm({
   onPendingChange,
   defaultValues,
 }: {
-  onSuccess?: () => void;
+  onSuccess?: (id: string) => void;
   onClose?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
@@ -171,6 +171,11 @@ export function JobCardCreateForm({
   const customer = customerQuery.data;
   const vehicle = vehicleQuery.data?.vehicle;
   const lastJob = vehicle?.jobCards?.[0];
+  const recentJobs = useQuery({
+    queryKey: ["job-opening-recent-jobs", vehicleId],
+    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(`/service/vehicles/${vehicleId}/recent-jobs`),
+    enabled: !!vehicleId && hasPermission("jobcard:read"),
+  });
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -214,6 +219,9 @@ export function JobCardCreateForm({
 
     setValue("mileage", Number.NaN);
     setValue("acType", "NONE");
+    setValue("isRepeat", false);
+    setValue("previousJobId", "");
+    setValue("repeatReason", "");
   };
 
   const applyBooking = (record: PickerRecord) => {
@@ -286,7 +294,7 @@ export function JobCardCreateForm({
       },
     );
 
-    setValue("serviceCharge", 0, {
+    setValue("serviceCharge", estimate.lines.reduce((total, line) => total + (line.type === "SERVICE" ? Math.round(line.amount * 100) : 0), 0) / 100, {
       shouldDirty: true,
     });
 
@@ -359,6 +367,8 @@ export function JobCardCreateForm({
             .slice(0, 5000),
           promisedAt: new Date(`${promisedDate}T${promisedTime}`).toISOString(),
           technicianId: values.technicianId || undefined,
+          previousJobId: values.isRepeat ? values.previousJobId : undefined,
+          repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
           teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
@@ -376,11 +386,11 @@ export function JobCardCreateForm({
           })),
         },
         {
-          onSuccess: () => {
+          onSuccess: (card) => {
             reset(values);
             onDirtyChange?.(false);
             toast.success("Job card opened");
-            onSuccess?.();
+            onSuccess?.(card.id);
           },
 
           onError: (error) =>
@@ -455,7 +465,7 @@ export function JobCardCreateForm({
           }
         }}
       >
-        <div className="contents" inert={!!(confirmation || find)}>
+        <div className="contents" inert={!!(confirmation || find) || create.isPending}>
           <header className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -645,11 +655,7 @@ export function JobCardCreateForm({
                       <WorkshopPicker
                         label="Regn no. / VIN"
                         required
-                        endpoint={
-                          customerId
-                            ? `/vehicles?customerId=${customerId}`
-                            : "/vehicles"
-                        }
+                        endpoint="/vehicles"
                         collection="vehicles"
                         value={field.value ?? ""}
                         selectedRecord={vehicle}
@@ -688,6 +694,8 @@ export function JobCardCreateForm({
                     </select>
                   </OpeningField>
                   <ReadOnlyField label="Colour" value={vehicle?.color} />
+                  <ReadOnlyField label="Recorded warranty status" value={vehicle?.warrantyStatus} />
+                  <ReadOnlyField label="Warranty expiry" value={vehicle?.warrantyExpiresAt ? formatDate(vehicle.warrantyExpiresAt) : undefined} />
                   <ReadOnlyField
                     label="Purchase dealer"
                     value={vehicle?.sellingDealer}
@@ -790,14 +798,34 @@ export function JobCardCreateForm({
                         onBlur={field.onBlur}
                         onChange={(id) => {
                           field.onChange(id);
-                          resetVehicle();
-                          setValue("appointmentId", "");
                         }}
                       />
                     )}
                   />
                 }
               />
+              {vehicleId && (
+                <OpeningCard title="Repeat visit" description="Review recent jobs for this vehicle before opening a new one.">
+                  {recentJobs.isLoading && <p role="status" className="text-sm">Loading recent jobs...</p>}
+                  {recentJobs.isError && <p role="alert" className="text-sm text-destructive">Could not load recent jobs. <button type="button" className="underline" onClick={() => recentJobs.refetch()}>Retry</button></p>}
+                  {recentJobs.data?.jobs.length === 0 && <p className="text-sm text-muted-foreground">No jobs within the configured repeat window.</p>}
+                  {!!recentJobs.data?.jobs.length && <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{recentJobs.data.jobs.length} recent job(s). Latest: <Link href={`/job-cards/${recentJobs.data.jobs[0].id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">{recentJobs.data.jobs[0].jobNumber}</Link> ({formatDate(recentJobs.data.jobs[0].createdAt)}).</p>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("isRepeat")} /> This is a repeat job</label>
+                    {watch("isRepeat") && <>
+                      <OpeningField label="Previous job" required error={errors.previousJobId?.message}>
+                        <select className={openingInput} aria-invalid={!!errors.previousJobId} {...register("previousJobId")}>
+                          <option value="">Select previous job</option>
+                          {recentJobs.data.jobs.map((job) => <option key={job.id} value={job.id}>{job.jobNumber} — {formatDate(job.createdAt)}{job.technician ? ` — ${job.technician.firstName} ${job.technician.lastName}` : ""}</option>)}
+                        </select>
+                      </OpeningField>
+                      <OpeningField label="Repeat reason" required error={errors.repeatReason?.message}>
+                        <textarea className={`${openingInput} h-24 py-2`} maxLength={2000} aria-invalid={!!errors.repeatReason} {...register("repeatReason")} />
+                      </OpeningField>
+                    </>}
+                  </div>}
+                </OpeningCard>
+              )}
               <OpeningCard title="Job scheduling & estimate">
                 <div className={openingGrid}>
                   <Controller
@@ -912,6 +940,7 @@ export function JobCardCreateForm({
                   Assign an engineer or group. Parts, oil and labour totals come
                   from Customer Requests.
                 </p>
+                <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" {...register("inHouse")} /> In-house job</label>
               </OpeningCard>
               <OpeningCard
                 title="Delivery & closing"

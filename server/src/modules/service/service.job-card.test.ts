@@ -74,6 +74,7 @@ import {
 import {
   assertTransition,
   repeatWindowStart,
+  jobStatusFilter,
 } from "./job-card-workflow.service";
 const id = "00000000-0000-4000-8000-000000000001";
 
@@ -97,6 +98,10 @@ const input = {
 };
 
 describe("JobCard workflow", () => {
+  it("includes legacy and canonical statuses in the same lifecycle filter", () => {
+    expect(jobStatusFilter("READY")).toEqual({ in: ["READY", "Ready", "Completed"] });
+    expect(jobStatusFilter("Closed")).toEqual({ in: ["DELIVERED", "Closed"] });
+  });
   beforeEach(() => {
     jest.restoreAllMocks();
     jest.clearAllMocks();
@@ -517,6 +522,32 @@ describe("JobCard workflow", () => {
         },
       },
     });
+  });
+
+  it("treats a legacy billed status as locked even without billedAt", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ status: "Billed", billedAt: null, invoices: [] });
+    await expect(new ServiceService().updateJobCard(id, { observations: "changed" }, id)).rejects.toThrow("Billed");
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
+  it("delivers an approved-credit job with a gate pass and recorded late reason", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
+      id, branchId: id, status: "READY", billedAt: null, invoices: [], creditApprovedById: id,
+      promisedAt: new Date("2020-01-01T00:00:00Z"),
+    });
+    (prisma.jobCard.update as jest.Mock).mockResolvedValue({ id, status: "DELIVERED" });
+    await new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id, lateReasonIds: [id], remarks: "Customer collected" }, id);
+    expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id }, data: expect.objectContaining({
+      status: "DELIVERED", deliveredAt: expect.any(Date), deliveryAdvisorId: id, lateReasonIds: [id], gatePassNumber: expect.any(String),
+    }) });
+    expect(prisma.jobCardStatusHistory.create).toHaveBeenCalledWith({ data: expect.objectContaining({ fromStatus: "READY", toStatus: "DELIVERED", actorId: id, remarks: "Customer collected" }) });
+  });
+
+  it("rejects delivery before billing or credit approval without issuing a gate pass", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: "READY", billedAt: null, invoices: [], promisedAt: new Date("2099-01-01T00:00:00Z") });
+    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("bill or approved credit");
+    expect(prisma.documentSequence.upsert).not.toHaveBeenCalled();
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 
   it("rejects invalid pagination and dates", () => {

@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import type { CreateJobCardFormValues } from "../schemas/job-card.schema";
@@ -27,6 +28,7 @@ function OpeningSession({
   defaultValues?: Partial<CreateJobCardFormValues>;
 }) {
   const [dirty, setDirty] = useState(false);
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [discard, setDiscard] = useState(false);
   const keep = useRef<HTMLButtonElement>(null);
@@ -59,7 +61,7 @@ function OpeningSession({
       <div hidden={discard}>
         <JobCardCreateForm
           defaultValues={defaultValues}
-          onSuccess={onClose}
+          onSuccess={(id) => { onClose(); router.push(`/job-cards/${id}`); }}
           onClose={requestClose}
           onDirtyChange={setDirty}
           onPendingChange={setPending}

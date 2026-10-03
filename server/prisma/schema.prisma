@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Branch {
+  receipts Receipt[]
   id          String   @id @default(uuid())
   name        String   @unique
   // Legacy store-location code (e.g. A, QS, DH, VI).
@@ -996,6 +997,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  serviceTotal Float @default(0)
   id String @id @default(uuid())
 
   customerId String
@@ -1154,6 +1156,10 @@ model Payment {
 
 model Receipt {
   id String @id @default(uuid())
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  idempotencyKey String? @unique
+  requestHash String?
 
   receiptNumber String   @unique
   customerId    String
@@ -1195,6 +1201,7 @@ model Receipt {
 
   @@index([invoiceId])
   @@index([customerId, issuedAt])
+  @@index([branchId, issuedAt])
   @@index([issuedById])
 }
 

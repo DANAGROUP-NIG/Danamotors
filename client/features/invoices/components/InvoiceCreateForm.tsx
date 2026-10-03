@@ -1,5 +1,6 @@
 "use client";
 
+import { isAxiosError } from "axios";
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
@@ -32,21 +33,24 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   const jobCards = useQuery({
     queryKey: [...invoiceKeys.billableJobCards(), branchId],
-    queryFn: getBillableJobCardsRequest,
+    queryFn: () => getBillableJobCardsRequest(branchId),
   });
   const advisors = useQuery({
-    queryKey: ["finance", "service-advisors", branchId],
-    queryFn: getServiceAdvisorsRequest,
+    queryKey: ["finance", "service-advisors", jobCards.data?.jobCards.find((card) => card.id === jobCardId)?.branch.id ?? branchId],
+    queryFn: () => getServiceAdvisorsRequest(jobCards.data?.jobCards.find((card) => card.id === jobCardId)?.branch.id ?? branchId),
   });
   const preview = useQuery({
     queryKey: invoiceKeys.jobBillPreview(jobCardId, partsDiscountPercent, labourDiscountPercent),
     queryFn: () => previewJobBillRequest({ jobCardId, partsDiscountPercent, labourDiscountPercent }),
-    enabled: Boolean(jobCardId),
+    enabled: Boolean(jobCardId) && [partsDiscountPercent, labourDiscountPercent].every((value) => Number.isFinite(value) && value >= 0 && value <= 100),
+    retry: false,
   });
 
   const bill = preview.data?.preview;
   const hasParts = Boolean(bill?.totals.partsTotal);
-  const effectiveAdvisorId = serviceAdvisorId || bill?.jobCard.serviceAdvisorId || "";
+  const candidateAdvisorId = serviceAdvisorId || bill?.jobCard.serviceAdvisorId || "";
+  const effectiveAdvisorId = advisors.data?.advisors.some((advisor) => advisor.id === candidateAdvisorId) ? candidateAdvisorId : "";
+  const validDiscounts = [partsDiscountPercent, labourDiscountPercent].every((value) => Number.isFinite(value) && value >= 0 && value <= 100);
 
   function selectJobCard(id: string) {
     setJobCardId(id);
@@ -57,7 +61,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!jobCardId || !effectiveAdvisorId || !bill) return;
+    if (!jobCardId || !effectiveAdvisorId || !bill || preview.isFetching || preview.isError || !validDiscounts || create.isPending) return;
     create.mutate({
       jobCardId,
       partsDiscountPercent,
@@ -68,20 +72,20 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
   }
 
   return (
-    <form className="grid gap-5" onSubmit={submit}>
-      <Field label="Completed job card">
+    <form className="grid gap-5" onSubmit={submit} inert={create.isPending}>
+      <Field label="Job card ready for billing">
         <select className={inputCls} value={jobCardId} onChange={(event) => selectJobCard(event.target.value)} required>
           <option value="">Select a job card</option>
           {jobCards.data?.jobCards.map((jobCard) => (
             <option key={jobCard.id} value={jobCard.id}>
-              {jobCard.jobNumber} - {jobCard.customer ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}` : "Customer missing"}
+              {jobCard.jobNumber} - {jobCard.customer ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}` : "Customer missing"}
             </option>
           ))}
         </select>
         {jobCards.isLoading && <span className="text-sm text-muted-foreground">Loading billable job cards...</span>}
-        {jobCards.isError && <span className="text-sm text-destructive">Could not load billable job cards.</span>}
+        {jobCards.isError && <div role="alert" className="flex items-center gap-2"><span className="text-sm text-destructive">Could not load billable job cards.</span><Button type="button" variant="outline" size="sm" onClick={() => jobCards.refetch()}>Retry</Button></div>}
         {!jobCards.isLoading && !jobCards.isError && jobCards.data?.jobCards.length === 0 && (
-          <span className="text-sm text-muted-foreground">No completed job cards are ready to bill.</span>
+          <span className="text-sm text-muted-foreground">No unbilled job cards are ready in this branch. Complete the job card?s quality check and mark it Ready before creating a bill. Credit-approved delivered jobs are also eligible.</span>
         )}
       </Field>
 
@@ -90,7 +94,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
           <div>
             <p className="font-semibold">{bill.jobCard.jobNumber}</p>
             <p className="text-sm text-muted-foreground">
-              {bill.jobCard.customer ? `${bill.jobCard.customer.firstName} ${bill.jobCard.customer.lastName}` : "Customer"}
+              {bill.jobCard.customer ? bill.jobCard.customer.companyName || `${bill.jobCard.customer.firstName} ${bill.jobCard.customer.lastName}` : "Customer"}
               {bill.jobCard.vehicle?.registrationNumber ? ` - ${bill.jobCard.vehicle.registrationNumber}` : ""}
             </p>
           </div>
@@ -102,7 +106,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
               <tbody>
                 {bill.lines.map((line, index) => (
                   <tr key={`${line.type}-${index}`} className="border-b last:border-0">
-                    <td className="py-2">{line.type === "PART" ? "Part" : "Labour"}</td>
+                    <td className="py-2">{line.type === "PART" ? "Part" : line.type === "SERVICE" ? "Service charge" : "Labour"}</td>
                     <td className="py-2">{line.description}</td>
                     <td className="py-2 text-right">{line.quantity}</td>
                     <td className="py-2 text-right">{currency.format(line.rate)}</td>
@@ -119,6 +123,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
             <dt>Parts discount</dt><dd className="text-right">-{currency.format(bill.totals.partsDiscountAmount)}</dd>
             <dt>Labour</dt><dd className="text-right">{currency.format(bill.totals.labourTotal)}</dd>
             <dt>Labour discount</dt><dd className="text-right">-{currency.format(bill.totals.labourDiscountAmount)}</dd>
+            <dt>Service charge</dt><dd className="text-right">{currency.format(bill.totals.serviceTotal ?? 0)}</dd>
             <dt>VAT ({bill.totals.vatRate}%)</dt><dd className="text-right">{currency.format(bill.totals.vatAmount)}</dd>
             <dt>Round-off</dt><dd className="text-right">{currency.format(bill.totals.roundOff)}</dd>
             <dt className="border-t pt-2 font-semibold">Total</dt><dd className="border-t pt-2 text-right font-semibold">{currency.format(bill.totals.total)}</dd>
@@ -141,16 +146,18 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
                 <option key={advisor.id} value={advisor.id}>{advisor.firstName} {advisor.lastName}</option>
               ))}
             </select>
+            {advisors.isLoading && <p className="text-sm text-muted-foreground">Loading advisors...</p>}
+            {advisors.isError && <p role="alert" className="text-sm text-destructive">Could not load advisors. <button type="button" onClick={() => advisors.refetch()}>Retry</button></p>}
           </Field>
         </div>
       )}
 
       {jobCardId && preview.isFetching && <p className="text-sm text-muted-foreground">Recalculating from job-card lines...</p>}
-      {jobCardId && preview.isError && <p role="alert" className="text-sm text-destructive">The bill preview could not be calculated. Check the job-card lines and discount values.</p>}
+      {jobCardId && preview.isError && <p role="alert" className="text-sm text-destructive">{isAxiosError(preview.error) ? preview.error.response?.data?.message || "Could not calculate the bill preview" : "Could not calculate the bill preview"}</p>}
       <Field label="Notes (optional)">
         <textarea className={inputCls} rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
-      <Button type="submit" disabled={!bill || preview.isFetching || create.isPending || !effectiveAdvisorId}>
+      <Button type="submit" disabled={!bill || preview.isError || !validDiscounts || preview.isFetching || create.isPending || !effectiveAdvisorId}>
         {create.isPending ? "Creating bill..." : "Create job bill"}
       </Button>
     </form>

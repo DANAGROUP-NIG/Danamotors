@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { isAxiosError } from "axios";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
@@ -105,7 +106,7 @@ export function JobCardLabourSection({
       setTechnicianId("");
       refresh();
     },
-    onError: () => toast.error("Could not add labour line"),
+    onError: (error) => toast.error(isAxiosError(error) ? error.response?.data?.message || "Could not add labour line" : "Could not add labour line"),
   });
   const saveLine = useMutation({
     mutationFn: ({
@@ -119,11 +120,12 @@ export function JobCardLabourSection({
         ...values,
         rate: isAdminOrAbove ? values.rate : undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       toast.success("Labour line updated");
+      setEditing((current) => { const next = { ...current }; delete next[id]; return next; });
       refresh();
     },
-    onError: () => toast.error("Could not update labour line"),
+    onError: (error) => toast.error(isAxiosError(error) ? error.response?.data?.message || "Could not update labour line" : "Could not update labour line"),
   });
   const removeLine = useMutation({
     mutationFn: (id: string) =>
@@ -177,7 +179,7 @@ export function JobCardLabourSection({
               <input
                 type="number"
                 min="0.01"
-                step="0.25"
+                step="0.01"
                 className={inputCls}
                 value={form.hours}
                 disabled={!canEdit}
@@ -218,6 +220,7 @@ export function JobCardLabourSection({
                 }
               >
                 <option value="">Unassigned</option>
+                {line.technician && !technicians.some((technician) => technician.id === line.technician?.id) && <option value={line.technician.id}>{line.technician.firstName} {line.technician.lastName}</option>}
                 {technicians.map((technician) => (
                   <option key={technician.id} value={technician.id}>
                     {technician.firstName} {technician.lastName}
@@ -226,12 +229,12 @@ export function JobCardLabourSection({
               </select>
             </Field>
             {canEdit && (
-              <div className="flex gap-1">
+              <div className="flex gap-1 print:hidden">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={saveLine.isPending}
+                  disabled={saveLine.isPending || removeLine.isPending || !Number.isFinite(Number(form.hours)) || Number(form.hours) <= 0 || !form.rate.trim() || !Number.isFinite(Number(form.rate)) || Number(form.rate) < 0}
                   onClick={() =>
                     saveLine.mutate({
                       id: line.id,
@@ -262,7 +265,7 @@ export function JobCardLabourSection({
       })}
       {canEdit && (
         <form
-          className="grid gap-3 border-t pt-4 md:grid-cols-[minmax(180px,1fr)_100px_1fr_auto] md:items-end"
+          className="grid gap-3 border-t pt-4 md:grid-cols-[minmax(180px,1fr)_100px_1fr_auto] md:items-end print:hidden"
           onSubmit={(event) => {
             event.preventDefault();
             if (labourItemId) addLine.mutate();
@@ -292,7 +295,7 @@ export function JobCardLabourSection({
             <input
               type="number"
               min="0.01"
-              step="0.25"
+              step="0.01"
               className={inputCls}
               value={hours}
               onChange={(event) => setHours(event.target.value)}

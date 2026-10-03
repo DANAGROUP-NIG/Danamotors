@@ -13,10 +13,12 @@ export function useCreateInvoice() {
 
   return useMutation({
     mutationFn: (payload: CreateJobBillPayload) => createJobBillRequest(payload),
-    onSuccess: () => {
-      toast.success("Job bill created successfully");
-      queryClient.invalidateQueries({ queryKey: invoiceKeys.lists() });
-      router.push("/invoices");
+    onSuccess: (invoice) => {
+      toast.success(`Job bill ${invoice.invoiceNumber} created`);
+      queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["finance"] });
+      router.push(`/invoices/${invoice.id}`);
     },
     onError: (error: unknown) => {
       const message =

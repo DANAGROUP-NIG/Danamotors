@@ -27,7 +27,7 @@ export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { r
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   };
   const update = useMutation({
-    mutationFn: () => updateReceiptRequest(receipt!.id, { amount: Number(amount), narration: narration || undefined }),
+    mutationFn: () => updateReceiptRequest(receipt!.id, { amount: Number(amount), narration }),
     onSuccess: () => { toast.success("Receipt updated"); refresh(); onClose(); },
     onError: (error: unknown) => toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Receipt cannot be updated"),
   });
@@ -39,8 +39,8 @@ export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { r
 
   if (!receipt) return null;
   return (
-    <ModalFame isOpen={Boolean(receipt)} onClose={onClose} title={`Receipt ${receipt.receiptNumber}`}>
-      <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
+    <ModalFame isOpen={Boolean(receipt)} onClose={() => { if (!update.isPending && !cancel.isPending) onClose(); }} title={`Receipt ${receipt.receiptNumber}`}>
+      <form inert={update.isPending || cancel.isPending} className="grid gap-4" onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
         <p className="text-sm text-muted-foreground">Only amount and narration can be edited. The server recalculates bill allocations.</p>
         <Field label="Amount received (NGN)"><input type="number" min="0.01" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
         <Field label="Narration"><textarea className={inputCls} rows={3} maxLength={1000} value={narration} onChange={(event) => setNarration(event.target.value)} /></Field>

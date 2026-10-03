@@ -40,6 +40,11 @@ export function canonicalJobStatus(status: string) {
   return aliases[status] ?? status;
 }
 
+export function jobStatusFilter(status: string) {
+  const canonical = canonicalJobStatus(status);
+  return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
+}
+
 export function repeatWindowStart(
   now = new Date(),
   days = Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 30),
@@ -394,6 +399,7 @@ export class JobCardWorkflowService {
         throw new BadRequestError("This job card is closed");
 
       const billed =
+        from === "BILLED" ||
         !!current.billedAt ||
         current.invoices.some(
           (bill) =>

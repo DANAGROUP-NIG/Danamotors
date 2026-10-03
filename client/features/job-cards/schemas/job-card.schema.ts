@@ -44,7 +44,7 @@ export const createJobCardSchema = z
     inHouse: z.boolean().optional(),
     isRepeat: z.boolean().optional(),
     previousJobId: z.string().optional(),
-    repeatReason: z.string().optional(),
+    repeatReason: z.string().trim().max(2000).optional(),
     remarks: z.string().max(500, "Keep remarks to 500 characters").optional(),
     tyres: z
       .array(
@@ -101,7 +101,9 @@ export const createJobCardSchema = z
         message: "Select a mechanic or team",
       });
 
-    if (v.isRepeat && (!v.previousJobId || !v.repeatReason?.trim()))
+    if (v.isRepeat && !v.previousJobId)
+      ctx.addIssue({ code: "custom", path: ["previousJobId"], message: "Choose a previous job" });
+    if (v.isRepeat && !v.repeatReason?.trim())
       ctx.addIssue({
         code: "custom",
         path: ["repeatReason"],

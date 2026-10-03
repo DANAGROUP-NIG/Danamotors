@@ -19,7 +19,7 @@ function exportRows(jobCards: JobCard[]) {
     jobNumber: jobCard.jobNumber,
     vehicleRegistration: jobCard.vehicle?.registrationNumber ?? "",
     customer: jobCard.customer
-      ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+      ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
       : "",
     branch: jobCard.branch?.name ?? "",
     agent: jobCard.createdBy

@@ -11,7 +11,9 @@ export function useCancelInvoice() {
     mutationFn: ({ id, remark }: { id: string; remark: string }) => cancelInvoiceRequest(id, remark),
     onSuccess: () => {
       toast.success("Job bill cancelled");
-      queryClient.invalidateQueries({ queryKey: invoiceKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["job-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["finance"] });
       queryClient.invalidateQueries({ queryKey: invoiceKeys.billableJobCards() });
     },
     onError: (error: unknown) => {

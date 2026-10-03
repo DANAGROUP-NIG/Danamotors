@@ -12,6 +12,7 @@ describe('calculateJobBillTotals', () => {
     })).toEqual({
       partsTotal: 1000,
       labourTotal: 1000,
+      serviceTotal: 0,
       partsDiscountAmount: 100,
       labourDiscountAmount: 200,
       vatRate: 7.5,
@@ -60,4 +61,7 @@ describe('calculateJobBillTotals', () => {
       vatRate: 7.5,
     })).toThrow(BadRequestError);
   });
+});
+it('bills the service charge separately without applying labour discount to it', () => {
+  expect(calculateJobBillTotals({ partsTotal: 0, labourTotal: 1000, serviceTotal: 200, partsDiscountPercent: 0, labourDiscountPercent: 20, vatRate: 7.5 })).toMatchObject({ serviceTotal: 200, labourDiscountAmount: 200, vatAmount: 75, total: 1075 });
 });

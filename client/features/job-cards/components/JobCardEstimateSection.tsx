@@ -1,5 +1,8 @@
 "use client";
 import { useState } from "react";
+import { toast } from "sonner";
+import { isAxiosError } from "axios";
+import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
@@ -57,7 +60,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         lines,
       }),
 
-    onSuccess: refresh,
+    onSuccess: async () => { toast.success("Priced estimate saved"); setLines([]); await refresh(); },
   });
 
   const approval = useMutation({
@@ -67,11 +70,11 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         approved,
       }),
 
-    onSuccess: refresh,
+    onSuccess: async () => { toast.success("Customer decision recorded"); await refresh(); },
   });
 
   const open =
-    !jobCard.billedAt &&
+    !hasJobBill(jobCard) &&
     ![
       "READY",
       "BILLED",
@@ -81,13 +84,14 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       "Completed",
       "Closed",
       "Cancelled",
-    ].includes(jobCard.status);
+    ].includes(canonicalJobStatus(jobCard.status));
+  const actionError = create.error ?? approval.error;
 
   return (
-    <section className="grid gap-3 rounded-xl border bg-white p-5 print:hidden">
+    <section className="grid gap-3 rounded-xl border bg-white p-5">
       <h2 className="font-semibold">Estimate and customer decision</h2>
       {open && hasPermission("estimate:create") && (
-        <>
+        <div className="grid gap-3 print:hidden" inert={create.isPending}>
           <p className="text-sm text-slate-500">
             Service catalog prices, part retail prices and model labour rates
             are applied when the estimate is saved.
@@ -112,7 +116,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               className={inputCls}
               value={type}
               onChange={(e) => {
-                setType(e.target.value as "PART" | "LABOUR");
+                setType(e.target.value as "PART" | "LABOUR" | "SERVICE");
                 setReferenceId("");
               }}
             >
@@ -163,7 +167,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           <Button
             type="button"
             variant="outline"
-            disabled={!referenceId || quantity <= 0}
+            disabled={!referenceId || !Number.isFinite(quantity) || quantity <= 0 || lines.length >= 200}
             onClick={() => {
               setLines((current) => [
                 ...current,
@@ -187,16 +191,18 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           >
             Save priced estimate
           </Button>
-        </>
+        </div>
       )}
       {jobCard.estimates?.map((estimate) => (
         <div key={estimate.id} className="border-t pt-2 text-sm">
           <p>
-            {estimate.description}: NGN {estimate.amount.toLocaleString()}—{" "}
+            {estimate.description}: {estimate.currency} {estimate.amount.toLocaleString()} —{" "}
             {estimate.status}
           </p>
-          {hasPermission("estimate:approve") && !estimate.approvals?.length && (
-            <div className="flex gap-2">
+          {!!estimate.lines?.length && <div className="mt-2 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="py-2">Description</th><th>Quantity / hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{estimate.lines.map((line) => <tr key={line.id} className="border-b"><td className="py-2">{line.description}</td><td>{line.quantity}</td><td>{line.rate.toLocaleString()}</td><td>{line.amount.toLocaleString()}</td></tr>)}</tbody></table></div>}
+          {estimate.approvals?.map((decision) => <p key={decision.id} className="mt-2 text-muted-foreground">{decision.approved ? "Approved" : "Declined"}{decision.decisionDate ? ` on ${new Date(decision.decisionDate).toLocaleString()}` : ""}{decision.comments ? ` — ${decision.comments}` : ""}</p>)}
+          {open && hasPermission("estimate:approve") && !estimate.approvals?.length && (
+            <div className="flex gap-2 print:hidden">
               <Button
                 type="button"
                 size="sm"
@@ -230,8 +236,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       ))}
       {(create.isError || approval.isError) && (
         <p role="alert" className="text-sm text-red-600">
-          Could not save the estimate or decision. Refresh and check the
-          selected lines.
+          {isAxiosError(actionError) ? actionError.response?.data?.message || "Could not save the estimate or decision." : "Could not save the estimate or decision."}
         </p>
       )}
     </section>

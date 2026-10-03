@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { canonicalJobStatus } from './job-card-workflow.service';
+import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
 import { z } from 'zod';
 import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
 import { JobCardWorkflowService } from './job-card-workflow.service';
@@ -307,7 +307,7 @@ export class ServiceService {
     const where: Record<string, unknown> = {};
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
-    if (params?.status) where.status = params.status;
+    if (params?.status) where.status = jobStatusFilter(params.status);
 
     if (params?.search) {
       where.OR = [

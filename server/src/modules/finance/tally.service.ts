@@ -1,3 +1,4 @@
+import { money, sumMoney } from './money';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -7,6 +8,24 @@ import { generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type
 export { generateTallyImportXml, generateTallyVoucherXml } from './tally-xml';
 
 export class TallyService {
+  async pendingBatches(branchId?: string) {
+    const [invoices, receipts] = await Promise.all([
+      prisma.invoice.findMany({ where: { tallyPostedAt: null, ...(branchId ? { jobCard: { branchId } } : {}) }, select: { id: true, invoiceNumber: true } }),
+      prisma.receipt.findMany({ where: { tallyPostedAt: null, ...(branchId ? { branchId } : {}) }, select: { id: true, receiptNumber: true } }),
+    ]);
+    const logs = await prisma.tallyPostingLog.findMany({ where: { status: 'EXPORTED', OR: [
+      { documentType: 'JOB_BILL', documentId: { in: invoices.map((invoice) => invoice.id) } },
+      { documentType: 'RECEIPT', documentId: { in: receipts.map((receipt) => receipt.id) } },
+    ] }, orderBy: { createdAt: 'desc' } });
+    const batches = new Map<string, { batchId: string; xml: string; exported: { type: string; id: string; documentNumber: string }[]; skipped: never[] }>();
+    for (const log of logs) {
+      const batch = batches.get(log.batchId) ?? { batchId: log.batchId, xml: '', exported: [], skipped: [] };
+      batch.xml += log.payload ?? '';
+      batch.exported.push({ type: log.documentType, id: log.documentId, documentNumber: (log.documentType === 'JOB_BILL' ? invoices.find((item) => item.id === log.documentId)?.invoiceNumber : receipts.find((item) => item.id === log.documentId)?.receiptNumber) ?? log.documentId });
+      batches.set(log.batchId, batch);
+    }
+    return [...batches.values()].map((batch) => ({ ...batch, xml: generateTallyImportXml([batch.xml]) }));
+  }
   async importLedgers(ledgers: Array<{ code: string; name: string }>) {
     if (ledgers.length === 0) throw new BadRequestError('At least one Tally ledger is required');
     const normalized = ledgers.map((ledger) => ({ code: ledger.code.trim(), name: ledger.name.trim() }));
@@ -106,10 +125,10 @@ export class TallyService {
         id: invoice.id,
         documentNumber: invoice.invoiceNumber,
         date: invoice.issuedDate,
-        customerName: `${invoice.customer.firstName} ${invoice.customer.lastName}`,
+        customerName: invoice.customer.companyName || `${invoice.customer.firstName} ${invoice.customer.lastName}`,
         tallyLedger: invoice.customer.tallyLedger,
-        ready: Boolean(invoice.customer.tallyLedger),
-        reason: invoice.customer.tallyLedger ? undefined : 'Customer has no Tally ledger mapping',
+        ready: Boolean(invoice.customer.tallyLedger?.active),
+        reason: invoice.customer.tallyLedger?.active ? undefined : 'Customer has no Tally ledger mapping',
         total: invoice.total,
       }));
     }
@@ -119,7 +138,7 @@ export class TallyService {
         issuedAt: { gte: start, lt: end },
         status: 'ACTIVE',
         tallyPostedAt: null,
-        ...(input.branchId ? { customer: { branchId: input.branchId } } : {}),
+        ...(input.branchId ? { branchId: input.branchId } : {}),
       },
       include: { customer: { include: { tallyLedger: true } }, bank: true },
       orderBy: { receiptNumber: 'asc' },
@@ -133,17 +152,19 @@ export class TallyService {
       id: receipt.id,
       documentNumber: receipt.receiptNumber,
       date: receipt.issuedAt,
-      customerName: `${receipt.customer.firstName} ${receipt.customer.lastName}`,
+      customerName: receipt.customer.companyName || `${receipt.customer.firstName} ${receipt.customer.lastName}`,
       tallyLedger: receipt.customer.tallyLedger,
-      ready: Boolean(receipt.customer.tallyLedger),
-      reason: receipt.customer.tallyLedger ? undefined : 'Customer has no Tally ledger mapping',
+      ready: Boolean(receipt.customer.tallyLedger?.active),
+      reason: receipt.customer.tallyLedger?.active ? undefined : 'Customer has no Tally ledger mapping',
       total: receipt.amount,
     }));
   }
 
   private async mappingsFor(type: TallyDocumentType, transaction: Prisma.TransactionClient) {
     const mappings = await transaction.tallyAccountMapping.findMany({ where: { documentType: type } });
-    return new Map(mappings.map((mapping) => [mapping.accountType, mapping.tallyLedgerName]));
+    const ledgers = await transaction.tallyLedger.findMany({ where: { code: { in: mappings.map((mapping) => mapping.tallyLedgerCode) }, active: true } });
+    const names = new Map(ledgers.map((ledger) => [ledger.code, ledger.name]));
+    return new Map(mappings.filter((mapping) => names.has(mapping.tallyLedgerCode)).map((mapping) => [mapping.accountType, names.get(mapping.tallyLedgerCode)!]));
   }
 
   async exportBatch(input: {
@@ -156,7 +177,9 @@ export class TallyService {
     const vouchers: string[] = [];
 
     await prisma.$transaction(async (transaction) => {
-      for (const selected of input.documents) {
+      for (const selected of [...input.documents].sort((a, b) => `${a.type}:${a.id}`.localeCompare(`${b.type}:${b.id}`))) {
+        if (selected.type === 'JOB_BILL') await transaction.$queryRaw(Prisma.sql`SELECT id FROM "Invoice" WHERE id = ${selected.id} FOR UPDATE`);
+        else await transaction.$queryRaw(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${selected.id} FOR UPDATE`);
         const existingLog = await transaction.tallyPostingLog.findUnique({
           where: { documentType_documentId: { documentType: selected.type, documentId: selected.id } },
         });
@@ -173,7 +196,7 @@ export class TallyService {
             where: { id: selected.id },
             include: { customer: { include: { tallyLedger: true } } },
           });
-          if (!invoice || !invoice.jobCardId || !isValidInvoiceStatus(invoice.status)) {
+          if (!invoice || !invoice.jobCardId || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             skipped.push({ ...selected, reason: 'Job bill is missing or cancelled' });
             continue;
           }
@@ -185,6 +208,7 @@ export class TallyService {
           const values = [
             ['PARTS_SALES', -invoice.partsTotal],
             ['LABOUR_SALES', -invoice.labourTotal],
+            ['SERVICE_SALES', -(invoice.serviceTotal ?? 0)],
             ['PARTS_DISCOUNT', invoice.partsDiscountAmount],
             ['LABOUR_DISCOUNT', invoice.labourDiscountAmount],
             ['VAT', -invoice.vatAmount],
@@ -196,16 +220,17 @@ export class TallyService {
             continue;
           }
           const entries: LedgerEntry[] = [
-            { name: invoice.customer.tallyLedger.name, amount: invoice.total },
+            { name: invoice.customer.tallyLedger.name, amount: invoice.total, bills: [{ name: invoice.invoiceNumber, type: 'New Ref', amount: invoice.total }] },
             ...values.filter(([, amount]) => amount !== 0).map(([key, amount]) => ({ name: mappings.get(key)!, amount })),
           ];
-          payload = generateTallyVoucherXml({ type: selected.type, number: invoice.invoiceNumber, date: invoice.issuedDate, party: invoice.customer.tallyLedger.name, entries });
+          if (sumMoney(entries.map((entry) => entry.amount)) !== 0) { skipped.push({ ...selected, documentNumber, reason: 'Invoice ledger totals do not balance; review the bill snapshot' }); continue; }
+          payload = generateTallyVoucherXml({ type: selected.type, number: invoice.invoiceNumber, id: invoice.id, date: invoice.issuedDate, party: invoice.customer.tallyLedger.name, entries });
         } else {
           const receipt = await transaction.receipt.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } } },
+            include: { customer: { include: { tallyLedger: true } }, allocations: { include: { invoice: { select: { invoiceNumber: true } } } } },
           });
-          if (!receipt || receipt.status !== 'ACTIVE') {
+          if (!receipt || receipt.status !== 'ACTIVE' || receipt.tallyPostedAt) {
             skipped.push({ ...selected, reason: 'Receipt is missing or cancelled' });
             continue;
           }
@@ -222,9 +247,9 @@ export class TallyService {
           }
           const entries: LedgerEntry[] = [
             { name: accountName, amount: receipt.amount },
-            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount },
+            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount, bills: [...receipt.allocations.map((allocation) => ({ name: allocation.invoice.invoiceNumber, type: 'Agst Ref' as const, amount: -money(allocation.amount) })), ...(receipt.advanceAmount > 0 ? [{ name: receipt.receiptNumber, type: 'Advance' as const, amount: -receipt.advanceAmount }] : [])] },
           ];
-          payload = generateTallyVoucherXml({ type: selected.type, number: receipt.receiptNumber, date: receipt.issuedAt, party: receipt.customer.tallyLedger.name, entries });
+          payload = generateTallyVoucherXml({ type: selected.type, number: receipt.receiptNumber, id: receipt.id, date: receipt.issuedAt, party: receipt.customer.tallyLedger.name, entries });
         }
 
         if (existingLog) {
@@ -252,7 +277,9 @@ export class TallyService {
   }) {
     return prisma.$transaction(async (transaction) => {
       const confirmed: string[] = [];
-      for (const document of input.documents) {
+      for (const document of [...input.documents].sort((a, b) => `${a.type}:${a.id}`.localeCompare(`${b.type}:${b.id}`))) {
+        if (document.type === 'JOB_BILL') await transaction.$queryRaw(Prisma.sql`SELECT id FROM "Invoice" WHERE id = ${document.id} FOR UPDATE`);
+        else await transaction.$queryRaw(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${document.id} FOR UPDATE`);
         const log = await transaction.tallyPostingLog.findUnique({
           where: { documentType_documentId: { documentType: document.type, documentId: document.id } },
         });
@@ -264,8 +291,8 @@ export class TallyService {
           data: { status: 'POSTED', voucherNumber: document.voucherNumber, postedAt: new Date(), postedById: input.postedById },
         });
         if (document.type === 'JOB_BILL') {
-          const invoice = await transaction.invoice.findUnique({ where: { id: document.id }, select: { status: true } });
-          if (!invoice || !isValidInvoiceStatus(invoice.status)) {
+          const invoice = await transaction.invoice.findUnique({ where: { id: document.id }, select: { status: true, tallyPostedAt: true } });
+          if (!invoice || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             throw new ConflictError('A cancelled or missing job bill cannot be confirmed as posted');
           }
           await transaction.invoice.update({
@@ -273,8 +300,8 @@ export class TallyService {
             data: { tallyVoucherNo: document.voucherNumber, tallyPostedAt: new Date(), tallyPostedById: input.postedById },
           });
         } else {
-          const receipt = await transaction.receipt.findUnique({ where: { id: document.id }, select: { status: true } });
-          if (!receipt || receipt.status !== 'ACTIVE') {
+          const receipt = await transaction.receipt.findUnique({ where: { id: document.id }, select: { status: true, tallyPostedAt: true } });
+          if (!receipt || receipt.status !== 'ACTIVE' || receipt.tallyPostedAt) {
             throw new ConflictError('A cancelled or missing receipt cannot be confirmed as posted');
           }
           await transaction.receipt.update({

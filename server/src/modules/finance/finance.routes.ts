@@ -393,7 +393,7 @@ router.get('/payments', requirePermission(PERMISSIONS.PAYMENT_READ), controller.
 router.get('/payments/:id', requirePermission(PERMISSIONS.PAYMENT_READ), validateRequest(paymentIdParamSchema), controller.getPayment);
 
 router.post('/receipts', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(createReceiptSchema), controller.createReceipt);
-router.get('/receipts', requirePermission(PERMISSIONS.RECEIPT_READ), controller.listReceipts);
+router.get('/receipts', requirePermission(PERMISSIONS.RECEIPT_READ), validateRequest(receiptRegisterQuerySchema), controller.listReceipts);
 router.patch('/receipts/:id', requirePermission(PERMISSIONS.RECEIPT_UPDATE), validateRequest(updateReceiptSchema), controller.updateReceipt);
 router.patch('/receipts/:id/cancel', requirePermission(PERMISSIONS.RECEIPT_CANCEL), validateRequest(cancelDocumentSchema), controller.cancelReceipt);
 router.get('/receipts/:id', requirePermission(PERMISSIONS.RECEIPT_READ), validateRequest(receiptIdParamSchema), controller.getReceipt);
@@ -404,6 +404,7 @@ router.get('/tally/ledgers', requirePermission(PERMISSIONS.TALLY_IMPORT), valida
 router.post('/tally/ledgers/import', requirePermission(PERMISSIONS.TALLY_IMPORT), validateRequest(importTallyLedgersSchema), controller.importTallyLedgers);
 router.get('/tally/account-mappings', requirePermission(PERMISSIONS.TALLY_IMPORT), controller.getTallyAccountMappings);
 router.put('/tally/account-mappings', requirePermission(PERMISSIONS.TALLY_IMPORT), validateRequest(saveTallyMappingsSchema), controller.saveTallyAccountMappings);
+router.get('/tally/batches', requirePermission(PERMISSIONS.TALLY_POST), controller.pendingTallyBatches);
 router.get('/tally/documents', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(tallyDocumentsQuerySchema), controller.listTallyDocuments);
 router.post('/tally/post', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(exportTallyBatchSchema), controller.exportTallyBatch);
 router.post('/tally/post/confirm', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(confirmTallyBatchSchema), controller.confirmTallyBatch);

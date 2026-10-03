@@ -2,6 +2,7 @@
 import {
   JOB_CARD_STATUS_LABELS,
   JOB_CARD_STATUS_TONES,
+  canonicalJobStatus,
 } from "@/features/job-cards/types/job-card-status";
 
 import { useEffect, useMemo, useState } from "react";
@@ -42,7 +43,7 @@ const STATUS_LABELS = JOB_CARD_STATUS_LABELS;
 
 const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
-const ALL_STATUSES = Object.keys(STATUS_LABELS).filter(isJobCardStatus);
+const ALL_STATUSES = Object.keys(STATUS_LABELS).filter(isJobCardStatus).filter((status) => canonicalJobStatus(status) === status);
 
 function isJobCardStatus(status: string): status is JobCardStatus {
   return status in STATUS_LABELS;
@@ -50,7 +51,7 @@ function isJobCardStatus(status: string): status is JobCardStatus {
 
 function formatJobCardText(jobCard: JobCard) {
   const customer = jobCard.customer
-    ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+    ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
     : "N/A";
   return `*Job Card ${jobCard.jobNumber}*\nCustomer: ${customer}\nVehicle: ${jobCard.vehicle?.registrationNumber ?? "N/A"}\nBranch: ${jobCard.branch?.name ?? "N/A"}\nStatus: ${STATUS_LABELS[jobCard.status]}`;
 }
@@ -60,7 +61,7 @@ function exportRows(jobCards: JobCard[]) {
     jobNumber: jobCard.jobNumber,
     vehicleRegistration: jobCard.vehicle?.registrationNumber ?? "",
     customer: jobCard.customer
-      ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+      ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
       : "",
     branch: jobCard.branch?.name ?? "",
     agent: jobCard.createdBy
@@ -192,7 +193,7 @@ export function JobCardsTable() {
       render: (jc) => (
         <span className="text-muted-foreground">
           {jc.customer
-            ? `${jc.customer.firstName} ${jc.customer.lastName}`
+            ? jc.customer.companyName || `${jc.customer.firstName} ${jc.customer.lastName}`
             : "—"}
         </span>
       ),

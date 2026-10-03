@@ -1,6 +1,7 @@
 export type InvoiceCustomer = {
   id: string;
-  email: string;
+  email: string | null;
+  companyName?: string | null;
   firstName: string;
   lastName: string;
   branchId?: string;
@@ -34,7 +35,7 @@ export type InvoiceReceipt = {
 
 export type InvoiceLine = {
   id: string;
-  type: "PART" | "LABOUR";
+  type: "PART" | "LABOUR" | "SERVICE";
   description: string;
   quantity: number;
   rate: number;
@@ -61,6 +62,7 @@ export type Invoice = {
   outstandingAmount: number;
   partsTotal: number;
   labourTotal: number;
+  serviceTotal: number;
   partsDiscountPercent: number;
   labourDiscountPercent: number;
   partsDiscountAmount: number;

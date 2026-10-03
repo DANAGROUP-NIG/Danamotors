@@ -1,4 +1,5 @@
 import prisma from '../../prisma/client';
+import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
   ServiceAppointment,
@@ -235,7 +236,7 @@ export class ServiceRepository {
     }
 
     if (params?.status) {
-      where.status = params.status;
+      where.status = jobStatusFilter(params.status);
     }
 
     if (params?.search) {
@@ -280,6 +281,9 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -318,6 +322,9 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -340,7 +347,7 @@ export class ServiceRepository {
         partIssuances: {
           include: {
             sparePart: {
-              select: { id: true, partNumber: true, name: true, unitPrice: true },
+              select: { id: true, partNumber: true, name: true, unitPrice: true, retailRate: true },
             },
             issuedBy: {
               select: { id: true, firstName: true, lastName: true },

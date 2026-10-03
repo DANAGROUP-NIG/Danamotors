@@ -1,6 +1,6 @@
 import prisma from '../../prisma/client';
 import { FinanceRepository } from './finance.repository';
-import { NotFoundError } from '../../shared/errors/appError';
+import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
 
 export class FinanceService {
   private financeRepository: FinanceRepository;
@@ -30,6 +30,7 @@ export class FinanceService {
       throw new NotFoundError('Invoice not found');
     }
 
+    if (['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase()) || invoice.tallyPostedAt) throw new BadRequestError('Cancelled or posted invoices cannot be edited');
     return this.financeRepository.updateInvoice(id, {
       dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       notes: data.notes,
@@ -59,12 +60,12 @@ export class FinanceService {
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     const invoiceWhere: Record<string, any> = {};
-    const receiptWhere: Record<string, any> = {};
+    const receiptWhere: Record<string, any> = { status: 'ACTIVE' };
     if (hasDateFilter) invoiceWhere.issuedDate = dateFilter;
     if (hasDateFilter) receiptWhere.issuedAt = dateFilter;
     if (params.branchId) {
-      invoiceWhere.customer = { branchId: params.branchId };
-      receiptWhere.customer = { branchId: params.branchId };
+      invoiceWhere.OR = [{ jobCard: { branchId: params.branchId } }, { jobCardId: null, customer: { branchId: params.branchId } }];
+      receiptWhere.branchId = params.branchId;
     }
 
     const activeInvoiceWhere = { ...invoiceWhere, status: { notIn: ['Cancelled', 'CANCELLED', 'VOID'] } };
@@ -85,7 +86,7 @@ export class FinanceService {
 
   async getInvoiceReport(params: { startDate?: string; endDate?: string; branchId?: string }) {
     const where: any = {};
-    if (params.branchId) where.customer = { branchId: params.branchId };
+    if (params.branchId) where.OR = [{ jobCard: { branchId: params.branchId } }, { jobCardId: null, customer: { branchId: params.branchId } }];
     if (params.startDate || params.endDate) {
       where.issuedDate = {};
       if (params.startDate) where.issuedDate.gte = new Date(params.startDate);
@@ -111,7 +112,7 @@ export class FinanceService {
   }
 
   async getDashboardOverview(branchId?: string) {
-    const invoiceScope = branchId ? { customer: { branchId } } : {};
+    const invoiceScope = branchId ? { OR: [{ jobCard: { branchId } }, { jobCardId: null, customer: { branchId } }] } : {};
     const [openInvoices, overdueInvoices, paidInvoices, totalOutstanding] = await Promise.all([
       prisma.invoice.count({ where: { ...invoiceScope, status: 'Unpaid' } }),
       prisma.invoice.count({ where: { ...invoiceScope, status: 'Overdue' } }),

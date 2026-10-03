@@ -425,7 +425,7 @@ export default function AppointmentDetailPage() {
       </ModalFame>
 
       <JobCardOpeningModal isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} defaultValues={{
-        appointmentId: appointment.id, customerId: appointment.customerId, vehicleId: appointment.vehicleId, branchName: (branch?.name as string) ?? "",
+        appointmentId: appointment.id, customerId: appointment.customerId, vehicleId: appointment.vehicleId, serviceId: appointment.serviceId ?? "", branchName: (branch?.name as string) ?? "",
       }} />
 
       <ConfirmDeleteModal
