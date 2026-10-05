@@ -25,7 +25,7 @@ export function DataTableToolbar({
   filters,
 }: DataTableToolbarProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <DataTableSearch
         value={search}
         onChange={onSearchChange}

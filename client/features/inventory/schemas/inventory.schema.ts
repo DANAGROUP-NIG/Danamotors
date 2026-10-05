@@ -15,7 +15,6 @@ const optionalText = (max: number) => z.string().trim().max(max, `Max ${max} cha
 /** Mirrors the backend Part Master validation (createPartMasterSchema). */
 export const partMasterSchema = z
   .object({
-    partCode: z.string().trim().min(1, "Part code is required").max(50, "Part code must be 50 characters or less"),
     partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
     name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
     category: z.string().trim().min(1, "Category is required").max(100, "Max 100 characters"),

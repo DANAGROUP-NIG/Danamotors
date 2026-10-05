@@ -84,7 +84,7 @@ export default function NotificationBell() {
                 type="button"
                 onClick={() => markAllRead.mutate()}
                 disabled={markAllRead.isPending}
-                className="flex items-center gap-1 text-xs font-medium text-primary transition hover:underline disabled:opacity-50"
+                className="flex items-center gap-1 text-sm font-medium text-primary transition hover:underline disabled:opacity-50"
               >
                 <CheckCheck className="size-3.5" />
                 Mark all read
@@ -144,7 +144,7 @@ export default function NotificationBell() {
                               />
                             )}
                           </span>
-                          <span className="mt-0.5 line-clamp-2 block text-xs text-slate-500">
+                          <span className="mt-0.5 line-clamp-2 block text-sm text-slate-500">
                             {notification.message}
                           </span>
                           <span className="mt-1 block text-[11px] text-slate-400">
@@ -167,7 +167,7 @@ export default function NotificationBell() {
                 setOpen(false);
                 router.push("/notifications");
               }}
-              className="flex w-full items-center justify-center gap-1 text-xs font-medium text-primary transition hover:underline"
+              className="flex w-full items-center justify-center gap-1 text-sm font-medium text-primary transition hover:underline"
             >
               View all notifications
             </button>

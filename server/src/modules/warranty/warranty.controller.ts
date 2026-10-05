@@ -42,8 +42,8 @@ export class WarrantyController {
   });
 
   updateVehicleWarranty = handle(async (req, res) => {
-    const body = req.body as { vehicleModelId?: string | null; warrantyStartDate?: Date | null; override?: unknown };
-    if ((body.vehicleModelId !== undefined || body.warrantyStartDate !== undefined) && !has(req, PERMISSIONS.WARRANTY_UPDATE)) {
+    const body = req.body as { vehicleModelId?: string | null; saleDate?: Date | null; override?: unknown };
+    if ((body.vehicleModelId !== undefined || body.saleDate !== undefined) && !has(req, PERMISSIONS.WARRANTY_UPDATE)) {
       throw new ForbiddenError("Changing a vehicle's model or warranty start date needs warranty:update");
     }
     if (body.override !== undefined && !has(req, PERMISSIONS.WARRANTY_SETTINGS)) {

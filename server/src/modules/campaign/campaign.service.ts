@@ -463,6 +463,7 @@ export class CampaignService {
     if (!row) throw new NotFoundError("Vehicle is not in this campaign");
     if (row.campaign.status !== CampaignStatus.ACTIVE) throw new BadRequestError("Only active campaigns can schedule work");
     if (!row.vehicle) throw new BadRequestError("This VIN is not in the system yet. Register the vehicle and customer first.");
+    if (!row.vehicle.customerId) throw new BadRequestError("This vehicle has no owner on record. Link it to a customer first.");
     if (row.status !== "SCHEDULED") assertVehicleTransition(row.status, "SCHEDULED");
     const branch = await prisma.branch.findUnique({ where: { id: input.branchId }, select: { name: true } });
     if (!branch) throw new NotFoundError("Branch not found");

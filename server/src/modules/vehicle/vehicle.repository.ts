@@ -19,18 +19,6 @@ export class VehicleRepository {
       where.customerId = params.customerId;
     }
 
-    if (params.branchId) {
-      where.customer = {
-        OR: [
-          { jobCards: { some: { branchId: params.branchId } } },
-          { appointments: { some: { branchId: params.branchId } } },
-        ],
-      };
-    }
-
-    if (params.createdById) {
-      where.createdById = params.createdById;
-    }
 
     const [vehicles, total] = await Promise.all([
       prisma.vehicle.findMany({
@@ -51,7 +39,7 @@ export class VehicleRepository {
             select: { id: true, firstName: true, lastName: true },
           },
           images: true,
-          ownerships: true,
+          ownerships: { include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true } } }, orderBy: { purchaseDate: 'desc' } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -78,8 +66,10 @@ export class VehicleRepository {
             branchId: true,
           },
         },
+        jobCards: { select: { id: true, jobNumber: true, createdAt: true, mileage: true, status: true, description: true, workDone: true }, orderBy: { createdAt: 'desc' } },
+        catalogue: { include: { parent: true } },
         images: true,
-        ownerships: true,
+        ownerships: { include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true } } }, orderBy: { purchaseDate: 'desc' } },
       },
     });
   }
@@ -94,12 +84,12 @@ export class VehicleRepository {
     trim?: string;
     color?: string;
     vehicleModelId?: string;
-    warrantyStartDate?: Date;
+    saleDate?: Date;
     ownershipStatus?: string;
     createdById?: string;
   }): Promise<Vehicle> {
     return prisma.vehicle.create({
-      data,
+      data: { ...data, customModel: data.model?.trim() || 'Unspecified (legacy)', customMake: data.make },
     });
   }
 

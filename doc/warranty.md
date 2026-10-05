@@ -10,7 +10,11 @@ Coverage is **calculated, never typed in** (`server/src/modules/warranty/warrant
 
 - The policy is set per vehicle model (`VehicleModel.warrantyDays`, `warrantyKm`, `warrantyCovered`).
   Manage it under **Warranty → Settings → Model policies**.
-- Warranty starts on the vehicle's sale date (`Vehicle.warrantyStartDate`). Only `warranty:update` holders can set it.
+- Warranty starts on the vehicle's sale date (`Vehicle.saleDate`, set on the vehicle form or under the vehicle's
+  warranty settings). The old `Vehicle.warrantyStartDate` column is deprecated; migration
+  `20261005100000_reconcile_warranty_with_job_billing` copied it into `saleDate` where that was empty.
+- Each vehicle links to a warranty policy model (`Vehicle.vehicleModelId`, **Warranty policy model** on the vehicle
+  form). This is separate from the vehicle catalogue model (`Vehicle.modelId`).
 - A vehicle is covered while `today <= start + warrantyDays` **and** `mileage <= warrantyKm`, whichever limit comes first.
   Dates are calendar days in Africa/Lagos.
 - The mileage checked is the reading entered at check-in or on the job card, otherwise the last recorded reading.
@@ -36,8 +40,9 @@ odometer was replaced, with a reason. The reason is kept in the job card's warra
 ## Before the job card is created
 
 `GET /api/vehicles/:id/warranty?mileage=` returns the coverage and the vehicle's **open campaigns** (active, in date,
-work not done). The new job card page (`/job-cards/new`) and the appointment **Check in vehicle** dialog both call it
-and show a banner for each finding.
+work not done). The job opening form (the **Open job card** modal, and `/job-cards/new` for links from a vehicle or
+campaign) shows it in a **Warranty & campaign check** card under the vehicle. The appointment **Check in vehicle**
+dialog calls it too. Each finding shows as a banner.
 
 - If the vehicle is covered or has open campaigns, the adviser must tick the acknowledgement.
 - **The server enforces this, not just the UI.** `POST /api/service/job-cards` recomputes coverage inside a transaction,
@@ -47,7 +52,8 @@ and show a banner for each finding.
 - Check-in (`PUT /api/service/appointments/:id` with `status: "Checked In"` and `mileage`) enforces the same rule
   and records the odometer.
 
-When the job card is created, one transaction:
+Job opening is `JobCardWorkflowService.open` (`server/src/modules/service/job-card-workflow.service.ts`). In the same
+transaction that opens the job card:
 
 1. Stores a **snapshot**: `mileage`, `warrantyStatusAtCreation`, reasons, expiry, km limit and `warrantySnapshot`
    (the policy, override and campaigns used). Later policy changes never rewrite it.
@@ -106,7 +112,10 @@ Every priced line on a job card has a `chargeType`:
 
 - **Parts** get a line automatically, one per stock issuance (`partIssuanceId` is unique). Quantities follow approved
   part returns. Reading the lines creates any that are missing, which also backfills older job cards.
-- **Labour** lines are added on the job card (`jobcard:line:update`).
+- **Labour** gets a line automatically, one per labour line recorded from the labour catalogue (`JobCardLabour`;
+  `jobCardLabourId` is unique). Hours, rate and description follow the labour line, and deleting the labour line
+  deletes its charge line.
+- Lines only record who pays. Parts are added by issuing stock, and labour through the job card's labour section.
 - **Defaults:**
   - `FREE` when a linked campaign's covered items include the line. Part numbers ending in `x` or `*` match a prefix.
   - `WARRANTY` when the vehicle was covered at creation and the part is warranty-applicable.
@@ -115,11 +124,12 @@ Every priced line on a job card has a `chargeType`:
   - `WARRANTY` needs coverage at creation (or a warranty case) and a warranty-applicable part.
   - `GOODWILL` needs `warranty:update` and asks for a reason.
   - `FREE` must name a linked campaign.
-  - Lines that are invoiced, or on a submitted claim, are locked.
+  - Once the job card is billed, every line is locked. A line on a submitted claim is also locked.
 
-**Invoices.** `POST /api/finance/invoices/from-job-card/:jobCardId` bills **only `CUSTOMER` lines**, adds VAT on taxable
-lines (`VAT_RATE` env, default 7.5%), and snapshots them as `InvoiceLine`s. A job card with priced lines can no longer
-get a hand-typed invoice.
+**Billing.** The job bill (`JobBillingService`, finance) is the only way to bill a job card. Each part and labour line is
+customer-paid only when the service type is not company-paid **and** its charge line is `CUSTOMER`. Warranty,
+goodwill and free lines never reach the customer's bill. VAT uses `JOB_BILL_VAT_RATE` (percent, default 7.5). The job
+card's **Who pays** card shows totals by payer; the bill adds the service charge and discounts.
 
 ## Campaigns
 
@@ -139,8 +149,8 @@ get a hand-typed invoice.
   - A contact attempt that reaches the customer moves the vehicle to `CONTACTED`.
   - **Schedule** books a service appointment.
   - Opening a job card for the vehicle marks it `SCHEDULED`.
-  - **Completing that job card marks it `COMPLETED`** in the same transaction, from either the job card update or the
-    workshop progress update.
+  - **When that job card reaches `READY`** (quality check passed), the vehicle is marked `COMPLETED` in the same
+    transaction. This works from the job card or the workshop screen.
 - **Progress** is shown overall and by branch; the branch is the vehicle owner's branch.
 
 ## Permissions
@@ -148,13 +158,13 @@ get a hand-typed invoice.
 | Permission | Allows | Granted to |
 |---|---|---|
 | `warranty:read` | See coverage and cases | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager, Receptionist, ReceptionManager, Accountant |
-| `warranty:update` | Edit cases and lines, set sale date or model, charge goodwill | WarrantyOfficer, Admin |
+| `warranty:update` | Edit cases and lines, set the warranty model or sale date on the warranty screen, charge goodwill | WarrantyOfficer, Admin |
 | `warranty:claim` | Open cases and move them through the workflow | WarrantyOfficer, Admin |
 | `warranty:settings` | Model policies, claim codes, extended warranty or goodwill overrides | WarrantyOfficer, Admin |
 | `campaign:read` | See campaigns | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager, Receptionist, ReceptionManager |
 | `campaign:create` / `campaign:update` | Create, edit, activate or close campaigns; add vehicles | WarrantyOfficer, Admin |
 | `campaign:vehicle:update` | Outreach: contacts, scheduling, status | WarrantyOfficer, Admin, Receptionist, ReceptionManager |
-| `jobcard:line:update` | Add labour, change charge types | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager |
+| `jobcard:line:update` | Change who pays for a line | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager |
 
 SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migration
 `20260930090100_warranty_permissions` (existing databases).
@@ -163,7 +173,11 @@ SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migrat
 
 - `20260930090000_warranty_and_campaigns` adds the schema. It is additive and idempotent, with check constraints on
   amounts, approval % and mileage.
-- The old free-text `Vehicle.warrantyProvider/Status/ExpiresAt` columns are kept but no longer used. The customer
+- `20260928125900_prepare_invoice_line_for_job_billing` and `20261005100000_reconcile_warranty_with_job_billing`
+  reconcile this feature with job billing and the labour catalogue. They convert any warranty-era `InvoiceLine` rows to
+  the job-bill shape, link labour charge lines to `JobCardLabour`, and copy `warrantyStartDate` into `saleDate`.
+- The old free-text `Vehicle.warrantyProvider/Status/ExpiresAt` columns, `Vehicle.warrantyStartDate`, and the
+  warranty-era `InvoiceLine.kind/taxable/jobCardLineId` columns are kept but no longer used. The customer
   portal shows the calculated coverage in their place. Drop them in a follow-up migration once no deployed build reads them.
 - `npm run prisma:seed:warranty` seeds Kia model policies, sample claim codes, a demo Kia Sportage under warranty, and
   a draft recall `RC-2026-014` that includes it. Activate it to see the banners.
@@ -175,7 +189,7 @@ SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migrat
 | File | Maps to |
 |---|---|
 | `model.csv` | `VehicleModel` |
-| `vehiclemaster.csv` | `Vehicle.warrantyStartDate` and model, matched by VIN / ChassisNO |
+| `vehiclemaster.csv` | `Vehicle.saleDate` and warranty model, matched by VIN / ChassisNO |
 | `partmast.csv` | `SparePart.warrantyApplicable` and `warrantyRate` |
 | `warrcomp.csv`, `warrdef.csv`, `warrpos.csv`, `warrrej.csv` | The claim code lookups |
 
@@ -208,6 +222,6 @@ The integration tests cover:
 
 - acknowledgement enforcement, the snapshot, the automatic case and officer notification
 - odometer rules and `UNKNOWN` handling
-- a full recall: VINs, activation, check-in flag, scheduling, completion and later VIN linking
-- charge types and invoices that bill only customer lines
+- a full recall: VINs, activation, check-in flag, scheduling, completion at `READY` and later VIN linking
+- charge types on issued parts and catalogue labour, and a job bill that charges only customer lines
 - the claim workflow, including concurrent decisions and partial approval or rejection

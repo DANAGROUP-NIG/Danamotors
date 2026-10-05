@@ -1,9 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { VehicleService } from './vehicle.service';
-import { assertBranchOwnership } from '../../middleware/authorize';
-import prisma from '../../prisma/client';
-import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
-import { ForbiddenError } from '../../shared/errors/appError';
 
 export class VehicleController {
   private vehicleService: VehicleService;
@@ -18,18 +14,7 @@ export class VehicleController {
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
       const customerId = req.query.customerId as string | undefined;
-      let branchId = req.query.branchId as string | undefined;
-      let createdById: string | undefined;
-
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
-      }
-
-      if (req.user && req.user.role === ROLES.RECEPTIONIST) {
-        createdById = req.user.userId;
-      }
-
-      const result = await this.vehicleService.listVehicles({ page, limit, search, branchId, createdById, customerId });
+      const result = await this.vehicleService.listVehicles({ page, limit, search, customerId });
 
       res.status(200).json({
         status: 'success',
@@ -48,7 +33,6 @@ export class VehicleController {
     try {
       const { id } = req.params;
       const result = await this.vehicleService.getVehicle(id);
-      assertBranchOwnership(req, (result.customer as any)?.branchId);
 
       res.status(200).json({
         status: 'success',
@@ -64,7 +48,6 @@ export class VehicleController {
 
   createVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      assertCanSetWarrantyStart(req);
       const createdById = req.user?.userId;
       const result = await this.vehicleService.createVehicle({ ...req.body, createdById });
 
@@ -84,12 +67,6 @@ export class VehicleController {
   updateVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
-      assertCanSetWarrantyStart(req);
       const result = await this.vehicleService.updateVehicle(id, req.body);
 
       res.status(200).json({
@@ -108,11 +85,6 @@ export class VehicleController {
   deleteVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
       await this.vehicleService.deleteVehicle(id);
 
       res.status(200).json({
@@ -128,11 +100,6 @@ export class VehicleController {
   addVehicleImage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.addVehicleImage(id, req.body);
 
       res.status(201).json({
@@ -151,11 +118,6 @@ export class VehicleController {
   getVehicleImages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.getVehicleImages(id);
 
       res.status(200).json({
@@ -173,11 +135,6 @@ export class VehicleController {
   addVehicleOwnership = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.addVehicleOwnership(id, req.body);
 
       res.status(201).json({
@@ -196,11 +153,6 @@ export class VehicleController {
   getVehicleOwnerships = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const vehicle = await prisma.vehicle.findUnique({
-        where: { id },
-        select: { customer: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, vehicle?.customer?.branchId);
       const result = await this.vehicleService.getVehicleOwnerships(id);
 
       res.status(200).json({
@@ -217,10 +169,3 @@ export class VehicleController {
 }
 
 export default VehicleController;
-
-/** The sale date starts the warranty clock, so only warranty:update holders may set it. */
-function assertCanSetWarrantyStart(req: Request) {
-  if (req.body?.warrantyStartDate === undefined) return;
-  if (req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(PERMISSIONS.WARRANTY_UPDATE)) return;
-  throw new ForbiddenError('Setting the warranty start (sale) date needs warranty:update');
-}

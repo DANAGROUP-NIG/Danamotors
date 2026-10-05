@@ -184,7 +184,7 @@ export function EnquiriesTable() {
           <p className='font-medium text-foreground'>
             {e.firstName} {e.lastName}
           </p>
-          <p className='text-xs text-muted-foreground'>{e.email}</p>
+          <p className='text-sm text-muted-foreground'>{e.email}</p>
         </div>
       ),
     },
@@ -220,7 +220,7 @@ export function EnquiriesTable() {
       render: (e) => (
         <span
           className={cn(
-            'rounded-full px-2.5 py-1 text-xs font-semibold',
+            'rounded-full px-2.5 py-1 text-sm font-semibold',
             STATUS_COLORS[e.status],
           )}
         >
@@ -231,7 +231,7 @@ export function EnquiriesTable() {
     {
       header: 'Submitted',
       render: (e) => (
-        <span className='text-xs text-muted-foreground'>
+        <span className='text-sm text-muted-foreground'>
           {formatDate(e.createdAt)}
         </span>
       ),
@@ -338,7 +338,7 @@ export function EnquiriesTable() {
             <>
               <div className='flex items-center gap-2'>
                 <DateInput value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(1); }} />
-                <span className='text-xs text-muted-foreground'>to</span>
+                <span className='text-sm text-muted-foreground'>to</span>
                 <DateInput value={dateTo} onChange={(v) => { setDateTo(v); setPage(1); }} />
               </div>
               <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} />

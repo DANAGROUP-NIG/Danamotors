@@ -86,7 +86,7 @@ export function assertChargeChange(change: ChargeChange): { campaignId: string |
 
 // ── Totals ───────────────────────────────────────────────────────────────────
 
-/** Nigerian VAT. The service passes config.VAT_RATE; this is the default for tests. */
+/** Nigerian VAT as a fraction. The service passes config.JOB_BILL_VAT_RATE / 100; this is the default for tests. */
 export const VAT_RATE = 0.075;
 
 export interface LineForTotals {
@@ -126,7 +126,3 @@ export function lineAmount(quantity: number, rate: number): number {
   return round2(quantity * rate);
 }
 
-/** Legacy statuses are free text ("Completed", "completed"). */
-export function isCompletedStatus(status: string | null | undefined): boolean {
-  return (status ?? "").trim().toLowerCase() === "completed";
-}

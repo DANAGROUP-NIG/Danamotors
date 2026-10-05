@@ -29,5 +29,5 @@ export function AuditLogDetailModal({ logId, onClose }: { logId: string | null; 
 }
 
 function Detail({ label, value, mono, preWrap }: { label: string; value: string; mono?: boolean; preWrap?: boolean }) {
-  return <div><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className={`${mono ? "font-mono" : ""} ${preWrap ? "whitespace-pre-wrap break-words" : ""}`}>{value}</p></div>;
+  return <div><p className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><p className={`${mono ? "font-mono" : ""} ${preWrap ? "whitespace-pre-wrap break-words" : ""}`}>{value}</p></div>;
 }

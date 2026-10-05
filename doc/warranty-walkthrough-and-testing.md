@@ -23,7 +23,7 @@ defect, call them back") could not be targeted at specific cars or tracked.
 | 1 | **Warranty coverage** | The system calculates whether a vehicle is under warranty from its model's policy, its sale date and its mileage. |
 | 2 | **Check before the job card** | When a vehicle is checked in or a job card is opened, the adviser sees warranty and recall banners and must confirm they told the customer. |
 | 3 | **Warranty cases** | A covered job automatically opens a "warranty case", which a new Warranty Officer role takes through Kia's claim process to settlement. |
-| 4 | **Who pays for each line** | Every part and labour line on a job card is marked Customer, Warranty, Goodwill or Free, and the customer invoice only bills Customer lines. |
+| 4 | **Who pays for each line** | Every part and labour line on a job card is marked Customer, Warranty, Goodwill or Free, and the job bill only charges the customer for Customer lines. |
 | 5 | **Campaigns** | Recalls and free fixes are created with the exact list of affected VINs, the team calls those customers, and progress is tracked to completion. |
 
 How they connect:
@@ -38,7 +38,7 @@ How they connect:
  │  ACTIVE / EXPIRED /  │                                            │
  │  UNKNOWN …           │                                            │
  └─────────┬────────────┘                                            │
-           │ shown at check-in and on the New Job Card page          │
+           │ shown at check-in and on the Open job card form         │
            ▼                                                         │
  Adviser ticks "I informed the customer" ──► JOB CARD created        │
            │                                   │                     │
@@ -46,13 +46,13 @@ How they connect:
            ▼                                   ▼                     │
  WARRANTY CASE opened automatically      Campaign vehicle = SCHEDULED │
  + Warranty Officer notified                   │                     │
-           │                                   │ job card completed  │
+           │                                   │ job card READY      │
            ▼                                   ▼                     │
  Officer: review → submit to Kia →       Campaign vehicle = COMPLETED│
  decision → settled → closed                                         │
                                                                      │
  Parts & labour lines on the job card ─── Customer / Warranty /      │
- Goodwill / Free ─── invoice bills Customer lines only               │
+ Goodwill / Free ─── job bill charges Customer lines only          │
                                                                      │
  CAMPAIGN (recall / free fix) ── affected VINs ── outreach ──────────┘
 ```
@@ -100,8 +100,8 @@ When the adviser picks a vehicle and enters the mileage, a panel shows:
 - 🟢 **Vehicle is under warranty**, or 🟠 **expired / could not be confirmed**
 - 🔴 **Open recall: RC-2026-014**, or 🔵 **Free fix: FF-2026-003**, for any open campaign on that VIN
 
-If the car is covered or has an open campaign, **"Create Job Card" stays disabled** until the adviser ticks *"I have
-informed the customer…"*.
+If the car is covered or has an open campaign, **"Save" stays disabled** until the adviser ticks *"I have informed the
+customer…"*.
 
 Important for the demo: this isn't only a UI rule. The **server** re-checks everything when the job card is saved. If
 someone skips the screen (Postman, an old app version), the server refuses with an error (`409 WARRANTY_ACK_REQUIRED`).
@@ -168,8 +168,12 @@ The system picks a sensible default:
 
 The adviser can change it, within rules.
 
-**Generate invoice** now builds the customer invoice from the **Customer lines only**, plus 7.5% VAT. Warranty, goodwill
-and free lines are never billed to the customer.
+Lines are created for you: one for each part issued from stock, and one for each labour line recorded from the labour
+catalogue. The **Who pays** card on the job card only sets the payer.
+
+The **job bill** (Create Job Bill, once the job is Ready) charges the customer for **Customer lines only**, plus the
+service charge and 7.5% VAT. Warranty, goodwill and free lines are never billed to the customer. Once the job is
+billed, who pays for each line can no longer change.
 
 ### G. Campaigns (recalls and free fixes)
 
@@ -180,8 +184,8 @@ range.
 - VINs that aren't in our system yet are still tracked, and link automatically when that car is registered.
 - Each vehicle moves through **Pending → Contacted → Scheduled → Completed** (or *Not reachable* / *Not applicable*).
 - Staff log calls and book appointments from the campaign page.
-- When a job card is opened for the car, it becomes **Scheduled**. When that job card is **completed**, it becomes
-  **Completed** automatically.
+- When a job card is opened for the car, it becomes **Scheduled**. When that job card reaches **Ready** (quality check
+  passed), it becomes **Completed** automatically.
 - The campaign page shows progress overall and **by branch**.
 
 ### H. New role and permissions
@@ -191,17 +195,17 @@ There is a new role, **WarrantyOfficer**. The new permissions are:
 | Permission | What it allows |
 |---|---|
 | `warranty:read` | See warranty status and cases |
-| `warranty:update` | Edit cases and lines, set the sale date, charge goodwill |
+| `warranty:update` | Edit cases and lines, set the warranty model and sale date on the warranty screen, charge goodwill |
 | `warranty:claim` | Move cases through the workflow |
 | `warranty:settings` | Model policies, claim codes, extended warranty and goodwill |
 | `campaign:read`, `campaign:create`, `campaign:update` | Campaigns |
 | `campaign:vehicle:update` | Outreach: calls, scheduling, status |
-| `jobcard:line:update` | Add labour lines and change who pays |
+| `jobcard:line:update` | Change who pays for a line |
 
 Who gets what by default:
 
 - **Warranty officer** and **Admin**: everything above.
-- **Service adviser**: read warranty and campaigns, and edit job card lines.
+- **Service adviser**: read warranty and campaigns, and change who pays on job card lines.
 - **Receptionist** and **reception manager**: read, plus campaign outreach.
 
 ## 1.4 Where the code lives
@@ -210,13 +214,16 @@ Who gets what by default:
 
 | Path | What's in it |
 |---|---|
-| `prisma/schema.prisma` | New tables: `VehicleModel`, `WarrantyCase` (+ lines, history, four code tables), `JobCardLine`, `InvoiceLine`, `Campaign` (+ models, covered items, vehicles, contact logs), `JobCardCampaign`. New fields on `Vehicle`, `JobCard`, `SparePart`. |
+| `prisma/schema.prisma` | New tables: `VehicleModel`, `WarrantyCase` (+ lines, history, four code tables), `JobCardLine`, `Campaign` (+ models, covered items, vehicles, contact logs), `JobCardCampaign`. New fields on `Vehicle`, `JobCard`, `SparePart`. |
 | `prisma/migrations/20260930090000_warranty_and_campaigns` | The schema. Additive only; safe to re-run. |
+| `prisma/migrations/20261005100000_reconcile_warranty_with_job_billing` | Links labour charge lines to the labour catalogue and copies the old warranty start date into `saleDate`. |
 | `prisma/migrations/20260930090100_warranty_permissions` | The new permissions and the WarrantyOfficer role. |
 | `src/modules/warranty/` | `warranty.logic.ts` (coverage rules and case workflow, pure and unit-tested), `warranty.coverage.ts` (the check), `warrantyCase.service.ts` (cases), `warrantySettings.service.ts` (models and codes), routes and validation. |
 | `src/modules/campaign/` | Campaign rules (`campaign.logic.ts`), service, routes, and hooks used by job cards. |
-| `src/modules/job-card-line/` | Lines, charge types and invoice generation. |
-| `src/modules/service/service.service.ts` | `createJobCard`: the check, the snapshot and the auto-opened case. Also check-in and the "job card completed → campaign completed" hook. |
+| `src/modules/job-card-line/` | Who pays for each line: lines mirror issued parts and catalogue labour. |
+| `src/modules/service/job-card-workflow.service.ts` | Job opening: the check, the snapshot and the auto-opened case. Also the "job card Ready → campaign completed" hook. |
+| `src/modules/finance/job-billing.service.ts` | The job bill; charges the customer only for Customer lines. |
+| `src/modules/service/service.service.ts` | Appointment check-in with the warranty check. |
 | `prisma/seed/warranty.ts` | Demo data. |
 | `prisma/legacy/warranty-migrate.ts` | Legacy data import. |
 
@@ -226,8 +233,8 @@ Who gets what by default:
 |---|---|
 | `features/warranty/` | Coverage card, check panel, check-in dialog, cases list and detail, decision dialog, settings |
 | `features/campaigns/` | Campaigns list, form, detail, add-vehicles and outreach dialogs |
-| `features/job-cards/` | New job card page, warranty snapshot cards, Parts & Labour card |
-| `app/(dashboard)/` | New pages: `warranty/`, `warranty/[id]`, `warranty/settings`, `campaigns/…`, `job-cards/new` |
+| `features/job-cards/` | Warranty check on the job opening form, warranty snapshot cards, Who pays card |
+| `app/(dashboard)/` | New pages: `warranty/`, `warranty/[id]`, `warranty/settings`, `campaigns/…`, `job-cards/new` (the job opening form as a page, for links from a vehicle or campaign) |
 
 ---
 
@@ -307,7 +314,7 @@ ones and you'll get **403**.
 
 ## T2. Vehicle warranty coverage card
 
-*Super admin or warranty officer (setting the sale date needs `warranty:update`).*
+*Super admin or warranty officer.*
 
 > **Where is the card?** The **Vehicles list** has no warranty column. Click a vehicle **row** to open its detail page;
 > the **Warranty Coverage** card is under the header.
@@ -316,14 +323,14 @@ ones and you'll get **403**.
 >
 > | Input | Where it comes from | Can you type it? |
 > |---|---|---|
-> | Model policy | **Edit** vehicle → *Model (warranty policy)* | Yes |
-> | Sale date | **Edit** vehicle → *Sale date (warranty start)* (needs `warranty:update`) | Yes |
+> | Model policy | **Edit** vehicle → *Warranty policy model* | Yes |
+> | Sale date | **Edit** vehicle → *Sale date (warranty start)* | Yes |
 > | Odometer reading | Recorded at **check-in** (T4) or when a **job card** is opened (T5) | **No, on purpose**: nobody can edit the mileage to fake coverage |
 
 1. Open **Vehicles** and click a vehicle **row**. Option A (seeded data): the Sportage `KNAPU81BDP7123456` already has a
    reading of 58,210 km, so it shows **Active** straight away.
-2. Option B (your own vehicle): click **Edit**, choose **Model (warranty policy)** = Sportage and **Sale date** =
-   12/03/2023. Save.
+2. Option B (your own vehicle): click **Edit**, choose **Warranty policy model** = Sportage and **Sale date (warranty
+   start)** = 12/03/2023. Save.
    - ✅ The card shows 🟠 **Unknown**, "Coverage could not be confirmed — No odometer reading yet — it is recorded at
      check-in or when a job card is opened".
    - The **Time** box already works (e.g. "Started 12/03/2023 · Expires 10/03/2028 · 526 days left").
@@ -331,7 +338,7 @@ ones and you'll get **403**.
 
    **This is correct behaviour.** The km limit can't be checked without a reading.
 3. **Record a first reading.** Create an appointment for this vehicle and **check it in** with a mileage (T4 steps 1–5),
-   or open a **New job card** for it (T5). Then reopen the vehicle page.
+   or open a job card for it (T5). Then reopen the vehicle page.
    ✅ The **Warranty Coverage** card now shows:
    - a green **Active** badge
    - "Under manufacturer warranty — X or Y km remaining, whichever comes first"
@@ -413,25 +420,28 @@ ones and you'll get **403**.
    approved".
 8. Note: in **Edit appointment**, the status dropdown no longer offers "Checked In". Check-in must go through the dialog.
 
-## T5. New job card with the warranty check (the core of the feature)
+## T5. Open a job card with the warranty check (the core of the feature)
 
 *Service adviser `advisor1`. Keep the warranty officer logged in elsewhere.*
 
-1. Go to **Job Cards → New job card**, or **Create Job Card** on the appointment, or **New Job Card** on the vehicle page.
-2. Pick the Sportage. ✅ Chips show the customer, phone and branch. **Linked appointment** lists the checked-in
-   appointment.
-3. **Odometer:** ✅ "Last recorded: … km on …" shows. Enter a valid mileage.
-4. ✅ The right-hand **Warranty & Campaign Check** panel shows:
+1. Open the job opening form in one of three ways:
+   - **Job Cards → Open job card** (a modal)
+   - **Create Job Card** on the checked-in appointment (a modal, prefilled)
+   - **New Job Card** on the vehicle page (a full page, prefilled)
+2. On **Vehicle Details**, pick the Sportage under **Regn no. / VIN**. ✅ The vehicle and customer details load, and
+   **Mileage** is pre-filled with the last recorded reading.
+3. **Mileage:** enter a valid reading (e.g. last recorded + 300). ✅ "Previous odometer: … km" shows under the vehicle.
+4. ✅ A **Warranty & campaign check** card appears under the vehicle and shows:
    - 🟢 *Vehicle is under warranty — Expires …, … km remaining. The warranty officer will be notified and a warranty
      case opened.*
    - 🔴 *Open recall: RC-2026-014*
    - the acknowledgement box
-5. Fill in a job number (e.g. `JC-TEST-001`) and the complaint "Engine warning light on, rough idle when cold".
-   ✅ **Create Job Card** is **disabled** until you tick the acknowledgement. Tick it, then create.
+5. Fill in the rest of the form as usual: service, bay, service advisor, mechanic or team, promised date and time, and a
+   customer request on **Customer Requests** (e.g. "Engine warning light on, rough idle when cold").
+   ✅ **Save** is **disabled** until you tick the acknowledgement. Tick it, then save.
 6. **Expected results:**
-   - ✅ Toasts: "Job card JC-TEST-001 created" and "Warranty case WTY… opened".
-   - ✅ You land on the job card. It shows the header (Customer, Vehicle + VIN, **Mileage at check-in**, Technician,
-     Complaint) and a **Warranty at creation** card:
+   - ✅ Toasts: "Job card opened" and "Warranty case WTY… opened". The job number is assigned on save.
+   - ✅ Open the job card. It shows a **Warranty at creation** card:
      - **Active**
      - expiry and km remaining
      - "Snapshot taken when the job card was created…"
@@ -441,11 +451,11 @@ ones and you'll get **403**.
    - ✅ The **warranty officer's** bell shows "Warranty job opened" with customer, phone, car, VIN, km, job card,
      branch, complaint and case number.
    - ✅ The adviser gets "Open campaign on this vehicle…".
-   - ✅ On the campaign page, this vehicle is now **Scheduled** and the Job card column is filled in after completion
-     (T8).
+   - ✅ On the campaign page, this vehicle is now **Scheduled**. The Job card column is filled in once the job is
+     Ready (T8).
 7. **Negative tests:**
-   - ❌ New job card with a **lower** mileage → "lower than the last recorded …". Tick **Odometer was replaced**, give a
-     reason, and it is accepted. ✅ The snapshot card shows the odometer note.
+   - ❌ Open a job card with a **lower** mileage → "lower than the last recorded …". Tick **Odometer was replaced**
+     (under the vehicle), give a reason, and it is accepted. ✅ The snapshot card shows the odometer note.
    - ❌ Pick a vehicle with **no model or sale date** → 🟠 "Warranty could not be confirmed". **No acknowledgement
      needed**, and after creating: **no case** is opened, and the snapshot says **Unknown**.
    - ❌ (Swagger) `POST /service/job-cards` for the Sportage with `"warrantyAcknowledged": false` → **409** with
@@ -453,32 +463,37 @@ ones and you'll get **403**.
 8. **Snapshot test:** change the Sportage model's km limit in Settings to 10,000. ✅ The vehicle page now says
    *Expired (km)*, but the job card's **Warranty at creation** still says **Active**. Put it back to 100,000.
 
-## T6. Parts & Labour, who pays, and the invoice
+## T6. Who pays, and the job bill
 
-*On the job card from T5. The adviser can add labour; issuing a part needs a store manager or admin.*
+*On the job card from T5. Lines come from the team's labour and parts sections; the **Who pays** card only sets the
+payer. Issuing a part needs a store manager or admin.*
 
-1. **Add labour:** operation `HRN-01`, "Harness inspection", 1.2 h, rate 15000.
-   ✅ Charge to = **Free – RC-2026-014** (blue), because the campaign covers HRN-01. Hover the ⓘ to see *"Default:
-   covered by campaign RC-2026-014"*.
-2. **Add labour:** `SRV-60K`, "Periodic service 60k", 2 h, 24000. ✅ Charge to = **Customer**.
-3. **Add part** (log in as `store.lagos` / Store@123 or super admin; the branch must have stock):
+> **Setup:** in **Settings → Labour rates**, make sure two labour operations exist: `HRN-01` "Harness inspection" and
+> `SRV-60K` "Periodic service 60k". On the campaign from T3, the covered labour item's operation code must be `HRN-01`.
+> Add an estimate on the job card that includes the service, both operations and both parts, and record the customer's
+> approval (the workshop's approval gate).
+
+1. **Labour:** in the job card's labour section, add `HRN-01` (1.2 h).
+   ✅ In **Who pays** it appears with Charge to = **Free – RC-2026-014** (blue), because the campaign covers HRN-01.
+   Hover the ⓘ to see *"Default: covered by campaign RC-2026-014"*.
+2. Add `SRV-60K` (2 h). ✅ Charge to = **Customer**.
+3. **Parts** (log in as `store.lagos` / Store@123 or super admin; the branch must have stock):
    - Issue the **warranty-applicable** part from T1. ✅ It appears as **Warranty**, priced at the **warranty rate**.
    - Issue the **non-applicable** part. ✅ It appears as **Customer**, priced at the retail rate.
-4. **Totals box:** ✅ Customer / Warranty (claim) / Goodwill / Free are each summed. *Customer invoice total = Customer
-   + 7.5% VAT*, with "Only lines charged to the customer are invoiced."
+4. **Totals box:** ✅ Customer / Warranty (claim) / Goodwill / Free are each summed. *Customer parts & labour* = Customer
+   + 7.5% VAT, "Before the service charge and bill discounts."
 5. **Change who pays:**
    - On the non-applicable part, the dropdown **doesn't offer Warranty**. (Through the API it is refused: "not
      warranty-applicable".)
    - As the **adviser**, Goodwill is not offered. As the **warranty officer**, choose **Goodwill**: a dialog asks for a
      reason. ✅ After saving, the ⓘ shows "Changed by … : reason".
-6. **Generate invoice** (top button, or the button under the table). ✅ The confirm dialog shows the customer total.
-   Confirm. ✅ "Invoice INV… created". Open **Invoices**: subtotal = **Customer lines only**, tax = 7.5%.
-7. ✅ After invoicing:
-   - The customer lines show a 🔒 lock, and their charge type can no longer change.
-   - The top **Generate Invoice** button disappears.
-   - ❌ A second invoice is refused ("already invoiced").
-8. ❌ Try the old manual **Invoices → New invoice** with this job card. ✅ It is refused: *"This job card has priced lines.
-   Use Generate invoice…"*.
+6. **Bill the job.** Move the job to **Ready** (In progress → QC → record a passed quality check → Ready), then
+   **Create Job Bill** as the billing officer or super admin.
+   ✅ The bill lists only the **Customer** lines plus the service charge. The warranty part, the free HRN-01 labour and
+   any goodwill line are not on it.
+7. ✅ After billing:
+   - Every line in **Who pays** shows a 🔒 lock, and "Billed on …" appears under the table.
+   - ❌ Changing who pays is refused ("billed … who pays can no longer change").
 
 ## T7. Warranty case workflow (the officer's workbench)
 
@@ -548,8 +563,9 @@ ones and you'll get **403**.
 6. ✅ The **Not in system** row has its buttons disabled.
 7. **Bulk:** tick two rows, then **Mark not applicable**. ✅ Both become **Not applicable**. Use **Back to pending**
    (row ⋯ menu) to undo.
-8. **Completion:** as the **workshop manager** (`wm.lagos`) or super admin (advisers don't have `jobcard:update`), open
-   the job card from T5 and set its status to **Completed** (Repairs/Workshop progress, or edit the job card).
+8. **Completion:** as the **workshop manager** (`wm.lagos`) or super admin (advisers don't have `jobcard:update`), take
+   the job card from T5 to **Ready**: In progress → QC → record a passed quality check → Ready. (The team's approval gate
+   needs a customer-approved estimate first; see T6.)
    - ✅ On the campaign page, that vehicle becomes **Completed** and the **Job card** column links to it.
    - ✅ The tiles and branch percentages update.
 9. **Late registration:** register a new vehicle (Vehicles → New) with the VIN `KNAPU81BDP7000099` from T3.
@@ -609,7 +625,7 @@ npm run legacy:warranty -- --dir /path/to/csv-exports --apply    # import (safe 
 cd server
 npx tsc --noEmit                                     # type check
 npx jest warranty campaign jobCardLine legacyImport  # rules: coverage, transitions, VINs, charge types, CSV
-TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/danamotors_test npx jest warranty.integration
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/danamotors_test npx jest warranty.integration workshop.integration
 cd ../client && npm run lint && npm run build
 ```
 
@@ -623,47 +639,57 @@ Never point `TEST_DATABASE_URL` at the shared dev database.
 
 > "The warranty and campaigns issue is implemented end to end and verified, not yet merged.
 > - Warranty is now **calculated** from the model policy, sale date and odometer, never typed.
-> - The adviser gets a warranty and recall banner at check-in and on the new job card page, and must acknowledge it;
+> - The adviser gets a warranty and recall banner at check-in and on the job opening form, and must acknowledge it;
 >   the server enforces that too.
 > - Covered jobs automatically open a warranty case for the new Warranty Officer role, with the full Kia claim
 >   workflow: submit, approve, partial, reject, return, settle.
-> - Every job card line now says who pays (customer, warranty, goodwill or campaign), and invoices only bill the
->   customer's lines.
+> - Every part and labour line on a job card now says who pays (customer, warranty, goodwill or campaign), and the
+>   job bill only charges the customer's lines.
 > - Recalls and free fixes are created from Kia's VIN lists, with outreach, scheduling, and automatic completion when
->   the job card is done.
+>   the job card is ready.
+> - It is merged with the team's labour catalogue, estimate approval and job billing: one billing path, and the
+>   vehicle's sale date starts the warranty.
 >
-> 272 automated tests pass, including database tests. Lint and build are clean. All 13 screens match the approved
-> designs."
+> Server and client type checks, lint and build are clean, and the warranty database tests pass on the merged code."
 
 ## Demo script (about 5 minutes)
 
 1. **Warranty Settings**: the Sportage policy is 5 years / 100,000 km. (T1)
 2. **Vehicle page**: Active, the time and km meters, and the open recall card. (T2, T3)
-3. **New Job Card**: enter the mileage; show the green and red banners; *Create* stays disabled until the box is ticked;
-   create the job card. (T5)
+3. **Open job card**: pick the vehicle and enter the mileage; show the green and red banners; *Save* stays disabled until
+   the box is ticked; save the job card. (T5)
 4. **Switch to the warranty officer**: the bell notification, the new case, import lines, submit, record a partial
    decision. (T7)
-5. **Job card**: the Parts & Labour charge types, and *Generate invoice* billing only the customer lines. (T6)
-6. **Campaign page**: progress by branch, log a call, schedule; complete the job card and the campaign updates. (T8)
+5. **Job card**: the **Who pays** card, and a job bill that charges only the customer lines. (T6)
+6. **Campaign page**: progress by branch, log a call, schedule; move the job card to Ready and the campaign updates. (T8)
 
 ## Decisions made (the team should know)
 
 - Warranty ends at the **date or km limit, whichever comes first**. Missing data means **Unknown**, never covered.
 - Warranty officers are **per branch**. If a branch has none, all officers are notified.
 - **Goodwill** needs the warranty officer (`warranty:update`) and a reason.
-- Job card lines (parts and labour), invoice lines and **invoice generation from the job card** were added. The issue
-  needed them for "invoice includes only customer lines".
+- **Who pays** is a layer on the team's design: one charge line per issued part and per catalogue labour line. The
+  team's job bill is the only billing path, and it charges the customer only for Customer lines.
+- The warranty starts on the team's `Vehicle.saleDate`. The old `warrantyStartDate` was copied into it and is no longer
+  used.
+- Campaign work is complete when the job card reaches **Ready** (quality check passed).
 - **PDI** (pre-delivery inspection) is out of scope.
 - Legacy data is imported from **CSV exports**, with a dry-run report first.
 - Two permissions were added beyond the issue: `warranty:settings` and `jobcard:line:update`.
 
 ## Risks and follow-ups
 
-- The old free-text `Vehicle.warrantyProvider/Status/ExpiresAt` columns are unused now. Drop them in a later migration.
+- The old free-text `Vehicle.warrantyProvider/Status/ExpiresAt` columns, `Vehicle.warrantyStartDate`, and leftover
+  `InvoiceLine.kind/taxable/jobCardLineId` columns are unused now. Drop them in a later migration.
+- **Two "model" tables:** the warranty policy model (`VehicleModel`) and the team's vehicle catalogue model
+  (`VehicleCatalogModel`) are separate. Unify them later so a vehicle's catalogue model sets its warranty policy.
+- **Warranty-only jobs:** if nothing is charged to the customer, there is nothing to bill, so delivery needs approved
+  credit (the team's existing rule). The team should decide whether such jobs can be delivered without a bill.
+- **Estimate approval:** the team's gate requires a customer-approved estimate before work, including warranty and
+  campaign work.
 - **The data team needs to export the legacy tables to CSV** and run the dry run. Many legacy vehicles have no sale date
   and will show *Unknown* until it is filled in.
 - **A job card for a vehicle now requires the mileage.**
-- **Behaviour change: manual invoices are blocked** for job cards that have priced lines.
 - **Global style fix:** a CSS rule was overriding all button and input font sizes. It's fixed, so some existing buttons
   look slightly smaller (as originally designed).
 
@@ -677,4 +703,4 @@ Never point `TEST_DATABASE_URL` at the shared dev database.
 | "Mileage … lower than the last recorded" | The odometer only goes forward | Enter the real reading, or tick *Odometer was replaced* with a reason |
 | The vehicle shows **Unknown** | No model, sale date or mileage | Link the model and set the sale date (Edit vehicle) |
 | A campaign doesn't show on the vehicle | The campaign is Draft or Closed, outside its dates, or the VIN differs | Activate it, and check the dates and VIN |
-| "Nothing to invoice" | No line is charged to the customer | Expected for fully warranty or campaign jobs |
+| "Record customer-paid parts, labour or a service charge before creating a job bill" | Nothing on the job is charged to the customer | Expected for fully warranty or campaign jobs |

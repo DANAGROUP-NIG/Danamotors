@@ -3,7 +3,7 @@
  *
  * Reads CSV exports of the legacy tables and maps them to the new warranty model:
  *   model.csv          → VehicleModel (code, name, warrdays, warrMileage)
- *   vehiclemaster.csv  → Vehicle.warrantyStartDate (SaleDate) + Vehicle.vehicleModelId, matched by VIN / ChassisNO
+ *   vehiclemaster.csv  → Vehicle.saleDate (SaleDate) + Vehicle.vehicleModelId, matched by VIN / ChassisNO
  *   partmast.csv       → SparePart.warrantyApplicable (WTYAPPLICABLE) + warrantyRate (warrrate)
  *   warrcomp.csv / warrdef.csv / warrpos.csv / warrrej.csv → claim code lookups
  *
@@ -14,7 +14,7 @@
  *
  * Options:
  *   --out <dir>        where to write warranty-migration-<timestamp>.{md,json} (default <dir>/report)
- *   --overwrite-dates  replace an existing, different warrantyStartDate (default: report as a conflict)
+ *   --overwrite-dates  replace an existing, different saleDate (default: report as a conflict)
  *
  * Legacy warranty claims (WarrantyHead / WarrantyDetails, 1 record) are not migrated.
  */
@@ -265,7 +265,7 @@ async function main() {
     report.vehicles = vehicles;
     const vehicleCsv = readCsv(opts.dir, vehicles.file);
     const appVehicles = await prisma.vehicle.findMany({
-      select: { id: true, vin: true, model: true, vehicleModelId: true, warrantyStartDate: true, warrantyExpiresAt: true },
+      select: { id: true, vin: true, model: true, vehicleModelId: true, saleDate: true, warrantyExpiresAt: true },
     });
     const byVin = new Map(appVehicles.map((v) => [normalizeVin(v.vin), v]));
     const modelsByName = new Map(existingModels.map((m) => [modelKey(m.name), m.id]));
@@ -304,11 +304,11 @@ async function main() {
         seen.add(v.id);
         const data: Prisma.VehicleUncheckedUpdateInput = {};
         if (saleDate) {
-          if (!v.warrantyStartDate) data.warrantyStartDate = saleDate;
-          else if (v.warrantyStartDate.toISOString().slice(0, 10) !== saleDate.toISOString().slice(0, 10)) {
+          if (!v.saleDate) data.saleDate = saleDate;
+          else if (v.saleDate.toISOString().slice(0, 10) !== saleDate.toISOString().slice(0, 10)) {
             count(vehicles, "sale date conflicts");
-            sample(vehicles, "sale date conflicts", `${vin}: app ${v.warrantyStartDate.toISOString().slice(0, 10)} vs legacy ${saleDate.toISOString().slice(0, 10)}`);
-            if (opts.overwriteDates) data.warrantyStartDate = saleDate;
+            sample(vehicles, "sale date conflicts", `${vin}: app ${v.saleDate.toISOString().slice(0, 10)} vs legacy ${saleDate.toISOString().slice(0, 10)}`);
+            if (opts.overwriteDates) data.saleDate = saleDate;
           }
         }
         if (!v.vehicleModelId) {

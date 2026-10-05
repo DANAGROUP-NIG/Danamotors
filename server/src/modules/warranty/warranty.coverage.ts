@@ -19,7 +19,7 @@ export const vehicleWarrantySelect = {
   year: true,
   trim: true,
   customerId: true,
-  warrantyStartDate: true,
+  saleDate: true,
   lastRecordedMileage: true,
   lastMileageAt: true,
   warrantyOverrideType: true,
@@ -47,7 +47,7 @@ export function overrideOf(vehicle: VehicleForWarranty): CoverageOverride | null
 /** Coverage for a vehicle at a given odometer reading (defaults to the last recorded reading). */
 export function coverageFor(vehicle: VehicleForWarranty, mileage?: number | null, today = new Date()): Coverage {
   return computeCoverage({
-    startDate: vehicle.warrantyStartDate,
+    startDate: vehicle.saleDate,
     policy: policyOf(vehicle),
     override: overrideOf(vehicle),
     mileage: mileage ?? vehicle.lastRecordedMileage ?? null,

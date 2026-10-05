@@ -299,7 +299,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
             <div className="grid gap-4 sm:grid-cols-3">
               <DetailField label="Model" value={[c.vehicle.make, c.vehicle.model].filter(Boolean).join(" ")} />
               <DetailField label="Variant" value={c.vehicle.trim} />
-              <DetailField label="Sale date" value={fmtDate(c.vehicle.warrantyStartDate)} />
+              <DetailField label="Sale date" value={fmtDate(c.vehicle.saleDate)} />
               <DetailField label="VIN" value={<Link href={`/vehicles/${c.vehicle.id}`} className="font-mono hover:underline">{c.vehicle.vin}</Link>} />
               <DetailField label="Mileage" value={fmtKm(c.mileage)} />
               <div>

@@ -90,7 +90,7 @@ export type VehicleModelPayload = {
 
 export type UpdateVehicleWarrantyPayload = {
   vehicleModelId?: string | null;
-  warrantyStartDate?: string | null;
+  saleDate?: string | null;
   override?: { type: "EXTENDED" | "GOODWILL"; until?: string | null; km?: number | null; reason: string } | null;
 };
 
@@ -212,7 +212,7 @@ export type WarrantyCase = {
     model: string | null;
     trim: string | null;
     year: number | null;
-    warrantyStartDate: string | null;
+    saleDate: string | null;
     vehicleModel: { id: string; code: string; name: string } | null;
   };
   customer: { id: string; firstName: string; lastName: string; email: string; phoneNumber: string | null } | null;

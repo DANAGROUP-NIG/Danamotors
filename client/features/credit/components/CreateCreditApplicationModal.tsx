@@ -110,7 +110,7 @@ export function CreateCreditApplicationModal({
             {...register("amount")}
           />
         </Field>
-        <p className="-mt-2 text-xs text-muted-foreground">
+        <p className="-mt-2 text-sm text-muted-foreground">
           Must be within the customer's credit balance and the invoice's
           outstanding balance.
         </p>

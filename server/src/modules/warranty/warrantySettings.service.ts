@@ -158,7 +158,7 @@ export class WarrantySettingsService {
     vehicleId: string,
     data: {
       vehicleModelId?: string | null;
-      warrantyStartDate?: Date | null;
+      saleDate?: Date | null;
       override?: { type: WarrantyOverrideType; until?: Date | null; km?: number | null; reason: string } | null;
     },
   ) {
@@ -168,12 +168,12 @@ export class WarrantySettingsService {
       const model = await prisma.vehicleModel.findUnique({ where: { id: data.vehicleModelId }, select: { isActive: true } });
       if (!model?.isActive) throw new BadRequestError("Choose an active vehicle model");
     }
-    if (data.warrantyStartDate && data.warrantyStartDate.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+    if (data.saleDate && data.saleDate.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
       throw new BadRequestError("The warranty start date cannot be in the future");
     }
     const update: Prisma.VehicleUncheckedUpdateInput = {};
     if (data.vehicleModelId !== undefined) update.vehicleModelId = data.vehicleModelId;
-    if (data.warrantyStartDate !== undefined) update.warrantyStartDate = data.warrantyStartDate;
+    if (data.saleDate !== undefined) update.saleDate = data.saleDate;
     if (data.override === null) {
       Object.assign(update, { warrantyOverrideType: null, warrantyOverrideUntil: null, warrantyOverrideKm: null, warrantyOverrideReason: null });
     } else if (data.override) {

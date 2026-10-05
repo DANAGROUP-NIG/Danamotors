@@ -85,7 +85,7 @@ export const useCancelIndent = () =>
 export const useDispatchIndent = () =>
   useIndentMutation(
     ({ id, body }: { id: string; body: DispatchIndentPayload }) => dispatchIndentRequest(id, body),
-    (i) => `Dispatched. STN ${i.stn?.stnNumber} and MIT ${i.stn?.mit?.mitNumber} created`,
+    (i) => `Dispatched on STN ${i.stn?.stnNumber}. The goods are now in transit`,
     "Failed to dispatch",
   );
 
@@ -93,10 +93,10 @@ export const useReceiveIndent = () =>
   useIndentMutation(
     ({ id, body }: { id: string; body: ReceiveIndentPayload }) => receiveIndentRequest(id, body),
     (i) => {
-      const srn = i.stn?.srns[i.stn.srns.length - 1];
+      const mrn = i.stn?.mrns[i.stn.mrns.length - 1];
       return i.status === "COMPLETED"
-        ? `SRN ${srn?.srnNumber} posted. Transfer complete`
-        : `SRN ${srn?.srnNumber} posted. Some items are still outstanding`;
+        ? `MRN ${mrn?.mrnNumber} generated. Transfer complete`
+        : `MRN ${mrn?.mrnNumber} generated. Some items are still outstanding`;
     },
     "Failed to receive",
   );

@@ -184,7 +184,7 @@ export function VehiclesTable() {
     {
       header: "VIN",
       render: (v) => v.vin,
-      className: "font-mono text-xs text-muted-foreground",
+      className: "font-mono text-sm text-muted-foreground",
     },
     {
       header: "Reg No",

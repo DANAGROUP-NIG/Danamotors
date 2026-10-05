@@ -9,7 +9,7 @@ import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
 import { downloadCsv, downloadExcel } from "@/lib/table-actions";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { RecordPaymentModal } from "@/features/invoices/components/RecordPaymentModal";
+import { PaymentReceiptModal } from "@/features/invoices/components/PaymentReceiptModal";
 import { usePayments } from "../hooks/use-payments";
 import {
   PaymentsTable,
@@ -21,7 +21,7 @@ export function PaymentsPage() {
   const [showPayment, setShowPayment] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasPermission } = useAuth();
-  const canCreate = hasPermission("payment:create");
+  const canCreate = hasPermission("receipt:create");
   const { data } = usePayments({ branchId: activeBranch?.id });
 
   const payments = data?.payments ?? [];
@@ -67,7 +67,7 @@ export function PaymentsPage() {
             {canCreate && (
               <Button size="sm" onClick={() => setShowPayment(true)}>
                 <Plus className="size-4" />
-                Record payment
+                New receipt
               </Button>
             )}
           </div>
@@ -75,7 +75,7 @@ export function PaymentsPage() {
       />
       <PaymentsTable />
 
-      <RecordPaymentModal
+      <PaymentReceiptModal
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}
       />

@@ -23,6 +23,8 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
   let cases: CaseServiceType;
   let campaigns: CampaignServiceType;
   let lines: LineServiceType;
+  let labour: { addJobCardLine(jobCardId: string, input: { labourItemId: string; hours?: number }): Promise<{ id: string }> };
+  let workshop: { updateQC(id: string, qcStatus: string, qcNotes?: string): Promise<unknown> };
 
   const run = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
   // Unique 17-character VINs for this run (digits only in the serial, never I/O/Q).
@@ -34,7 +36,11 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
   let sportage: { id: string };
   let coilPart: { id: string; partNumber: string };
   let oilPart: { id: string; partNumber: string };
-  let jobSeq = 0;
+  let bay: { id: string };
+  let team: { id: string };
+  let catalogService: { id: string };
+  let harnessOp: { id: string; code: string };
+  let serviceOp: { id: string; code: string };
 
   const vehicle = (n: number, data: { startDate?: Date | null; lastMileage?: number | null; model?: string | null } = {}) =>
     prisma.vehicle.create({
@@ -43,8 +49,10 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
         vin: vin(n),
         make: "Kia",
         model: "Sportage",
+        customMake: "Kia",
+        customModel: "Sportage",
         vehicleModelId: data.model === null ? null : sportage.id,
-        warrantyStartDate: data.startDate === undefined ? new Date(Date.now() - 400 * 86_400_000) : data.startDate,
+        saleDate: data.startDate === undefined ? new Date(Date.now() - 400 * 86_400_000) : data.startDate,
         lastRecordedMileage: data.lastMileage === undefined ? 30_000 : data.lastMileage,
       },
     });
@@ -53,13 +61,35 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     service.createJobCard({
       vehicleId,
       customerId: customer.id,
+      serviceId: catalogService.id,
       branchName: branch.name,
-      jobNumber: `JC-${run}-${++jobSeq}`,
       description: "Engine warning light on, rough idle when cold",
+      bayId: bay.id,
+      teamId: team.id,
+      serviceAdvisorId: adviser.id,
+      promisedAt: new Date(Date.now() + 86_400_000).toISOString(),
+      complaints: [{ description: "Engine warning light on" }],
       createdById: adviser.id,
       mileage: 35_000,
       ...extra,
     });
+
+  /** The customer approves an estimate for the service plus this scope (the team's approval gate). */
+  const approve = async (jobCardId: string, scope: { type: "PART" | "LABOUR"; referenceId: string; quantity: number }[]) => {
+    const estimate = await service.addEstimate(jobCardId, {
+      description: "Approved scope",
+      lines: [{ type: "SERVICE", referenceId: catalogService.id, quantity: 1 }, ...scope],
+    });
+    await service.addApproval(estimate.id, { customerId: customer.id, approved: true });
+  };
+
+  /** OPEN → IN_PROGRESS → QC (passed) → READY. */
+  const toReady = async (jobCardId: string) => {
+    await service.updateJobCard(jobCardId, { status: "IN_PROGRESS" }, adviser.id);
+    await service.updateJobCard(jobCardId, { status: "QC" }, adviser.id);
+    await workshop.updateQC(jobCardId, "PASSED", "Checked");
+    return service.updateJobCard(jobCardId, { status: "READY" }, adviser.id);
+  };
 
   const issue = async (jobCardId: string, partId: string, quantity: number) =>
     prisma.partIssuance.create({ data: { branchId: branch.id, sparePartId: partId, jobCardId, issuedById: adviser.id, quantity } });
@@ -71,6 +101,8 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     cases = new (require("./warrantyCase.service").WarrantyCaseService)();
     campaigns = new (require("../campaign/campaign.service").CampaignService)();
     lines = new (require("../job-card-line/jobCardLine.service").JobCardLineService)();
+    labour = new (require("../service/labour.service").LabourService)();
+    workshop = new (require("../workshop/workshop.service").WorkshopService)();
 
     const role = (name: string) => prisma.role.upsert({ where: { name }, update: {}, create: { name } });
     const [adviserRole, officerRole] = await Promise.all([role("ServiceAdviser"), role("WarrantyOfficer")]);
@@ -93,6 +125,11 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     oilPart = await prisma.sparePart.create({
       data: { partNumber: `26300-35505-${run}`, name: "Engine oil and filter kit", unitPrice: 30_000, retailRate: 38_500 },
     });
+    const master = (kind: string) => prisma.workshopMaster.create({ data: { kind, code: `${kind}-${run}`, description: kind } });
+    [bay, team] = await Promise.all([master("BAY"), master("TEAM")]);
+    catalogService = await prisma.service.create({ data: { name: `Warranty test service ${run}`, price: 0 } });
+    harnessOp = await prisma.labourItem.create({ data: { code: `HRN-${run}`, description: "Harness inspection", defaultHours: 1.2, rate: 15_000 } });
+    serviceOp = await prisma.labourItem.create({ data: { code: `SRV-${run}`, description: "Periodic service 60k", defaultHours: 2, rate: 24_000 } });
     await prisma.warrantyDefectCode.upsert({ where: { code: `D07${run}` }, update: {}, create: { code: `D07${run}`, description: "Internal short" } });
     await prisma.warrantyRejectReason.upsert({ where: { code: `R02${run}` }, update: {}, create: { code: `R02${run}`, description: "Outside warranty period" } });
   });
@@ -156,7 +193,7 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
         type: "RECALL",
         startDate: new Date(Date.now() - 86_400_000),
         models: [{ vehicleModelId: sportage.id }],
-        coveredItems: [{ kind: "LABOUR", operationCode: "HRN-01", description: "Harness inspection" }],
+        coveredItems: [{ kind: "LABOUR", operationCode: harnessOp.code, description: "Harness inspection" }],
       },
       officer.id,
     );
@@ -181,22 +218,22 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     expect(row.status).toBe("SCHEDULED");
     expect(await prisma.jobCardCampaign.count({ where: { jobCardId: card.id, campaignId: created.id } })).toBe(1);
 
-    // Labour covered by the campaign defaults to FREE, charged to the campaign.
-    const labour = await lines.addLabour(card.id, { operationCode: "HRN-01", description: "Harness inspection", hours: 1.2, rate: 15_000 }, { userId: adviser.id, canChargeGoodwill: false });
-    expect(labour).toMatchObject({ chargeType: "FREE", campaignId: created.id });
+    // Labour (from the labour catalogue) covered by the campaign defaults to FREE, charged to the campaign.
+    await approve(card.id, [{ type: "LABOUR", referenceId: harnessOp.id, quantity: 1.2 }]);
+    const harness = await labour.addJobCardLine(card.id, { labourItemId: harnessOp.id, hours: 1.2 });
+    const harnessLine = (await lines.list(card.id)).lines.find((l) => l.jobCardLabourId === harness.id);
+    expect(harnessLine).toMatchObject({ kind: "LABOUR", chargeType: "FREE", campaignId: created.id, quantity: 1.2, amount: 18_000 });
 
-    await service.updateJobCard(card.id, { status: "completed" });
+    // The campaign work is complete when the job card reaches READY.
+    expect((await prisma.campaignVehicle.findUniqueOrThrow({ where: { id: row.id } })).status).toBe("SCHEDULED");
+    const ready = await toReady(card.id);
+    expect(ready.readyAt).not.toBeNull();
     const done = await prisma.campaignVehicle.findUniqueOrThrow({ where: { id: row.id } });
     expect(done).toMatchObject({ status: "COMPLETED", completedJobCardId: card.id });
-    expect((await prisma.jobCard.findUniqueOrThrow({ where: { id: card.id } })).completedAt).not.toBeNull();
-
-    // Completing again changes nothing.
-    await service.updateJobCard(card.id, { status: "completed" });
-    expect((await prisma.campaignVehicle.findUniqueOrThrow({ where: { id: row.id } })).completedAt).toEqual(done.completedAt);
 
     // A vehicle registered later links to its campaign row by VIN.
     const { VehicleService } = require("../vehicle/vehicle.service");
-    const registered = await new VehicleService().createVehicle({ customerId: customer.id, vin: later.toLowerCase(), make: "Kia", model: "Sportage" });
+    const registered = await new VehicleService().createVehicle({ customerId: customer.id, vin: later.toLowerCase(), customMake: "Kia", customModel: "Sportage" });
     const linked = await prisma.campaignVehicle.findUniqueOrThrow({ where: { campaignId_vin: { campaignId: created.id, vin: later } } });
     expect(linked.vehicleId).toBe(registered.id);
 
@@ -205,40 +242,53 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     expect(progress.byBranch.find((b) => b.branchId === branch.id)).toMatchObject({ completed: 1 });
   });
 
-  it("charges lines by payer and invoices only customer lines", async () => {
+  it("charges lines by payer, and the job bill charges only customer lines", async () => {
     const v = await vehicle(5);
     const card = await jobCard(v.id, { warrantyAcknowledged: true });
+    await approve(card.id, [
+      { type: "PART", referenceId: coilPart.id, quantity: 1 },
+      { type: "PART", referenceId: oilPart.id, quantity: 1 },
+      { type: "LABOUR", referenceId: serviceOp.id, quantity: 2 },
+    ]);
     await issue(card.id, coilPart.id, 1);
     await issue(card.id, oilPart.id, 1);
-    await lines.addLabour(card.id, { operationCode: "SRV-60K", description: "Periodic service 60k", hours: 2, rate: 24_000 }, { userId: adviser.id, canChargeGoodwill: false });
+    await labour.addJobCardLine(card.id, { labourItemId: serviceOp.id, hours: 2 });
 
     const listed = await lines.list(card.id);
     const coil = listed.lines.find((l) => l.sparePartId === coilPart.id)!;
     const oil = listed.lines.find((l) => l.sparePartId === oilPart.id)!;
+    const service60k = listed.lines.find((l) => l.kind === "LABOUR")!;
     expect(coil).toMatchObject({ chargeType: "WARRANTY", rate: 48_500, amount: 48_500 });
     expect(oil).toMatchObject({ chargeType: "CUSTOMER", rate: 38_500 });
+    expect(service60k).toMatchObject({ chargeType: "CUSTOMER", operationCode: serviceOp.code, quantity: 2, amount: 48_000 });
     expect(listed.totals).toMatchObject({ customer: 86_500, warranty: 48_500 });
+    expect(listed.vatRate).toBe(0.075);
 
-    // Syncing twice does not duplicate issuance lines.
+    // Syncing twice does not duplicate issuance or labour lines.
     expect((await lines.list(card.id)).lines).toHaveLength(3);
 
     // Only warranty-applicable parts can be charged to warranty; goodwill needs warranty:update.
     await expect(lines.updateLine(card.id, oil.id, { chargeType: "WARRANTY" }, { userId: adviser.id, canChargeGoodwill: false })).rejects.toThrow(/not warranty-applicable/);
     await expect(lines.updateLine(card.id, oil.id, { chargeType: "GOODWILL" }, { userId: adviser.id, canChargeGoodwill: false })).rejects.toThrow(/goodwill/);
 
-    const invoice = await lines.generateInvoice(card.id, {});
-    expect(invoice.subtotal).toBe(86_500);
-    expect(invoice.tax).toBe(6_487.5);
-    expect(invoice.total).toBe(92_987.5);
-    expect(invoice.lines.map((l) => l.description).sort()).toEqual(["Engine oil and filter kit", "Periodic service 60k"]);
+    await toReady(card.id);
+    const { JobBillingService } = require("../finance/job-billing.service");
+    const bill = await new JobBillingService().createJobBill({
+      jobCardId: card.id,
+      partsDiscountPercent: 0,
+      labourDiscountPercent: 0,
+      serviceAdvisorId: adviser.id,
+      actorId: adviser.id,
+    });
+    const billed = bill.lines.filter((l: { amount: number }) => l.amount > 0).map((l: { description: string }) => l.description).sort();
+    expect(billed).toEqual(["Engine oil and filter kit", "Periodic service 60k"]);
+    expect(bill.subtotal).toBe(86_500);
 
-    await expect(lines.generateInvoice(card.id, {})).rejects.toMatchObject({ statusCode: 409 });
-    await expect(lines.updateLine(card.id, oil.id, { chargeType: "FREE" }, { userId: adviser.id, canChargeGoodwill: true })).rejects.toMatchObject({ statusCode: 409 });
-
-    const { FinanceService } = require("../finance/finance.service");
-    await expect(
-      new FinanceService().createInvoice({ customerId: customer.id, jobCardId: card.id, invoiceNumber: `MAN-${run}`, subtotal: 1, total: 1 }),
-    ).rejects.toMatchObject({ statusCode: 409 });
+    // Once billed, who pays is fixed.
+    const after = await lines.list(card.id);
+    expect(after.lines.every((l) => l.locked)).toBe(true);
+    expect(after.bill?.invoiceNumber).toBe(bill.invoiceNumber);
+    await expect(lines.updateLine(card.id, oil.id, { chargeType: "GOODWILL" }, { userId: adviser.id, canChargeGoodwill: true })).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it("moves a claim through valid transitions only, once, with history", async () => {

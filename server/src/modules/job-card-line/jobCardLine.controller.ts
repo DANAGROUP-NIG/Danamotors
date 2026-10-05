@@ -39,25 +39,8 @@ export class JobCardLineController {
     ok(res, await this.service.list(req.params.id));
   });
 
-  addLabour = handle(async (req, res) => {
-    await assertJobCardBranch(req, req.params.id);
-    ok(res, { line: await this.service.addLabour(req.params.id, req.body, actor(req)) }, "Labour line added", 201);
-  });
-
   update = handle(async (req, res) => {
     await assertJobCardBranch(req, req.params.id);
     ok(res, { line: await this.service.updateLine(req.params.id, req.params.lineId, req.body, actor(req)) }, "Line updated");
-  });
-
-  remove = handle(async (req, res) => {
-    await assertJobCardBranch(req, req.params.id);
-    await this.service.deleteLine(req.params.id, req.params.lineId);
-    ok(res, null, "Line removed");
-  });
-
-  generateInvoice = handle(async (req, res) => {
-    await assertJobCardBranch(req, req.params.jobCardId);
-    const invoice = await this.service.generateInvoice(req.params.jobCardId, req.body ?? {});
-    ok(res, { invoice }, `Invoice ${invoice.invoiceNumber} created`, 201);
   });
 }

@@ -34,7 +34,7 @@ export const updateVehicleWarrantySchema = z.object({
   body: z
     .object({
       vehicleModelId: uuid("vehicle model ID").nullable().optional(),
-      warrantyStartDate: z.coerce.date().nullable().optional(),
+      saleDate: z.coerce.date().nullable().optional(),
       override: z
         .object({
           type: z.nativeEnum(WarrantyOverrideType),

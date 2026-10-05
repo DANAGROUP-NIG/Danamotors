@@ -256,6 +256,8 @@ export type PortalInvoiceDetail = PortalInvoice & {
 };
 
 export type PortalVehicleRegistration = {
+  catalogueId: string;
+  colourId: string;
   vin: string;
   registrationNumber?: string;
   make?: string;

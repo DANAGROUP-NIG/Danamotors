@@ -30,12 +30,12 @@ export function CustomerPortalAccessCard({ customer }: { customer: Customer }) {
       {hasAccount && customer.account && (
         <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            <dt className="text-sm font-medium uppercase tracking-wider text-slate-400">
               Status
             </dt>
             <dd className="mt-0.5">
               <span
-                className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
                   customer.account.isActive
                     ? "bg-green-100 text-green-700"
                     : "bg-red-100 text-red-700"
@@ -46,7 +46,7 @@ export function CustomerPortalAccessCard({ customer }: { customer: Customer }) {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            <dt className="text-sm font-medium uppercase tracking-wider text-slate-400">
               Created
             </dt>
             <dd className="mt-0.5 text-slate-700">
@@ -54,7 +54,7 @@ export function CustomerPortalAccessCard({ customer }: { customer: Customer }) {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            <dt className="text-sm font-medium uppercase tracking-wider text-slate-400">
               Last login
             </dt>
             <dd className="mt-0.5 text-slate-700">

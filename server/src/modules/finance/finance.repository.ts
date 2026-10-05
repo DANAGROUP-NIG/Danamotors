@@ -10,7 +10,10 @@ export class FinanceRepository {
     }
 
     if (params?.branchId) {
-      where.jobCard = { branchId: params.branchId };
+      where.OR = [
+        { jobCard: { is: { branchId: params.branchId } } },
+        { jobCardId: null, customer: { is: { branchId: params.branchId } } },
+      ];
     }
 
     return prisma.invoice.findMany({
@@ -23,11 +26,16 @@ export class FinanceRepository {
             firstName: true,
             lastName: true,
             branchId: true,
+            companyName: true,
+            phoneNumber: true,
           },
         },
-        jobCard: true,
+        jobCard: { include: { branch: true, vehicle: true } },
         payments: true,
         receipts: true,
+        lines: true,
+        allocations: { include: { receipt: true } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { issuedDate: 'desc' },
     });
@@ -44,43 +52,32 @@ export class FinanceRepository {
             firstName: true,
             lastName: true,
             branchId: true,
+            companyName: true,
+            phoneNumber: true,
           },
         },
-        jobCard: true,
+        jobCard: { include: { branch: true, vehicle: true } },
         payments: true,
         receipts: true,
+        lines: true,
+        allocations: { include: { receipt: true } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
       },
     });
   }
 
-  async createInvoice(data: {
-    customerId: string;
-    jobCardId?: string;
-    invoiceNumber: string;
-    issuedDate?: Date;
-    dueDate?: Date;
-    subtotal: number;
-    tax?: number;
-    total: number;
-    status?: string;
-    notes?: string;
-  }): Promise<Invoice> {
-    return prisma.invoice.create({ data });
-  }
-
-  async updateInvoice(id: string, data: Partial<Invoice>) {
+  async updateInvoice(id: string, data: { dueDate?: Date; notes?: string }) {
     return prisma.invoice.update({ where: { id }, data });
-  }
-
-  async deleteInvoice(id: string) {
-    return prisma.invoice.delete({ where: { id } });
   }
 
   async listPayments(params?: { branchId?: string }): Promise<Payment[]> {
     const where: Record<string, any> = {};
 
     if (params?.branchId) {
-      where.invoice = { jobCard: { branchId: params.branchId } };
+      where.invoice = { OR: [
+        { jobCard: { is: { branchId: params.branchId } } },
+        { jobCardId: null, customer: { is: { branchId: params.branchId } } },
+      ] };
     }
 
     return prisma.payment.findMany({
@@ -105,18 +102,6 @@ export class FinanceRepository {
         },
       },
     });
-  }
-
-  async createPayment(data: {
-    invoiceId: string;
-    recordedById: string;
-    amount: number;
-    method: string;
-    paymentDate?: Date;
-    reference?: string;
-    notes?: string;
-  }): Promise<Payment> {
-    return prisma.payment.create({ data });
   }
 
   async listReceipts(params?: { branchId?: string }): Promise<Receipt[]> {
@@ -150,16 +135,6 @@ export class FinanceRepository {
     });
   }
 
-  async createReceipt(data: {
-    invoiceId: string;
-    issuedById: string;
-    amount: number;
-    issuedAt?: Date;
-    reference?: string;
-    notes?: string;
-  }): Promise<Receipt> {
-    return prisma.receipt.create({ data });
-  }
 }
 
 export default FinanceRepository;

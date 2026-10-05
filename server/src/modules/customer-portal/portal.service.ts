@@ -113,7 +113,7 @@ export class PortalService {
   }
 
   async getDashboard(customerId: string) {
-    const activeStatuses = ["Open", "In Progress"];
+    const activeStatuses = ["Open", "In Progress", "OPEN", "IN_PROGRESS", "QC"];
     const pendingStatuses = ["Pending", "Confirmed"];
 
     const [
@@ -132,7 +132,7 @@ export class PortalService {
         where: { customerId, status: { in: activeStatuses } },
       }),
       prisma.jobCard.count({
-        where: { customerId, status: { in: ["Completed", "Closed"] } },
+        where: { customerId, status: { in: ["Completed", "Closed", "DELIVERED"] } },
       }),
       prisma.serviceAppointment.count({
         where: {
@@ -204,16 +204,7 @@ export class PortalService {
     };
   }
 
-  async registerVehicle(customerId: string, data: {
-    vin: string;
-    registrationNumber?: string;
-    make?: string;
-    model?: string;
-    year?: number;
-    trim?: string;
-    color?: string;
-    ownershipStatus?: string;
-  }) {
+  async registerVehicle(customerId: string, data: { vin: string; registrationNumber?: string; catalogueId: string; colourId: string; year?: number }) {
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) {
       throw new UnauthorizedError("Customer session not found");
@@ -224,12 +215,10 @@ export class PortalService {
       customerId,
       vin: data.vin,
       registrationNumber: data.registrationNumber,
-      make: data.make,
-      model: data.model,
+      catalogueId: data.catalogueId,
+      colourId: data.colourId,
       year: data.year,
-      trim: data.trim,
-      color: data.color,
-      ownershipStatus: data.ownershipStatus,
+
     });
 
     const notificationService = new NotificationService();
@@ -443,40 +432,9 @@ export class PortalService {
       throw new NotFoundError("Estimate not found");
     }
 
-    const decisionDate = new Date();
-    const status = data.approved ? "Approved" : "Rejected";
-
-    const existing = await prisma.customerApproval.findFirst({
-      where: { estimateId, customerId },
-    });
-
-    if (existing) {
-      await prisma.customerApproval.update({
-        where: { id: existing.id },
-        data: {
-          approved: data.approved,
-          decisionDate,
-          comments: data.comments,
-          status,
-        },
-      });
-    } else {
-      await prisma.customerApproval.create({
-        data: {
-          estimateId,
-          customerId,
-          approved: data.approved,
-          decisionDate,
-          comments: data.comments,
-          status,
-        },
-      });
-    }
-
-    await prisma.estimate.update({
-      where: { id: estimateId },
-      data: { status },
-    });
+    const approval = await new ServiceService().addApproval(estimateId, { customerId, ...data });
+    const decisionDate = approval.decisionDate;
+    const status = approval.status;
 
     const notificationService = new NotificationService();
     await notificationService.notifyRole(

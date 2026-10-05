@@ -62,7 +62,6 @@ export type PartMaster = {
 };
 
 export type PartMasterPayload = {
-  partCode: string;
   partNumber: string;
   name: string;
   category: string;
@@ -166,7 +165,6 @@ export type PartQueryResult = {
   part: {
     id: string;
     partNumber: string;
-    partCode: string;
     name: string;
     description: string | null;
     uom: string;

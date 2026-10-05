@@ -1,54 +1,58 @@
-import { PartRole } from '@prisma/client/wasm';
-import { z } from 'zod';
+import { PartRole } from "@prisma/client/wasm";
+import { z } from "zod";
 
 enum PartStatus {
   ACTIVE,
-  BLOCKED
+  BLOCKED,
 }
 
 export const partIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid spare part ID'),
+    id: z.string().uuid("Invalid spare part ID"),
   }),
 });
 
 export const purchaseRequestIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid purchase request ID'),
+    id: z.string().uuid("Invalid purchase request ID"),
   }),
 });
 
 export const partIssuanceIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid part issuance ID'),
+    id: z.string().uuid("Invalid part issuance ID"),
   }),
 });
 
 export const partReturnIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid part return ID'),
+    id: z.string().uuid("Invalid part return ID"),
   }),
 });
 
 export const transferIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid transfer ID'),
+    id: z.string().uuid("Invalid transfer ID"),
   }),
 });
 
 export const createSparePartSchema = z.object({
   body: z.object({
-    partNumber: z.string().min(1, 'Part number is required'),
-    name: z.string().min(1, 'Name is required'),
+    partNumber: z.string().min(1, "Part number is required"),
+    name: z.string().min(1, "Name is required"),
     description: z.string().optional(),
     category: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
-    branchStock: z.array(z.object({
-      branchId: z.string().uuid('Invalid branch ID'),
-      quantity: z.number().int().nonnegative('Quantity must be 0 or more'),
-      minimumStock: z.number().int().nonnegative().optional(),
-      rackLocation: z.string().max(100).optional(),
-    })).optional(),
+    branchStock: z
+      .array(
+        z.object({
+          branchId: z.string().uuid("Invalid branch ID"),
+          quantity: z.number().int().nonnegative("Quantity must be 0 or more"),
+          minimumStock: z.number().int().nonnegative().optional(),
+          rackLocation: z.string().max(100).optional(),
+        }),
+      )
+      .optional(),
   }),
 });
 
@@ -60,7 +64,7 @@ export const updateSparePartSchema = z.object({
     unitPrice: z.number().nonnegative().optional(),
   }),
   params: z.object({
-    id: z.string().uuid('Invalid spare part ID'),
+    id: z.string().uuid("Invalid spare part ID"),
   }),
 });
 
@@ -69,7 +73,7 @@ export const createAlternatePartSchema = z.object({
     ...createSparePartSchema.shape.body.shape,
   }),
   params: z.object({
-    id: z.string().uuid('Invalid main part ID'),
+    id: z.string().uuid("Invalid main part ID"),
   }),
 });
 
@@ -85,24 +89,49 @@ export const listPartsFilterQuerySchema = z.object({
   }),
 });
 
-const partStatusEnum = z.enum(['ACTIVE', 'BLOCKED']);
+const partStatusEnum = z.enum(["ACTIVE", "BLOCKED"]);
 
 const basePartMasterFields = {
-  partCode: z.string().min(1, 'Part code is required').max(50, 'Part code must be 50 characters or less'),
-  partNumber: z.string().min(1, 'Part number is required'),
-  name: z.string().min(1, 'Name is required'),
-  category: z.string().min(1, 'Category is required'),
-  uom: z.string().min(1, 'Unit of measure is required'),
+  partCode: z
+    .string()
+    .min(1, "Part code is required")
+    .max(50, "Part code must be 50 characters or less"),
+  partNumber: z.string().min(1, "Part number is required"),
+  name: z.string().min(1, "Name is required"),
+  category: z.string().min(1, "Category is required"),
+  uom: z.string().min(1, "Unit of measure is required"),
   taxCategory: z.string().optional(),
   taxForm: z.string().optional(),
-  minLevel: z.number().nonnegative('Minimum level must be 0 or more').optional(),
-  maxLevel: z.number().nonnegative('Maximum level must be 0 or more').optional(),
-  reorderQty: z.number().nonnegative('Reorder quantity must be 0 or more').optional(),
-  unitRate: z.number().positive('Unit rate must be greater than zero'),
-  retailRate: z.number().nonnegative('Retail rate must be 0 or more').optional(),
+  minLevel: z
+    .number()
+    .nonnegative("Minimum level must be 0 or more")
+    .optional(),
+  maxLevel: z
+    .number()
+    .nonnegative("Maximum level must be 0 or more")
+    .optional(),
+  reorderQty: z
+    .number()
+    .nonnegative("Reorder quantity must be 0 or more")
+    .optional(),
+  unitRate: z.number().positive("Unit rate must be greater than zero"),
+  retailRate: z
+    .number()
+    .nonnegative("Retail rate must be 0 or more")
+    .optional(),
   taxable: z.boolean().optional(),
-  partFlag: z.string().trim().min(1, 'Part flag is required').max(2, 'Part flag must be 1 or 2 characters').optional(),
-  priceCategoryCode: z.string().trim().toUpperCase().max(2, 'Price category must be 1 or 2 characters').optional(),
+  partFlag: z
+    .string()
+    .trim()
+    .min(1, "Part flag is required")
+    .max(2, "Part flag must be 1 or 2 characters")
+    .optional(),
+  priceCategoryCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(2, "Price category must be 1 or 2 characters")
+    .optional(),
   binLocation: z.string().optional(),
   storeLocation: z.string().optional(),
   // Legacy partmast.WTYAPPLICABLE / warrrate.
@@ -111,62 +140,67 @@ const basePartMasterFields = {
 };
 
 export const createPartMasterSchema = z.object({
-  body: z.object({
-    ...basePartMasterFields,
-    partStatus: partStatusEnum.optional(),
-    role: z.literal('MAIN').optional(),
-  }).refine(
-    (data) => {
-      if (data.minLevel == null || data.maxLevel == null) return true;
-      return data.maxLevel >= data.minLevel;
-    },
-    {
-      message: 'Maximum level must be greater than or equal to minimum level',
-      path: ['maxLevel'],
-    },
-  ),
+  body: z
+    .object({
+      ...basePartMasterFields,
+      partStatus: partStatusEnum.optional(),
+      role: z.literal("MAIN").optional(),
+    })
+    .omit({ partCode: true })
+    .refine(
+      (data) => {
+        if (data.minLevel == null || data.maxLevel == null) return true;
+        return data.maxLevel >= data.minLevel;
+      },
+      {
+        message: "Maximum level must be greater than or equal to minimum level",
+        path: ["maxLevel"],
+      },
+    ),
 });
 
 export const updatePartMasterSchema = z.object({
-  body: z.object({
-    partCode: basePartMasterFields.partCode.optional(),
-    partNumber: basePartMasterFields.partNumber.optional(),
-    name: basePartMasterFields.name.optional(),
-    category: basePartMasterFields.category.optional(),
-    uom: basePartMasterFields.uom.optional(),
-    taxCategory: basePartMasterFields.taxCategory,
-    taxForm: basePartMasterFields.taxForm,
-    minLevel: basePartMasterFields.minLevel,
-    maxLevel: basePartMasterFields.maxLevel,
-    reorderQty: basePartMasterFields.reorderQty,
-    unitRate: basePartMasterFields.unitRate.optional(),
-    retailRate: basePartMasterFields.retailRate,
-    taxable: basePartMasterFields.taxable,
-    partFlag: basePartMasterFields.partFlag,
-    priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
-    binLocation: basePartMasterFields.binLocation,
-    storeLocation: basePartMasterFields.storeLocation,
-    warrantyApplicable: basePartMasterFields.warrantyApplicable,
-    warrantyRate: basePartMasterFields.warrantyRate,
-    partStatus: partStatusEnum.optional(),
-  }).refine(
-    (data) => {
-      if (data.minLevel == null || data.maxLevel == null) return true;
-      return data.maxLevel >= data.minLevel;
-    },
-    {
-      message: 'Maximum level must be greater than or equal to minimum level',
-      path: ['maxLevel'],
-    },
-  ),
+  body: z
+    .object({
+      partCode: basePartMasterFields.partCode.optional(),
+      partNumber: basePartMasterFields.partNumber.optional(),
+      name: basePartMasterFields.name.optional(),
+      category: basePartMasterFields.category.optional(),
+      uom: basePartMasterFields.uom.optional(),
+      taxCategory: basePartMasterFields.taxCategory,
+      taxForm: basePartMasterFields.taxForm,
+      minLevel: basePartMasterFields.minLevel,
+      maxLevel: basePartMasterFields.maxLevel,
+      reorderQty: basePartMasterFields.reorderQty,
+      unitRate: basePartMasterFields.unitRate.optional(),
+      retailRate: basePartMasterFields.retailRate,
+      taxable: basePartMasterFields.taxable,
+      partFlag: basePartMasterFields.partFlag,
+      priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
+      binLocation: basePartMasterFields.binLocation,
+      storeLocation: basePartMasterFields.storeLocation,
+      warrantyApplicable: basePartMasterFields.warrantyApplicable,
+      warrantyRate: basePartMasterFields.warrantyRate,
+      partStatus: partStatusEnum.optional(),
+    })
+    .refine(
+      (data) => {
+        if (data.minLevel == null || data.maxLevel == null) return true;
+        return data.maxLevel >= data.minLevel;
+      },
+      {
+        message: "Maximum level must be greater than or equal to minimum level",
+        path: ["maxLevel"],
+      },
+    ),
   params: z.object({
-    id: z.string().uuid('Invalid part ID'),
+    id: z.string().uuid("Invalid part ID"),
   }),
 });
 
 export const partMasterIdParamSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid part ID'),
+    id: z.string().uuid("Invalid part ID"),
   }),
 });
 
@@ -191,7 +225,7 @@ export const listPartsQueryWithFiltersSchema = z.object({
     partStatus: partStatusEnum.optional(),
     role: z.nativeEnum(PartRole).optional(),
     mainPartId: z.string().uuid().optional(), // add
-    search: z.string().optional(),        // add
+    search: z.string().optional(), // add
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
   }),
@@ -199,9 +233,9 @@ export const listPartsQueryWithFiltersSchema = z.object({
 
 export const createPurchaseRequestSchema = z.object({
   body: z.object({
-    sparePartId: z.string().uuid('Invalid spare part ID'),
-    requestedById: z.string().uuid('Invalid requester ID'),
-    quantity: z.number().int().positive('Quantity must be positive'),
+    sparePartId: z.string().uuid("Invalid spare part ID"),
+    requestedById: z.string().uuid("Invalid requester ID"),
+    quantity: z.number().int().positive("Quantity must be positive"),
     status: z.string().optional(),
     approvalNotes: z.string().optional(),
   }),
@@ -209,31 +243,31 @@ export const createPurchaseRequestSchema = z.object({
 
 export const updatePurchaseRequestStatusSchema = z.object({
   body: z.object({
-    status: z.string().min(1, 'Status is required'),
+    status: z.string().min(1, "Status is required"),
     approvalNotes: z.string().optional(),
   }),
   params: z.object({
-    id: z.string().uuid('Invalid purchase request ID'),
+    id: z.string().uuid("Invalid purchase request ID"),
   }),
 });
 
 export const createPartIssuanceSchema = z.object({
   body: z.object({
-    sparePartId: z.string().uuid('Invalid spare part ID'),
-    branchId: z.string().uuid('Invalid branch ID'),
-    jobCardId: z.string().uuid('Invalid job card ID').optional(),
-    issuedById: z.string().uuid('Invalid issuer ID'),
-    quantity: z.number().int().positive('Quantity must be positive'),
+    sparePartId: z.string().uuid("Invalid spare part ID"),
+    branchId: z.string().uuid("Invalid branch ID"),
+    jobCardId: z.string().uuid("Invalid job card ID").optional(),
+    issuedById: z.string().uuid("Invalid issuer ID"),
+    quantity: z.number().int().positive("Quantity must be positive"),
     notes: z.string().optional(),
   }),
 });
 
 export const createPartReturnSchema = z.object({
   body: z.object({
-    partIssuanceId: z.string().uuid('Invalid part issuance ID'),
-    branchId: z.string().uuid('Invalid branch ID'),
-    returnedById: z.string().uuid('Invalid returner ID'),
-    quantity: z.number().int().positive('Quantity must be positive'),
+    partIssuanceId: z.string().uuid("Invalid part issuance ID"),
+    branchId: z.string().uuid("Invalid branch ID"),
+    returnedById: z.string().uuid("Invalid returner ID"),
+    quantity: z.number().int().positive("Quantity must be positive"),
     reason: z.string().optional(),
     status: z.string().optional(),
   }),
@@ -241,82 +275,109 @@ export const createPartReturnSchema = z.object({
 
 export const adjustStockSchema = z.object({
   body: z.object({
-    branchId: z.string().uuid('Invalid branch ID'),
-    partId: z.string().uuid('Invalid part ID'),
-    quantity: z.number().int('Quantity must be an integer'),
-    type: z.string().min(1, 'Transaction type is required'),
+    branchId: z.string().uuid("Invalid branch ID"),
+    partId: z.string().uuid("Invalid part ID"),
+    quantity: z.number().int("Quantity must be an integer"),
+    type: z.string().min(1, "Transaction type is required"),
     notes: z.string().optional(),
   }),
 });
 
 export const createTransferSchema = z.object({
   body: z.object({
-    requestingBranchId: z.string().uuid('Invalid requesting branch ID'),
-    sourceBranchId: z.string().uuid('Invalid source branch ID'),
+    requestingBranchId: z.string().uuid("Invalid requesting branch ID"),
+    sourceBranchId: z.string().uuid("Invalid source branch ID"),
     notes: z.string().optional(),
-    items: z.array(z.object({
-      partId: z.string().uuid('Invalid part ID'),
-      requestedQuantity: z.number().int().positive('Quantity must be positive'),
-    })).min(1, 'At least one item is required'),
+    items: z
+      .array(
+        z.object({
+          partId: z.string().uuid("Invalid part ID"),
+          requestedQuantity: z
+            .number()
+            .int()
+            .positive("Quantity must be positive"),
+        }),
+      )
+      .min(1, "At least one item is required"),
   }),
 });
 
 export const updateTransferStatusSchema = z.object({
   body: z.object({
     notes: z.string().optional(),
-    items: z.array(z.object({
-      id: z.string().uuid('Invalid item ID'),
-      dispatchedQuantity: z.number().int().nonnegative().optional(),
-      receivedQuantity: z.number().int().nonnegative().optional(),
-    })).optional(),
+    items: z
+      .array(
+        z.object({
+          id: z.string().uuid("Invalid item ID"),
+          dispatchedQuantity: z.number().int().nonnegative().optional(),
+          receivedQuantity: z.number().int().nonnegative().optional(),
+        }),
+      )
+      .optional(),
   }),
   params: z.object({
-    id: z.string().uuid('Invalid transfer ID'),
+    id: z.string().uuid("Invalid transfer ID"),
   }),
 });
 
 export const branchIdParamSchema = z.object({
   params: z.object({
-    branchId: z.string().uuid('Invalid branch ID'),
+    branchId: z.string().uuid("Invalid branch ID"),
   }),
 });
 
 export const branchPartParamSchema = z.object({
   params: z.object({
-    branchId: z.string().uuid('Invalid branch ID'),
-    partId: z.string().uuid('Invalid part ID'),
+    branchId: z.string().uuid("Invalid branch ID"),
+    partId: z.string().uuid("Invalid part ID"),
   }),
 });
 
 export const partQueryQuerySchema = z.object({
   query: z.object({
-    partNumber: z.string().trim().min(1, 'Enter a part number').max(40),
-    branchId: z.string().uuid('Invalid branch ID').optional(),
+    partNumber: z.string().trim().min(1, "Enter a part number").max(40),
+    branchId: z.string().uuid("Invalid branch ID").optional(),
   }),
 });
 
 const optionalLocationText = (max: number) =>
-  z.string().trim().max(max, `Max ${max} characters`).transform((v) => v || null).nullable().optional();
+  z
+    .string()
+    .trim()
+    .max(max, `Max ${max} characters`)
+    .transform((v) => v || null)
+    .nullable()
+    .optional();
 
 export const updateStockLocationSchema = z.object({
   params: z.object({
-    branchId: z.string().uuid('Invalid branch ID'),
-    partId: z.string().uuid('Invalid part ID'),
+    branchId: z.string().uuid("Invalid branch ID"),
+    partId: z.string().uuid("Invalid part ID"),
   }),
   body: z
     .object({
       rackLocation: optionalLocationText(40),
       binCard: optionalLocationText(20),
-      minimumStock: z.number().int().nonnegative('Minimum stock must be 0 or more').optional(),
-      maximumStock: z.number().int().nonnegative('Maximum stock must be 0 or more').nullable().optional(),
+      minimumStock: z
+        .number()
+        .int()
+        .nonnegative("Minimum stock must be 0 or more")
+        .optional(),
+      maximumStock: z
+        .number()
+        .int()
+        .nonnegative("Maximum stock must be 0 or more")
+        .nullable()
+        .optional(),
     })
-    .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update' }),
+    .refine((b) => Object.keys(b).length > 0, { message: "Nothing to update" }),
 });
 
 export const stockQuerySchema = z.object({
   query: z.object({
-    branchId: z.string().uuid('Invalid branch ID').optional(),
-    partId: z.string().uuid('Invalid part ID').optional(),
-    search: z.string().trim().optional(),
+    branchId: z.string().uuid("Invalid branch ID").optional(),
+    partId: z.string().uuid("Invalid part ID").optional(),
+    search: z.string().trim().max(100).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });

@@ -144,7 +144,7 @@ export default function BranchDropdown({
             })}
           </div>
           {branches.length === 0 && !isLoading && (
-            <p className="px-4 py-3 text-center text-xs text-white/40">
+            <p className="px-4 py-3 text-center text-sm text-white/40">
               No branches available
             </p>
           )}

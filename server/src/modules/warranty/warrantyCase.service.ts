@@ -53,7 +53,7 @@ const caseDetailInclude = {
       model: true,
       trim: true,
       year: true,
-      warrantyStartDate: true,
+      saleDate: true,
       lastRecordedMileage: true,
       vehicleModel: { select: { id: true, code: true, name: true } },
     },

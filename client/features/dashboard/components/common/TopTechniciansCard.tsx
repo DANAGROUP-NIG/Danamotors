@@ -19,7 +19,7 @@ export function TopTechniciansCard({ technicians }: TopTechniciansCardProps) {
     <div className="rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-semibold text-foreground">Top Technicians</p>
-        <select className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground outline-none">
+        <select className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground outline-none">
           <option>This Week</option>
         </select>
       </div>
@@ -37,10 +37,10 @@ export function TopTechniciansCard({ technicians }: TopTechniciansCardProps) {
 
               return (
                 <li key={t.name} className="flex items-center gap-3">
-                  <span className="w-4 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                  <span className="w-4 shrink-0 text-center text-sm font-bold text-muted-foreground">
                     {t.rank}
                   </span>
-                  <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                     {initials}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -69,13 +69,13 @@ export function TopTechniciansCard({ technicians }: TopTechniciansCardProps) {
           </ul>
           <a
             href="/technicians"
-            className="mt-4 block w-full text-center text-xs font-semibold text-primary hover:underline"
+            className="mt-4 block w-full text-center text-sm font-semibold text-primary hover:underline"
           >
             View all technicians →
           </a>
         </>
       ) : (
-        <div className="flex h-[240px] items-center justify-center text-xs text-muted-foreground">
+        <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">
           No technician data available
         </div>
       )}

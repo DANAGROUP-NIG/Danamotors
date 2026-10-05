@@ -19,7 +19,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
-import { useRouter } from "next/navigation";
+import ModalFame from "@/components/modals/ModalFame";
+import { JobCardOpeningModal } from "@/features/job-cards/components/JobCardOpeningModal";
 import ReceptionistDashboard from "@/features/dashboard/components/ReceptionistDashboard";
 import ReceptionManagerDashboard from "@/features/dashboard/components/ReceptionManagerDashboard";
 import StoreManagerDashboard from "@/features/dashboard/components/StoreManagerDashboard";
@@ -61,7 +62,7 @@ export default function DashboardPage() {
     isReceptionManager,
     isStoreManager,
   } = useAuth();
-  const router = useRouter();
+  const [showNewJobCard, setShowNewJobCard] = useState(false);
   const [today, setToday] = useState("");
 
   useEffect(() => {
@@ -147,7 +148,7 @@ export default function DashboardPage() {
               </h2>
               <p className="text-sm capitalize text-muted-foreground">{user?.role}</p>
               {user?.email && (
-                <p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
               )}
             </div>
           </div>
@@ -213,7 +214,7 @@ export default function DashboardPage() {
           user={user}
           today={today}
           canCreateJob={canCreateJob}
-          onNewJobCard={() => router.push("/job-cards/new")}
+          onNewJobCard={() => setShowNewJobCard(true)}
         />
 
         {/* Inventory Alert Banner */}
@@ -325,6 +326,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <JobCardOpeningModal isOpen={showNewJobCard} onClose={() => setShowNewJobCard(false)} />
     </>
   );
 }

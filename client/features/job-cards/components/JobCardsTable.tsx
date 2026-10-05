@@ -1,4 +1,9 @@
 "use client";
+import {
+  JOB_CARD_STATUS_LABELS,
+  JOB_CARD_STATUS_TONES,
+  canonicalJobStatus,
+} from "@/features/job-cards/types/job-card-status";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,7 +21,7 @@ import { DataTableSearchHeader } from "@/components/ui/table-components/DataTabl
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DateInput } from "@/components/forms/DateInput";
 import { DataTable, Column } from "@/components/ui/table-components/DataTable";
-import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
 import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
 import { useDataTableSelection } from "@/hooks/use-data-table-selection";
@@ -34,23 +39,11 @@ import type { JobCard, JobCardStatus } from "../types/job-card.types";
 
 const PAGE_SIZE = 10;
 
-const STATUS_LABELS: Record<JobCardStatus, string> = {
-  pending: "Pending",
-  in_progress: "In Progress",
-  completed: "Completed",
-  on_hold: "On Hold",
-  cancelled: "Cancelled",
-};
+const STATUS_LABELS = JOB_CARD_STATUS_LABELS;
 
-const STATUS_TONES: Record<JobCardStatus, StatusTone> = {
-  pending: "amber",
-  in_progress: "blue",
-  completed: "emerald",
-  on_hold: "gray",
-  cancelled: "red",
-};
+const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
-const ALL_STATUSES = Object.keys(STATUS_LABELS).filter(isJobCardStatus);
+const ALL_STATUSES = Object.keys(STATUS_LABELS).filter(isJobCardStatus).filter((status) => canonicalJobStatus(status) === status);
 
 function isJobCardStatus(status: string): status is JobCardStatus {
   return status in STATUS_LABELS;
@@ -58,9 +51,9 @@ function isJobCardStatus(status: string): status is JobCardStatus {
 
 function formatJobCardText(jobCard: JobCard) {
   const customer = jobCard.customer
-    ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+    ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
     : "N/A";
-  return `*Job Card ${jobCard.jobNumber}*\nCustomer: ${customer}\nVehicle: ${jobCard.vehicle?.registrationNumber ?? "N/A"}\nBranch: ${jobCard.branch?.name ?? "N/A"}\nProgress: ${jobCard.progress}%\nStatus: ${STATUS_LABELS[jobCard.status]}`;
+  return `*Job Card ${jobCard.jobNumber}*\nCustomer: ${customer}\nVehicle: ${jobCard.vehicle?.registrationNumber ?? "N/A"}\nBranch: ${jobCard.branch?.name ?? "N/A"}\nStatus: ${STATUS_LABELS[jobCard.status]}`;
 }
 
 function exportRows(jobCards: JobCard[]) {
@@ -68,13 +61,12 @@ function exportRows(jobCards: JobCard[]) {
     jobNumber: jobCard.jobNumber,
     vehicleRegistration: jobCard.vehicle?.registrationNumber ?? "",
     customer: jobCard.customer
-      ? `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+      ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
       : "",
     branch: jobCard.branch?.name ?? "",
     agent: jobCard.createdBy
       ? `${jobCard.createdBy.firstName} ${jobCard.createdBy.lastName}`
       : "",
-    progress: jobCard.progress,
     status: STATUS_LABELS[jobCard.status],
     createdAt: jobCard.createdAt,
   }));
@@ -87,7 +79,6 @@ function exportColumns() {
     { key: "customer", label: "Customer" },
     { key: "branch", label: "Branch" },
     { key: "agent", label: "Agent" },
-    { key: "progress", label: "Progress (%)" },
     { key: "status", label: "Status" },
     { key: "createdAt", label: "Created At" },
   ];
@@ -201,7 +192,9 @@ export function JobCardsTable() {
       header: "Customer",
       render: (jc) => (
         <span className="text-muted-foreground">
-          {jc.customer ? `${jc.customer.firstName} ${jc.customer.lastName}` : "—"}
+          {jc.customer
+            ? jc.customer.companyName || `${jc.customer.firstName} ${jc.customer.lastName}`
+            : "—"}
         </span>
       ),
     },
@@ -215,25 +208,21 @@ export function JobCardsTable() {
       header: "Agent",
       render: (jc) => (
         <span className="text-muted-foreground">
-          {jc.createdBy ? jc.createdBy.firstName : <span className="text-border">—</span>}
+          {jc.createdBy ? (
+            jc.createdBy.firstName
+          ) : (
+            <span className="text-border">—</span>
+          )}
         </span>
-      ),
-    },
-    {
-      header: "Progress",
-      render: (jc) => (
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${jc.progress}%` }} />
-          </div>
-          <span className="text-xs text-muted-foreground">{jc.progress}%</span>
-        </div>
       ),
     },
     {
       header: "Status",
       render: (jc) => (
-        <StatusBadge status={STATUS_LABELS[jc.status]} tone={STATUS_TONES[jc.status]} />
+        <StatusBadge
+          status={STATUS_LABELS[jc.status]}
+          tone={STATUS_TONES[jc.status]}
+        />
       ),
     },
     {
@@ -309,7 +298,9 @@ export function JobCardsTable() {
         isFetching={isFetching}
         searchQuery={
           committedSearch ||
-          (isJobCardStatus(statusFilter) ? STATUS_LABELS[statusFilter] : undefined)
+          (isJobCardStatus(statusFilter)
+            ? STATUS_LABELS[statusFilter]
+            : undefined)
         }
         rowKey={(jc) => jc.id}
         selection={selection}
@@ -337,7 +328,7 @@ export function JobCardsTable() {
                   setPage(1);
                 }}
               />
-              <span className="text-xs text-muted-foreground">to</span>
+              <span className="text-sm text-muted-foreground">to</span>
               <DateInput
                 value={dateTo}
                 onChange={(v) => {

@@ -118,7 +118,7 @@ export default function StoreManagerDashboard() {
                 {data.inventoryAlerts} item{data.inventoryAlerts !== 1 ? "s" : ""} below
                 minimum stock
               </p>
-              <p className="text-xs text-amber-700">
+              <p className="text-sm text-amber-700">
                 Restock needed — review and create purchase requests before the next service
                 day.
               </p>
@@ -128,7 +128,7 @@ export default function StoreManagerDashboard() {
               <p className="text-sm font-semibold text-emerald-900">
                 All stock levels are healthy
               </p>
-              <p className="text-xs text-emerald-700">
+              <p className="text-sm text-emerald-700">
                 Every part is above its minimum stock threshold.
               </p>
             </>
@@ -137,7 +137,7 @@ export default function StoreManagerDashboard() {
         <a
           href="/inventory"
           className={cn(
-            "shrink-0 text-xs font-bold hover:underline",
+            "shrink-0 text-sm font-bold hover:underline",
             data.inventoryAlerts > 0 ? "text-amber-700" : "text-emerald-700",
           )}
         >
@@ -150,7 +150,7 @@ export default function StoreManagerDashboard() {
         {/* Low Stock Alerts */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Low Stock Alerts</p>
+            <p className="text-sm font-medium text-muted-foreground">Low Stock Alerts</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
               <AlertTriangle className="size-4 text-amber-500" />
             </span>
@@ -161,7 +161,7 @@ export default function StoreManagerDashboard() {
         {/* Active Jobs (parts demand indicator) */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Active Jobs</p>
+            <p className="text-sm font-medium text-muted-foreground">Active Jobs</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-orange-50">
               <Wrench className="size-4 text-orange-500" />
             </span>
@@ -172,7 +172,7 @@ export default function StoreManagerDashboard() {
         {/* Total Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Total Jobs</p>
+            <p className="text-sm font-medium text-muted-foreground">Total Jobs</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
               <ClipboardList className="size-4 text-blue-600" />
             </span>
@@ -183,7 +183,7 @@ export default function StoreManagerDashboard() {
         {/* Completed Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Completed</p>
+            <p className="text-sm font-medium text-muted-foreground">Completed</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
               <CheckCircle2 className="size-4 text-green-600" />
             </span>

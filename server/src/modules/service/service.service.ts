@@ -1,35 +1,17 @@
+import { latestEstimateQuery } from './estimate-approval';
+import { lineAmount, sumMoney } from '../finance/money';
 import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
+import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
+import { z } from 'zod';
+import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
+import { JobCardWorkflowService } from './job-card-workflow.service';
 import prisma from '../../prisma/client';
 import { ServiceRepository } from './service.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
-import { NOTIFICATION_TYPES, NotificationService } from '../notification/notification.service';
+import { NotificationService } from '../notification/notification.service';
 import { assertMileage } from '../warranty/warranty.logic';
 import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
-import { WarrantyCaseService, notifyWarrantyOfficers } from '../warranty/warrantyCase.service';
-import { completeCampaignVehiclesForJobCard, markCampaignVehiclesInWorkshop } from '../campaign/campaign.hooks';
-import { isCompletedStatus } from '../job-card-line/jobCardLine.logic';
-
-/**
- * Updates a job card and, when it becomes completed, marks the campaign work it was
- * opened for as completed — in one transaction. Shared by the service and workshop modules
- * so every path that completes a job card runs the hook.
- */
-export async function applyJobCardUpdate(
-  id: string,
-  previousStatus: string,
-  data: Prisma.JobCardUncheckedUpdateInput & { status?: string },
-) {
-  const completing = data.status !== undefined && isCompletedStatus(data.status) && !isCompletedStatus(previousStatus);
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.jobCard.update({
-      where: { id },
-      data: { ...data, ...(completing && { completedAt: new Date() }) },
-    });
-    if (completing) await completeCampaignVehiclesForJobCard(tx, id);
-    return updated;
-  });
-}
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -349,208 +331,8 @@ export class ServiceService {
     await this.serviceRepository.deleteAppointment(id);
   }
 
-  /**
-   * Creates a job card. For a vehicle it runs the warranty & campaign check inside the
-   * transaction: the server recomputes coverage from today's mileage and refuses to
-   * create the card (409 WARRANTY_ACK_REQUIRED) unless the adviser acknowledged a covered
-   * vehicle and every open campaign. It then snapshots coverage, links the campaigns and,
-   * for a covered vehicle, opens a warranty case. Notifications go out after commit.
-   */
-  async createJobCard(data: {
-    appointmentId?: string;
-    customerId?: string;
-    vehicleId?: string;
-    branchName: string;
-    jobNumber: string;
-    description: string;
-    status?: string;
-    estimatedHours?: number;
-    estimatedCost?: number;
-    assignedTo?: string;
-    createdById?: string;
-    mileage?: number;
-    odometerReplaced?: boolean;
-    odometerReplacedReason?: string;
-    warrantyAcknowledged?: boolean;
-    acknowledgedCampaignIds?: string[];
-  }) {
-    let appointment: Awaited<ReturnType<ServiceRepository['findAppointmentById']>> = null;
-    if (data.appointmentId) {
-      appointment = await this.serviceRepository.findAppointmentById(data.appointmentId);
-      if (!appointment) throw new NotFoundError('Appointment not found');
-    }
-
-    // A job card for an appointment is for that appointment's customer and vehicle.
-    const vehicleId = data.vehicleId ?? appointment?.vehicleId;
-    const customerId = data.customerId ?? appointment?.customerId;
-    if (appointment && data.vehicleId && data.vehicleId !== appointment.vehicleId) {
-      throw new BadRequestError('The vehicle does not match the linked appointment');
-    }
-
-    if (customerId) {
-      const customer = await prisma.customer.findUnique({ where: { id: customerId } });
-      if (!customer) throw new NotFoundError('Customer not found');
-    }
-
-    const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
-    if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
-
-    if (!vehicleId) {
-      const card = await this.serviceRepository.createJobCard({
-        appointmentId: data.appointmentId,
-        customerId,
-        branchId: branch.id,
-        jobNumber: data.jobNumber,
-        description: data.description,
-        status: data.status,
-        estimatedHours: data.estimatedHours,
-        estimatedCost: data.estimatedCost,
-        assignedTo: data.assignedTo,
-        createdById: data.createdById,
-      });
-      // Same response shape as the vehicle path: no vehicle, so no warranty check.
-      return { ...card, warrantyCase: null, warrantyCheck: null };
-    }
-
-    if (data.mileage === undefined) {
-      throw new BadRequestError('Enter the current mileage (km) so warranty can be checked');
-    }
-    if (data.odometerReplaced && !data.odometerReplacedReason?.trim()) {
-      throw new BadRequestError('Give a reason for the odometer replacement');
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      // Serialise job cards and mileage updates for the same vehicle.
-      await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${vehicleId} FOR UPDATE`;
-      const vehicle = await loadVehicleForWarranty(tx, vehicleId);
-      if (customerId && vehicle.customerId !== customerId) {
-        throw new BadRequestError('The vehicle does not belong to this customer');
-      }
-      assertMileage(data.mileage!, vehicle.lastRecordedMileage, data.odometerReplaced);
-
-      const openCampaigns = await findOpenCampaigns(tx, vehicle);
-      const check = buildCheck(vehicle, data.mileage, openCampaigns);
-      const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
-      const unacknowledgedCampaigns = openCampaigns.filter((c) => !acknowledged.has(c.campaignId));
-      const coverageNeedsAck = check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged;
-      if (coverageNeedsAck || unacknowledgedCampaigns.length > 0) {
-        throw new ConflictError(
-          coverageNeedsAck
-            ? 'This vehicle is under warranty. Inform the customer and acknowledge the warranty before creating the job card.'
-            : `This vehicle has open campaigns (${unacknowledgedCampaigns.map((c) => c.code).join(', ')}). Acknowledge them before creating the job card.`,
-        ).withCode('WARRANTY_ACK_REQUIRED', check);
-      }
-
-      const now = new Date();
-      const card = await tx.jobCard.create({
-        data: {
-          appointmentId: data.appointmentId,
-          customerId: customerId ?? vehicle.customerId,
-          vehicleId,
-          branchId: branch.id,
-          jobNumber: data.jobNumber,
-          description: data.description,
-          status: data.status,
-          estimatedHours: data.estimatedHours,
-          estimatedCost: data.estimatedCost,
-          assignedTo: data.assignedTo,
-          createdById: data.createdById,
-          mileage: data.mileage,
-          warrantyStatusAtCreation: check.coverage.status,
-          warrantyReasonsAtCreation: check.coverage.reasons,
-          warrantyExpiresOnAtCreation: check.coverage.expiresOn ? new Date(`${check.coverage.expiresOn}T00:00:00Z`) : null,
-          warrantyKmLimitAtCreation: check.coverage.kmLimit,
-          warrantySnapshot: {
-            coverage: check.coverage,
-            policy: check.policy,
-            override: check.override,
-            reasonText: check.reasonText,
-            openCampaigns: openCampaigns.map((c) => ({ id: c.campaignId, code: c.code, type: c.type, title: c.title })),
-            odometerReplaced: Boolean(data.odometerReplaced),
-            odometerReplacedReason: data.odometerReplaced ? data.odometerReplacedReason!.trim() : null,
-            previousMileage: vehicle.lastRecordedMileage,
-          } as unknown as Prisma.InputJsonValue,
-          ...(check.requiresAcknowledgement && { warrantyAcknowledgedById: data.createdById, warrantyAcknowledgedAt: now }),
-        },
-      });
-
-      // Odometer only moves forward, except for an audited replacement.
-      const newMileage = data.odometerReplaced ? data.mileage! : Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage!);
-      await tx.vehicle.update({ where: { id: vehicleId }, data: { lastRecordedMileage: newMileage, lastMileageAt: now } });
-
-      if (openCampaigns.length > 0) {
-        await tx.jobCardCampaign.createMany({
-          data: openCampaigns.map((c) => ({
-            jobCardId: card.id,
-            campaignId: c.campaignId,
-            campaignCode: c.code,
-            campaignTitle: c.title,
-            campaignType: c.type,
-          })),
-        });
-        await markCampaignVehiclesInWorkshop(tx, openCampaigns.map((c) => c.campaignVehicleId), vehicleId);
-      }
-
-      const warrantyCase =
-        check.coverage.status === WarrantyCoverageStatus.ACTIVE
-          ? await new WarrantyCaseService().openForJobCard(tx, {
-              jobCardId: card.id,
-              vehicleId,
-              customerId: card.customerId,
-              branchId: branch.id,
-              complaint: data.description,
-              mileage: data.mileage!,
-              coverageStatus: check.coverage.status,
-              actorId: data.createdById ?? null,
-              automatic: true,
-            })
-          : null;
-
-      return { card, check, openCampaigns, warrantyCase, vehicle };
-    });
-
-    await this.notifyWarrantyJob(result, branch);
-    return { ...result.card, warrantyCase: result.warrantyCase, warrantyCheck: result.check };
-  }
-
-  private async notifyWarrantyJob(
-    result: {
-      card: { id: string; jobNumber: string; description: string; mileage: number | null; createdById: string | null };
-      warrantyCase: { id: string; caseNumber: string } | null;
-      openCampaigns: { code: string; title: string; type: string }[];
-      vehicle: { vin: string; make: string | null; model: string | null; customerId: string };
-    },
-    branch: { id: string; name: string },
-  ) {
-    const { card, warrantyCase, openCampaigns, vehicle } = result;
-    const customer = await prisma.customer.findUnique({
-      where: { id: vehicle.customerId },
-      select: { firstName: true, lastName: true, phoneNumber: true },
-    });
-    const who = customer ? `${customer.firstName} ${customer.lastName}${customer.phoneNumber ? ` (${customer.phoneNumber})` : ''}` : 'Customer';
-    const car = [vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
-    const km = card.mileage != null ? `${card.mileage.toLocaleString('en-NG')} km` : 'mileage not recorded';
-
-    if (warrantyCase) {
-      await notifyWarrantyOfficers(branch.id, {
-        type: NOTIFICATION_TYPES.WARRANTY_JOB_CREATED,
-        title: 'Warranty job opened',
-        message: `${who} · ${car} · VIN ${vehicle.vin} · ${km} · job card ${card.jobNumber} at ${branch.name}. Complaint: ${card.description}. Case ${warrantyCase.caseNumber} opened.`,
-        link: `/warranty/${warrantyCase.id}`,
-        branchId: branch.id,
-      });
-    }
-    if (openCampaigns.length > 0 && card.createdById) {
-      await new NotificationService().notifyUsers([card.createdById], {
-        type: NOTIFICATION_TYPES.CAMPAIGN_VEHICLE_CHECKED_IN,
-        title: 'Open campaign on this vehicle',
-        message: `Job card ${card.jobNumber} (${car}, VIN ${vehicle.vin}) has open campaign work: ${openCampaigns
-          .map((c) => `${c.code} ${c.title}`)
-          .join('; ')}. Include it in the job.`,
-        link: `/job-cards/${card.id}`,
-        branchId: branch.id,
-      });
-    }
+  async createJobCard(data: z.infer<typeof jobOpeningBody> & { createdById?: string }) {
+    return new JobCardWorkflowService().open(data);
   }
 
   async listJobCards(params?: {
@@ -569,11 +351,13 @@ export class ServiceService {
     const where: Record<string, unknown> = {};
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
-    if (params?.status) where.status = params.status;
+    if (params?.status) where.status = jobStatusFilter(params.status);
 
     if (params?.search) {
       where.OR = [
         { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { description: { contains: params.search, mode: 'insensitive' } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
@@ -586,7 +370,7 @@ export class ServiceService {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     const [jobCards, total] = await Promise.all([
@@ -631,26 +415,8 @@ export class ServiceService {
     };
   }
 
-  async updateJobCard(id: string, data: {
-    appointmentId?: string;
-    customerId?: string;
-    vehicleId?: string;
-    description?: string;
-    status?: string;
-    estimatedHours?: number;
-    estimatedCost?: number;
-    assignedTo?: string;
-  }) {
-    const card = await this.serviceRepository.findJobCardById(id);
-    if (!card) {
-      throw new NotFoundError('Job card not found');
-    }
-    // The warranty snapshot, campaign links and case belong to the original vehicle.
-    if (data.vehicleId !== undefined && data.vehicleId !== card.vehicleId && card.warrantyStatusAtCreation) {
-      throw new BadRequestError('The vehicle cannot be changed after the warranty check. Open a new job card instead.');
-    }
-
-    return applyJobCardUpdate(id, card.status, data);
+  async updateJobCard(id: string, data: z.infer<typeof jobUpdateBody>, actorId?: string) {
+    return new JobCardWorkflowService().update(id, data, actorId);
   }
 
   async addInspection(jobCardId: string, data: {
@@ -675,36 +441,57 @@ export class ServiceService {
     });
   }
 
-  async addEstimate(jobCardId: string, data: {
-    description: string;
-    amount: number;
-    currency?: string;
-    status?: string;
-  }) {
-    const card = await this.serviceRepository.findJobCardById(jobCardId);
-    if (!card) {
-      throw new NotFoundError('Job card not found');
-    }
-
-    const estimate = await this.serviceRepository.addEstimate({
-      jobCardId,
-      description: data.description,
-      amount: data.amount,
-      currency: data.currency,
-      status: data.status,
-    });
-
-    const notificationService = new NotificationService();
-    const payload = {
-      type: 'ESTIMATE_CREATED',
-      title: 'New estimate created',
-      message: `An estimate for job card ${card.jobNumber} was created (${data.currency ?? 'NGN'} ${data.amount}).`,
-      link: `/job-cards/${jobCardId}`,
-    };
-    await notificationService.notifyRole(ROLES.SERVICE_ADVISOR, card.branchId, payload);
-    await notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, card.branchId, payload);
-
-    return estimate;
+  async addEstimate(jobCardId: string, input: z.infer<typeof estimateBody>, actorId?: string) {
+    const data = estimateBody.parse(input);
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
+      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { vehicle: { include: { catalogue: true } } } });
+      if (!card) throw new NotFoundError('Job card not found');
+      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to unbilled jobs');
+      const billable = data.lines.filter(line => line.type !== 'COMPLAINT');
+      if (new Set(billable.map(line => `${line.type}:${line.referenceId}`)).size !== billable.length) throw new BadRequestError('Each service, part or labour operation can appear only once per estimate');
+      const services = billable.filter(line => line.type === 'SERVICE');
+      if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
+      if (data.lines.some(line => line.includedInService && !['PART', 'LABOUR'].includes(line.type))) throw new BadRequestError('Only parts and labour can be included in the service charge');
+      if (data.lines.some(line => line.includedInService) && services.length !== 1) throw new BadRequestError('Package inclusions require the selected service line');
+      const lines = [];
+      for (const line of data.lines) {
+        let description = line.description ?? '';
+        let rate = 0;
+        let quantity = line.quantity;
+        if (line.type === 'PART') {
+          const part = line.referenceId ? await tx.sparePart.findUnique({ where: { id: line.referenceId } }) : null;
+          if (!part) throw new BadRequestError('Select a part');
+          if (part.retailRate == null) throw new BadRequestError(`Retail rate is not set for ${part.partNumber}`);
+          description = part.name; rate = part.retailRate;
+        } else if (line.type === 'LABOUR') {
+          const item = line.referenceId ? await tx.labourItem.findFirst({ where: { id: line.referenceId, active: true } }) : null;
+          if (!item) throw new BadRequestError('Select an active labour operation');
+          const modelId = card.vehicle?.catalogue?.parentId;
+          const modelRate = modelId ? await tx.labourRate.findFirst({ where: { labourItemId: item.id, modelId, active: true } }) : null;
+          description = item.description; rate = modelRate?.rate ?? item.rate;
+          quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
+        } else if (line.type === 'SERVICE') {
+          const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
+          if (!service) throw new BadRequestError('Select an active service');
+          description = service.name; rate = card.serviceCharge ?? service.price;
+        } else if (line.referenceId) {
+          const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
+          if (!complaint) throw new BadRequestError('Complaint must belong to this job');
+          description = complaint.description;
+        }
+        if (!description) throw new BadRequestError('Complaint description is required');
+        const { includedInService, ...fields } = line;
+        lines.push({ ...fields, type: includedInService ? `INCLUDED_${line.type}` : line.type, description, rate: includedInService ? 0 : rate, quantity, amount: includedInService ? 0 : lineAmount(quantity, rate) });
+      }
+      // A new scope needs a fresh QC result and fresh credit authorization.
+      const reopening = canonicalJobStatus(card.status) === 'READY';
+      await tx.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING', creditApprovedById: null, ...(reopening ? { status: 'QC', readyAt: null, statusHistory: { create: { fromStatus: card.status, toStatus: 'QC', actorId: actorId ?? card.createdById!, remarks: 'Estimate revised; approval and quality check required' } } } : {}) } });
+      const previous = (await tx.estimate.findMany({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { createdAt: true } }))?.[0];
+      // Strict ordering under the shared row lock, including transactions started earlier.
+      const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1));
+      return tx.estimate.create({ data: { createdAt, jobCardId, description: data.description, currency: 'NGN', status: 'Pending', amount: sumMoney(lines.map(line => line.amount)), lines: { createMany: { data: lines } } }, include: { lines: true } });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 
   async addApproval(estimateId: string, data: {
@@ -713,32 +500,28 @@ export class ServiceService {
     decisionDate?: string;
     comments?: string;
     status?: string;
-  }) {
-    const estimate = await prisma.estimate.findUnique({ where: { id: estimateId } });
-    if (!estimate) {
-      throw new NotFoundError('Estimate not found');
-    }
-
-    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-    if (!customer) {
-      throw new NotFoundError('Customer not found');
-    }
-
-    const existingApproval = await prisma.customerApproval.findFirst({
-      where: { estimateId, customerId: data.customerId },
-    });
-    if (existingApproval) {
-      throw new ConflictError('Approval already exists for this customer and estimate');
-    }
-
-    return this.serviceRepository.addApproval({
-      estimateId,
-      customerId: data.customerId,
-      approved: data.approved,
-      decisionDate: data.decisionDate ? new Date(data.decisionDate) : undefined,
-      comments: data.comments,
-      status: data.status,
-    });
+  }, actorId?: string) {
+    const identity = await prisma.estimate.findUnique({ where: { id: estimateId }, select: { jobCardId: true } });
+    if (!identity) throw new NotFoundError('Estimate not found');
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`);
+      const estimates = await tx.estimate.findMany({ where: { jobCardId: identity.jobCardId }, ...latestEstimateQuery });
+      const estimate = estimates[0];
+      if (!estimate || estimate.id !== estimateId) throw new ConflictError('Only the latest estimate revision can receive a decision');
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: identity.jobCardId } });
+      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('This job is closed for estimate decisions');
+      if (card.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
+      if (estimate.approvals.length) throw new ConflictError('This revision already has a decision. Create a new revision to change scope.');
+      const status = data.approved ? 'Approved' : 'Declined';
+      if (data.approved) {
+        const services = estimate.lines.filter(line => line.type === 'SERVICE');
+        if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
+        if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
+      }
+      await tx.estimate.update({ where: { id: estimateId }, data: { status } });
+      if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: 'ESTIMATE_DECISION_RECORDED', details: JSON.stringify({ jobCardId: card.id, estimateId, customerId: data.customerId, status, comments: data.comments }) } });
+      return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 
   async getApprovals(estimateId: string) {

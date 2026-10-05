@@ -1,342 +1,1276 @@
 "use client";
-
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Car, FileText, Gauge, Loader2, Phone, ShieldCheck, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
+import {
+  Download,
+  Loader2,
+  LockKeyhole,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Save,
+  Search,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Field, inputCls } from "@/components/forms/FormField";
+import { ActionMenu } from "@/components/ui/ActionMenu";
+import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
+import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
-import { useBranchStore } from "@/store/branch.store";
-import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
-import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
-import { useVehicle } from "@/features/vehicles/hooks/use-vehicle";
-import type { Vehicle } from "@/features/vehicles/types/vehicle.types";
-import { useAppointment } from "@/features/appointments/hooks/use-appointment";
-import { useAppointments } from "@/features/appointments/hooks/use-appointments";
 import { useVehicleWarranty } from "@/features/warranty/hooks/use-warranty";
 import { WarrantyCheckPanel, ackRequiredCheck } from "@/features/warranty/components/WarrantyCheckPanel";
-import { fmtDate, fmtDateTime, fmtKm, apiErrorMessage } from "@/features/warranty/lib/warranty-format";
 import type { WarrantyCheck } from "@/features/warranty/types/warranty.types";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { cn } from "@/lib/utils";
+import { apiGet } from "@/lib/api/apiClient";
+import { getCustomerRequest } from "@/features/customers/api/customer.api";
+import { getVehicleRequest } from "@/features/vehicles/api/vehicle.api";
 import { useCreateJobCard } from "../hooks/use-create-job-card";
-import { createJobCardSchema, type CreateJobCardFormInput, type CreateJobCardFormValues } from "../schemas/job-card.schema";
+import {
+  createJobCardSchema,
+  type CreateJobCardFormValues,
+} from "../schemas/job-card.schema";
+import { WorkshopPicker, type PickerRecord } from "./WorkshopPicker";
+import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
+import {
+  CustomerRequestsTab,
+  emptyRequest,
+  requestTotals,
+} from "./opening/CustomerRequestsTab";
+import { OtherDetailsTab } from "./opening/OtherDetailsTab";
 
-const textareaCls =
-  "min-h-24 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
+import {
+  OpeningCard,
+  OpeningField,
+  ReadOnlyField,
+  CurrencyInput,
+  OpeningDatePicker,
+  localDate,
+  openingInput,
+  openingGrid,
+  formatDate,
+  money,
+} from "./opening/opening-ui";
 
-function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <h2 className="mb-4 flex items-center gap-3 text-base font-semibold text-slate-800">
-      <span className="text-slate-600 [&_svg]:size-5">{icon}</span>
-      {children}
-    </h2>
-  );
+const tabs = ["Vehicle Details", "Customer Requests", "Other Details"] as const;
+type Tab = (typeof tabs)[number];
+
+function defaults(
+  branchName: string,
+  values?: Partial<CreateJobCardFormValues>,
+): Partial<CreateJobCardFormValues> {
+  return {
+    branchName,
+    serviceId: "",
+    complaints: [emptyRequest()],
+
+    tyres: Array.from(
+      {
+        length: 5,
+      },
+      () => ({
+        makeId: "",
+        number: "",
+      }),
+    ),
+
+    serviceCharge: undefined,
+    ...values,
+  };
 }
 
-function Chip({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-      <span className="text-slate-500 [&_svg]:size-4">{icon}</span>
-      <span className="truncate">{children}</span>
-    </div>
-  );
-}
-
-/**
- * Screen 02 — open a job card for a customer vehicle. The warranty & campaign check runs
- * as soon as the vehicle and mileage are known, before the job card can be created.
- */
-export function JobCardCreateForm({ appointmentId: initialAppointmentId, vehicleId: initialVehicleId }: { appointmentId?: string; vehicleId?: string }) {
-  const router = useRouter();
+export function JobCardCreateForm({
+  onSuccess,
+  onClose,
+  onDirtyChange,
+  onPendingChange,
+  defaultValues,
+}: {
+  onSuccess?: (id: string) => void;
+  onClose?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onPendingChange?: (pending: boolean) => void;
+  defaultValues?: Partial<CreateJobCardFormValues>;
+}) {
   const create = useCreateJobCard();
-  const { user, isSuperAdmin, hasPermission } = useAuth();
-  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
-  const branches = useBranchStore((s) => s.branches);
-  const activeBranch = useBranchStore((s) => s.activeBranch);
-  useFetchBranches(true);
 
-  const appointmentQuery = useAppointment(initialAppointmentId ?? "");
-  const appointment = appointmentQuery.data?.appointment;
+  const { hasPermission, isSuperAdmin, user } = useAuth();
+  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
+
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const branches = useBranchStore((s) => s.branches);
+  const [openedAt, setOpenedAt] = useState(() => new Date());
+  const initial = useRef(defaults(activeBranch?.name ?? "", defaultValues));
+
+  const form = useForm<CreateJobCardFormValues>({
+    resolver: zodResolver(createJobCardSchema),
+    defaultValues: initial.current,
+    mode: "onBlur",
+  });
 
   const {
     register,
     control,
-    handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitted },
-  } = useForm<CreateJobCardFormInput, unknown, CreateJobCardFormValues>({
-    resolver: zodResolver(createJobCardSchema),
-    defaultValues: {
-      vehicleId: initialVehicleId ?? "",
-      appointmentId: initialAppointmentId ?? "",
-      mileage: "",
-      odometerReplaced: false,
-      odometerReplacedReason: "",
-      jobNumber: "",
-      branchName: activeBranch?.name ?? "",
-      description: "",
-    },
+    reset,
+    handleSubmit,
+
+    formState: { errors, isDirty },
+  } = form;
+
+  const selectedServiceId = watch("serviceId");
+  const selectedServiceCharge = watch("serviceCharge");
+  const serviceQuery = useQuery({
+    queryKey: ["job-opening-service", selectedServiceId],
+    queryFn: () => apiGet<{ service: { price: number } }>(`/services/${selectedServiceId}`),
+    enabled: !!selectedServiceId,
+  });
+  useEffect(() => {
+    if (serviceQuery.data && selectedServiceCharge === undefined) {
+      setValue("serviceCharge", serviceQuery.data.service.price, { shouldValidate: true });
+    }
+  }, [serviceQuery.data, selectedServiceCharge, setValue]);
+
+  const [tab, setTab] = useState<Tab>("Vehicle Details");
+  const [confirmation, setConfirmation] = useState<
+    "new" | "undo" | "estimate" | null
+  >(null);
+  const [estimate, setEstimate] = useState<PickerRecord>();
+  const [find, setFind] = useState(false);
+  const content = useRef<HTMLDivElement>(null);
+  const overlay = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!confirmation && !find) return;
+
+    const previous = document.activeElement as HTMLElement | null;
+    overlay.current?.querySelector<HTMLElement>("input, button")?.focus();
+    return () => previous?.focus();
+  }, [confirmation, find]);
+
+  const hydratedVehicle = useRef<string | undefined>(undefined);
+  const [customerId, vehicleId, appointmentId, branchName] = watch([
+    "customerId",
+    "vehicleId",
+    "appointmentId",
+    "branchName",
+  ]);
+  const branchId =
+    branches.find((branch) => branch.name === branchName)?.id ??
+    activeBranch?.id;
+
+  const customerQuery = useQuery({
+    queryKey: ["job-opening-customer", customerId],
+    queryFn: () => getCustomerRequest(customerId),
+    enabled: !!customerId,
   });
 
-  const vehicleId = watch("vehicleId");
-  const selectedAppointmentId = watch("appointmentId");
+  const vehicleQuery = useQuery({
+    queryKey: ["job-opening-vehicle", vehicleId],
+    queryFn: () => getVehicleRequest(vehicleId),
+    enabled: !!vehicleId,
+  });
+
+  const bookingQuery = useQuery({
+    queryKey: ["job-opening-booking", appointmentId],
+
+    queryFn: () =>
+      apiGet<{
+        appointment: PickerRecord;
+      }>(`/service/appointments/${appointmentId}`),
+
+    enabled: !!appointmentId,
+  });
+
+  const customer = customerQuery.data;
+  const vehicle = vehicleQuery.data?.vehicle;
+
+  // Warranty & campaign check: runs once the vehicle and mileage are known. A covered
+  // vehicle or an open campaign must be acknowledged before the job card is saved.
+  const mileageValue = watch("mileage");
   const odometerReplaced = watch("odometerReplaced");
-  const rawMileage = String(watch("mileage") ?? "").replace(/,/g, "");
-  const mileageNumber = /^\d+$/.test(rawMileage) ? Number(rawMileage) : undefined;
+  const mileageNumber = Number.isInteger(mileageValue) && mileageValue >= 0 ? mileageValue : undefined;
   const debouncedMileage = useDebouncedValue(mileageNumber, 450);
-
-  // Prefill from the appointment the job card is opened for.
-  useEffect(() => {
-    if (!appointment) return;
-    setValue("vehicleId", appointment.vehicleId);
-    if (appointment.branch?.name) setValue("branchName", appointment.branch.name);
-    if (appointment.notes) setValue("description", appointment.notes);
-  }, [appointment, setValue]);
-
-  useEffect(() => {
-    if (!watch("branchName") && activeBranch?.name) setValue("branchName", activeBranch.name);
-  }, [activeBranch, setValue, watch]);
-
-  const vehicleQuery = useVehicle(vehicleId ?? "");
-  const [pickedVehicle, setPickedVehicle] = useState<Vehicle | null>(null);
-  const vehicle = (vehicleQuery.data?.vehicle as Vehicle | undefined) ?? pickedVehicle;
-  const customer = vehicle?.customer;
-
-  const appointmentsQuery = useAppointments(customer?.id ? { customerId: customer.id, limit: 50 } : undefined);
-  const openAppointments = useMemo(
-    () =>
-      (appointmentsQuery.data?.appointments ?? []).filter(
-        (a) => a.vehicleId === vehicleId && !["Completed", "Cancelled", "Closed"].includes(a.status),
-      ),
-    [appointmentsQuery.data, vehicleId],
-  );
-
-  const warranty = useVehicleWarranty(vehicleId, debouncedMileage, canSeeWarranty && debouncedMileage !== undefined);
+  const warranty = useVehicleWarranty(vehicleId, debouncedMileage, canSeeWarranty && !!vehicleId && debouncedMileage !== undefined);
   const [serverCheck, setServerCheck] = useState<WarrantyCheck | null>(null);
   const check = serverCheck ?? warranty.data;
   const [acknowledged, setAcknowledged] = useState(false);
-  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
-
-  // A new check (vehicle or mileage changed) needs a fresh acknowledgement.
   useEffect(() => {
+    // A new check (vehicle or mileage changed) needs a fresh acknowledgement.
     setAcknowledged(false);
     setServerCheck(null);
   }, [vehicleId, debouncedMileage]);
+  const needsAck = canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
+  const lastJob = vehicle?.jobCards?.[0];
+  const recentJobs = useQuery({
+    queryKey: ["job-opening-recent-jobs", vehicleId],
+    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(`/service/vehicles/${vehicleId}/recent-jobs`),
+    enabled: !!vehicleId && hasPermission("jobcard:read"),
+  });
+
   useEffect(() => {
-    if (warranty.dataUpdatedAt) setCheckedAt(new Date(warranty.dataUpdatedAt));
-  }, [warranty.dataUpdatedAt]);
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
-  const needsAck = Boolean(check?.requiresAcknowledgement) && !acknowledged;
-  const lastRecorded = check?.vehicle.lastRecordedMileage ?? vehicle?.lastRecordedMileage ?? null;
+  useEffect(() => {
+    onPendingChange?.(create.isPending);
+  }, [create.isPending, onPendingChange]);
 
-  function onSubmit(values: CreateJobCardFormValues) {
-    if (canSeeWarranty && needsAck) {
-      toast.error("Acknowledge the warranty and campaign check first");
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (isDirty) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!vehicleId) {
+      hydratedVehicle.current = undefined;
       return;
     }
-    create.mutate(
+
+    if (!vehicle || hydratedVehicle.current === vehicle.id) return;
+
+    hydratedVehicle.current = vehicle.id;
+    setValue("mileage", vehicle.lastRecordedMileage ?? Number.NaN);
+    setValue("acType", vehicle.catalogue?.acFitted ? "FACTORY" : "NONE");
+  }, [vehicle, vehicleId, setValue]);
+
+  const resetVehicle = () => {
+    hydratedVehicle.current = undefined;
+
+    setValue("vehicleId", "", {
+      shouldDirty: true,
+    });
+
+    setValue("mileage", Number.NaN);
+    setValue("odometerReplaced", false);
+    setValue("odometerReplacedReason", "");
+    setValue("acType", "NONE");
+    setValue("isRepeat", false);
+    setValue("previousJobId", "");
+    setValue("repeatReason", "");
+  };
+
+  const applyBooking = (record: PickerRecord) => {
+    resetVehicle();
+
+    setValue("customerId", record.customerId ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    setValue("vehicleId", record.vehicleId ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    if (record.branch && record.branch.name !== branchName) {
+      setValue("branchName", record.branch.name, {
+        shouldDirty: true,
+      });
+
+      setValue("serviceAdvisorId", "");
+      setValue("technicianId", "");
+    }
+
+    if (record.serviceId) {
+      setValue("serviceId", record.serviceId, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  };
+
+  const applyEstimate = () => {
+    if (!estimate?.lines?.length || estimate.currency !== "NGN") {
+      toast.error("Select a priced NGN estimate with line items.");
+      return;
+    }
+
+    resetVehicle();
+    setValue("appointmentId", "");
+
+    setValue("customerId", estimate.jobCard?.customer?.id ?? "", {
+      shouldDirty: true,
+    });
+
+    setValue("vehicleId", estimate.jobCard?.vehicle?.id ?? "", {
+      shouldDirty: true,
+    });
+
+    if (estimate.jobCard?.branch?.name)
+      setValue("branchName", estimate.jobCard.branch.name, {
+        shouldDirty: true,
+      });
+
+    setValue("serviceAdvisorId", "");
+    setValue("technicianId", "");
+
+    setValue(
+      "complaints",
+      estimate.lines.map((line) => ({
+        ...emptyRequest(),
+        defectCode: "9999999",
+        description: line.description,
+        spare: line.type === "PART" ? line.amount : 0,
+        labour: line.type === "LABOUR" ? line.amount : 0,
+      })),
       {
-        vehicleId: values.vehicleId,
-        customerId: customer?.id,
-        appointmentId: values.appointmentId || undefined,
-        branchName: values.branchName,
-        jobNumber: values.jobNumber.trim(),
-        description: values.description.trim(),
-        estimatedHours: values.estimatedHours,
-        estimatedCost: values.estimatedCost,
-        mileage: values.mileage,
-        odometerReplaced: values.odometerReplaced || undefined,
-        odometerReplacedReason: values.odometerReplaced ? values.odometerReplacedReason?.trim() : undefined,
-        warrantyAcknowledged: acknowledged && check?.coverage.status === "ACTIVE",
-        acknowledgedCampaignIds: acknowledged ? (check?.openCampaigns ?? []).map((c) => c.campaignId) : [],
-      },
-      {
-        onSuccess: (card) => {
-          toast.success(`Job card ${card.jobNumber} created`);
-          if (card.warrantyCase) toast.success(`Warranty case ${card.warrantyCase.caseNumber} opened`);
-          router.push(`/job-cards/${card.id}`);
-        },
-        onError: (error) => {
-          const latest = ackRequiredCheck(error);
-          if (latest) {
-            // The coverage or campaigns changed since the check ran: show the server's view and ask again.
-            setServerCheck(latest);
-            setAcknowledged(false);
-            toast.error("The warranty check changed. Review it and acknowledge again.");
-            return;
-          }
-          toast.error(apiErrorMessage(error, "Could not create the job card"));
-        },
+        shouldDirty: true,
+        shouldValidate: true,
       },
     );
-  }
+
+    setValue("serviceCharge", estimate.lines.reduce((total, line) => total + (line.type === "SERVICE" ? Math.round(line.amount * 100) : 0), 0) / 100, {
+      shouldDirty: true,
+    });
+
+    setTab("Customer Requests");
+    toast.success("Estimate lines loaded for review");
+  };
+
+  const resetForm = (kind: "new" | "undo") => {
+    hydratedVehicle.current = undefined;
+
+    if (kind === "new") {
+      initial.current = defaults(activeBranch?.name ?? branchName);
+      setOpenedAt(new Date());
+    }
+
+    reset(initial.current);
+    setEstimate(undefined);
+    setTab("Vehicle Details");
+    create.reset();
+  };
+
+  const askReset = (kind: "new" | "undo") => {
+    if (isDirty) setConfirmation(kind);
+    else resetForm(kind);
+  };
+
+  const rows = watch("complaints");
+  const totals = requestTotals(rows);
+  const charge = watch("serviceCharge") ?? 0;
+  const total =
+    (Math.round(totals.spare * 100) +
+      Math.round(totals.oil * 100) +
+      Math.round(totals.labour * 100) +
+      Math.round(charge * 100)) /
+    100;
+  const otherErrors = [
+    "tyres",
+    "batteryMakeId",
+    "batteryNumber",
+    "customField1",
+  ];
+
+  const countErrors = (target: Tab) =>
+    Object.keys(errors).filter((key) =>
+      target === "Customer Requests"
+        ? key === "complaints"
+        : target === "Other Details"
+          ? otherErrors.includes(key)
+          : key !== "complaints" && !otherErrors.includes(key),
+    ).length;
+
+  const selectTab = (target: Tab) => {
+    setTab(target);
+
+    content.current?.scrollTo({
+      top: 0,
+    });
+  };
+
+  const submit = handleSubmit(
+    (values) => {
+      if (needsAck) {
+        setTab("Vehicle Details");
+        toast.error("Acknowledge the warranty and campaign check first");
+        return;
+      }
+      const { promisedDate, promisedTime, odometerReplaced: replaced, odometerReplacedReason, ...data } = values;
+
+      create.mutate(
+        {
+          ...data,
+          odometerReplaced: replaced || undefined,
+          odometerReplacedReason: replaced ? odometerReplacedReason?.trim() : undefined,
+          warrantyAcknowledged: acknowledged && check?.coverage.status === "ACTIVE",
+          acknowledgedCampaignIds: acknowledged ? (check?.openCampaigns ?? []).map((c) => c.campaignId) : [],
+          description: values.complaints
+            .map((row) => row.description)
+            .join("; ")
+            .slice(0, 5000),
+          promisedAt: new Date(`${promisedDate}T${promisedTime}`).toISOString(),
+          technicianId: values.technicianId || undefined,
+          previousJobId: values.isRepeat ? values.previousJobId : undefined,
+          repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
+          teamId: values.teamId || undefined,
+          estimatedParts: totals.spare,
+          estimatedOil: totals.oil,
+          estimatedLabour: totals.labour,
+          batteryMakeId: values.batteryMakeId || undefined,
+
+          tyres: values.tyres.map((tyre) => ({
+            makeId: tyre.makeId || undefined,
+            number: tyre.number?.toUpperCase(),
+          })),
+
+          complaints: values.complaints.map((row) => ({
+            ...row,
+            complaintCodeId: row.complaintCodeId || undefined,
+          })),
+        },
+        {
+          onSuccess: (card) => {
+            reset(values);
+            onDirtyChange?.(false);
+            toast.success("Job card opened");
+            if (card.warrantyCase) toast.success(`Warranty case ${card.warrantyCase.caseNumber} opened`);
+            onSuccess?.(card.id);
+          },
+
+          onError: (error) => {
+            const latest = ackRequiredCheck(error);
+            if (latest) {
+              // Coverage or campaigns changed since the check ran: show the server's view and ask again.
+              setServerCheck(latest);
+              setAcknowledged(false);
+              setTab("Vehicle Details");
+              toast.error("The warranty check changed. Review it and acknowledge again.");
+              return;
+            }
+            toast.error(
+              isAxiosError(error)
+                ? error.response?.data?.message || "Could not save job card"
+                : "Could not save job card",
+            );
+          },
+        },
+      );
+    },
+    (validation) => {
+      const key = Object.keys(validation)[0];
+
+      selectTab(
+        key === "complaints"
+          ? "Customer Requests"
+          : otherErrors.includes(key)
+            ? "Other Details"
+            : "Vehicle Details",
+      );
+
+      requestAnimationFrame(() =>
+        content.current
+          ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+          ?.focus(),
+      );
+    },
+  );
+
+  const masterPicker = (
+    name: "bayId" | "teamId",
+    label: string,
+    kind: string,
+    required = false,
+  ) => (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <WorkshopPicker
+          label={label}
+          required={required}
+          endpoint={`/workshop-masters?kind=${kind}`}
+          collection="items"
+          value={field.value ?? ""}
+          onChange={field.onChange}
+          onBlur={field.onBlur}
+          error={errors[name]?.message}
+        />
+      )}
+    />
+  );
+
+  const loading =
+    (!!customerId && customerQuery.isPending) ||
+    (!!vehicleId && vehicleQuery.isPending);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-      {/* ── Left: form ── */}
-      <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-        <section className="p-6">
-          <SectionTitle icon={<Car />}>Vehicle & Customer</SectionTitle>
-          <Field label="Vehicle" error={errors.vehicleId?.message}>
-            <Controller
-              control={control}
-              name="vehicleId"
-              render={({ field }) => (
-                <VehicleSelectWithCreate
-                  value={field.value}
-                  onChange={(id) => {
-                    field.onChange(id);
-                    setValue("appointmentId", "");
-                  }}
-                  onVehicleSelect={setPickedVehicle}
-                  disabled={Boolean(initialAppointmentId)}
-                  error={errors.vehicleId?.message}
-                />
-              )}
-            />
-          </Field>
-          {customer && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Chip icon={<User />}>
-                {customer.firstName} {customer.lastName}
-              </Chip>
-              <Chip icon={<Phone />}>{customer.phoneNumber || customer.email}</Chip>
-              <Chip icon={<Building2 />}>{watch("branchName") || "—"}</Chip>
-            </div>
-          )}
-          <div className="mt-4">
-            <Field label="Linked appointment">
-              <select className={inputCls} {...register("appointmentId")} disabled={!vehicleId || Boolean(initialAppointmentId)}>
-                <option value="">No appointment (walk-in)</option>
-                {appointment && !openAppointments.some((a) => a.id === appointment.id) && (
-                  <option value={appointment.id}>
-                    APT · {fmtDateTime(appointment.scheduledAt)} · {appointment.status}
-                  </option>
+    <FormProvider {...form}>
+      <form
+        className="flex h-[calc(100dvh-10rem)] min-h-0 flex-col text-sm"
+        onSubmit={submit}
+        noValidate
+        onKeyDown={(event) => {
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key.toLowerCase() === "k"
+          ) {
+            event.preventDefault();
+            setFind(true);
+          }
+        }}
+      >
+        <div className="contents" inert={!!(confirmation || find) || create.isPending}>
+          <header className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/50 px-2.5 py-1 text-sm font-medium">
+                  <LockKeyhole className="h-3 w-3" />
+                  Job no. assigned on save
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {formatDate(openedAt.toISOString())}{" "}
+                  <span className="px-1">/</span>{" "}
+                  {openedAt.toLocaleTimeString("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {lastJob && (
+                  <span
+                    title={`Last visit: ${formatDate(lastJob.createdAt)}`}
+                    className="rounded-full bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary"
+                  >
+                    Repeat visit
+                  </span>
                 )}
-                {openAppointments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    APT · {fmtDateTime(a.scheduledAt)} · {a.status}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {selectedAppointmentId && appointment?.status === "Pending" && (
-              <p className="mt-1 text-xs text-amber-700">This appointment is not checked in yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="p-6">
-          <SectionTitle icon={<Gauge />}>Odometer</SectionTitle>
-          <div className="grid items-start gap-4 sm:grid-cols-2">
-            <Field label="Current mileage (km)" error={errors.mileage?.message}>
-              <input className={cn(inputCls, "h-12 text-base")} inputMode="numeric" placeholder="e.g. 61580" autoComplete="off" {...register("mileage")} />
-              <span className="text-xs text-slate-500">
-                {lastRecorded != null
-                  ? `Last recorded: ${fmtKm(lastRecorded)}${check?.vehicle.lastMileageAt ? ` on ${fmtDate(check.vehicle.lastMileageAt)}` : ""}`
-                  : vehicleId
-                    ? "No previous reading recorded"
-                    : "Select a vehicle first"}
-              </span>
-            </Field>
-            <label className="flex items-center gap-3 pt-2 text-sm text-slate-700 sm:pt-8">
-              <input type="checkbox" className="size-4 accent-[#05141F]" {...register("odometerReplaced")} />
-              Odometer was replaced
-            </label>
-          </div>
-          {odometerReplaced && (
-            <div className="mt-4">
-              <Field label="Reason for the odometer replacement" error={errors.odometerReplacedReason?.message}>
-                <input className={inputCls} placeholder="e.g. Instrument cluster replaced under job JC-2026-000112" {...register("odometerReplacedReason")} />
-              </Field>
-              <p className="mt-1 text-xs text-slate-500">A lower reading is only accepted with a reason, which is kept on the job card.</p>
+                {customer?.vip && (
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+                    VIP
+                  </span>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {branchName || "Select a branch from the app header"}
+                </span>
+              </div>
             </div>
-          )}
-        </section>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <WorkshopPicker
+                    label="Estimate"
+                    endpoint={`/service/estimates?branchId=${branchId ?? ""}`}
+                    collection="estimates"
+                    value={estimate?.id ?? ""}
+                    selectedRecord={estimate}
+                    disabled={!branchId || !hasPermission("estimate:read")}
+                    onChange={(id) => {
+                      if (!id) setEstimate(undefined);
+                    }}
+                    onSelect={setEstimate}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!estimate || create.isPending}
+                  aria-label="Load selected estimate"
+                  title="Load selected estimate"
+                  onClick={() => {
+                    if (isDirty) setConfirmation("estimate");
+                    else applyEstimate();
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+              <Controller
+                name="appointmentId"
+                control={control}
+                render={({ field }) => (
+                  <WorkshopPicker
+                    label="Booking"
+                    endpoint={`/service/appointments?branchId=${branchId ?? ""}`}
+                    collection="appointments"
+                    value={field.value ?? ""}
+                    selectedRecord={bookingQuery.data?.appointment}
+                    disabled={!branchId}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    onSelect={applyBooking}
+                  />
+                )}
+              />
+            </div>
+          </header>
+          <div
+            role="tablist"
+            aria-label="Job card sections"
+            className="flex shrink-0 border-b border-border bg-muted/30 px-2 md:px-4"
+          >
+            {tabs.map((label, index) => (
+              <button
+                key={label}
+                id={`job-opening-tab-${index}`}
+                type="button"
+                role="tab"
+                aria-selected={tab === label}
+                aria-controls={`job-opening-panel-${index}`}
+                tabIndex={tab === label ? 0 : -1}
+                onClick={() => selectTab(label)}
+                onKeyDown={(event) => {
+                  const direction =
+                    event.key === "ArrowRight"
+                      ? 1
+                      : event.key === "ArrowLeft"
+                        ? -1
+                        : 0;
 
-        <section className="p-6">
-          <SectionTitle icon={<FileText />}>Job details</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Job number" error={errors.jobNumber?.message}>
-              <input className={cn(inputCls, "font-mono")} placeholder="JC-2026-000418" {...register("jobNumber")} />
-            </Field>
-            <Field label="Branch" error={errors.branchName?.message}>
-              {isSuperAdmin ? (
-                <select className={inputCls} {...register("branchName")}>
-                  <option value="">Select branch</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input className={inputCls} readOnly {...register("branchName")} />
-              )}
-            </Field>
+                  if (direction) {
+                    event.preventDefault();
+                    const next =
+                      (index + direction + tabs.length) % tabs.length;
+                    selectTab(tabs[next]);
+                    document.getElementById(`job-opening-tab-${next}`)?.focus();
+                  }
+                }}
+                className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:flex-none md:px-5 md:text-sm ${tab === label ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {label}
+                {countErrors(label) > 0 && (
+                  <span
+                    aria-label={`${countErrors(label)} field groups need attention`}
+                    className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] text-destructive-foreground"
+                  >
+                    {countErrors(label)}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
-          <div className="mt-4">
-            <Field label="Customer complaint / description" error={errors.description?.message}>
-              <textarea className={textareaCls} placeholder="e.g. Engine warning light on, rough idle when cold" {...register("description")} />
-            </Field>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="Estimated hours" error={errors.estimatedHours?.message}>
-              <input className={inputCls} inputMode="decimal" placeholder="e.g. 3.5" {...register("estimatedHours")} />
-            </Field>
-            <Field label="Estimated cost (₦)" error={errors.estimatedCost?.message}>
-              <input className={inputCls} inputMode="decimal" placeholder="e.g. 145000" {...register("estimatedCost")} />
-            </Field>
-          </div>
-        </section>
-      </div>
-
-      {/* ── Right: warranty & campaign check ── */}
-      <aside className="lg:sticky lg:top-6 lg:self-start">
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-800">
-              <ShieldCheck className="size-5 text-slate-600" /> Warranty & Campaign Check
-            </h2>
-            {warranty.isFetching ? (
-              <Loader2 className="size-4 animate-spin text-slate-400" />
-            ) : (
-              checkedAt && check && <span className="text-xs text-slate-400">Checked {fmtDateTime(checkedAt.toISOString()).split(" ")[1]}</span>
+          <div
+            ref={content}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20 p-4 md:p-6"
+          >
+            {Object.keys(errors).length > 0 && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                Review the highlighted fields before saving.
+                {errors.branchName && (
+                  <span className="block">
+                    Select an active branch from the app header before opening a
+                    job.
+                  </span>
+                )}
+              </div>
             )}
+            {create.isError && (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {isAxiosError(create.error)
+                  ? create.error.response?.data?.message ||
+                    "Could not save job card."
+                  : "Could not save job card."}
+              </p>
+            )}
+            <div
+              role="tabpanel"
+              id="job-opening-panel-0"
+              aria-labelledby="job-opening-tab-0"
+              hidden={tab !== "Vehicle Details"}
+              className="space-y-5"
+            >
+              <OpeningCard
+                title="Vehicle"
+                description="Search registration or VIN. Saved vehicle details load automatically."
+                action={
+                  vehicle && (
+                    <Link
+                      href={`/vehicles/${vehicle.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-primary underline"
+                    >
+                      Edit vehicle record
+                    </Link>
+                  )
+                }
+              >
+                <div className={openingGrid}>
+                  <Controller
+                    name="vehicleId"
+                    control={control}
+                    render={({ field }) => (
+                      <WorkshopPicker
+                        label="Regn no. / VIN"
+                        required
+                        endpoint="/vehicles"
+                        collection="vehicles"
+                        value={field.value ?? ""}
+                        selectedRecord={vehicle}
+                        error={errors.vehicleId?.message}
+                        onBlur={field.onBlur}
+                        onChange={(id) => {
+                          resetVehicle();
+                          field.onChange(id);
+                          setValue("appointmentId", "");
+                        }}
+                        onSelect={(record) => {
+                          setValue(
+                            "customerId",
+                            record.customer?.id ?? record.customerId ?? "",
+                            {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            },
+                          );
+                        }}
+                      />
+                    )}
+                  />
+                  <ReadOnlyField
+                    label="Variant"
+                    value={vehicle?.catalogue?.description || vehicle?.trim}
+                  />
+                  <ReadOnlyField label="Model" value={vehicle?.model} />
+                  <ReadOnlyField label="VIN" value={vehicle?.vin} />
+                  <ReadOnlyField label="Engine" value={vehicle?.engineNumber} />
+                  <OpeningField label="A/C">
+                    <select className={openingInput} {...register("acType")}>
+                      <option value="NONE">None</option>
+                      <option value="FACTORY">Factory fitted</option>
+                      <option value="DEALER">Dealer fitted</option>
+                    </select>
+                  </OpeningField>
+                  <ReadOnlyField label="Colour" value={vehicle?.color} />
+                  <ReadOnlyField
+                    label="Purchase dealer"
+                    value={vehicle?.sellingDealer}
+                  />
+                  <ReadOnlyField
+                    label="Purchase date"
+                    value={
+                      vehicle?.saleDate
+                        ? formatDate(vehicle.saleDate)
+                        : undefined
+                    }
+                  />
+                  <OpeningField
+                    label="Mileage"
+                    required
+                    error={errors.mileage?.message}
+                  >
+                    <div className="relative">
+                      <input
+                        aria-invalid={!!errors.mileage}
+                        type="number"
+                        min={0}
+                        step="1"
+                        className={`${openingInput} pr-10 tabular-nums`}
+                        {...register("mileage", {
+                          valueAsNumber: true,
+                        })}
+                      />
+                      <span className="absolute right-3 top-3 text-sm text-muted-foreground">
+                        km
+                      </span>
+                    </div>
+                  </OpeningField>
+                </div>
+                <Controller
+                  name="serviceId"
+                  control={control}
+                  render={({ field }) => (
+                    <WorkshopPicker
+                      label="Service"
+                      required
+                      endpoint="/services?isActive=true"
+                      collection="services"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      onSelect={(service) => setValue("serviceCharge", service.price ?? 0, { shouldDirty: true, shouldValidate: true })}
+                      error={errors.serviceId?.message}
+                    />
+                  )}
+                />
+                {vehicle && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Previous odometer:{" "}
+                    {vehicle.lastRecordedMileage?.toLocaleString() ??
+                      "Not recorded"}
+                    km. The recorded mileage cannot decrease unless the odometer was replaced.
+                  </p>
+                )}
+                {vehicle && (
+                  <div className="mt-3 space-y-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" {...register("odometerReplaced")} /> Odometer was replaced
+                    </label>
+                    {odometerReplaced && (
+                      <OpeningField label="Reason for the odometer replacement" required error={errors.odometerReplacedReason?.message}>
+                        <input
+                          className={openingInput}
+                          maxLength={300}
+                          aria-invalid={!!errors.odometerReplacedReason}
+                          placeholder="e.g. Instrument cluster replaced"
+                          {...register("odometerReplacedReason")}
+                        />
+                      </OpeningField>
+                    )}
+                  </div>
+                )}
+                {vehicleId && vehicleQuery.isPending && (
+                  <p
+                    role="status"
+                    className="mt-3 text-sm text-muted-foreground"
+                  >
+                    Loading vehicle details...
+                  </p>
+                )}
+                {vehicleQuery.isError && (
+                  <p role="alert" className="mt-3 text-sm text-destructive">
+                    Vehicle details could not be loaded.{" "}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => vehicleQuery.refetch()}
+                    >
+                      Retry
+                    </button>
+                  </p>
+                )}
+              </OpeningCard>
+              {vehicleId && (
+                <OpeningCard
+                  title="Warranty & campaign check"
+                  description="Runs before the job card is saved. A covered vehicle or an open campaign must be acknowledged."
+                  action={warranty.isFetching ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : undefined}
+                >
+                  {canSeeWarranty ? (
+                    <WarrantyCheckPanel
+                      check={debouncedMileage !== undefined ? check : undefined}
+                      isFetching={warranty.isFetching}
+                      isError={warranty.isError}
+                      acknowledged={acknowledged}
+                      onAcknowledgedChange={setAcknowledged}
+                      acknowledgedBy={user ? `${user.firstName} ${user.lastName}` : undefined}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">You do not have access to warranty information.</p>
+                  )}
+                </OpeningCard>
+              )}
+              <CustomerDetailsCard
+                customer={customer}
+                loading={!!customerId && customerQuery.isPending}
+                error={customerQuery.isError}
+                retry={() => {
+                  void customerQuery.refetch();
+                }}
+                lookup={
+                  <Controller
+                    name="customerId"
+                    control={control}
+                    render={({ field }) => (
+                      <WorkshopPicker
+                        label="Existing customers"
+                        required
+                        endpoint="/customers"
+                        collection="customers"
+                        value={field.value ?? ""}
+                        selectedRecord={customer}
+                        error={errors.customerId?.message}
+                        onBlur={field.onBlur}
+                        onChange={(id) => {
+                          field.onChange(id);
+                        }}
+                      />
+                    )}
+                  />
+                }
+              />
+              {vehicleId && (
+                <OpeningCard title="Repeat visit" description="Review recent jobs for this vehicle before opening a new one.">
+                  {recentJobs.isLoading && <p role="status" className="text-sm">Loading recent jobs...</p>}
+                  {recentJobs.isError && <p role="alert" className="text-sm text-destructive">Could not load recent jobs. <button type="button" className="underline" onClick={() => recentJobs.refetch()}>Retry</button></p>}
+                  {recentJobs.data?.jobs.length === 0 && <p className="text-sm text-muted-foreground">No jobs within the configured repeat window.</p>}
+                  {!!recentJobs.data?.jobs.length && <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{recentJobs.data.jobs.length} recent job(s). Latest: <Link href={`/job-cards/${recentJobs.data.jobs[0].id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">{recentJobs.data.jobs[0].jobNumber}</Link> ({formatDate(recentJobs.data.jobs[0].createdAt)}).</p>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("isRepeat")} /> This is a repeat job</label>
+                    {watch("isRepeat") && <>
+                      <OpeningField label="Previous job" required error={errors.previousJobId?.message}>
+                        <select className={openingInput} aria-invalid={!!errors.previousJobId} {...register("previousJobId")}>
+                          <option value="">Select previous job</option>
+                          {recentJobs.data.jobs.map((job) => <option key={job.id} value={job.id}>{job.jobNumber} — {formatDate(job.createdAt)}{job.technician ? ` — ${job.technician.firstName} ${job.technician.lastName}` : ""}</option>)}
+                        </select>
+                      </OpeningField>
+                      <OpeningField label="Repeat reason" required error={errors.repeatReason?.message}>
+                        <textarea className={`${openingInput} h-24 py-2`} maxLength={2000} aria-invalid={!!errors.repeatReason} {...register("repeatReason")} />
+                      </OpeningField>
+                    </>}
+                  </div>}
+                </OpeningCard>
+              )}
+              <OpeningCard title="Job scheduling & estimate">
+                <div className={openingGrid}>
+                  <Controller
+                    name="promisedDate"
+                    control={control}
+                    render={({ field }) => (
+                      <OpeningField
+                        label="Promised date"
+                        required
+                        error={errors.promisedDate?.message}
+                      >
+                        <OpeningDatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          invalid={!!errors.promisedDate}
+                          min={localDate(openedAt)}
+                        />
+                      </OpeningField>
+                    )}
+                  />
+                  <OpeningField
+                    label="Promised time"
+                    required
+                    error={errors.promisedTime?.message}
+                  >
+                    <input
+                      type="time"
+                      className={openingInput}
+                      {...register("promisedTime")}
+                    />
+                  </OpeningField>
+                  {masterPicker("teamId", "Group", "TEAM")}
+                  <Controller
+                    name="technicianId"
+                    control={control}
+                    render={({ field }) => (
+                      <WorkshopPicker
+                        label="Engineer"
+                        endpoint={`/service/staff?role=Technician&branchId=${branchId ?? ""}`}
+                        collection="users"
+                        disabled={!branchId}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        error={errors.technicianId?.message}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="serviceAdvisorId"
+                    control={control}
+                    render={({ field }) => (
+                      <WorkshopPicker
+                        label="Received by"
+                        required
+                        endpoint={`/service/staff?role=ServiceAdviser&branchId=${branchId ?? ""}`}
+                        collection="users"
+                        disabled={!branchId}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        error={errors.serviceAdvisorId?.message}
+                      />
+                    )}
+                  />
+                  {masterPicker("bayId", "Bay", "BAY", true)}
+                  <ReadOnlyField
+                    label="Est. part amt"
+                    currency
+                    value={money(totals.spare)}
+                  />
+                  <ReadOnlyField
+                    label="Est. labour amt"
+                    currency
+                    value={money(totals.labour)}
+                  />
+                  <ReadOnlyField
+                    label="Est. oil amt"
+                    currency
+                    value={money(totals.oil)}
+                  />
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium">Service charge</p>
+                    <p className="text-xs text-muted-foreground">Defaults to the selected service price. This amount becomes a separate bill line; enter 0 only for a waived charge.</p>
+                    <Controller
+                      name="serviceCharge"
+                      control={control}
+                      render={({ field }) => (
+                        <CurrencyInput
+                          label="Service charge"
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          error={errors.serviceCharge?.message}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 md:col-span-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total estimated amount
+                    </p>
+                    <p
+                      aria-live="polite"
+                      className="mt-1 text-xl font-semibold tabular-nums text-primary"
+                    >
+                      {money(total)}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Assign an engineer or group. Parts, oil and labour totals come
+                  from Customer Requests.
+                </p>
+                <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" {...register("inHouse")} /> In-house job</label>
+              </OpeningCard>
+              <OpeningCard
+                title="Delivery & closing"
+                description="Available after quality check and billing or credit approval on the saved job card."
+              >
+                <div className={openingGrid}>
+                  <ReadOnlyField label="Vehicle ready" value="Not ready" />
+                  <ReadOnlyField
+                    label="Delivery date"
+                    value="Awaiting delivery"
+                  />
+                  <ReadOnlyField
+                    label="Delivery time"
+                    value="Awaiting delivery"
+                  />
+                  <ReadOnlyField
+                    label="Delivered by"
+                    value="Awaiting delivery"
+                  />
+                  <ReadOnlyField
+                    label="Invoice no."
+                    value="Assigned when invoiced"
+                  />
+                </div>
+                <div className="mt-4">
+                  <OpeningField label="Remarks" error={errors.remarks?.message}>
+                    <textarea
+                      className={`${openingInput} h-24 resize-y py-2`}
+                      maxLength={500}
+                      {...register("remarks")}
+                    />
+                    <span className="text-right text-sm text-muted-foreground">
+                      {watch("remarks")?.length ?? 0}/500
+                    </span>
+                  </OpeningField>
+                </div>
+              </OpeningCard>
+            </div>
+            <div
+              role="tabpanel"
+              id="job-opening-panel-1"
+              aria-labelledby="job-opening-tab-1"
+              hidden={tab !== "Customer Requests"}
+            >
+              <CustomerRequestsTab lastJobId={lastJob?.id} />
+            </div>
+            <div
+              role="tabpanel"
+              id="job-opening-panel-2"
+              aria-labelledby="job-opening-tab-2"
+              hidden={tab !== "Other Details"}
+            >
+              <OtherDetailsTab />
+            </div>
           </div>
-          <p className="mb-4 text-sm text-slate-500">These checks run before the job card is created.</p>
-          {canSeeWarranty ? (
-            <WarrantyCheckPanel
-              check={debouncedMileage !== undefined && vehicleId ? check : undefined}
-              isFetching={warranty.isFetching}
-              isError={warranty.isError}
-              acknowledged={acknowledged}
-              onAcknowledgedChange={setAcknowledged}
-              acknowledgedBy={user ? `${user.firstName} ${user.lastName}` : undefined}
-            />
-          ) : (
-            <p className="text-sm text-slate-400">You do not have access to warranty information.</p>
-          )}
+          <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border bg-background px-4 py-3 md:px-6">
+            <div className="hidden items-center gap-2 md:flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={create.isPending}
+                onClick={() => askReset("new")}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                New job card
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!isDirty || create.isPending}
+                onClick={() => askReset("undo")}
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                Undo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFind(true)}
+              >
+                <Search className="mr-1.5 h-4 w-4" />
+                Find
+              </Button>
+            </div>
+            <div className="md:hidden">
+              <ActionMenu
+                align="start"
+                trigger={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label="More job card actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                }
+              >
+                <ActionMenuItem
+                  className="md:hidden"
+                  disabled={create.isPending}
+                  onClick={() => askReset("new")}
+                >
+                  New job card
+                </ActionMenuItem>
+                <ActionMenuItem
+                  className="md:hidden"
+                  disabled={!isDirty || create.isPending}
+                  onClick={() => askReset("undo")}
+                >
+                  Undo changes
+                </ActionMenuItem>
+                <ActionMenuItem
+                  className="md:hidden"
+                  onClick={() => setFind(true)}
+                >
+                  Find job card
+                </ActionMenuItem>
+              </ActionMenu>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={create.isPending}
+                onClick={onClose}
+              >
+                <X className="mr-1 h-4 w-4" />
+                Close
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  !isDirty ||
+                  create.isPending ||
+                  needsAck ||
+                  loading ||
+                  customerQuery.isError ||
+                  vehicleQuery.isError
+                }
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                {create.isPending ? "Saving..." : "Save job card"}
+              </Button>
+            </div>
+          </footer>
         </div>
-      </aside>
+        {(confirmation || find) && (
+          <div
+            ref={overlay}
+            className="absolute inset-0 z-40 flex items-center justify-center rounded-2xl bg-background/95 p-4"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setConfirmation(null);
+                setFind(false);
+              }
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={find ? "Find job card" : "Confirm changes"}
+              className="w-full max-w-lg rounded-xl border bg-background p-5 shadow-lg"
+            >
+              {find ? (
+                <>
+                  <h3 className="mb-4 font-semibold">Find job card</h3>
+                  <WorkshopPicker
+                    label="Job number, registration or customer"
+                    endpoint="/service/job-cards"
+                    collection="jobCards"
+                    onChange={() => {}}
+                    onSelect={(record) =>
+                      window.open(
+                        `/job-cards/${record.id}`,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setFind(false)}
+                  >
+                    Back to opening
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold">
+                    {confirmation === "estimate"
+                      ? "Load this estimate?"
+                      : "Discard unsaved changes?"}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {confirmation === "estimate"
+                      ? "This replaces the selected customer, vehicle and request lines."
+                      : "Your unsaved entries will be cleared."}
+                  </p>
+                  <div className="mt-5 flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      autoFocus
+                      onClick={() => setConfirmation(null)}
+                    >
+                      Keep editing
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (confirmation === "estimate") applyEstimate();
+                        else if (confirmation) resetForm(confirmation);
 
-      {/* ── Actions ── */}
-      <div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
-        {isSubmitted && Object.keys(errors).length > 0 && <p className="mr-auto text-sm text-red-600">Fix the highlighted fields.</p>}
-        <Button type="button" variant="outline" size="lg" asChild>
-          <Link href={initialAppointmentId ? `/appointments/${initialAppointmentId}` : "/job-cards"}>Cancel</Link>
-        </Button>
-        <Button type="submit" size="lg" disabled={create.isPending || (canSeeWarranty && needsAck)}>
-          {create.isPending ? "Creating…" : "Create Job Card"}
-        </Button>
-      </div>
-    </form>
+                        setConfirmation(null);
+                      }}
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </form>
+    </FormProvider>
   );
 }

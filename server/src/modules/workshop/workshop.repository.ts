@@ -121,7 +121,7 @@ export class WorkshopRepository {
         _count: {
           select: {
             technicianAssignments: {
-              where: { status: { notIn: ['Completed', 'Cancelled'] } },
+              where: { status: { notIn: ['Completed', 'Cancelled', 'DELIVERED', 'CANCELLED'] } },
             },
           },
         },

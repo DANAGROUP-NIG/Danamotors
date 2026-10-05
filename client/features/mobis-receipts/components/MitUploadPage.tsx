@@ -17,9 +17,10 @@ import { useImportMit } from "../hooks/use-mobis";
 import { DEFAULT_CONVERSION_RATE, RECEIVED_MODE_LABELS, fmtNaira, fmtPrice, isCpd } from "../lib/mobis-labels";
 import type { PartMatch, ReceivedMode } from "../types/mobis.types";
 
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
 const today = () => new Date().toISOString().slice(0, 10);
+const ACCEPTED_EXTENSIONS = [".xls", ".xlsx", ".csv", ".txt", ".tsv"];
 
 /** Legacy Part Purchase > MIT > Add, with the invoice file read in the browser and previewed before saving. */
 export function MitUploadPage() {
@@ -34,6 +35,7 @@ export function MitUploadPage() {
   const [parsed, setParsed] = useState<ParsedMitFile | null>(null);
   const [parseError, setParseError] = useState("");
   const [reading, setReading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [matches, setMatches] = useState<PartMatch[] | null>(null);
   const [matchFailed, setMatchFailed] = useState(false);
 
@@ -77,6 +79,21 @@ export function MitUploadPage() {
       setReading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  // The input's accept attribute only filters the file dialog, so dropped files are checked here.
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    if (reading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      setParseError(`${file.name} is not a supported file. Use ${ACCEPTED_EXTENSIONS.join(", ")}.`);
+      return;
+    }
+    onFile(file);
   }
 
   function clearFile() {
@@ -146,7 +163,22 @@ export function MitUploadPage() {
       <PageHeader title="Upload MIT" description="Import a Mobis invoice file in MIT format. Nothing is saved until you click Save." />
 
       {/* ── File ── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div
+        className={cn(
+          "rounded-xl border border-slate-200 bg-white p-6 transition-colors",
+          dragging && "border-primary bg-primary/5",
+        )}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          if (!dragging) setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          // Ignore leave events fired when moving over child elements.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={onDrop}
+      >
         <input
           ref={fileRef}
           type="file"
@@ -158,10 +190,15 @@ export function MitUploadPage() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 py-10 text-sm text-slate-500 hover:border-primary hover:text-primary"
+            className={cn(
+              "flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 py-10 text-sm text-slate-500 hover:border-primary hover:text-primary",
+              dragging && "border-primary text-primary",
+            )}
           >
             <Upload className="size-6" />
-            <span className="font-medium">Choose the Mobis invoice file</span>
+            <span className="font-medium">
+              {dragging ? "Drop the file to read it" : "Choose the Mobis invoice file, or drag it here"}
+            </span>
             <span className="text-xs">.xls, .xlsx, .csv or tab-separated text in MIT format</span>
           </button>
         ) : (
@@ -191,7 +228,7 @@ export function MitUploadPage() {
             <p className="flex items-center gap-1.5 font-medium">
               <AlertTriangle className="size-4" /> {parsed.problems.length} row(s) could not be read and will be left out:
             </p>
-            <ul className="mt-1 list-disc pl-5 text-xs">
+            <ul className="mt-1 list-disc pl-5 text-sm">
               {parsed.problems.slice(0, 8).map((p) => (
                 <li key={p}>{p}</li>
               ))}
@@ -285,27 +322,27 @@ export function MitUploadPage() {
                   const known = matchByNumber.get(l.partNumber);
                   return (
                     <tr key={l.row} className="border-t border-slate-100">
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.orderNumber}</td>
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.lineNumber}</td>
-                      <td className={cn(tdCls, "font-mono text-xs font-medium")}>{l.partNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.orderNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.lineNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm font-medium")}>{l.partNumber}</td>
                       <td className={cn(tdCls, "max-w-64 truncate")}>{l.partName}</td>
                       <td className={cn(tdCls, "text-right")}>{l.quantity}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtPrice(l.unitPrice)}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtPrice(l.amount)}</td>
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.caseNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.caseNumber}</td>
                       <td className={tdCls}>{l.weight ?? ""}</td>
                       <td className={tdCls}>{l.hsCode}</td>
                       <td className={tdCls}>
                         {matchFailed ? (
-                          <span className="text-xs text-slate-400">Not checked</span>
+                          <span className="text-sm text-slate-400">Not checked</span>
                         ) : matches === null ? (
                           <Loader2 className="size-3.5 animate-spin text-slate-400" />
                         ) : known ? (
-                          <span className={cn("text-xs", known.partStatus === "BLOCKED" ? "text-red-600" : "text-emerald-700")}>
+                          <span className={cn("text-sm", known.partStatus === "BLOCKED" ? "text-red-600" : "text-emerald-700")}>
                             {known.partStatus === "BLOCKED" ? "Exists (blocked)" : "Exists"}
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-blue-700">New part</span>
+                          <span className="text-sm font-medium text-blue-700">New part</span>
                         )}
                       </td>
                     </tr>
@@ -319,7 +356,7 @@ export function MitUploadPage() {
 
       {/* ── Save ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <p className="text-xs text-slate-500">{errors.length ? errors.join(" · ") : "Ready to save. The MIT will then be checked and posted with an MRN."}</p>
+        <p className="text-sm text-slate-500">{errors.length ? errors.join(" · ") : "Ready to save. The MIT will then be checked and posted with an MRN."}</p>
         <Button type="button" disabled={errors.length > 0 || importMit.isPending || reading} onClick={save} className="gap-1.5">
           {importMit.isPending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
           Save MIT

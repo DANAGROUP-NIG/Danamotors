@@ -7,6 +7,7 @@ import { ArrowLeft, Copy, FileText, Phone, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { VehicleEditForm, useVehicle } from "@/features/vehicles";
+import { VehicleHistoryCard } from "@/features/vehicles/components/VehicleHistoryCard";
 import { useJobCards } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
@@ -179,6 +180,8 @@ export default function VehicleDetailPage() {
           </div>
         )}
       </SectionCard>
+
+      <VehicleHistoryCard vehicle={vehicle} showServiceHistory={false} />
 
       <ModalFame isOpen={editing} onClose={() => setEditing(false)} title="Edit vehicle">
         <VehicleEditForm vehicle={vehicle} onSuccess={() => setEditing(false)} />

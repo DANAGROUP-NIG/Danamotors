@@ -38,12 +38,12 @@ export class DashboardService {
         where: { ...jobWhere, createdAt: { gte: startOfYesterday, lt: startOfToday } },
       }),
       prisma.jobCard.count({
-        where: { ...jobWhere, status: 'In Progress' },
+        where: { ...jobWhere, status: { in: ['In Progress', 'IN_PROGRESS'] } },
       }),
       prisma.jobCard.count({
         where: {
           ...jobWhere,
-          status: 'In Progress',
+          status: { in: ['In Progress', 'IN_PROGRESS'] },
           updatedAt: { gte: startOfYesterday, lt: startOfToday },
         },
       }),
@@ -53,7 +53,7 @@ export class DashboardService {
       prisma.jobCard.count({
         where: {
           ...jobWhere,
-          status: 'Closed',
+          status: { in: ['Closed', 'DELIVERED'] },
           updatedAt: { gte: startOfYesterday, lt: startOfToday },
         },
       }),
@@ -161,7 +161,7 @@ export class DashboardService {
         ? prisma.jobCard.count({ where: { technicianId: userId, ...jobWhere } })
         : Promise.resolve(0),
       userId
-        ? prisma.jobCard.count({ where: { technicianId: userId, status: 'Closed', ...jobWhere } })
+        ? prisma.jobCard.count({ where: { technicianId: userId, status: { in: ['Closed', 'DELIVERED'] }, ...jobWhere } })
         : Promise.resolve(0),
       userId
         ? prisma.jobCard.groupBy({ by: ['status'], where: { technicianId: userId, ...jobWhere }, _count: { id: true } })

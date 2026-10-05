@@ -20,9 +20,9 @@ const SETTINGS_CARDS = [
     href: "/settings",
   },
   {
-    title: "Service Types",
-    description: "Manage the list of service types offered.",
-    href: "/settings",
+    title: "Workshop Masters",
+    description: "Service types, bays, complaints, teams and the vehicle catalogue.",
+    href: "/settings/workshop-masters",
   },
   {
     title: "Integrations",

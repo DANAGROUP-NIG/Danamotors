@@ -8,23 +8,24 @@ datasource db {
 }
 
 model Branch {
+  receipts Receipt[]
   id          String   @id @default(uuid())
   name        String   @unique
   // Legacy store-location code (e.g. A, QS, DH, VI).
-  code        String?  @unique
+  code           String?  @unique
   // Set when this is a sub-location (store, godown) at another branch's premises.
   parentBranchId String?
   parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
   subLocations   Branch[] @relation("BranchSubLocations")
-  address     String?
-  city        String?
-  state       String?
-  country     String?
-  phoneNumber String?
-  email       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  phoneNumber    String?
+  email          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   users             User[]
   customers         Customer[]
@@ -38,18 +39,16 @@ model Branch {
   transferRequests InterBranchTransfer[] @relation("RequestingBranch")
   transferSources  InterBranchTransfer[] @relation("SourceBranch")
 
-  indentRequests BranchIndent[]      @relation("IndentRequestingBranch")
-  indentSources  BranchIndent[]      @relation("IndentSourceBranch")
-  pickingLists   PickingList[]       @relation("PickingListBranch")
-  stnsOut        StockTransferNote[] @relation("StnSourceBranch")
-  stnsIn         StockTransferNote[] @relation("StnDestinationBranch")
-  transferCases  TransferCase[]      @relation("TransferCaseBranch")
-  packingLists   PackingList[]       @relation("PackingListBranch")
-  mitsOut        MaterialInTransit[] @relation("MitSourceBranch")
-  mitsIn         MaterialInTransit[] @relation("MitDestinationBranch")
-  srnsReceived   StockReceiptNote[]  @relation("SrnReceivingBranch")
+  indentRequests BranchIndent[]        @relation("IndentRequestingBranch")
+  indentSources  BranchIndent[]        @relation("IndentSourceBranch")
+  pickingLists   PickingList[]         @relation("PickingListBranch")
+  stnsOut        StockTransferNote[]   @relation("StnSourceBranch")
+  stnsIn         StockTransferNote[]   @relation("StnDestinationBranch")
+  transferCases  TransferCase[]        @relation("TransferCaseBranch")
+  packingLists   PackingList[]         @relation("PackingListBranch")
+  mitsIn         MaterialInTransit[]   @relation("MitDestinationBranch")
   mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
-  srnsSourced    StockReceiptNote[]  @relation("SrnSourceBranch")
+  mrnsSourced    MaterialReceiptNote[] @relation("MrnSourceBranch")
 
   notifications Notification[]
 
@@ -84,10 +83,14 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
 
-  createdAppointments ServiceAppointment[] @relation("ReceptionistBookings")
-  createdCustomers    Customer[]           @relation("CreatedCustomers")
-  createdVehicles     Vehicle[]            @relation("CreatedVehicles")
-  createdJobCards     JobCard[]            @relation("CreatedJobCards")
+  createdAppointments ServiceAppointment[]   @relation("ReceptionistBookings")
+  createdCustomers    Customer[]             @relation("CreatedCustomers")
+  createdVehicles     Vehicle[]              @relation("CreatedVehicles")
+  advisedJobs         JobCard[]              @relation("JobServiceAdvisor")
+  deliveredJobs       JobCard[]              @relation("JobDeliveryAdvisor")
+  creditApprovedJobs  JobCard[]              @relation("JobCreditApprover")
+  jobStatusChanges    JobCardStatusHistory[]
+  createdJobCards     JobCard[]              @relation("CreatedJobCards")
 
   technicianAssignments       JobCard[] @relation("TechnicianAssignments")
   qualityInspectorAssignments JobCard[] @relation("QualityInspectorAssignments")
@@ -97,8 +100,15 @@ model User {
   issuedPartIssuances PartIssuance[] @relation("UserPartIssuances")
   returnedPartReturns PartReturn[]   @relation("UserPartReturns")
 
-  recordedPayments Payment[] @relation("UserRecordedPayments")
-  issuedReceipts   Receipt[] @relation("UserIssuedReceipts")
+  recordedPayments       Payment[]         @relation("UserRecordedPayments")
+  issuedReceipts         Receipt[]         @relation("UserIssuedReceipts")
+  jobCardLabourLines     JobCardLabour[]
+  serviceAdvisorInvoices Invoice[]         @relation("InvoiceServiceAdvisor")
+  cancelledInvoices      Invoice[]         @relation("InvoiceCancelledBy")
+  tallyPostedInvoices    Invoice[]         @relation("InvoiceTallyPostedBy")
+  tallyPostedReceipts    Receipt[]         @relation("ReceiptTallyPostedBy")
+  receiptEditLogs        ReceiptEditLog[]
+  tallyPostingLogs       TallyPostingLog[] @relation("TallyPostingUser")
 
   transferRequests   InterBranchTransfer[] @relation("TransferRequestedBy")
   transferApprovals  InterBranchTransfer[] @relation("TransferApprovedBy")
@@ -117,7 +127,6 @@ model User {
   transferCasesCreated TransferCase[]          @relation("TransferCaseCreatedBy")
   packingListsCreated  PackingList[]           @relation("PackingListCreatedBy")
   mitsCreated          MaterialInTransit[]     @relation("MitCreatedBy")
-  srnsReceived         StockReceiptNote[]      @relation("SrnReceivedBy")
   mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
@@ -201,7 +210,7 @@ model Customer {
   id                     String    @id @default(uuid())
   firstName              String
   lastName               String
-  email                  String    @unique
+  email                  String?   @unique
   phoneNumber            String?
   dateOfBirth            DateTime?
   driverLicenseNumber    String?
@@ -210,7 +219,29 @@ model Customer {
   state                  String?
   postalCode             String?
   country                String?
+  residencePhone         String?
+  fax                    String?
+  stdCode                String?
+  vip                    Boolean @default(false)
+  anniversaryDate        String?
+  preferredFollowupDay   String?
+  preferredFollowupTime  String?
   preferredContactMethod String?
+
+  code           String? @unique
+  type           String  @default("INDIVIDUAL")
+  salutation     String?
+  companyName    String?
+  contactPerson  String?
+  registeredName String?
+  mobile2        String?
+  office1        String?
+  office2        String?
+  house          String?
+  street         String?
+  zone           String?
+  tallyPartyCode String?
+  mergedIntoId   String?
 
   creditBalance Float @default(0)
 
@@ -232,6 +263,9 @@ model Customer {
   jobCards          JobCard[]
   approvals         CustomerApproval[]
   invoices          Invoice[]
+  receipts          Receipt[]
+  tallyLedgerId     String?
+  tallyLedger       TallyLedger?         @relation(fields: [tallyLedgerId], references: [id], onDelete: SetNull)
 
   creditTransactions CustomerCreditTransaction[]
   creditApplications CustomerCreditApplication[]
@@ -239,6 +273,8 @@ model Customer {
   warrantyCases WarrantyCase[]
 
   @@index([branchId])
+  @@index([phoneNumber])
+  @@index([mergedIntoId])
 }
 
 model CustomerAccount {
@@ -287,6 +323,7 @@ model Service {
   updatedAt DateTime @updatedAt
 
   appointments ServiceAppointment[]
+  jobCards     JobCard[]
 }
 
 model ServiceAppointment {
@@ -338,6 +375,9 @@ model JobCard {
   appointmentId String?
   appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
@@ -347,11 +387,52 @@ model JobCard {
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
+  serviceTypeId      String?
+  serviceType        WorkshopMaster?        @relation("JobServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  bayId              String?
+  bay                WorkshopMaster?        @relation("JobBay", fields: [bayId], references: [id], onDelete: Restrict)
+  teamId             String?
+  team               WorkshopMaster?        @relation("JobTeam", fields: [teamId], references: [id], onDelete: Restrict)
+  serviceAdvisorId   String?
+  serviceAdvisor     User?                  @relation("JobServiceAdvisor", fields: [serviceAdvisorId], references: [id], onDelete: Restrict)
+  deliveryAdvisorId  String?
+  deliveryAdvisor    User?                  @relation("JobDeliveryAdvisor", fields: [deliveryAdvisorId], references: [id], onDelete: Restrict)
+  mileage            Int?
+  promisedAt         DateTime?
+  acFitted           Boolean                @default(false)
+  inHouse            Boolean                @default(true)
+  remarks            String?
+  observations       String?
+  workDone           String?
+  isRepeat           Boolean                @default(false)
+  previousJobId      String?
+  previousJob        JobCard?               @relation("RepeatJob", fields: [previousJobId], references: [id], onDelete: Restrict)
+  repeatJobs         JobCard[]              @relation("RepeatJob")
+  repeatReason       String?
+  readyAt            DateTime?
+  deliveredAt        DateTime?
+  gatePassNumber     String?                @unique
+  lateReasonIds      String[]               @default([])
+  creditApprovedById String?
+  creditApprovedBy   User?                  @relation("JobCreditApprover", fields: [creditApprovedById], references: [id], onDelete: Restrict)
+  complaints         JobComplaint[]
+  statusHistory      JobCardStatusHistory[]
+
   jobNumber   String @unique
   description String
 
   status         String @default("Open")
   estimatedHours Float?
+  tyres          Json?
+  batteryMake    String?
+  batteryNumber  String?
+  customField1   String?
+  acType         String?
+  checklist      String?
+  estimatedParts Float?
+  estimatedOil   Float?
+  estimatedLabour Float?
+  serviceCharge  Float?
   estimatedCost  Float?
 
   assignedTo String?
@@ -368,9 +449,6 @@ model JobCard {
 
   createdById String?
   createdBy   User?   @relation("CreatedJobCards", fields: [createdById], references: [id], onDelete: SetNull)
-
-  // Odometer reading taken when the job card was opened.
-  mileage Int?
 
   // Warranty snapshot taken at creation. Later policy or vehicle changes never rewrite it.
   warrantyStatusAtCreation    WarrantyCoverageStatus?
@@ -391,8 +469,10 @@ model JobCard {
   estimates     Estimate[]
   partIssuances PartIssuance[]
   invoices      Invoice[]
+  labourLines   JobCardLabour[]
+  billedAt      DateTime?
 
-  indentLines   BranchIndentLine[] @relation("IndentLineJobCard")
+  indentLines BranchIndentLine[] @relation("IndentLineJobCard")
 
   lines                     JobCardLine[]
   campaigns                 JobCardCampaign[]
@@ -402,6 +482,7 @@ model JobCard {
   @@index([branchId])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([vehicleId, createdAt])
   @@index([appointmentId])
 }
 
@@ -446,6 +527,7 @@ model Estimate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  lines     EstimateLine[]
   approvals CustomerApproval[]
 
   @@index([jobCardId])
@@ -476,19 +558,38 @@ model CustomerApproval {
 // ============================================================
 
 model Vehicle {
+  modelId             String?
+  catalogModel        VehicleCatalogModel? @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  generationId        String?
+  catalogGeneration   VehicleCatalogGeneration? @relation(fields: [generationId], references: [id], onDelete: Restrict)
+  engineId            String?
+  catalogEngine       VehicleCatalogEngine? @relation(fields: [engineId], references: [id], onDelete: Restrict)
+  customMake          String?
+  customModel         String?
   id String @id @default(uuid())
 
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   vin                String  @unique
   registrationNumber String? @unique
 
-  make  String?
-  model String?
-  year  Int?
-  trim  String?
-  color String?
+  catalogueId         String?
+  catalogue           WorkshopMaster? @relation("VehicleCatalogue", fields: [catalogueId], references: [id], onDelete: Restrict)
+  colourId            String?
+  colour              WorkshopMaster? @relation("VehicleColour", fields: [colourId], references: [id], onDelete: Restrict)
+  engineNumber        String?
+  keyNumber           String?
+  pdiDone             Boolean         @default(false)
+  pdiDate             DateTime?
+  saleDate            DateTime?
+  sellingDealer       String?
+  lastRecordedMileage Int?
+  make                String?
+  model               String?
+  year                Int?
+  trim                String?
+  color               String?
 
   // Deprecated free-text warranty fields. No longer read or written by the app:
   // coverage is calculated (see modules/warranty). Kept until a follow-up
@@ -501,10 +602,11 @@ model Vehicle {
   vehicleModelId String?
   vehicleModel   VehicleModel? @relation(fields: [vehicleModelId], references: [id], onDelete: SetNull)
 
-  // Sale or delivery date; warranty runs from here.
+  // Deprecated: superseded by saleDate (the warranty runs from the sale date).
+  // Kept because migrations are additive; the reconcile migration copies it into saleDate.
   warrantyStartDate   DateTime?
-  // Highest odometer reading seen. Only ever increases (except an audited odometer replacement).
-  lastRecordedMileage Int?
+  // When lastRecordedMileage was last updated. lastRecordedMileage only ever increases
+  // (except an audited odometer replacement).
   lastMileageAt       DateTime?
 
   // Extended warranty or goodwill that replaces the model policy limits.
@@ -529,6 +631,10 @@ model Vehicle {
   campaignVehicles CampaignVehicle[]
 
   @@index([customerId])
+  @@index([modelId])
+  @@index([generationId])
+  @@index([engineId])
+
   @@index([vehicleModelId])
 }
 
@@ -564,27 +670,27 @@ enum PartRole {
 model SparePart {
   id String @id @default(uuid())
 
-  partCode   String @unique @default(uuid())
-  partNumber String @unique
-  name       String
+  partCode    String  @unique @default(uuid())
+  partNumber  String  @unique
+  name        String
   // `unitPrice` is the legacy column name; it maps to Part Master `unitRate`.
   description String?
   category    String?
 
-  uom          String @default("UNIT")
-  taxCategory  String?
-  taxForm      String?
-  minLevel     Float?
-  maxLevel     Float?
-  reorderQty   Float?
+  uom         String  @default("UNIT")
+  taxCategory String?
+  taxForm     String?
+  minLevel    Float?
+  maxLevel    Float?
+  reorderQty  Float?
 
-  unitPrice Float @default(0)
+  unitPrice         Float         @default(0)
   // Legacy dealer rate is unitPrice; retail rate is the selling price.
-  retailRate Float?
+  retailRate        Float?
   // Legacy tax status (partmast.taxable).
-  taxable    Boolean @default(true)
+  taxable           Boolean       @default(true)
   // Legacy part flag, for example O for original.
-  partFlag   String  @default("O")
+  partFlag          String        @default("O")
   // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
   priceCategoryCode String?
   priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
@@ -598,9 +704,9 @@ model SparePart {
   warrantyRate       Float?
 
   // --- new: main/alternate relationship ---
-  role PartRole @default(MAIN)
-  mainPartId String?
-  mainPart   SparePart? @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
+  role           PartRole    @default(MAIN)
+  mainPartId     String?
+  mainPart       SparePart?  @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
   alternateParts SparePart[] @relation("PartAlternates")
 
   createdAt DateTime @default(now())
@@ -611,16 +717,15 @@ model SparePart {
   inventoryStocks   InventoryStock[]
   stockTransactions StockTransaction[]
   transferItems     InterBranchTransferItem[]
+  invoiceLines      InvoiceLine[]
 
-  indentLines       BranchIndentLine[]      @relation("IndentLinePart")
-  pickingRequested  PickingListLine[]       @relation("PickingRequestedPart")
-  pickingSupplied   PickingListLine[]       @relation("PickingSuppliedPart")
-  stnRequested      StockTransferNoteLine[] @relation("StnRequestedPart")
-  stnSupplied       StockTransferNoteLine[] @relation("StnSuppliedPart")
-  mitLines          MaterialInTransitLine[] @relation("MitLinePart")
-  mitRequestedLines MaterialInTransitLine[] @relation("MitLineRequestedPart")
-  srnLines          StockReceiptLine[]      @relation("SrnLinePart")
-  mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
+  indentLines      BranchIndentLine[]      @relation("IndentLinePart")
+  pickingRequested PickingListLine[]       @relation("PickingRequestedPart")
+  pickingSupplied  PickingListLine[]       @relation("PickingSuppliedPart")
+  stnRequested     StockTransferNoteLine[] @relation("StnRequestedPart")
+  stnSupplied      StockTransferNoteLine[] @relation("StnSuppliedPart")
+  mitLines         MaterialInTransitLine[] @relation("MitLinePart")
+  mrnLines         MaterialReceiptLine[]   @relation("MrnLinePart")
 
   jobCardLines      JobCardLine[]
   warrantyCaseLines WarrantyCaseLine[]
@@ -951,6 +1056,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  serviceTotal Float @default(0)
   id String @id @default(uuid())
 
   customerId String
@@ -968,6 +1074,30 @@ model Invoice {
   tax      Float @default(0)
   total    Float
 
+  partsTotal            Float @default(0)
+  labourTotal           Float @default(0)
+  partsDiscountPercent  Float @default(0)
+  labourDiscountPercent Float @default(0)
+  partsDiscountAmount   Float @default(0)
+  labourDiscountAmount  Float @default(0)
+  vatRate               Float @default(7.5)
+  vatAmount             Float @default(0)
+  roundOff              Float @default(0)
+  outstandingAmount     Float @default(0)
+
+  serviceAdvisorId String?
+  serviceAdvisor   User?   @relation("InvoiceServiceAdvisor", fields: [serviceAdvisorId], references: [id], onDelete: SetNull)
+
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
+
+  tallyVoucherNo  String?
+  tallyPostedAt   DateTime?
+  tallyPostedById String?
+  tallyPostedBy   User?     @relation("InvoiceTallyPostedBy", fields: [tallyPostedById], references: [id], onDelete: SetNull)
+
   status String @default("Unpaid")
 
   notes String?
@@ -975,16 +1105,81 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  payments Payment[]
-  receipts Receipt[]
+  payments    Payment[]
+  receipts    Receipt[]
+  lines       InvoiceLine[]
+  allocations ReceiptAllocation[]
 
   creditApplications CustomerCreditApplication[]
 
-  // Present on invoices generated from a job card: the CUSTOMER lines that were billed.
-  lines InvoiceLine[]
 
   @@index([customerId])
   @@index([jobCardId])
+}
+
+model LabourItem {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  description  String
+  defaultHours Float    @default(1)
+  rate         Float
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicleSystem String?
+  group         String?
+  modelRates    LabourRate[]
+  jobCardLines  JobCardLabour[]
+}
+
+model JobCardLabour {
+  id           String     @id @default(uuid())
+  jobCardId    String
+  jobCard      JobCard    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  labourItemId String
+  labourItem   LabourItem @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  description  String
+  hours        Float
+  rate         Float
+  amount       Float
+  technicianId String?
+  technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  invoiceLines InvoiceLine[]
+
+  // Who pays for this labour line (warranty / goodwill / free / customer).
+  chargeLine JobCardLine?
+
+  @@index([jobCardId])
+  @@index([labourItemId])
+}
+
+model InvoiceLine {
+  id              String         @id @default(uuid())
+  invoiceId       String
+  invoice         Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  type            String
+  partId          String?
+  part            SparePart?     @relation(fields: [partId], references: [id], onDelete: Restrict)
+  jobCardLabourId String?
+  jobCardLabour   JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: Restrict)
+  description     String
+  quantity        Float
+  rate            Float
+  amount          Float
+  customerPaid    Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+
+  @@index([invoiceId])
+}
+
+model DocumentSequence {
+  key       String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================
@@ -1008,6 +1203,9 @@ model Payment {
   reference String?
   notes     String?
 
+  receiptId String?
+  receipt   Receipt? @relation("PaymentReceiptLink", fields: [receiptId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1021,14 +1219,36 @@ model Payment {
 
 model Receipt {
   id String @id @default(uuid())
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  idempotencyKey String? @unique
+  requestHash String?
 
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receiptNumber String   @unique
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  issuedById String
-  issuedBy   User   @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Restrict)
+  issuedById String?
+  issuedBy   User?   @relation("UserIssuedReceipts", fields: [issuedById], references: [id], onDelete: Restrict)
 
   amount Float
+
+  mode          String    @default("BANK_TRANSFER")
+  category      String    @default("SERVICE_PARTS")
+  bankId        String?
+  bank          Bank?     @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  chequeNumber  String?
+  chequeDate    DateTime?
+  advanceAmount Float     @default(0)
+  status        String    @default("ACTIVE")
+  cancelRemark  String?
+
+  tallyVoucherNo  String?
+  tallyPostedAt   DateTime?
+  tallyPostedById String?
+  tallyPostedBy   User?     @relation("ReceiptTallyPostedBy", fields: [tallyPostedById], references: [id], onDelete: SetNull)
 
   issuedAt DateTime @default(now())
 
@@ -1038,8 +1258,94 @@ model Receipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  allocations ReceiptAllocation[]
+  editLogs    ReceiptEditLog[]
+  payments    Payment[]           @relation("PaymentReceiptLink")
+
   @@index([invoiceId])
+  @@index([customerId, issuedAt])
+  @@index([branchId, issuedAt])
   @@index([issuedById])
+}
+
+model Bank {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  name          String
+  accountNumber String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  receipts Receipt[]
+}
+
+model ReceiptAllocation {
+  id        String   @id @default(uuid())
+  receiptId String
+  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amount    Float
+  createdAt DateTime @default(now())
+
+  @@unique([receiptId, invoiceId])
+  @@index([invoiceId])
+}
+
+model ReceiptEditLog {
+  id           String   @id @default(uuid())
+  receiptId    String
+  receipt      Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  editedById   String
+  editedBy     User     @relation(fields: [editedById], references: [id], onDelete: Restrict)
+  oldAmount    Float
+  newAmount    Float
+  oldNarration String?
+  newNarration String?
+  createdAt    DateTime @default(now())
+
+  @@index([receiptId, createdAt])
+}
+
+model TallyLedger {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  active     Boolean  @default(true)
+  importedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customers Customer[]
+}
+
+model TallyAccountMapping {
+  id              String   @id @default(uuid())
+  documentType    String
+  accountType     String
+  tallyLedgerCode String
+  tallyLedgerName String
+  updatedAt       DateTime @updatedAt
+
+  @@unique([documentType, accountType])
+}
+
+model TallyPostingLog {
+  id            String    @id @default(uuid())
+  documentType  String
+  documentId    String
+  status        String    @default("EXPORTED")
+  voucherNumber String?
+  batchId       String
+  payload       String?
+  postedAt      DateTime?
+  postedById    String?
+  postedBy      User?     @relation("TallyPostingUser", fields: [postedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+
+  @@unique([documentType, documentId])
+  @@index([batchId])
+  @@index([status, createdAt])
 }
 
 // ============================================================
@@ -1176,6 +1482,162 @@ model Enquiry {
   @@index([email])
 }
 
+// Typed master families share search, activation and legacy-code handling.
+model WorkshopMaster {
+  id               String           @id @default(uuid())
+  kind             String
+  code             String
+  description      String
+  active           Boolean          @default(true)
+  category         String?
+  chargedTo        String           @default("CUSTOMER")
+  freeService      Boolean          @default(false)
+  parentId         String?
+  parent           WorkshopMaster?  @relation("MasterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children         WorkshopMaster[] @relation("MasterHierarchy")
+  fuel             String?
+  gearbox          String?
+  acFitted         Boolean          @default(false)
+  warrantyDays     Int?
+  warrantyKm       Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  serviceJobs      JobCard[]        @relation("JobServiceType")
+  bayJobs          JobCard[]        @relation("JobBay")
+  teamJobs         JobCard[]        @relation("JobTeam")
+  complaints       JobComplaint[]
+  vehicles         Vehicle[]        @relation("VehicleCatalogue")
+  colouredVehicles Vehicle[]        @relation("VehicleColour")
+  labourRates      LabourRate[]
+
+  @@unique([kind, code])
+  @@index([kind, active])
+  @@index([parentId])
+}
+
+model JobComplaint {
+  id              String          @id @default(uuid())
+  jobCardId       String
+  jobCard         JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  complaintCodeId String?
+  complaintCode   WorkshopMaster? @relation(fields: [complaintCodeId], references: [id], onDelete: Restrict)
+  description     String
+  defectCode      String?
+  spare           Float           @default(0)
+  oil             Float           @default(0)
+  labour          Float           @default(0)
+
+  @@index([jobCardId])
+}
+
+model JobCardStatusHistory {
+  id         String   @id @default(uuid())
+  jobCardId  String
+  jobCard    JobCard  @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  remarks    String?
+  createdAt  DateTime @default(now())
+
+  @@index([jobCardId, createdAt])
+}
+
+model LabourRate {
+  id           String         @id @default(uuid())
+  labourItemId String
+  labourItem   LabourItem     @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  modelId      String
+  model        WorkshopMaster @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  pricing      String         @default("TIME")
+  hours        Float          @default(1)
+  rate         Float
+  active       Boolean        @default(true)
+
+  @@unique([labourItemId, modelId])
+}
+
+model EstimateLine {
+  id          String   @id @default(uuid())
+  estimateId  String
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  type        String
+  referenceId String?
+  description String
+  quantity    Float    @default(1)
+  rate        Float    @default(0)
+  amount      Float    @default(0)
+
+  @@index([estimateId])
+}
+
+model VehicleCatalogMake {
+  id     String               @id @default(uuid())
+  name   String               @unique
+  models VehicleCatalogModel[]
+}
+
+model VehicleCatalogModel {
+  id          String                    @id @default(uuid())
+  makeId      String
+  make        VehicleCatalogMake        @relation(fields: [makeId], references: [id], onDelete: Restrict)
+  name        String
+  searchName  String
+  aliases     String[]
+  yearStart   Int
+  yearEnd     Int?
+  generations VehicleCatalogGeneration[]
+  vehicles    Vehicle[]
+
+  @@unique([makeId, name])
+  @@index([makeId, searchName])
+}
+
+model VehicleCatalogGeneration {
+  id            String                 @id @default(uuid())
+  modelId       String
+  model         VehicleCatalogModel    @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  name          String
+  yearStart     Int
+  yearEnd       Int?
+  bodyType      String?
+  sourceOrdinal Int                    @default(0)
+  engines       VehicleCatalogEngine[]
+  vehicles      Vehicle[]
+
+  @@unique([modelId, name, yearStart, sourceOrdinal])
+  @@index([modelId])
+}
+
+model VehicleCatalogEngine {
+  id                    String                  @id @default(uuid())
+  generationId          String
+  generation            VehicleCatalogGeneration @relation(fields: [generationId], references: [id], onDelete: Restrict)
+  label                 String
+  sourceOrdinal         Int                     @default(0)
+  fuelType              String?
+  cylinders             Int?
+  displacementCc        Int?
+  powerHp               Float?
+  torqueNm              Float?
+  transmission          String?
+  drivetrain            String?
+  zeroToHundredKmhS      Float?
+  topSpeedKmh           Float?
+  fuelEconomyCombinedL100 Float?
+  lengthMm              Int?
+  widthMm               Int?
+  heightMm              Int?
+  wheelbaseMm           Int?
+  curbWeightKg          Int?
+  specs                 Json
+  vehicles              Vehicle[]
+
+  @@unique([generationId, label, sourceOrdinal])
+  @@index([generationId])
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock transfer workflow (issue #62, Process A)
 //
@@ -1198,7 +1660,7 @@ enum IndentStatus {
   PACKED
   DISPATCHED
   IN_TRANSIT
-  SRN_CREATED
+  MRN_CREATED
   PARTIALLY_RECEIVED
   RECEIVED
   COMPLETED
@@ -1257,11 +1719,6 @@ model PartCategory {
   parts SparePart[]
 }
 
-enum MitSourceType {
-  INTERNAL_TRANSFER
-  EXTERNAL_VENDOR
-}
-
 enum MitStatus {
   IN_TRANSIT
   VERIFIED
@@ -1270,19 +1727,10 @@ enum MitStatus {
   CANCELLED
 }
 
-enum SrnStatus {
-  COMPLETED
-  CANCELLED
-}
-
-// Atomic per-document, per-year counters used to generate document numbers.
-model DocumentSequence {
-  docType   String
-  year      Int
-  lastValue Int      @default(0)
-  updatedAt DateTime @updatedAt
-
-  @@id([docType, year])
+// Where the stock on an MRN came from: a Mobis invoice (MIT) or a branch transfer (STN).
+enum MrnSource {
+  MOBIS
+  BRANCH_TRANSFER
 }
 
 model BranchIndent {
@@ -1357,7 +1805,7 @@ model BranchIndentLine {
   urgentQuantity     Int @default(0)
   stockQuantity      Int @default(0)
   stockOrderQuantity Int @default(0)
-  requestedQuantity Int
+  requestedQuantity  Int
 
   approvedQuantity  Int?
   backOrderQuantity Int  @default(0)
@@ -1503,8 +1951,8 @@ model StockTransferNote {
   lines       StockTransferNoteLine[]
   cases       TransferCase[]
   packingList PackingList?
-  mit         MaterialInTransit?
-  srns        StockReceiptNote[]
+  // Goods received notes raised by the receiving branch; more than one when received in parts.
+  mrns        MaterialReceiptNote[]
 
   @@index([sourceBranchId])
   @@index([destinationBranchId])
@@ -1531,10 +1979,15 @@ model StockTransferNoteLine {
   unitRate Float
   amount   Float
 
+  // Running receipt tallies, updated by each MRN the receiving branch posts against this line.
+  receivedQuantity Int @default(0)
+  damagedQuantity  Int @default(0)
+  shortQuantity    Int @default(0)
+
   createdAt DateTime @default(now())
 
   caseLines TransferCaseLine[]
-  mitLine   MaterialInTransitLine?
+  mrnLines  MaterialReceiptLine[]
 
   @@index([stnId])
   @@index([partId])
@@ -1616,38 +2069,31 @@ model PackingList {
 
 // MIT covers both internal transfers (from an STN) and, later, external
 // vendor (Mobis) shipments. Vendor fields stay null for internal transfers.
+// Material in transit from Mobis only: one record per imported Mobis invoice.
+// Branch-to-branch transfers do not use MIT; they travel on the STN and are received with an MRN.
 model MaterialInTransit {
-  id         String        @id @default(uuid())
-  mitNumber  String        @unique
-  sourceType MitSourceType
-  status     MitStatus     @default(IN_TRANSIT)
-
-  stnId String?            @unique
-  stn   StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: Restrict)
-
-  sourceBranchId String?
-  sourceBranch   Branch? @relation("MitSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
+  id        String    @id @default(uuid())
+  mitNumber String    @unique
+  status    MitStatus @default(IN_TRANSIT)
 
   destinationBranchId String
   destinationBranch   Branch @relation("MitDestinationBranch", fields: [destinationBranchId], references: [id], onDelete: Restrict)
 
-  // External vendor fields (Process B).
-  vendor         String?
-  invoiceNumber  String?
-  invoiceDate    DateTime?
-  conversionRate Float?
-  receivedMode   TransportMode?
+  // Mobis invoice fields.
+  vendor              String?
+  invoiceNumber       String?
+  invoiceDate         DateTime?
+  conversionRate      Float?
+  receivedMode        TransportMode?
   // Legacy "Material phy rec date" and the imported file's name.
   physicalReceiptDate DateTime?
   sourceFileName      String?
   cancelledAt         DateTime?
 
-  dispatchMode  TransportMode?
-  waybillNumber String?
-  transitDate   DateTime       @default(now())
-  totalCases    Int            @default(0)
-  totalQuantity Int            @default(0)
-  totalAmount   Float          @default(0)
+  transitDate   DateTime @default(now())
+  totalCases    Int      @default(0)
+  totalQuantity Int      @default(0)
+  totalAmount   Float    @default(0)
   remarks       String?
 
   createdById String?
@@ -1657,14 +2103,11 @@ model MaterialInTransit {
   updatedAt DateTime @updatedAt
 
   lines MaterialInTransitLine[]
-  srns  StockReceiptNote[]
   mrn   MaterialReceiptNote?
 
-  @@index([sourceType])
   @@index([vendor, invoiceNumber])
   @@index([status])
   @@index([destinationBranchId])
-  @@index([sourceBranchId])
 }
 
 model MaterialInTransitLine {
@@ -1672,20 +2115,15 @@ model MaterialInTransitLine {
   mitId String
   mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Cascade)
 
-  stnLineId String?                @unique
-  stnLine   StockTransferNoteLine? @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
-
-  partId          String
-  part            SparePart  @relation("MitLinePart", fields: [partId], references: [id], onDelete: Restrict)
-  requestedPartId String?
-  requestedPart   SparePart? @relation("MitLineRequestedPart", fields: [requestedPartId], references: [id], onDelete: SetNull)
+  partId String
+  part   SparePart @relation("MitLinePart", fields: [partId], references: [id], onDelete: Restrict)
 
   caseNumbers String?
   quantity    Int
   unitPrice   Float
   amount      Float
 
-  // External vendor line details (Process B), as printed on the Mobis invoice.
+  // Line details as printed on the Mobis invoice.
   orderNumber     String?
   lineNumber      Int?
   weight          Float?
@@ -1697,96 +2135,50 @@ model MaterialInTransitLine {
   // True when the part was created in Part Master from this invoice.
   newPart         Boolean @default(false)
 
-  // Running receipt tallies, updated by each SRN posted against this line.
+  // Receipt tallies, set when the MRN is posted against this line.
   receivedQuantity Int @default(0)
   damagedQuantity  Int @default(0)
   shortQuantity    Int @default(0)
 
   createdAt DateTime @default(now())
 
-  srnLines StockReceiptLine[]
   mrnLines MaterialReceiptLine[]
 
   @@index([mitId])
   @@index([partId])
 }
 
-model StockReceiptNote {
-  id        String @id @default(uuid())
-  srnNumber String @unique
-
-  mitId String
-  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
-
-  stnId String
-  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Restrict)
-
-  receivingBranchId String
-  receivingBranch   Branch @relation("SrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
-
-  sourceBranchId String
-  sourceBranch   Branch @relation("SrnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
-
-  status        SrnStatus      @default(COMPLETED)
-  receiptDate   DateTime       @default(now())
-  taxForm       String?
-  transportMode TransportMode?
-  remarks       String?
-
-  totalReceived Int @default(0)
-  totalDamaged  Int @default(0)
-  totalShort    Int @default(0)
-
-  receivedById String?
-  receivedBy   User?   @relation("SrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-
-  lines StockReceiptLine[]
-
-  @@index([mitId])
-  @@index([stnId])
-  @@index([receivingBranchId])
-}
-
-model StockReceiptLine {
-  id    String           @id @default(uuid())
-  srnId String
-  srn   StockReceiptNote @relation(fields: [srnId], references: [id], onDelete: Cascade)
-
-  mitLineId String
-  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
-
-  partId String
-  part   SparePart @relation("SrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
-
-  receivedQuantity Int     @default(0)
-  damagedQuantity  Int     @default(0)
-  shortQuantity    Int     @default(0)
-  remarks          String?
-
-  @@index([srnId])
-  @@index([mitLineId])
-}
-
 // Material Receipt Note: receipt of externally purchased (Mobis) material into
 // CPD stock. Distinct from the SRN, which receives internal transfers.
 // One MRN per MIT, so stock from an invoice can only be posted once.
+// Material receipt note: posts received stock to the receiving branch.
+// A Mobis MRN closes one MIT. A branch-transfer MRN is raised by the receiving branch against
+// the STN; a transfer received in parts has one MRN per receipt.
 model MaterialReceiptNote {
-  id        String @id @default(uuid())
-  mrnNumber String @unique
+  id        String    @id @default(uuid())
+  mrnNumber String    @unique
+  source    MrnSource
 
-  mitId String            @unique
-  mit   MaterialInTransit @relation(fields: [mitId], references: [id], onDelete: Restrict)
+  // Set when source = MOBIS.
+  mitId String?            @unique
+  mit   MaterialInTransit? @relation(fields: [mitId], references: [id], onDelete: Restrict)
+
+  // Set when source = BRANCH_TRANSFER.
+  stnId          String?
+  stn            StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: Restrict)
+  sourceBranchId String?
+  sourceBranch   Branch?            @relation("MrnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
 
   receivingBranchId String
   receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
 
-  vendor         String
+  // Mobis only.
+  vendor         String?
   invoiceNumber  String?
-  // Legacy MRN tax form for purchases is P.
-  taxForm        String   @default("P")
-  conversionRate Float
+  // Legacy tax form: P for Mobis purchases; a transfer MRN takes the STN's form, if any.
+  taxForm        String?
+  // Invoice currency to naira; 1 for branch transfers, which are already in naira.
+  conversionRate Float    @default(1)
   receiptDate    DateTime @default(now())
   remarks        String?
 
@@ -1804,6 +2196,8 @@ model MaterialReceiptNote {
   lines MaterialReceiptLine[]
 
   @@index([receivingBranchId])
+  @@index([stnId])
+  @@index([source])
 }
 
 model MaterialReceiptLine {
@@ -1811,8 +2205,11 @@ model MaterialReceiptLine {
   mrnId String
   mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
 
-  mitLineId String
-  mitLine   MaterialInTransitLine @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+  // Exactly one of these is set, matching the MRN's source.
+  mitLineId String?
+  mitLine   MaterialInTransitLine? @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
+  stnLineId String?
+  stnLine   StockTransferNoteLine? @relation(fields: [stnLineId], references: [id], onDelete: Restrict)
 
   partId String
   part   SparePart @relation("MrnLinePart", fields: [partId], references: [id], onDelete: Restrict)
@@ -1821,7 +2218,7 @@ model MaterialReceiptLine {
   damagedQuantity  Int @default(0)
   shortQuantity    Int @default(0)
 
-  // Vendor unit price (foreign currency) and its local value.
+  // Unit price as sent (Mobis: invoice currency; transfer: naira) and its naira cost.
   unitPrice Float
   unitCost  Float
   amount    Float
@@ -1830,6 +2227,7 @@ model MaterialReceiptLine {
 
   @@index([mrnId])
   @@index([mitLineId])
+  @@index([stnLineId])
 }
 
 // ============================================================
@@ -1953,6 +2351,10 @@ model JobCardLine {
   partIssuanceId String?       @unique
   partIssuance   PartIssuance? @relation(fields: [partIssuanceId], references: [id], onDelete: SetNull)
 
+  // Set for labour lines: the job card labour line (labour catalogue) this charge line belongs to.
+  jobCardLabourId String?        @unique
+  jobCardLabour   JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: Cascade)
+
   operationCode String?
   description   String
   // Quantity for parts, hours for labour.
@@ -1978,7 +2380,6 @@ model JobCardLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoiceLines      InvoiceLine[]
   warrantyCaseLines WarrantyCaseLine[]
 
   @@index([jobCardId])
@@ -1986,28 +2387,6 @@ model JobCardLine {
   @@index([sparePartId])
 }
 
-// Snapshot of a billed job card line on a customer invoice.
-model InvoiceLine {
-  id String @id @default(uuid())
-
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  jobCardLineId String?
-  jobCardLine   JobCardLine? @relation(fields: [jobCardLineId], references: [id], onDelete: SetNull)
-
-  kind        JobCardLineKind
-  description String
-  quantity    Float
-  rate        Float
-  amount      Float
-  taxable     Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  @@index([invoiceId])
-  @@index([jobCardLineId])
-}
 
 // ── Warranty claim codes (legacy warrcomp, warrdef, warrpos, warrrej) ──
 

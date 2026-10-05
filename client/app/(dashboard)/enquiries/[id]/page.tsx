@@ -78,7 +78,7 @@ export default function EnquiryPage() {
             </p>
           </div>
           <span
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE[enquiry.status]}`}
+            className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${STATUS_BADGE[enquiry.status]}`}
           >
             {enquiry.status}
           </span>
@@ -243,7 +243,7 @@ function DetailField({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
         {label}
       </p>
       <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>

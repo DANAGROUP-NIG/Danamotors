@@ -30,7 +30,6 @@ describeDb('Part Query (database)', () => {
     Object.assign(ids, { kp: kp.id, qs: qs.id, vi: vi.id });
 
     const main = await inventory.createPart({
-      partCode: `PQ-${run}`,
       partNumber: `PQ${run}`,
       name: 'FILTER ASSY-ENGINE OIL',
       category: 'Filters',
@@ -92,7 +91,6 @@ describeDb('Part Query (database)', () => {
 
   it('derives the retail rate from the legacy price category', async () => {
     const part = await inventory.createPart({
-      partCode: `RR-${run}`,
       partNumber: `RR${run}`,
       name: 'FILTER ASSY-ENGINE OIL',
       category: 'Filters',
@@ -112,19 +110,21 @@ describeDb('Part Query (database)', () => {
     await expect(inventory.updatePart(part.id, { priceCategoryCode: 'ZZ' })).rejects.toThrow(/Unknown price category/);
   });
 
-  it('gives alternates a readable part code', async () => {
-    const alt = await prisma.sparePart.findUniqueOrThrow({ where: { id: ids.alt } });
-    expect(alt.partCode).toBe(`PQ${run}A`);
-    // Force a clash: another part already uses the would-be code.
-    await prisma.sparePart.update({ where: { id: ids.main }, data: { partCode: `PQ${run}B` } });
-    const clash = await inventory.createAlternatePart({ mainPartId: ids.main, partNumber: `PQ${run}B`, name: 'FILTER 2' });
-    expect(clash.partCode).toBe(`PQ${run}B-2`);
-    await prisma.sparePart.update({ where: { id: ids.main }, data: { partCode: `PQ-${run}` } });
+  it('generates part codes that are unique and unrelated to the part number', async () => {
+    const [main, alt] = await Promise.all([
+      prisma.sparePart.findUniqueOrThrow({ where: { id: ids.main } }),
+      prisma.sparePart.findUniqueOrThrow({ where: { id: ids.alt } }),
+    ]);
+    for (const part of [main, alt]) {
+      expect(part.partCode).toMatch(/^[0-9a-f-]{36}$/);
+      expect(part.partCode).not.toBe(part.partNumber);
+    }
+    expect(main.partCode).not.toBe(alt.partCode);
   });
 
-  it('finds a part by part code and reports unknown parts', async () => {
-    const byCode = await inventory.partQuery(`PQ-${run}`, ids.kp);
-    expect(byCode.part.id).toBe(ids.main);
+  it('finds a part by part number in any case and reports unknown parts', async () => {
+    const byNumber = await inventory.partQuery(`pq${run}`.toLowerCase(), ids.kp);
+    expect(byNumber.part.id).toBe(ids.main);
     await expect(inventory.partQuery(`NOPE${run}`, ids.kp)).rejects.toThrow(/not found/);
   });
 });

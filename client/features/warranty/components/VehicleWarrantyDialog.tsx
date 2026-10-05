@@ -36,7 +36,7 @@ export function VehicleWarrantyDialog({ check, onClose }: { check: WarrantyCheck
     const body: UpdateVehicleWarrantyPayload = {};
     if (canUpdate) {
       body.vehicleModelId = modelId || null;
-      body.warrantyStartDate = startDate || null;
+      body.saleDate = startDate || null;
     }
     if (canOverride) {
       if (mode === "NONE") {

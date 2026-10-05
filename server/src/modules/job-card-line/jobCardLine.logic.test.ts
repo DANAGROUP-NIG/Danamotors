@@ -1,4 +1,4 @@
-import { assertChargeChange, chargeTotals, defaultChargeType, isCompletedStatus } from "./jobCardLine.logic";
+import { assertChargeChange, chargeTotals, defaultChargeType } from "./jobCardLine.logic";
 
 describe("defaultChargeType", () => {
   const base = { kind: "PART" as const, coverageAtCreation: "ACTIVE" as const, hasWarrantyCase: false, partWarrantyApplicable: true, campaignMatchId: null };
@@ -76,14 +76,5 @@ describe("chargeTotals", () => {
 
   it("does not tax non-taxable lines", () => {
     expect(chargeTotals([{ chargeType: "CUSTOMER", amount: 100, taxable: false }]).customerInvoiceTotal).toBe(100);
-  });
-});
-
-describe("isCompletedStatus", () => {
-  it("matches legacy casing", () => {
-    expect(isCompletedStatus("Completed")).toBe(true);
-    expect(isCompletedStatus("completed")).toBe(true);
-    expect(isCompletedStatus("in_progress")).toBe(false);
-    expect(isCompletedStatus(null)).toBe(false);
   });
 });

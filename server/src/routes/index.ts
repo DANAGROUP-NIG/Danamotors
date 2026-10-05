@@ -3,6 +3,7 @@ import authRoutes from '../modules/auth/auth.routes';
 import adminRoutes from '../modules/administration/admin.routes';
 import customerRoutes from '../modules/customer/customer.routes';
 import vehicleRoutes from '../modules/vehicle/vehicle.routes';
+import vehicleCatalogRoutes from '../modules/vehicle-catalog/vehicle-catalog.routes';
 import serviceRoutes from '../modules/service/service.routes';
 import servicesRoutes from '../modules/services/services.routes';
 import workshopRoutes from '../modules/workshop/workshop.routes';
@@ -20,9 +21,12 @@ import enquiryRoutes from '../modules/enquiry/enquiry.routes';
 import auditRoutes from '../modules/audit/audit.routes';
 import warrantyRoutes, { vehicleModelRouter, vehicleWarrantyRouter } from '../modules/warranty/warranty.routes';
 import campaignRoutes from '../modules/campaign/campaign.routes';
-import { jobCardInvoiceRouter, jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
+import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
+
+import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
 
 const router = Router();
+router.use('/workshop-masters', workshopMasterRoutes);
 
 // Base health check
 /**
@@ -67,6 +71,7 @@ router.use('/admin', adminRoutes);
 router.use('/customers', customerRoutes);
 router.use('/vehicles', vehicleWarrantyRouter);
 router.use('/vehicles', vehicleRoutes);
+router.use('/vehicle-catalog', vehicleCatalogRoutes);
 router.use('/vehicle-models', vehicleModelRouter);
 router.use('/service', jobCardLineRouter);
 router.use('/service', serviceRoutes);
@@ -75,7 +80,6 @@ router.use('/workshop', workshopRoutes);
 router.use('/inventory', mobisPurchaseRoutes);
 router.use('/inventory', stockTransferRoutes);
 router.use('/inventory', inventoryRoutes);
-router.use('/finance', jobCardInvoiceRouter);
 router.use('/finance', financeRoutes);
 router.use('/branches', branchRoutes);
 router.use('/dashboard', dashboardRoutes);

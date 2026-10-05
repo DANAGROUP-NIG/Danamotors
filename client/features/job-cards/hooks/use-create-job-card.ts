@@ -9,6 +9,7 @@ export function useCreateJobCard() {
     mutationFn: createJobCardRequest,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: jobCardKeys.lists() });
+      qc.invalidateQueries({ queryKey: ["appointments"] });
     },
   });
 }

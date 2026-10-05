@@ -1,4 +1,5 @@
 import prisma from '../../prisma/client';
+import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
   ServiceAppointment,
@@ -86,6 +87,9 @@ export class ServiceRepository {
     if (params.search) {
       where.OR = [
         { notes: { contains: params.search, mode: 'insensitive' } },
+        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
+        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { email: { contains: params.search, mode: 'insensitive' } } },
@@ -232,12 +236,14 @@ export class ServiceRepository {
     }
 
     if (params?.status) {
-      where.status = params.status;
+      where.status = jobStatusFilter(params.status);
     }
 
     if (params?.search) {
       where.OR = [
         { jobNumber: { contains: params.search, mode: 'insensitive' } },
+        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
         { description: { contains: params.search, mode: 'insensitive' } },
         { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
@@ -250,7 +256,7 @@ export class ServiceRepository {
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo);
+    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
     if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
 
     return prisma.jobCard.findMany({
@@ -258,6 +264,15 @@ export class ServiceRepository {
       skip: params?.skip,
       take: params?.take,
       include: {
+        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        service: true,
+        serviceType: true,
+        bay: true,
+        team: true,
+        complaints: { include: { complaintCode: true } },
+        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
         appointment: true,
         branch: true,
         customer: {
@@ -266,10 +281,16 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
         createdBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        technician: {
           select: { id: true, firstName: true, lastName: true },
         },
         inspections: true,
@@ -283,6 +304,16 @@ export class ServiceRepository {
     return prisma.jobCard.findUnique({
       where: { id },
       include: {
+        labourLines: { include: { labourItem: true } },
+        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        service: true,
+        serviceType: true,
+        bay: true,
+        team: true,
+        complaints: { include: { complaintCode: true } },
+        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
         appointment: true,
         branch: true,
         customer: {
@@ -291,6 +322,9 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -305,14 +339,16 @@ export class ServiceRepository {
         },
         inspections: true,
         estimates: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
-            approvals: true,
+            approvals: { orderBy: { createdAt: 'desc' } },
+            lines: true,
           },
         },
         partIssuances: {
           include: {
             sparePart: {
-              select: { id: true, partNumber: true, name: true, unitPrice: true },
+              select: { id: true, partNumber: true, name: true, unitPrice: true, retailRate: true },
             },
             issuedBy: {
               select: { id: true, firstName: true, lastName: true },
@@ -479,6 +515,7 @@ export class ServiceRepository {
       skip: params.skip,
       take: params.take,
       include: {
+        lines: true,
         jobCard: {
           select: {
             id: true,

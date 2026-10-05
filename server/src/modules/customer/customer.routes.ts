@@ -1,3 +1,8 @@
+import { listCustomerSchema } from './customer.validation';
+import { z } from 'zod';
+import { CustomerService } from './customer.service';
+import { requireRole } from '../../middleware/authorize';
+import { ROLES } from '../../shared/constants/roles';
 import { Router } from 'express';
 import { CustomerController } from './customer.controller';
 import { validateRequest } from '../../middleware/requestValidator';
@@ -11,12 +16,20 @@ import {
   createServiceHistorySchema,
   customerIdParamSchema,
   customerAccountSchema,
+  customerTallyLedgerSchema,
 } from './customer.validation';
 
 const router = Router();
 const controller = new CustomerController();
 
 router.use(authMiddleware);
+router.get('/duplicates', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: z.object({ phoneNumber: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), companyName: z.string().optional() }) })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: { customers: await new CustomerService().findDuplicates(req.query) } }); } catch (error) { next(error); }
+});
+router.post('/:id/merge', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ targetId: z.string().uuid() }).strict() })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: { customer: await new CustomerService().merge(req.params.id, req.body.targetId, req.user!.userId) } }); } catch (error) { next(error); }
+});
+
 
 /**
  * @openapi
@@ -286,10 +299,25 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), controller.getCustomers);
+router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(listCustomerSchema), controller.getCustomers);
 router.get('/:id', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomer);
 router.post('/', requirePermission(PERMISSIONS.CUSTOMER_CREATE), validateRequest(createCustomerSchema), controller.createCustomer);
 router.put('/:id', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(updateCustomerSchema), controller.updateCustomer);
+/**
+ * @openapi
+ * /customers/{id}/tally-ledger:
+ *   put:
+ *     tags: [Customers]
+ *     summary: Link a customer to an imported Tally ledger
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { tallyLedgerCode: 'LEDGER-001' }
+ *     responses:
+ *       200: { description: Customer ledger mapping saved }
+ */
+router.put('/:id/tally-ledger', requirePermission(PERMISSIONS.CUSTOMER_TALLY_MAPPING), validateRequest(customerTallyLedgerSchema), controller.updateCustomerTallyLedger);
 
 router.post('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_DOCUMENT_CREATE), validateRequest(createCustomerDocumentSchema), controller.addCustomerDocument);
 router.get('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomerDocuments);

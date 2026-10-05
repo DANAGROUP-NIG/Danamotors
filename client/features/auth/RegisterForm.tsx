@@ -91,7 +91,7 @@ function RegisterFormContent() {
                   {...field("firstName")}
                 />
                 {errors.firstName && (
-                  <span className="text-xs text-red-500">
+                  <span className="text-sm text-red-500">
                     {errors.firstName.message}
                   </span>
                 )}
@@ -105,7 +105,7 @@ function RegisterFormContent() {
                   {...field("lastName")}
                 />
                 {errors.lastName && (
-                  <span className="text-xs text-red-500">
+                  <span className="text-sm text-red-500">
                     {errors.lastName.message}
                   </span>
                 )}
@@ -120,7 +120,7 @@ function RegisterFormContent() {
                 {...field("email")}
               />
               {errors.email && (
-                <span className="text-xs text-red-500">
+                <span className="text-sm text-red-500">
                   {errors.email.message}
                 </span>
               )}
@@ -139,7 +139,7 @@ function RegisterFormContent() {
                 {...field("phoneNumber")}
               />
               {errors.phoneNumber && (
-                <span className="text-xs text-red-500">
+                <span className="text-sm text-red-500">
                   {errors.phoneNumber.message}
                 </span>
               )}
@@ -164,7 +164,7 @@ function RegisterFormContent() {
                 ))}
               </select>
               {errors.branchName && (
-                <span className="text-xs text-red-500">
+                <span className="text-sm text-red-500">
                   {errors.branchName.message}
                 </span>
               )}
@@ -178,7 +178,7 @@ function RegisterFormContent() {
                 {...field("password")}
               />
               {errors.password && (
-                <span className="text-xs text-red-500">
+                <span className="text-sm text-red-500">
                   {errors.password.message}
                 </span>
               )}
@@ -192,7 +192,7 @@ function RegisterFormContent() {
                 {...field("confirmPassword")}
               />
               {errors.confirmPassword && (
-                <span className="text-xs text-red-500">
+                <span className="text-sm text-red-500">
                   {errors.confirmPassword.message}
                 </span>
               )}

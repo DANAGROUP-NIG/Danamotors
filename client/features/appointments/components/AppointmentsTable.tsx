@@ -273,7 +273,7 @@ export function AppointmentsTable() {
       render: (a) => (
         <span
           className={cn(
-            "rounded-full px-2.5 py-1 text-xs font-semibold",
+            "rounded-full px-2.5 py-1 text-sm font-semibold",
             STATUS_COLORS[a.status],
           )}
         >
@@ -287,7 +287,7 @@ export function AppointmentsTable() {
       render: (a) => (
         <span
           className={cn(
-            "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
+            "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-semibold",
             SOURCE_COLORS[a.source],
           )}
         >
@@ -440,7 +440,7 @@ export function AppointmentsTable() {
                       setPage(1);
                     }}
                   />
-                  <span className="text-xs text-muted-foreground">to</span>
+                  <span className="text-sm text-muted-foreground">to</span>
                   <DateInput
                     value={dateTo}
                     onChange={(v) => {

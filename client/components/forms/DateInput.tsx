@@ -9,6 +9,8 @@ interface DateInputProps {
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  onBlur?: () => void;
+  invalid?: boolean;
 }
 
 function formatToDisplay(iso?: string): string {
@@ -54,6 +56,8 @@ export function DateInput({
   className = inputCls,
   placeholder = "dd/mm/yyyy",
   disabled,
+  onBlur,
+  invalid,
 }: DateInputProps) {
   const [display, setDisplay] = useState(() => formatToDisplay(value));
 
@@ -73,6 +77,8 @@ export function DateInput({
       inputMode="numeric"
       value={display}
       onChange={handleChange}
+      onBlur={onBlur}
+      aria-invalid={invalid}
       className={className}
       placeholder={placeholder}
       disabled={disabled}

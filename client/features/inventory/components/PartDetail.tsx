@@ -57,11 +57,22 @@ function SectionCard({ icon, title, action, children }: { icon: ReactNode; title
   );
 }
 
-function DetailField({ label, value, mono }: { label: string; value?: ReactNode; mono?: boolean }) {
+function DetailField({
+  label,
+  value,
+  mono,
+  wide,
+}: {
+  label: string;
+  value?: ReactNode;
+  mono?: boolean;
+  /** Takes the full row on phones, for long text such as descriptions. */
+  wide?: boolean;
+}) {
   const empty = value === null || value === undefined || value === "";
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
       <p className={cn("mt-0.5 text-sm text-slate-700", mono && "font-mono")}>{empty ? "—" : value}</p>
     </div>
   );
@@ -110,13 +121,13 @@ function FamilyRow({ part, current }: { part: PartMaster; current?: boolean }) {
     <tr className="border-t border-slate-100">
       <td className="px-3 py-2">
         {current ? (
-          <span className="font-mono text-xs font-medium text-slate-800">{part.partNumber} (this part)</span>
+          <span className="font-mono text-sm font-medium text-slate-800">{part.partNumber} (this part)</span>
         ) : (
-          <Link href={`/inventory/${part.id}`} className="font-mono text-xs font-medium text-primary hover:underline">
+          <Link href={`/inventory/${part.id}`} className="font-mono text-sm font-medium text-primary hover:underline">
             {part.partNumber}
           </Link>
         )}
-        <p className="text-xs text-slate-500">{part.name}</p>
+        <p className="text-sm text-slate-500">{part.name}</p>
       </td>
       <td className="px-3 py-2">
         <PartRoleBadge role={part.role} />
@@ -234,11 +245,9 @@ export function PartDetail({ id }: { id: string }) {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-xl font-semibold text-slate-800">{part.name}</h1>
-              <p className="mt-1 font-mono text-sm text-slate-500">
-                {part.partNumber} · {part.partCode}
-              </p>
+              <p className="mt-1 font-mono text-sm text-slate-500">{part.partNumber}</p>
               {part.role === "ALTERNATE" && mainPart && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   Alternate for{" "}
                   <Link href={`/inventory/${mainPart.id}`} className="font-mono font-medium text-primary hover:underline">
                     {mainPart.partNumber}
@@ -257,7 +266,7 @@ export function PartDetail({ id }: { id: string }) {
               This part is blocked. It cannot be requested on new indents or supplied as an alternate.
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
             <DetailField label="Part flag" value={part.partFlag} />
@@ -283,7 +292,7 @@ export function PartDetail({ id }: { id: string }) {
                   : "Not applicable"
               }
             />
-            <DetailField label="Description" value={part.description} />
+            <DetailField label="Description" value={part.description} wide />
           </div>
         </div>
 
@@ -346,7 +355,7 @@ export function PartDetail({ id }: { id: string }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50">
-                    <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                    <tr className="text-left text-sm font-medium uppercase tracking-wider text-slate-400">
                       <th className="px-3 py-2">Branch</th>
                       <th className="px-3 py-2 text-right">On hand</th>
                       <th className="px-3 py-2 text-right">Reserved</th>
@@ -360,7 +369,7 @@ export function PartDetail({ id }: { id: string }) {
                   <tbody>
                     {stock.map((s) => (
                       <tr key={s.id} className="border-t border-slate-100">
-                        <td className="px-3 py-2 text-slate-700">{s.branch.name}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-700">{s.branch.name}</td>
                         <td className="px-3 py-2 text-right font-medium">{s.quantity}</td>
                         <td className="px-3 py-2 text-right text-slate-500">{s.reservedQuantity}</td>
                         <td
@@ -417,7 +426,7 @@ export function PartDetail({ id }: { id: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
-                  <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <tr className="text-left text-sm font-medium uppercase tracking-wider text-slate-400">
                     <th className="px-3 py-2">Part</th>
                     <th className="px-3 py-2">Role</th>
                     <th className="px-3 py-2">Dealer rate</th>
@@ -436,7 +445,7 @@ export function PartDetail({ id }: { id: string }) {
           )}
         </SectionCard>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-sm text-slate-400">
           Created {fmtDateTime(part.createdAt)} · Last updated {fmtDateTime(part.updatedAt)}
         </p>
       </div>

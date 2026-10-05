@@ -388,7 +388,12 @@ CREATE INDEX IF NOT EXISTS "JobCardLine_sparePartId_idx" ON "JobCardLine"("spare
 CREATE INDEX IF NOT EXISTS "InvoiceLine_invoiceId_idx" ON "InvoiceLine"("invoiceId");
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "InvoiceLine_jobCardLineId_idx" ON "InvoiceLine"("jobCardLineId");
+-- Guarded: when job billing created "InvoiceLine" first, it has no "jobCardLineId" column.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'InvoiceLine' AND column_name = 'jobCardLineId') THEN
+    CREATE INDEX IF NOT EXISTS "InvoiceLine_jobCardLineId_idx" ON "InvoiceLine"("jobCardLineId");
+  END IF;
+END $$;
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "WarrantyComplaintCode_code_key" ON "WarrantyComplaintCode"("code");
@@ -518,7 +523,9 @@ END $$;
 
 -- AddForeignKey
 DO $$ BEGIN
-  ALTER TABLE "InvoiceLine" ADD CONSTRAINT "InvoiceLine_jobCardLineId_fkey" FOREIGN KEY ("jobCardLineId") REFERENCES "JobCardLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'InvoiceLine' AND column_name = 'jobCardLineId') THEN
+    ALTER TABLE "InvoiceLine" ADD CONSTRAINT "InvoiceLine_jobCardLineId_fkey" FOREIGN KEY ("jobCardLineId") REFERENCES "JobCardLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

@@ -28,7 +28,7 @@ export function InventoryAlertBanner({ alertsCount = 7 }: InventoryAlertBannerPr
             <p className="text-sm font-semibold text-amber-900">
               {alertsCount} inventory alert{alertsCount !== 1 ? "s" : ""}
             </p>
-            <p className="text-xs text-amber-700">
+            <p className="text-sm text-amber-700">
               Items at or below minimum stock — review before next service day.
             </p>
           </>
@@ -37,7 +37,7 @@ export function InventoryAlertBanner({ alertsCount = 7 }: InventoryAlertBannerPr
             <p className="text-sm font-semibold text-emerald-900">
               Inventory is fully stocked
             </p>
-            <p className="text-xs text-emerald-700">
+            <p className="text-sm text-emerald-700">
               All items are above minimum stock levels.
             </p>
           </>
@@ -46,7 +46,7 @@ export function InventoryAlertBanner({ alertsCount = 7 }: InventoryAlertBannerPr
       <a
         href="/inventory"
         className={cn(
-          "shrink-0 text-xs font-bold hover:underline",
+          "shrink-0 text-sm font-bold hover:underline",
           hasAlerts ? "text-amber-700" : "text-emerald-700"
         )}
       >

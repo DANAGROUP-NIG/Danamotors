@@ -35,7 +35,7 @@ const P = PERMISSIONS;
  *       Vehicle warranty coverage, warranty cases (claims to the manufacturer) and claim codes.
  *
  *       **Coverage is calculated, never typed in.** A vehicle is covered while
- *       `today <= warrantyStartDate + model.warrantyDays` **and** `mileage <= model.warrantyKm`
+ *       `today <= saleDate + model.warrantyDays` **and** `mileage <= model.warrantyKm`
  *       (whichever comes first). Status is one of `ACTIVE`, `EXPIRED_DATE`, `EXPIRED_MILEAGE`,
  *       `NOT_COVERED` (model flagged not covered) or `UNKNOWN` (missing start date, mileage or policy).
  *
@@ -77,7 +77,7 @@ const P = PERMISSIONS;
  *         status: SUBMITTED
  *         openedAutomatically: true
  *         jobCard: { id: "7d1a…", jobNumber: JC-2026-000418, createdAt: "2026-09-29T10:42:00Z" }
- *         vehicle: { vin: KNAPU81BDP7123456, model: Sportage, trim: EX, warrantyStartDate: "2023-03-12T00:00:00Z" }
+ *         vehicle: { vin: KNAPU81BDP7123456, model: Sportage, trim: EX, saleDate: "2023-03-12T00:00:00Z" }
  *         customer: { firstName: Chinedu, lastName: Okafor, phoneNumber: "08035552190" }
  *         mileage: 61580
  *         coverageStatus: ACTIVE
@@ -135,7 +135,7 @@ export const vehicleWarrantyRouter = Router();
  *         application/json:
  *           example:
  *             vehicleModelId: "9c2e…"
- *             warrantyStartDate: "2023-03-12"
+ *             saleDate: "2023-03-12"
  *             override: { type: EXTENDED, until: "2030-03-12", km: 150000, reason: "Extended warranty certificate EW-2231" }
  *     responses:
  *       200: { description: Updated coverage, content: { application/json: { schema: { $ref: '#/components/schemas/WarrantyCheck' } } } }

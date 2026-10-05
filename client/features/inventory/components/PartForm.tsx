@@ -32,7 +32,7 @@ export const PART_CATEGORIES = [
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
 const sectionCls = "rounded-lg border border-[#e8edf3] bg-slate-50 p-4";
-const sectionTitle = "mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+const sectionTitle = "mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
 interface PartFormProps {
   part?: PartMaster;
@@ -42,7 +42,6 @@ interface PartFormProps {
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
   if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", warrantyApplicable: false };
   return {
-    partCode: part.partCode,
     partNumber: part.partNumber,
     name: part.name,
     category: part.category ?? "",
@@ -87,8 +86,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
     handleSubmit,
     reset,
     watch,
-    setValue,
-    getValues,
     formState: { errors, isDirty, dirtyFields },
   } = useForm<PartMasterFormInput, unknown, PartMasterFormValues>({
     resolver: zodResolver(partMasterSchema),
@@ -168,16 +165,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             <input
               className={inputCls}
               placeholder="e.g. 2630035505"
-              {...register("partNumber", {
-                // The legacy system keys parts by number; default the code to it.
-                onBlur: (e) => {
-                  if (!isEdit && !getValues("partCode")) setValue("partCode", e.target.value.trim(), { shouldValidate: true });
-                },
-              })}
+              {...register("partNumber")}
             />
-          </Field>
-          <Field label="Part code" error={errors.partCode?.message}>
-            <input className={inputCls} placeholder="Defaults to the part number" {...register("partCode")} />
           </Field>
           <Field label="Name" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />
@@ -238,7 +227,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("retailRate")}
             />
             {derivedRetail != null && !retailDirty && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from category {selectedCategory?.code} when
                 the dealer rate or category changes. Type a value to override.
               </span>
