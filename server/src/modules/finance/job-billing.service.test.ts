@@ -15,10 +15,12 @@ import { JobBillingService } from './job-billing.service';
 import { ROLES } from '../../shared/constants/roles';
 
 const input = { jobCardId: 'job', serviceAdvisorId: 'advisor', actorId: 'actor', partsDiscountPercent: 0, labourDiscountPercent: 0 };
+const approved = { id: 'estimate', status: 'Approved', amount: 300, approvals: [{ approved: true, customerId: 'customer' }], lines: [{ type: 'LABOUR', referenceId: 'operation', description: 'Repair', quantity: 1, rate: 100, amount: 100 }, { type: 'SERVICE', referenceId: 'service', description: 'Full service', quantity: 1, rate: 200, amount: 200 }] };
 const card = {
+  serviceId: 'service', estimates: [approved],
   id: 'job', customerId: 'customer', branchId: 'branch', status: 'DELIVERED', creditApprovedById: 'admin',
   gatePassNumber: 'GP-1', deliveredAt: new Date('2026-01-01'), billedAt: null, invoices: [], partIssuances: [],
-  labourLines: [{ id: 'labour', description: 'Repair', hours: 1, rate: 100, amount: 100 }],
+  labourLines: [{ id: 'labour', labourItemId: 'operation', description: 'Repair', hours: 1, rate: 100, amount: 100 }],
 };
 
 describe('Job billing after delivery on credit', () => {
@@ -40,6 +42,41 @@ describe('Job billing after delivery on credit', () => {
     expect(data).not.toHaveProperty('deliveredAt');
     expect(data).not.toHaveProperty('gatePassNumber');
     expect(data.statusHistory.create).toEqual(expect.objectContaining({ toStatus: 'DELIVERED', actorId: 'actor', remarks: expect.stringContaining('Job bill') }));
+  });
+
+  it('snapshots the named service charge exactly once alongside labour', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, service: { name: 'Full service' }, serviceCharge: 200 });
+    const preview = await new JobBillingService().previewJobBill(input);
+    await new JobBillingService().createJobBill(input);
+    const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(preview.lines.filter(line => line.type === 'SERVICE')).toEqual([expect.objectContaining({ description: 'Full service ? service charge', amount: 200, quantity: 1 })]);
+    expect(data.serviceTotal).toBe(200);
+    expect(data.total).toBe(preview.totals.total);
+    expect(data.lines.createMany.data.filter((line: { type: string }) => line.type === 'SERVICE')).toHaveLength(1);
+  });
+
+  it('keeps an explicitly waived service visible without adding a charge', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, service: { name: 'Full service' }, serviceCharge: 0 });
+    const preview = await new JobBillingService().previewJobBill(input);
+    expect(preview.lines).toContainEqual(expect.objectContaining({ type: 'SERVICE', amount: 0 }));
+    expect(preview.totals.serviceTotal).toBe(0);
+  });
+
+  it('blocks billing when the latest estimate is not approved', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, estimates: [{ ...approved, status: 'Pending', approvals: [] }] });
+    const preview = await new JobBillingService().previewJobBill(input);
+    expect(preview.review.canBill).toBe(false);
+    await expect(new JobBillingService().createJobBill(input)).rejects.toThrow('latest estimate');
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+  });
+
+  it('saves included labour at zero additional charge and charges the service once', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, serviceCharge: 200, estimates: [{ ...approved, lines: approved.lines.map(line => line.type === 'LABOUR' ? { ...line, type: 'INCLUDED_LABOUR', rate: 0, amount: 0 } : line) }] });
+    await new JobBillingService().createJobBill(input);
+    const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.serviceTotal).toBe(200);
+    expect(data.labourTotal).toBe(0);
+    expect(data.lines.createMany.data).toContainEqual(expect.objectContaining({ type: 'LABOUR', amount: 0, rate: 0, description: 'Repair (included in service charge)' }));
   });
 
   it('rejects delivered jobs without credit approval', async () => {

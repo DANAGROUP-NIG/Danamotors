@@ -1,3 +1,4 @@
+import { latestEstimateQuery, reviewApprovedScope } from '../service/estimate-approval';
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import {
@@ -27,8 +28,10 @@ export class JobBillingService {
     const jobCard = await transaction.jobCard.findUnique({
       where: { id: jobCardId },
       include: {
+        estimates: latestEstimateQuery,
         customer: true,
         serviceType: true,
+        service: { select: { name: true } },
         appointment: { select: { customerId: true } },
         vehicle: true,
         branch: true,
@@ -89,6 +92,7 @@ export class JobBillingService {
         {
           type: "PART",
           partId: issuance.sparePartId,
+          referenceId: issuance.sparePartId,
           description: issuance.sparePart.name,
           quantity,
           rate: issuance.sparePart.retailRate,
@@ -100,20 +104,31 @@ export class JobBillingService {
     const labourLines = jobCard.labourLines.map((line) => ({
       type: "LABOUR",
       jobCardLabourId: line.id,
+      referenceId: line.labourItemId,
       description: line.description,
       quantity: line.hours,
       rate: line.rate,
       amount: money(line.amount),
       customerPaid: jobCard.serviceType?.chargedTo !== "COMPANY",
     }));
-    const serviceLines = jobCard.serviceCharge == null || jobCard.serviceCharge === 0 ? [] : [{
-      type: "SERVICE", description: "Service charge", quantity: 1, rate: money(jobCard.serviceCharge),
+    const serviceLines = jobCard.serviceCharge == null ? [] : [{
+      type: "SERVICE", referenceId: jobCard.serviceId, description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : "Service charge", quantity: 1, rate: money(jobCard.serviceCharge),
       amount: money(jobCard.serviceCharge), customerPaid: jobCard.serviceType?.chargedTo !== "COMPANY",
     }];
     const lines = [...partLines, ...labourLines, ...serviceLines];
     if (!lines.some((line) => line.customerPaid)) throw new BadRequestError("Record customer-paid parts, labour or a service charge before creating a job bill");
     if (lines.some((line) => line.amount < 0 || !Number.isFinite(line.amount))) throw new BadRequestError("Invalid job-card line amount");
     return lines;
+  }
+
+  private pricedScope(jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>) {
+    const rawLines = this.getBillLines(jobCard).filter(line => line.customerPaid);
+    const review = reviewApprovedScope(jobCard.estimates?.[0], rawLines, jobCard.customerId ?? jobCard.appointment?.customerId);
+    const lines = rawLines.map(line => {
+      const row = review.rows.find(row => row.type === line.type && row.referenceId === line.referenceId);
+      return row?.included ? { ...line, rate: 0, amount: 0, description: `${line.description} (included in service charge)` } : line;
+    });
+    return { lines, review };
   }
 
   async listBillableJobCards(branchId?: string) {
@@ -155,9 +170,7 @@ export class JobBillingService {
   }) {
     const jobCard = await this.loadJobCard(input.jobCardId);
     this.assertBillable(jobCard);
-    const lines = this.getBillLines(jobCard).filter(
-      (line) => line.customerPaid,
-    );
+    const { lines, review } = this.pricedScope(jobCard);
     const partsTotal = lines
       .filter((line) => line.type === "PART")
       .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
@@ -174,6 +187,7 @@ export class JobBillingService {
     });
     return {
       jobCard,
+      review,
       lines,
       totals: { ...totals, subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]) },
     };
@@ -217,9 +231,8 @@ export class JobBillingService {
                 "The service advisor must belong to the job card branch",
               );
 
-            const lines = this.getBillLines(jobCard).filter(
-              (line) => line.customerPaid,
-            );
+            const { lines, review } = this.pricedScope(jobCard);
+            if (!review.canBill) throw new BadRequestError(review.issues.join(' '));
             const partsTotal = lines
               .filter((line) => line.type === "PART")
               .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
@@ -261,7 +274,7 @@ export class JobBillingService {
                 notes: input.notes,
                 status: totals.total === 0 ? "Paid" : "Unpaid",
                 // Batch line snapshots to avoid one insert round trip per line.
-                lines: { createMany: { data: lines } },
+                lines: { createMany: { data: lines.map(({ referenceId: _referenceId, ...line }) => line) } },
               },
               include: {
                 lines: true,
@@ -284,7 +297,7 @@ export class JobBillingService {
                       ? "DELIVERED"
                       : "BILLED",
                     actorId: input.actorId ?? input.serviceAdvisorId,
-                    remarks: `Job bill ${invoiceNumber} created`,
+                    remarks: `Job bill ${invoiceNumber} created against approved estimate ${review.estimateId}`,
                   },
                 },
               },

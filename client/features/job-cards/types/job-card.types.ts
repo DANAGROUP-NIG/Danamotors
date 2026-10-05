@@ -15,10 +15,12 @@ export type Estimate = {
   amount: number;
   currency: string;
   status: string;
+  createdAt?: string;
   approvals?: CustomerApproval[];
   lines?: {
     id: string;
     type: string;
+    referenceId?: string | null;
     description: string;
     quantity: number;
     rate: number;
@@ -97,6 +99,7 @@ export type PartReturn = {
 };
 
 export type JobCardInvoice = {
+  outstandingAmount: number;
   id: string;
   invoiceNumber: string;
   issuedDate: string;
