@@ -1,3 +1,4 @@
+import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import prisma from "../../prisma/client";
@@ -204,7 +205,7 @@ export class JobCardWorkflowService {
 
       const service = await tx.service.findFirst({
         where: { id: data.serviceId, isActive: true },
-        select: { id: true },
+        select: { id: true, price: true },
       });
       if (!service) throw new BadRequestError("Select an active service");
 
@@ -309,9 +310,11 @@ export class JobCardWorkflowService {
         ...fields
       } = data;
 
+      const serviceCharge = data.serviceCharge ?? service.price ?? 0;
       const card = await tx.jobCard.create({
         data: {
           ...fields,
+          serviceCharge,
           tyres,
           batteryMake,
           acFitted: data.acType ? data.acType !== "NONE" : data.acFitted,
@@ -322,13 +325,13 @@ export class JobCardWorkflowService {
             estimatedParts,
             estimatedOil,
             estimatedLabour,
-            data.serviceCharge,
+            serviceCharge,
           ].some((value) => value !== undefined)
             ? [
                 estimatedParts,
                 estimatedOil,
                 estimatedLabour,
-                data.serviceCharge,
+                serviceCharge,
               ].reduce<number>(
                 (total, value) => total + Math.round((value ?? 0) * 100),
                 0,
@@ -413,7 +416,8 @@ export class JobCardWorkflowService {
         (data.status !== "DELIVERED" ||
           data.description !== undefined ||
           data.observations !== undefined ||
-          data.workDone !== undefined)
+          data.workDone !== undefined ||
+          data.serviceCharge !== undefined)
       )
         throw new BadRequestError("Billed job cards can only be delivered");
 
@@ -423,8 +427,15 @@ export class JobCardWorkflowService {
         description: data.description,
         observations: data.observations,
         workDone: data.workDone,
+        serviceCharge: data.serviceCharge,
+        ...(data.serviceCharge !== undefined ? { estimatedCost: [current.estimatedParts, current.estimatedOil, current.estimatedLabour, data.serviceCharge].reduce<number>((sum, value) => sum + Math.round((value ?? 0) * 100), 0) / 100 } : {}),
       };
 
+      if (data.status && data.status !== from && ['IN_PROGRESS', 'QC', 'READY'].includes(data.status)) {
+        await assertApprovedOperation(tx, id, current.customerId, []);
+      }
+      if (data.status === 'READY' && current.qcStatus?.toUpperCase() !== 'PASSED') throw new BadRequestError('Record a passed quality check before marking the job Ready');
+      if (data.status === 'READY' || (data.status === 'DELIVERED' && !billed)) await assertRecordedScope(tx, id);
       if (data.status && data.status !== from) {
         assertTransition(
           from,
@@ -437,9 +448,9 @@ export class JobCardWorkflowService {
         );
 
         if (data.status === "DELIVERED") {
-          if (!billed && !current.creditApprovedById)
+          if ((!billed || current.invoices.some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) && !current.creditApprovedById)
             throw new BadRequestError(
-              "Delivery requires a bill or approved credit",
+              "Delivery requires a fully paid bill or approved credit",
             );
 
           if (!data.deliveryAdvisorId)
@@ -487,7 +498,7 @@ export class JobCardWorkflowService {
 
         data: update,
       });
-    });
+    }, { maxWait: 5000, timeout: 15000 });
 
     if (card.status === "READY" && data.status === "READY") {
       await new NotificationService().notifyRole(

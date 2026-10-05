@@ -1,3 +1,4 @@
+import { assertApprovedOperation } from '../service/estimate-approval';
 import prisma from "../../prisma/client";
 import { InventoryRepository } from "./inventory.repository";
 import {
@@ -904,6 +905,15 @@ export class InventoryService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      if (data.jobCardId) {
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
+        const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });
+        if (card.branchId !== data.branchId || card.billedAt || ['READY', 'COMPLETED', 'BILLED', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(card.status.toUpperCase())) throw new BadRequestError('Parts can only be issued to an open job in this branch');
+        const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId }, include: { returns: true } });
+        const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((n, r) => n + r.quantity, 0), 0);
+        if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+      }
       const updated = await tx.inventoryStock.updateMany({
         where: {
           branchId: data.branchId,
@@ -916,6 +926,7 @@ export class InventoryService {
         throw new BadRequestError("Insufficient stock at this branch");
       }
 
+      if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
       const issuance = await tx.partIssuance.create({ data });
       await tx.stockTransaction.create({
         data: {
@@ -938,7 +949,7 @@ export class InventoryService {
         include: { part: { select: { id: true, name: true } } },
       });
       return { issuance, stock };
-    });
+    }, { maxWait: 5000, timeout: 15000 });
 
     // The stock mutation has committed; notification failure must not invite a duplicate issue.
     await this.notifyLowStock(
