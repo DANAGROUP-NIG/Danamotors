@@ -27,6 +27,7 @@ export type PartRole = "MAIN" | "ALTERNATE";
  */
 export type PartMaster = {
   id: string;
+  partCode: string;
   partNumber: string;
   name: string;
   description: string | null;
