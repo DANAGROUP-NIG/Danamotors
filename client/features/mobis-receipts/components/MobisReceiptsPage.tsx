@@ -54,7 +54,7 @@ export function MobisReceiptsPage() {
     {
       header: "MIT #",
       render: (m) => (
-        <Link href={`/inventory/mobis-receipts/${m.id}`} className="font-mono text-xs font-medium hover:underline">
+        <Link href={`/inventory/mobis-receipts/${m.id}`} className="font-mono text-sm font-medium hover:underline">
           {m.mitNumber}
         </Link>
       ),
@@ -79,13 +79,13 @@ export function MobisReceiptsPage() {
       render: (m) => (
         <span className="text-muted-foreground">
           {fmtPrice(m.totalAmount)}
-          <span className="block text-xs">{fmtNaira(m.totalAmount * m.conversionRate)} @ {m.conversionRate}</span>
+          <span className="block text-sm">{fmtNaira(m.totalAmount * m.conversionRate)} @ {m.conversionRate}</span>
         </span>
       ),
     },
     {
       header: "MRN #",
-      render: (m) => <span className="font-mono text-xs text-muted-foreground">{m.mrn?.mrnNumber ?? "—"}</span>,
+      render: (m) => <span className="font-mono text-sm text-muted-foreground">{m.mrn?.mrnNumber ?? "—"}</span>,
     },
     { header: "Status", render: (m) => <StatusBadge status={MIT_STATUS_LABELS[m.status]} tone={MIT_STATUS_TONES[m.status]} /> },
     {
@@ -167,7 +167,7 @@ export function MobisReceiptsPage() {
         </DataTable>
       )}
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <FileSpreadsheet className="size-3.5" />
         Only Mobis invoices are uploaded. Transfers between branches need no files: they are shared in the app.
       </p>

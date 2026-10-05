@@ -57,7 +57,7 @@ function RevenueTooltip({ active, payload, label }: {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-[#e8edf3] bg-white px-3 py-2 shadow-lg">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-sm font-bold text-foreground">{fmtFull(payload[0].value)}</p>
     </div>
   );
@@ -157,7 +157,7 @@ export default function ServiceAdvisorDashboard() {
         {/* Today's Bookings */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Today&apos;s Bookings</p>
+            <p className="text-sm font-medium text-muted-foreground">Today&apos;s Bookings</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
               <CalendarDays className="size-4 text-blue-600" />
             </span>
@@ -168,7 +168,7 @@ export default function ServiceAdvisorDashboard() {
         {/* Pending Appointments */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Pending Approval</p>
+            <p className="text-sm font-medium text-muted-foreground">Pending Approval</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
               <Clock className="size-4 text-amber-500" />
             </span>
@@ -179,7 +179,7 @@ export default function ServiceAdvisorDashboard() {
         {/* Active Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Active Jobs</p>
+            <p className="text-sm font-medium text-muted-foreground">Active Jobs</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-orange-50">
               <Wrench className="size-4 text-orange-500" />
             </span>
@@ -190,7 +190,7 @@ export default function ServiceAdvisorDashboard() {
         {/* Open Invoices */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Open Invoices</p>
+            <p className="text-sm font-medium text-muted-foreground">Open Invoices</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-emerald-50">
               <CheckCircle2 className="size-4 text-emerald-600" />
             </span>
@@ -207,7 +207,7 @@ export default function ServiceAdvisorDashboard() {
             <p className="text-sm font-semibold text-foreground">Upcoming Appointments</p>
             <a
               href="/appointments"
-              className="text-xs font-semibold text-primary hover:underline"
+              className="text-sm font-semibold text-primary hover:underline"
             >
               View all →
             </a>
@@ -216,7 +216,7 @@ export default function ServiceAdvisorDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e8edf3] text-xs text-muted-foreground">
+                  <tr className="border-b border-[#e8edf3] text-sm text-muted-foreground">
                     <th className="pb-2 font-medium">Time</th>
                     <th className="pb-2 font-medium">Customer</th>
                     <th className="pb-2 font-medium">Vehicle</th>
@@ -287,7 +287,7 @@ export default function ServiceAdvisorDashboard() {
             <p className="text-sm font-semibold text-foreground">Revenue (7 Days)</p>
             <p className="mt-0.5 text-2xl font-extrabold text-foreground">
               {fmtFull(data.todayRevenue)}{" "}
-              <span className="text-xs font-medium text-muted-foreground">today</span>
+              <span className="text-sm font-medium text-muted-foreground">today</span>
             </p>
           </div>
           {data.revenueChart.length > 0 ? (
@@ -326,7 +326,7 @@ export default function ServiceAdvisorDashboard() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
+            <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
               No revenue data available
             </div>
           )}

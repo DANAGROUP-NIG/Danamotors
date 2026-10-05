@@ -11,7 +11,7 @@ export default function FormField({ label, error, children }: FormFieldProps) {
     <label className="grid gap-2">
       <span className="text-sm font-bold">{label}</span>
       {children}
-      {error ? <span className="text-xs font-semibold text-red-500">{error}</span> : null}
+      {error ? <span className="text-sm font-semibold text-red-500">{error}</span> : null}
     </label>
   );
 }

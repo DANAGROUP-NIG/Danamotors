@@ -273,7 +273,7 @@ export class ServiceController {
       const { id } = req.params;
       const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
       assertBranchOwnership(req, card?.branchId);
-      const result = await this.serviceService.addEstimate(id, req.body);
+      const result = await this.serviceService.addEstimate(id, req.body, req.user?.userId);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Estimate created successfully', data: { estimate: result } });
     } catch (error) {
       next(error);
@@ -291,7 +291,7 @@ export class ServiceController {
         select: { jobCard: { select: { branchId: true } } },
       });
       assertBranchOwnership(req, estimate?.jobCard?.branchId);
-      const result = await this.serviceService.addApproval(id, req.body);
+      const result = await this.serviceService.addApproval(id, req.body, req.user?.userId);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Customer approval recorded successfully', data: { approval: result } });
     } catch (error) {
       next(error);

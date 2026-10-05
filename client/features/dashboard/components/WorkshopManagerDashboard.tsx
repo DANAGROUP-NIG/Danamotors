@@ -133,7 +133,7 @@ export default function WorkshopManagerDashboard() {
               <p className="text-sm font-semibold text-amber-900">
                 {data.inventoryAlerts} inventory alert{data.inventoryAlerts !== 1 ? "s" : ""}
               </p>
-              <p className="text-xs text-amber-700">
+              <p className="text-sm text-amber-700">
                 Items at or below minimum stock — review before next service day.
               </p>
             </>
@@ -142,7 +142,7 @@ export default function WorkshopManagerDashboard() {
               <p className="text-sm font-semibold text-emerald-900">
                 Inventory is fully stocked
               </p>
-              <p className="text-xs text-emerald-700">
+              <p className="text-sm text-emerald-700">
                 All items are above minimum stock levels.
               </p>
             </>
@@ -151,7 +151,7 @@ export default function WorkshopManagerDashboard() {
         <a
           href="/inventory"
           className={cn(
-            "shrink-0 text-xs font-bold hover:underline",
+            "shrink-0 text-sm font-bold hover:underline",
             data.inventoryAlerts > 0 ? "text-amber-700" : "text-emerald-700",
           )}
         >
@@ -164,7 +164,7 @@ export default function WorkshopManagerDashboard() {
         {/* Total Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Total Jobs</p>
+            <p className="text-sm font-medium text-muted-foreground">Total Jobs</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
               <Wrench className="size-4 text-blue-600" />
             </span>
@@ -175,7 +175,7 @@ export default function WorkshopManagerDashboard() {
         {/* In Progress */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">In Progress</p>
+            <p className="text-sm font-medium text-muted-foreground">In Progress</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-orange-50">
               <Clock className="size-4 text-orange-500" />
             </span>
@@ -186,7 +186,7 @@ export default function WorkshopManagerDashboard() {
         {/* Completed */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Completed</p>
+            <p className="text-sm font-medium text-muted-foreground">Completed</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
               <CheckCircle2 className="size-4 text-green-600" />
             </span>
@@ -197,7 +197,7 @@ export default function WorkshopManagerDashboard() {
         {/* Inventory Alerts */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Low Stock Alerts</p>
+            <p className="text-sm font-medium text-muted-foreground">Low Stock Alerts</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
               <Package className="size-4 text-amber-500" />
             </span>
@@ -248,7 +248,7 @@ export default function WorkshopManagerDashboard() {
               </div>
             </>
           ) : (
-            <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
+            <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
               No job data available
             </div>
           )}
@@ -263,10 +263,10 @@ export default function WorkshopManagerDashboard() {
             <ul className="flex flex-col gap-3">
               {data.topTechnicians.map((t) => (
                 <li key={t.name} className="flex items-center gap-3">
-                  <span className="w-4 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                  <span className="w-4 shrink-0 text-center text-sm font-bold text-muted-foreground">
                     {t.rank}
                   </span>
-                  <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                     {t.name.split(" ").map((n) => n[0]).join("")}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -289,7 +289,7 @@ export default function WorkshopManagerDashboard() {
               ))}
             </ul>
           ) : (
-            <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
+            <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
               No technician data available
             </div>
           )}

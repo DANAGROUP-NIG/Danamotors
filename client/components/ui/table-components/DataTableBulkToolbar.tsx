@@ -63,7 +63,7 @@ export function DataTableBulkToolbar<T>({
               <p className="text-sm font-semibold text-white">
                 {pluralize(selectedCount, "item")} selected
               </p>
-              <p className="text-xs text-white/70">
+              <p className="text-sm text-white/70">
                 of {totalCount} total
               </p>
             </div>
@@ -79,7 +79,7 @@ export function DataTableBulkToolbar<T>({
                 disabled={action.disabled}
                 onClick={() => action.onClick(selectedItems)}
                 className={cn(
-                  "h-8 gap-1.5 text-xs font-semibold",
+                  "h-8 gap-1.5 text-sm font-semibold",
                   action.variant === "ghost" &&
                     "bg-white/10 text-white hover:bg-white/20 hover:text-white",
                   action.variant === "default" &&

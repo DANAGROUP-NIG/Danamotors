@@ -10,6 +10,7 @@ import { downloadExcel } from "@/lib/table-actions";
 import { getReceiptRegisterRequest } from "@/features/invoices/api/invoice.api";
 import { ReceiptManageModal } from "@/features/invoices/components/ReceiptManageModal";
 import type { ReceiptRegisterRow } from "@/features/invoices/api/invoice.api";
+import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 const COLUMNS = [
@@ -26,6 +27,7 @@ const COLUMNS = [
 const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 
 export function ReportsPage() {
+  const branchId = useBranchStore((state) => state.activeBranch?.id);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [category, setCategory] = useState<"ALL" | "SERVICE_PARTS" | "SALES_ENQUIRY">("ALL");
@@ -35,8 +37,8 @@ export function ReportsPage() {
   const canEditReceipts = hasPermission("receipt:update");
   const canCancelReceipts = hasPermission("receipt:cancel");
   const report = useQuery({
-    queryKey: ["receipt-register", from, to, category],
-    queryFn: () => getReceiptRegisterRequest({ from: from || undefined, to: to || undefined, category }),
+    queryKey: ["receipt-register", branchId, from, to, category],
+    queryFn: () => getReceiptRegisterRequest({ branchId, from: from || undefined, to: to || undefined, category }),
   });
   const receipts = report.data?.receipts ?? [];
 
@@ -46,7 +48,7 @@ export function ReportsPage() {
       receipts.map((receipt) => ({
         receiptNumber: receipt.receiptNumber,
         date: new Date(receipt.issuedAt).toLocaleDateString("en-NG"),
-        customer: `${receipt.customer.firstName} ${receipt.customer.lastName}`,
+        customer: receipt.customer.companyName || `${receipt.customer.firstName} ${receipt.customer.lastName}`,
         mode: receipt.mode,
         bank: receipt.bank?.name ?? "",
         invoices: receipt.allocations.map((allocation) => allocation.invoice.invoiceNumber).join(", "),
@@ -114,7 +116,7 @@ export function ReportsPage() {
                 <tr key={receipt.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="px-3 py-3 font-medium">{receipt.receiptNumber}</td>
                   <td className="px-3 py-3">{new Date(receipt.issuedAt).toLocaleDateString("en-NG")}</td>
-                  <td className="px-3 py-3">{receipt.customer.firstName} {receipt.customer.lastName}</td>
+                  <td className="px-3 py-3">{receipt.customer.companyName || `${receipt.customer.firstName} ${receipt.customer.lastName}`}</td>
                   <td className="px-3 py-3">{receipt.mode.replaceAll("_", " ")}</td>
                   <td className="px-3 py-3">{receipt.bank?.name ?? "-"}</td>
                   <td className="px-3 py-3">{receipt.allocations.map((allocation) => allocation.invoice.invoiceNumber).join(", ") || "Advance"}</td>

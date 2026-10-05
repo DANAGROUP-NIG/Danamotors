@@ -100,7 +100,7 @@ export function PermissionGrid({
                   )}
                 />
                 {group.module}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
                   ({permNames.length})
                 </span>
               </button>
@@ -109,7 +109,7 @@ export function PermissionGrid({
                 type="button"
                 onClick={() => toggleGroup(permNames)}
                 className={cn(
-                  "cursor-pointer rounded-md border px-2 py-1 text-xs font-medium",
+                  "cursor-pointer rounded-md border px-2 py-1 text-sm font-medium",
                   groupSelected
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",

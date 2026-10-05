@@ -17,7 +17,7 @@ import { useImportMit } from "../hooks/use-mobis";
 import { DEFAULT_CONVERSION_RATE, RECEIVED_MODE_LABELS, fmtNaira, fmtPrice, isCpd } from "../lib/mobis-labels";
 import type { PartMatch, ReceivedMode } from "../types/mobis.types";
 
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
 const today = () => new Date().toISOString().slice(0, 10);
 const ACCEPTED_EXTENSIONS = [".xls", ".xlsx", ".csv", ".txt", ".tsv"];
@@ -228,7 +228,7 @@ export function MitUploadPage() {
             <p className="flex items-center gap-1.5 font-medium">
               <AlertTriangle className="size-4" /> {parsed.problems.length} row(s) could not be read and will be left out:
             </p>
-            <ul className="mt-1 list-disc pl-5 text-xs">
+            <ul className="mt-1 list-disc pl-5 text-sm">
               {parsed.problems.slice(0, 8).map((p) => (
                 <li key={p}>{p}</li>
               ))}
@@ -322,27 +322,27 @@ export function MitUploadPage() {
                   const known = matchByNumber.get(l.partNumber);
                   return (
                     <tr key={l.row} className="border-t border-slate-100">
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.orderNumber}</td>
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.lineNumber}</td>
-                      <td className={cn(tdCls, "font-mono text-xs font-medium")}>{l.partNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.orderNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.lineNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm font-medium")}>{l.partNumber}</td>
                       <td className={cn(tdCls, "max-w-64 truncate")}>{l.partName}</td>
                       <td className={cn(tdCls, "text-right")}>{l.quantity}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtPrice(l.unitPrice)}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtPrice(l.amount)}</td>
-                      <td className={cn(tdCls, "font-mono text-xs")}>{l.caseNumber}</td>
+                      <td className={cn(tdCls, "font-mono text-sm")}>{l.caseNumber}</td>
                       <td className={tdCls}>{l.weight ?? ""}</td>
                       <td className={tdCls}>{l.hsCode}</td>
                       <td className={tdCls}>
                         {matchFailed ? (
-                          <span className="text-xs text-slate-400">Not checked</span>
+                          <span className="text-sm text-slate-400">Not checked</span>
                         ) : matches === null ? (
                           <Loader2 className="size-3.5 animate-spin text-slate-400" />
                         ) : known ? (
-                          <span className={cn("text-xs", known.partStatus === "BLOCKED" ? "text-red-600" : "text-emerald-700")}>
+                          <span className={cn("text-sm", known.partStatus === "BLOCKED" ? "text-red-600" : "text-emerald-700")}>
                             {known.partStatus === "BLOCKED" ? "Exists (blocked)" : "Exists"}
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-blue-700">New part</span>
+                          <span className="text-sm font-medium text-blue-700">New part</span>
                         )}
                       </td>
                     </tr>
@@ -356,7 +356,7 @@ export function MitUploadPage() {
 
       {/* ── Save ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <p className="text-xs text-slate-500">{errors.length ? errors.join(" · ") : "Ready to save. The MIT will then be checked and posted with an MRN."}</p>
+        <p className="text-sm text-slate-500">{errors.length ? errors.join(" · ") : "Ready to save. The MIT will then be checked and posted with an MRN."}</p>
         <Button type="button" disabled={errors.length > 0 || importMit.isPending || reading} onClick={save} className="gap-1.5">
           {importMit.isPending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
           Save MIT

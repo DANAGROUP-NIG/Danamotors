@@ -153,7 +153,7 @@ export default function PortalInvoiceDetailPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr className="border-b border-border text-left text-sm uppercase tracking-wide text-muted-foreground">
                     <th className="px-3 py-2 font-semibold">Amount</th>
                     <th className="px-3 py-2 font-semibold">Requested</th>
                     <th className="px-3 py-2 font-semibold">Comments</th>
@@ -176,7 +176,7 @@ export default function PortalInvoiceDetailPage() {
                       <td className="px-3 py-3">
                         <CreditApplicationActions application={app} />
                       </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">
+                      <td className="px-3 py-3 text-sm text-muted-foreground">
                         {app.decisionDate ? formatDate(app.decisionDate) : "—"}
                       </td>
                     </tr>
@@ -189,7 +189,7 @@ export default function PortalInvoiceDetailPage() {
           )}
           {pendingApplications.length === 0 &&
             invoice.creditApplications.length > 0 && (
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="mt-3 text-sm text-muted-foreground">
                 You have no pending credit applications for this invoice.
               </p>
             )}

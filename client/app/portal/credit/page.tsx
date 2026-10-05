@@ -61,7 +61,7 @@ export default function PortalCreditPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border text-left text-sm uppercase tracking-wide text-muted-foreground">
                       <th className="px-3 py-2 font-semibold">Date</th>
                       <th className="px-3 py-2 font-semibold">Description</th>
                       <th className="px-3 py-2 font-semibold">Amount</th>
@@ -113,7 +113,7 @@ export default function PortalCreditPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border text-left text-sm uppercase tracking-wide text-muted-foreground">
                       <th className="px-3 py-2 font-semibold">Invoice</th>
                       <th className="px-3 py-2 font-semibold">Amount</th>
                       <th className="px-3 py-2 font-semibold">Requested</th>

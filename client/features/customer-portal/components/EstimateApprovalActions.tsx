@@ -19,7 +19,7 @@ export function EstimateApprovalActions({ estimate }: { estimate: PortalEstimate
       <div className="flex flex-col gap-1">
         <StatusBadge status={estimate.status} />
         {latestDecision?.decisionDate && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             Decided{" "}
             {new Date(latestDecision.decisionDate).toLocaleDateString(undefined, {
               day: "numeric",
@@ -29,7 +29,7 @@ export function EstimateApprovalActions({ estimate }: { estimate: PortalEstimate
           </span>
         )}
         {latestDecision?.comments && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             “{latestDecision.comments}”
           </span>
         )}

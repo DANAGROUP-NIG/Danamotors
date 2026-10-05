@@ -42,7 +42,7 @@ import type { Indent } from "../types/indent.types";
 
 type DialogKind = "approve" | "dispatch" | "receive" | "reject" | "cancel" | null;
 
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 align-top";
 
 function SectionCard({ icon, title, action, children }: { icon: ReactNode; title: string; action?: ReactNode; children: ReactNode }) {
@@ -62,9 +62,9 @@ function SectionCard({ icon, title, action, children }: { icon: ReactNode; title
 
 function DetailField({ label, value, wide }: { label: string; value?: ReactNode; wide?: boolean }) {
   return (
-    <div className={cn("min-w-0", wide && "col-span-2")}>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-      <div className="mt-0.5 break-words text-sm text-slate-700">{value ?? "—"}</div>
+    <div>
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <div className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</div>
     </div>
   );
 }
@@ -185,14 +185,14 @@ export function IndentDetail({ id }: { id: string }) {
         <div className="rounded-xl border border-slate-200 bg-white p-6 print:border print:shadow-none">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Branch indent</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Branch indent</p>
               <h1 className="font-mono text-xl font-semibold text-slate-800">{indent.indentNumber}</h1>
               <p className="mt-1 text-sm text-slate-500">
                 {indent.sourceBranch.name} → {indent.requestingBranch.name}
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">Created {fmtDateTime(indent.createdAt)}</span>
+              <span className="text-sm text-slate-400">Created {fmtDateTime(indent.createdAt)}</span>
               <StatusBadge status={INDENT_STATUS_LABELS[indent.status]} tone={INDENT_STATUS_TONES[indent.status]} />
             </div>
           </div>
@@ -275,8 +275,8 @@ export function IndentDetail({ id }: { id: string }) {
                   return (
                     <tr key={l.id} className="border-t border-slate-100">
                       <td className={cn(tdCls, "text-slate-400")}>{l.lineNumber}</td>
-                      <td className={cn(tdCls, "min-w-52")}>
-                        <p className="font-mono text-xs font-medium text-slate-800">
+                      <td className={tdCls}>
+                        <p className="font-mono text-sm font-medium text-slate-800">
                           {l.part.partNumber}
                           {l.partFlag && <span className="ml-1.5 text-slate-400">({l.partFlag})</span>}
                           <span
@@ -289,9 +289,9 @@ export function IndentDetail({ id }: { id: string }) {
                             {l.supplyCode}
                           </span>
                         </p>
-                        <p className="text-xs text-slate-500">{l.part.name}</p>
+                        <p className="text-sm text-slate-500">{l.part.name}</p>
                         {supplied && (
-                          <p className="mt-1 text-xs font-medium text-purple-700">
+                          <p className="mt-1 text-sm font-medium text-purple-700">
                             Supplied as alternate {supplied.part.partNumber}
                           </p>
                         )}
@@ -300,7 +300,7 @@ export function IndentDetail({ id }: { id: string }) {
                           {fmtCurrency(l.unitRate)} / {l.part.uom} · stock at request {l.currentStock ?? 0}
                         </p>
                       </td>
-                      <td className={cn(tdCls, "text-xs text-slate-500")}>
+                      <td className={cn(tdCls, "text-sm text-slate-500")}>
                         {l.registrationNumber || l.jobNumber || l.vin ? (
                           <>
                             {l.registrationNumber && <p className="font-medium text-slate-700">{l.registrationNumber}</p>}
@@ -352,9 +352,9 @@ export function IndentDetail({ id }: { id: string }) {
           <ol className="space-y-3">
             {indent.statusHistory.map((h) => (
               <li key={h.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-                <span className="w-40 shrink-0 text-xs text-slate-400">{fmtDateTime(h.createdAt)}</span>
+                <span className="w-40 shrink-0 text-sm text-slate-400">{fmtDateTime(h.createdAt)}</span>
                 <span className="font-medium text-slate-700">{INDENT_STATUS_LABELS[h.toStatus]}</span>
-                <span className="text-xs text-slate-500">
+                <span className="text-sm text-slate-500">
                   {personName(h.actor)}
                   {h.remarks ? ` · ${h.remarks}` : ""}
                 </span>
@@ -380,10 +380,10 @@ function DocHeader({ label, number, meta }: { label: string; number: string; met
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <p className="text-sm">
-        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</span>{" "}
+        <span className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</span>{" "}
         <span className="font-mono font-semibold text-slate-800">{number}</span>
       </p>
-      {meta && <p className="text-xs text-slate-500">{meta}</p>}
+      {meta && <p className="text-sm text-slate-500">{meta}</p>}
     </div>
   );
 }
@@ -403,7 +403,7 @@ function Documents({ indent }: { indent: Indent }) {
               number={pickingList.pickingNumber}
               meta={`${pickingList.status.toLowerCase()} · ${fmtDate(pickingList.createdAt)}`}
             />
-            <ul className="space-y-1 text-xs text-slate-600">
+            <ul className="space-y-1 text-sm text-slate-600">
               {pickingList.lines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-2">
                   <span>
@@ -425,13 +425,13 @@ function Documents({ indent }: { indent: Indent }) {
               number={stn.stnNumber}
               meta={`${fmtDate(stn.documentDate)} · ${personName(stn.dispatchedBy)}`}
             />
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4">
               <span>Qty {stn.totalQuantity}</span>
               <span>{fmtCurrency(stn.totalValue)}</span>
               <span>{stn.transportMode ? TRANSPORT_MODE_LABELS[stn.transportMode] : "—"}</span>
               <span>Tax form {stn.taxForm ?? "—"}</span>
             </div>
-            <p className="text-xs text-emerald-700">
+            <p className="text-sm text-emerald-700">
               {stn.stockDeducted ? `Stock deducted from ${indent.sourceBranch.name}` : "Stock not yet deducted"}
             </p>
             {/* The goods travel on the STN; each line shows how much the receiving branch has accounted for. */}
@@ -455,7 +455,7 @@ function Documents({ indent }: { indent: Indent }) {
               number={stn.packingList.packingNumber}
               meta={fmtDate(stn.packingList.packingDate)}
             />
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
               <span>Waybill {stn.packingList.waybillNumber ?? "—"}</span>
               <span>Courier {stn.packingList.courierName ?? "—"}</span>
               <span>
@@ -465,7 +465,7 @@ function Documents({ indent }: { indent: Indent }) {
             </div>
             <div className="space-y-2 pt-1">
               {stn.cases.map((c) => (
-                <div key={c.id} className="rounded-md bg-slate-50 px-3 py-2 text-xs">
+                <div key={c.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
                   <p className="flex items-center justify-between gap-2 font-medium text-slate-700">
                     <span className="inline-flex items-center gap-1.5">
                       <Boxes className="size-3.5" /> Case <span className="font-mono">{c.caseNumber}</span>
@@ -509,10 +509,26 @@ function Documents({ indent }: { indent: Indent }) {
                 </li>
               ))}
             </ul>
-            {mrn.remarks && <p className="text-xs text-slate-500">{mrn.remarks}</p>}
+          </div>
+        ))}
+
+        {stn?.srns.map((srn) => (
+          <div key={srn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
+            <DocHeader
+              label="SRN"
+              number={srn.srnNumber}
+              meta={`${fmtDateTime(srn.receiptDate)} · ${personName(srn.receivedBy)}`}
+            />
+            <div className="flex flex-wrap gap-3 text-sm">
+              <span className="text-emerald-700">{srn.totalReceived} received</span>
+              {srn.totalDamaged > 0 && <span className="text-red-600">{srn.totalDamaged} damaged</span>}
+              {srn.totalShort > 0 && <span className="text-red-600">{srn.totalShort} short</span>}
+            </div>
+            {srn.remarks && <p className="text-sm text-slate-500">{srn.remarks}</p>}
           </div>
         ))}
       </div>
     </SectionCard>
   );
+
 }

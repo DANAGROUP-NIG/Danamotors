@@ -39,7 +39,7 @@ function RevenueTooltip({ active, payload, label }: {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-[#e8edf3] bg-white px-3 py-2 shadow-lg">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-sm font-bold text-foreground">{fmtFull(payload[0].value)}</p>
     </div>
   );
@@ -97,7 +97,7 @@ export default function AccountantDashboard() {
         {/* Monthly Revenue */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Monthly Revenue</p>
+            <p className="text-sm font-medium text-muted-foreground">Monthly Revenue</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-emerald-50">
               <TrendingUp className="size-4 text-emerald-600" />
             </span>
@@ -108,7 +108,7 @@ export default function AccountantDashboard() {
         {/* Total Outstanding */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Outstanding</p>
+            <p className="text-sm font-medium text-muted-foreground">Outstanding</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
               <DollarSign className="size-4 text-amber-500" />
             </span>
@@ -119,7 +119,7 @@ export default function AccountantDashboard() {
         {/* Open Invoices */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Open Invoices</p>
+            <p className="text-sm font-medium text-muted-foreground">Open Invoices</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-blue-50">
               <FileText className="size-4 text-blue-600" />
             </span>
@@ -130,7 +130,7 @@ export default function AccountantDashboard() {
         {/* Overdue */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Overdue</p>
+            <p className="text-sm font-medium text-muted-foreground">Overdue</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-red-50">
               <Clock className="size-4 text-red-500" />
             </span>
@@ -144,7 +144,7 @@ export default function AccountantDashboard() {
         <div className="mb-4">
           <p className="text-sm font-semibold text-foreground">Revenue Trend (7 Days)</p>
           <p className="mt-0.5 text-2xl font-extrabold text-foreground">
-            {fmtFull(data.todayRevenue)} <span className="text-xs font-medium text-muted-foreground">today</span>
+            {fmtFull(data.todayRevenue)} <span className="text-sm font-medium text-muted-foreground">today</span>
           </p>
         </div>
         {data.revenueChart.length > 0 ? (
@@ -183,7 +183,7 @@ export default function AccountantDashboard() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
             No revenue data available
           </div>
         )}

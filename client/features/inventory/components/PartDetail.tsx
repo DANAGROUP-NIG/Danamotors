@@ -71,9 +71,9 @@ function DetailField({
 }) {
   const empty = value === null || value === undefined || value === "";
   return (
-    <div className={cn("min-w-0", wide && "col-span-2")}>
-      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={cn("mt-0.5 break-words text-sm text-slate-700", mono && "font-mono")}>{empty ? "—" : value}</p>
+    <div>
+      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <p className={cn("mt-0.5 text-sm text-slate-700", mono && "font-mono")}>{empty ? "—" : value}</p>
     </div>
   );
 }
@@ -121,13 +121,13 @@ function FamilyRow({ part, current }: { part: PartMaster; current?: boolean }) {
     <tr className="border-t border-slate-100">
       <td className="px-3 py-2">
         {current ? (
-          <span className="font-mono text-xs font-medium text-slate-800">{part.partNumber} (this part)</span>
+          <span className="font-mono text-sm font-medium text-slate-800">{part.partNumber} (this part)</span>
         ) : (
-          <Link href={`/inventory/${part.id}`} className="font-mono text-xs font-medium text-primary hover:underline">
+          <Link href={`/inventory/${part.id}`} className="font-mono text-sm font-medium text-primary hover:underline">
             {part.partNumber}
           </Link>
         )}
-        <p className="text-xs text-slate-500">{part.name}</p>
+        <p className="text-sm text-slate-500">{part.name}</p>
       </td>
       <td className="px-3 py-2">
         <PartRoleBadge role={part.role} />
@@ -247,7 +247,7 @@ export function PartDetail({ id }: { id: string }) {
               <h1 className="text-xl font-semibold text-slate-800">{part.name}</h1>
               <p className="mt-1 font-mono text-sm text-slate-500">{part.partNumber}</p>
               {part.role === "ALTERNATE" && mainPart && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   Alternate for{" "}
                   <Link href={`/inventory/${mainPart.id}`} className="font-mono font-medium text-primary hover:underline">
                     {mainPart.partNumber}
@@ -347,7 +347,7 @@ export function PartDetail({ id }: { id: string }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50">
-                    <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                    <tr className="text-left text-sm font-medium uppercase tracking-wider text-slate-400">
                       <th className="px-3 py-2">Branch</th>
                       <th className="px-3 py-2 text-right">On hand</th>
                       <th className="px-3 py-2 text-right">Reserved</th>
@@ -418,7 +418,7 @@ export function PartDetail({ id }: { id: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
-                  <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <tr className="text-left text-sm font-medium uppercase tracking-wider text-slate-400">
                     <th className="px-3 py-2">Part</th>
                     <th className="px-3 py-2">Role</th>
                     <th className="px-3 py-2">Dealer rate</th>
@@ -437,7 +437,7 @@ export function PartDetail({ id }: { id: string }) {
           )}
         </SectionCard>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-sm text-slate-400">
           Created {fmtDateTime(part.createdAt)} · Last updated {fmtDateTime(part.updatedAt)}
         </p>
       </div>

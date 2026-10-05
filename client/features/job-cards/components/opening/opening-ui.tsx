@@ -27,7 +27,7 @@ export function OpeningField(
     children: ReactNode;
   },
 ) {
-  return <label className="grid min-w-0 content-start gap-1.5"><span className="text-xs font-medium text-foreground">{label}{required && <span className="ml-1 text-destructive">*</span>}</span>{children}{error && <span role="alert" className="text-xs text-destructive">{error}</span>}</label>;
+  return <label className="grid min-w-0 content-start gap-1.5"><span className="text-sm font-medium text-foreground">{label}{required && <span className="ml-1 text-destructive">*</span>}</span>{children}{error && <span role="alert" className="text-sm text-destructive">{error}</span>}</label>;
 }
 
 export function ReadOnlyField(
@@ -42,7 +42,7 @@ export function ReadOnlyField(
   },
 ) {
   return (
-    <div className="min-w-0 space-y-1.5"><p className="text-xs font-medium">{label}</p><div
+    <div className="min-w-0 space-y-1.5"><p className="text-sm font-medium">{label}</p><div
         className={`flex min-h-10 items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm ${currency ? "tabular-nums" : ""}`}><LockKeyhole aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className={`min-w-0 break-words ${currency ? "ml-auto text-right font-medium" : ""}`}>{value === "" || value == null ? <span className="text-muted-foreground">Not recorded</span> : value}</span></div></div>
   );
 }
@@ -60,7 +60,7 @@ export function OpeningCard(
     action?: ReactNode;
   },
 ) {
-  return <section className="min-w-0 rounded-xl border border-border bg-background p-4 shadow-sm md:p-6"><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold">{title}</h3>{description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}</div>{action}</div>{children}</section>;
+  return <section className="min-w-0 rounded-xl border border-border bg-background p-4 shadow-sm md:p-6"><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold">{title}</h3>{description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>{action}</div>{children}</section>;
 }
 
 export function CurrencyInput(
@@ -83,7 +83,7 @@ export function CurrencyInput(
   const [draft, setDraft] = useState("");
 
   return (
-    <div className="relative"><span className="pointer-events-none absolute left-3 top-3 text-xs text-muted-foreground">{"₦"}</span><input
+    <div className="relative"><span className="pointer-events-none absolute left-3 top-3 text-sm text-muted-foreground">{"₦"}</span><input
         id={id}
         aria-label={label}
         aria-invalid={!!error}
@@ -110,7 +110,7 @@ export function CurrencyInput(
         onBlur={() => {
           setFocused(false);
           onBlur?.();
-        }} />{error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-destructive">{error}</p>}</div>
+        }} />{error && <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-destructive">{error}</p>}</div>
   );
 }
 

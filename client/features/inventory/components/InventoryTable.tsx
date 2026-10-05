@@ -211,7 +211,7 @@ export function InventoryTable() {
       render: (stock) => (
         <>
           <p className="font-medium">{stock.part.name}</p>
-          <p className="font-mono text-xs text-muted-foreground">{stock.part.partNumber}</p>
+          <p className="text-sm text-muted-foreground">{stock.part.partNumber}</p>
         </>
       ),
     },

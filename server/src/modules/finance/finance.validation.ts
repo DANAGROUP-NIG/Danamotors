@@ -1,4 +1,5 @@
 import { z } from 'zod';
+const amount = z.number().finite().positive().max(1e12).multipleOf(0.01);
 
 export const invoiceIdParamSchema = z.object({
   params: z.object({ id: z.string().uuid('Invalid invoice ID') }),
@@ -50,20 +51,24 @@ export const createPaymentSchema = z.object({
 export const createReceiptSchema = z.object({
   body: z.object({
     customerId: z.string().uuid('Invalid customer ID'),
-    mode: z.enum(['POS', 'BANK_TRANSFER', 'CASH']),
+    branchId: z.string().uuid().optional(),
+    idempotencyKey: z.string().uuid().optional(),
+    mode: z.enum(['POS', 'BANK_TRANSFER', 'CHEQUE', 'CASH']),
     category: z.enum(['SERVICE_PARTS', 'SALES_ENQUIRY']).default('SERVICE_PARTS'),
     bankId: z.string().uuid('Invalid bank ID').optional(),
-    amount: z.number().positive('Receipt amount must be positive'),
+    amount,
+    chequeNumber: z.string().trim().min(1).max(100).optional(),
+    chequeDate: z.string().date().optional(),
     reference: z.string().max(150).optional(),
     narration: z.string().max(1000).optional(),
     issuedAt: z.string().datetime().optional(),
     allocations: z.array(z.object({
       invoiceId: z.string().uuid('Invalid invoice ID'),
-      amount: z.number().positive('Allocation amount must be positive'),
-    }).strict()).default([]),
+      amount,
+    }).strict()).max(200).default([]),
   }).strict().superRefine((body, context) => {
     if (body.mode !== 'CASH' && !body.bankId) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ['bankId'], message: 'A bank is required for POS and bank transfer receipts' });
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['bankId'], message: 'A bank is required for POS, transfer and cheque receipts' });
     }
     if (body.mode === 'CASH' && body.bankId) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['bankId'], message: 'Cash receipts must not specify a bank' });
@@ -72,7 +77,9 @@ export const createReceiptSchema = z.object({
     if (new Set(invoiceIds).size !== invoiceIds.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['allocations'], message: 'Each invoice can only appear once' });
     }
-    if (body.allocations.reduce((sum, allocation) => sum + allocation.amount, 0) > body.amount) {
+    if (body.mode === 'CHEQUE' && (!body.chequeNumber || !body.chequeDate)) context.addIssue({ code: 'custom', path: ['chequeNumber'], message: 'Cheque number and date are required' });
+    if (body.mode !== 'CHEQUE' && (body.chequeNumber || body.chequeDate)) context.addIssue({ code: 'custom', path: ['mode'], message: 'Cheque details are only allowed for cheque receipts' });
+    if (body.allocations.reduce((sum, allocation) => sum + Math.round(allocation.amount * 100), 0) > Math.round(body.amount * 100)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['allocations'], message: 'Allocations cannot exceed the receipt amount' });
     }
   }),
@@ -98,7 +105,7 @@ export const createJobBillSchema = z.object({
 
 export const updateReceiptSchema = z.object({
   body: z.object({
-    amount: z.number().positive().optional(),
+    amount: amount.optional(),
     narration: z.string().max(1000).optional(),
   }).strict().refine((body) => Object.keys(body).length > 0, 'Amount or narration is required'),
   params: z.object({ id: z.string().uuid('Invalid receipt ID') }),
@@ -114,6 +121,7 @@ export const receiptRegisterQuerySchema = z.object({
     from: z.string().date().optional(),
     to: z.string().date().optional(),
     category: z.enum(['ALL', 'SERVICE_PARTS', 'SALES_ENQUIRY']).default('ALL'),
+    branchId: z.string().uuid().optional(),
   }).refine((query) => !query.from || !query.to || query.from <= query.to, {
     path: ['to'], message: 'The end date must be on or after the start date',
   }),

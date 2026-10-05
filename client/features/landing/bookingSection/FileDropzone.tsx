@@ -34,7 +34,7 @@ export function FileDropzone({ onFileSelect }: FileDropzoneProps) {
         <p className="mt-2 text-sm font-semibold">
           {acceptedFiles[0]?.name ?? "Drop a vehicle document, photo, or report"}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           PDF, image, or service record
         </p>
       </div>

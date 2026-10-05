@@ -212,7 +212,7 @@ export function UsersTable() {
       header: "User",
       render: (u) => (
         <div className="flex items-center gap-3">
-          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
+          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-black text-primary">
             {getUserInitials(u)}
           </span>
           <span className="font-medium">
@@ -229,7 +229,7 @@ export function UsersTable() {
     {
       header: "Role",
       render: (u) => (
-        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-sm font-medium">
           {u.role?.name ?? "—"}
         </span>
       ),
@@ -251,7 +251,7 @@ export function UsersTable() {
       render: (u) => (
         <span
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            "inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium",
             u.isActive
               ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
               : "bg-red-50 text-red-700 ring-1 ring-red-600/20",

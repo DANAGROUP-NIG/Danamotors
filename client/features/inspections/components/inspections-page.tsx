@@ -212,7 +212,7 @@ export function InspectionsPage() {
     },
     {
       header: "Job #",
-      render: (i) => <span className="font-mono text-xs font-medium">{i.jobCard.jobNumber}</span>,
+      render: (i) => <span className="font-mono text-sm font-medium">{i.jobCard.jobNumber}</span>,
     },
     {
       header: "Vehicle",
@@ -232,7 +232,7 @@ export function InspectionsPage() {
     {
       header: "Outcome",
       render: (i) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[i.status] || ""}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[i.status] || ""}`}>
           {i.status}
         </span>
       ),

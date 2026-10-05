@@ -43,7 +43,7 @@ export function FinancePage() {
               {title}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            <span className="mt-4 block text-xs font-semibold text-primary">
+            <span className="mt-4 block text-sm font-semibold text-primary">
               Open →
             </span>
           </a>

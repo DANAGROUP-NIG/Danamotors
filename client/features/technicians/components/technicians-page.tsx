@@ -184,7 +184,7 @@ export function TechniciansPage() {
           <User className="size-4 text-muted-foreground" />
           <span className="font-medium">
             {t.firstName} {t.lastName}
-            {!t.isActive && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">Inactive</span>}
+            {!t.isActive && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-sm text-gray-500">Inactive</span>}
           </span>
         </div>
       ),
@@ -196,7 +196,7 @@ export function TechniciansPage() {
     {
       header: "Active Jobs",
       render: (t) => (
-        <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-sm font-medium text-blue-700">
           {t._count.technicianAssignments}
         </span>
       ),

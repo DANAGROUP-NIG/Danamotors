@@ -62,7 +62,7 @@ export function VehicleCustomerField({ value, onChange, onBlur, error, readOnly,
         </div>
       )}
       {!value && <p className="text-sm text-muted-foreground">{readOnly ? "No customer currently linked. Use Change owner in the vehicle ownership section to assign one." : "Search by customer name, code or contact details before adding this vehicle."}</p>}
-      {readOnly && value && <p className="text-xs text-muted-foreground">This vehicle is linked to the selected customer. Owner changes are recorded through the vehicle ownership workflow.</p>}
+      {readOnly && value && <p className="text-sm text-muted-foreground">This vehicle is linked to the selected customer. Owner changes are recorded through the vehicle ownership workflow.</p>}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { assertApprovedOperation } from './estimate-approval';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
@@ -93,11 +94,14 @@ export class LabourService {
         branchId: jobCard.branchId,
         vehicleId: jobCard.vehicleId,
       });
+      const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId, labourItemId: values.labourItemId } });
+      await assertApprovedOperation(transaction, jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.hours, rate: line.rate, amount: line.amount })));
+      await transaction.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING' } });
       return transaction.jobCardLabour.create({
         data: { jobCardId: jobCard.id, ...values },
         include: { labourItem: true, technician: { select: { id: true, firstName: true, lastName: true } } },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 
   async updateJobCardLine(id: string, input: { labourItemId?: string; hours?: number; rate?: number; technicianId?: string | null }) {
@@ -114,12 +118,15 @@ export class LabourService {
         technicianId: input.technicianId === undefined ? existing.technicianId : input.technicianId,
         branchId: (await transaction.jobCard.findUniqueOrThrow({ where: { id: existing.jobCardId }, select: { branchId: true } })).branchId,
       });
+      const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId: existing.jobCardId, labourItemId: values.labourItemId, id: { not: id } } });
+      await assertApprovedOperation(transaction, existing.jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.hours, rate: line.rate, amount: line.amount })));
+      await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });
       return transaction.jobCardLabour.update({
         where: { id },
         data: values,
         include: { labourItem: true, technician: { select: { id: true, firstName: true, lastName: true } } },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 
   async removeJobCardLine(id: string) {
@@ -128,7 +135,8 @@ export class LabourService {
       if (!existing) throw new NotFoundError('Job-card labour line not found');
       await this.lockJobCard(transaction, existing.jobCardId);
       await this.assertJobCardOpen(existing.jobCardId, transaction);
+      await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });
       await transaction.jobCardLabour.delete({ where: { id } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 }

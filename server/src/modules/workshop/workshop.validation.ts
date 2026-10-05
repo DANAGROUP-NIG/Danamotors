@@ -26,7 +26,7 @@ export const qcUpdateSchema = z.object({
     id: z.string().uuid('Invalid job card ID'),
   }),
   body: z.object({
-    qcStatus: z.string().min(1, 'QC status is required'),
+    qcStatus: z.enum(['PASSED', 'FAILED', 'PENDING']),
     qcNotes: z.string().optional(),
   }),
 });

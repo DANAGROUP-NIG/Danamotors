@@ -165,7 +165,7 @@ export function CustomersTable() {
       header: "Customer",
       render: (c) => (
         <div className="flex items-center gap-3">
-          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">
+          <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-black text-primary">
             {getCustomerInitials(c)}
           </span>
           <span className="font-medium">

@@ -1,3 +1,4 @@
+import { assertApprovedOperation } from '../service/estimate-approval';
 import prisma from "../../prisma/client";
 import { InventoryRepository } from "./inventory.repository";
 import {
@@ -10,21 +11,20 @@ import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
 
-
 const INHERITABLE_FIELDS = [
-  'category',
-  'uom',
-  'taxCategory',
-  'taxForm',
-  'minLevel',
-  'maxLevel',
-  'reorderQty',
-  'unitPrice',
-  'retailRate',
-  'taxable',
-  'partFlag',
-  'priceCategoryCode',
-  'storeLocation',
+  "category",
+  "uom",
+  "taxCategory",
+  "taxForm",
+  "minLevel",
+  "maxLevel",
+  "reorderQty",
+  "unitPrice",
+  "retailRate",
+  "taxable",
+  "partFlag",
+  "priceCategoryCode",
+  "storeLocation",
 ] as const;
 
 type InheritableField = (typeof INHERITABLE_FIELDS)[number];
@@ -64,7 +64,6 @@ interface CreateAlternatePartInput {
   overrides?: Partial<InheritedDefaults>;
 }
 
-
 interface ListPartsQuery {
   branchId?: string | null;
   partCode?: string;
@@ -75,15 +74,21 @@ interface ListPartsQuery {
   role?: PartRole | string;
   mainPartId?: string;
   search?: string;
-  page?: number ;
-  pageSize?: number ;
-  limit?: number ;
+  page?: number;
+  pageSize?: number;
+  limit?: number;
 }
 /** Prisma reports RESTRICT violations as P2003 or as a raw Postgres 23001/23503 error. */
 function isForeignKeyViolation(error: unknown): boolean {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") return true;
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2003"
+  )
+    return true;
   const message = error instanceof Error ? error.message : "";
-  return /violates (RESTRICT setting of )?foreign key constraint|23001|23503/.test(message);
+  return /violates (RESTRICT setting of )?foreign key constraint|23001|23503/.test(
+    message,
+  );
 }
 
 export class InventoryService {
@@ -93,21 +98,46 @@ export class InventoryService {
     this.inventoryRepository = new InventoryRepository();
   }
 
+  /**
+   * Parts created without an explicit code use their part number, which is
+   * already unique; a numbered suffix covers the rare clash with another code.
+   */
+  private async generatePartCode(partNumber: string): Promise<string> {
+    for (let i = 0; i < 50; i++) {
+      const candidate = i === 0 ? partNumber : `${partNumber}-${i + 1}`;
+      const taken = await prisma.sparePart.findUnique({
+        where: { partCode: candidate },
+        select: { id: true },
+      });
+      if (!taken) return candidate;
+    }
+    throw new ConflictError(`Could not generate a part code for ${partNumber}`);
+  }
+
   /** Legacy retail rate: dealer rate x the price category's multiplier, rounded to kobo. */
-  private async retailFromCategory(dealerRate: number, code: string | null | undefined): Promise<number | null> {
+  private async retailFromCategory(
+    dealerRate: number,
+    code: string | null | undefined,
+  ): Promise<number | null> {
     if (!code) return null;
     const category = await prisma.partCategory.findUnique({ where: { code } });
     if (!category) throw new BadRequestError(`Unknown price category ${code}`);
-    if (!category.isActive) throw new BadRequestError(`Price category ${code} is inactive`);
+    if (!category.isActive)
+      throw new BadRequestError(`Price category ${code} is inactive`);
     return Math.round(dealerRate * category.markupMultiplier * 100) / 100;
   }
 
   async listPartCategories() {
-    return prisma.partCategory.findMany({ orderBy: { code: 'asc' } });
+    return prisma.partCategory.findMany({ orderBy: { code: "asc" } });
   }
 
-  private withAvailableQuantity<T extends { quantity: number; reservedQuantity: number }>(stock: T): T & { availableQuantity: number } {
-    return { ...stock, availableQuantity: stock.quantity - stock.reservedQuantity };
+  private withAvailableQuantity<
+    T extends { quantity: number; reservedQuantity: number },
+  >(stock: T): T & { availableQuantity: number } {
+    return {
+      ...stock,
+      availableQuantity: stock.quantity - stock.reservedQuantity,
+    };
   }
 
   private async notifyLowStock(
@@ -168,8 +198,11 @@ export class InventoryService {
       );
     }
 
-    // partCode is not set here: the database generates it.
-    const { branchStock, recordedById, ...partData } = data;
+    const { branchStock, recordedById, ...rest } = data;
+    const partData = {
+      ...rest,
+      partCode: await this.generatePartCode(rest.partNumber),
+    };
 
     if (!branchStock || branchStock.length === 0) {
       return this.inventoryRepository.createSparePart(partData);
@@ -262,8 +295,8 @@ export class InventoryService {
       // Prevents alternates being chained off other alternates —
       // keeps the hierarchy exactly one level deep, matching one-to-many.
       throw new Error(
-      `Part ${data.mainPartId} is not a MAIN part and cannot have alternates`
-      )
+        `Part ${data.mainPartId} is not a MAIN part and cannot have alternates`,
+      );
     }
 
     const inherited: InheritedDefaults = INHERITABLE_FIELDS.reduce(
@@ -274,7 +307,14 @@ export class InventoryService {
       {} as InheritedDefaults,
     );
 
-    const { mainPartId, partNumber, name, description, binLocation, overrides } = data;
+    const {
+      mainPartId,
+      partNumber,
+      name,
+      description,
+      binLocation,
+      overrides,
+    } = data;
 
     return prisma.sparePart.create({
       data: {
@@ -292,7 +332,9 @@ export class InventoryService {
 
   // ---------- GET /inventory/parts/:id/alternates ----------
   async listAlternates(mainPartId: string, branchId?: string | null) {
-    const mainPart = await prisma.sparePart.findUnique({ where: { id: mainPartId } });
+    const mainPart = await prisma.sparePart.findUnique({
+      where: { id: mainPartId },
+    });
     if (!mainPart) throw new NotFoundError(`Part ${mainPartId} not found`);
 
     return prisma.sparePart.findMany({
@@ -300,29 +342,42 @@ export class InventoryService {
         mainPartId,
         ...(branchId && { inventoryStocks: { some: { branchId } } }),
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
   }
 
   // ---------- GET /inventory/parts?role=ALTERNATE&... ----------
   async listPartsWithFilters(query: ListPartsQuery) {
-    const {branchId, role, name, partCode, partNumber, category, partStatus, mainPartId, search } = query;
+    const {
+      branchId,
+      role,
+      name,
+      partCode,
+      partNumber,
+      category,
+      partStatus,
+      mainPartId,
+      search,
+    } = query;
     const page = query.page ?? 1;
     const limit = query.limit ?? query.pageSize ?? 25;
 
     const where: Prisma.SparePartWhereInput = {
       ...(partCode && { partCode }),
-    ...(partNumber && { partNumber }),
-    ...(name && { name: { contains: name, mode: 'insensitive' } }),
-      ...(category && { category: { contains: category, mode: 'insensitive' } }),
-    ...(partStatus && { partStatus: partStatus as PartStatus }),
-    ...(role && { role: role as PartRole }),
-    ...(mainPartId && { mainPartId }),
-    ...(branchId && { inventoryStocks: { some: { branchId } } }),
-    ...(search && {
+      ...(partNumber && { partNumber }),
+      ...(name && { name: { contains: name, mode: "insensitive" } }),
+      ...(category && {
+        category: { contains: category, mode: "insensitive" },
+      }),
+      ...(partStatus && { partStatus: partStatus as PartStatus }),
+      ...(role && { role: role as PartRole }),
+      ...(mainPartId && { mainPartId }),
+      ...(branchId && { inventoryStocks: { some: { branchId } } }),
+      ...(search && {
         OR: [
-          { partNumber: { contains: search, mode: 'insensitive' } },
-          { name: { contains: search, mode: 'insensitive' } },
+          { partNumber: { contains: search, mode: "insensitive" } },
+          { partCode: { contains: search, mode: "insensitive" } },
+          { name: { contains: search, mode: "insensitive" } },
         ],
       }),
     };
@@ -332,7 +387,7 @@ export class InventoryService {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.sparePart.count({ where }),
     ]);
@@ -340,16 +395,17 @@ export class InventoryService {
     return { items, total, page: page, pageSize: limit };
   }
 
-
   // ---------- GET /inventory/parts/:id/replacement-options ----------
   async getReplacementOptions(mainPartId: string, branchId?: string | null) {
-    const mainPart = await prisma.sparePart.findUnique({ where: { id: mainPartId } });
+    const mainPart = await prisma.sparePart.findUnique({
+      where: { id: mainPartId },
+    });
     if (!mainPart) throw new NotFoundError(`Part ${mainPartId} not found`);
 
     const alternates = await prisma.sparePart.findMany({
       where: {
         mainPartId,
-        partStatus: 'ACTIVE' as never,
+        partStatus: "ACTIVE" as never,
         ...(branchId && { inventoryStocks: { some: { branchId } } }),
       },
       include: {
@@ -361,7 +417,10 @@ export class InventoryService {
     return alternates
       .map((alt) => ({
         ...alt,
-        totalAvailableQty: alt.inventoryStocks.reduce((sum, s) => sum + (s.quantity ?? 0), 0),
+        totalAvailableQty: alt.inventoryStocks.reduce(
+          (sum, s) => sum + (s.quantity ?? 0),
+          0,
+        ),
       }))
       .filter((alt) => alt.totalAvailableQty > 0)
       .sort((a, b) => b.totalAvailableQty - a.totalAvailableQty);
@@ -375,6 +434,7 @@ export class InventoryService {
   }
 
   async createPart(data: {
+    partCode?: string;
     partNumber: string;
     name: string;
     category: string;
@@ -394,10 +454,26 @@ export class InventoryService {
     partStatus?: PartStatus;
   }) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
-      data = { ...data, retailRate: (await this.retailFromCategory(data.unitRate, data.priceCategoryCode)) ?? undefined };
+      data = {
+        ...data,
+        retailRate:
+          (await this.retailFromCategory(
+            data.unitRate,
+            data.priceCategoryCode,
+          )) ?? undefined,
+      };
     } else if (data.priceCategoryCode) {
       await this.retailFromCategory(data.unitRate, data.priceCategoryCode); // validates the code
     }
+    if (data.partCode) {
+      const existing = await this.inventoryRepository.findPartByCode(
+        data.partCode,
+      );
+      if (existing) {
+        throw new ConflictError("A part with this part code already exists");
+      }
+    }
+
     const { unitRate, ...rest } = data;
     const part = await this.inventoryRepository.createPart({
       ...rest,
@@ -453,6 +529,7 @@ export class InventoryService {
   async updatePart(
     id: string,
     data: {
+      partCode?: string;
       partNumber?: string;
       name?: string;
       category?: string;
@@ -477,6 +554,15 @@ export class InventoryService {
       throw new NotFoundError("Part not found");
     }
 
+    if (data.partCode && data.partCode !== part.partCode) {
+      const existing = await this.inventoryRepository.findPartByCode(
+        data.partCode,
+      );
+      if (existing && existing.id !== id) {
+        throw new ConflictError("A part with this part code already exists");
+      }
+    }
+
     const { unitRate, ...rest } = data;
     const updateData: Partial<SparePart> = { ...rest };
     if (unitRate !== undefined) {
@@ -484,10 +570,18 @@ export class InventoryService {
     }
 
     // Keep the retail rate in step with the dealer rate and price category unless it was sent explicitly.
-    const category = data.priceCategoryCode !== undefined ? data.priceCategoryCode : part.priceCategoryCode;
+    const category =
+      data.priceCategoryCode !== undefined
+        ? data.priceCategoryCode
+        : part.priceCategoryCode;
     const dealer = unitRate ?? part.unitPrice;
-    if (data.priceCategoryCode) await this.retailFromCategory(dealer, data.priceCategoryCode);
-    if (data.retailRate === undefined && (unitRate !== undefined || data.priceCategoryCode !== undefined) && category) {
+    if (data.priceCategoryCode)
+      await this.retailFromCategory(dealer, data.priceCategoryCode);
+    if (
+      data.retailRate === undefined &&
+      (unitRate !== undefined || data.priceCategoryCode !== undefined) &&
+      category
+    ) {
       updateData.retailRate = await this.retailFromCategory(dealer, category);
     }
 
@@ -501,7 +595,9 @@ export class InventoryService {
       throw new NotFoundError("Part not found");
     }
 
-    const alternates = await prisma.sparePart.count({ where: { mainPartId: id } });
+    const alternates = await prisma.sparePart.count({
+      where: { mainPartId: id },
+    });
     if (alternates > 0) {
       throw new ConflictError(
         `This part has ${alternates} alternate part(s). Delete or reassign them first, or block the part instead.`,
@@ -538,11 +634,17 @@ export class InventoryService {
   }
 
   async listBranchStock(branchId: string) {
-    const stock = await this.inventoryRepository.listInventoryStockByBranch(branchId);
+    const stock =
+      await this.inventoryRepository.listInventoryStockByBranch(branchId);
     return stock.map((item) => this.withAvailableQuantity(item));
   }
 
-  async listAllStock(filters?: { branchId?: string; partId?: string; search?: string }) {
+  async listAllStock(filters?: {
+    branchId?: string;
+    partId?: string;
+    search?: string;
+    limit?: number;
+  }) {
     const stock = await this.inventoryRepository.listAllInventoryStock(filters);
     return stock.map((item) => this.withAvailableQuantity(item));
   }
@@ -589,20 +691,43 @@ export class InventoryService {
   async updateStockLocation(
     branchId: string,
     partId: string,
-    data: { rackLocation?: string | null; binCard?: string | null; minimumStock?: number; maximumStock?: number | null },
+    data: {
+      rackLocation?: string | null;
+      binCard?: string | null;
+      minimumStock?: number;
+      maximumStock?: number | null;
+    },
   ) {
     const [branch, part] = await Promise.all([
-      prisma.branch.findUnique({ where: { id: branchId }, select: { id: true } }),
-      prisma.sparePart.findUnique({ where: { id: partId }, select: { id: true } }),
+      prisma.branch.findUnique({
+        where: { id: branchId },
+        select: { id: true },
+      }),
+      prisma.sparePart.findUnique({
+        where: { id: partId },
+        select: { id: true },
+      }),
     ]);
     if (!branch) throw new NotFoundError("Branch not found");
     if (!part) throw new NotFoundError("Part not found");
-    if (data.maximumStock != null && data.minimumStock != null && data.maximumStock < data.minimumStock) {
-      throw new BadRequestError("Maximum stock must be greater than or equal to minimum stock");
+    if (
+      data.maximumStock != null &&
+      data.minimumStock != null &&
+      data.maximumStock < data.minimumStock
+    ) {
+      throw new BadRequestError(
+        "Maximum stock must be greater than or equal to minimum stock",
+      );
     }
     const stock = await prisma.inventoryStock.upsert({
       where: { branchId_partId: { branchId, partId } },
-      create: { branchId, partId, quantity: 0, ...data, minimumStock: data.minimumStock ?? 0 },
+      create: {
+        branchId,
+        partId,
+        quantity: 0,
+        ...data,
+        minimumStock: data.minimumStock ?? 0,
+      },
       update: data,
       include: { branch: true, part: true },
     });
@@ -618,7 +743,10 @@ export class InventoryService {
 
     const rootId = part.mainPartId ?? part.id;
     const alternates = await prisma.sparePart.findMany({
-      where: { id: { not: part.id }, OR: [{ id: rootId }, { mainPartId: rootId }] },
+      where: {
+        id: { not: part.id },
+        OR: [{ id: rootId }, { mainPartId: rootId }],
+      },
       orderBy: { partNumber: "asc" },
     });
     const [branches, stocks] = await Promise.all([
@@ -628,7 +756,14 @@ export class InventoryService {
       }),
       prisma.inventoryStock.findMany({
         where: { partId: { in: [part.id, ...alternates.map((a) => a.id)] } },
-        select: { branchId: true, partId: true, quantity: true, reservedQuantity: true, rackLocation: true, binCard: true },
+        select: {
+          branchId: true,
+          partId: true,
+          quantity: true,
+          reservedQuantity: true,
+          rackLocation: true,
+          binCard: true,
+        },
       }),
     ]);
     return buildPartQuery({ part, alternates, branches, stocks, homeBranchId });
@@ -729,6 +864,9 @@ export class InventoryService {
     if (!sparePart) {
       throw new NotFoundError("Spare part not found");
     }
+    if (sparePart.partStatus !== PartStatus.ACTIVE) {
+      throw new BadRequestError("Blocked parts cannot be issued");
+    }
 
     if (data.quantity <= 0) {
       throw new BadRequestError("Issued quantity must be greater than zero");
@@ -763,6 +901,15 @@ export class InventoryService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      if (data.jobCardId) {
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
+        const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });
+        if (card.branchId !== data.branchId || card.billedAt || ['READY', 'COMPLETED', 'BILLED', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(card.status.toUpperCase())) throw new BadRequestError('Parts can only be issued to an open job in this branch');
+        const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId }, include: { returns: true } });
+        const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((n, r) => n + r.quantity, 0), 0);
+        if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+      }
       const updated = await tx.inventoryStock.updateMany({
         where: {
           branchId: data.branchId,
@@ -775,6 +922,7 @@ export class InventoryService {
         throw new BadRequestError("Insufficient stock at this branch");
       }
 
+      if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
       const issuance = await tx.partIssuance.create({ data });
       await tx.stockTransaction.create({
         data: {
@@ -789,16 +937,25 @@ export class InventoryService {
       });
       const stock = await tx.inventoryStock.findUniqueOrThrow({
         where: {
-          branchId_partId: { branchId: data.branchId, partId: data.sparePartId },
+          branchId_partId: {
+            branchId: data.branchId,
+            partId: data.sparePartId,
+          },
         },
         include: { part: { select: { id: true, name: true } } },
       });
       return { issuance, stock };
-    });
+    }, { maxWait: 5000, timeout: 15000 });
 
     // The stock mutation has committed; notification failure must not invite a duplicate issue.
-    await this.notifyLowStock(data.branchId, result.stock.part, result.stock.quantity, result.stock.minimumStock)
-      .catch(() => console.error('Low-stock notification could not be recorded'));
+    await this.notifyLowStock(
+      data.branchId,
+      result.stock.part,
+      result.stock.quantity,
+      result.stock.minimumStock,
+    ).catch(() =>
+      console.error("Low-stock notification could not be recorded"),
+    );
     return result.issuance;
   }
 
@@ -823,22 +980,68 @@ export class InventoryService {
     reason?: string;
     status?: string;
   }) {
-    if (!Number.isInteger(data.quantity) || data.quantity <= 0) throw new BadRequestError('Returned quantity must be a positive integer');
+    if (!Number.isInteger(data.quantity) || data.quantity <= 0)
+      throw new BadRequestError("Returned quantity must be a positive integer");
     return prisma.$transaction(async (tx) => {
-      const initial = await tx.partIssuance.findUnique({ where: { id: data.partIssuanceId } });
-      if (!initial) throw new NotFoundError('Part issuance not found');
+      const initial = await tx.partIssuance.findUnique({
+        where: { id: data.partIssuanceId },
+      });
+      if (!initial) throw new NotFoundError("Part issuance not found");
       if (initial.jobCardId) {
-        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`);
-        const card = await tx.jobCard.findUniqueOrThrow({ where: { id: initial.jobCardId } });
-        if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'].includes(card.status)) throw new BadRequestError('Cannot return parts on a billed or closed job');
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`,
+        );
+        const card = await tx.jobCard.findUniqueOrThrow({
+          where: { id: initial.jobCardId },
+        });
+        if (
+          card.billedAt ||
+          ["BILLED", "DELIVERED", "CANCELLED", "Closed", "Cancelled"].includes(
+            card.status,
+          )
+        )
+          throw new BadRequestError(
+            "Cannot return parts on a billed or closed job",
+          );
       }
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "PartIssuance" WHERE id = ${initial.id} FOR UPDATE`);
-      if (initial.branchId !== data.branchId) throw new BadRequestError('Return branch must match issuance');
-      const returned = await tx.partReturn.aggregate({ where: { partIssuanceId: initial.id, status: { notIn: ['Rejected', 'REJECTED'] } }, _sum: { quantity: true } });
-      if ((returned._sum.quantity ?? 0) + data.quantity > initial.quantity) throw new BadRequestError('Returned quantity exceeds issued quantity');
-      await tx.inventoryStock.updateMany({ where: { branchId: data.branchId, partId: initial.sparePartId }, data: { quantity: { increment: data.quantity } } });
-      await tx.stockTransaction.create({ data: { branchId: data.branchId, partId: initial.sparePartId, type: 'RETURNED', quantity: data.quantity, referenceId: initial.id, notes: data.reason, recordedById: data.returnedById } });
-      return tx.partReturn.create({ data: { partIssuanceId: initial.id, returnedById: data.returnedById, quantity: data.quantity, reason: data.reason, status: 'Completed' } });
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "PartIssuance" WHERE id = ${initial.id} FOR UPDATE`,
+      );
+      if (initial.branchId !== data.branchId)
+        throw new BadRequestError("Return branch must match issuance");
+      const returned = await tx.partReturn.aggregate({
+        where: {
+          partIssuanceId: initial.id,
+          status: { notIn: ["Rejected", "REJECTED"] },
+        },
+        _sum: { quantity: true },
+      });
+      if ((returned._sum.quantity ?? 0) + data.quantity > initial.quantity)
+        throw new BadRequestError("Returned quantity exceeds issued quantity");
+      await tx.inventoryStock.updateMany({
+        where: { branchId: data.branchId, partId: initial.sparePartId },
+        data: { quantity: { increment: data.quantity } },
+      });
+      await tx.stockTransaction.create({
+        data: {
+          branchId: data.branchId,
+          partId: initial.sparePartId,
+          type: "RETURNED",
+          quantity: data.quantity,
+          referenceId: initial.id,
+          notes: data.reason,
+          recordedById: data.returnedById,
+        },
+      });
+      return tx.partReturn.create({
+        data: {
+          partIssuanceId: initial.id,
+          returnedById: data.returnedById,
+          quantity: data.quantity,
+          reason: data.reason,
+          status: "Completed",
+        },
+      });
     });
   }
 
@@ -1004,8 +1207,15 @@ export class InventoryService {
       );
 
     const transferItems = await this.inventoryRepository.findTransferItems(id);
-    if (items?.some((item) => !transferItems.some((transferItem) => transferItem.id === item.id))) {
-      throw new BadRequestError("One or more transfer items do not belong to this transfer");
+    if (
+      items?.some(
+        (item) =>
+          !transferItems.some((transferItem) => transferItem.id === item.id),
+      )
+    ) {
+      throw new BadRequestError(
+        "One or more transfer items do not belong to this transfer",
+      );
     }
     const parts = await prisma.sparePart.findMany({
       where: { id: { in: transferItems.map((i) => i.partId) } },
@@ -1096,8 +1306,15 @@ export class InventoryService {
       );
 
     const transferItems = await this.inventoryRepository.findTransferItems(id);
-    if (items?.some((item) => !transferItems.some((transferItem) => transferItem.id === item.id))) {
-      throw new BadRequestError("One or more transfer items do not belong to this transfer");
+    if (
+      items?.some(
+        (item) =>
+          !transferItems.some((transferItem) => transferItem.id === item.id),
+      )
+    ) {
+      throw new BadRequestError(
+        "One or more transfer items do not belong to this transfer",
+      );
     }
     for (const item of transferItems) {
       const receivedQty =

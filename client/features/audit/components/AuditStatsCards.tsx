@@ -19,7 +19,7 @@ export function AuditStatsCards() {
         <Card key={label} className="rounded-xl border-[#e8edf3] bg-white">
           <CardContent className="flex items-start justify-between p-5">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
               {isLoading ? <div className="mt-2 h-7 w-24 animate-pulse rounded bg-muted" /> : (
                 <p className="mt-1 truncate text-xl font-bold" title={String(value)}>{isError ? "Unavailable" : value}</p>
               )}

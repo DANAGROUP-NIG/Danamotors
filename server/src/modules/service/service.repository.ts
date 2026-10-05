@@ -1,4 +1,5 @@
 import prisma from '../../prisma/client';
+import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
   ServiceAppointment,
@@ -235,7 +236,7 @@ export class ServiceRepository {
     }
 
     if (params?.status) {
-      where.status = params.status;
+      where.status = jobStatusFilter(params.status);
     }
 
     if (params?.search) {
@@ -266,6 +267,7 @@ export class ServiceRepository {
         previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        service: true,
         serviceType: true,
         bay: true,
         team: true,
@@ -279,6 +281,9 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -303,6 +308,7 @@ export class ServiceRepository {
         previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        service: true,
         serviceType: true,
         bay: true,
         team: true,
@@ -316,6 +322,9 @@ export class ServiceRepository {
             firstName: true,
             lastName: true,
             email: true,
+            companyName: true,
+            code: true,
+            phoneNumber: true,
           },
         },
         vehicle: true,
@@ -330,6 +339,7 @@ export class ServiceRepository {
         },
         inspections: true,
         estimates: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
             approvals: { orderBy: { createdAt: 'desc' } },
             lines: true,
@@ -338,7 +348,7 @@ export class ServiceRepository {
         partIssuances: {
           include: {
             sparePart: {
-              select: { id: true, partNumber: true, name: true, unitPrice: true },
+              select: { id: true, partNumber: true, name: true, unitPrice: true, retailRate: true },
             },
             issuedBy: {
               select: { id: true, firstName: true, lastName: true },

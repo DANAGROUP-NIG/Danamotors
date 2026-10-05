@@ -58,7 +58,7 @@ export function CustomerCreditCard({ customer }: { customer: Customer }) {
           className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:flex-row sm:items-end"
         >
           <label className="grid flex-1 gap-1">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-400">
               Amount (₦) — positive adds, negative deducts
             </span>
             <input
@@ -71,7 +71,7 @@ export function CustomerCreditCard({ customer }: { customer: Customer }) {
             />
           </label>
           <label className="grid flex-1 gap-1">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-400">
               Description
             </span>
             <input
@@ -103,7 +103,7 @@ export function CustomerCreditCard({ customer }: { customer: Customer }) {
       )}
 
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">
+        <p className="mb-2 text-sm font-medium uppercase tracking-wider text-slate-400">
           Ledger
         </p>
         {isLoading ? (
@@ -116,7 +116,7 @@ export function CustomerCreditCard({ customer }: { customer: Customer }) {
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-medium uppercase tracking-wider text-slate-400">
+                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
                   <th className="py-2 pr-4">Date</th>
                   <th className="py-2 pr-4">Type</th>
                   <th className="py-2 pr-4">Description</th>
@@ -132,7 +132,7 @@ export function CustomerCreditCard({ customer }: { customer: Customer }) {
                     </td>
                     <td className="py-2 pr-4">
                       <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
                           tx.amount < 0
                             ? "bg-red-100 text-red-700"
                             : "bg-green-100 text-green-700"

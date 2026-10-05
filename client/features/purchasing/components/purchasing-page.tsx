@@ -191,7 +191,7 @@ export function PurchasingPage() {
           <Package className="size-4 text-muted-foreground" />
           <div>
             <div className="text-sm font-medium">{pr.sparePart.name}</div>
-            <div className="font-mono text-xs text-muted-foreground">{pr.sparePart.partNumber}</div>
+            <div className="font-mono text-sm text-muted-foreground">{pr.sparePart.partNumber}</div>
           </div>
         </div>
       ),
@@ -223,7 +223,7 @@ export function PurchasingPage() {
     {
       header: "Status",
       render: (pr) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[pr.status] || ""}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[pr.status] || ""}`}>
           {pr.status}
         </span>
       ),

@@ -15,7 +15,17 @@ export type Estimate = {
   amount: number;
   currency: string;
   status: string;
+  createdAt?: string;
   approvals?: CustomerApproval[];
+  lines?: {
+    id: string;
+    type: string;
+    referenceId?: string | null;
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+  }[];
 };
 
 export type CustomerApproval = {
@@ -44,7 +54,10 @@ export type JobCardCustomer = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
+  companyName?: string | null;
+  code?: string | null;
+  phoneNumber?: string | null;
 };
 
 export type JobCardVehicle = {
@@ -67,6 +80,7 @@ export type PartIssuance = {
     partNumber: string;
     name: string;
     unitPrice: number;
+    retailRate?: number | null;
   };
   issuedBy: {
     id: string;
@@ -85,6 +99,7 @@ export type PartReturn = {
 };
 
 export type JobCardInvoice = {
+  outstandingAmount: number;
   id: string;
   invoiceNumber: string;
   issuedDate: string;
@@ -114,6 +129,8 @@ export type JobCard = {
   serviceCharge?: number | null;
   id: string;
   mileage?: number | null;
+  inHouse?: boolean | null;
+  acFitted?: boolean | null;
   promisedAt?: string | null;
   readyAt?: string | null;
   deliveredAt?: string | null;
@@ -125,11 +142,29 @@ export type JobCard = {
   creditApprovedById?: string | null;
   observations?: string | null;
   workDone?: string | null;
-  previousJob?: { id: string; jobNumber: string; technician?: { firstName: string; lastName: string } | null } | null;
+  previousJob?: {
+    id: string;
+    jobNumber: string;
+    technician?: { firstName: string; lastName: string } | null;
+  } | null;
   isRepeat?: boolean;
   repeatReason?: string | null;
-  complaints?: { id: string; description: string; defectCode?: string | null; spare?: number; oil?: number; labour?: number }[];
-  statusHistory?: { id: string; fromStatus?: string; toStatus: string; createdAt: string; remarks?: string; actor: { firstName: string; lastName: string } }[];
+  complaints?: {
+    id: string;
+    description: string;
+    defectCode?: string | null;
+    spare?: number;
+    oil?: number;
+    labour?: number;
+  }[];
+  statusHistory?: {
+    id: string;
+    fromStatus?: string;
+    toStatus: string;
+    createdAt: string;
+    remarks?: string;
+    actor: { firstName: string; lastName: string };
+  }[];
   jobNumber: string;
   description: string;
   status: JobCardStatus;
@@ -151,6 +186,15 @@ export type JobCard = {
   createdAt: string;
   updatedAt: string;
   billedAt?: string | null;
+  serviceId?: string | null;
+  service?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    durationMins?: number | null;
+    price: number;
+  } | null;
   appointment?: JobCardAppointment;
   branch: JobCardBranch;
   customer: JobCardCustomer;

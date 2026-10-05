@@ -1,5 +1,6 @@
 "use client";
 
+import { useBranchStore } from "@/store/branch.store";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileUp, RefreshCw } from "lucide-react";
@@ -96,6 +97,9 @@ function downloadXml(batch: ExportBatch) {
 }
 
 export function TallyWorkspace() {
+  const branchId = useBranchStore((state) => state.activeBranch?.id);
+  const [busy, setBusy] = useState(false);
+  const pending = useQuery({ queryKey: ["tally-batches", branchId], queryFn: () => apiGet<{ batches: ExportBatch[] }>(`/finance/tally/batches${branchId ? `?branchId=${encodeURIComponent(branchId)}` : ""}`) });
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [type, setType] = useState<DocumentType>("JOB_BILL");
   const [selected, setSelected] = useState<string[]>([]);
@@ -108,9 +112,10 @@ export function TallyWorkspace() {
   const [selectedLedgerCode, setSelectedLedgerCode] = useState("");
 
   const documents = useQuery({
-    queryKey: ["tally-documents", date, type],
+    queryKey: ["tally-documents", branchId, date, type],
     queryFn: async () => {
       const query = new URLSearchParams({ date, type });
+      if (branchId) query.set("branchId", branchId);
       return apiGet<{ documents: TallyDocument[] }>(`${API_ROUTES.finance.tally.documents}?${query}`);
     },
   });
@@ -130,6 +135,8 @@ export function TallyWorkspace() {
   }
 
   async function exportBatch() {
+    if (busy) return;
+    setBusy(true);
     try {
       const result = await apiPost<ExportBatch>(API_ROUTES.finance.tally.export, {
         documents: selected.map((id) => ({ id, type })),
@@ -143,13 +150,14 @@ export function TallyWorkspace() {
       await documents.refetch();
     } catch {
       toast.error("Could not prepare Tally XML");
-    }
+    } finally { setBusy(false); await pending.refetch(); }
   }
 
   async function confirmPosted() {
-    if (!batch) return;
+    if (!batch || busy) return;
     const confirmed = batch.exported.filter((document) => voucherNumbers[document.id]?.trim());
     if (confirmed.length === 0) return;
+    setBusy(true);
     try {
       await apiPost(API_ROUTES.finance.tally.confirm, {
         batchId: batch.batchId,
@@ -160,11 +168,12 @@ export function TallyWorkspace() {
         })),
       });
       toast.success(`${confirmed.length} Tally posting(s) recorded`);
-      setBatch(null);
+      const remaining = batch.exported.filter((item) => !confirmed.some((done) => done.id === item.id));
+      setBatch(remaining.length ? { ...batch, exported: remaining } : null);
       await documents.refetch();
     } catch {
       toast.error("Could not confirm Tally posting references");
-    }
+    } finally { setBusy(false); await pending.refetch(); }
   }
 
   async function importLedgers() {
@@ -215,7 +224,7 @@ export function TallyWorkspace() {
           </select>
         </Field>
         <div className="flex items-end gap-2">
-          <Button onClick={exportBatch} disabled={selected.length === 0}>
+          <Button onClick={exportBatch} disabled={busy || selected.length === 0}>
             <Download className="size-4" />
             Export selected XML ({selected.length})
           </Button>
@@ -244,11 +253,12 @@ export function TallyWorkspace() {
         </div>
       )}
 
+      {!!pending.data?.batches.length && <Field label="Resume exported batch"><select className={inputCls} disabled={busy} value={batch?.batchId ?? ""} onChange={(event) => { setBatch(pending.data?.batches.find((item) => item.batchId === event.target.value) ?? null); setVoucherNumbers({}); }}><option value="">Choose pending batch</option>{pending.data.batches.map((item) => <option key={item.batchId} value={item.batchId}>{item.batchId} ({item.exported.length} pending)</option>)}</select></Field>}
       {batch && <section className="grid gap-4 border-y py-4">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Export batch {batch.batchId}</h2><p className="text-sm text-muted-foreground">Exported XML is not marked posted until you enter Tally voucher references.</p></div><Button variant="outline" onClick={() => downloadXml(batch)}><Download className="size-4" />Download XML again</Button></div>
         {batch.exported.map((document) => <div key={document.id} className="grid gap-3 sm:grid-cols-[1fr_240px] sm:items-center"><span className="text-sm">{document.documentNumber}</span><input className={inputCls} placeholder="Tally voucher reference after import" value={voucherNumbers[document.id] ?? ""} onChange={(event) => setVoucherNumbers((current) => ({ ...current, [document.id]: event.target.value }))} /></div>)}
         {batch.skipped.map((document) => <p key={document.id} className="text-sm text-amber-700">{document.documentNumber ?? document.id}: {document.reason}</p>)}
-        {batch.exported.length > 0 && <div><Button onClick={confirmPosted} disabled={!batch.exported.some((document) => voucherNumbers[document.id]?.trim())}>Record confirmed postings</Button></div>}
+        {batch.exported.length > 0 && <div><Button onClick={confirmPosted} disabled={busy || !batch.exported.some((document) => voucherNumbers[document.id]?.trim())}>Record confirmed postings</Button></div>}
       </section>}
 
       <section className="grid gap-4 border-y py-4">
@@ -264,11 +274,11 @@ export function TallyWorkspace() {
       <section className="grid gap-4 border-y py-4 md:grid-cols-4">
         <div className="md:col-span-4"><h2 className="font-semibold">Account mappings</h2></div>
         <Field label="Document type"><select className={inputCls} value={mappingType} onChange={(event) => { setMappingType(event.target.value as DocumentType); setAccountType(event.target.value === "JOB_BILL" ? "PARTS_SALES" : "BANK"); }}><option value="JOB_BILL">Job bill</option><option value="RECEIPT">Receipt</option></select></Field>
-        <Field label="Account role"><select className={inputCls} value={accountType} onChange={(event) => setAccountType(event.target.value)}>{(mappingType === "JOB_BILL" ? ["PARTS_SALES", "LABOUR_SALES", "PARTS_DISCOUNT", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"] : ["BANK", "CASH"]).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></Field>
+        <Field label="Account role"><select className={inputCls} value={accountType} onChange={(event) => setAccountType(event.target.value)}>{(mappingType === "JOB_BILL" ? ["PARTS_SALES", "LABOUR_SALES", "SERVICE_SALES", "PARTS_DISCOUNT", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"] : ["BANK", "CASH"]).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></Field>
         <Field label="Find ledger by code/name"><input className={inputCls} value={ledgerSearch} onChange={(event) => { setLedgerSearch(event.target.value); setSelectedLedgerCode(""); }} /></Field>
         <Field label="Selected ledger"><select className={inputCls} value={selectedLedgerCode} onChange={(event) => setSelectedLedgerCode(event.target.value)}><option value="">Choose a matching ledger</option>{ledgers.data?.ledgers.map((ledger) => <option key={ledger.id} value={ledger.code}>{ledger.code} - {ledger.name}</option>)}</select></Field>
         <div className="flex items-end"><Button variant="outline" onClick={saveMapping} disabled={!selectedLedgerCode}>Save mapping</Button></div>
-        <div className="md:col-span-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">{mappings.data?.mappings.map((mapping) => <span key={`${mapping.documentType}-${mapping.accountType}`}>{mapping.documentType} / {mapping.accountType}: {mapping.tallyLedgerCode} - {mapping.tallyLedgerName}</span>)}</div>
+        <div className="md:col-span-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">{mappings.data?.mappings.map((mapping) => <span key={`${mapping.documentType}-${mapping.accountType}`}>{mapping.documentType} / {mapping.accountType}: {mapping.tallyLedgerCode} - {mapping.tallyLedgerName}</span>)}</div>
       </section>
     </div>
   );

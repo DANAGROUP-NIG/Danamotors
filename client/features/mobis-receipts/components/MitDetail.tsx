@@ -21,7 +21,7 @@ import {
 } from "../lib/mobis-labels";
 import type { MobisMit } from "../types/mobis.types";
 
-const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
+const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
 const numCls = cn(inputCls, "ml-auto h-9 w-20 text-right");
 const toInt = (v: string) => {
@@ -114,10 +114,10 @@ function MrnDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) {
               {values.map(({ line, ok, short }) => (
                 <tr key={line.id} className="border-t border-slate-100">
                   <td className={tdCls}>
-                    <p className="font-mono text-xs font-medium">{line.part.partNumber}</p>
-                    <p className="max-w-48 truncate text-xs text-slate-500">{line.part.name}</p>
+                    <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
+                    <p className="max-w-48 truncate text-sm text-slate-500">{line.part.name}</p>
                   </td>
-                  <td className={cn(tdCls, "font-mono text-xs text-slate-500")}>{line.caseNumbers ?? "—"}</td>
+                  <td className={cn(tdCls, "font-mono text-sm text-slate-500")}>{line.caseNumbers ?? "—"}</td>
                   <td className={cn(tdCls, "text-right")}>{line.quantity}</td>
                   {(["received", "damaged"] as const).map((field) => (
                     <td key={field} className={cn(tdCls, "text-right")}>
@@ -136,7 +136,7 @@ function MrnDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) {
             </tbody>
           </table>
         </div>
-        {invalid && <p className="text-xs text-red-500">Received plus damaged cannot exceed the invoiced quantity.</p>}
+        {invalid && <p className="text-sm text-red-500">Received plus damaged cannot exceed the invoiced quantity.</p>}
         <Field label="Remarks (optional)">
           <input className={inputCls} maxLength={500} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
         </Field>
@@ -238,7 +238,7 @@ export function MitDetail({ id }: { id: string }) {
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Material in transit · Mobis</p>
+              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">Material in transit · Mobis</p>
               <h1 className="font-mono text-xl font-semibold text-slate-800">{mit.mitNumber}</h1>
               <p className="mt-1 text-sm text-slate-500">
                 Invoice <span className="font-mono">{mit.invoiceNumber}</span> → {mit.destinationBranch.name}
@@ -281,10 +281,10 @@ export function MitDetail({ id }: { id: string }) {
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm">
-                <span className="text-xs font-medium uppercase tracking-wider text-emerald-700">MRN</span>{" "}
+                <span className="text-sm font-medium uppercase tracking-wider text-emerald-700">MRN</span>{" "}
                 <span className="font-mono text-lg font-semibold text-emerald-900">{mit.mrn.mrnNumber}</span>
               </p>
-              <p className="text-xs text-emerald-800">
+              <p className="text-sm text-emerald-800">
                 {fmtDate(mit.mrn.receiptDate)}
                 {mit.mrn.receivedBy ? ` · ${mit.mrn.receivedBy.firstName} ${mit.mrn.receivedBy.lastName}` : ""} · tax form {mit.mrn.taxForm}
               </p>
@@ -321,10 +321,10 @@ export function MitDetail({ id }: { id: string }) {
               <tbody>
                 {mit.lines.map((l) => (
                   <tr key={l.id} className="border-t border-slate-100">
-                    <td className={cn(tdCls, "font-mono text-xs")}>{l.orderNumber ?? ""}</td>
-                    <td className={cn(tdCls, "font-mono text-xs")}>{l.lineNumber != null ? String(l.lineNumber).padStart(4, "0") : ""}</td>
+                    <td className={cn(tdCls, "font-mono text-sm")}>{l.orderNumber ?? ""}</td>
+                    <td className={cn(tdCls, "font-mono text-sm")}>{l.lineNumber != null ? String(l.lineNumber).padStart(4, "0") : ""}</td>
                     <td className={tdCls}>
-                      <Link href={`/inventory/${l.partId}`} className="font-mono text-xs font-medium hover:underline">
+                      <Link href={`/inventory/${l.partId}`} className="font-mono text-sm font-medium hover:underline">
                         {l.part.partNumber}
                       </Link>
                       {l.newPart && <span className="ml-1.5 rounded bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">NEW</span>}
@@ -333,7 +333,7 @@ export function MitDetail({ id }: { id: string }) {
                     <td className={cn(tdCls, "text-right")}>{l.quantity}</td>
                     <td className={cn(tdCls, "text-right")}>{fmtPrice(l.unitPrice)}</td>
                     <td className={cn(tdCls, "text-right")}>{fmtPrice(l.amount)}</td>
-                    <td className={cn(tdCls, "font-mono text-xs")}>{l.caseNumbers ?? ""}</td>
+                    <td className={cn(tdCls, "font-mono text-sm")}>{l.caseNumbers ?? ""}</td>
                     <td className={tdCls}>{l.weight ?? ""}</td>
                     <td className={tdCls}>{l.hsCode ?? ""}</td>
                     {mit.mrn && <td className={cn(tdCls, "text-right font-medium text-emerald-700")}>{l.receivedQuantity}</td>}

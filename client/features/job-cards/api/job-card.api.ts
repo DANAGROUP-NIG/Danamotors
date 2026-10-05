@@ -36,14 +36,21 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 
 export interface CreateJobCardPayload {
   branchName: string;
-  serviceTypeId: string;
+  serviceId: string;
   bayId: string;
   serviceAdvisorId: string;
   technicianId?: string;
   teamId?: string;
   mileage: number;
   promisedAt: string;
-  complaints: { complaintCodeId?: string; defectCode?: string; description?: string; spare?: number; oil?: number; labour?: number }[];
+  complaints: {
+    complaintCodeId?: string;
+    defectCode?: string;
+    description?: string;
+    spare?: number;
+    oil?: number;
+    labour?: number;
+  }[];
   isRepeat?: boolean;
   previousJobId?: string;
   repeatReason?: string;
@@ -71,11 +78,14 @@ export interface CreateJobCardPayload {
 export async function createJobCardRequest(
   data: CreateJobCardPayload,
 ): Promise<JobCard> {
-  const result = await apiPost<{ jobCard: JobCard }>(API_ROUTES.service.jobCards.base, {
-    ...data,
-    appointmentId: data.appointmentId || undefined,
-    customerId: data.customerId || undefined,
-    vehicleId: data.vehicleId || undefined,
-  });
+  const result = await apiPost<{ jobCard: JobCard }>(
+    API_ROUTES.service.jobCards.base,
+    {
+      ...data,
+      appointmentId: data.appointmentId || undefined,
+      customerId: data.customerId || undefined,
+      vehicleId: data.vehicleId || undefined,
+    },
+  );
   return result.jobCard;
 }

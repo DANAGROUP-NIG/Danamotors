@@ -184,20 +184,20 @@ export function EnquiryReviewModal({
               : '—'],
           ].map(([label, value]) => (
             <div key={label}>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
               <p className="mt-0.5 font-medium text-foreground">{value}</p>
             </div>
           ))}
         </div>
 
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Service Description</p>
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Service Description</p>
           <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{enquiry.serviceDescription}</p>
         </div>
 
         {enquiry.status !== 'Pending' && (
           <div className="rounded-lg bg-background border border-border p-3">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Reviewed by {enquiry.reviewedBy
                 ? `${enquiry.reviewedBy.firstName} ${enquiry.reviewedBy.lastName}`
                 : 'staff'}{' '}
@@ -211,7 +211,7 @@ export function EnquiryReviewModal({
             {enquiry.appointment && (
               <a
                 href={`/appointments/${enquiry.appointment.id}`}
-                className="mt-2 inline-flex items-center text-xs font-medium text-blue-600 hover:underline"
+                className="mt-2 inline-flex items-center text-sm font-medium text-blue-600 hover:underline"
               >
                 View Appointment →
               </a>

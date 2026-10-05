@@ -217,7 +217,7 @@ export function RepairsPage() {
       render: (jc) => (
         <div className="flex items-center gap-2">
           <Wrench className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium">{jc.jobNumber}</span>
+          <span className="font-mono text-sm font-medium">{jc.jobNumber}</span>
         </div>
       ),
     },

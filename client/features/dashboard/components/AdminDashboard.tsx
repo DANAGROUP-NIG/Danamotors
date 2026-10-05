@@ -56,7 +56,7 @@ export default function AdminDashboard() {
         <p className="text-sm font-semibold text-foreground">
           Failed to load dashboard data
         </p>
-        <p className="max-w-xs text-xs text-muted-foreground">
+        <p className="max-w-xs text-sm text-muted-foreground">
           Please check your connection and try again.
         </p>
       </div>

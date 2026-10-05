@@ -1,5 +1,5 @@
 export type TallyDocumentType = 'JOB_BILL' | 'RECEIPT';
-export type LedgerEntry = { name: string; amount: number };
+export type LedgerEntry = { name: string; amount: number; bills?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' | 'On Account'; amount: number }[] };
 
 const escapeXml = (value: string) => value.replace(/[<>&"']/g, (character) => ({
   '<': '&lt;',
@@ -12,6 +12,7 @@ const escapeXml = (value: string) => value.replace(/[<>&"']/g, (character) => ({
 export function generateTallyVoucherXml(input: {
   type: TallyDocumentType;
   number: string;
+  id?: string;
   date: Date;
   party: string;
   entries: LedgerEntry[];
@@ -21,11 +22,14 @@ export function generateTallyVoucherXml(input: {
         <ALLLEDGERENTRIES.LIST>
           <LEDGERNAME>${escapeXml(entry.name)}</LEDGERNAME>
           <ISDEEMEDPOSITIVE>${entry.amount >= 0 ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-          <AMOUNT>${entry.amount.toFixed(2)}</AMOUNT>
+          <ISPARTYLEDGER>${entry.name === input.party ? 'Yes' : 'No'}</ISPARTYLEDGER>
+          <AMOUNT>${(-entry.amount).toFixed(2)}</AMOUNT>
+          ${(entry.bills ?? []).map((bill) => `<BILLALLOCATIONS.LIST><NAME>${escapeXml(bill.name)}</NAME><BILLTYPE>${bill.type}</BILLTYPE><AMOUNT>${(-bill.amount).toFixed(2)}</AMOUNT></BILLALLOCATIONS.LIST>`).join('')}
         </ALLLEDGERENTRIES.LIST>`).join('');
   return `
       <TALLYMESSAGE xmlns:UDF="TallyUDF">
-        <VOUCHER VCHTYPE="${voucherType}" ACTION="Create" OBJVIEW="Accounting Voucher View">
+        <VOUCHER ${input.id ? `REMOTEID="${escapeXml(input.id)}"` : ''} VCHTYPE="${voucherType}" ACTION="Create" OBJVIEW="Accounting Voucher View">
+          ${input.id ? `<GUID>${escapeXml(input.id)}</GUID>` : ''}
           <DATE>${input.date.toISOString().slice(0, 10).replace(/-/g, '')}</DATE>
           <VOUCHERTYPENAME>${voucherType}</VOUCHERTYPENAME>
           <VOUCHERNUMBER>${escapeXml(input.number)}</VOUCHERNUMBER>

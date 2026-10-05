@@ -32,7 +32,7 @@ export const PART_CATEGORIES = [
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
 const sectionCls = "rounded-lg border border-[#e8edf3] bg-slate-50 p-4";
-const sectionTitle = "mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+const sectionTitle = "mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
 interface PartFormProps {
   part?: PartMaster;
@@ -223,7 +223,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("retailRate")}
             />
             {derivedRetail != null && !retailDirty && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from category {selectedCategory?.code} when
                 the dealer rate or category changes. Type a value to override.
               </span>

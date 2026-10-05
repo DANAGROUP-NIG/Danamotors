@@ -112,7 +112,7 @@ export default function ReceptionistDashboard() {
         {/* Bookings overview */}
         <div className="flex flex-col gap-3 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Today&apos;s Bookings
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-primary/10">
@@ -124,14 +124,14 @@ export default function ReceptionistDashboard() {
             <p className="text-3xl font-extrabold leading-none text-foreground">
               {data.myTodayBookings}
             </p>
-            <span className="pb-0.5 text-xs text-muted-foreground">
+            <span className="pb-0.5 text-sm text-muted-foreground">
               today
             </span>
           </div>
 
           <div className="mt-1 grid grid-cols-2 gap-3 border-t border-[#f1f5f9] pt-3">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 This Week
               </p>
               <p className="mt-0.5 text-xl font-extrabold text-foreground">
@@ -139,7 +139,7 @@ export default function ReceptionistDashboard() {
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 This Month
               </p>
               <p className="mt-0.5 text-xl font-extrabold text-foreground">
@@ -152,7 +152,7 @@ export default function ReceptionistDashboard() {
         {/* Today's Available Appointments */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Available Today
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
@@ -164,7 +164,7 @@ export default function ReceptionistDashboard() {
               (a) => a.status === "Pending" && new Date(a.scheduledAt).toISOString().slice(0, 10) === todayStr,
             ).length}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Appointments scheduled for today
           </p>
         </div>
@@ -172,7 +172,7 @@ export default function ReceptionistDashboard() {
         {/* Total My Appointments */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Total Appointments
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
@@ -182,7 +182,7 @@ export default function ReceptionistDashboard() {
           <p className="text-2xl font-extrabold text-foreground">
             {data.myTotalBookings}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             All your booked appointments
           </p>
         </div>
@@ -200,7 +200,7 @@ export default function ReceptionistDashboard() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs font-semibold text-primary hover:text-primary/80"
+                className="text-sm font-semibold text-primary hover:text-primary/80"
               >
                 View all →
               </Button>
@@ -214,7 +214,7 @@ export default function ReceptionistDashboard() {
                 key={f}
                 onClick={() => setAptFilter(f)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                  "rounded-full border px-3 py-1 text-sm font-semibold transition-colors",
                   aptFilter === f
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
@@ -229,7 +229,7 @@ export default function ReceptionistDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e8edf3] text-xs text-muted-foreground">
+                  <tr className="border-b border-[#e8edf3] text-sm text-muted-foreground">
                     <th className="pb-2 font-medium">Time</th>
                     <th className="pb-2 font-medium">Customer</th>
                     <th className="pb-2 font-medium">Vehicle</th>
@@ -324,7 +324,7 @@ export default function ReceptionistDashboard() {
                 <p className="text-sm font-semibold text-foreground">
                   New Appointment
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Schedule a service
                 </p>
               </div>
@@ -342,7 +342,7 @@ export default function ReceptionistDashboard() {
                 <p className="text-sm font-semibold text-foreground">
                   Register Customer
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Add a new customer
                 </p>
               </div>
@@ -360,7 +360,7 @@ export default function ReceptionistDashboard() {
                 <p className="text-sm font-semibold text-foreground">
                   Register Vehicle
                 </p>
-                <p className="text-xs text-muted-foreground">Add a vehicle</p>
+                <p className="text-sm text-muted-foreground">Add a vehicle</p>
               </div>
             </Button>
           </div>

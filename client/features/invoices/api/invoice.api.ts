@@ -31,17 +31,19 @@ export type BillableJobCard = {
   jobNumber: string;
   status: string;
   description: string;
-  customer?: { id: string; firstName: string; lastName: string } | null;
+  customer?: { id: string; firstName: string; lastName: string; companyName?: string | null } | null;
   vehicle?: { make?: string | null; model?: string | null; registrationNumber?: string | null } | null;
   branch: { id: string; name: string };
 };
 
 export type JobBillPreview = {
+  review: { estimateId: string | null; status: string; canBill: boolean; issues: string[]; approvedSubtotal: number; actualSubtotal: number; rows: { type: string; referenceId?: string | null; description: string; approvedQuantity: number; actualQuantity: number; approvedAmount: number; actualAmount: number; difference: number; included: boolean; reason: string | null }[] };
   jobCard: BillableJobCard;
-  lines: Array<{ id?: string; type: "PART" | "LABOUR"; description: string; quantity: number; rate: number; amount: number }>;
+  lines: Array<{ id?: string; type: "PART" | "LABOUR" | "SERVICE"; description: string; quantity: number; rate: number; amount: number }>;
   totals: {
     partsTotal: number;
     labourTotal: number;
+    serviceTotal: number;
     partsDiscountAmount: number;
     labourDiscountAmount: number;
     vatRate: number;
@@ -55,8 +57,13 @@ export type JobBillPreview = {
 export type ServiceAdvisor = { id: string; firstName: string; lastName: string; email: string };
 export type ReceivingBank = { id: string; code: string; name: string; accountNumber?: string | null };
 export type CreateReceiptPayload = {
+  branchId?: string;
+  idempotencyKey?: string;
+  issuedAt?: string;
+  chequeNumber?: string;
+  chequeDate?: string;
   customerId: string;
-  mode: "POS" | "BANK_TRANSFER" | "CASH";
+  mode: "POS" | "BANK_TRANSFER" | "CHEQUE" | "CASH";
   category: "SERVICE_PARTS" | "SALES_ENQUIRY";
   bankId?: string;
   amount: number;
@@ -74,7 +81,7 @@ export type ReceiptRegisterRow = {
   advanceAmount: number;
   notes?: string | null;
   status: string;
-  customer: { id: string; firstName: string; lastName: string };
+  customer: { id: string; firstName: string; lastName: string; companyName?: string | null };
   bank?: { id: string; name: string } | null;
   allocations: Array<{ invoice: { invoiceNumber: string } }>;
 };
@@ -91,12 +98,12 @@ export type CreateJobBillPayload = {
   notes?: string;
 };
 
-export async function getBillableJobCardsRequest(): Promise<{ jobCards: BillableJobCard[] }> {
-  return apiGet(API_ROUTES.finance.jobCardsBillable);
+export async function getBillableJobCardsRequest(branchId?: string): Promise<{ jobCards: BillableJobCard[] }> {
+  return apiGet(`${API_ROUTES.finance.jobCardsBillable}${branchId ? `?branchId=${branchId}` : ""}`);
 }
 
-export async function getServiceAdvisorsRequest(): Promise<{ advisors: ServiceAdvisor[] }> {
-  return apiGet(API_ROUTES.finance.serviceAdvisors);
+export async function getServiceAdvisorsRequest(branchId?: string): Promise<{ advisors: ServiceAdvisor[] }> {
+  return apiGet(`${API_ROUTES.finance.serviceAdvisors}${branchId ? `?branchId=${branchId}` : ""}`);
 }
 
 export async function previewJobBillRequest(input: {
@@ -126,6 +133,7 @@ export async function cancelInvoiceRequest(id: string, remark: string): Promise<
 }
 
 export async function getReceiptRegisterRequest(params: {
+  branchId?: string;
   from?: string;
   to?: string;
   category: "ALL" | "SERVICE_PARTS" | "SALES_ENQUIRY";
@@ -134,6 +142,7 @@ export async function getReceiptRegisterRequest(params: {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   query.set("category", params.category);
+  if (params.branchId) query.set("branchId", params.branchId);
   return apiGet(`${API_ROUTES.finance.receiptRegister}?${query.toString()}`);
 }
 

@@ -40,7 +40,7 @@ function RevenueTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-[#e8edf3] bg-white px-3 py-2 shadow-lg">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-sm font-bold text-foreground">
         ₦{payload[0].value.toLocaleString()}
       </p>
@@ -66,7 +66,7 @@ export function RevenueChartCard({
         {timeRangeOptions.length > 0 && (
           <select
             onChange={(e) => onTimeRangeChange?.(e.target.value)}
-            className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground outline-none"
+            className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground outline-none"
           >
             {timeRangeOptions.map((opt) => (
               <option key={opt} value={opt}>
@@ -113,7 +113,7 @@ export function RevenueChartCard({
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">
+        <div className="flex h-[190px] items-center justify-center text-sm text-muted-foreground">
           No revenue data available
         </div>
       )}
