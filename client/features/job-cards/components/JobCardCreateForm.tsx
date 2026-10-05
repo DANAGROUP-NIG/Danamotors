@@ -73,7 +73,7 @@ function defaults(
       }),
     ),
 
-    serviceCharge: 0,
+    serviceCharge: undefined,
     ...values,
   };
 }
@@ -116,6 +116,19 @@ export function JobCardCreateForm({
 
     formState: { errors, isDirty },
   } = form;
+
+  const selectedServiceId = watch("serviceId");
+  const selectedServiceCharge = watch("serviceCharge");
+  const serviceQuery = useQuery({
+    queryKey: ["job-opening-service", selectedServiceId],
+    queryFn: () => apiGet<{ service: { price: number } }>(`/services/${selectedServiceId}`),
+    enabled: !!selectedServiceId,
+  });
+  useEffect(() => {
+    if (serviceQuery.data && selectedServiceCharge === undefined) {
+      setValue("serviceCharge", serviceQuery.data.service.price, { shouldValidate: true });
+    }
+  }, [serviceQuery.data, selectedServiceCharge, setValue]);
 
   const [tab, setTab] = useState<Tab>("Vehicle Details");
   const [confirmation, setConfirmation] = useState<
@@ -742,6 +755,7 @@ export function JobCardCreateForm({
                       value={field.value ?? ""}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
+                      onSelect={(service) => setValue("serviceCharge", service.price ?? 0, { shouldDirty: true, shouldValidate: true })}
                       error={errors.serviceId?.message}
                     />
                   )}
@@ -910,6 +924,7 @@ export function JobCardCreateForm({
                   />
                   <div className="space-y-1.5">
                     <p className="text-sm font-medium">Service charge</p>
+                    <p className="text-xs text-muted-foreground">Defaults to the selected service price. This amount becomes a separate bill line; enter 0 only for a waived charge.</p>
                     <Controller
                       name="serviceCharge"
                       control={control}

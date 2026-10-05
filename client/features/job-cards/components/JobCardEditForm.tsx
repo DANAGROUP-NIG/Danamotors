@@ -6,7 +6,7 @@ import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
+import { apiGet, apiPost, apiPut, apiPatch } from "@/lib/api/apiClient";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { jobCardKeys } from "../api/job-card.keys";
 import { WorkshopPicker } from "./WorkshopPicker";
@@ -23,12 +23,15 @@ const nextStatuses: Record<string, string[]> = {
 export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const queryClient = useQueryClient();
 
-  const { isAdminOrAbove } = useAuth();
+  const { isAdminOrAbove, hasPermission } = useAuth();
 
   const current = canonicalJobStatus(jobCard.status);
   const billed = hasJobBill(jobCard);
-  const canDeliver = billed || !!jobCard.creditApprovedById;
+  const canDeliver = (billed && !(jobCard.invoices ?? []).some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) || !!jobCard.creditApprovedById;
+  const estimateApproved = jobCard.estimates?.[0]?.status === "Approved";
+  const [qcNotes, setQcNotes] = useState(jobCard.qcNotes ?? "");
   const late = !!jobCard.promisedAt && new Date() > new Date(jobCard.promisedAt);
+  const [serviceCharge, setServiceCharge] = useState(String(jobCard.serviceCharge ?? 0));
   const [status, setStatus] = useState("");
   const [remarks, setRemarks] = useState("");
   const [observations, setObservations] = useState(jobCard.observations ?? "");
@@ -55,12 +58,17 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       queryKey: jobCardKeys.all,
     });
 
+  const qc = useMutation({
+    mutationFn: (qcStatus: "PASSED" | "FAILED") => apiPatch(`/workshop/qc/${jobCard.id}`, { qcStatus, qcNotes }),
+    onSuccess: async () => { toast.success("Quality check recorded"); await refresh(); },
+  });
   const update = useMutation({
     mutationFn: () =>
       apiPut(`/service/job-cards/${jobCard.id}`, {
         ...(billed
           ? {}
           : {
+              ...(Number(serviceCharge) !== (jobCard.serviceCharge ?? 0) ? { serviceCharge: Number(serviceCharge) } : {}),
               observations,
               workDone,
             }),
@@ -95,18 +103,20 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   });
 
   if (["DELIVERED", "CANCELLED"].includes(current)) return null;
-  const actionError = update.error ?? credit.error;
+  const actionError = update.error ?? credit.error ?? qc.error;
 
   return (
     <form
       className="grid gap-4 rounded-xl border bg-white p-5 print:hidden"
-      inert={update.isPending || credit.isPending}
+      inert={update.isPending || credit.isPending || qc.isPending}
       onSubmit={(event) => {
         event.preventDefault();
         update.mutate();
       }}
     >
       <h2 className="font-semibold">Workshop actions</h2>
+      {!estimateApproved && !billed && <p className="text-sm text-amber-700">Approve the latest estimate before starting or completing work. <a className="underline" href="#estimate-approval">Open Estimate &amp; Approval</a></p>}
+      {current === "QC" && hasPermission("qcstatus:update") && <div className="grid gap-2 border-b pb-3"><Field label="Quality-check findings"><textarea className={inputCls} value={qcNotes} onChange={event => setQcNotes(event.target.value)} /></Field><p className="text-sm">QC: {jobCard.qcStatus || "Pending"}</p><div className="flex gap-2"><Button type="button" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("PASSED")}>Record QC pass</Button><Button type="button" variant="outline" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("FAILED")}>Record QC failure</Button></div></div>}
       <ol className="flex flex-wrap gap-3 text-sm">
         {["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED"].map(
           (step) => (
@@ -123,6 +133,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       </ol>
       {!billed && (
         <>
+          <Field label="Service charge (NGN)"><input type="number" min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
           <Field label="Observations">
             <textarea
               className={inputCls}
@@ -149,11 +160,11 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
         >
           <option value="">{billed ? "Select an action" : "Save findings only"}</option>
           {(nextStatuses[billed ? "BILLED" : current] ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
-            <option key={value} value={value}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
+            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
           ))}
         </select>
       </Field>
-      {current === "READY" && !canDeliver && <p className="text-sm text-muted-foreground">Create the job bill or obtain delivery-on-credit approval before delivering this vehicle.</p>}
+      {["READY", "BILLED"].includes(current) && !canDeliver && <p className="text-sm text-muted-foreground">Create and settle the job bill or obtain delivery-on-credit approval before delivering this vehicle.</p>}
       <Field label="Remarks / cancellation reason">
         <textarea
           required={status === "CANCELLED"}
@@ -189,12 +200,12 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           </Field>
         </>
       )}
-      {(update.isError || credit.isError) && (
+      {(update.isError || credit.isError || qc.isError) && (
         <p role="alert" className="text-sm text-red-600">
           {isAxiosError(actionError) ? actionError.response?.data?.message || "Could not apply action. Please retry." : "Could not apply action. Please retry."}
         </p>
       )}
-      {isAdminOrAbove && current === "READY" && !billed && !jobCard.creditApprovedById && (
+      {isAdminOrAbove && ["READY", "BILLED"].includes(current) && !jobCard.creditApprovedById && (
         <Button
           type="button"
           variant="outline"
