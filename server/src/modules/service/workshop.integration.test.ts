@@ -9,6 +9,8 @@ jest.mock("../notification/notification.service", () => ({
   })),
 }));
 
+import { ReceiptService } from '../finance/receipt.service';
+import { WorkshopService } from '../workshop/workshop.service';
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
@@ -120,6 +122,7 @@ integration("Workshop database flow", () => {
               partNumber: suffix,
               name: "Test part",
               unitPrice: 1000,
+              retailRate: 1000,
             },
           });
 
@@ -174,6 +177,12 @@ integration("Workshop database flow", () => {
 
             expect(job.jobNumber).toMatch(/^\d{10}$/);
 
+            const estimate = await jobs.addEstimate(job.id, { description: 'Approved scope', lines: [
+              { type: 'SERVICE', referenceId: catalogService.id, quantity: 1 },
+              { type: 'PART', referenceId: part.id, quantity: 2 },
+              { type: 'LABOUR', referenceId: operation.id, quantity: 1 },
+            ] });
+            await jobs.addApproval(estimate.id, { customerId: customer.id, approved: true });
             await new LabourService().addJobCardLine(job.id, {
               labourItemId: operation.id,
             });
@@ -209,6 +218,7 @@ integration("Workshop database flow", () => {
               user.id,
             );
 
+            await new WorkshopService().updateQC(job.id, "PASSED", "Checked");
             await jobs.updateJobCard(
               job.id,
               {
@@ -225,7 +235,8 @@ integration("Workshop database flow", () => {
               actorId: user.id,
             });
 
-            expect(bill.lines).toHaveLength(2);
+            expect(bill.lines).toHaveLength(3);
+            await new ReceiptService().createReceipt({ customerId: customer.id, branchId: branch.id, issuedById: user.id, mode: 'CASH', category: 'SERVICE_PARTS', amount: bill.total, allocations: [{ invoiceId: bill.id, amount: bill.total }] });
 
             await expect(
               jobs.updateJobCard(

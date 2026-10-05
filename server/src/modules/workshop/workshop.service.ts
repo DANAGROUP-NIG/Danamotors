@@ -1,3 +1,4 @@
+import { assertRecordedScope } from '../service/estimate-approval';
 import { Prisma } from '@prisma/client';
 import { WorkshopRepository } from './workshop.repository';
 import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
@@ -123,7 +124,8 @@ export class WorkshopService {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
       const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
       if (current.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(current.status))) throw new BadRequestError('This job card is no longer open');
+      if (qcStatus === 'PASSED') await assertRecordedScope(tx, id);
       return tx.jobCard.update({ where: { id }, data: { qcStatus, qcNotes } });
-    });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 }
