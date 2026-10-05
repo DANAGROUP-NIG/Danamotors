@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { INVENTORY_PERMISSIONS } from "./features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -27,6 +27,7 @@ import {
   PackageSearch,
   Ship,
   Landmark,
+  Megaphone,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -128,6 +129,8 @@ export const NAV_GROUPS: NavGroup[] = [
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
       INVENTORY_PERMISSIONS.TRANSFER_READ,
+      WARRANTY_PERMISSIONS.READ,
+      CAMPAIGN_PERMISSIONS.READ,
     ],
     items: [
       {
@@ -195,8 +198,15 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Warranty",
-        href: "#",
+        href: "/warranty",
         icon: BadgeCheck,
+        permissions: [WARRANTY_PERMISSIONS.READ],
+      },
+      {
+        label: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
       },
       {
         label: "Reports",

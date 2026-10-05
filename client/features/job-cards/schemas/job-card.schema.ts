@@ -14,7 +14,11 @@ export const createJobCardSchema = z
     mileage: z
       .number({ invalid_type_error: "Enter the current odometer reading" })
       .int()
-      .nonnegative("Enter a valid odometer reading"),
+      .nonnegative("Enter a valid odometer reading")
+      .max(2_000_000, "Check the mileage"),
+    // A reading below the last recorded one needs an audited odometer replacement.
+    odometerReplaced: z.boolean().optional(),
+    odometerReplacedReason: z.string().trim().max(300).optional(),
     promisedDate: z.string().date("Select a valid promised date"),
     promisedTime: z
       .string()
@@ -109,6 +113,13 @@ export const createJobCardSchema = z
         path: ["repeatReason"],
         message: "Choose a previous job and enter the repeat reason",
       });
+    if (v.odometerReplaced && !v.odometerReplacedReason?.trim())
+      ctx.addIssue({
+        code: "custom",
+        path: ["odometerReplacedReason"],
+        message: "Give a reason for the odometer replacement",
+      });
   });
 
 export type CreateJobCardFormValues = z.infer<typeof createJobCardSchema>;
+export type CreateJobCardFormInput = z.input<typeof createJobCardSchema>;

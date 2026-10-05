@@ -12,6 +12,7 @@ function database() {
     $queryRaw: jest.fn().mockResolvedValue([]),
     customer: { findFirst: jest.fn().mockResolvedValue({ id: modelId }) },
     vehicleOwnership: { create: jest.fn().mockResolvedValue({ id: 'ownership' }) },
+    campaignVehicle: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     vehicle: {
       create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'vehicle', ...data })),
       update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...existing, ...data })),

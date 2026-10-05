@@ -14,8 +14,11 @@ import type { Vehicle } from "../types/vehicle.types";
 export function VehicleHistoryCard(
   {
     vehicle,
+    showServiceHistory = true,
   }: {
     vehicle: Vehicle;
+    /** Off where the page shows its own service history table. */
+    showServiceHistory?: boolean;
   },
 ) {
   const {
@@ -49,7 +52,7 @@ export function VehicleHistoryCard(
 
   return (
     <section className="mt-5 grid gap-3 rounded-xl border bg-card p-5">
-      <h2 className="font-semibold">Ownership and service history</h2>
+      <h2 className="font-semibold">{showServiceHistory ? "Ownership and service history" : "Ownership history"}</h2>
       <p>Current mileage: {vehicle.lastRecordedMileage ?? "Not recorded"}km · Engine: {vehicle.engineNumber || "—"}· Key: {vehicle.keyNumber || "—"}</p>
       <p>PDI: {vehicle.pdiDone ? vehicle.pdiDate?.slice(0, 10) : "Not completed"}· Sold: {vehicle.saleDate?.slice(0, 10) || "Not recorded"}· Dealer: {vehicle.sellingDealer || "—"}</p>
       {!vehicle.customer && <p>In stock — no current owner.</p>}
@@ -57,11 +60,13 @@ export function VehicleHistoryCard(
       {vehicle.ownerships?.map(
         owner => <p key={owner.id} className="text-sm">{owner.customer?.companyName || `${owner.customer?.firstName ?? ""} ${owner.customer?.lastName ?? ""}`}· {new Date(owner.purchaseDate).toLocaleDateString()}— {owner.saleDate ? new Date(owner.saleDate).toLocaleDateString() : "Current"}</p>,
       )}
-      <h3 className="font-medium">Service history</h3>
-      {!vehicle.jobCards?.length && <p className="text-sm text-slate-500">No job cards recorded.</p>}
-      {vehicle.jobCards?.map(
-        job => <div key={job.id} className="border-t py-2 text-sm"><Link className="text-primary underline" href={`/job-cards/${job.id}`}>{job.jobNumber}</Link>· {new Date(job.createdAt).toLocaleDateString()}· {job.mileage ?? "—"}km · {job.status}<p>{job.description}</p><p>{job.workDone}</p></div>,
-      )}
+      {showServiceHistory && <>
+        <h3 className="font-medium">Service history</h3>
+        {!vehicle.jobCards?.length && <p className="text-sm text-slate-500">No job cards recorded.</p>}
+        {vehicle.jobCards?.map(
+          job => <div key={job.id} className="border-t py-2 text-sm"><Link className="text-primary underline" href={`/job-cards/${job.id}`}>{job.jobNumber}</Link>· {new Date(job.createdAt).toLocaleDateString()}· {job.mileage ?? "—"}km · {job.status}<p>{job.description}</p><p>{job.workDone}</p></div>,
+        )}
+      </>}
       <ModalFame isOpen={open} onClose={() => setOpen(false)} title="Change vehicle owner"><form
           className="grid gap-4 p-5"
           onSubmit={e => {

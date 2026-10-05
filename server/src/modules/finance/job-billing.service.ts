@@ -35,8 +35,8 @@ export class JobBillingService {
         appointment: { select: { customerId: true } },
         vehicle: true,
         branch: true,
-        partIssuances: { include: { sparePart: true, returns: true } },
-        labourLines: true,
+        partIssuances: { include: { sparePart: true, returns: true, jobCardLine: { select: { chargeType: true } } } },
+        labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
         },
@@ -71,6 +71,11 @@ export class JobBillingService {
   private getBillLines(
     jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
   ) {
+    // The customer pays a line unless the service type is company-paid or the line's
+    // charge type (job card lines: warranty, campaign, goodwill, internal) says otherwise.
+    const companyPaid = jobCard.serviceType?.chargedTo === "COMPANY";
+    const customerPays = (chargeLine: { chargeType: string } | null) =>
+      !companyPaid && (chargeLine?.chargeType ?? "CUSTOMER") === "CUSTOMER";
     const partLines = jobCard.partIssuances.flatMap((issuance) => {
       const quantity =
         issuance.quantity -
@@ -97,7 +102,7 @@ export class JobBillingService {
           quantity,
           rate: issuance.sparePart.retailRate,
           amount: lineAmount(quantity, issuance.sparePart.retailRate),
-          customerPaid: jobCard.serviceType?.chargedTo !== "COMPANY",
+          customerPaid: customerPays(issuance.jobCardLine),
         },
       ];
     });
@@ -109,11 +114,11 @@ export class JobBillingService {
       quantity: line.hours,
       rate: line.rate,
       amount: money(line.amount),
-      customerPaid: jobCard.serviceType?.chargedTo !== "COMPANY",
+      customerPaid: customerPays(line.chargeLine),
     }));
     const serviceLines = jobCard.serviceCharge == null ? [] : [{
       type: "SERVICE", referenceId: jobCard.serviceId, description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : "Service charge", quantity: 1, rate: money(jobCard.serviceCharge),
-      amount: money(jobCard.serviceCharge), customerPaid: jobCard.serviceType?.chargedTo !== "COMPANY",
+      amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,
     }];
     const lines = [...partLines, ...labourLines, ...serviceLines];
     if (!lines.some((line) => line.customerPaid)) throw new BadRequestError("Record customer-paid parts, labour or a service charge before creating a job bill");

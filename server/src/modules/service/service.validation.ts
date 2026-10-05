@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { MAX_MILEAGE } from "../warranty/warranty.logic";
+
+const mileageField = z.number().int("Mileage must be a whole number").min(0, "Mileage cannot be negative").max(MAX_MILEAGE);
+const acknowledgementFields = {
+  warrantyAcknowledged: z.boolean().optional(),
+  acknowledgedCampaignIds: z.array(z.string().uuid("Invalid campaign ID")).max(50).optional(),
+};
 
 export const serviceIdParamSchema = z.object({
   params: z.object({
@@ -39,6 +46,9 @@ export const updateAppointmentSchema = z.object({
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
+    // Odometer reading taken at check-in (status 'Checked In').
+    mileage: mileageField.optional(),
+    ...acknowledgementFields,
   }),
 
   params: z.object({
@@ -96,7 +106,11 @@ export const jobOpeningBody = z
     vehicleId: z.string().uuid(),
     branchName: z.string().trim().min(1),
     description: z.string().trim().min(1).max(5000),
-    mileage: z.number().int().nonnegative(),
+    mileage: mileageField,
+    // An odometer reading below the last recorded one is allowed only for an audited replacement.
+    odometerReplaced: z.boolean().optional(),
+    odometerReplacedReason: z.string().trim().max(300).optional(),
+    ...acknowledgementFields,
     bayId: z.string().uuid(),
     serviceAdvisorId: z.string().uuid(),
     technicianId: z.string().uuid().optional(),
@@ -173,6 +187,13 @@ export const jobOpeningBody = z
         code: "custom",
         path: ["isRepeat"],
         message: "Mark the job as a repeat",
+      });
+
+    if (data.odometerReplaced && !data.odometerReplacedReason?.trim())
+      ctx.addIssue({
+        code: "custom",
+        path: ["odometerReplacedReason"],
+        message: "Give a reason for the odometer replacement",
       });
   });
 

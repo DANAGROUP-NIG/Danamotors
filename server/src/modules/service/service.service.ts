@@ -1,6 +1,6 @@
 import { latestEstimateQuery } from './estimate-approval';
 import { lineAmount, sumMoney } from '../finance/money';
-import { Prisma } from '@prisma/client';
+import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
 import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
 import { z } from 'zod';
 import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
@@ -10,6 +10,8 @@ import { ServiceRepository } from './service.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
 import { NotificationService } from '../notification/notification.service';
+import { assertMileage } from '../warranty/warranty.logic';
+import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -161,10 +163,16 @@ export class ServiceService {
     notes?: string;
     status?: string;
     requestingUserRole?: string;
+    mileage?: number;
+    warrantyAcknowledged?: boolean;
+    acknowledgedCampaignIds?: string[];
   }) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
       throw new NotFoundError('Appointment not found');
+    }
+    if (data.mileage !== undefined && data.status !== 'Checked In') {
+      throw new BadRequestError('Mileage is recorded when the vehicle is checked in');
     }
 
     const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
@@ -197,11 +205,41 @@ export class ServiceService {
     const oldScheduledAt = appointment.scheduledAt;
 
     // ── Persist update ────────────────────────────────────────────────────────
-    const updated = await this.serviceRepository.updateAppointment(id, {
-      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
-      durationMins: data.durationMins,
-      notes: data.notes,
-      status: data.status,
+    // Check-in with an odometer reading records it and runs the warranty & campaign check;
+    // a covered vehicle or open campaign must be acknowledged, like on the job card form.
+    let checkInCampaigns: { code: string; title: string }[] = [];
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.status === 'Checked In' && data.mileage !== undefined) {
+        await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${appointment.vehicleId} FOR UPDATE`;
+        const vehicle = await loadVehicleForWarranty(tx, appointment.vehicleId);
+        assertMileage(data.mileage, vehicle.lastRecordedMileage);
+        const openCampaigns = await findOpenCampaigns(tx, vehicle);
+        const check = buildCheck(vehicle, data.mileage, openCampaigns);
+        const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
+        const missing =
+          (check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged) ||
+          openCampaigns.some((c) => !acknowledged.has(c.campaignId));
+        if (missing) {
+          throw new ConflictError('Inform the customer and acknowledge the warranty status and open campaigns before check-in.').withCode(
+            'WARRANTY_ACK_REQUIRED',
+            check,
+          );
+        }
+        await tx.vehicle.update({
+          where: { id: vehicle.id },
+          data: { lastRecordedMileage: Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage), lastMileageAt: new Date() },
+        });
+        checkInCampaigns = openCampaigns.map((c) => ({ code: c.code, title: c.title }));
+      }
+      return tx.serviceAppointment.update({
+        where: { id },
+        data: {
+          scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+          durationMins: data.durationMins,
+          notes: data.notes,
+          status: data.status,
+        },
+      });
     });
 
     // ── Post-update notifications ─────────────────────────────────────────────
@@ -237,8 +275,12 @@ export class ServiceService {
       if (newStatus === 'Checked In') {
         const payload = {
           type: 'APPOINTMENT_CHECKED_IN',
-          title: 'Appointment checked in',
-          message: `${customerName} has checked in at ${branchName}.`,
+          title: checkInCampaigns.length > 0 ? 'Checked in — open campaign' : 'Appointment checked in',
+          message:
+            `${customerName} has checked in at ${branchName}.` +
+            (checkInCampaigns.length > 0
+              ? ` Open campaign work: ${checkInCampaigns.map((c) => `${c.code} ${c.title}`).join('; ')}.`
+              : ''),
           link: `/appointments/${id}`,
           branchId,
         };
@@ -353,7 +395,24 @@ export class ServiceService {
       throw new NotFoundError('Job card not found');
     }
 
-    return card;
+    // This vehicle's progress in each campaign the job card was opened for.
+    const campaignVehicles =
+      card.campaigns.length > 0 && card.vehicle
+        ? await prisma.campaignVehicle.findMany({
+            where: {
+              campaignId: { in: card.campaigns.map((c) => c.campaignId) },
+              OR: [{ vehicleId: card.vehicle.id }, { vin: card.vehicle.vin.toUpperCase() }],
+            },
+            select: { campaignId: true, status: true, completedJobCardId: true },
+          })
+        : [];
+    return {
+      ...card,
+      campaigns: card.campaigns.map((c) => ({
+        ...c,
+        vehicleStatus: campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ?? null,
+      })),
+    };
   }
 
   async updateJobCard(id: string, data: z.infer<typeof jobUpdateBody>, actorId?: string) {

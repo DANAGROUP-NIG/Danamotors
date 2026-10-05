@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { VehicleRepository } from './vehicle.repository';
 import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
+import { linkCampaignVehiclesByVin } from '../campaign/campaign.hooks';
 
 export class VehicleService {
   private vehicleRepository: VehicleRepository;
@@ -49,9 +50,8 @@ export class VehicleService {
         year: vehicle.year,
         trim: vehicle.trim,
         color: vehicle.color,
-        warrantyProvider: vehicle.warrantyProvider,
-        warrantyStatus: vehicle.warrantyStatus,
-        warrantyExpiresAt: vehicle.warrantyExpiresAt,
+        vehicleModelId: vehicle.vehicleModelId,
+        lastRecordedMileage: vehicle.lastRecordedMileage,
         ownershipStatus: vehicle.ownershipStatus,
 
         customer: vehicle.customer ? {
@@ -94,9 +94,14 @@ export class VehicleService {
       year: vehicle.year,
       trim: vehicle.trim,
       color: vehicle.color,
-      warrantyProvider: vehicle.warrantyProvider,
-      warrantyStatus: vehicle.warrantyStatus,
-      warrantyExpiresAt: vehicle.warrantyExpiresAt,
+      vehicleModelId: vehicle.vehicleModelId,
+      vehicleModel: vehicle.vehicleModel,
+      lastRecordedMileage: vehicle.lastRecordedMileage,
+      lastMileageAt: vehicle.lastMileageAt,
+      warrantyOverrideType: vehicle.warrantyOverrideType,
+      warrantyOverrideUntil: vehicle.warrantyOverrideUntil,
+      warrantyOverrideKm: vehicle.warrantyOverrideKm,
+      warrantyOverrideReason: vehicle.warrantyOverrideReason,
       ownershipStatus: vehicle.ownershipStatus,
 
       customer: vehicle.customer ? {
@@ -104,6 +109,7 @@ export class VehicleService {
         email: vehicle.customer.email,
         firstName: vehicle.customer.firstName,
         lastName: vehicle.customer.lastName,
+        phoneNumber: vehicle.customer.phoneNumber,
         branchId: vehicle.customer.branchId,
       } : null,
 
@@ -167,6 +173,8 @@ export class VehicleService {
       if (!data.modelId && (data.generationId || data.engineId))
         throw new BadRequestError('Catalog generation and engine selections require a model');
 
+      await this.assertWarrantyModel(tx, data.vehicleModelId);
+
       const identity = data.modelId || data.customModel || !data.catalogueId
         ? await resolveVehicleIdentity(tx, data)
         : await this.legacyIdentity(tx, data.catalogueId, data.colourId);
@@ -189,6 +197,9 @@ export class VehicleService {
           status: 'Current',
         },
       });
+
+      // Campaign rows added by VIN before the vehicle was registered now point to it.
+      await linkCampaignVehiclesByVin(tx, vehicle);
 
       return vehicle;
     });
@@ -234,6 +245,9 @@ export class VehicleService {
       if ((data.pdiDone ?? vehicle.pdiDone) && !(data.pdiDate ?? vehicle.pdiDate))
         throw new BadRequestError('PDI date is required');
 
+      if (data.vehicleModelId !== undefined && data.vehicleModelId !== vehicle.vehicleModelId)
+        await this.assertWarrantyModel(tx, data.vehicleModelId);
+
       return tx.vehicle.update({
         where: {
           id,
@@ -247,6 +261,13 @@ export class VehicleService {
         },
       });
     });
+  }
+
+  /** The warranty policy model (VehicleModel) must exist and be active when one is chosen. */
+  private async assertWarrantyModel(tx: Prisma.TransactionClient, vehicleModelId?: string | null) {
+    if (!vehicleModelId) return;
+    const model = await tx.vehicleModel.findUnique({ where: { id: vehicleModelId }, select: { isActive: true } });
+    if (!model?.isActive) throw new BadRequestError('Choose an active vehicle model');
   }
 
   async deleteVehicle(id: string) {

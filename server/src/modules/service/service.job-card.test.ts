@@ -56,6 +56,11 @@ jest.mock("../../prisma/client", () => ({
     jobCardStatusHistory: {
       create: jest.fn(),
     },
+
+    // Warranty & campaign check on opening: no open campaigns for the test vehicle.
+    campaignVehicle: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   },
 }));
 
@@ -118,8 +123,11 @@ describe("JobCard workflow", () => {
 
     (prisma.vehicle.findUnique as jest.Mock).mockResolvedValue({
       id,
+      vin: "KNAPU81BDP7123456",
       customerId: "different-owner",
       lastRecordedMileage: 90,
+      saleDate: null,
+      vehicleModel: null,
     });
 
     (prisma.customer.findFirst as jest.Mock).mockResolvedValue({
@@ -257,6 +265,7 @@ describe("JobCard workflow", () => {
 
       data: {
         lastRecordedMileage: 100,
+        lastMileageAt: expect.any(Date),
       },
     });
   });

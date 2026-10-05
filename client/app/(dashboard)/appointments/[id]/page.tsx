@@ -26,6 +26,7 @@ import { useDeleteAppointment } from "@/features/appointments/hooks/use-delete-a
 import ModalFame from "@/components/modals/ModalFame";
 import { AppointmentEditForm } from "@/features/appointments/components/AppointmentEditForm";
 import { JobCardOpeningModal } from "@/features/job-cards/components/JobCardOpeningModal";
+import { CheckInDialog } from "@/features/warranty/components/CheckInDialog";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
@@ -87,6 +88,7 @@ export default function AppointmentDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showJobCardCreate, setShowJobCardCreate] = useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
 
   if (isLoading) {
     return (
@@ -134,6 +136,11 @@ export default function AppointmentDetailPage() {
 
   function handleStatusTransition() {
     if (!nextStatus) return;
+    // Check-in records the odometer and runs the warranty & campaign check.
+    if (nextStatus === "Checked In") {
+      setShowCheckIn(true);
+      return;
+    }
     update.mutate({ status: nextStatus as Appointment["status"] });
   }
 
@@ -427,6 +434,7 @@ export default function AppointmentDetailPage() {
       <JobCardOpeningModal isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} defaultValues={{
         appointmentId: appointment.id, customerId: appointment.customerId, vehicleId: appointment.vehicleId, serviceId: appointment.serviceId ?? "", branchName: (branch?.name as string) ?? "",
       }} />
+      {showCheckIn && <CheckInDialog appointment={appointment} onClose={() => setShowCheckIn(false)} />}
 
       <ConfirmDeleteModal
         isOpen={showDelete}

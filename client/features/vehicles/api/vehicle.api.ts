@@ -35,7 +35,7 @@ export async function createVehicleRequest(
 ): Promise<{ vehicle: Vehicle }> {
   return apiPost<{ vehicle: Vehicle }, CreateVehiclePayload>(
     API_ROUTES.vehicles.base,
-    Object.fromEntries(Object.entries(payload).filter(([key]) => !["make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : key === "customerId" ? value || null : value])) as CreateVehiclePayload,
+    Object.fromEntries(Object.entries(payload).filter(([key]) => !["make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : ["customerId", "vehicleModelId"].includes(key) ? value || null : value])) as CreateVehiclePayload,
   );
 }
 
@@ -45,7 +45,7 @@ export async function updateVehicleRequest(
 ): Promise<{ vehicle: Vehicle }> {
   return apiPut<{ vehicle: Vehicle }, UpdateVehiclePayload>(
     API_ROUTES.vehicles.detail(id),
-    Object.fromEntries(Object.entries(payload).filter(([key]) => !["vin", "customerId", "make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : value])) as UpdateVehiclePayload,
+    Object.fromEntries(Object.entries(payload).filter(([key]) => !["vin", "customerId", "make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : key === "vehicleModelId" ? value || null : value])) as UpdateVehiclePayload,
   );
 }
 

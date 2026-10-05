@@ -134,6 +134,9 @@ const basePartMasterFields = {
     .optional(),
   binLocation: z.string().optional(),
   storeLocation: z.string().optional(),
+  // Legacy partmast.WTYAPPLICABLE / warrrate.
+  warrantyApplicable: z.boolean().optional(),
+  warrantyRate: z.number().nonnegative('Warranty rate must be 0 or more').nullable().optional(),
 };
 
 export const createPartMasterSchema = z.object({
@@ -176,6 +179,8 @@ export const updatePartMasterSchema = z.object({
       priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
       binLocation: basePartMasterFields.binLocation,
       storeLocation: basePartMasterFields.storeLocation,
+      warrantyApplicable: basePartMasterFields.warrantyApplicable,
+      warrantyRate: basePartMasterFields.warrantyRate,
       partStatus: partStatusEnum.optional(),
     })
     .refine(

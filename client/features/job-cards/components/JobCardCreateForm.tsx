@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
   Download,
+  Loader2,
   LockKeyhole,
   MoreHorizontal,
   Plus,
@@ -21,6 +22,11 @@ import { ActionMenu } from "@/components/ui/ActionMenu";
 import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { useVehicleWarranty } from "@/features/warranty/hooks/use-warranty";
+import { WarrantyCheckPanel, ackRequiredCheck } from "@/features/warranty/components/WarrantyCheckPanel";
+import type { WarrantyCheck } from "@/features/warranty/types/warranty.types";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { apiGet } from "@/lib/api/apiClient";
 import { getCustomerRequest } from "@/features/customers/api/customer.api";
 import { getVehicleRequest } from "@/features/vehicles/api/vehicle.api";
@@ -93,7 +99,8 @@ export function JobCardCreateForm({
 }) {
   const create = useCreateJobCard();
 
-  const { hasPermission } = useAuth();
+  const { hasPermission, isSuperAdmin, user } = useAuth();
+  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
@@ -183,6 +190,23 @@ export function JobCardCreateForm({
 
   const customer = customerQuery.data;
   const vehicle = vehicleQuery.data?.vehicle;
+
+  // Warranty & campaign check: runs once the vehicle and mileage are known. A covered
+  // vehicle or an open campaign must be acknowledged before the job card is saved.
+  const mileageValue = watch("mileage");
+  const odometerReplaced = watch("odometerReplaced");
+  const mileageNumber = Number.isInteger(mileageValue) && mileageValue >= 0 ? mileageValue : undefined;
+  const debouncedMileage = useDebouncedValue(mileageNumber, 450);
+  const warranty = useVehicleWarranty(vehicleId, debouncedMileage, canSeeWarranty && !!vehicleId && debouncedMileage !== undefined);
+  const [serverCheck, setServerCheck] = useState<WarrantyCheck | null>(null);
+  const check = serverCheck ?? warranty.data;
+  const [acknowledged, setAcknowledged] = useState(false);
+  useEffect(() => {
+    // A new check (vehicle or mileage changed) needs a fresh acknowledgement.
+    setAcknowledged(false);
+    setServerCheck(null);
+  }, [vehicleId, debouncedMileage]);
+  const needsAck = canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
   const lastJob = vehicle?.jobCards?.[0];
   const recentJobs = useQuery({
     queryKey: ["job-opening-recent-jobs", vehicleId],
@@ -231,6 +255,8 @@ export function JobCardCreateForm({
     });
 
     setValue("mileage", Number.NaN);
+    setValue("odometerReplaced", false);
+    setValue("odometerReplacedReason", "");
     setValue("acType", "NONE");
     setValue("isRepeat", false);
     setValue("previousJobId", "");
@@ -369,11 +395,20 @@ export function JobCardCreateForm({
 
   const submit = handleSubmit(
     (values) => {
-      const { promisedDate, promisedTime, ...data } = values;
+      if (needsAck) {
+        setTab("Vehicle Details");
+        toast.error("Acknowledge the warranty and campaign check first");
+        return;
+      }
+      const { promisedDate, promisedTime, odometerReplaced: replaced, odometerReplacedReason, ...data } = values;
 
       create.mutate(
         {
           ...data,
+          odometerReplaced: replaced || undefined,
+          odometerReplacedReason: replaced ? odometerReplacedReason?.trim() : undefined,
+          warrantyAcknowledged: acknowledged && check?.coverage.status === "ACTIVE",
+          acknowledgedCampaignIds: acknowledged ? (check?.openCampaigns ?? []).map((c) => c.campaignId) : [],
           description: values.complaints
             .map((row) => row.description)
             .join("; ")
@@ -403,15 +438,26 @@ export function JobCardCreateForm({
             reset(values);
             onDirtyChange?.(false);
             toast.success("Job card opened");
+            if (card.warrantyCase) toast.success(`Warranty case ${card.warrantyCase.caseNumber} opened`);
             onSuccess?.(card.id);
           },
 
-          onError: (error) =>
+          onError: (error) => {
+            const latest = ackRequiredCheck(error);
+            if (latest) {
+              // Coverage or campaigns changed since the check ran: show the server's view and ask again.
+              setServerCheck(latest);
+              setAcknowledged(false);
+              setTab("Vehicle Details");
+              toast.error("The warranty check changed. Review it and acknowledge again.");
+              return;
+            }
             toast.error(
               isAxiosError(error)
                 ? error.response?.data?.message || "Could not save job card"
                 : "Could not save job card",
-            ),
+            );
+          },
         },
       );
     },
@@ -707,8 +753,6 @@ export function JobCardCreateForm({
                     </select>
                   </OpeningField>
                   <ReadOnlyField label="Colour" value={vehicle?.color} />
-                  <ReadOnlyField label="Recorded warranty status" value={vehicle?.warrantyStatus} />
-                  <ReadOnlyField label="Warranty expiry" value={vehicle?.warrantyExpiresAt ? formatDate(vehicle.warrantyExpiresAt) : undefined} />
                   <ReadOnlyField
                     label="Purchase dealer"
                     value={vehicle?.sellingDealer}
@@ -730,7 +774,7 @@ export function JobCardCreateForm({
                       <input
                         aria-invalid={!!errors.mileage}
                         type="number"
-                        min={vehicle?.lastRecordedMileage ?? 0}
+                        min={0}
                         step="1"
                         className={`${openingInput} pr-10 tabular-nums`}
                         {...register("mileage", {
@@ -765,8 +809,26 @@ export function JobCardCreateForm({
                     Previous odometer:{" "}
                     {vehicle.lastRecordedMileage?.toLocaleString() ??
                       "Not recorded"}
-                    km. The recorded mileage cannot decrease.
+                    km. The recorded mileage cannot decrease unless the odometer was replaced.
                   </p>
+                )}
+                {vehicle && (
+                  <div className="mt-3 space-y-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" {...register("odometerReplaced")} /> Odometer was replaced
+                    </label>
+                    {odometerReplaced && (
+                      <OpeningField label="Reason for the odometer replacement" required error={errors.odometerReplacedReason?.message}>
+                        <input
+                          className={openingInput}
+                          maxLength={300}
+                          aria-invalid={!!errors.odometerReplacedReason}
+                          placeholder="e.g. Instrument cluster replaced"
+                          {...register("odometerReplacedReason")}
+                        />
+                      </OpeningField>
+                    )}
+                  </div>
                 )}
                 {vehicleId && vehicleQuery.isPending && (
                   <p
@@ -789,6 +851,26 @@ export function JobCardCreateForm({
                   </p>
                 )}
               </OpeningCard>
+              {vehicleId && (
+                <OpeningCard
+                  title="Warranty & campaign check"
+                  description="Runs before the job card is saved. A covered vehicle or an open campaign must be acknowledged."
+                  action={warranty.isFetching ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : undefined}
+                >
+                  {canSeeWarranty ? (
+                    <WarrantyCheckPanel
+                      check={debouncedMileage !== undefined ? check : undefined}
+                      isFetching={warranty.isFetching}
+                      isError={warranty.isError}
+                      acknowledged={acknowledged}
+                      onAcknowledgedChange={setAcknowledged}
+                      acknowledgedBy={user ? `${user.firstName} ${user.lastName}` : undefined}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">You do not have access to warranty information.</p>
+                  )}
+                </OpeningCard>
+              )}
               <CustomerDetailsCard
                 customer={customer}
                 loading={!!customerId && customerQuery.isPending}
@@ -1095,6 +1177,7 @@ export function JobCardCreateForm({
                 disabled={
                   !isDirty ||
                   create.isPending ||
+                  needsAck ||
                   loading ||
                   customerQuery.isError ||
                   vehicleQuery.isError

@@ -5,6 +5,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { VehicleModelFields, type ModelSelection } from "./VehicleModelFields";
 import { VehicleCustomerField } from "./VehicleCustomerField";
+import { useVehicleModels } from "@/features/warranty/hooks/use-warranty";
 import { createVehicleSchema, vehicleProfileSchema, type CreateVehicleFormValues } from "../schemas/vehicle.schema";
 import type { Vehicle } from "../types/vehicle.types";
 
@@ -21,6 +22,7 @@ export function VehicleProfileForm(
     failed: boolean;
   },
 ) {
+  const { data: warrantyModels = [] } = useVehicleModels();
   const {
     register,
     control,
@@ -50,6 +52,7 @@ export function VehicleProfileForm(
       saleDate: vehicle.saleDate?.slice(0, 10) ?? "",
       sellingDealer: vehicle.sellingDealer ?? "",
       year: vehicle.year ?? undefined,
+      vehicleModelId: vehicle.vehicleModelId ?? "",
     } : {},
   });
 
@@ -65,6 +68,7 @@ export function VehicleProfileForm(
       if (vehicle && (values.modelId ?? null) === (vehicle.modelId ?? null) && (values.generationId ?? null) === (vehicle.generationId ?? null) && (values.engineId ?? null) === (vehicle.engineId ?? null) && (values.customModel || null) === (vehicle.modelId ? null : vehicle.customModel || vehicle.model || "Unspecified (legacy)") && (values.customMake || null) === (vehicle.customMake || vehicle.make || null)) {
         delete payload.modelId; delete payload.generationId; delete payload.engineId; delete payload.customModel; delete payload.customMake;
       }
+      if (vehicle && (values.vehicleModelId || null) === (vehicle.vehicleModelId ?? null)) delete payload.vehicleModelId;
       onSubmit(payload);
     })}>
       {vehicle ? (
@@ -89,6 +93,12 @@ export function VehicleProfileForm(
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2"><VehicleModelFields value={selection} onChange={updateSelection} selectedName={vehicle?.model} error={errors.customModel?.message || errors.modelId?.message} /></div>
         <Field label="Colour (optional)"><input className={inputCls} {...register("color")} /></Field>
+        <Field label="Warranty policy model">
+          <select className={inputCls} {...register("vehicleModelId")}>
+            <option value="">Not linked</option>
+            {warrantyModels.map(model => <option key={model.id} value={model.id}>{model.make} {model.name} ({model.code})</option>)}
+          </select>
+        </Field>
         {(["engineNumber", "keyNumber", "sellingDealer"] as const).map(key => <Field
           key={key}
           label={{
@@ -102,7 +112,7 @@ export function VehicleProfileForm(
             {...register("year", {
               setValueAs: (value: string) => value === "" ? undefined : Number(value),
             })} /></Field>
-        <Field label="Sale date"><input type="date" className={inputCls} {...register("saleDate")} /></Field>
+        <Field label="Sale date (warranty start)"><input type="date" className={inputCls} {...register("saleDate")} /></Field>
         <Field label="PDI date"><input type="date" className={inputCls} {...register("pdiDate")} /></Field>
         <label><input type="checkbox" {...register("pdiDone")} />PDI done</label>
       </div>

@@ -10,6 +10,7 @@ export const ROLES = {
   TECHNICIAN: "Technician",
   RECEPTIONIST: "Receptionist",
   RECEPTION_MANAGER: "ReceptionManager",
+  WARRANTY_OFFICER: "WarrantyOfficer",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
@@ -176,6 +177,24 @@ export const PERMISSIONS = {
 
   // ── Audit ─────────────────────────────────────────────────────────────────
   AUDIT_READ: "audit:read",
+
+  // ── Service — Job card lines (parts/labour and who pays) ──────────────────
+  JOBCARD_LINE_UPDATE: "jobcard:line:update",
+
+  // ── Warranty ──────────────────────────────────────────────────────────────
+  WARRANTY_READ: "warranty:read",
+  // Edit cases and their lines, vehicle warranty start date, goodwill charges.
+  WARRANTY_UPDATE: "warranty:update",
+  // Open cases and move them through the manufacturer claim workflow.
+  WARRANTY_CLAIM: "warranty:claim",
+  // Model warranty policies, claim codes, extended warranty and goodwill overrides.
+  WARRANTY_SETTINGS: "warranty:settings",
+
+  // ── Campaigns (recall / free fix / service campaign) ──────────────────────
+  CAMPAIGN_READ: "campaign:read",
+  CAMPAIGN_CREATE: "campaign:create",
+  CAMPAIGN_UPDATE: "campaign:update",
+  CAMPAIGN_VEHICLE_UPDATE: "campaign:vehicle:update",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -259,6 +278,15 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SERVICES_CREATE,
     PERMISSIONS.SERVICES_UPDATE,
     PERMISSIONS.AUDIT_READ,
+    PERMISSIONS.JOBCARD_LINE_UPDATE,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.WARRANTY_UPDATE,
+    PERMISSIONS.WARRANTY_CLAIM,
+    PERMISSIONS.WARRANTY_SETTINGS,
+    PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.CAMPAIGN_CREATE,
+    PERMISSIONS.CAMPAIGN_UPDATE,
+    PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -358,6 +386,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.LABOUR_ITEM_CREATE,
     PERMISSIONS.LABOUR_ITEM_UPDATE,
+    PERMISSIONS.JOBCARD_LINE_UPDATE,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.CAMPAIGN_READ,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
@@ -373,6 +404,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.PAYMENT_CREATE,
     PERMISSIONS.RECEIPT_READ,
     PERMISSIONS.FINANCE_REPORT_READ,
+    PERMISSIONS.WARRANTY_READ,
   ],
 
   [ROLES.BILLING_OFFICER]: [
@@ -424,6 +456,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBLABOUR_UPDATE,
     PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.JOBCARD_LINE_UPDATE,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.CAMPAIGN_READ,
   ],
 
   // Executes repairs, updates job card progress
@@ -461,6 +496,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ENQUIRY_CREATE,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
@@ -493,5 +531,33 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+  ],
+
+  // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
+  [ROLES.WARRANTY_OFFICER]: [
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.NOTIFICATION_READ,
+    PERMISSIONS.NOTIFICATION_UPDATE,
+    PERMISSIONS.SEARCH_READ,
+    PERMISSIONS.CUSTOMER_READ,
+    PERMISSIONS.VEHICLE_READ,
+    PERMISSIONS.APPOINTMENT_READ,
+    PERMISSIONS.APPOINTMENT_CREATE,
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_LINE_UPDATE,
+    PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.SERVICES_READ,
+    PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.WARRANTY_UPDATE,
+    PERMISSIONS.WARRANTY_CLAIM,
+    PERMISSIONS.WARRANTY_SETTINGS,
+    PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.CAMPAIGN_CREATE,
+    PERMISSIONS.CAMPAIGN_UPDATE,
+    PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
   ],
 };

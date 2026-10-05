@@ -19,6 +19,9 @@ import portalRoutes from '../modules/customer-portal/portal.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import enquiryRoutes from '../modules/enquiry/enquiry.routes';
 import auditRoutes from '../modules/audit/audit.routes';
+import warrantyRoutes, { vehicleModelRouter, vehicleWarrantyRouter } from '../modules/warranty/warranty.routes';
+import campaignRoutes from '../modules/campaign/campaign.routes';
+import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
 
 import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
 
@@ -66,8 +69,11 @@ router.get('/health', (_req, res) => {
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/customers', customerRoutes);
+router.use('/vehicles', vehicleWarrantyRouter);
 router.use('/vehicles', vehicleRoutes);
 router.use('/vehicle-catalog', vehicleCatalogRoutes);
+router.use('/vehicle-models', vehicleModelRouter);
+router.use('/service', jobCardLineRouter);
 router.use('/service', serviceRoutes);
 router.use('/services', servicesRoutes);
 router.use('/workshop', workshopRoutes);
@@ -83,5 +89,7 @@ router.use('/portal', portalRoutes);
 router.use('/credit', creditRoutes);
 router.use('/enquiries', enquiryRoutes);
 router.use('/audit', auditRoutes);
+router.use('/warranty', warrantyRoutes);
+router.use('/campaigns', campaignRoutes);
 
 export default router;

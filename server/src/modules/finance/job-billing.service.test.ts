@@ -114,7 +114,7 @@ describe('Job-bill transaction resilience', () => {
     await new JobBillingService().createJobBill(input);
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', maxWait: 5000, timeout: 15000 });
     expect((prisma.invoice.create as jest.Mock).mock.calls[0][0].data.lines).toEqual({ createMany: { data: [expect.objectContaining({ type: 'LABOUR', amount: 100 })] } });
-    expect((prisma.jobCard.findUnique as jest.Mock).mock.calls[0][0].include.labourLines).toBe(true);
+    expect((prisma.jobCard.findUnique as jest.Mock).mock.calls[0][0].include.labourLines).toEqual({ include: { chargeLine: { select: { chargeType: true } } } });
   });
 
   it('retries an aborted serialization conflict', async () => {

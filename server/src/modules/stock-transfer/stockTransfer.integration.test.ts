@@ -211,7 +211,7 @@ describeDb("Stock transfer workflow (database)", () => {
       data: { firstName: "Ade", lastName: `Oye${run}`, email: `ade.${run}@test.local`, branchId: branch.id },
     });
     const vehicle = await prisma.vehicle.create({
-      data: { customerId: customer.id, vin: `KN${run.slice(-15)}`, registrationNumber: `R${run.slice(-11)}`, model: "SOR" },
+      data: { customerId: customer.id, vin: `KN${run.slice(-15)}`, registrationNumber: `R${run.slice(-11)}`, model: "SOR", customModel: "SOR" },
     });
     const jobCard = await prisma.jobCard.create({
       data: { branchId: branch.id, vehicleId: vehicle.id, jobNumber: `JC-${run}`, description: "Service" },

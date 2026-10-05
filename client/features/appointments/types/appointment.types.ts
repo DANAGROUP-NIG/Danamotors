@@ -68,6 +68,10 @@ export type UpdateAppointmentPayload = {
   durationMins?: number;
   notes?: string;
   status?: AppointmentStatus;
+  /** Odometer reading taken at check-in; runs the warranty & campaign check. */
+  mileage?: number;
+  warrantyAcknowledged?: boolean;
+  acknowledgedCampaignIds?: string[];
 };
 
 export type AppointmentListResponse = {

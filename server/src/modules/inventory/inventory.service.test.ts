@@ -27,8 +27,10 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   role: PartRole.MAIN,
   mainPartId: null,
   partStatus: PartStatus.ACTIVE,
-  createdAt: new Date("2026-01-01T00:00:00Z"),
-  updatedAt: new Date("2026-01-01T00:00:00Z"),
+  warrantyApplicable: false,
+  warrantyRate: null,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
   ...overrides,
 });
 

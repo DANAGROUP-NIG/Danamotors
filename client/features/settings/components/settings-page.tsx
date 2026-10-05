@@ -30,6 +30,11 @@ const SETTINGS_CARDS = [
     href: "/settings",
   },
   {
+    title: "Warranty",
+    description: "Model warranty policies and manufacturer claim codes.",
+    href: "/warranty/settings",
+  },
+  {
     title: "Audit Log",
     description: "Review a history of system actions and changes.",
     href: "/settings/audit-log",

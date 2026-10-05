@@ -191,7 +191,7 @@ export default function CustomerDetailPage() {
                   <th className="py-2 pr-4">Model</th>
                   <th className="py-2 pr-4">Year</th>
                   <th className="py-2 pr-4">Color</th>
-                  <th className="py-2 pr-4">Warranty</th>
+                  <th className="py-2 pr-4">Sale date</th>
                   <th className="py-2 pr-4"></th>
                 </tr>
               </thead>
@@ -214,7 +214,7 @@ export default function CustomerDetailPage() {
                       {v.color ?? "—"}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {v.warrantyStatus ?? "—"}
+                      {v.saleDate ? new Date(v.saleDate).toLocaleDateString("en-GB") : "—"}
                     </td>
                     <td className="py-2 pr-4">
                       <Link

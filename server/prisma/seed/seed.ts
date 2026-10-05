@@ -12,6 +12,7 @@ import seedStockTransactions from "./transactions";
 import seedCustomerPortal from "./portal";
 import seedWorkshop from "./workshop";
 import seedEnquiries from "./enquiries";
+import seedWarranty from "./warranty";
 
 const prisma = new PrismaClient();
 
@@ -67,6 +68,10 @@ async function main() {
     vehicles,
     services,
   );
+
+  // 10. Warranty policies, claim codes and a draft recall campaign
+  console.log("\nSeeding warranty and campaign reference data...");
+  await seedWarranty(prisma);
 
   // Summary
   console.log("\n── Summary ──");

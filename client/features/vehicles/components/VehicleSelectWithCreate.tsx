@@ -168,18 +168,19 @@ export function VehicleSelectWithCreate({
       year: initialVehicle?.year,
       trim: "",
       color: "",
-      warrantyProvider: "",
-      warrantyStatus: "",
-      warrantyExpiresAt: "",
+      vehicleModelId: "",
       ownershipStatus: "",
     });
   }, [customerId, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineVehicle(values: CreateVehicleFormValues) {
     if (!customerId || values.customerId !== customerId) return;
+    // The inline form has no warranty policy field; never send an empty ID.
+    const { vehicleModelId, ...rest } = values;
     const payload = {
-      ...values,
+      ...rest,
       customerId,
+      ...(vehicleModelId && { vehicleModelId }),
     };
     createVehicleMutation.mutate(payload, {
       onSuccess: (res) => {

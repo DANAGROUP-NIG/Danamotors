@@ -73,12 +73,22 @@ export interface CreateJobCardPayload {
   remarks?: string;
   estimatedHours?: number;
   estimatedCost?: number;
+  odometerReplaced?: boolean;
+  odometerReplacedReason?: string;
+  /** The adviser informed the customer of the warranty coverage. */
+  warrantyAcknowledged?: boolean;
+  /** Open campaigns the adviser acknowledged. */
+  acknowledgedCampaignIds?: string[];
+}
+
+export type CreatedJobCard = JobCard & {
+  warrantyCase: { id: string; caseNumber: string } | null;
 }
 
 export async function createJobCardRequest(
   data: CreateJobCardPayload,
-): Promise<JobCard> {
-  const result = await apiPost<{ jobCard: JobCard }>(
+): Promise<CreatedJobCard> {
+  const result = await apiPost<{ jobCard: CreatedJobCard }>(
     API_ROUTES.service.jobCards.base,
     {
       ...data,

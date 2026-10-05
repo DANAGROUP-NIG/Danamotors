@@ -362,6 +362,21 @@ export class ServiceRepository {
             receipts: true,
           },
         },
+        warrantyAcknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        warrantyCase: {
+          select: { id: true, caseNumber: true, status: true },
+        },
+        campaigns: {
+          select: {
+            campaignId: true,
+            campaignCode: true,
+            campaignTitle: true,
+            campaignType: true,
+            campaign: { select: { status: true } },
+          },
+        },
       },
     });
   }

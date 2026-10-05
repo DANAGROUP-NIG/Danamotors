@@ -166,6 +166,14 @@ export default async function seedStaffUsers(
       role: ROLES.RECEPTION_MANAGER,
       branchId: mainBranch.id,
     },
+    {
+      email: "warranty@danamotors.com",
+      password: "Warranty@123",
+      firstName: "Folake",
+      lastName: "Adebayo",
+      role: ROLES.WARRANTY_OFFICER,
+      branchId: mainBranch.id,
+    },
   ];
 
   const result = [];

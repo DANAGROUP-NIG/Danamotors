@@ -38,6 +38,9 @@ import type {
   JobCardInvoice,
 } from "@/features/job-cards/types/job-card.types";
 import { JobCardLabourSection } from "@/features/job-cards/components/JobCardLabourSection";
+import { JobCardLinesCard } from "@/features/job-cards/components/JobCardLinesCard";
+import { LinkedCampaignsCard, WarrantySnapshotCard } from "@/features/job-cards/components/JobCardWarrantyCards";
+import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
@@ -56,11 +59,12 @@ export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: jobCard, isLoading, error } = useJobCard(id);
-  const { hasPermission } = useAuth();
+  const { hasPermission, isSuperAdmin } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
   const canManage = hasPermission("jobcard:update");
   const canCreateBill = hasPermission("invoice:job-bill:create");
+  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   function handlePrint() {
     window.print();
@@ -277,6 +281,14 @@ export default function JobCardDetailPage() {
             />
           </div>
         </div>
+
+        {/* ── Warranty snapshot & campaigns ── */}
+        {canSeeWarranty && jobCard.vehicleId && (
+          <div className="grid gap-5 md:grid-cols-2">
+            <WarrantySnapshotCard jobCard={jobCard} />
+            <LinkedCampaignsCard jobCard={jobCard} />
+          </div>
+        )}
 
         {/* ── Customer & Vehicle ── */}
         <div className="grid gap-4 md:grid-cols-2">
@@ -605,6 +617,9 @@ export default function JobCardDetailPage() {
           branchId={jobCard.branchId}
           billedAt={jobCard.billedAt}
         />
+
+        {/* ── Who pays for each part and labour line (warranty, goodwill, campaign, customer) ── */}
+        <JobCardLinesCard jobCardId={jobCard.id} />
 
         {/* ── Technician & QC Assignments ── */}
         <div className="grid gap-5 md:grid-cols-2">

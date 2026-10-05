@@ -53,12 +53,16 @@ export class VehicleRepository {
     return prisma.vehicle.findUnique({
       where: { id },
       include: {
+        vehicleModel: {
+          select: { id: true, code: true, make: true, name: true, warrantyDays: true, warrantyKm: true, warrantyCovered: true },
+        },
         customer: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
+            phoneNumber: true,
             branchId: true,
           },
         },
@@ -79,9 +83,8 @@ export class VehicleRepository {
     year?: number;
     trim?: string;
     color?: string;
-    warrantyProvider?: string;
-    warrantyStatus?: string;
-    warrantyExpiresAt?: Date;
+    vehicleModelId?: string;
+    saleDate?: Date;
     ownershipStatus?: string;
     createdById?: string;
   }): Promise<Vehicle> {
@@ -90,7 +93,7 @@ export class VehicleRepository {
     });
   }
 
-  async updateVehicle(id: string, data: Partial<Vehicle>): Promise<Vehicle> {
+  async updateVehicle(id: string, data: Prisma.VehicleUncheckedUpdateInput): Promise<Vehicle> {
     return prisma.vehicle.update({
       where: { id },
       data,

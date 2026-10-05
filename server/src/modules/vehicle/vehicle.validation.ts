@@ -16,6 +16,8 @@ export const vehicleBody = z.object({
   modelId: z.string().uuid().nullable().optional(),
   generationId: z.string().uuid().nullable().optional(),
   engineId: z.string().uuid().nullable().optional(),
+  // Warranty policy model (VehicleModel); separate from the catalog modelId above.
+  vehicleModelId: z.string().uuid().nullable().optional(),
   customMake: modelText,
   customModel: modelText,
   color: z.string().trim().max(80).nullable().optional(),

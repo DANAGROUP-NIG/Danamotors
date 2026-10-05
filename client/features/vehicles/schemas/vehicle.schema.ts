@@ -23,9 +23,8 @@ const vehicleFields = z.object({
   year: z.number().int().min(1900).max(2200).optional(),
   trim: z.string().optional(),
   color: z.string().optional(),
-  warrantyProvider: z.string().optional(),
-  warrantyStatus: z.string().optional(),
-  warrantyExpiresAt: z.string().optional(),
+  // Warranty policy model; the warranty starts on the sale date.
+  vehicleModelId: z.string().optional(),
   ownershipStatus: z.string().optional(),
 });
 
