@@ -34,7 +34,6 @@ const STATUS_OPTIONS = [
 ];
 
 export const PART_EXPORT_COLUMNS = [
-  { key: "partCode", label: "Part Code" },
   { key: "partNumber", label: "Part Number" },
   { key: "name", label: "Name" },
   { key: "category", label: "Category" },
@@ -57,7 +56,6 @@ export const PART_EXPORT_COLUMNS = [
 
 export function partExportRow(p: PartMaster): Record<string, string | number> {
   return {
-    partCode: p.partCode,
     partNumber: p.partNumber,
     name: p.name,
     category: p.category ?? "",
@@ -135,6 +133,7 @@ export function PartMasterTable() {
   const columns: Column<PartMaster>[] = [
     {
       header: "Part",
+      className: "min-w-44",
       render: (p) => (
         <Link href={`/inventory/${p.id}`} className="block hover:underline">
           <p className="font-medium">{p.name}</p>
@@ -268,7 +267,7 @@ export function PartMasterTable() {
             setCommittedSearch("");
             setPage(1);
           }}
-          placeholder="Search by part code, number or name…"
+          placeholder="Search by part number or name…"
           filters={
             <div className="flex flex-wrap items-center gap-3">
               <DataTableFilterChips options={STATUS_OPTIONS} selected={status} onChange={resetPage(setStatus)} />

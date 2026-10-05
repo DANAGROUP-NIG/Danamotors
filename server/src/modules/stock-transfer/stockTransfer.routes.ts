@@ -12,7 +12,6 @@ import {
   emptyQuerySchema,
   idParamSchema,
   listIndentsSchema,
-  listMitsSchema,
   listPickingListsSchema,
   listStnsSchema,
   partLookupSchema,
@@ -30,8 +29,7 @@ router.use("/picking-lists", authMiddleware);
 router.use("/stn", authMiddleware);
 router.use("/cases", authMiddleware);
 router.use("/packing-lists", authMiddleware);
-router.use("/mit", authMiddleware);
-router.use("/srn", authMiddleware);
+router.use("/transfer-mrns", authMiddleware);
 
 const read = requirePermission(PERMISSIONS.TRANSFER_READ);
 
@@ -46,9 +44,10 @@ const read = requirePermission(PERMISSIONS.TRANSFER_READ);
  *
  *       1. **Create indent** (requesting branch) → indent number, status SUBMITTED.
  *       2. **Approve** (supplying branch) → picking list, stock reserved, unavailable quantities on back order.
- *       3. **Dispatch** (supplying branch) → STN, cases, packing list, MIT; source stock deducted exactly once.
- *       4. **Receive** (requesting branch) → SRN; stock posted to the requesting branch. Supports partial,
- *          damaged and short receipts.
+ *       3. **Dispatch** (supplying branch) → STN, cases and packing list; source stock deducted exactly once.
+ *          The goods are in transit on the STN. Transfers do not use MIT, which is for Mobis invoices only.
+ *       4. **Receive** (requesting branch) → MRN; stock posted to the requesting branch. Supports partial,
+ *          damaged and short receipts, with one MRN per receipt.
  *
  *       Document numbers use the legacy format `YYYY` + 6 digits, for example `2026000132`.
  *
@@ -89,7 +88,7 @@ const read = requirePermission(PERMISSIONS.TRANSFER_READ);
  *           - { key: STN_CREATED, label: STN created, completed: true }
  *           - { key: PACKED, label: Cases packed, completed: true }
  *           - { key: DISPATCHED, label: Dispatched (in transit), completed: true }
- *           - { key: SRN_CREATED, label: SRN created, completed: false }
+ *           - { key: MRN_CREATED, label: MRN created, completed: false }
  *           - { key: RECEIVED, label: Received, completed: false }
  *         pickingList: { pickingNumber: "2026000045", status: COMPLETED }
  *         stn:
@@ -98,8 +97,7 @@ const read = requirePermission(PERMISSIONS.TRANSFER_READ);
  *           stockDeducted: true
  *           cases: [{ caseNumber: "2026000310", totalQuantity: 5 }]
  *           packingList: { packingNumber: "2026000090", waybillNumber: "WB-7781", dispatchMode: ROAD }
- *           mit: { mitNumber: "2026000077", sourceType: INTERNAL_TRANSFER, status: IN_TRANSIT }
- *           srns: []
+ *           mrns: []
  *         statusHistory:
  *           - { fromStatus: null, toStatus: DRAFT }
  *           - { fromStatus: DRAFT, toStatus: SUBMITTED }
@@ -330,8 +328,8 @@ router.patch("/indents/:id/cancel", requirePermission(PERMISSIONS.TRANSFER_CANCE
  *     tags: [Stock Transfers]
  *     summary: Dispatch a picked indent in one step
  *     description: |
- *       Creates the STN, cases, packing list and internal MIT (`sourceType = INTERNAL_TRANSFER`), deducts
- *       source stock exactly once and releases the reservation. Every field is optional:
+ *       Creates the STN, cases and packing list, deducts source stock exactly once and releases the
+ *       reservation. The goods are then in transit on the STN; no MIT is created. Every field is optional:
  *
  *       - Without `lines`, the full picked quantity ships. Use `lines` only to ship less; the difference goes to back order.
  *       - Without `cases`, everything is packed into one case. When given, the cases must hold exactly the dispatched quantities, and one case may hold any number of parts.
@@ -373,10 +371,11 @@ router.patch("/indents/:id/dispatch", requirePermission(PERMISSIONS.TRANSFER_DIS
  * /inventory/indents/{id}/receive:
  *   patch:
  *     tags: [Stock Transfers]
- *     summary: Receive a dispatched indent (creates an SRN)
+ *     summary: Receive a dispatched indent (the receiving branch generates an MRN)
  *     description: |
- *       With an empty body everything outstanding is received in good condition and the transfer closes.
- *       Send `lines` to record partial, damaged or missing quantities per MIT line. Good quantities are posted
+ *       Generates an MRN against the STN. With an empty body everything outstanding is received in good
+ *       condition and the transfer closes. Send `lines` to record partial, damaged or missing quantities
+ *       per STN line; each receipt gets its own MRN. Good quantities are posted
  *       to the requesting branch as `TRANSFER_IN`; damaged quantities are recorded but not added to stock.
  *       With `closeShort: true`, anything still outstanding is recorded as short and the transfer closes.
  *       Otherwise the indent becomes PARTIALLY_RECEIVED and can be received again.
@@ -388,9 +387,9 @@ router.patch("/indents/:id/dispatch", requirePermission(PERMISSIONS.TRANSFER_DIS
  *             remarks: One filter crushed in transit
  *             closeShort: true
  *             lines:
- *               - { mitLineId: 4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f8a, receivedQuantity: 4, damagedQuantity: 1 }
+ *               - { stnLineId: 4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f8a, receivedQuantity: 4, damagedQuantity: 1 }
  *     responses:
- *       200: { description: SRN created. Status is COMPLETED or PARTIALLY_RECEIVED. }
+ *       200: { description: MRN created. Status is COMPLETED or PARTIALLY_RECEIVED. }
  *       400: { description: Quantities exceed what is outstanding }
  *       409: { description: Nothing in transit for this indent }
  */
@@ -419,7 +418,7 @@ router.patch("/indents/:id/receive", requirePermission(PERMISSIONS.TRANSFER_RECE
  * /inventory/stn/{id}:
  *   get:
  *     tags: [Stock Transfers]
- *     summary: Get an STN with lines, cases, packing list, MIT and SRNs
+ *     summary: Get an STN with lines, cases, packing list and MRNs
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
  *     responses: { 200: { description: STN } }
  * /inventory/cases/{id}:
@@ -434,31 +433,18 @@ router.patch("/indents/:id/receive", requirePermission(PERMISSIONS.TRANSFER_RECE
  *     summary: Get a packing list with its cases
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
  *     responses: { 200: { description: Packing list } }
- * /inventory/mit:
+ * /inventory/transfer-mrns:
  *   get:
  *     tags: [Stock Transfers]
- *     summary: List material in transit
- *     parameters:
- *       - { in: query, name: status, schema: { type: string, enum: [IN_TRANSIT, VERIFIED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED] } }
- *       - { in: query, name: sourceType, schema: { type: string, enum: [INTERNAL_TRANSFER, EXTERNAL_VENDOR] } }
- *     responses: { 200: { description: MIT records } }
- * /inventory/mit/{id}:
+ *     summary: List MRNs generated for branch transfers
+ *     description: Mobis MRNs are listed under Mobis Receiving.
+ *     responses: { 200: { description: Transfer MRNs } }
+ * /inventory/transfer-mrns/{id}:
  *   get:
  *     tags: [Stock Transfers]
- *     summary: Get an MIT with its lines and receipts
+ *     summary: Get a transfer MRN with received, damaged and short quantities per STN line
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
- *     responses: { 200: { description: MIT } }
- * /inventory/srn:
- *   get:
- *     tags: [Stock Transfers]
- *     summary: List stock receipt notes
- *     responses: { 200: { description: SRNs } }
- * /inventory/srn/{id}:
- *   get:
- *     tags: [Stock Transfers]
- *     summary: Get an SRN with received, damaged and short quantities
- *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
- *     responses: { 200: { description: SRN } }
+ *     responses: { 200: { description: MRN } }
  */
 router.get("/picking-lists", read, validateRequest(listPickingListsSchema), controller.listPickingLists);
 router.get("/picking-lists/:id", read, validateRequest(idParamSchema), controller.getPickingList);
@@ -466,9 +452,7 @@ router.get("/stn", read, validateRequest(listStnsSchema), controller.listStns);
 router.get("/stn/:id", read, validateRequest(idParamSchema), controller.getStn);
 router.get("/cases/:id", read, validateRequest(idParamSchema), controller.getCase);
 router.get("/packing-lists/:id", read, validateRequest(idParamSchema), controller.getPackingList);
-router.get("/mit", read, validateRequest(listMitsSchema), controller.listMits);
-router.get("/mit/:id", read, validateRequest(idParamSchema), controller.getMit);
-router.get("/srn", read, validateRequest(emptyQuerySchema), controller.listSrns);
-router.get("/srn/:id", read, validateRequest(idParamSchema), controller.getSrn);
+router.get("/transfer-mrns", read, validateRequest(emptyQuerySchema), controller.listTransferMrns);
+router.get("/transfer-mrns/:id", read, validateRequest(idParamSchema), controller.getTransferMrn);
 
 export default router;

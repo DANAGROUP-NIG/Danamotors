@@ -60,7 +60,7 @@ function SectionCard({ icon, title, action, children }: { icon: ReactNode; title
   );
 }
 
-function DetailField({ label, value }: { label: string; value?: ReactNode }) {
+function DetailField({ label, value, wide }: { label: string; value?: ReactNode; wide?: boolean }) {
   return (
     <div>
       <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
@@ -174,7 +174,7 @@ export function IndentDetail({ id }: { id: string }) {
           )}
           {can.receive && (
             <Button size="sm" onClick={() => setDialog("receive")} className="gap-1.5">
-              <PackageCheck className="size-4" /> Receive
+              <PackageCheck className="size-4" /> Generate MRN
             </Button>
           )}
         </div>
@@ -196,7 +196,7 @@ export function IndentDetail({ id }: { id: string }) {
               <StatusBadge status={INDENT_STATUS_LABELS[indent.status]} tone={INDENT_STATUS_TONES[indent.status]} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             <DetailField label="Requesting branch" value={indent.requestingBranch.name} />
             <DetailField label="Supplying branch" value={indent.sourceBranch.name} />
             <DetailField label="Requested by" value={personName(indent.requestedBy)} />
@@ -209,8 +209,8 @@ export function IndentDetail({ id }: { id: string }) {
               <DetailField label="Approved by" value={`${personName(indent.approvedBy)} · ${fmtDate(indent.approvedAt)}`} />
             )}
             <DetailField label="Order value" value={fmtCurrency(totalAmount)} />
-            {indent.remarks && <DetailField label="Remarks" value={indent.remarks} />}
-            {indent.approvalRemarks && <DetailField label="Approval remarks" value={indent.approvalRemarks} />}
+            {indent.remarks && <DetailField wide label="Remarks" value={indent.remarks} />}
+            {indent.approvalRemarks && <DetailField wide label="Approval remarks" value={indent.approvalRemarks} />}
           </div>
 
           {indent.status === "REJECTED" && (
@@ -434,6 +434,17 @@ function Documents({ indent }: { indent: Indent }) {
             <p className="text-sm text-emerald-700">
               {stn.stockDeducted ? `Stock deducted from ${indent.sourceBranch.name}` : "Stock not yet deducted"}
             </p>
+            {/* The goods travel on the STN; each line shows how much the receiving branch has accounted for. */}
+            <ul className="space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-600">
+              {stn.lines.map((l) => (
+                <li key={l.id} className="flex justify-between gap-2">
+                  <span className="font-mono">{l.part.partNumber}</span>
+                  <span>
+                    {l.receivedQuantity + l.damagedQuantity + l.shortQuantity}/{l.quantity} received on MRN
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -473,19 +484,27 @@ function Documents({ indent }: { indent: Indent }) {
           </div>
         )}
 
-        {stn?.mit && (
-          <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+        {stn?.mrns.map((mrn) => (
+          <div key={mrn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
             <DocHeader
-              label="Material in transit"
-              number={stn.mit.mitNumber}
-              meta={`${stn.mit.status.replace(/_/g, " ").toLowerCase()} · ${fmtDate(stn.mit.transitDate)}`}
+              label="MRN"
+              number={mrn.mrnNumber}
+              meta={`${fmtDateTime(mrn.receiptDate)} · ${personName(mrn.receivedBy)}`}
             />
-            <ul className="space-y-1 text-sm text-slate-600">
-              {stn.mit.lines.map((l) => (
+            <div className="flex flex-wrap gap-3 text-xs">
+              <span className="text-emerald-700">{mrn.totalReceived} received</span>
+              {mrn.totalDamaged > 0 && <span className="text-red-600">{mrn.totalDamaged} damaged</span>}
+              {mrn.totalShort > 0 && <span className="text-red-600">{mrn.totalShort} short</span>}
+              <span className="text-slate-500">{fmtCurrency(mrn.totalValue)}</span>
+            </div>
+            <ul className="space-y-1 text-xs text-slate-600">
+              {mrn.lines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-2">
                   <span className="font-mono">{l.part.partNumber}</span>
                   <span>
-                    {l.receivedQuantity + l.damagedQuantity + l.shortQuantity}/{l.quantity} accounted
+                    {l.receivedQuantity} good
+                    {l.damagedQuantity > 0 && ` · ${l.damagedQuantity} damaged`}
+                    {l.shortQuantity > 0 && ` · ${l.shortQuantity} short`}
                   </span>
                 </li>
               ))}

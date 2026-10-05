@@ -42,7 +42,6 @@ interface PartFormProps {
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
   if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O" };
   return {
-    partCode: part.partCode,
     partNumber: part.partNumber,
     name: part.name,
     category: part.category ?? "",
@@ -85,8 +84,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
     handleSubmit,
     reset,
     watch,
-    setValue,
-    getValues,
     formState: { errors, isDirty, dirtyFields },
   } = useForm<PartMasterFormInput, unknown, PartMasterFormValues>({
     resolver: zodResolver(partMasterSchema),
@@ -164,16 +161,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             <input
               className={inputCls}
               placeholder="e.g. 2630035505"
-              {...register("partNumber", {
-                // The legacy system keys parts by number; default the code to it.
-                onBlur: (e) => {
-                  if (!isEdit && !getValues("partCode")) setValue("partCode", e.target.value.trim(), { shouldValidate: true });
-                },
-              })}
+              {...register("partNumber")}
             />
-          </Field>
-          <Field label="Part code" error={errors.partCode?.message}>
-            <input className={inputCls} placeholder="Defaults to the part number" {...register("partCode")} />
           </Field>
           <Field label="Name" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />

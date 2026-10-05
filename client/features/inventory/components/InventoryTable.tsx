@@ -207,6 +207,7 @@ export function InventoryTable() {
   const columns: Column<BranchStockItem>[] = [
     {
       header: "Part",
+      className: "min-w-44",
       render: (stock) => (
         <>
           <p className="font-medium">{stock.part.name}</p>

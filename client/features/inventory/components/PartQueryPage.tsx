@@ -77,8 +77,9 @@ function StoreRows({ rows, empty }: { rows: PartQueryRow[]; empty: string }) {
   if (rows.length === 0) {
     return (
       <tr>
-        <td colSpan={9} className="px-3 py-6 text-center text-sm text-muted-foreground">
-          {empty}
+        <td colSpan={9} className="px-3 py-6 text-sm text-muted-foreground">
+          {/* Sticky so the message stays in view when the wide table scrolls on phones. */}
+          <span className="sticky left-3">{empty}</span>
         </td>
       </tr>
     );
@@ -102,8 +103,8 @@ function AlternateRows({ rows }: { rows: PartQueryAlternateRow[] }) {
   if (rows.length === 0) {
     return (
       <tr>
-        <td colSpan={11} className="px-3 py-6 text-center text-sm text-muted-foreground">
-          This part has no alternates.
+        <td colSpan={11} className="px-3 py-6 text-sm text-muted-foreground">
+          <span className="sticky left-3">This part has no alternates.</span>
         </td>
       </tr>
     );
@@ -214,7 +215,7 @@ export function PartQueryPage() {
 
       {!submitted ? (
         <p className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-muted-foreground">
-          Enter a part number or part code and click Show.
+          Enter a part number and click Show.
         </p>
       ) : isError ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">{errorMessage(error)}</p>
@@ -235,9 +236,8 @@ export function PartQueryPage() {
               </div>
               <PartStatusBadge status={data.part.partStatus} />
             </div>
-            <div className="mt-4 grid gap-4 text-sm sm:grid-cols-4 lg:grid-cols-7">
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
               {[
-                ["Part code", data.part.partCode],
                 ["Flag", data.part.partFlag],
                 ["Price category", data.part.priceCategoryCode ?? "—"],
                 ["Taxable", data.part.taxable ? "Yes" : "No"],

@@ -41,6 +41,11 @@ export const NOTIFICATION_TYPE_STYLES: Record<
     icon: PackageCheck,
     classes: "bg-emerald-50 text-emerald-600",
   },
+  // MRN posted for part of a transfer; the rest is still outstanding.
+  TRANSFER_MRN_CREATED: {
+    icon: PackageCheck,
+    classes: "bg-amber-50 text-amber-600",
+  },
   PURCHASE_REQUEST_CREATED: {
     icon: ShoppingCart,
     classes: "bg-purple-50 text-purple-600",

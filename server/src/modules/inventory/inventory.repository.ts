@@ -53,7 +53,6 @@ export class InventoryRepository {
   // ── Part Master ────────────────────────────────────────────────────────
 
   async createPart(data: {
-    partCode: string;
     partNumber: string;
     name: string;
     category: string;

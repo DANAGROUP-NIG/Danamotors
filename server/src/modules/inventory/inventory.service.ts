@@ -319,7 +319,6 @@ export class InventoryService {
     return prisma.sparePart.create({
       data: {
         mainPartId,
-        partCode: await this.generatePartCode(partNumber),
         partNumber,
         name,
         description,
@@ -435,7 +434,6 @@ export class InventoryService {
   }
 
   async createPart(data: {
-    partCode: string;
     partNumber: string;
     name: string;
     category: string;
@@ -528,7 +526,6 @@ export class InventoryService {
   async updatePart(
     id: string,
     data: {
-      partCode?: string;
       partNumber?: string;
       name?: string;
       category?: string;
@@ -736,12 +733,7 @@ export class InventoryService {
   /** Legacy Part Query: stock at the home premises, alternates, and other branches. */
   async partQuery(partNumber: string, homeBranchId?: string | null) {
     const part = await prisma.sparePart.findFirst({
-      where: {
-        OR: [
-          { partNumber: { equals: partNumber, mode: "insensitive" } },
-          { partCode: { equals: partNumber, mode: "insensitive" } },
-        ],
-      },
+      where: { partNumber: { equals: partNumber, mode: "insensitive" } },
     });
     if (!part) throw new NotFoundError(`Part ${partNumber} not found`);
 

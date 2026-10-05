@@ -85,11 +85,11 @@ function ApproveRow({
           </select>
         )}
       </td>
-      <td className={cn(tdCls, "text-right")}>{line.requestedQuantity}</td>
-      <td className={cn(tdCls, "text-right")}>
+      <td data-label="Requested" className={cn(tdCls, "text-right")}>{line.requestedQuantity}</td>
+      <td data-label="Available" className={cn(tdCls, "text-right")}>
         {isLoading ? <Loader2 className="ml-auto size-4 animate-spin text-slate-400" /> : available}
       </td>
-      <td className={cn(tdCls, "text-right")}>
+      <td data-label="Approve" className={cn(tdCls, "text-right")}>
         <input
           type="number"
           min={0}
@@ -99,8 +99,8 @@ function ApproveRow({
           onChange={(e) => onChange({ ...value, approved: e.target.value })}
         />
       </td>
-      <td className={cn(tdCls, "text-right font-medium text-emerald-700")}>{picked}</td>
-      <td className={cn(tdCls, "text-right", backOrder > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
+      <td data-label="Will pick" className={cn(tdCls, "text-right font-medium text-emerald-700")}>{picked}</td>
+      <td data-label="Back order" className={cn(tdCls, "text-right", backOrder > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
         {backOrder}
       </td>
     </tr>
@@ -149,7 +149,7 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
           on back order and the general store manager is notified.
         </p>
         <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
+          <table className="stack-table w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className={thCls}>Part</th>
@@ -271,7 +271,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
         </p>
 
         <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
+          <table className="stack-table w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className={thCls}>Part</th>
@@ -290,9 +290,9 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                       {l.isAlternate && ` · alternate for ${l.requestedPart.partNumber}`}
                     </p>
                   </td>
-                  <td className={cn(tdCls, "text-sm text-slate-500")}>{l.binLocation ?? "—"}</td>
-                  <td className={cn(tdCls, "text-right")}>{l.pickedQuantity}</td>
-                  <td className={cn(tdCls, "text-right")}>
+                  <td data-label="Bin" className={cn(tdCls, "text-xs text-slate-500")}>{l.binLocation ?? "—"}</td>
+                  <td data-label="Picked" className={cn(tdCls, "text-right")}>{l.pickedQuantity}</td>
+                  <td data-label="Ship" className={cn(tdCls, "text-right")}>
                     <input
                       type="number"
                       min={0}
@@ -364,7 +364,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                 </Button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="stack-table w-full text-sm">
                   <thead>
                     <tr>
                       <th className={thCls}>Part</th>
@@ -383,7 +383,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                         <tr key={l.id} className="border-t border-slate-100">
                           <td className={cn(tdCls, "font-mono text-sm")}>{l.part.partNumber}</td>
                           {Array.from({ length: caseCount }, (_, c) => (
-                            <td key={c} className={cn(tdCls, "text-right")}>
+                            <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
                               <input
                                 type="number"
                                 min={0}
@@ -393,7 +393,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                               />
                             </td>
                           ))}
-                          <td className={cn(tdCls, "text-right text-sm font-medium", ok ? "text-emerald-700" : "text-red-600")}>
+                          <td data-label="Packed / ship" className={cn(tdCls, "text-right text-xs font-medium", ok ? "text-emerald-700" : "text-red-600")}>
                             {caseSum(l.id)} / {shipQty(l.id)}
                           </td>
                         </tr>
@@ -402,7 +402,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                     <tr className="border-t border-slate-100">
                       <td className={cn(tdCls, "text-sm text-slate-500")}>Weight (kg)</td>
                       {Array.from({ length: caseCount }, (_, c) => (
-                        <td key={c} className={cn(tdCls, "text-right")}>
+                        <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
                           <input
                             type="number"
                             min={0}
@@ -419,7 +419,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                           />
                         </td>
                       ))}
-                      <td />
+                      <td className="max-sm:hidden" />
                     </tr>
                   </tbody>
                 </table>
@@ -453,10 +453,18 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
 
 export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
   const receive = useReceiveIndent();
-  const mitLines = useMemo(() => indent.stn?.mit?.lines ?? [], [indent.stn?.mit?.lines]);
-  const outstanding = (l: (typeof mitLines)[number]) =>
+  const stnLines = useMemo(() => indent.stn?.lines ?? [], [indent.stn?.lines]);
+  // Case numbers per STN line, for finding the goods in the delivery.
+  const caseNumbers = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of indent.stn?.cases ?? []) {
+      for (const l of c.lines) map.set(l.stnLineId, [...(map.get(l.stnLineId) ?? []), c.caseNumber]);
+    }
+    return map;
+  }, [indent.stn?.cases]);
+  const outstanding = (l: (typeof stnLines)[number]) =>
     l.quantity - l.receivedQuantity - l.damagedQuantity - l.shortQuantity;
-  const open_ = mitLines.filter((l) => outstanding(l) > 0);
+  const open_ = stnLines.filter((l) => outstanding(l) > 0);
 
   const [rows, setRows] = useState<Record<string, { received: string; damaged: string }>>(() =>
     Object.fromEntries(open_.map((l) => [l.id, { received: String(outstanding(l)), damaged: "0" }])),
@@ -484,7 +492,7 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
           closeShort: closeShort || undefined,
           // Always explicit: an empty list would mean "receive everything" on the server.
           lines: values.map((v) => ({
-            mitLineId: v.line.id,
+            stnLineId: v.line.id,
             receivedQuantity: v.r,
             damagedQuantity: v.d || undefined,
           })),
@@ -498,11 +506,11 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
     <ModalFame isOpen={open} onClose={onClose} title={`Receive STN ${indent.stn?.stnNumber ?? ""}`}>
       <div className="grid gap-4">
         <p className="text-sm text-slate-600">
-          Good units are added to {indent.requestingBranch.name} stock. Damaged units are recorded on the SRN but not
-          added to stock.
+          This generates an MRN for what arrived. Good units are added to {indent.requestingBranch.name} stock.
+          Damaged units are recorded on the MRN but not added to stock.
         </p>
         <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
+          <table className="stack-table w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
                 <th className={thCls}>Part</th>
@@ -520,10 +528,12 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
                     <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
                     <p className="text-sm text-slate-500">{line.part.name}</p>
                   </td>
-                  <td className={cn(tdCls, "text-sm text-slate-500")}>{line.caseNumbers || "—"}</td>
-                  <td className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
+                  <td data-label="Case" className={cn(tdCls, "text-xs text-slate-500")}>
+                    {caseNumbers.get(line.id)?.join(", ") || "—"}
+                  </td>
+                  <td data-label="Outstanding" className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
                   {(["received", "damaged"] as const).map((field) => (
-                    <td key={field} className={cn(tdCls, "text-right")}>
+                    <td key={field} data-label={field === "received" ? "Received good" : "Damaged"} className={cn(tdCls, "text-right")}>
                       <input
                         type="number"
                         min={0}
@@ -535,7 +545,7 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
                       />
                     </td>
                   ))}
-                  <td className={cn(tdCls, "text-right", left > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
+                  <td data-label="Still missing" className={cn(tdCls, "text-right", left > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
                     {left}
                   </td>
                 </tr>
@@ -563,7 +573,7 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
             Close
           </Button>
           <Button disabled={receive.isPending || invalid || !anything} onClick={confirm}>
-            {receive.isPending ? "Posting…" : "Post receipt"}
+            {receive.isPending ? "Generating MRN…" : "Generate MRN"}
           </Button>
         </div>
       </div>

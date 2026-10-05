@@ -59,18 +59,27 @@ describe("createPartMasterSchema", () => {
     ).rejects.toThrow("Unit rate must be greater than zero");
   });
 
-  it("should reject missing required fields", async () => {
-    const { partCode, ...missingCode } = validCreateInput;
+  it('should reject missing required fields', async () => {
+    const { partNumber, ...missingNumber } = validCreateInput;
     await expect(
       createPartMasterSchema.parseAsync({
-        body: missingCode,
+        body: missingNumber,
         query: {},
         params: {},
       }),
     ).rejects.toThrow();
   });
 
-  it("should reject maxLevel less than minLevel", async () => {
+  it('should drop a client-supplied part code, which the server generates', async () => {
+    const result = await createPartMasterSchema.parseAsync({
+      body: { ...validCreateInput, partCode: 'CLIENT-CODE' },
+      query: {},
+      params: {},
+    });
+    expect(result.body).not.toHaveProperty('partCode');
+  });
+
+  it('should reject maxLevel less than minLevel', async () => {
     await expect(
       createPartMasterSchema.parseAsync({
         body: { ...validCreateInput, minLevel: 10, maxLevel: 5 },

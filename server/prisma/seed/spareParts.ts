@@ -152,7 +152,6 @@ export default async function seedSpareParts(prisma: PrismaClient) {
     const batch = PARTS.slice(i, i + BATCH_SIZE);
     await prisma.sparePart.createMany({
       data: batch.map((p) => ({
-        partCode: p.partNumber,
         partNumber: p.partNumber,
         name: p.name,
         category: p.category,

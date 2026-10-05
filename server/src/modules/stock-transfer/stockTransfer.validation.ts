@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IndentStatus, MitSourceType, MitStatus, MobisOrderMode, PickingListStatus, StnStatus, TransportMode } from "@prisma/client";
+import { IndentStatus, MobisOrderMode, PickingListStatus, StnStatus, TransportMode } from "@prisma/client";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const qty = z.number().int("Quantity must be a whole number");
@@ -121,7 +121,7 @@ export const receiveIndentSchema = z.object({
       lines: z
         .array(
           z.object({
-            mitLineId: uuid("transit line ID"),
+            stnLineId: uuid("STN line ID"),
             receivedQuantity: qty.nonnegative(),
             damagedQuantity: qty.nonnegative().optional(),
             remarks: optionalText(200),
@@ -173,13 +173,6 @@ export const listPickingListsSchema = z.object({
 
 export const listStnsSchema = z.object({
   query: z.object({ status: z.nativeEnum(StnStatus).optional() }),
-});
-
-export const listMitsSchema = z.object({
-  query: z.object({
-    status: z.nativeEnum(MitStatus).optional(),
-    sourceType: z.nativeEnum(MitSourceType).optional(),
-  }),
 });
 
 export const emptyQuerySchema = z.object({ query: z.object({}).passthrough() });

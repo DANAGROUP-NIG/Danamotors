@@ -111,7 +111,6 @@ router.use(authMiddleware);
  *           schema:
  *             $ref: '#/components/schemas/CreatePartMasterInput'
  *           example:
- *             partCode: TYT-OIL-5W30
  *             partNumber: ENG-OIL-5W30
  *             name: Toyota 5W-30 Engine Oil (4L)
  *             category: Lubricants

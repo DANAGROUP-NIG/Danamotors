@@ -20,6 +20,7 @@ import type { PartMatch, ReceivedMode } from "../types/mobis.types";
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
 const today = () => new Date().toISOString().slice(0, 10);
+const ACCEPTED_EXTENSIONS = [".xls", ".xlsx", ".csv", ".txt", ".tsv"];
 
 /** Legacy Part Purchase > MIT > Add, with the invoice file read in the browser and previewed before saving. */
 export function MitUploadPage() {
@@ -34,6 +35,7 @@ export function MitUploadPage() {
   const [parsed, setParsed] = useState<ParsedMitFile | null>(null);
   const [parseError, setParseError] = useState("");
   const [reading, setReading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [matches, setMatches] = useState<PartMatch[] | null>(null);
   const [matchFailed, setMatchFailed] = useState(false);
 
@@ -77,6 +79,21 @@ export function MitUploadPage() {
       setReading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  // The input's accept attribute only filters the file dialog, so dropped files are checked here.
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    if (reading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      setParseError(`${file.name} is not a supported file. Use ${ACCEPTED_EXTENSIONS.join(", ")}.`);
+      return;
+    }
+    onFile(file);
   }
 
   function clearFile() {
@@ -146,7 +163,22 @@ export function MitUploadPage() {
       <PageHeader title="Upload MIT" description="Import a Mobis invoice file in MIT format. Nothing is saved until you click Save." />
 
       {/* ── File ── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div
+        className={cn(
+          "rounded-xl border border-slate-200 bg-white p-6 transition-colors",
+          dragging && "border-primary bg-primary/5",
+        )}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          if (!dragging) setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          // Ignore leave events fired when moving over child elements.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={onDrop}
+      >
         <input
           ref={fileRef}
           type="file"
@@ -158,11 +190,16 @@ export function MitUploadPage() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 py-10 text-sm text-slate-500 hover:border-primary hover:text-primary"
+            className={cn(
+              "flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 py-10 text-sm text-slate-500 hover:border-primary hover:text-primary",
+              dragging && "border-primary text-primary",
+            )}
           >
             <Upload className="size-6" />
-            <span className="font-medium">Choose the Mobis invoice file</span>
-            <span className="text-sm">.xls, .xlsx, .csv or tab-separated text in MIT format</span>
+            <span className="font-medium">
+              {dragging ? "Drop the file to read it" : "Choose the Mobis invoice file, or drag it here"}
+            </span>
+            <span className="text-xs">.xls, .xlsx, .csv or tab-separated text in MIT format</span>
           </button>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">

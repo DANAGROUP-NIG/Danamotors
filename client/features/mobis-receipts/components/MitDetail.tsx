@@ -29,11 +29,11 @@ const toInt = (v: string) => {
   return Number.isInteger(n) && n >= 0 ? n : NaN;
 };
 
-function DetailField({ label, value }: { label: string; value?: ReactNode }) {
+function DetailField({ label, value, wide }: { label: string; value?: ReactNode; wide?: boolean }) {
   return (
-    <div>
-      <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
-      <div className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</div>
+    <div className={cn("min-w-0", wide && "col-span-2")}>
+      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      <div className="mt-0.5 break-words text-sm text-slate-700">{value ?? "—"}</div>
     </div>
   );
 }
@@ -246,7 +246,7 @@ export function MitDetail({ id }: { id: string }) {
             </div>
             <StatusBadge status={MIT_STATUS_LABELS[mit.status]} tone={MIT_STATUS_TONES[mit.status]} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Invoice date" value={fmtDate(mit.invoiceDate)} />
             <DetailField label="Physical receipt date" value={fmtDate(mit.physicalReceiptDate)} />
             <DetailField label="Received mode" value={mit.receivedMode ? RECEIVED_MODE_LABELS[mit.receivedMode] : null} />
@@ -259,7 +259,7 @@ export function MitDetail({ id }: { id: string }) {
               value={`${mit.createdBy ? `${mit.createdBy.firstName} ${mit.createdBy.lastName} · ` : ""}${fmtDate(mit.createdAt)}`}
             />
             {mit.sourceFileName && <DetailField label="File" value={mit.sourceFileName} />}
-            {mit.remarks && <DetailField label="Remarks" value={<span className="whitespace-pre-line">{mit.remarks}</span>} />}
+            {mit.remarks && <DetailField wide label="Remarks" value={<span className="whitespace-pre-line">{mit.remarks}</span>} />}
           </div>
           {newParts.length > 0 && (
             <p className="mt-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
