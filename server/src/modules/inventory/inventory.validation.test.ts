@@ -6,7 +6,6 @@ import {
 } from "./inventory.validation";
 
 const validCreateInput = {
-  partCode: "TYT-OIL-5W30",
   partNumber: "ENG-OIL-5W30",
   name: "Toyota 5W-30 Engine Oil (4L)",
   category: "Lubricants",

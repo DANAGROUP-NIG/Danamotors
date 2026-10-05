@@ -143,6 +143,7 @@ export const createPartMasterSchema = z.object({
       partStatus: partStatusEnum.optional(),
       role: z.literal("MAIN").optional(),
     })
+    .omit({ partCode: true })
     .refine(
       (data) => {
         if (data.minLevel == null || data.maxLevel == null) return true;

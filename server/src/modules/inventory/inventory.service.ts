@@ -434,6 +434,7 @@ export class InventoryService {
   }
 
   async createPart(data: {
+    partCode?: string;
     partNumber: string;
     name: string;
     category: string;
@@ -464,11 +465,13 @@ export class InventoryService {
     } else if (data.priceCategoryCode) {
       await this.retailFromCategory(data.unitRate, data.priceCategoryCode); // validates the code
     }
-    const existing = await this.inventoryRepository.findPartByCode(
-      data.partCode,
-    );
-    if (existing) {
-      throw new ConflictError("A part with this part code already exists");
+    if (data.partCode) {
+      const existing = await this.inventoryRepository.findPartByCode(
+        data.partCode,
+      );
+      if (existing) {
+        throw new ConflictError("A part with this part code already exists");
+      }
     }
 
     const { unitRate, ...rest } = data;
@@ -526,6 +529,7 @@ export class InventoryService {
   async updatePart(
     id: string,
     data: {
+      partCode?: string;
       partNumber?: string;
       name?: string;
       category?: string;
