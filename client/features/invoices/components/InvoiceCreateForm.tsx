@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { isAxiosError } from "axios";
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -61,7 +62,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!jobCardId || !effectiveAdvisorId || !bill || preview.isFetching || preview.isError || !validDiscounts || create.isPending) return;
+    if (!bill?.review.canBill || !jobCardId || !effectiveAdvisorId || !bill || preview.isFetching || preview.isError || !validDiscounts || create.isPending) return;
     create.mutate({
       jobCardId,
       partsDiscountPercent,
@@ -131,6 +132,8 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
         </section>
       )}
 
+      {bill && <section className="grid gap-3 border-y py-4"><h2 className="font-semibold">Approved estimate vs actual charges</h2><p className="text-sm">{bill.review.status}. Comparison is before discounts, VAT and round-off.</p><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th>Work</th><th>Approved qty</th><th>Actual qty</th><th>Approved</th><th>Actual</th><th>Difference</th></tr></thead><tbody>{bill.review.rows.map((row, index) => <tr key={index} className="border-b"><td className="py-2">{row.description}{row.included ? " (included)" : ""}{row.reason && <p className="text-destructive">{row.reason}</p>}</td><td>{row.approvedQuantity}</td><td>{row.actualQuantity}</td><td>{currency.format(row.approvedAmount)}</td><td>{currency.format(row.actualAmount)}</td><td>{currency.format(row.difference)}</td></tr>)}</tbody></table></div>{!bill.review.canBill && <div role="alert" className="text-sm text-destructive">{bill.review.issues.map((issue, index) => <p key={index}>{issue}</p>)}<Link className="underline" href={`/job-cards/${jobCardId}#estimate-approval`}>Review estimate and approval on the job card</Link></div>}</section>}
+
       {jobCardId && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Parts discount (%)">
@@ -157,7 +160,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
       <Field label="Notes (optional)">
         <textarea className={inputCls} rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
-      <Button type="submit" disabled={!bill || preview.isError || !validDiscounts || preview.isFetching || create.isPending || !effectiveAdvisorId}>
+      <Button type="submit" disabled={!bill?.review.canBill || !bill || preview.isError || !validDiscounts || preview.isFetching || create.isPending || !effectiveAdvisorId}>
         {create.isPending ? "Creating bill..." : "Create job bill"}
       </Button>
     </form>
