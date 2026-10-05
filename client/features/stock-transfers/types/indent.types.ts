@@ -211,6 +211,7 @@ export type Stn = {
   cases: TransferCase[];
   packingList: PackingList | null;
   mrns: Mrn[];
+  srns: Srn[]; 
 };
 
 export type Indent = {
@@ -272,7 +273,32 @@ export type PartSearchResult = PartRef & {
   sourceAvailable: number;
   requestingStock: number;
 };
+export type SrnLine = {
+  id: string;
+  stnLineId: string | null;
+  partId: string;
+  part: PartRef;
+  receivedQuantity: number;
+  damagedQuantity: number;
+  shortQuantity: number;
+  unitCost: number;
+  amount: number;
+  remarks?: string | null;
+};
 
+export type Srn = {
+  id: string;
+  srnNumber: string;
+  receiptDate: string;
+  taxForm?: string | null;
+  remarks?: string | null;
+  totalReceived: number;
+  totalDamaged: number;
+  totalShort: number;
+  totalValue: number;
+  receivedBy?: PersonRef | null;
+  lines: SrnLine[];
+};
 export type PartLookup = {
   part: PartRef & { unitRate: number };
   requestingBranchStock: { quantity: number; reserved: number; available: number } | null;

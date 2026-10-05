@@ -510,7 +510,7 @@ function Documents({ indent }: { indent: Indent }) {
               ))}
             </ul>
           </div>
-        )}
+        ))}
 
         {stn?.srns.map((srn) => (
           <div key={srn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
@@ -530,4 +530,5 @@ function Documents({ indent }: { indent: Indent }) {
       </div>
     </SectionCard>
   );
+
 }
