@@ -190,12 +190,12 @@ router.post(
       assertBranchOwnership(req, card.branchId);
       const result = await prisma.$transaction(async (tx) => {
         const updated = await tx.jobCard.updateMany({
-          where: { id: card.id, status: jobStatusFilter("READY"), billedAt: null, creditApprovedById: null },
+          where: { id: card.id, OR: [{ status: jobStatusFilter("READY") }, { status: jobStatusFilter("BILLED") }], creditApprovedById: null },
           data: { creditApprovedById: req.user!.userId },
         });
         if (!updated.count)
           throw new ConflictError(
-            "Credit approval requires a READY job without an existing approval",
+            "Credit approval requires a READY or BILLED job without an existing approval",
           );
         await tx.auditLog.create({
           data: {

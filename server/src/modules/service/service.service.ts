@@ -1,3 +1,5 @@
+import { latestEstimateQuery } from './estimate-approval';
+import { lineAmount, sumMoney } from '../finance/money';
 import { Prisma } from '@prisma/client';
 import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
 import { z } from 'zod';
@@ -380,13 +382,19 @@ export class ServiceService {
     });
   }
 
-  async addEstimate(jobCardId: string, input: z.infer<typeof estimateBody>) {
+  async addEstimate(jobCardId: string, input: z.infer<typeof estimateBody>, actorId?: string) {
     const data = estimateBody.parse(input);
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
       const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { vehicle: { include: { catalogue: true } } } });
       if (!card) throw new NotFoundError('Job card not found');
-      if (card.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to open jobs');
+      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to unbilled jobs');
+      const billable = data.lines.filter(line => line.type !== 'COMPLAINT');
+      if (new Set(billable.map(line => `${line.type}:${line.referenceId}`)).size !== billable.length) throw new BadRequestError('Each service, part or labour operation can appear only once per estimate');
+      const services = billable.filter(line => line.type === 'SERVICE');
+      if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
+      if (data.lines.some(line => line.includedInService && !['PART', 'LABOUR'].includes(line.type))) throw new BadRequestError('Only parts and labour can be included in the service charge');
+      if (data.lines.some(line => line.includedInService) && services.length !== 1) throw new BadRequestError('Package inclusions require the selected service line');
       const lines = [];
       for (const line of data.lines) {
         let description = line.description ?? '';
@@ -395,7 +403,8 @@ export class ServiceService {
         if (line.type === 'PART') {
           const part = line.referenceId ? await tx.sparePart.findUnique({ where: { id: line.referenceId } }) : null;
           if (!part) throw new BadRequestError('Select a part');
-          description = part.name; rate = part.unitPrice;
+          if (part.retailRate == null) throw new BadRequestError(`Retail rate is not set for ${part.partNumber}`);
+          description = part.name; rate = part.retailRate;
         } else if (line.type === 'LABOUR') {
           const item = line.referenceId ? await tx.labourItem.findFirst({ where: { id: line.referenceId, active: true } }) : null;
           if (!item) throw new BadRequestError('Select an active labour operation');
@@ -406,17 +415,24 @@ export class ServiceService {
         } else if (line.type === 'SERVICE') {
           const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
           if (!service) throw new BadRequestError('Select an active service');
-          description = service.name; rate = service.price;
+          description = service.name; rate = card.serviceCharge ?? service.price;
         } else if (line.referenceId) {
           const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
           if (!complaint) throw new BadRequestError('Complaint must belong to this job');
           description = complaint.description;
         }
         if (!description) throw new BadRequestError('Complaint description is required');
-        lines.push({ ...line, description, rate, quantity, amount: Math.round(quantity * rate * 100) / 100 });
+        const { includedInService, ...fields } = line;
+        lines.push({ ...fields, type: includedInService ? `INCLUDED_${line.type}` : line.type, description, rate: includedInService ? 0 : rate, quantity, amount: includedInService ? 0 : lineAmount(quantity, rate) });
       }
-      return tx.estimate.create({ data: { jobCardId, description: data.description, currency: 'NGN', amount: lines.reduce((sum, line) => sum + line.amount, 0), lines: { create: lines } }, include: { lines: true } });
-    });
+      // A new scope needs a fresh QC result and fresh credit authorization.
+      const reopening = canonicalJobStatus(card.status) === 'READY';
+      await tx.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING', creditApprovedById: null, ...(reopening ? { status: 'QC', readyAt: null, statusHistory: { create: { fromStatus: card.status, toStatus: 'QC', actorId: actorId ?? card.createdById!, remarks: 'Estimate revised; approval and quality check required' } } } : {}) } });
+      const previous = (await tx.estimate.findMany({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { createdAt: true } }))?.[0];
+      // Strict ordering under the shared row lock, including transactions started earlier.
+      const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1));
+      return tx.estimate.create({ data: { createdAt, jobCardId, description: data.description, currency: 'NGN', status: 'Pending', amount: sumMoney(lines.map(line => line.amount)), lines: { createMany: { data: lines } } }, include: { lines: true } });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 
   async addApproval(estimateId: string, data: {
@@ -425,17 +441,28 @@ export class ServiceService {
     decisionDate?: string;
     comments?: string;
     status?: string;
-  }) {
+  }, actorId?: string) {
+    const identity = await prisma.estimate.findUnique({ where: { id: estimateId }, select: { jobCardId: true } });
+    if (!identity) throw new NotFoundError('Estimate not found');
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "Estimate" WHERE id = ${estimateId} FOR UPDATE`);
-      const estimate = await tx.estimate.findUnique({ where: { id: estimateId }, include: { jobCard: true } });
-      if (!estimate) throw new NotFoundError('Estimate not found');
-      if (estimate.jobCard.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
-      if (await tx.customerApproval.count({ where: { estimateId } })) throw new ConflictError('An approval decision has already been recorded');
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`);
+      const estimates = await tx.estimate.findMany({ where: { jobCardId: identity.jobCardId }, ...latestEstimateQuery });
+      const estimate = estimates[0];
+      if (!estimate || estimate.id !== estimateId) throw new ConflictError('Only the latest estimate revision can receive a decision');
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: identity.jobCardId } });
+      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('This job is closed for estimate decisions');
+      if (card.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
+      if (estimate.approvals.length) throw new ConflictError('This revision already has a decision. Create a new revision to change scope.');
       const status = data.approved ? 'Approved' : 'Declined';
+      if (data.approved) {
+        const services = estimate.lines.filter(line => line.type === 'SERVICE');
+        if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
+        if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
+      }
       await tx.estimate.update({ where: { id: estimateId }, data: { status } });
+      if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: 'ESTIMATE_DECISION_RECORDED', details: JSON.stringify({ jobCardId: card.id, estimateId, customerId: data.customerId, status, comments: data.comments }) } });
       return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
-    });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 
   async getApprovals(estimateId: string) {

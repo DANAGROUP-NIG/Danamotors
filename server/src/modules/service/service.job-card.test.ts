@@ -22,6 +22,7 @@ jest.mock("../../prisma/client", () => ({
       count: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
     },
 
@@ -46,6 +47,7 @@ jest.mock("../../prisma/client", () => ({
     },
 
     estimate: {
+      findMany: jest.fn(),
       create: jest.fn(),
     },
 
@@ -169,6 +171,18 @@ describe("JobCard workflow", () => {
     ).toBe(false);
   });
 
+  it("snapshots the catalogue price when no service charge was supplied", async () => {
+    (prisma.service.findFirst as jest.Mock).mockResolvedValue({ id, price: 85000 });
+    await new ServiceService().createJobCard({ ...input, createdById: id });
+    expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceCharge: 85000 }) });
+  });
+
+  it("preserves an explicitly waived service charge", async () => {
+    (prisma.service.findFirst as jest.Mock).mockResolvedValue({ id, price: 85000 });
+    await new ServiceService().createJobCard({ ...input, serviceCharge: 0, createdById: id });
+    expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceCharge: 0 }) });
+  });
+
   it("opens a job card without a service type master", async () => {
     await new ServiceService().createJobCard({ ...input, createdById: id });
 
@@ -275,14 +289,14 @@ describe("JobCard workflow", () => {
         data: expect.objectContaining({
           amount: 85000,
           lines: {
-            create: [
+            createMany: { data: [
               expect.objectContaining({
                 type: "SERVICE",
                 description: "Full Service",
                 rate: 85000,
                 amount: 85000,
               }),
-            ],
+            ] },
           },
         }),
       }),
@@ -535,6 +549,8 @@ describe("JobCard workflow", () => {
       id, branchId: id, status: "READY", billedAt: null, invoices: [], creditApprovedById: id,
       promisedAt: new Date("2020-01-01T00:00:00Z"),
     });
+    (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValue({ id, customerId: id, partIssuances: [], labourLines: [] });
+    (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id, status: 'Approved', amount: 0, lines: [], approvals: [{ approved: true, customerId: id }] }]);
     (prisma.jobCard.update as jest.Mock).mockResolvedValue({ id, status: "DELIVERED" });
     await new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id, lateReasonIds: [id], remarks: "Customer collected" }, id);
     expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id }, data: expect.objectContaining({
@@ -547,6 +563,22 @@ describe("JobCard workflow", () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: "READY", billedAt: null, invoices: [], promisedAt: new Date("2099-01-01T00:00:00Z") });
     await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("bill or approved credit");
     expect(prisma.documentSequence.upsert).not.toHaveBeenCalled();
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks delivery of an unpaid bill without explicit credit approval", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, branchId: id, status: 'BILLED', billedAt: new Date(), invoices: [{ status: 'Unpaid', outstandingAmount: 100 }], promisedAt: new Date('2099-01-01') });
+    await expect(new ServiceService().updateJobCard(id, { status: 'DELIVERED', deliveryAdvisorId: id }, id)).rejects.toThrow('fully paid');
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks work before approval and readiness before a passed QC", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, customerId: id, status: 'OPEN', invoices: [] });
+    (prisma.estimate.findMany as jest.Mock).mockResolvedValue([]);
+    await expect(new ServiceService().updateJobCard(id, { status: 'IN_PROGRESS' }, id)).rejects.toThrow('approval');
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, customerId: id, status: 'QC', qcStatus: 'FAILED', invoices: [] });
+    (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id, status: 'Approved', amount: 0, lines: [], approvals: [{ approved: true, customerId: id }] }]);
+    await expect(new ServiceService().updateJobCard(id, { status: 'READY' }, id)).rejects.toThrow('passed quality check');
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 

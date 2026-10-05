@@ -339,6 +339,7 @@ export class ServiceRepository {
         },
         inspections: true,
         estimates: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
             approvals: { orderBy: { createdAt: 'desc' } },
             lines: true,

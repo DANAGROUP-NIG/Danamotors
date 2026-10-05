@@ -182,6 +182,7 @@ export const createJobCardSchema = z.object({
 
 export const jobUpdateBody = z
   .object({
+    serviceCharge: z.number().finite().min(0).max(1e12).multipleOf(0.01).optional(),
     description: z.string().trim().min(1).max(5000).optional(),
     observations: z.string().trim().max(10000).optional(),
     workDone: z.string().trim().max(10000).optional(),
@@ -234,7 +235,8 @@ export const estimateBody = z
             type: z.enum(["COMPLAINT", "PART", "LABOUR", "SERVICE"]),
             referenceId: z.string().uuid().optional(),
             description: z.string().trim().max(2000).optional(),
-            quantity: z.number().positive().default(1),
+            quantity: z.number().finite().positive().max(1e6).default(1),
+            includedInService: z.boolean().optional(),
           })
           .strict(),
       )
