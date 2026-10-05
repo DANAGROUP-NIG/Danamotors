@@ -33,7 +33,7 @@ export function partErrorMessage(error: unknown, fallback: string): string {
   }
   const duplicate = message.match(/^Duplicate field value: (.+)$/);
   if (duplicate) {
-    const field = duplicate[1].includes("partNumber") ? "part number" : duplicate[1].includes("partCode") ? "part code" : duplicate[1];
+    const field = duplicate[1].includes("partNumber") ? "part number" : duplicate[1];
     return `Another part already uses this ${field}.`;
   }
   return message;

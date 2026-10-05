@@ -40,6 +40,8 @@ const toInt = (v: string) => {
   return Number.isInteger(n) && n > 0 ? n : 0;
 };
 
+const lineQty = (l: DraftLine) => toInt(l.urgentQuantity) + toInt(l.stockQuantity) + toInt(l.stockOrderQuantity);
+
 export function IndentCreateForm() {
   const router = useRouter();
   const create = useCreateIndent();
@@ -78,8 +80,6 @@ export function IndentCreateForm() {
     }
     return { qty, amount };
   }, [lines]);
-
-  const lineQty = (l: DraftLine) => toInt(l.urgentQuantity) + toInt(l.stockQuantity) + toInt(l.stockOrderQuantity);
 
   function update(key: string, patch: Partial<DraftLine>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));

@@ -98,3 +98,47 @@ textarea {
 .animate-shimmer {
   animation: shimmer 2s infinite;
 }
+/*
+ * Tables with inputs (indent approve / dispatch / receive) stack into one card per row on
+ * phones, so every quantity box stays on screen. The first cell is the row heading; every
+ * other cell shows its column name from data-label. Tablets and desktops keep the table.
+ */
+@media (max-width: 639px) {
+  .stack-table thead {
+    display: none;
+  }
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr {
+    display: block;
+    width: 100%;
+  }
+  .stack-table tr {
+    padding: 0.5rem 0;
+  }
+  .stack-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    text-align: right;
+  }
+  .stack-table td:first-child {
+    display: block;
+    padding-bottom: 0.5rem;
+    text-align: left;
+  }
+  .stack-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #94a3b8;
+  }
+  .stack-table td:first-child::before {
+    content: none;
+  }
+}

@@ -17,7 +17,6 @@ export const DOC_TYPES = {
   CASE: "CASE",
   PACKING: "PACKING",
   MIT: "MIT",
-  SRN: "SRN",
   MRN: "MRN",
 } as const;
 
@@ -233,6 +232,7 @@ export function planCases(
 
 // ── Receipt ──────────────────────────────────────────────────────────────────
 
+/** A line that was sent and is being received: an STN line (transfer) or a Mobis MIT line. */
 export interface TransitLine {
   id: string;
   quantity: number;
@@ -242,14 +242,15 @@ export interface TransitLine {
 }
 
 export interface ReceiptInputLine {
-  mitLineId: string;
+  /** The STN line (transfer) or MIT line (Mobis) being received. */
+  lineId: string;
   receivedQuantity: number;
   damagedQuantity?: number;
   remarks?: string;
 }
 
 export interface ReceiptLinePlan {
-  mitLineId: string;
+  lineId: string;
   receivedQuantity: number;
   damagedQuantity: number;
   shortQuantity: number;
@@ -288,7 +289,7 @@ export function planReceipt(
       const outstanding = outstandingQuantity(line);
       if (outstanding > 0) {
         posted.set(line.id, {
-          mitLineId: line.id,
+          lineId: line.id,
           receivedQuantity: outstanding,
           damagedQuantity: 0,
           shortQuantity: 0,
@@ -297,12 +298,12 @@ export function planReceipt(
     }
   } else {
     for (const entry of input) {
-      const line = byId.get(entry.mitLineId);
+      const line = byId.get(entry.lineId);
       if (!line) {
-        throw new BadRequestError(`Transit line ${entry.mitLineId} does not belong to this transfer`);
+        throw new BadRequestError(`Line ${entry.lineId} does not belong to this receipt`);
       }
-      if (posted.has(entry.mitLineId)) {
-        throw new BadRequestError(`Transit line ${entry.mitLineId} is listed more than once`);
+      if (posted.has(entry.lineId)) {
+        throw new BadRequestError(`Line ${entry.lineId} is listed more than once`);
       }
       const received = entry.receivedQuantity;
       const damaged = entry.damagedQuantity ?? 0;
@@ -312,11 +313,11 @@ export function planReceipt(
       const outstanding = outstandingQuantity(line);
       if (received + damaged > outstanding) {
         throw new BadRequestError(
-          `Transit line ${entry.mitLineId} has ${outstanding} outstanding but ${received + damaged} was entered`,
+          `Line ${entry.lineId} has ${outstanding} outstanding but ${received + damaged} was entered`,
         );
       }
-      posted.set(entry.mitLineId, {
-        mitLineId: entry.mitLineId,
+      posted.set(entry.lineId, {
+        lineId: entry.lineId,
         receivedQuantity: received,
         damagedQuantity: damaged,
         shortQuantity: 0,
@@ -334,7 +335,7 @@ export function planReceipt(
         if (plan) plan.shortQuantity = remaining;
         else
           posted.set(line.id, {
-            mitLineId: line.id,
+            lineId: line.id,
             receivedQuantity: 0,
             damagedQuantity: 0,
             shortQuantity: remaining,
@@ -381,7 +382,7 @@ export const PROGRESS_STEPS: { key: string; label: string; statuses: IndentStatu
     label: "Dispatched (in transit)",
     statuses: [IndentStatus.DISPATCHED, IndentStatus.IN_TRANSIT],
   },
-  { key: "SRN_CREATED", label: "SRN created", statuses: [IndentStatus.SRN_CREATED] },
+  { key: "MRN_CREATED", label: "MRN created", statuses: [IndentStatus.MRN_CREATED] },
   {
     key: "RECEIVED",
     label: "Received",

@@ -45,10 +45,8 @@ describe('InventoryService - Part Master', () => {
       const createPartSpy = jest
         .spyOn(InventoryRepository.prototype, 'createPart')
         .mockResolvedValue(mockSparePart());
-      jest.spyOn(InventoryRepository.prototype, 'findPartByCode').mockResolvedValue(null);
 
       const result = await service.createPart({
-        partCode: 'TYT-OIL-5W30',
         partNumber: 'ENG-OIL-5W30',
         name: 'Toyota 5W-30 Engine Oil (4L)',
         category: 'Lubricants',
@@ -57,7 +55,6 @@ describe('InventoryService - Part Master', () => {
       });
 
       expect(createPartSpy).toHaveBeenCalledWith({
-        partCode: 'TYT-OIL-5W30',
         partNumber: 'ENG-OIL-5W30',
         name: 'Toyota 5W-30 Engine Oil (4L)',
         category: 'Lubricants',
@@ -68,21 +65,20 @@ describe('InventoryService - Part Master', () => {
       expect(result).not.toHaveProperty('unitPrice');
     });
 
-    it('should throw conflict error for duplicate partCode', async () => {
-      jest
-        .spyOn(InventoryRepository.prototype, 'findPartByCode')
-        .mockResolvedValue(mockSparePart({ partCode: 'TYT-OIL-5W30' }));
+    it('leaves the part code for the database to generate', async () => {
+      const createPartSpy = jest
+        .spyOn(InventoryRepository.prototype, 'createPart')
+        .mockResolvedValue(mockSparePart());
 
-      await expect(
-        service.createPart({
-          partCode: 'TYT-OIL-5W30',
-          partNumber: 'ENG-OIL-10W40',
-          name: 'Engine Oil 10W-40 (4L)',
-          category: 'Lubricants',
-          uom: 'Litre',
-          unitRate: 7500,
-        }),
-      ).rejects.toThrow(ConflictError);
+      await service.createPart({
+        partNumber: 'ENG-OIL-10W40',
+        name: 'Engine Oil 10W-40 (4L)',
+        category: 'Lubricants',
+        uom: 'Litre',
+        unitRate: 7500,
+      });
+
+      expect(createPartSpy.mock.calls[0][0]).not.toHaveProperty('partCode');
     });
   });
 
@@ -132,7 +128,6 @@ describe('InventoryService - Part Master', () => {
       jest
         .spyOn(InventoryRepository.prototype, 'findPartById')
         .mockResolvedValue(mockSparePart());
-      jest.spyOn(InventoryRepository.prototype, 'findPartByCode').mockResolvedValue(null);
       jest
         .spyOn(InventoryRepository.prototype, 'updatePart')
         .mockResolvedValue(mockSparePart({ name: 'Updated name', unitPrice: 4600 }));
@@ -152,19 +147,6 @@ describe('InventoryService - Part Master', () => {
       await expect(
         service.updatePart('00000000-0000-0000-0000-000000000000', { name: 'Updated name' }),
       ).rejects.toThrow(NotFoundError);
-    });
-
-    it('should throw conflict error when updating to a duplicate partCode', async () => {
-      jest
-        .spyOn(InventoryRepository.prototype, 'findPartById')
-        .mockResolvedValue(mockSparePart({ partCode: 'OLD-CODE' }));
-      jest
-        .spyOn(InventoryRepository.prototype, 'findPartByCode')
-        .mockResolvedValue(mockSparePart({ id: 'other-id', partCode: 'NEW-CODE' }));
-
-      await expect(
-        service.updatePart('550e8400-e29b-41d4-a716-446655440000', { partCode: 'NEW-CODE' }),
-      ).rejects.toThrow(ConflictError);
     });
   });
 

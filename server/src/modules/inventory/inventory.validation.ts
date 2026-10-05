@@ -88,7 +88,6 @@ export const listPartsFilterQuerySchema = z.object({
 const partStatusEnum = z.enum(['ACTIVE', 'BLOCKED']);
 
 const basePartMasterFields = {
-  partCode: z.string().min(1, 'Part code is required').max(50, 'Part code must be 50 characters or less'),
   partNumber: z.string().min(1, 'Part number is required'),
   name: z.string().min(1, 'Name is required'),
   category: z.string().min(1, 'Category is required'),
@@ -126,7 +125,6 @@ export const createPartMasterSchema = z.object({
 
 export const updatePartMasterSchema = z.object({
   body: z.object({
-    partCode: basePartMasterFields.partCode.optional(),
     partNumber: basePartMasterFields.partNumber.optional(),
     name: basePartMasterFields.name.optional(),
     category: basePartMasterFields.category.optional(),

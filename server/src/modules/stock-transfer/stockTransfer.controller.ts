@@ -136,7 +136,7 @@ export class StockTransferController {
     const branches = await this.service.getIndentBranches(req.params.id);
     assertInventoryBranchAccess(req, [branches.requestingBranchId]);
     const indent = await this.service.receiveIndent(req.params.id, req.user!.userId, req.body);
-    ok(res, { indent }, "Receipt posted: SRN created and stock updated");
+    ok(res, { indent }, "Receipt posted: MRN generated and stock updated");
   });
 
   // ── Documents (read-only; they are produced by the indent actions) ────────
@@ -175,26 +175,14 @@ export class StockTransferController {
     ok(res, { packingList: doc });
   });
 
-  listMits = handle(async (req, res) => {
-    const q = req.query as { status?: never; sourceType?: never };
-    const docs = await this.service.listMits(listScope(req), { status: q.status, sourceType: q.sourceType });
-    ok(res, { mits: docs });
+  listTransferMrns = handle(async (req, res) => {
+    ok(res, { mrns: await this.service.listTransferMrns(listScope(req)) });
   });
 
-  getMit = handle(async (req, res) => {
-    const doc = await this.service.getMit(req.params.id);
-    assertEitherBranch(req, doc.sourceBranchId, doc.destinationBranchId);
-    ok(res, { mit: doc });
-  });
-
-  listSrns = handle(async (req, res) => {
-    ok(res, { srns: await this.service.listSrns(listScope(req)) });
-  });
-
-  getSrn = handle(async (req, res) => {
-    const doc = await this.service.getSrn(req.params.id);
+  getTransferMrn = handle(async (req, res) => {
+    const doc = await this.service.getTransferMrn(req.params.id);
     assertEitherBranch(req, doc.receivingBranchId, doc.sourceBranchId);
-    ok(res, { srn: doc });
+    ok(res, { mrn: doc });
   });
 }
 

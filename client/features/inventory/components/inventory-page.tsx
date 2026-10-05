@@ -140,9 +140,9 @@ export function InventoryPage() {
         title="Inventory"
         description={description}
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {tab === "stock" && canSwitchBranch && (
-              <div className="w-48">
+              <div className="w-full sm:w-48">
                 <BranchSwitcher />
               </div>
             )}

@@ -182,35 +182,35 @@ describe("planReceipt", () => {
   });
 
   it("supports a partial receipt that stays open", () => {
-    const plan = planReceipt(fresh(), [{ mitLineId: "m1", receivedQuantity: 2 }]);
+    const plan = planReceipt(fresh(), [{ lineId: "m1", receivedQuantity: 2 }]);
     expect(plan.fullyAccounted).toBe(false);
     expect(plan.lines).toEqual([
-      { mitLineId: "m1", receivedQuantity: 2, damagedQuantity: 0, shortQuantity: 0, remarks: undefined },
+      { lineId: "m1", receivedQuantity: 2, damagedQuantity: 0, shortQuantity: 0, remarks: undefined },
     ]);
   });
 
   it("records damaged quantities separately from good stock", () => {
     const plan = planReceipt(fresh(), [
-      { mitLineId: "m1", receivedQuantity: 4, damagedQuantity: 1 },
-      { mitLineId: "m2", receivedQuantity: 3 },
+      { lineId: "m1", receivedQuantity: 4, damagedQuantity: 1 },
+      { lineId: "m2", receivedQuantity: 3 },
     ]);
     expect(plan.fullyAccounted).toBe(true);
     expect(plan.totals).toEqual({ received: 7, damaged: 1, short: 0 });
   });
 
   it("closes a transfer with missing items as short", () => {
-    const plan = planReceipt(fresh(), [{ mitLineId: "m1", receivedQuantity: 4 }], true);
+    const plan = planReceipt(fresh(), [{ lineId: "m1", receivedQuantity: 4 }], true);
     expect(plan.fullyAccounted).toBe(true);
     expect(plan.totals).toEqual({ received: 4, damaged: 0, short: 4 });
-    expect(plan.lines.find((l) => l.mitLineId === "m2")?.shortQuantity).toBe(3);
+    expect(plan.lines.find((l) => l.lineId === "m2")?.shortQuantity).toBe(3);
   });
 
   it("only allows what is still outstanding", () => {
     const lines = fresh();
     lines[0].receivedQuantity = 4;
-    expect(() => planReceipt(lines, [{ mitLineId: "m1", receivedQuantity: 2 }])).toThrow(BadRequestError);
+    expect(() => planReceipt(lines, [{ lineId: "m1", receivedQuantity: 2 }])).toThrow(BadRequestError);
     const second = planReceipt(lines);
-    expect(second.lines.find((l) => l.mitLineId === "m1")?.receivedQuantity).toBe(1);
+    expect(second.lines.find((l) => l.lineId === "m1")?.receivedQuantity).toBe(1);
   });
 
   it("refuses to post a receipt when nothing is outstanding", () => {
