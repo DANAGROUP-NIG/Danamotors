@@ -72,6 +72,7 @@ const ACTION_MAP: Record<string, string> = {
 
   // ── Inventory — Stock ────────────────────────────────────────────────────
   'POST /api/inventory/stock/adjust': 'STOCK_ADJUST',
+  'PATCH /api/inventory/stock': 'STOCK_LOCATION_UPDATE',
 
   // ── Inventory — Purchase Requests ────────────────────────────────────────
   'POST /api/inventory/purchase-requests': 'PURCHASE_REQUEST_CREATE',
@@ -88,6 +89,21 @@ const ACTION_MAP: Record<string, string> = {
   'PATCH /api/inventory/transfers/receive': 'TRANSFER_RECEIVE',
   'PATCH /api/inventory/transfers/reject': 'TRANSFER_REJECT',
   'PATCH /api/inventory/transfers/cancel': 'TRANSFER_CANCEL',
+  // ── Inventory — Stock transfer workflow (indent → STN → MRN) ──────────────
+  'POST /api/inventory/indents': 'INDENT_CREATE',
+  'PATCH /api/inventory/indents/submit': 'INDENT_SUBMIT',
+  'PATCH /api/inventory/indents/approve': 'INDENT_APPROVE',
+  'PATCH /api/inventory/indents/pick': 'INDENT_PICK',
+  'PATCH /api/inventory/indents/reject': 'INDENT_REJECT',
+  'PATCH /api/inventory/indents/cancel': 'INDENT_CANCEL',
+  'PATCH /api/inventory/indents/dispatch': 'INDENT_DISPATCH',
+  'PATCH /api/inventory/indents/receive': 'INDENT_RECEIVE',
+
+  // ── Inventory — Mobis purchase receiving (MIT -> MRN) ─────────────────────
+  'POST /api/inventory/mobis/mit': 'MOBIS_MIT_IMPORT',
+  'POST /api/inventory/mobis/mit/match-parts': 'MOBIS_MIT_MATCH_PARTS',
+  'POST /api/inventory/mobis/mit/mrn': 'MRN_CREATE',
+  'PATCH /api/inventory/mobis/mit/cancel': 'MOBIS_MIT_CANCEL',
 
   // ── Finance ──────────────────────────────────────────────────────────────
   'POST /api/finance/invoices': 'INVOICE_CREATE',

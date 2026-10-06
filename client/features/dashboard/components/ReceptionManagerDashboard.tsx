@@ -141,7 +141,7 @@ export default function ReceptionManagerDashboard() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "rounded-md px-4 py-1.5 text-xs font-semibold transition",
+              "rounded-md px-4 py-1.5 text-sm font-semibold transition",
               activeTab === tab
                 ? "bg-primary text-white shadow-sm"
                 : "text-muted-foreground hover:bg-muted",
@@ -157,7 +157,7 @@ export default function ReceptionManagerDashboard() {
         {/* Total Receptionists */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Total Receptionists
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-violet-50">
@@ -172,7 +172,7 @@ export default function ReceptionManagerDashboard() {
         {/* Active period bookings */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               {activeTab === "Day"
                 ? "Today's Bookings"
                 : activeTab === "Week"
@@ -190,7 +190,7 @@ export default function ReceptionManagerDashboard() {
           </p>
           <span
             className={cn(
-              "inline-flex items-center gap-1 text-xs font-semibold",
+              "inline-flex items-center gap-1 text-sm font-semibold",
               current.delta >= 0 ? "text-emerald-600" : "text-red-500",
             )}
           >
@@ -207,7 +207,7 @@ export default function ReceptionManagerDashboard() {
         {/* Pending */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Pending
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
@@ -222,7 +222,7 @@ export default function ReceptionManagerDashboard() {
         {/* Active Jobs */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Active Jobs
             </p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-green-50">
@@ -254,14 +254,14 @@ export default function ReceptionManagerDashboard() {
                 return (
                   <div key={s.name} className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <span
                           className="size-2 shrink-0 rounded-full"
                           style={{ background: s.color }}
                         />
                         {s.name}
                       </span>
-                      <span className="text-xs font-bold text-foreground">
+                      <span className="text-sm font-bold text-foreground">
                         {s.value}
                       </span>
                     </div>
@@ -292,7 +292,7 @@ export default function ReceptionManagerDashboard() {
             <p className="text-sm font-semibold text-foreground">
               Receptionist Performance
             </p>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {data.receptionistPerformance.length} team member
               {data.receptionistPerformance.length !== 1 ? "s" : ""}
             </span>
@@ -301,7 +301,7 @@ export default function ReceptionManagerDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#e8edf3] text-xs text-muted-foreground">
+                  <tr className="border-b border-[#e8edf3] text-sm text-muted-foreground">
                     <th className="pb-2 font-medium">Name</th>
                     <th className="pb-2 font-medium">Branch</th>
                     <th className="pb-2 font-medium text-right">Bookings</th>
@@ -360,7 +360,7 @@ export default function ReceptionManagerDashboard() {
           </p>
           <a
             href="/appointments"
-            className="text-xs font-semibold text-primary hover:underline"
+            className="text-sm font-semibold text-primary hover:underline"
           >
             View all →
           </a>
@@ -369,7 +369,7 @@ export default function ReceptionManagerDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[#e8edf3] text-xs text-muted-foreground">
+                <tr className="border-b border-[#e8edf3] text-sm text-muted-foreground">
                   <th className="pb-2 font-medium">Time</th>
                   <th className="pb-2 font-medium">Customer</th>
                   <th className="pb-2 font-medium">Vehicle Reg No</th>

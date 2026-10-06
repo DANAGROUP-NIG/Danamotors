@@ -7,6 +7,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { VehicleService } from "../vehicle/vehicle.service";
 import { ServiceService } from "../service/service.service";
 import { CreditService } from "../credit/credit.service";
+import { coverageFor, vehicleWarrantySelect } from "../warranty/warranty.coverage";
 
 export class PortalService {
   private portalRepository: PortalRepository;
@@ -112,7 +113,7 @@ export class PortalService {
   }
 
   async getDashboard(customerId: string) {
-    const activeStatuses = ["Open", "In Progress"];
+    const activeStatuses = ["Open", "In Progress", "OPEN", "IN_PROGRESS", "QC"];
     const pendingStatuses = ["Pending", "Confirmed"];
 
     const [
@@ -131,7 +132,7 @@ export class PortalService {
         where: { customerId, status: { in: activeStatuses } },
       }),
       prisma.jobCard.count({
-        where: { customerId, status: { in: ["Completed", "Closed"] } },
+        where: { customerId, status: { in: ["Completed", "Closed", "DELIVERED"] } },
       }),
       prisma.serviceAppointment.count({
         where: {
@@ -203,17 +204,7 @@ export class PortalService {
     };
   }
 
-  async registerVehicle(customerId: string, data: {
-    vin: string;
-    registrationNumber?: string;
-    make?: string;
-    model?: string;
-    year?: number;
-    trim?: string;
-    color?: string;
-    warrantyStatus?: string;
-    ownershipStatus?: string;
-  }) {
+  async registerVehicle(customerId: string, data: { vin: string; registrationNumber?: string; catalogueId: string; colourId: string; year?: number }) {
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) {
       throw new UnauthorizedError("Customer session not found");
@@ -224,13 +215,10 @@ export class PortalService {
       customerId,
       vin: data.vin,
       registrationNumber: data.registrationNumber,
-      make: data.make,
-      model: data.model,
+      catalogueId: data.catalogueId,
+      colourId: data.colourId,
       year: data.year,
-      trim: data.trim,
-      color: data.color,
-      warrantyStatus: data.warrantyStatus,
-      ownershipStatus: data.ownershipStatus,
+
     });
 
     const notificationService = new NotificationService();
@@ -310,6 +298,7 @@ export class PortalService {
 
   async getVehicles(customerId: string) {
     const vehicles = await this.portalRepository.listVehicles(customerId);
+    const coverage = await portalCoverage(vehicles.map((v) => v.id));
     return vehicles.map((vehicle) => {
       const latestJob = vehicle.jobCards[0] ?? null;
       return {
@@ -321,7 +310,7 @@ export class PortalService {
         year: vehicle.year,
         trim: vehicle.trim,
         color: vehicle.color,
-        warrantyStatus: vehicle.warrantyStatus,
+        warrantyStatus: coverage.get(vehicle.id)?.status ?? null,
         ownershipStatus: vehicle.ownershipStatus,
         images: vehicle.images,
         latestJobCard: latestJob
@@ -344,6 +333,7 @@ export class PortalService {
     if (!vehicle) {
       throw new NotFoundError("Vehicle not found");
     }
+    const warranty = (await portalCoverage([vehicle.id])).get(vehicle.id);
 
     return {
       id: vehicle.id,
@@ -354,9 +344,10 @@ export class PortalService {
       year: vehicle.year,
       trim: vehicle.trim,
       color: vehicle.color,
-      warrantyProvider: vehicle.warrantyProvider,
-      warrantyStatus: vehicle.warrantyStatus,
-      warrantyExpiresAt: vehicle.warrantyExpiresAt,
+      // Calculated coverage, read-only for customers.
+      warrantyProvider: warranty?.provider ?? null,
+      warrantyStatus: warranty?.status ?? null,
+      warrantyExpiresAt: warranty?.expiresOn ?? null,
       ownershipStatus: vehicle.ownershipStatus,
       images: vehicle.images,
       jobCards: vehicle.jobCards.map((jobCard) => ({
@@ -441,40 +432,9 @@ export class PortalService {
       throw new NotFoundError("Estimate not found");
     }
 
-    const decisionDate = new Date();
-    const status = data.approved ? "Approved" : "Rejected";
-
-    const existing = await prisma.customerApproval.findFirst({
-      where: { estimateId, customerId },
-    });
-
-    if (existing) {
-      await prisma.customerApproval.update({
-        where: { id: existing.id },
-        data: {
-          approved: data.approved,
-          decisionDate,
-          comments: data.comments,
-          status,
-        },
-      });
-    } else {
-      await prisma.customerApproval.create({
-        data: {
-          estimateId,
-          customerId,
-          approved: data.approved,
-          decisionDate,
-          comments: data.comments,
-          status,
-        },
-      });
-    }
-
-    await prisma.estimate.update({
-      where: { id: estimateId },
-      data: { status },
-    });
+    const approval = await new ServiceService().addApproval(estimateId, { customerId, ...data });
+    const decisionDate = approval.decisionDate;
+    const status = approval.status;
 
     const notificationService = new NotificationService();
     await notificationService.notifyRole(
@@ -529,4 +489,32 @@ export class PortalService {
     const creditService = new CreditService();
     return creditService.decideApplication(customerId, applicationId, data);
   }
+}
+
+const PORTAL_COVERAGE_LABEL: Record<string, string> = {
+  ACTIVE: "Under warranty",
+  EXPIRED_DATE: "Expired",
+  EXPIRED_MILEAGE: "Expired (km limit)",
+  NOT_COVERED: "Not covered",
+  UNKNOWN: "Not confirmed",
+};
+
+const PORTAL_SOURCE_LABEL: Record<string, string> = { MODEL: "Manufacturer", EXTENDED: "Extended warranty", GOODWILL: "Goodwill" };
+
+/** Calculated warranty coverage for the customer portal (friendly labels, no internals). */
+async function portalCoverage(vehicleIds: string[]) {
+  const vehicles = await prisma.vehicle.findMany({ where: { id: { in: vehicleIds } }, select: vehicleWarrantySelect });
+  return new Map(
+    vehicles.map((v) => {
+      const c = coverageFor(v);
+      return [
+        v.id,
+        {
+          status: PORTAL_COVERAGE_LABEL[c.status],
+          provider: c.source ? PORTAL_SOURCE_LABEL[c.source] : null,
+          expiresOn: c.status === "ACTIVE" ? c.expiresOn : null,
+        },
+      ];
+    }),
+  );
 }

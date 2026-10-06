@@ -71,7 +71,7 @@ export function DashboardFallbackState({ user }: DashboardFallbackStateProps) {
 
       {/* Suggested quick links */}
       <div className="border-t border-slate-100 px-6 py-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Navigate to
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">

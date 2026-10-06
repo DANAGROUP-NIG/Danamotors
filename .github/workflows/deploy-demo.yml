@@ -3,7 +3,7 @@ name: Deploy Dana Motors Demo
 on:
   push:
     branches:
-      - uat
+      - main
   workflow_dispatch:
 
 permissions:

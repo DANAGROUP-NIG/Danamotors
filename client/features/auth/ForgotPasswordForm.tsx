@@ -71,7 +71,7 @@ function ForgotPasswordFormContent() {
                 {...register("email")}
               />
               {errors.email && (
-                <span className="text-xs text-red-500">{errors.email.message}</span>
+                <span className="text-sm text-red-500">{errors.email.message}</span>
               )}
             </label>
 

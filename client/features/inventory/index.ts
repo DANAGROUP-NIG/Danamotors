@@ -1,31 +1,32 @@
 export { InventoryPage } from "./components/inventory-page";
-export { InventoryCreateForm } from "./components/InventoryCreateForm";
-export { InventoryEditForm } from "./components/InventoryEditForm";
-export { InventoryDeleteButton } from "./components/InventoryDeleteButton";
 export { InventoryTable } from "./components/InventoryTable";
-export { useInventory } from "./hooks/use-inventory";
+export { PartMasterTable } from "./components/PartMasterTable";
+export { PartForm } from "./components/PartForm";
+export { PartDetail } from "./components/PartDetail";
+export { PartQueryPage } from "./components/PartQueryPage";
+export { useParts, usePart, usePartAlternates, usePartStock, usePartQuery, usePriceCategories } from "./hooks/use-parts";
+export {
+  useCreatePart,
+  useUpdatePart,
+  useSetPartStatus,
+  useDeletePart,
+  useCreateAlternate,
+} from "./hooks/use-part-mutations";
 export { useBranchStock } from "./hooks/use-branch-stock";
-export { useCreateInventoryItem } from "./hooks/use-create-inventory-item";
-export { useUpdateInventoryItem } from "./hooks/use-update-inventory-item";
-export { useDeleteInventoryItem } from "./hooks/use-delete-inventory-item";
 export { inventoryKeys } from "./api/inventory.keys";
 export {
-  getInventoryRequest,
-  getInventoryItemRequest,
-  createInventoryItemRequest,
-  updateInventoryItemRequest,
-  deleteInventoryItemRequest,
+  getPartsRequest,
+  getPartRequest,
+  createPartRequest,
+  updatePartRequest,
+  deletePartRequest,
+  getBranchStockRequest,
 } from "./api/inventory.api";
-export {
-  createInventoryItemSchema,
-  updateInventoryItemSchema,
-  type CreateInventoryItemFormValues,
-  type UpdateInventoryItemFormValues,
-} from "./schemas/inventory.schema";
+export { partMasterSchema, type PartMasterFormValues } from "./schemas/inventory.schema";
 export type {
-  InventoryItem,
-  SparePartPayload,
-  UpdateSparePartPayload,
+  PartMaster,
+  PartMasterPayload,
+  PartStatus,
+  PartRole,
   BranchStockItem,
-  BranchStockEntry,
 } from "./types/inventory.types";

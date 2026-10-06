@@ -3,10 +3,13 @@ import authRoutes from '../modules/auth/auth.routes';
 import adminRoutes from '../modules/administration/admin.routes';
 import customerRoutes from '../modules/customer/customer.routes';
 import vehicleRoutes from '../modules/vehicle/vehicle.routes';
+import vehicleCatalogRoutes from '../modules/vehicle-catalog/vehicle-catalog.routes';
 import serviceRoutes from '../modules/service/service.routes';
 import servicesRoutes from '../modules/services/services.routes';
 import workshopRoutes from '../modules/workshop/workshop.routes';
 import inventoryRoutes from '../modules/inventory/inventory.routes';
+import stockTransferRoutes from '../modules/stock-transfer/stockTransfer.routes';
+import mobisPurchaseRoutes from '../modules/mobis-purchase/mobisPurchase.routes';
 import financeRoutes from '../modules/finance/finance.routes';
 import branchRoutes from '../modules/branch/branch.routes';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes';
@@ -16,8 +19,14 @@ import portalRoutes from '../modules/customer-portal/portal.routes';
 import creditRoutes from '../modules/credit/credit.routes';
 import enquiryRoutes from '../modules/enquiry/enquiry.routes';
 import auditRoutes from '../modules/audit/audit.routes';
+import warrantyRoutes, { vehicleModelRouter, vehicleWarrantyRouter } from '../modules/warranty/warranty.routes';
+import campaignRoutes from '../modules/campaign/campaign.routes';
+import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
+
+import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
 
 const router = Router();
+router.use('/workshop-masters', workshopMasterRoutes);
 
 // Base health check
 /**
@@ -60,10 +69,16 @@ router.get('/health', (_req, res) => {
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/customers', customerRoutes);
+router.use('/vehicles', vehicleWarrantyRouter);
 router.use('/vehicles', vehicleRoutes);
+router.use('/vehicle-catalog', vehicleCatalogRoutes);
+router.use('/vehicle-models', vehicleModelRouter);
+router.use('/service', jobCardLineRouter);
 router.use('/service', serviceRoutes);
 router.use('/services', servicesRoutes);
 router.use('/workshop', workshopRoutes);
+router.use('/inventory', mobisPurchaseRoutes);
+router.use('/inventory', stockTransferRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/branches', branchRoutes);
@@ -74,5 +89,7 @@ router.use('/portal', portalRoutes);
 router.use('/credit', creditRoutes);
 router.use('/enquiries', enquiryRoutes);
 router.use('/audit', auditRoutes);
+router.use('/warranty', warrantyRoutes);
+router.use('/campaigns', campaignRoutes);
 
 export default router;

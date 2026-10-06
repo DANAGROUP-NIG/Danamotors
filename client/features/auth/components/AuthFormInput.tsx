@@ -17,7 +17,7 @@ export const AuthFormInput = forwardRef<HTMLInputElement, AuthFormInputProps>(
           className="h-11 w-full rounded-md border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-ring"
           {...props}
         />
-        {error && <span className="text-xs text-red-500">{error}</span>}
+        {error && <span className="text-sm text-red-500">{error}</span>}
       </label>
     );
   }

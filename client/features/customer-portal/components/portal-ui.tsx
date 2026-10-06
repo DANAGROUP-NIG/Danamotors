@@ -27,7 +27,7 @@ export function StatCard({  label,
             {label}
           </p>
           <p className="text-2xl font-bold">{value}</p>
-          {hint && <p className="truncate text-xs text-muted-foreground">{hint}</p>}
+          {hint && <p className="truncate text-sm text-muted-foreground">{hint}</p>}
         </div>
       </CardContent>
     </Card>
@@ -96,7 +96,7 @@ export function SimpleTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b border-border text-left text-sm uppercase tracking-wide text-muted-foreground">
             {headers.map((h) => (
               <th key={h} className="px-3 py-2 font-semibold">
                 {h}

@@ -25,6 +25,8 @@ import {
   branchIdParamSchema,
   branchPartParamSchema,
   stockQuerySchema,
+  partQueryQuerySchema,
+  updateStockLocationSchema,
 } from './inventory.validation';
 
 const router = Router();
@@ -109,7 +111,6 @@ router.use(authMiddleware);
  *           schema:
  *             $ref: '#/components/schemas/CreatePartMasterInput'
  *           example:
- *             partCode: TYT-OIL-5W30
  *             partNumber: ENG-OIL-5W30
  *             name: Toyota 5W-30 Engine Oil (4L)
  *             category: Lubricants
@@ -847,6 +848,64 @@ router.use(authMiddleware);
  */
 // Spare Parts / Part Master
 // router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(listPartsQuerySchema), controller.listParts);
+/**
+ * @openapi
+ * /inventory/parts/query:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Part Query (legacy Master > Part Query)
+ *     description: |
+ *       Looks up a part by part number (or part code) and returns three grids:
+ *       stock at every store location of the home premises (a branch plus its sub-locations),
+ *       the same for each alternate part, and stock at the other branches. Each row carries part flag,
+ *       tax status, current stock, location, bin card, dealer rate, retail rate and quantity blocked.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: query, name: partNumber, required: true, schema: { type: string, example: "2630035505" } }
+ *       - { in: query, name: branchId, description: Home branch for cross-branch users, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Part Query result
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 part: { partNumber: "2630035505", name: "FILTER ASSY-ENGINE OIL", partFlag: "O", taxable: true, dealerRate: 9056.34, retailRate: 18746.62 }
+ *                 locations:
+ *                   - { branchName: "Kia Plaza", partFlag: "O", taxable: true, currentStock: 5, location: "N-QSB", binCard: "AUTO", dealerRate: 9056.34, retailRate: 18746.62, qtyBlocked: 0 }
+ *                   - { branchName: "Quick Service Bay", currentStock: 0, location: null, binCard: null }
+ *                 alternates:
+ *                   - { partNumber: "2630035503", description: "FILTER", branchName: "Kia Plaza", currentStock: 0, location: "M2-BOX", dealerRate: 6947.10, retailRate: 14380.50, qtyBlocked: 0 }
+ *                 otherBranches:
+ *                   - { branchName: "Utako Branch", currentStock: 12, location: "AUTO", binCard: "AUTO" }
+ *                   - { branchName: "Victoria Island", currentStock: 52, location: "QSB" }
+ *       404:
+ *         description: Part not found
+ */
+/**
+ * @openapi
+ * /inventory/part-categories:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: List price categories (legacy Category master)
+ *     description: Each category's multiplier derives a part's retail rate from its dealer rate, e.g. category A x 2.07.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Categories
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data: { categories: [{ code: "A", description: "Co-op parts", markupMultiplier: 2.07, isActive: true }] }
+ */
+router.get('/part-categories', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listPartCategories);
+router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
 router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updatePartMasterSchema), controller.updatePart);
@@ -861,6 +920,27 @@ router.get('/parts/:id/replacement-options', requirePermission(PERMISSIONS.SPARE
 router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);
 router.get('/stock/:branchId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchIdParamSchema), controller.listBranchStock);
 router.get('/stock/:branchId/:partId', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(branchPartParamSchema), controller.getBranchStock);
+/**
+ * @openapi
+ * /inventory/stock/{branchId}/{partId}:
+ *   patch:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Update where a part is kept at a branch
+ *     description: Sets rack location, bin card and branch stock levels. Creates a zero-quantity stock record if none exists. Does not change quantities.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: branchId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: partId, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { rackLocation: "N-QSB", binCard: "AUTO", minimumStock: 2, maximumStock: 20 }
+ *     responses:
+ *       200: { description: Stock location updated }
+ */
+router.patch('/stock/:branchId/:partId', requirePermission(PERMISSIONS.STOCK_UPDATE), validateRequest(updateStockLocationSchema), controller.updateStockLocation);
 router.post('/stock/adjust', requirePermission(PERMISSIONS.STOCK_UPDATE), validateRequest(adjustStockSchema), controller.adjustStock);
 
 // Stock Transactions

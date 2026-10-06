@@ -15,6 +15,13 @@
   --muted-foreground: #64748b;
   --border: #dbe3ef;
   --ring: #05141F;
+  /* Semantic aliases reuse the existing surface and error palette. */
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--color-red-600);
+  --destructive-foreground: var(--primary-foreground);
 }
 
 
@@ -31,6 +38,12 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -40,6 +53,7 @@
 
 html {
   scroll-behavior: smooth;
+  font-size: 106.25%;
 }
 
 body {
@@ -66,11 +80,16 @@ aside a {
   color: inherit;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+/* In the base layer so Tailwind text utilities (text-sm, text-xs…) on buttons and
+   inputs win. Unlayered, this rule overrode every utility and all buttons inherited
+   the parent's font size. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 @keyframes shimmer {
@@ -84,4 +103,48 @@ textarea {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+/*
+ * Tables with inputs (indent approve / dispatch / receive) stack into one card per row on
+ * phones, so every quantity box stays on screen. The first cell is the row heading; every
+ * other cell shows its column name from data-label. Tablets and desktops keep the table.
+ */
+@media (max-width: 639px) {
+  .stack-table thead {
+    display: none;
+  }
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr {
+    display: block;
+    width: 100%;
+  }
+  .stack-table tr {
+    padding: 0.5rem 0;
+  }
+  .stack-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    text-align: right;
+  }
+  .stack-table td:first-child {
+    display: block;
+    padding-bottom: 0.5rem;
+    text-align: left;
+  }
+  .stack-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #94a3b8;
+  }
+  .stack-table td:first-child::before {
+    content: none;
+  }
 }

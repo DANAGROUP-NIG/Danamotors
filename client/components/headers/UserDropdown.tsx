@@ -42,7 +42,7 @@ export default function UserDropdown() {
         className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-slate-100"
         aria-label="Account menu"
       >
-        <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-white">
+        <span className="inline-grid size-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-white">
           {initials}
         </span>
         <span className="hidden text-sm font-semibold text-slate-700 lg:block">
@@ -63,7 +63,7 @@ export default function UserDropdown() {
             <p className="text-sm font-semibold text-slate-800">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="truncate text-xs text-slate-500">{user?.email}</p>
+            <p className="truncate text-sm text-slate-500">{user?.email}</p>
           </div>
 
           {/* Menu items */}

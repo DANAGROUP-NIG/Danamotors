@@ -20,14 +20,19 @@ const SETTINGS_CARDS = [
     href: "/settings",
   },
   {
-    title: "Service Types",
-    description: "Manage the list of service types offered.",
-    href: "/settings",
+    title: "Workshop Masters",
+    description: "Service types, bays, complaints, teams and the vehicle catalogue.",
+    href: "/settings/workshop-masters",
   },
   {
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",
+  },
+  {
+    title: "Warranty",
+    description: "Model warranty policies and manufacturer claim codes.",
+    href: "/warranty/settings",
   },
   {
     title: "Audit Log",

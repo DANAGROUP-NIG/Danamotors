@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { jobCardStatus } from '../service/service.validation';
 
 export const assignTechnicianSchema = z.object({
   params: z.object({
@@ -16,7 +17,7 @@ export const updateJobProgressSchema = z.object({
   }),
   body: z.object({
     progress: z.number().int().min(0).max(100),
-    status: z.string().optional(),
+    status: jobCardStatus.optional(),
   }),
 });
 
@@ -25,7 +26,7 @@ export const qcUpdateSchema = z.object({
     id: z.string().uuid('Invalid job card ID'),
   }),
   body: z.object({
-    qcStatus: z.string().min(1, 'QC status is required'),
+    qcStatus: z.enum(['PASSED', 'FAILED', 'PENDING']),
     qcNotes: z.string().optional(),
   }),
 });

@@ -36,9 +36,9 @@ export default function EnquiryTriageWidget() {
                   <div className="text-sm font-medium truncate">
                     {`${e.firstName} ${e.lastName}`}
                   </div>
-                  <div className="text-xs text-white/60 truncate">{e.serviceDescription}</div>
+                  <div className="text-sm text-white/60 truncate">{e.serviceDescription}</div>
                 </div>
-                <div className="ml-4 text-xs text-white/60">
+                <div className="ml-4 text-sm text-white/60">
                   {e.createdAt ? formatDistanceToNow(new Date(e.createdAt), { addSuffix: true }) : ''}
                 </div>
               </Link>

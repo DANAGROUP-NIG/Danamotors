@@ -1,4 +1,5 @@
 "use client";
+import { JOB_CARD_STATUS_LABELS, JOB_CARD_STATUS_TONES } from "@/features/job-cards/types/job-card-status";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
-import { StatusBadge, type StatusTone } from "@/components/ui/table-components/StatusBadge";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
 import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -39,21 +40,9 @@ import type { JobCard, JobCardStatus } from "@/features/job-cards";
 
 const PAGE_SIZE = 10;
 
-const STATUS_LABELS: Record<JobCardStatus, string> = {
-  pending: "Pending",
-  in_progress: "In Progress",
-  completed: "Completed",
-  on_hold: "On Hold",
-  cancelled: "Cancelled",
-};
+const STATUS_LABELS = JOB_CARD_STATUS_LABELS;
 
-const STATUS_TONES: Record<JobCardStatus, StatusTone> = {
-  pending: "amber",
-  in_progress: "blue",
-  completed: "emerald",
-  on_hold: "gray",
-  cancelled: "red",
-};
+const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as JobCardStatus[];
 
@@ -228,7 +217,7 @@ export function RepairsPage() {
       render: (jc) => (
         <div className="flex items-center gap-2">
           <Wrench className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs font-medium">{jc.jobNumber}</span>
+          <span className="font-mono text-sm font-medium">{jc.jobNumber}</span>
         </div>
       ),
     },

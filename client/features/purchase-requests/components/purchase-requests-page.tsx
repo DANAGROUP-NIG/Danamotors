@@ -206,7 +206,7 @@ export function PurchaseRequestsPage() {
               ? "bg-red-50 text-red-600"
               : "bg-amber-50 text-amber-700";
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusColor}`}>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${statusColor}`}>
             {pr.status}
           </span>
         );

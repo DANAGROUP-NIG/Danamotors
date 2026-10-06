@@ -24,7 +24,7 @@ export function StatusBadge({ status, tone = "gray", className }: StatusBadgePro
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize transition-colors",
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold capitalize transition-colors",
         toneStyles[tone],
         className
       )}

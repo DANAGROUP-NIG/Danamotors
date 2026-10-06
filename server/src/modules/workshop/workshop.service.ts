@@ -1,7 +1,12 @@
+import { assertRecordedScope } from '../service/estimate-approval';
+import { Prisma } from '@prisma/client';
 import { WorkshopRepository } from './workshop.repository';
-import { NotFoundError } from '../../shared/errors/appError';
+import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
 import prisma from '../../prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import { jobUpdateBody } from '../service/service.validation';
+import { canonicalJobStatus } from '../service/job-card-workflow.service';
+import { ServiceService } from '../service/service.service';
 
 export class WorkshopService {
   private workshopRepository: WorkshopRepository;
@@ -60,19 +65,28 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
-    const technician = await prisma.user.findUnique({ where: { id: technicianId } });
-    if (!technician) {
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
+    if (['READY', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))) throw new BadRequestError('This job card is no longer open');
+    const technician = await prisma.user.findUnique({ where: { id: technicianId }, include: { role: true } });
+    if (!technician || !technician.isActive || technician.role.name !== 'Technician') {
       throw new NotFoundError('Technician not found');
     }
+    if (technician.branchId !== jobCard.branchId) throw new BadRequestError('Technician must belong to the job card branch');
 
     if (qualityInspectorId) {
       const inspector = await prisma.user.findUnique({ where: { id: qualityInspectorId } });
-      if (!inspector) {
+      if (!inspector || !inspector.isActive) {
         throw new NotFoundError('Quality inspector not found');
       }
+      if (inspector.branchId !== jobCard.branchId) throw new BadRequestError('Quality inspector must belong to the job card branch');
     }
 
-    const updatedJobCard = await this.workshopRepository.assignTechnician(id, technicianId, qualityInspectorId);
+    const updatedJobCard = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
+      const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
+      if (current.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(current.status))) throw new BadRequestError('This job card is no longer open');
+      return tx.jobCard.update({ where: { id }, data: { technicianId, qualityInspectorId } });
+    });
 
     const notificationService = new NotificationService();
     await notificationService.notifyUsers([technicianId], {
@@ -86,13 +100,16 @@ export class WorkshopService {
     return updatedJobCard;
   }
 
-  async updateProgress(id: string, progress: number, status?: string) {
+  async updateProgress(id: string, _progress: number, status?: string, actorId?: string) {
     const jobCard = await this.workshopRepository.findJobCardById(id);
     if (!jobCard) {
       throw new NotFoundError('Job card not found');
     }
 
-    return this.workshopRepository.updateProgress(id, progress, status);
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
+    if (['READY', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))) throw new BadRequestError('This job card is no longer open');
+    if (!status) throw new BadRequestError('Use the job-card lifecycle instead of progress percentages');
+    return new ServiceService().updateJobCard(id, jobUpdateBody.parse({ status: canonicalJobStatus(status) }), actorId);
   }
 
   async updateQC(id: string, qcStatus: string, qcNotes?: string) {
@@ -101,6 +118,14 @@ export class WorkshopService {
       throw new NotFoundError('Job card not found');
     }
 
-    return this.workshopRepository.updateQC(id, qcStatus, qcNotes);
+    if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
+    if (['READY', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))) throw new BadRequestError('This job card is no longer open');
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
+      const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
+      if (current.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(current.status))) throw new BadRequestError('This job card is no longer open');
+      if (qcStatus === 'PASSED') await assertRecordedScope(tx, id);
+      return tx.jobCard.update({ where: { id }, data: { qcStatus, qcNotes } });
+    }, { maxWait: 5000, timeout: 15000 });
   }
 }

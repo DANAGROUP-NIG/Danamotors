@@ -1,33 +1,40 @@
-import { InventoryService } from './inventory.service';
-import { InventoryRepository } from './inventory.repository';
-import { ConflictError, NotFoundError } from '../../shared/errors/appError';
-import { PartRole, PartStatus, SparePart } from '@prisma/client';
+import { InventoryService } from "./inventory.service";
+import { InventoryRepository } from "./inventory.repository";
+import { ConflictError, NotFoundError } from "../../shared/errors/appError";
+import { PartRole, PartStatus, Prisma, SparePart } from "@prisma/client";
+import prisma from "../../prisma/client";
 
 const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
-  id: '550e8400-e29b-41d4-a716-446655440000',
-  partCode: 'TYT-OIL-5W30',
-  partNumber: 'ENG-OIL-5W30',
-  name: 'Toyota 5W-30 Engine Oil (4L)',
+  id: "550e8400-e29b-41d4-a716-446655440000",
+  partCode: "TYT-OIL-5W30",
+  partNumber: "ENG-OIL-5W30",
+  name: "Toyota 5W-30 Engine Oil (4L)",
   description: null,
-  category: 'Lubricants',
-  uom: 'Litre',
+  category: "Lubricants",
+  uom: "Litre",
   taxCategory: null,
   taxForm: null,
   minLevel: null,
   maxLevel: null,
   reorderQty: null,
   unitPrice: 4500,
+  retailRate: null,
+  taxable: true,
+  partFlag: "O",
+  priceCategoryCode: null,
   binLocation: null,
   storeLocation: null,
   role: PartRole.MAIN,
   mainPartId: null,
   partStatus: PartStatus.ACTIVE,
+  warrantyApplicable: false,
+  warrantyRate: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
   ...overrides,
 });
 
-describe('InventoryService - Part Master', () => {
+describe("InventoryService - Part Master", () => {
   let service: InventoryService;
 
   beforeEach(() => {
@@ -35,59 +42,66 @@ describe('InventoryService - Part Master', () => {
     jest.clearAllMocks();
   });
 
-  describe('createPart', () => {
-    it('should create a part with all required fields', async () => {
+  describe("createPart", () => {
+    it("should create a part with all required fields", async () => {
       const createPartSpy = jest
-        .spyOn(InventoryRepository.prototype, 'createPart')
+        .spyOn(InventoryRepository.prototype, "createPart")
         .mockResolvedValue(mockSparePart());
-      jest.spyOn(InventoryRepository.prototype, 'findPartByCode').mockResolvedValue(null);
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartByCode")
+        .mockResolvedValue(null);
 
       const result = await service.createPart({
-        partCode: 'TYT-OIL-5W30',
-        partNumber: 'ENG-OIL-5W30',
-        name: 'Toyota 5W-30 Engine Oil (4L)',
-        category: 'Lubricants',
-        uom: 'Litre',
+        partCode: "TYT-OIL-5W30",
+        partNumber: "ENG-OIL-5W30",
+        name: "Toyota 5W-30 Engine Oil (4L)",
+        category: "Lubricants",
+        uom: "Litre",
         unitRate: 4500,
       });
 
       expect(createPartSpy).toHaveBeenCalledWith({
-        partCode: 'TYT-OIL-5W30',
-        partNumber: 'ENG-OIL-5W30',
-        name: 'Toyota 5W-30 Engine Oil (4L)',
-        category: 'Lubricants',
-        uom: 'Litre',
+        partCode: "TYT-OIL-5W30",
+        partNumber: "ENG-OIL-5W30",
+        name: "Toyota 5W-30 Engine Oil (4L)",
+        category: "Lubricants",
+        uom: "Litre",
         unitPrice: 4500,
       });
       expect(result.unitRate).toBe(4500);
-      expect(result).not.toHaveProperty('unitPrice');
+      expect(result).not.toHaveProperty("unitPrice");
     });
 
-    it('should throw conflict error for duplicate partCode', async () => {
+    it("should throw conflict error for duplicate partCode", async () => {
       jest
-        .spyOn(InventoryRepository.prototype, 'findPartByCode')
-        .mockResolvedValue(mockSparePart({ partCode: 'TYT-OIL-5W30' }));
+        .spyOn(InventoryRepository.prototype, "findPartByCode")
+        .mockResolvedValue(mockSparePart({ partCode: "TYT-OIL-5W30" }));
 
       await expect(
         service.createPart({
-          partCode: 'TYT-OIL-5W30',
-          partNumber: 'ENG-OIL-10W40',
-          name: 'Engine Oil 10W-40 (4L)',
-          category: 'Lubricants',
-          uom: 'Litre',
+          partCode: "TYT-OIL-5W30",
+          partNumber: "ENG-OIL-10W40",
+          name: "Engine Oil 10W-40 (4L)",
+          category: "Lubricants",
+          uom: "Litre",
           unitRate: 7500,
         }),
       ).rejects.toThrow(ConflictError);
     });
   });
 
-  describe('getAllParts', () => {
-    it('should return paginated parts filtered by status', async () => {
-      const parts = [mockSparePart(), mockSparePart({ id: '660e8400-e29b-41d4-a716-446655440001' })];
-      jest.spyOn(InventoryRepository.prototype, 'findAllParts').mockResolvedValue({
-        parts,
-        total: 2,
-      });
+  describe("getAllParts", () => {
+    it("should return paginated parts filtered by status", async () => {
+      const parts = [
+        mockSparePart(),
+        mockSparePart({ id: "660e8400-e29b-41d4-a716-446655440001" }),
+      ];
+      jest
+        .spyOn(InventoryRepository.prototype, "findAllParts")
+        .mockResolvedValue({
+          parts,
+          total: 2,
+        });
 
       const result = await service.getAllParts({
         partStatus: PartStatus.ACTIVE,
@@ -101,86 +115,181 @@ describe('InventoryService - Part Master', () => {
     });
   });
 
-  describe('getPartById', () => {
-    it('should return a part by id', async () => {
+  describe("getPartById", () => {
+    it("should return a part by id", async () => {
       jest
-        .spyOn(InventoryRepository.prototype, 'findPartById')
+        .spyOn(InventoryRepository.prototype, "findPartById")
         .mockResolvedValue(mockSparePart());
 
-      const result = await service.getPartById('550e8400-e29b-41d4-a716-446655440000');
+      const result = await service.getPartById(
+        "550e8400-e29b-41d4-a716-446655440000",
+      );
 
-      expect(result.id).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.id).toBe("550e8400-e29b-41d4-a716-446655440000");
       expect(result.unitRate).toBe(4500);
     });
 
-    it('should throw not found error when part does not exist', async () => {
-      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(null);
+    it("should throw not found error when part does not exist", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(null);
 
       await expect(
-        service.getPartById('00000000-0000-0000-0000-000000000000'),
+        service.getPartById("00000000-0000-0000-0000-000000000000"),
       ).rejects.toThrow(NotFoundError);
     });
   });
 
-  describe('updatePart', () => {
-    it('should update a part successfully', async () => {
+  describe("updatePart", () => {
+    it("should update a part successfully", async () => {
       jest
-        .spyOn(InventoryRepository.prototype, 'findPartById')
+        .spyOn(InventoryRepository.prototype, "findPartById")
         .mockResolvedValue(mockSparePart());
-      jest.spyOn(InventoryRepository.prototype, 'findPartByCode').mockResolvedValue(null);
       jest
-        .spyOn(InventoryRepository.prototype, 'updatePart')
-        .mockResolvedValue(mockSparePart({ name: 'Updated name', unitPrice: 4600 }));
+        .spyOn(InventoryRepository.prototype, "findPartByCode")
+        .mockResolvedValue(null);
+      jest
+        .spyOn(InventoryRepository.prototype, "updatePart")
+        .mockResolvedValue(
+          mockSparePart({ name: "Updated name", unitPrice: 4600 }),
+        );
 
-      const result = await service.updatePart('550e8400-e29b-41d4-a716-446655440000', {
-        name: 'Updated name',
-        unitRate: 4600,
-      });
+      const result = await service.updatePart(
+        "550e8400-e29b-41d4-a716-446655440000",
+        {
+          name: "Updated name",
+          unitRate: 4600,
+        },
+      );
 
-      expect(result.name).toBe('Updated name');
+      expect(result.name).toBe("Updated name");
       expect(result.unitRate).toBe(4600);
     });
 
-    it('should throw not found error when part does not exist', async () => {
-      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(null);
+    it("should throw not found error when part does not exist", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(null);
 
       await expect(
-        service.updatePart('00000000-0000-0000-0000-000000000000', { name: 'Updated name' }),
+        service.updatePart("00000000-0000-0000-0000-000000000000", {
+          name: "Updated name",
+        }),
       ).rejects.toThrow(NotFoundError);
     });
 
-    it('should throw conflict error when updating to a duplicate partCode', async () => {
+    it("should throw conflict error when updating to a duplicate partCode", async () => {
       jest
-        .spyOn(InventoryRepository.prototype, 'findPartById')
-        .mockResolvedValue(mockSparePart({ partCode: 'OLD-CODE' }));
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(mockSparePart({ partCode: "OLD-CODE" }));
       jest
-        .spyOn(InventoryRepository.prototype, 'findPartByCode')
-        .mockResolvedValue(mockSparePart({ id: 'other-id', partCode: 'NEW-CODE' }));
+        .spyOn(InventoryRepository.prototype, "findPartByCode")
+        .mockResolvedValue(
+          mockSparePart({ id: "other-id", partCode: "NEW-CODE" }),
+        );
 
       await expect(
-        service.updatePart('550e8400-e29b-41d4-a716-446655440000', { partCode: 'NEW-CODE' }),
+        service.updatePart("550e8400-e29b-41d4-a716-446655440000", {
+          partCode: "NEW-CODE",
+        }),
       ).rejects.toThrow(ConflictError);
     });
   });
 
-  describe('deletePart', () => {
-    it('should delete a part successfully', async () => {
-      jest
-        .spyOn(InventoryRepository.prototype, 'findPartById')
-        .mockResolvedValue(mockSparePart());
-      jest.spyOn(InventoryRepository.prototype, 'deletePart').mockResolvedValue(mockSparePart());
-
-      const result = await service.deletePart('550e8400-e29b-41d4-a716-446655440000');
-
-      expect(result.message).toBe('Part deleted successfully');
+  describe("deletePart", () => {
+    beforeEach(() => {
+      jest.spyOn(prisma.sparePart, "count").mockResolvedValue(0);
     });
 
-    it('should throw not found error when part does not exist', async () => {
-      jest.spyOn(InventoryRepository.prototype, 'findPartById').mockResolvedValue(null);
+    it("should delete a part successfully", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(mockSparePart());
+      jest
+        .spyOn(InventoryRepository.prototype, "deletePart")
+        .mockResolvedValue(mockSparePart());
+
+      const result = await service.deletePart(
+        "550e8400-e29b-41d4-a716-446655440000",
+      );
+
+      expect(result.message).toBe("Part deleted successfully");
+    });
+
+    it("should throw not found error when part does not exist", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(null);
 
       await expect(
-        service.deletePart('00000000-0000-0000-0000-000000000000'),
+        service.deletePart("00000000-0000-0000-0000-000000000000"),
       ).rejects.toThrow(NotFoundError);
+    });
+
+    it("should refuse to delete a main part that has alternates", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(mockSparePart());
+      jest.spyOn(prisma.sparePart, "count").mockResolvedValue(2);
+      const del = jest.spyOn(InventoryRepository.prototype, "deletePart");
+
+      await expect(
+        service.deletePart("550e8400-e29b-41d4-a716-446655440000"),
+      ).rejects.toThrow(/2 alternate part/);
+      expect(del).not.toHaveBeenCalled();
+    });
+
+    it("should return a conflict instead of a database error when the part is in use", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(mockSparePart());
+      jest
+        .spyOn(InventoryRepository.prototype, "deletePart")
+        .mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError(
+            "Foreign key constraint failed",
+            { code: "P2003", clientVersion: "test" },
+          ),
+        );
+
+      await expect(
+        service.deletePart("550e8400-e29b-41d4-a716-446655440000"),
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it("should also recognise a raw RESTRICT violation from Postgres", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findPartById")
+        .mockResolvedValue(mockSparePart());
+      jest
+        .spyOn(InventoryRepository.prototype, "deletePart")
+        .mockRejectedValue(
+          new Error(
+            'update or delete on table "SparePart" violates RESTRICT setting of foreign key constraint',
+          ),
+        );
+
+      await expect(
+        service.deletePart("550e8400-e29b-41d4-a716-446655440000"),
+      ).rejects.toThrow(/Block it instead/);
+    });
+  });
+
+  describe("createPartIssuance", () => {
+    it("rejects blocked parts even if a client submits their id directly", async () => {
+      jest
+        .spyOn(InventoryRepository.prototype, "findSparePartById")
+        .mockResolvedValue(mockSparePart({ partStatus: PartStatus.BLOCKED }));
+
+      await expect(
+        service.createPartIssuance({
+          sparePartId: "550e8400-e29b-41d4-a716-446655440000",
+          branchId: "660e8400-e29b-41d4-a716-446655440000",
+          jobCardId: "770e8400-e29b-41d4-a716-446655440000",
+          issuedById: "880e8400-e29b-41d4-a716-446655440000",
+          quantity: 1,
+        }),
+      ).rejects.toThrow("Blocked parts cannot be issued");
     });
   });
 });

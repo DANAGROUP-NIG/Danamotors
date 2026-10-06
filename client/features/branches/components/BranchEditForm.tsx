@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateBranch } from "../hooks/use-update-branch";
+import { useBranch } from "../hooks/use-branch";
+import { BranchPlacementFields } from "./BranchPlacementFields";
 import {
   updateBranchSchema,
   type UpdateBranchFormValues,
@@ -35,8 +37,12 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       country: branch.country ?? "",
       phoneNumber: branch.phoneNumber ?? "",
       email: branch.email ?? "",
+      code: branch.code ?? "",
+      parentBranchId: branch.parentBranchId ?? "",
     },
   });
+  const { data: detail } = useBranch(branch.id);
+  const hasSubLocations = (detail?.branch.subLocations?.length ?? 0) > 0;
 
   useEffect(() => {
     reset({
@@ -47,13 +53,22 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       country: branch.country ?? "",
       phoneNumber: branch.phoneNumber ?? "",
       email: branch.email ?? "",
+      code: branch.code ?? "",
+      parentBranchId: branch.parentBranchId ?? "",
     });
   }, [branch, reset]);
 
   function onSubmit(values: UpdateBranchFormValues) {
-    const payload = Object.fromEntries(
-      Object.entries(values).filter(([, v]) => v !== "" && v !== undefined),
-    ) as UpdateBranchFormValues;
+    const { code, parentBranchId, ...rest } = values;
+    const payload = {
+      ...(Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== "" && v !== undefined)) as Omit<
+        UpdateBranchFormValues,
+        "code" | "parentBranchId"
+      >),
+      // Empty clears these, so they are always sent.
+      code: code?.trim() ? code.trim().toUpperCase() : null,
+      parentBranchId: parentBranchId || null,
+    };
     update.mutate(payload, { onSuccess });
   }
 
@@ -87,6 +102,8 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
           <input type="email" className={inputCls} {...register("email")} />
         </Field>
       </div>
+
+      <BranchPlacementFields register={register} errors={errors} selfId={branch.id} hasSubLocations={hasSubLocations} />
 
       <Button type="submit" disabled={update.isPending} size="sm">
         {update.isPending ? "Saving…" : "Save changes"}

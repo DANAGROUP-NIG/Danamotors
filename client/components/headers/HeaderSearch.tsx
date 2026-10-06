@@ -146,7 +146,7 @@ export default function HeaderSearch() {
                   <div key={category}>
                     <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
                       <span className="text-slate-400">{ICON_MAP[category]}</span>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">
                         {LABEL_MAP[category]}
                       </span>
                     </div>
@@ -161,7 +161,7 @@ export default function HeaderSearch() {
                           <p className="truncate text-sm font-medium text-slate-800">
                             {"name" in item ? item.name : item.label}
                           </p>
-                          <p className="truncate text-xs text-slate-500">
+                          <p className="truncate text-sm text-slate-500">
                             {"email" in item ? item.email : item.sublabel}
                           </p>
                         </div>

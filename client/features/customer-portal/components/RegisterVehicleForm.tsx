@@ -1,89 +1,49 @@
 "use client";
-
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useRegisterPortalVehicle } from "../hooks/use-portal-mutations";
+import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { useRegisterPortalVehicle } from "../hooks/use-portal-mutations";
-import {
-  registerPortalVehicleSchema,
-  type RegisterPortalVehicleFormValues,
-} from "../schemas/portal.schema";
 
-interface RegisterVehicleFormProps {
-  onSuccess?: () => void;
-}
-
-export function RegisterVehicleForm({ onSuccess }: RegisterVehicleFormProps) {
-  const registerVehicle = useRegisterPortalVehicle();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<RegisterPortalVehicleFormValues>({
-    resolver: zodResolver(registerPortalVehicleSchema),
-  });
-
-  function onSubmit(values: RegisterPortalVehicleFormValues) {
-    registerVehicle.mutate(
-      {
-        vin: values.vin,
-        registrationNumber: values.registrationNumber || undefined,
-        make: values.make || undefined,
-        model: values.model || undefined,
-        year: values.year ? Number(values.year) : undefined,
-        trim: values.trim || undefined,
-        color: values.color || undefined,
-      },
-      {
-        onSuccess: () => {
-          reset();
-          onSuccess?.();
-        },
-      },
-    );
-  }
+export function RegisterVehicleForm(
+  {
+    onSuccess,
+  }: {
+    onSuccess?: () => void;
+  },
+) {
+  const mutation = useRegisterPortalVehicle();
+  const [vin, setVin] = useState("");
+  const [registrationNumber, setRegistration] = useState("");
+  const [catalogueId, setCatalogue] = useState("");
+  const [colourId, setColour] = useState("");
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-      <Field label="VIN" error={errors.vin?.message}>
-        <input
-          className={inputCls}
-          placeholder="Vehicle Identification Number"
-          {...register("vin")}
-        />
-      </Field>
-      <Field label="Registration number (Reg No)" error={errors.registrationNumber?.message}>
-        <input
-          className={inputCls}
-          placeholder="e.g. KJA-837-AA"
-          {...register("registrationNumber")}
-        />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Make" error={errors.make?.message}>
-          <input className={inputCls} placeholder="Toyota" {...register("make")} />
-        </Field>
-        <Field label="Model" error={errors.model?.message}>
-          <input className={inputCls} placeholder="Corolla" {...register("model")} />
-        </Field>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Year" error={errors.year?.message}>
-          <input type="number" className={inputCls} placeholder="2020" {...register("year")} />
-        </Field>
-        <Field label="Trim" error={errors.trim?.message}>
-          <input className={inputCls} placeholder="SE" {...register("trim")} />
-        </Field>
-        <Field label="Color" error={errors.color?.message}>
-          <input className={inputCls} placeholder="Silver" {...register("color")} />
-        </Field>
-      </div>
-      <Button type="submit" disabled={registerVehicle.isPending} className="mt-1">
-        {registerVehicle.isPending ? "Registering…" : "Register vehicle"}
-      </Button>
-    </form>
+    <form
+      className="grid gap-4"
+      onSubmit={e => {
+        e.preventDefault();
+
+        mutation.mutate({
+          vin,
+          registrationNumber,
+          catalogueId,
+          colourId,
+        }, {
+          onSuccess,
+        });
+      }}><Field label="VIN"><input required className={inputCls} value={vin} onChange={e => setVin(e.target.value)} /></Field><Field label="Registration (optional)"><input className={inputCls} value={registrationNumber} onChange={e => setRegistration(e.target.value)} /></Field><WorkshopPicker
+        required
+        label="Vehicle variant"
+        endpoint="/portal/catalogue?kind=VARIANT"
+        collection="items"
+        value={catalogueId}
+        onChange={setCatalogue} /><WorkshopPicker
+        required
+        label="Colour"
+        endpoint="/portal/catalogue?kind=COLOUR"
+        collection="items"
+        value={colourId}
+        onChange={setColour} />{mutation.isError && <p role="alert" className="text-red-600">Could not register vehicle. Check that the variant and colour belong to the same model.</p>}<Button disabled={mutation.isPending}>Register vehicle</Button></form>
   );
 }

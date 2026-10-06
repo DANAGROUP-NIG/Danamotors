@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -19,10 +19,16 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/enquiries": ["enquiry:read"],
   "/users": ["user:read"],
   "/branches": ["branch:read"],
+  "/job-cards/new": ["jobcard:create"],
   "/job-cards": ["jobcard:read"],
+  "/invoices": ["invoice:read"],
+  "/labour-catalogue": ["labour-item:read"],
   "/inspections": ["inspection:read"],
   "/repairs": ["jobcard:update", "workshop:read"],
   "/technicians": ["workshop:read"],
+  "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
+  "/inventory/mobis-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
+  "/inventory/mobis-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory": [
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,
@@ -31,15 +37,22 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,
   ],
+  // More specific paths must come first: the guard uses the first prefix that matches.
+  "/transfers/new": [INVENTORY_PERMISSIONS.TRANSFER_CREATE],
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
+  "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],
-  "/reports": ["financereport:read"],
+  "/reports": ["financereport:read", "report:receipt-register"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
+  "/warranty/settings": [WARRANTY_PERMISSIONS.SETTINGS],
+  "/warranty": [WARRANTY_PERMISSIONS.READ],
+  "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
+  "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
   "/settings": ["role:read"],
 };
 

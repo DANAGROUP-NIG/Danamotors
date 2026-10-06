@@ -1,4 +1,12 @@
-export type JobCardStatus = "pending" | "in_progress" | "completed" | "on_hold" | "cancelled";
+import type { JobCardStatus } from "./job-card-status";
+import type {
+  CampaignType,
+  CampaignVehicleStatus,
+  CaseStatus,
+  Coverage,
+  CoverageStatus,
+} from "@/features/warranty/types/warranty.types";
+export type { JobCardStatus } from "./job-card-status";
 
 export type Inspection = {
   id: string;
@@ -14,7 +22,17 @@ export type Estimate = {
   amount: number;
   currency: string;
   status: string;
+  createdAt?: string;
   approvals?: CustomerApproval[];
+  lines?: {
+    id: string;
+    type: string;
+    referenceId?: string | null;
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+  }[];
 };
 
 export type CustomerApproval = {
@@ -43,7 +61,10 @@ export type JobCardCustomer = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
+  companyName?: string | null;
+  code?: string | null;
+  phoneNumber?: string | null;
 };
 
 export type JobCardVehicle = {
@@ -66,6 +87,7 @@ export type PartIssuance = {
     partNumber: string;
     name: string;
     unitPrice: number;
+    retailRate?: number | null;
   };
   issuedBy: {
     id: string;
@@ -84,6 +106,7 @@ export type PartReturn = {
 };
 
 export type JobCardInvoice = {
+  outstandingAmount: number;
   id: string;
   invoiceNumber: string;
   issuedDate: string;
@@ -98,7 +121,57 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  labourLines?: { labourItem: { description: string } }[];
+  tyres?: { make: string; number: string }[] | null;
+  batteryMake?: string | null;
+  batteryNumber?: string | null;
+  customField1?: string | null;
+  checklist?: string | null;
+  remarks?: string | null;
+  serviceAdvisor?: { firstName: string; lastName: string } | null;
+  deliveryAdvisor?: { firstName: string; lastName: string } | null;
+  estimatedParts?: number | null;
+  estimatedOil?: number | null;
+  estimatedLabour?: number | null;
+  serviceCharge?: number | null;
   id: string;
+  mileage?: number | null;
+  inHouse?: boolean | null;
+  acFitted?: boolean | null;
+  promisedAt?: string | null;
+  readyAt?: string | null;
+  deliveredAt?: string | null;
+  gatePassNumber?: string | null;
+  serviceType?: { description: string } | null;
+  bay?: { description: string } | null;
+  team?: { description: string } | null;
+  serviceAdvisorId?: string | null;
+  creditApprovedById?: string | null;
+  observations?: string | null;
+  workDone?: string | null;
+  previousJob?: {
+    id: string;
+    jobNumber: string;
+    technician?: { firstName: string; lastName: string } | null;
+  } | null;
+  isRepeat?: boolean;
+  repeatReason?: string | null;
+  complaints?: {
+    id: string;
+    description: string;
+    defectCode?: string | null;
+    spare?: number;
+    oil?: number;
+    labour?: number;
+  }[];
+  statusHistory?: {
+    id: string;
+    fromStatus?: string;
+    toStatus: string;
+    createdAt: string;
+    remarks?: string;
+    actor: { firstName: string; lastName: string };
+  }[];
   jobNumber: string;
   description: string;
   status: JobCardStatus;
@@ -119,6 +192,16 @@ export type JobCard = {
   qualityInspector?: { id: string; firstName: string; lastName: string } | null;
   createdAt: string;
   updatedAt: string;
+  billedAt?: string | null;
+  serviceId?: string | null;
+  service?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    durationMins?: number | null;
+    price: number;
+  } | null;
   appointment?: JobCardAppointment;
   branch: JobCardBranch;
   customer: JobCardCustomer;
@@ -127,6 +210,31 @@ export type JobCard = {
   estimates: Estimate[];
   partIssuances?: PartIssuance[];
   invoices?: JobCardInvoice[];
+
+  // Warranty snapshot taken at creation (never rewritten).
+  warrantyStatusAtCreation?: CoverageStatus | null;
+  warrantyReasonsAtCreation?: string[];
+  warrantyExpiresOnAtCreation?: string | null;
+  warrantyKmLimitAtCreation?: number | null;
+  warrantySnapshot?: {
+    coverage?: Coverage;
+    reasonText?: string[];
+    odometerReplaced?: boolean;
+    odometerReplacedReason?: string | null;
+    previousMileage?: number | null;
+  } | null;
+  warrantyAcknowledgedBy?: { id: string; firstName: string; lastName: string } | null;
+  warrantyAcknowledgedAt?: string | null;
+  completedAt?: string | null;
+  warrantyCase?: { id: string; caseNumber: string; status: CaseStatus } | null;
+  campaigns?: {
+    campaignId: string;
+    campaignCode: string;
+    campaignTitle: string;
+    campaignType: CampaignType;
+    vehicleStatus: CampaignVehicleStatus | null;
+    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED" };
+  }[];
 };
 
 export type JobCardListResponse = {

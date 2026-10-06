@@ -199,7 +199,7 @@ export function ServicesTable() {
         <div className="flex flex-col">
           <span className="font-medium">{s.name}</span>
           {s.description && (
-            <span className="line-clamp-1 max-w-xs text-xs text-muted-foreground">
+            <span className="line-clamp-1 max-w-xs text-sm text-muted-foreground">
               {s.description}
             </span>
           )}
@@ -237,7 +237,7 @@ export function ServicesTable() {
       render: (s) => (
         <span
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+            "inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium",
             s.isActive
               ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20"
               : "bg-red-50 text-red-700 ring-1 ring-red-600/20",

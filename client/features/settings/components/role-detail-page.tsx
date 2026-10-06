@@ -21,6 +21,7 @@ const SYSTEM_ROLE_NAMES = new Set([
   "Technician",
   "Receptionist",
   "ReceptionManager",
+  "WarrantyOfficer",
 ]);
 
 export function RoleDetailPage() {
@@ -117,7 +118,7 @@ export function RoleDetailPage() {
                     className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
                     />
                     {isSystemRole && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                    <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
                         <Lock className="size-3.5" /> System role names cannot be changed
                     </div>
                     )}
@@ -142,9 +143,9 @@ export function RoleDetailPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Permissions</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Choose what this role can access.</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">Choose what this role can access.</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-600">
                     {permissions.length} selected
                   </span>
                 </div>

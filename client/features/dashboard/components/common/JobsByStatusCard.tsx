@@ -20,7 +20,7 @@ export function JobsByStatusCard({ data, totalJobs }: JobsByStatusCardProps) {
     <div className="rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-semibold text-foreground">Jobs by Status</p>
-        <select className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground outline-none">
+        <select className="rounded-lg border border-[#e8edf3] bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground outline-none">
           <option>This Week</option>
         </select>
       </div>
@@ -71,7 +71,7 @@ export function JobsByStatusCard({ data, totalJobs }: JobsByStatusCardProps) {
           </ul>
         </>
       ) : (
-        <div className="flex h-[240px] items-center justify-center text-xs text-muted-foreground">
+        <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">
           No job data available
         </div>
       )}

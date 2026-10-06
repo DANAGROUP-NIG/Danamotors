@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
+import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type { Invoice, InvoiceListResponse } from "../types/invoice.types";
 
@@ -16,39 +16,142 @@ export async function getInvoicesRequest(params?: {
 }
 
 export async function getInvoiceRequest(id: string): Promise<Invoice> {
-  return apiGet<Invoice>(API_ROUTES.finance.invoices.detail(id));
+  const result = await apiGet<{ invoice: Invoice }>(API_ROUTES.finance.invoices.detail(id));
+  return result.invoice;
 }
-
-export type CreateInvoicePayload = {
-  customerId: string;
-  jobCardId?: string;
-  invoiceNumber: string;
-  issuedDate?: string;
-  dueDate?: string;
-  subtotal: number;
-  tax?: number;
-  total: number;
-  status?: string;
-  notes?: string;
-};
 
 export type UpdateInvoicePayload = {
   dueDate?: string;
-  subtotal?: number;
-  tax?: number;
-  total?: number;
-  status?: string;
   notes?: string;
 };
 
-export async function createInvoiceRequest(
-  payload: CreateInvoicePayload,
-): Promise<Invoice> {
-  const result = await apiPost<{ invoice: Invoice }>(
-    API_ROUTES.finance.invoices.base,
-    payload,
-  );
+export type BillableJobCard = {
+  serviceAdvisorId?: string | null;
+  id: string;
+  jobNumber: string;
+  status: string;
+  description: string;
+  customer?: { id: string; firstName: string; lastName: string; companyName?: string | null } | null;
+  vehicle?: { make?: string | null; model?: string | null; registrationNumber?: string | null } | null;
+  branch: { id: string; name: string };
+};
+
+export type JobBillPreview = {
+  review: { estimateId: string | null; status: string; canBill: boolean; issues: string[]; approvedSubtotal: number; actualSubtotal: number; rows: { type: string; referenceId?: string | null; description: string; approvedQuantity: number; actualQuantity: number; approvedAmount: number; actualAmount: number; difference: number; included: boolean; reason: string | null }[] };
+  jobCard: BillableJobCard;
+  lines: Array<{ id?: string; type: "PART" | "LABOUR" | "SERVICE"; description: string; quantity: number; rate: number; amount: number }>;
+  totals: {
+    partsTotal: number;
+    labourTotal: number;
+    serviceTotal: number;
+    partsDiscountAmount: number;
+    labourDiscountAmount: number;
+    vatRate: number;
+    vatAmount: number;
+    roundOff: number;
+    subtotal: number;
+    total: number;
+  };
+};
+
+export type ServiceAdvisor = { id: string; firstName: string; lastName: string; email: string };
+export type ReceivingBank = { id: string; code: string; name: string; accountNumber?: string | null };
+export type CreateReceiptPayload = {
+  branchId?: string;
+  idempotencyKey?: string;
+  issuedAt?: string;
+  chequeNumber?: string;
+  chequeDate?: string;
+  customerId: string;
+  mode: "POS" | "BANK_TRANSFER" | "CHEQUE" | "CASH";
+  category: "SERVICE_PARTS" | "SALES_ENQUIRY";
+  bankId?: string;
+  amount: number;
+  reference?: string;
+  narration?: string;
+  allocations: Array<{ invoiceId: string; amount: number }>;
+};
+export type ReceiptRegisterRow = {
+  id: string;
+  receiptNumber: string;
+  issuedAt: string;
+  mode: string;
+  category: "SERVICE_PARTS" | "SALES_ENQUIRY";
+  amount: number;
+  advanceAmount: number;
+  notes?: string | null;
+  status: string;
+  customer: { id: string; firstName: string; lastName: string; companyName?: string | null };
+  bank?: { id: string; name: string } | null;
+  allocations: Array<{ invoice: { invoiceNumber: string } }>;
+};
+export type ReceiptRegisterResponse = {
+  receipts: ReceiptRegisterRow[];
+  totalsByMode: Record<string, number>;
+  grandTotal: number;
+};
+export type CreateJobBillPayload = {
+  jobCardId: string;
+  partsDiscountPercent: number;
+  labourDiscountPercent: number;
+  serviceAdvisorId: string;
+  notes?: string;
+};
+
+export async function getBillableJobCardsRequest(branchId?: string): Promise<{ jobCards: BillableJobCard[] }> {
+  return apiGet(`${API_ROUTES.finance.jobCardsBillable}${branchId ? `?branchId=${branchId}` : ""}`);
+}
+
+export async function getServiceAdvisorsRequest(branchId?: string): Promise<{ advisors: ServiceAdvisor[] }> {
+  return apiGet(`${API_ROUTES.finance.serviceAdvisors}${branchId ? `?branchId=${branchId}` : ""}`);
+}
+
+export async function previewJobBillRequest(input: {
+  jobCardId: string;
+  partsDiscountPercent: number;
+  labourDiscountPercent: number;
+}): Promise<{ preview: JobBillPreview }> {
+  return apiPost(API_ROUTES.finance.jobBillPreview, input);
+}
+
+export async function createJobBillRequest(payload: CreateJobBillPayload): Promise<Invoice> {
+  const result = await apiPost<{ invoice: Invoice }>(API_ROUTES.finance.jobBills, payload);
   return result.invoice;
+}
+
+export async function getBanksRequest(): Promise<{ banks: ReceivingBank[] }> {
+  return apiGet(API_ROUTES.finance.banks);
+}
+
+export async function createReceiptRequest(payload: CreateReceiptPayload) {
+  return apiPost(API_ROUTES.finance.receipts, payload);
+}
+
+export async function cancelInvoiceRequest(id: string, remark: string): Promise<Invoice> {
+  const result = await apiPatch<{ invoice: Invoice }>(`${API_ROUTES.finance.invoices.detail(id)}/cancel`, { remark });
+  return result.invoice;
+}
+
+export async function getReceiptRegisterRequest(params: {
+  branchId?: string;
+  from?: string;
+  to?: string;
+  category: "ALL" | "SERVICE_PARTS" | "SALES_ENQUIRY";
+}): Promise<ReceiptRegisterResponse> {
+  const query = new URLSearchParams();
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  query.set("category", params.category);
+  if (params.branchId) query.set("branchId", params.branchId);
+  return apiGet(`${API_ROUTES.finance.receiptRegister}?${query.toString()}`);
+}
+
+export async function updateReceiptRequest(id: string, payload: { amount?: number; narration?: string }) {
+  return apiPatch(`${API_ROUTES.finance.receipts}/${id}`, payload);
+}
+
+export async function cancelReceiptRequest(id: string, remark: string) {
+  return apiPatch(`${API_ROUTES.finance.receipts}/${id}/cancel`, { remark });
 }
 
 export async function updateInvoiceRequest(

@@ -38,7 +38,7 @@ export function DashboardKpiCard({
     <div className="flex flex-col gap-3 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
           <p className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">
             {value}
           </p>
@@ -58,7 +58,7 @@ export function DashboardKpiCard({
       <div className="flex items-center justify-between">
         <span
           className={cn(
-            "inline-flex items-center gap-1 text-xs font-semibold",
+            "inline-flex items-center gap-1 text-sm font-semibold",
             up ? "text-emerald-600" : "text-red-500"
           )}
         >
@@ -72,7 +72,7 @@ export function DashboardKpiCard({
         {warn && warnLink && (
           <a
             href={warnLink}
-            className="text-xs font-semibold text-amber-600 hover:underline"
+            className="text-sm font-semibold text-amber-600 hover:underline"
           >
             View low stock items
           </a>

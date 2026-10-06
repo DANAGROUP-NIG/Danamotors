@@ -17,7 +17,7 @@ export function CreditApplicationActions({
   if (application.status !== "Pending") {
     return (
       <span
-        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+        className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
           application.status === "Approved"
             ? "bg-green-100 text-green-700"
             : application.status === "Declined"

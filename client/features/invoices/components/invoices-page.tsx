@@ -101,7 +101,7 @@ function ExportInvoicesButton() {
 export function InvoicesPage() {
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { hasPermission } = useAuth();
-  const canCreate = hasPermission("invoice:create");
+  const canCreate = hasPermission("invoice:job-bill:create");
   const { data } = useInvoices({ branchId: activeBranch?.id });
 
   const total = data?.invoices?.length ?? 0;
@@ -122,7 +122,7 @@ export function InvoicesPage() {
               <Link href="/invoices/new">
                 <Button size="sm">
                   <Plus className="size-4" />
-                  New invoice
+                  New job bill
                 </Button>
               </Link>
             )}

@@ -86,7 +86,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             </button>
             <div>
               <p className="text-sm font-bold">DanaMotors — Customer Portal</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Your vehicles, service and invoices in one place
               </p>
             </div>

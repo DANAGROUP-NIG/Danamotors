@@ -8,10 +8,12 @@ export type AppRole =
   | "branchstoremanager"
   | "workshopmanager"
   | "accountant"
+  | "billingofficer"
   | "serviceadviser"
   | "technician"
   | "receptionist"
   | "receptionmanager"
+  | "warrantyofficer"
   | "customer";
 
 // Inventory permissions mirror server/src/shared/constants/roles.ts.
@@ -40,6 +42,23 @@ export const INVENTORY_PERMISSIONS = {
   TRANSFER_RECEIVE: "transfer:receive",
 } as const;
 
+// Warranty, campaign and job card line permissions mirror server/src/shared/constants/roles.ts.
+export const WARRANTY_PERMISSIONS = {
+  READ: "warranty:read",
+  UPDATE: "warranty:update",
+  CLAIM: "warranty:claim",
+  SETTINGS: "warranty:settings",
+} as const;
+
+export const CAMPAIGN_PERMISSIONS = {
+  READ: "campaign:read",
+  CREATE: "campaign:create",
+  UPDATE: "campaign:update",
+  VEHICLE_UPDATE: "campaign:vehicle:update",
+} as const;
+
+export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.
@@ -48,6 +67,7 @@ export const FINANCE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "accountant",
+  "billingofficer",
   "serviceadviser",
 ];
 
@@ -74,6 +94,7 @@ export const MANAGE_ROLES: AppRole[] = [
 export const CUSTOMER_ROLES: AppRole[] = [
   "superadmin",
   "admin",
+  "billingofficer",
   "serviceadviser",
   "receptionist",
   "receptionmanager",

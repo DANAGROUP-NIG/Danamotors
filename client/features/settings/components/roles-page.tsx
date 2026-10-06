@@ -50,6 +50,7 @@ const SYSTEM_ROLE_NAMES = new Set([
   "Technician",
   "Receptionist",
   "ReceptionManager",
+  "WarrantyOfficer",
 ]);
 
 const PAGE_SIZE = 10;
@@ -239,7 +240,7 @@ export function RolesPage() {
               <div className="flex flex-col">
                 <span className="font-semibold text-foreground">{role.name}</span>
                 {role.description && (
-                  <span className="mt-1 text-xs text-muted-foreground">{role.description}</span>
+                  <span className="mt-1 text-sm text-muted-foreground">{role.description}</span>
                 )}
               </div>
             ),
@@ -247,7 +248,7 @@ export function RolesPage() {
           {
             header: "Permissions",
             render: (role) => (
-              <span className="inline-flex rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
+              <span className="inline-flex rounded-full bg-muted px-2 py-1 text-sm font-medium text-foreground">
                 {role.permissionsCount ?? role._count?.permissions ?? 0} permissions
               </span>
             ),
@@ -263,7 +264,7 @@ export function RolesPage() {
             render: (role) => (
               <span
                 className={cn(
-                  "inline-flex rounded-full px-2 py-1 text-xs font-medium",
+                  "inline-flex rounded-full px-2 py-1 text-sm font-medium",
                   SYSTEM_ROLE_NAMES.has(role.name)
                     ? "bg-slate-100 text-slate-700"
                     : "bg-emerald-50 text-emerald-700",

@@ -53,7 +53,7 @@ export class InventoryRepository {
   // ── Part Master ────────────────────────────────────────────────────────
 
   async createPart(data: {
-    partCode: string;
+    partCode?: string;
     partNumber: string;
     name: string;
     category: string;
@@ -64,6 +64,10 @@ export class InventoryRepository {
     maxLevel?: number | null;
     reorderQty?: number | null;
     unitPrice: number;
+    retailRate?: number | null;
+    taxable?: boolean;
+    partFlag?: string;
+    priceCategoryCode?: string | null;
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;
@@ -83,16 +87,16 @@ export class InventoryRepository {
     const where: Record<string, unknown> = {};
 
     if (filters?.partCode) {
-      where.partCode = { contains: filters.partCode, mode: 'insensitive' };
+      where.partCode = { contains: filters.partCode, mode: "insensitive" };
     }
     if (filters?.partNumber) {
-      where.partNumber = { contains: filters.partNumber, mode: 'insensitive' };
+      where.partNumber = { contains: filters.partNumber, mode: "insensitive" };
     }
     if (filters?.name) {
-      where.name = { contains: filters.name, mode: 'insensitive' };
+      where.name = { contains: filters.name, mode: "insensitive" };
     }
     if (filters?.category) {
-      where.category = { contains: filters.category, mode: 'insensitive' };
+      where.category = { contains: filters.category, mode: "insensitive" };
     }
     if (filters?.partStatus) {
       where.partStatus = filters.partStatus;
@@ -103,7 +107,7 @@ export class InventoryRepository {
         where,
         skip: filters?.skip,
         take: filters?.take,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
       }),
       prisma.sparePart.count({ where }),
     ]);
@@ -119,10 +123,7 @@ export class InventoryRepository {
     return prisma.sparePart.findUnique({ where: { partCode } });
   }
 
-  async updatePart(
-    id: string,
-    data: Partial<SparePart>,
-  ): Promise<SparePart> {
+  async updatePart(id: string, data: Partial<SparePart>): Promise<SparePart> {
     return prisma.sparePart.update({ where: { id }, data });
   }
 
@@ -217,6 +218,7 @@ export class InventoryRepository {
     branchId?: string;
     partId?: string;
     search?: string;
+    limit?: number;
   }): Promise<InventoryStock[]> {
     return prisma.inventoryStock.findMany({
       where: {
@@ -225,9 +227,15 @@ export class InventoryRepository {
         ...(filters?.search
           ? {
               part: {
+                ...(filters?.limit ? { partStatus: PartStatus.ACTIVE } : {}),
                 OR: [
-                  { name: { contains: filters.search, mode: 'insensitive' } },
-                  { partNumber: { contains: filters.search, mode: 'insensitive' } },
+                  { name: { contains: filters.search, mode: "insensitive" } },
+                  {
+                    partNumber: {
+                      contains: filters.search,
+                      mode: "insensitive",
+                    },
+                  },
                 ],
               },
             }
@@ -235,6 +243,7 @@ export class InventoryRepository {
       },
       include: { part: true, branch: true },
       orderBy: { updatedAt: "desc" },
+      take: filters?.limit,
     });
   }
 

@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { INVENTORY_PERMISSIONS } from "./features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -24,6 +24,10 @@ import {
   Wallet,
   ListChecks,
   BadgeCheck,
+  PackageSearch,
+  Ship,
+  Landmark,
+  Megaphone,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -125,6 +129,8 @@ export const NAV_GROUPS: NavGroup[] = [
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
       INVENTORY_PERMISSIONS.TRANSFER_READ,
+      WARRANTY_PERMISSIONS.READ,
+      CAMPAIGN_PERMISSIONS.READ,
     ],
     items: [
       {
@@ -135,6 +141,18 @@ export const NAV_GROUPS: NavGroup[] = [
           INVENTORY_PERMISSIONS.SPAREPART_READ,
           INVENTORY_PERMISSIONS.STOCK_READ,
         ],
+      },
+      {
+        label: "Part Query",
+        href: "/inventory/part-query",
+        icon: PackageSearch,
+        permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ, INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Mobis Receipts",
+        href: "/inventory/mobis-receipts",
+        icon: Ship,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
         label: "Transfers",
@@ -161,6 +179,18 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: ["invoice:read"],
       },
       {
+        label: "Tally",
+        href: "/finance/tally",
+        icon: Landmark,
+        permissions: ["tally:post", "tally:import"],
+      },
+      {
+        label: "Labour Catalogue",
+        href: "/labour-catalogue",
+        icon: ListChecks,
+        permissions: ["labour-item:read"],
+      },
+      {
         label: "Credit Applications",
         href: "/credit-applications",
         icon: Wallet,
@@ -168,14 +198,21 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         label: "Warranty",
-        href: "#",
+        href: "/warranty",
         icon: BadgeCheck,
+        permissions: [WARRANTY_PERMISSIONS.READ],
+      },
+      {
+        label: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
       },
       {
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read"],
+        permissions: ["financereport:read", "report:receipt-register"],
       },
     ],
   },

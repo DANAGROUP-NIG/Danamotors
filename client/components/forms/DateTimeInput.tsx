@@ -126,7 +126,7 @@ export function DateTimeInput({
         type="button"
         onClick={toggleMeridiem}
         disabled={disabled}
-        className="h-10 shrink-0 rounded-md border border-border bg-slate-50 px-3 text-xs font-bold text-foreground outline-none transition hover:bg-slate-100 focus:ring-2 focus:ring-ring disabled:opacity-50"
+        className="h-10 shrink-0 rounded-md border border-border bg-slate-50 px-3 text-sm font-bold text-foreground outline-none transition hover:bg-slate-100 focus:ring-2 focus:ring-ring disabled:opacity-50"
       >
         {meridiem}
       </button>

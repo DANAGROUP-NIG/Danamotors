@@ -69,7 +69,7 @@ export function AppointmentStatusStepper({ currentStatus }: AppointmentStatusSte
                 </div>
                 <span
                   className={cn(
-                    "mt-2 text-xs font-medium",
+                    "mt-2 text-sm font-medium",
                     completed && "text-green-600",
                     active && "text-blue-600",
                     future && "text-slate-400",

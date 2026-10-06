@@ -1,3 +1,4 @@
+import { listVehicleSchema } from './vehicle.validation';
 import { Router } from 'express';
 import { VehicleController } from './vehicle.controller';
 import { validateRequest } from '../../middleware/requestValidator';
@@ -271,7 +272,7 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.get('/', requirePermission(PERMISSIONS.VEHICLE_READ), controller.getVehicles);
+router.get('/', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(listVehicleSchema), controller.getVehicles);
 router.get('/:id', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(vehicleIdParamSchema), controller.getVehicle);
 router.post('/', requirePermission(PERMISSIONS.VEHICLE_CREATE), validateRequest(createVehicleSchema), controller.createVehicle);
 router.put('/:id', requirePermission(PERMISSIONS.VEHICLE_UPDATE), validateRequest(updateVehicleSchema), controller.updateVehicle);

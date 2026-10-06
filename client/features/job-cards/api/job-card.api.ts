@@ -36,19 +36,66 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 
 export interface CreateJobCardPayload {
   branchName: string;
-  jobNumber: string;
+  serviceId: string;
+  bayId: string;
+  serviceAdvisorId: string;
+  technicianId?: string;
+  teamId?: string;
+  mileage: number;
+  promisedAt: string;
+  complaints: {
+    complaintCodeId?: string;
+    defectCode?: string;
+    description?: string;
+    spare?: number;
+    oil?: number;
+    labour?: number;
+  }[];
+  isRepeat?: boolean;
+  previousJobId?: string;
+  repeatReason?: string;
   description: string;
   appointmentId?: string;
   customerId?: string;
   vehicleId?: string;
-  status?: string;
+  tyres?: { makeId?: string; number?: string }[];
+  batteryMakeId?: string;
+  batteryNumber?: string;
+  customField1?: string;
+  acType?: "FACTORY" | "DEALER" | "NONE";
+  checklist?: string;
+  estimatedParts?: number;
+  estimatedOil?: number;
+  estimatedLabour?: number;
+  serviceCharge?: number;
+  acFitted?: boolean;
+  inHouse?: boolean;
+  remarks?: string;
   estimatedHours?: number;
   estimatedCost?: number;
-  assignedTo?: string;
+  odometerReplaced?: boolean;
+  odometerReplacedReason?: string;
+  /** The adviser informed the customer of the warranty coverage. */
+  warrantyAcknowledged?: boolean;
+  /** Open campaigns the adviser acknowledged. */
+  acknowledgedCampaignIds?: string[];
+}
+
+export type CreatedJobCard = JobCard & {
+  warrantyCase: { id: string; caseNumber: string } | null;
 }
 
 export async function createJobCardRequest(
   data: CreateJobCardPayload,
-): Promise<JobCard> {
-  return apiPost<JobCard>(API_ROUTES.service.jobCards.base, data);
+): Promise<CreatedJobCard> {
+  const result = await apiPost<{ jobCard: CreatedJobCard }>(
+    API_ROUTES.service.jobCards.base,
+    {
+      ...data,
+      appointmentId: data.appointmentId || undefined,
+      customerId: data.customerId || undefined,
+      vehicleId: data.vehicleId || undefined,
+    },
+  );
+  return result.jobCard;
 }

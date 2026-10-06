@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Pencil,
   Eye,
@@ -36,12 +37,13 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useBranchStock } from "../hooks/use-branch-stock";
-import { useBulkDeleteInventory } from "../hooks/use-bulk-delete-inventory";
-import { InventoryEditForm } from "./InventoryEditForm";
+import { useBulkDeleteParts } from "../hooks/use-bulk-delete-inventory";
+import { normalizePart } from "../api/inventory.api";
+import { PartForm, PART_CATEGORIES } from "./PartForm";
 import type { BranchStockItem } from "../types/inventory.types";
 
 const PAGE_SIZE = 10;
-const CATEGORIES = ["Engine", "Electrical", "Brakes", "Tyres", "Body", "Fluids", "Filters", "Suspension", "Other"];
+const CATEGORIES = PART_CATEGORIES;
 
 function formatCurrency(amount: number) {
   return `₦${amount.toLocaleString()}`;
@@ -54,7 +56,7 @@ function formatInventoryText(stock: BranchStockItem) {
     `Category: ${stock.part.category}`,
     `Quantity: ${stock.quantity}`,
     `Minimum Stock: ${stock.minimumStock}`,
-    `Unit Price: ${formatCurrency(stock.part.unitPrice)}`,
+    `Unit Rate: ${formatCurrency(stock.part.unitPrice)}`,
   ];
   if (stock.rackLocation) lines.push(`Rack Location: ${stock.rackLocation}`);
   return lines.join("\n");
@@ -64,7 +66,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   return {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
-    category: stock.part.category,
+    category: stock.part.category ?? "",
     unitPrice: stock.part.unitPrice,
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
@@ -89,6 +91,7 @@ function exportColumns() {
 }
 
 export function InventoryTable() {
+  const router = useRouter();
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -126,7 +129,7 @@ export function InventoryTable() {
     rowKey: (s) => s.id,
   });
 
-  const bulkDelete = useBulkDeleteInventory();
+  const bulkDelete = useBulkDeleteParts();
 
   const editingItem = stockData?.find((s) => s.id === editingId) ?? null;
 
@@ -177,7 +180,7 @@ export function InventoryTable() {
 
   function handleConfirmDelete() {
     if (!deleteCandidates) return;
-    bulkDelete.mutate(deleteCandidates, {
+    bulkDelete.mutate(deleteCandidates.map((s) => s.part.id), {
       onSuccess: () => {
         setDeleteCandidates(null);
         selection.clear();
@@ -204,10 +207,11 @@ export function InventoryTable() {
   const columns: Column<BranchStockItem>[] = [
     {
       header: "Part",
+      className: "min-w-44",
       render: (stock) => (
         <>
           <p className="font-medium">{stock.part.name}</p>
-          <p className="text-xs text-muted-foreground">{stock.part.partNumber}</p>
+          <p className="text-sm text-muted-foreground">{stock.part.partNumber}</p>
         </>
       ),
     },
@@ -259,7 +263,7 @@ export function InventoryTable() {
               id: "view",
               label: "View details",
               icon: <Eye className="size-4" />,
-              onClick: () => setEditingId(stock.id),
+              onClick: () => router.push(`/inventory/${stock.part.id}`),
             },
             {
               id: "download",
@@ -412,10 +416,10 @@ export function InventoryTable() {
       <ModalFame
         isOpen={!!editingId}
         onClose={() => setEditingId(null)}
-        title="Edit spare part"
+        title={`Edit ${editingItem?.part.partNumber ?? "part"}`}
       >
         {editingItem && (
-          <InventoryEditForm item={editingItem.part} onSuccess={() => setEditingId(null)} />
+          <PartForm part={normalizePart(editingItem.part)} onSuccess={() => setEditingId(null)} />
         )}
       </ModalFame>
 

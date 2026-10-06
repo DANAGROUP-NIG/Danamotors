@@ -483,7 +483,7 @@ export default function SideNav({
                 <p className="truncate text-sm font-semibold text-white">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="truncate text-xs capitalize text-white/50">
+                <p className="truncate text-sm capitalize text-white/50">
                   {roleLabel ?? user?.role ?? "Workshop Manager"}
                 </p>
               </div>
