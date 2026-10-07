@@ -7,5 +7,5 @@ type ServiceChargeJob = {
 
 // Existing appointment-linked jobs retain their catalogue reference. New
 // workshop-only jobs identify the charge by their selected service type.
-export const serviceChargeReference = (job: ServiceChargeJob) => job.serviceId ?? job.serviceTypeId ?? undefined;
+export const serviceChargeReference = (job: ServiceChargeJob) => job.serviceTypeId ?? job.serviceId ?? undefined;
 export const serviceChargeDescription = (job: ServiceChargeJob) => job.serviceType?.description ?? job.service?.name ?? 'Service charge';
