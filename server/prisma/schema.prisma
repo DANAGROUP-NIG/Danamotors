@@ -484,6 +484,10 @@ model JobCard {
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
   @@index([appointmentId])
+  @@index([createdAt, id])
+  @@index([branchId, createdAt, id])
+  @@index([branchId, status, createdAt, id])
+  @@index([customerId, createdAt, id])
 }
 
 // ============================================================
