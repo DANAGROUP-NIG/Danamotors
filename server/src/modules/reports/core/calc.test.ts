@@ -1,4 +1,4 @@
-import { daysOpen, efficiency, isBeforeFirstService, mileageBandFor, promiseState, splitLabourLine, statusAsOn } from './calc';
+import { billGroupOf, daysOpen, efficiency, freeServiceClaimable, isBeforeFirstService, mileageBandFor, promiseState, splitLabourLine, statusAsOn } from './calc';
 
 const t = (iso: string) => new Date(iso);
 const asOf = t('2026-09-30T23:00:00Z');
@@ -154,5 +154,19 @@ describe('splitLabourLine and efficiency', () => {
     expect(efficiency(168, 150)).toBe(112);
     expect(efficiency(10, 12)).toBe(83);
     expect(efficiency(5, 0)).toBeNull();
+  });
+});
+
+describe('billing rules', () => {
+  it('puts zero-value bills in their own group', () => {
+    expect(billGroupOf(0)).toBe('ZERO');
+    expect(billGroupOf(0.004)).toBe('ZERO');
+    expect(billGroupOf(0.01)).toBe('BILLED');
+    expect(billGroupOf(5_412_560)).toBe('BILLED');
+  });
+
+  it('claims the free service charge plus warranty labour and parts', () => {
+    expect(freeServiceClaimable({ serviceCharge: 30_000, warrantyLabour: 7_500.255, warrantyParts: 4_499.745 })).toBe(42_000);
+    expect(freeServiceClaimable({ serviceCharge: null, warrantyLabour: 0, warrantyParts: 777 })).toBe(777);
   });
 });

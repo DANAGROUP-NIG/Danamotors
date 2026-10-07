@@ -17,6 +17,7 @@ import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
 import { startOfLocalDay } from './core/dates';
 import type { ReportDb, ReportDefinition, ReportMode, ReportScope } from './core/types';
+import { dailyLabourRegisterReport, freeServiceReport, workshopBillReport } from './billing.reports';
 import { serviceBookingReport } from './front-office.reports';
 import { dailyProductivityReport, technicianProductivityReport } from './productivity.reports';
 import { getReportSettings, saveReportSettings } from './settings';
@@ -370,6 +371,60 @@ integration('Productivity reports against the database', () => {
       const onlyPeter = await run(tx, technicianProductivityReport, w.scope, { from: '2026-09-29', to: '2026-09-29', technician: peter.id });
       expect(onlyPeter.groups.map((group) => group.label)).toEqual(['Peter Tech']);
       expect(onlyPeter.rows).toHaveLength(1);
+    });
+  });
+});
+
+integration('Billing reports against the database', () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('registers labour per bill with warranty and FOC labour, grouping zero-value bills', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      const item = await tx.labourItem.create({ data: { code: `LB-${w.suffix}`, description: 'Labour', rate: 10_000 } });
+      const chargeLine = async (jobCardId: string, kind: 'LABOUR' | 'PART', chargeType: 'CUSTOMER' | 'WARRANTY' | 'FREE' | 'GOODWILL', amount: number) => {
+        const labour = kind === 'LABOUR' ? await tx.jobCardLabour.create({ data: { jobCardId, labourItemId: item.id, description: 'Labour', hours: 1, rate: amount, amount } }) : null;
+        return tx.jobCardLine.create({ data: { jobCardId, kind, chargeType, description: kind, quantity: 1, rate: amount, amount, jobCardLabourId: labour?.id } });
+      };
+      // The delivered job's bill (29/09, ₦120,000): ₦20,000 labour, ₦2,000 labour discount (from seed).
+      await tx.invoice.update({ where: { invoiceNumber: (await tx.invoice.findFirstOrThrow({ where: { jobCardId: w.jobs.delivered.id } })).invoiceNumber }, data: { serviceTotal: 2_500, vatAmount: 1_537.5 } });
+      await chargeLine(w.jobs.delivered.id, 'LABOUR', 'WARRANTY', 7_000);
+      await chargeLine(w.jobs.delivered.id, 'LABOUR', 'FREE', 3_000);
+      await chargeLine(w.jobs.delivered.id, 'LABOUR', 'GOODWILL', 1_000);
+      await chargeLine(w.jobs.delivered.id, 'PART', 'WARRANTY', 50_000);
+      // A zero-value bill on the legacy job, and a bill on the PDI job (excluded).
+      await w.bill(w.jobs.legacy.id, at('2026-09-29', '13:00'), 0, { partsTotal: 0, labourTotal: 0, labourDiscountAmount: 0 });
+      await w.bill(w.jobs.pdiJob.id, at('2026-09-29', '13:00'), 9_999);
+
+      const register = await run(tx, dailyLabourRegisterReport, w.scope, { from: '2026-09-29', to: '2026-09-29' });
+      expect(register.rows).toHaveLength(2);
+      const billed = register.rows.find((row) => row.jobNumber === w.jobs.delivered.jobNumber)!;
+      expect(billed).toMatchObject({ groupKey: 'BILLED', labourCharges: 20_000, discount: 2_000, serviceCharges: 2_500, vatOnLabour: 1_537.5, totalLabour: 22_037.5, billAmount: 120_000, warrantyLabour: 7_000, focLabour: 4_000 });
+      expect(register.groups.map((group) => [group.key, group.count])).toEqual([['BILLED', 1], ['ZERO', 1]]);
+      // The cancelled bill (rebilled job) is not listed.
+      expect(register.rows.some((row) => row.jobNumber === w.jobs.rebilled.jobNumber)).toBe(false);
+
+      const bills = await run(tx, workshopBillReport, w.scope, { from: '2026-09-29', to: '2026-09-29', orderBy: 'billNumber' });
+      expect(bills.totals).toMatchObject({ count: 2, billAmount: 120_000 });
+      expect(bills.rows.find((row) => row.jobNumber === w.jobs.delivered.jobNumber)).toMatchObject({ deliveredBy: 'Blessing Adeyemi', partsAmount: 100_000, labourAmount: 22_500 });
+    });
+  });
+
+  it('claims free services: service charge plus warranty labour and parts', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      const free1 = await w.master('SERVICE_TYPE', 'F1', { freeService: true, freeServiceNo: 1 });
+      await tx.jobCard.update({ where: { id: w.jobs.delivered.id }, data: { serviceTypeId: free1.id, serviceCharge: 30_000, freeServiceCouponNo: 'C-118' } });
+      await tx.vehicle.update({ where: { id: w.vehicle.id }, data: { engineNumber: 'G4FG123456', saleDate: new Date('2026-03-12T00:00:00Z'), sellingDealer: 'Dana Motors Abuja' } });
+      await tx.jobCardLine.create({ data: { jobCardId: w.jobs.delivered.id, kind: 'PART', chargeType: 'WARRANTY', description: 'Filter', quantity: 1, rate: 12_000, amount: 12_000 } });
+
+      const result = await run(tx, freeServiceReport, w.scope, { from: '2026-09-29', to: '2026-09-29' });
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toMatchObject({ freeServiceNo: 1, couponNo: 'C-118', engineNumber: 'G4FG123456', saleDate: '2026-03-12', serviceCharge: 30_000, otherCharges: 12_000, netClaimable: 42_000 });
+      expect(result.groups).toEqual([expect.objectContaining({ key: '1', label: '1st free service', totals: { count: 1, serviceCharge: 30_000, otherCharges: 12_000, netClaimable: 42_000 } })]);
+      expect(result.breakdown).toEqual([expect.objectContaining({ count: 1, amount: 42_000 })]);
     });
   });
 });

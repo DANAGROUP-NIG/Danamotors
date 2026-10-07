@@ -210,6 +210,29 @@ Labour lines now record:
   100). Without shares the line's hours and amount are split evenly; the last technician takes
   any rounding difference so the shares add back up to the line.
 
+### Billing
+
+All three read active (not cancelled) job bills by **bill date**. Bills do not yet record
+whether they are cash or credit (issue #65), so **cash and credit bills share one group** and
+**zero-value bills** (total ₦0) are grouped separately, as in the legacy registers. When #65
+adds the bill type, only `billGroupOf()` in `reports/core/calc.ts` changes.
+
+**Daily labour register** (`daily-labour-register`, 132 col) — per bill: labour charges, labour
+discount, service charges, VAT on labour, **total labour** (labour − discount + service charges +
+VAT) and bill amount, plus **warranty labour** and **FOC labour** (free and goodwill) on the job —
+these are charged to the manufacturer or company, not the customer's bill. External labour and
+WCT from the legacy register are not recorded in this system and are left out.
+
+**Workshop bill report** (`workshop-bill`, 80 col) — the legacy layout: job no and date,
+registration, customer, model / variant, service, delivered by, gate pass no, bill no and date
+and total amount; *Show parts / labour breakdown* adds parts, labour (incl. service charges),
+discount, VAT and round-off. Order by job no (default) or bill no; print address.
+
+**Free service report** (`free-service`, 80 col) — billed jobs whose service type is a **free
+service**: engine no, sale date, selling dealer, mileage, free service no, coupon no, service
+charge, other charges (warranty labour and parts on the job) and **net claimable** (service charge
++ other charges). Grouped by free service no, with a model × free service summary.
+
 ### Vehicle analysis
 
 **Vehicles reported before first service** (`before-first-service`, 80 col) — vehicles **sold**

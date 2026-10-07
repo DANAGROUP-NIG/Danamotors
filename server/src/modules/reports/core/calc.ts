@@ -188,3 +188,22 @@ export function splitLabourLine(line: LabourLineAmounts, technicians: LineTechni
 export function efficiency(standardHours: number, chargedHours: number): number | null {
   return chargedHours > 0 ? Math.round((standardHours / chargedHours) * 100) : null;
 }
+
+/**
+ * Bill groups on the billing reports. Bills do not yet record cash / credit (issue #65), so
+ * non-zero bills share one group; zero-value bills (total 0) are separate, as in the legacy
+ * registers.
+ */
+export const BILL_GROUPS = [
+  { key: 'BILLED', label: 'Cash and credit bills' },
+  { key: 'ZERO', label: 'Zero value bills' },
+] as const;
+
+export function billGroupOf(total: number): 'BILLED' | 'ZERO' {
+  return Math.abs(total) < 0.005 ? 'ZERO' : 'BILLED';
+}
+
+/** Free service: the service charge plus warranty labour and parts on the job is claimable. */
+export function freeServiceClaimable(input: { serviceCharge: number | null; warrantyLabour: number; warrantyParts: number }): number {
+  return round2((input.serviceCharge ?? 0) + input.warrantyLabour + input.warrantyParts);
+}
