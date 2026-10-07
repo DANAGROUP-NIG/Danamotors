@@ -16,6 +16,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "prisma:status": "prisma migrate status",
+    "db:prepare": "prisma migrate deploy && prisma generate",
     "prisma:seed": "ts-node prisma/seed/seed.ts",
     "prisma:seed:branches": "ts-node prisma/seed/branches.ts",
     "prisma:seed:roles": "ts-node prisma/seed/roles.ts",
