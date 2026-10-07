@@ -363,6 +363,7 @@ model ServiceAppointment {
   @@index([branchId])
   @@index([customerId])
   @@index([vehicleId])
+  @@index([branchId, scheduledAt])
 }
 
 // ============================================================
@@ -484,6 +485,8 @@ model JobCard {
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
   @@index([appointmentId])
+  @@index([branchId, createdAt])
+  @@index([branchId, promisedAt])
 }
 
 // ============================================================
@@ -1115,6 +1118,7 @@ model Invoice {
 
   @@index([customerId])
   @@index([jobCardId])
+  @@index([issuedDate])
 }
 
 model LabourItem {
