@@ -1,4 +1,4 @@
-import { daysOpen, isBeforeFirstService, mileageBandFor, promiseState, statusAsOn } from './calc';
+import { daysOpen, efficiency, isBeforeFirstService, mileageBandFor, promiseState, splitLabourLine, statusAsOn } from './calc';
 
 const t = (iso: string) => new Date(iso);
 const asOf = t('2026-09-30T23:00:00Z');
@@ -111,5 +111,48 @@ describe('isBeforeFirstService', () => {
     expect(isBeforeFirstService(job('2026-05-01T09:00:00Z', '2026-05-01'), '2026-03-12', t('2026-05-01T09:00:00Z'))).toBe(false);
     expect(isBeforeFirstService(job('2026-06-01T09:00:00Z', '2026-06-01'), '2026-03-12', t('2026-05-01T09:00:00Z'))).toBe(false);
     expect(isBeforeFirstService(job('2026-04-02T09:00:00Z', '2026-04-02'), null, null)).toBe(false);
+  });
+});
+
+describe('splitLabourLine and efficiency', () => {
+  const line = { standardHours: 2, hours: 1.5, amount: 100_000 };
+
+  it('splits evenly when no shares are recorded, adding back up to the line', () => {
+    const shares = splitLabourLine({ standardHours: 1, hours: 1, amount: 100 }, [
+      { technicianId: 'a', sharePercent: null },
+      { technicianId: 'b', sharePercent: null },
+      { technicianId: 'c', sharePercent: null },
+    ]);
+    expect(shares.map((s) => s.amount)).toEqual([33.33, 33.33, 33.34]);
+    expect(shares.map((s) => s.chargedHours)).toEqual([0.33, 0.33, 0.34]);
+    expect(shares.reduce((sum, s) => sum + s.amount, 0)).toBeCloseTo(100, 10);
+    expect(shares.map((s) => s.appliedPercent)).toEqual([33.33, 33.33, 33.33]);
+  });
+
+  it('uses recorded shares when every technician has one', () => {
+    const shares = splitLabourLine(line, [
+      { technicianId: 'a', sharePercent: 75 },
+      { technicianId: 'b', sharePercent: 25 },
+    ]);
+    expect(shares.map((s) => [s.standardHours, s.chargedHours, s.amount])).toEqual([[1.5, 1.13, 75_000], [0.5, 0.37, 25_000]]);
+  });
+
+  it('falls back to an even split when only some shares are recorded', () => {
+    const shares = splitLabourLine(line, [
+      { technicianId: 'a', sharePercent: 75 },
+      { technicianId: 'b', sharePercent: null },
+    ]);
+    expect(shares.map((s) => s.amount)).toEqual([50_000, 50_000]);
+  });
+
+  it('keeps unknown standard hours unknown and returns nothing without technicians', () => {
+    expect(splitLabourLine({ standardHours: null, hours: 2, amount: 10 }, [{ technicianId: 'a', sharePercent: null }])[0].standardHours).toBeNull();
+    expect(splitLabourLine(line, [])).toEqual([]);
+  });
+
+  it('measures efficiency as standard ÷ charged hours', () => {
+    expect(efficiency(168, 150)).toBe(112);
+    expect(efficiency(10, 12)).toBe(83);
+    expect(efficiency(5, 0)).toBeNull();
   });
 });

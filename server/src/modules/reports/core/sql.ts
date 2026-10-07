@@ -51,12 +51,11 @@ export const J = {
 };
 
 /**
- * Job card with the dimensions every workshop report shows. Aliases: j job card, b branch,
+ * Joins from job card j to the dimensions every workshop report shows. Aliases: b branch,
  * v vehicle, var/mdl variant and model masters, c customer, st service type, tm team,
  * sa service advisor (received by), da delivery advisor (delivered by).
  */
-export const jobFromSql = Prisma.sql`
-  FROM "JobCard" j
+export const jobJoinsSql = Prisma.sql`
   JOIN "Branch" b ON b."id" = j."branchId"
   LEFT JOIN "Vehicle" v ON v."id" = j."vehicleId"
   LEFT JOIN "WorkshopMaster" var ON var."id" = v."catalogueId"
@@ -66,6 +65,10 @@ export const jobFromSql = Prisma.sql`
   LEFT JOIN "WorkshopMaster" tm ON tm."id" = j."teamId"
   LEFT JOIN "User" sa ON sa."id" = j."serviceAdvisorId"
   LEFT JOIN "User" da ON da."id" = j."deliveryAdvisorId"`;
+
+export const jobFromSql = Prisma.sql`
+  FROM "JobCard" j
+  ${jobJoinsSql}`;
 
 /** Display columns from jobFromSql(), selected by most workshop reports. */
 export const jobColumnsSql = Prisma.sql`
@@ -105,7 +108,9 @@ export function jobFilterSql(scope: ReportScope, filters: DimensionFilters, opti
   const technician = filters.technician?.length
     ? Prisma.sql` AND EXISTS (
         SELECT 1 FROM "JobCardLabour" fl
-        WHERE fl."jobCardId" = j."id" AND fl."technicianId" IN (${Prisma.join(filters.technician)}))`
+        LEFT JOIN "JobCardLabourTechnician" flt ON flt."jobCardLabourId" = fl."id"
+        WHERE fl."jobCardId" = j."id"
+          AND (fl."technicianId" IN (${Prisma.join(filters.technician)}) OR flt."technicianId" IN (${Prisma.join(filters.technician)})))`
     : Prisma.empty;
   const complaint = filters.complaint?.length
     ? Prisma.sql` AND EXISTS (SELECT 1 FROM "JobComplaint" fc WHERE fc."jobCardId" = j."id" AND fc."complaintCodeId" IN (${Prisma.join(filters.complaint)}))`

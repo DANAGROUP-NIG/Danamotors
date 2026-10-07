@@ -93,9 +93,10 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
       <>
         <td colSpan={span} className={cn("px-3 py-2.5", labelClass)}>{label}</td>
         {columns.slice(span).map((column) => {
+          const key = column.totalKey ?? column.key;
           return (
             <td key={column.key} className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-              {totalText(column, totals)}
+              {column.renderTotal && key in totals ? column.renderTotal(totals[key]) : totalText(column, totals)}
             </td>
           );
         })}

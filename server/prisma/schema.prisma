@@ -104,6 +104,7 @@ model User {
   recordedPayments       Payment[]         @relation("UserRecordedPayments")
   issuedReceipts         Receipt[]         @relation("UserIssuedReceipts")
   jobCardLabourLines     JobCardLabour[]
+  labourLineShares       JobCardLabourTechnician[] @relation("LabourLineTechnicians")
   serviceAdvisorInvoices Invoice[]         @relation("InvoiceServiceAdvisor")
   cancelledInvoices      Invoice[]         @relation("InvoiceCancelledBy")
   tallyPostedInvoices    Invoice[]         @relation("InvoiceTallyPostedBy")
@@ -1228,11 +1229,17 @@ model JobCardLabour {
   labourItemId String
   labourItem   LabourItem @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
   description  String
+  // Charged hours.
   hours        Float
+  // Standard (flat-rate) hours from the model labour rate or the labour item when the line was
+  // added; compared with charged hours for technician efficiency.
+  standardHours Float?
   rate         Float
   amount       Float
+  // First technician, kept for existing screens; all technicians are in `technicians`.
   technicianId String?
   technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  technicians  JobCardLabourTechnician[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -1243,6 +1250,22 @@ model JobCardLabour {
 
   @@index([jobCardId])
   @@index([labourItemId])
+}
+
+/// Technicians who worked a labour line (legacy labour slip: up to three). Without a recorded
+/// share the line's hours and amount are split evenly.
+model JobCardLabourTechnician {
+  id              String        @id @default(uuid())
+  jobCardLabourId String
+  jobCardLabour   JobCardLabour @relation(fields: [jobCardLabourId], references: [id], onDelete: Cascade)
+  technicianId    String
+  technician      User          @relation("LabourLineTechnicians", fields: [technicianId], references: [id], onDelete: Restrict)
+  // Percentage of the line credited to this technician; null = an even split.
+  sharePercent    Float?
+  createdAt       DateTime      @default(now())
+
+  @@unique([jobCardLabourId, technicianId])
+  @@index([technicianId])
 }
 
 model InvoiceLine {

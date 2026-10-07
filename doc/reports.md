@@ -192,6 +192,24 @@ yet delivered, sorted by promised time. *At risk* (red) = past the promise time 
 The engineer and job type filters from the legacy screens are not shown yet: the job card has no
 engineer or job type field (open questions 1 and 2 in the plan).
 
+### Productivity
+
+**Daily productivity report** (`daily-productivity`, 80 col; workshop manager) — labour lines
+**recorded** on the day, grouped by technician: jobs, lines, standard hours, charged hours,
+labour amount and **efficiency** (standard ÷ charged hours; green from 100%, amber 85–99%, red
+below). Lines with no technician are listed last under *No technician*.
+
+**Technician productivity report** (`technician-productivity`, 80 col) — labour on jobs **billed**
+in the period, by technician, with an efficiency chart. Filters: model, variant, technician (only
+the chosen technicians' share of each line). Order by job date or bill date.
+
+Labour lines now record:
+- **Standard hours** — the model labour rate's hours (else the labour item's default hours) when
+  the line is added; existing lines were filled the same way.
+- **Up to three technicians**, each with an optional **share %** (all or none, adding up to
+  100). Without shares the line's hours and amount are split evenly; the last technician takes
+  any rounding difference so the shares add back up to the line.
+
 ### Vehicle analysis
 
 **Vehicles reported before first service** (`before-first-service`, 80 col) — vehicles **sold**

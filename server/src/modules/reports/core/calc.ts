@@ -128,3 +128,63 @@ export function isBeforeFirstService(job: { at: Date; localDate: string }, saleD
   if (job.localDate <= saleDate) return false;
   return !firstServiceAt || job.at < firstServiceAt;
 }
+
+export interface LabourLineAmounts {
+  standardHours: number | null;
+  /** Charged hours. */
+  hours: number;
+  amount: number;
+}
+
+export interface LineTechnician {
+  technicianId: string;
+  sharePercent: number | null;
+}
+
+export interface TechnicianShare extends LineTechnician {
+  standardHours: number | null;
+  chargedHours: number;
+  amount: number;
+  /** The percentage actually applied. */
+  appliedPercent: number;
+}
+
+const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+/**
+ * Credit a labour line to its technicians: by the recorded shares when every technician has
+ * one, otherwise evenly. Hours and amounts are rounded to 2dp and the last technician takes the
+ * remainder, so the shares always add back up to the line.
+ */
+export function splitLabourLine(line: LabourLineAmounts, technicians: LineTechnician[]): TechnicianShare[] {
+  if (!technicians.length) return [];
+  const recorded = technicians.every((t) => t.sharePercent !== null && t.sharePercent > 0);
+  const total = recorded ? technicians.reduce((sum, t) => sum + (t.sharePercent ?? 0), 0) : technicians.length;
+  const fraction = (t: LineTechnician) => (recorded ? (t.sharePercent ?? 0) / total : 1 / technicians.length);
+
+  let standardLeft = line.standardHours ?? 0;
+  let chargedLeft = line.hours;
+  let amountLeft = line.amount;
+  return technicians.map((technician, index) => {
+    const last = index === technicians.length - 1;
+    const part = fraction(technician);
+    const standardHours = last ? round2(standardLeft) : round2((line.standardHours ?? 0) * part);
+    const chargedHours = last ? round2(chargedLeft) : round2(line.hours * part);
+    const amount = last ? round2(amountLeft) : round2(line.amount * part);
+    standardLeft -= standardHours;
+    chargedLeft -= chargedHours;
+    amountLeft -= amount;
+    return {
+      ...technician,
+      standardHours: line.standardHours === null ? null : standardHours,
+      chargedHours,
+      amount,
+      appliedPercent: round2(part * 100),
+    };
+  });
+}
+
+/** Efficiency = standard hours ÷ charged hours, as a percentage (null when nothing was charged). */
+export function efficiency(standardHours: number, chargedHours: number): number | null {
+  return chargedHours > 0 ? Math.round((standardHours / chargedHours) * 100) : null;
+}

@@ -358,6 +358,27 @@ export const updateLabourItemSchema = z.object({
   }),
 });
 
+/**
+ * Technicians on a labour line (at most three, as on the legacy labour slip). Shares are
+ * optional; when given for one they must be given for all and add up to 100.
+ */
+export const labourTechniciansField = z
+  .array(
+    z
+      .object({
+        technicianId: z.string().uuid("Invalid technician ID"),
+        sharePercent: z.number().gt(0, "A share must be more than 0").max(100).optional(),
+      })
+      .strict(),
+  )
+  .max(3, "At most three technicians per labour line")
+  .refine((list) => new Set(list.map((item) => item.technicianId)).size === list.length, "Each technician can appear once")
+  .refine((list) => {
+    const shares = list.filter((item) => item.sharePercent !== undefined);
+    if (!shares.length) return true;
+    return shares.length === list.length && Math.abs(shares.reduce((sum, item) => sum + item.sharePercent!, 0) - 100) < 0.001;
+  }, "Give a share for every technician, adding up to 100%, or none for an even split");
+
 export const createJobCardLabourSchema = z.object({
   body: z
     .object({
@@ -365,6 +386,7 @@ export const createJobCardLabourSchema = z.object({
       hours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       technicianId: z.string().uuid("Invalid technician ID").optional(),
+      technicians: labourTechniciansField.optional(),
     })
     .strict(),
 
@@ -384,6 +406,7 @@ export const updateJobCardLabourSchema = z.object({
         .uuid("Invalid technician ID")
         .nullable()
         .optional(),
+      technicians: labourTechniciansField.optional(),
     })
     .strict()
     .refine(

@@ -76,6 +76,8 @@ export interface ReportColumn<Row extends ReportRow = ReportRow> {
   totalKey?: string;
   /** Format of the subtotal/total when it differs from the cells (e.g. a count under a date column). */
   totalFormat?: ColumnFormat;
+  /** Custom on-screen subtotal/total cell (print and Excel use the formatted value). */
+  renderTotal?: (value: number) => ReactNode;
   /** Shown only when this option is on (e.g. printAddress). */
   whenOption?: string;
   /** Hidden in print (screen-only helper columns). */

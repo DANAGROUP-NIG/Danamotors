@@ -18,6 +18,7 @@ import { ROLES } from '../../shared/constants/roles';
 import { startOfLocalDay } from './core/dates';
 import type { ReportDb, ReportDefinition, ReportMode, ReportScope } from './core/types';
 import { serviceBookingReport } from './front-office.reports';
+import { dailyProductivityReport, technicianProductivityReport } from './productivity.reports';
 import { getReportSettings, saveReportSettings } from './settings';
 import { beforeFirstServiceReport, mileageWiseReport } from './vehicle-analysis.reports';
 import { jobCardsOpenReport, serviceWiseProgressReport, vehiclesToBeReadyReport, workshopProgressReport, workshopStatusReport } from './workshop.reports';
@@ -321,6 +322,54 @@ integration('Booking and vehicle analysis reports against the database', () => {
       const result = await run(tx, workshopProgressReport, w.scope, { from: '2026-09-28', to: today });
       expect(result.rows.find((row) => row.jobNumber === due.jobNumber)?.promiseState).toBe('DUE_SOON');
       expect(result.summary?.dueSoonHours).toBe(30);
+    });
+  });
+});
+
+integration('Productivity reports against the database', () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('credits labour to technicians by share or evenly, with efficiency', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      const role = await tx.role.upsert({ where: { name: ROLES.TECHNICIAN }, update: {}, create: { name: ROLES.TECHNICIAN } });
+      const tech = (first: string) => tx.user.create({ data: { email: `${first}-${w.suffix}@example.test`, firstName: first, lastName: 'Tech', passwordHash: 'x', roleId: role.id, branchId: w.branch.id } });
+      const musa = await tech('Musa');
+      const peter = await tech('Peter');
+      const item = await tx.labourItem.create({ data: { code: `PM-${w.suffix}`, description: 'Periodic maintenance', rate: 20_000, defaultHours: 2 } });
+      const line = async (jobCardId: string, hours: number, standardHours: number, createdAt: Date, techs: Array<[string, number | null]>) => {
+        const created = await tx.jobCardLabour.create({ data: { jobCardId, labourItemId: item.id, description: 'Periodic maintenance', hours, standardHours, rate: 20_000, amount: hours * 20_000, technicianId: techs[0]?.[0] ?? null, createdAt } });
+        for (const [technicianId, sharePercent] of techs) await tx.jobCardLabourTechnician.create({ data: { jobCardLabourId: created.id, technicianId, sharePercent } });
+        return created;
+      };
+      // Delivered job (billed 29/09): one line shared 75/25, one line Musa alone.
+      await line(w.jobs.delivered.id, 2, 2.4, at('2026-09-29', '10:00'), [[musa.id, 75], [peter.id, 25]]);
+      await line(w.jobs.delivered.id, 1, 1, at('2026-09-29', '11:00'), [[musa.id, null]]);
+      // In-progress job (not billed), recorded 30/09: shared evenly; plus an unassigned line.
+      await line(w.jobs.inProgress.id, 3, 3, at(w.D, '10:00'), [[musa.id, null], [peter.id, null]]);
+      await line(w.jobs.inProgress.id, 1, 1, at(w.D, '12:00'), []);
+      // A PDI job line is excluded.
+      await line(w.jobs.pdiJob.id, 5, 5, at(w.D, '10:00'), [[musa.id, null]]);
+
+      const daily = await run(tx, dailyProductivityReport, w.scope, { date: w.D });
+      const dailyGroups = Object.fromEntries(daily.groups.map((group) => [group.label, group.totals]));
+      expect(dailyGroups['Musa Tech']).toMatchObject({ count: 1, jobs: 1, chargedHours: 1.5, standardHours: 1.5, amount: 30_000, efficiency: 100 });
+      expect(dailyGroups['Peter Tech']).toMatchObject({ chargedHours: 1.5, amount: 30_000 });
+      expect(dailyGroups['No technician']).toMatchObject({ chargedHours: 1, amount: 20_000 });
+      expect(daily.groups[daily.groups.length - 1].label).toBe('No technician');
+      expect(daily.totals).toMatchObject({ count: 3, jobs: 1, chargedHours: 4, amount: 80_000 });
+
+      const period = await run(tx, technicianProductivityReport, w.scope, { from: '2026-09-29', to: '2026-09-29' });
+      const musaPeriod = period.groups.find((group) => group.label === 'Musa Tech')!.totals;
+      // 75% of (2 charged, 2.4 standard, 40,000) + the whole 1-hour line.
+      expect(musaPeriod).toMatchObject({ count: 2, jobs: 1, chargedHours: 2.5, standardHours: 2.8, amount: 50_000, efficiency: 112 });
+      expect(period.groups.find((group) => group.label === 'Peter Tech')!.totals).toMatchObject({ chargedHours: 0.5, standardHours: 0.6, amount: 10_000 });
+
+      const onlyPeter = await run(tx, technicianProductivityReport, w.scope, { from: '2026-09-29', to: '2026-09-29', technician: peter.id });
+      expect(onlyPeter.groups.map((group) => group.label)).toEqual(['Peter Tech']);
+      expect(onlyPeter.rows).toHaveLength(1);
     });
   });
 });
