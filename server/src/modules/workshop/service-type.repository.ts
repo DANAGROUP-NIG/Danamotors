@@ -32,7 +32,7 @@ export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: str
       WHERE p.kind <> 'MODEL' AND NOT m.id = ANY(p.visited)
     ), vehicle_identity AS (
       SELECT v.id, v."saleDate", v."catalogueId",
-        COALESCE(cm.name, NULLIF(trim(v."customModel"), ''), v.model) AS name,
+        COALESCE(cm.name, NULLIF(NULLIF(trim(v."customModel"), ''), 'Unspecified (legacy)'), v.model) AS name,
         CASE WHEN cm.id IS NOT NULL THEN cm.aliases
           ELSE ARRAY[v.model] END AS aliases,
         COALESCE(mk.name, NULLIF(trim(v."customMake"), ''), v.make) AS make
