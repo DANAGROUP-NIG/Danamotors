@@ -101,7 +101,8 @@ export const listJobCardsSchema = z.object({
 export const jobOpeningBody = z
   .object({
     appointmentId: z.string().uuid().optional(),
-    serviceId: z.string().uuid(),
+    serviceId: z.string().uuid().optional(),
+    serviceTypeId: z.string().uuid(),
     customerId: z.string().uuid(),
     vehicleId: z.string().uuid(),
     branchName: z.string().trim().min(1),
@@ -130,7 +131,7 @@ export const jobOpeningBody = z
           })
           .strict()
           .refine(
-            (c) => !!c.complaintCodeId || !!c.description,
+            (c) => !!c.complaintCodeId || !!c.defectCode || !!c.description,
             "Enter a complaint code or description",
           ),
       )

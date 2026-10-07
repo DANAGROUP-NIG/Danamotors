@@ -32,7 +32,9 @@ jest.mock("../../prisma/client", () => ({
 
     workshopMaster: {
       findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
+    warrantyDefectCode: { findMany: jest.fn().mockResolvedValue([]) },
 
     documentSequence: {
       upsert: jest.fn(),
@@ -91,6 +93,7 @@ const input = {
   customerId: id,
   vehicleId: id,
   serviceId: id,
+  serviceTypeId: id,
   bayId: id,
   serviceAdvisorId: id,
   technicianId: id,
@@ -137,6 +140,11 @@ describe("JobCard workflow", () => {
     (prisma.service.findFirst as jest.Mock).mockResolvedValue({
       id,
     });
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{
+      vehicleId: id, modelId: id, id, code: 'RG', description: 'PAID SERVICE',
+      chargedTo: 'CUSTOMER', displayOrder: null, serviceCharge: 15100,
+      previousCharge: 12800, effectiveFrom: new Date('2022-04-20T00:00:00Z'),
+    }]);
 
     (prisma.workshopMaster.findFirst as jest.Mock).mockResolvedValue({
       id,
@@ -159,7 +167,7 @@ describe("JobCard workflow", () => {
   it.each([
     "customerId",
     "vehicleId",
-    "serviceId",
+    "serviceTypeId",
     "bayId",
     "serviceAdvisorId",
     "mileage",
@@ -179,10 +187,10 @@ describe("JobCard workflow", () => {
     ).toBe(false);
   });
 
-  it("snapshots the catalogue price when no service charge was supplied", async () => {
+  it("snapshots the model service-type charge instead of the appointment catalogue price", async () => {
     (prisma.service.findFirst as jest.Mock).mockResolvedValue({ id, price: 85000 });
     await new ServiceService().createJobCard({ ...input, createdById: id });
-    expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceCharge: 85000 }) });
+    expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceCharge: 15100 }) });
   });
 
   it("preserves an explicitly waived service charge", async () => {
@@ -191,14 +199,17 @@ describe("JobCard workflow", () => {
     expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceCharge: 0 }) });
   });
 
-  it("opens a job card without a service type master", async () => {
-    await new ServiceService().createJobCard({ ...input, createdById: id });
+  it("opens a job card without an appointment catalogue service", async () => {
+    await new ServiceService().createJobCard({ ...input, serviceId: undefined, createdById: id });
 
-    expect(prisma.workshopMaster.findFirst).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ kind: "SERVICE_TYPE" }),
-      }),
-    );
+    expect(prisma.service.findFirst).not.toHaveBeenCalled();
+    expect(prisma.jobCard.create).toHaveBeenCalledWith({ data: expect.objectContaining({ serviceTypeId: id }) });
+  });
+  it("rejects an unavailable service type before creating the card", async () => {
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ vehicleId: id, modelId: id, id: null }]);
+    await expect(new ServiceService().createJobCard({ ...input, createdById: id }))
+      .rejects.toMatchObject({ statusCode: 400, message: 'Service type not available for this vehicle model' });
+    expect(prisma.jobCard.create).not.toHaveBeenCalled();
   });
 
   it("rejects raw job numbers, lifecycle overrides, empty complaints and unassigned jobs", () => {
@@ -310,6 +321,22 @@ describe("JobCard workflow", () => {
         }),
       }),
     );
+  });
+
+  it("carries a workshop-only service charge into the approved estimate without a catalogue lookup", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
+      id, status: 'OPEN', vehicle: null, serviceId: null, serviceTypeId: id,
+      serviceType: { description: 'PAID SERVICE' }, serviceCharge: 15100,
+    });
+    await new ServiceService().addEstimate(id, {
+      description: 'Model charge', lines: [{ type: 'SERVICE', referenceId: id, quantity: 1 }],
+    });
+    expect(prisma.service.findFirst).not.toHaveBeenCalled();
+    expect(prisma.estimate.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      amount: 15100, lines: { createMany: { data: [expect.objectContaining({
+        type: 'SERVICE', referenceId: id, description: 'PAID SERVICE', amount: 15100,
+      })] } },
+    }) }));
   });
 
   it("calculates the opening estimate from its breakdown and persists the checklist", async () => {
