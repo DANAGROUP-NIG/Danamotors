@@ -23,6 +23,7 @@
     "prisma:seed:roles": "ts-node prisma/seed/roles.ts",
     "prisma:seed:staff": "ts-node prisma/seed/staff.ts",
     "prisma:seed:services": "ts-node prisma/seed/services.ts",
+    "prisma:seed:service-types": "ts-node prisma/seed/service-types.ts",
     "prisma:seed:spare-parts": "ts-node prisma/seed/spareParts.ts",
     "prisma:seed:inventory": "ts-node prisma/seed/inventory.ts",
     "prisma:seed:transactions": "ts-node prisma/seed/transactions.ts",
