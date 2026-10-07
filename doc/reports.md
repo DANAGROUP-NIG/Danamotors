@@ -122,6 +122,26 @@ type, mileage, booking requests, estimated amount (parts + labour + oil on the r
 status: *Booked*, *Arrived* (a job card was opened from the booking, with its job no),
 *No-show* or *Cancelled*. Totals by service type with the number that arrived.
 
+**Job estimate register** (`job-estimate-register`, 132 col) — estimates dated in the period:
+estimates prepared **before** a job card and the **latest** estimate of each job card (earlier
+revisions are left out). Filters: model, variant, **estimate status** (active / pending approval /
+closed / all) and **job status** (not opened / opened / both). Shows parts, labour, service,
+discount and net amount, the customer's decision, the estimate status and the job opened; *Show
+estimate lines* lists the lines under each estimate.
+
+Estimate statuses:
+- **Pending approval** — waiting for the customer's decision.
+- **Active** — approved, no job card yet.
+- **Closed** — a job card was opened from it (or it was approved as a job's scope), the customer
+  declined, it was cancelled, or a later revision replaced it.
+
+Estimates before a job (**Quotations → New estimate**): pick the customer, vehicle and parts /
+labour / services; prices come from the part retail rate, the model labour rate and the service
+price. Each gets a number (`YYYY######`) and one customer decision (*Record decision*); an open
+one can be cancelled with a reason. Opening a job card from it (*Estimate* on the job opening
+form) loads its lines and closes it as converted. Existing estimates were numbered by date and
+given a status from their latest decision.
+
 Bookings now record (Appointments → Book / Edit):
 - **Booking no** `BKYYYY######`, given automatically (existing bookings were numbered by date);
 - **Service type** — the workshop service type (paid service, free service, running repair…);

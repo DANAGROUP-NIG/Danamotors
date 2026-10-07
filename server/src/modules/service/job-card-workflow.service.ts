@@ -12,6 +12,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { nextDocumentNumber } from "../finance/document-number";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { jobOpeningBody, jobUpdateBody } from "./service.validation";
+import { linkEstimateToOpenedJob } from "./pre-job-estimate.service";
 import { NOTIFICATION_TYPES, NotificationService } from "../notification/notification.service";
 import { assertMileage } from "../warranty/warranty.logic";
 import { OpenCampaign, buildCheck, findOpenCampaigns, loadVehicleForWarranty } from "../warranty/warranty.coverage";
@@ -320,6 +321,7 @@ export class JobCardWorkflowService {
         odometerReplacedReason,
         warrantyAcknowledged: _warrantyAcknowledged,
         acknowledgedCampaignIds: _acknowledgedCampaignIds,
+        estimateId,
         promisedAt,
         ...fields
       } = data;
@@ -397,6 +399,9 @@ export class JobCardWorkflowService {
           lastMileageAt: now,
         },
       });
+
+      // The job was opened from a pre-job estimate: it is now converted.
+      if (estimateId) await linkEstimateToOpenedJob(tx, estimateId, { id: card.id, vehicleId: vehicle.id, branchId: branch.id });
 
       // The booking arrived: it now counts as converted on the service booking report.
       if (data.appointmentId)

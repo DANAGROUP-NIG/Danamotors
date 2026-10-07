@@ -37,6 +37,10 @@ export type PickerRecord = {
   price?: number;
   serviceId?: string | null;
   serviceTypeId?: string | null;
+  // Estimates: the number, and null jobCardId for one prepared before a job.
+  estimateNumber?: string | null;
+  estimateStatus?: string;
+  jobCardId?: string | null;
   parentId?: string | null;
   currency?: string;
   lines?: { type: string; description: string; amount: number }[];
@@ -51,6 +55,9 @@ export type PickerRecord = {
 export function recordLabel(row: PickerRecord) {
   if (row.scheduledAt)
     return `${new Date(row.scheduledAt).toLocaleString()} | ${row.vehicle?.registrationNumber || row.vehicle?.vin || "Booking"}`;
+
+  if (row.estimateNumber)
+    return [row.estimateNumber, row.jobCard?.jobNumber ? `Job ${row.jobCard.jobNumber}` : "Before job card", row.description].filter(Boolean).join(" | ");
 
   return (
     row.registrationNumber ||

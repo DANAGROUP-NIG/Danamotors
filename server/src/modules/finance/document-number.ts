@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 // Bookings carry a prefix so their numbers are never mistaken for job or bill numbers.
 const PREFIX: Partial<Record<DocumentType, string>> = { BOOKING: 'BK' };
 
-export type DocumentType = 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS' | 'BOOKING';
+export type DocumentType = 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS' | 'BOOKING' | 'ESTIMATE';
 
 export async function nextDocumentNumber(
   transaction: Prisma.TransactionClient,

@@ -123,6 +123,8 @@ export const listJobCardsSchema = z.object({
 export const jobOpeningBody = z
   .object({
     appointmentId: z.string().uuid().optional(),
+    // A pre-job estimate the job is opened from.
+    estimateId: z.string().uuid().optional(),
     serviceId: z.string().uuid(),
     customerId: z.string().uuid(),
     vehicleId: z.string().uuid(),

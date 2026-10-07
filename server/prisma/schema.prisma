@@ -53,6 +53,7 @@ model Branch {
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
+  estimates     Estimate[]
 }
 
 // ============================================================
@@ -271,6 +272,7 @@ model Customer {
   creditApplications CustomerCreditApplication[]
 
   warrantyCases WarrantyCase[]
+  estimates     Estimate[]
 
   @@index([branchId])
   @@index([phoneNumber])
@@ -505,7 +507,8 @@ model JobCard {
   updatedAt DateTime @updatedAt
 
   inspections   Inspection[]
-  estimates     Estimate[]
+  estimates     Estimate[]     @relation("JobCardEstimates")
+  openedFromEstimates Estimate[] @relation("EstimateOpenedJob")
   partIssuances PartIssuance[]
   invoices      Invoice[]
   labourLines   JobCardLabour[]
@@ -557,13 +560,36 @@ model Inspection {
 model Estimate {
   id String @id @default(uuid())
 
-  jobCardId String
-  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  // Set for a revision of a job card's scope. Null for an estimate prepared before a job
+  // exists (the legacy estimate register); see openedJobCardId for the job opened from it.
+  jobCardId String?
+  jobCard   JobCard? @relation("JobCardEstimates", fields: [jobCardId], references: [id], onDelete: Cascade)
 
-  description String
-  amount      Float
-  currency    String @default("USD")
-  status      String @default("Pending")
+  // Who and what the estimate is for (copied from the job card for revisions).
+  branchId   String?
+  branch     Branch?   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicleId  String?
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+
+  // Estimate number (YYYY######) and date, shown on the job estimate register.
+  estimateNumber String?   @unique
+  estimateDate   DateTime?
+
+  description    String
+  amount         Float
+  discountAmount Float  @default(0)
+  currency       String @default("NGN")
+  // Customer decision: Pending, Approved, Declined.
+  status         String @default("Pending")
+
+  estimateStatus EstimateStatus       @default(PENDING_APPROVAL)
+  closedReason   EstimateCloseReason?
+
+  // The job card opened from a pre-job estimate.
+  openedJobCardId String?
+  openedJobCard   JobCard? @relation("EstimateOpenedJob", fields: [openedJobCardId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -572,6 +598,25 @@ model Estimate {
   approvals CustomerApproval[]
 
   @@index([jobCardId])
+  @@index([branchId, estimateDate])
+  @@index([vehicleId])
+  @@index([openedJobCardId])
+}
+
+enum EstimateStatus {
+  // Approved (or not needing approval) and still open.
+  ACTIVE
+  PENDING_APPROVAL
+  CLOSED
+}
+
+enum EstimateCloseReason {
+  // A job card was opened from it (or it was approved as a job card's scope).
+  CONVERTED
+  DECLINED
+  CANCELLED
+  // A later revision of the same job card replaced it.
+  SUPERSEDED
 }
 
 model CustomerApproval {
@@ -670,6 +715,7 @@ model Vehicle {
   jobCards         JobCard[]
   warrantyCases    WarrantyCase[]
   campaignVehicles CampaignVehicle[]
+  estimates        Estimate[]
 
   @@index([customerId])
   @@index([modelId])

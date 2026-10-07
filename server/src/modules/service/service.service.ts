@@ -1,6 +1,6 @@
 import { latestEstimateQuery } from './estimate-approval';
 import { lineAmount, sumMoney } from '../finance/money';
-import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
+import { EstimateCloseReason, EstimateStatus, Prisma, WarrantyCoverageStatus } from '@prisma/client';
 import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
 import { z } from 'zod';
 import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
@@ -13,6 +13,8 @@ import { NotificationService } from '../notification/notification.service';
 import { assertMileage } from '../warranty/warranty.logic';
 import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
 import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
+import { decidePreJobEstimate, estimateListWhere } from './pre-job-estimate.service';
+import { nextDocumentNumber } from '../finance/document-number';
 
 /** The booked service type and the complaint codes on booking requests must be active masters. */
 async function assertBookingMasters(db: Prisma.TransactionClient | typeof prisma, serviceTypeId?: string, requests?: AppointmentRequestInput[]) {
@@ -520,7 +522,28 @@ export class ServiceService {
       const previous = (await tx.estimate.findMany({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { createdAt: true } }))?.[0];
       // Strict ordering under the shared row lock, including transactions started earlier.
       const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1));
-      return tx.estimate.create({ data: { createdAt, jobCardId, description: data.description, currency: 'NGN', status: 'Pending', amount: sumMoney(lines.map(line => line.amount)), lines: { createMany: { data: lines } } }, include: { lines: true } });
+      await tx.estimate.updateMany({
+        where: { jobCardId, OR: [{ closedReason: null }, { closedReason: { not: EstimateCloseReason.SUPERSEDED } }] },
+        data: { estimateStatus: EstimateStatus.CLOSED, closedReason: EstimateCloseReason.SUPERSEDED },
+      });
+      return tx.estimate.create({
+        data: {
+          createdAt,
+          jobCardId,
+          branchId: card.branchId,
+          customerId: card.customerId,
+          vehicleId: card.vehicleId,
+          estimateNumber: await nextDocumentNumber(tx, 'ESTIMATE', createdAt),
+          estimateDate: createdAt,
+          estimateStatus: EstimateStatus.PENDING_APPROVAL,
+          description: data.description,
+          currency: 'NGN',
+          status: 'Pending',
+          amount: sumMoney(lines.map(line => line.amount)),
+          lines: { createMany: { data: lines } },
+        },
+        include: { lines: true },
+      });
     }, { maxWait: 5000, timeout: 15000 });
   }
 
@@ -533,12 +556,14 @@ export class ServiceService {
   }, actorId?: string) {
     const identity = await prisma.estimate.findUnique({ where: { id: estimateId }, select: { jobCardId: true } });
     if (!identity) throw new NotFoundError('Estimate not found');
+    if (!identity.jobCardId) return decidePreJobEstimate(estimateId, data, actorId);
+    const jobCardId = identity.jobCardId;
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`);
-      const estimates = await tx.estimate.findMany({ where: { jobCardId: identity.jobCardId }, ...latestEstimateQuery });
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
+      const estimates = await tx.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery });
       const estimate = estimates[0];
       if (!estimate || estimate.id !== estimateId) throw new ConflictError('Only the latest estimate revision can receive a decision');
-      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: identity.jobCardId } });
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId } });
       if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('This job is closed for estimate decisions');
       if (card.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
       if (estimate.approvals.length) throw new ConflictError('This revision already has a decision. Create a new revision to change scope.');
@@ -548,7 +573,11 @@ export class ServiceService {
         if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
         if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
       }
-      await tx.estimate.update({ where: { id: estimateId }, data: { status } });
+      // The decision closes the revision: approved = the job's scope, declined = rejected.
+      await tx.estimate.update({
+        where: { id: estimateId },
+        data: { status, estimateStatus: EstimateStatus.CLOSED, closedReason: data.approved ? EstimateCloseReason.CONVERTED : EstimateCloseReason.DECLINED },
+      });
       if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: 'ESTIMATE_DECISION_RECORDED', details: JSON.stringify({ jobCardId: card.id, estimateId, customerId: data.customerId, status, comments: data.comments }) } });
       return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
     }, { maxWait: 5000, timeout: 15000 });
@@ -621,18 +650,7 @@ export class ServiceService {
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
-    if (params?.branchId) where.jobCard = { branchId: params.branchId };
-    if (params?.status) where.status = params.status;
-
-    if (params?.search) {
-      where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
-      ];
-    }
+    const where = estimateListWhere({ branchId: params?.branchId, status: params?.status, search: params?.search });
 
     const [estimates, total] = await Promise.all([
       this.serviceRepository.listEstimates({

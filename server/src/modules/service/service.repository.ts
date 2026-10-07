@@ -1,6 +1,7 @@
 import prisma from '../../prisma/client';
 import { nextDocumentNumber } from '../finance/document-number';
 import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
+import { estimateListWhere } from './pre-job-estimate.service';
 import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
@@ -508,27 +509,8 @@ export class ServiceRepository {
     status?: string;
     search?: string;
   }) {
-    const where: Record<string, unknown> = {};
-
-    if (params.branchId) {
-      where.jobCard = { branchId: params.branchId };
-    }
-
-    if (params.status) {
-      where.status = params.status;
-    }
-
-    if (params.search) {
-      where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
-      ];
-    }
-
     return prisma.estimate.findMany({
-      where,
+      where: estimateListWhere(params),
       skip: params.skip,
       take: params.take,
       include: {
@@ -554,6 +536,11 @@ export class ServiceRepository {
           },
         },
         approvals: true,
+        // Pre-job estimates have no job card: who and what they are for come from here.
+        customer: { select: { id: true, firstName: true, lastName: true, companyName: true } },
+        vehicle: { select: { id: true, make: true, model: true, registrationNumber: true, vin: true } },
+        branch: { select: { id: true, name: true } },
+        openedJobCard: { select: { id: true, jobNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
