@@ -13,8 +13,8 @@ export class VehicleCatalogService {
     const model = await prisma.vehicleCatalogModel.findUnique({ where: { id }, select: {
       id: true,
       generations: { orderBy: [{ yearStart: 'desc' }, { name: 'asc' }, { sourceOrdinal: 'asc' }], select: {
-        id: true, name: true, yearStart: true, yearEnd: true,
-        engines: { orderBy: [{ label: 'asc' }, { sourceOrdinal: 'asc' }], select: { id: true, label: true, fuelType: true, powerHp: true, transmission: true, drivetrain: true } },
+        id: true, name: true, yearStart: true, yearEnd: true, bodyType: true,
+        engines: { orderBy: [{ label: 'asc' }, { sourceOrdinal: 'asc' }], select: { id: true, label: true, fuelType: true, powerHp: true, cylinders: true, displacementCc: true, transmission: true, drivetrain: true } },
       } },
     } });
     if (!model) throw new NotFoundError('Catalog model not found');

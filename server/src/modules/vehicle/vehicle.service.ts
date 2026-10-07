@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { vehicleBody } from './vehicle.validation';
 import { resolveVehicleIdentity } from '../vehicle-catalog/vehicle-identity';
-import { requireMaster } from '../workshop/workshop-master.service';
+import { WorkshopVehicleCatalog } from '../vehicle-catalog/workshop-vehicle-catalog';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { VehicleRepository } from './vehicle.repository';
@@ -120,30 +120,11 @@ export class VehicleService {
     };
   }
 
-  private async catalogue(tx: Prisma.TransactionClient, catalogueId: string, colourId: string) {
-    const variant = await requireMaster(tx, catalogueId, 'VARIANT');
-    const model = await requireMaster(tx, variant.parentId!, 'MODEL');
-    const product = await requireMaster(tx, model.parentId!, 'PRODUCT');
-    const make = await requireMaster(tx, product.parentId!, 'MAKE');
-    const colour = await requireMaster(tx, colourId, 'COLOUR');
+  private workshopCatalog = new WorkshopVehicleCatalog();
 
-    if (colour.parentId !== model.id)
-      throw new BadRequestError('Colour must belong to the selected model');
-
-    return {
-      catalogueId,
-      colourId,
-      make: make.description,
-      model: model.description,
-      trim: variant.description,
-      color: colour.description,
-    };
-  }
-
-  private async legacyIdentity(tx: Prisma.TransactionClient, catalogueId: string, colourId?: string | null) {
-    if (!colourId) throw new BadRequestError('Select a catalogue colour');
-    const legacy = await this.catalogue(tx, catalogueId, colourId);
-    return { ...legacy, customMake: legacy.make, customModel: legacy.model };
+  private assertSingleCatalogue(data: z.infer<typeof vehicleBody>) {
+    if (data.catalogueId && (data.modelId || data.generationId || data.engineId || data.customModel?.trim() || data.customMake?.trim()))
+      throw new BadRequestError('Choose one vehicle catalogue identity');
   }
 
   async createVehicle(
@@ -160,6 +141,7 @@ export class VehicleService {
 
     return prisma.$transaction(async tx => {
       if (data.customerId && !(await tx.customer.findFirst({
+        select: { id: true },
         where: {
           id: data.customerId,
           mergedIntoId: null,
@@ -174,10 +156,10 @@ export class VehicleService {
         throw new BadRequestError('Catalog generation and engine selections require a model');
 
       await this.assertWarrantyModel(tx, data.vehicleModelId);
-
-      const identity = data.modelId || data.customModel || !data.catalogueId
-        ? await resolveVehicleIdentity(tx, data)
-        : await this.legacyIdentity(tx, data.catalogueId, data.colourId);
+      this.assertSingleCatalogue(data);
+      const identity = data.catalogueId
+        ? await this.workshopCatalog.identity(tx, data.catalogueId, data.colourId)
+        : await resolveVehicleIdentity(tx, data);
 
       const vehicle = await tx.vehicle.create({
         data: {
@@ -221,7 +203,13 @@ export class VehicleService {
 
       const identityChanged = ['modelId', 'customModel', 'customMake', 'generationId', 'engineId'].some(key => Object.prototype.hasOwnProperty.call(data, key));
       let identity: Prisma.VehicleUncheckedUpdateInput = {};
-      if (identityChanged) {
+      if (data.catalogueId || data.colourId) {
+        const catalogueId = data.catalogueId ?? vehicle.catalogueId;
+        const colourId = data.colourId ?? vehicle.colourId;
+        if (!catalogueId || !colourId) throw new BadRequestError('Select catalogue variant and colour');
+        this.assertSingleCatalogue({ ...data, catalogueId, vin: vehicle.vin });
+        identity = await this.workshopCatalog.identity(tx, catalogueId, colourId);
+      } else if (identityChanged) {
         if (data.modelId && data.customModel) throw new BadRequestError('Choose either a catalog model or a custom model');
         if (data.customModel && (data.generationId || data.engineId)) throw new BadRequestError('Custom vehicles cannot have catalog generation or engine selections');
         const modelChanged = data.modelId !== undefined && data.modelId !== vehicle.modelId;
@@ -234,12 +222,6 @@ export class VehicleService {
           generationId: customSelected ? null : data.generationId === undefined ? modelChanged ? null : vehicle.generationId : data.generationId,
           engineId: customSelected ? null : data.engineId === undefined ? modelChanged || generationChanged ? null : vehicle.engineId : data.engineId,
         });
-      } else if (data.catalogueId || data.colourId) {
-        const catalogueId = data.catalogueId ?? vehicle.catalogueId;
-        const colourId = data.colourId ?? vehicle.colourId;
-        if (!catalogueId || !colourId) throw new BadRequestError('Select catalogue variant and colour');
-        const legacy = await this.catalogue(tx, catalogueId, colourId);
-        identity = { ...legacy, modelId: null, generationId: null, engineId: null, customMake: legacy.make, customModel: legacy.model };
       }
 
       if ((data.pdiDone ?? vehicle.pdiDone) && !(data.pdiDate ?? vehicle.pdiDate))
