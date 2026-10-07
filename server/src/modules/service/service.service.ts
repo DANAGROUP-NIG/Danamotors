@@ -474,7 +474,7 @@ export class ServiceService {
           description = item.description; rate = modelRate?.rate ?? item.rate;
           quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
         } else if (line.type === 'SERVICE') {
-          if (!card.serviceId && card.serviceTypeId && line.referenceId === card.serviceTypeId) {
+          if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
             description = serviceChargeDescription(card);
             rate = card.serviceCharge ?? 0;
           } else {
