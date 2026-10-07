@@ -23,6 +23,8 @@ export const masterBody = z.object({
   category: z.string().trim().max(100).nullable().optional(),
   chargedTo: z.enum(['CUSTOMER', 'COMPANY']).optional(),
   freeService: z.boolean().optional(),
+  displayOrder: z.number().int().min(0).max(100000).nullable().optional(),
+  preDelivery: z.boolean().optional(),
   parentId: z.string().uuid().nullable().optional(),
   fuel: z.string().trim().max(50).nullable().optional(),
   gearbox: z.string().trim().max(50).nullable().optional(),

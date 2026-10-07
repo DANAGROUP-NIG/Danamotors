@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { apiGet } from "@/lib/api/apiClient";
 import { inputCls } from "@/components/forms/FormField";
+import type { ReactNode } from "react";
 
 export type PickerRecord = {
   id: string;
@@ -32,6 +33,8 @@ export type PickerRecord = {
     name: string;
   };
   name?: string;
+  make?: string | null;
+  model?: string | null;
   category?: string | null;
   durationMins?: number | null;
   price?: number;
@@ -93,6 +96,17 @@ export function WorkshopPicker({
   error,
   onBlur,
   onCustom,
+  localOptions,
+  optionsLoading = false,
+  optionsError = false,
+  onRetry,
+  emptyMessage = "No matching records. Try another search.",
+  renderOption,
+  formatLabel = recordLabel,
+  requestLimit = 50,
+  loadOnValue = true,
+  staleTime = 30_000,
+  getOptionId = row => row.id,
 }: {
   label: string;
   endpoint: string;
@@ -106,6 +120,17 @@ export function WorkshopPicker({
   error?: string;
   onBlur?: () => void;
   onCustom?: (code: string) => void;
+  localOptions?: PickerRecord[];
+  optionsLoading?: boolean;
+  optionsError?: boolean;
+  onRetry?: () => void;
+  emptyMessage?: string;
+  renderOption?: (row: PickerRecord) => ReactNode;
+  formatLabel?: (row: PickerRecord) => string;
+  requestLimit?: number;
+  loadOnValue?: boolean;
+  staleTime?: number;
+  getOptionId?: (row: PickerRecord) => string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -133,29 +158,33 @@ export function WorkshopPicker({
   }, [search]);
 
   const query = useQuery({
-    queryKey: ["workshop-picker", endpoint, debouncedSearch],
+    queryKey: ["workshop-picker", endpoint, debouncedSearch, requestLimit],
 
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiGet<Record<string, PickerRecord[]>>(
-        `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=50&search=${encodeURIComponent(debouncedSearch)}`,
+        `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${requestLimit}&search=${encodeURIComponent(debouncedSearch)}`,
+        { signal },
       ),
 
-    enabled: !disabled && (open || !!value),
-    staleTime: 30_000,
+    enabled: localOptions === undefined && !disabled && (open || (loadOnValue && !!value)),
+    staleTime,
   });
 
-  const rows = query.data?.[collection] ?? [];
-  const selectedId = value === undefined ? chosen?.id : value;
+  const rows = localOptions
+    ? localOptions.filter(row => `${row.description ?? ""} ${row.code ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()))
+    : query.data?.[collection] ?? [];
+  const failed = localOptions === undefined ? query.isError : optionsError;
+  const selectedId = value === undefined ? chosen && getOptionId(chosen) : value;
   const selected =
-    selectedRecord?.id === selectedId
+    selectedRecord && getOptionId(selectedRecord) === selectedId
       ? selectedRecord
-      : (rows.find((row) => row.id === selectedId) ??
-        (chosen?.id === selectedId ? chosen : undefined));
-  const loading = query.isFetching || search !== debouncedSearch;
+      : (rows.find((row) => getOptionId(row) === selectedId) ??
+        (chosen && getOptionId(chosen) === selectedId ? chosen : undefined));
+  const loading = localOptions === undefined ? query.isFetching || search !== debouncedSearch : optionsLoading;
 
   const choose = (row: PickerRecord) => {
     setChosen(row);
-    onChange(row.id);
+    onChange(getOptionId(row));
     onSelect?.(row);
     setOpen(false);
     setSearch("");
@@ -200,13 +229,14 @@ export function WorkshopPicker({
               : undefined
           }
           autoComplete="off"
+          maxLength={100}
           disabled={disabled}
           className={`${inputCls} rounded-lg pl-9 pr-16 ${error ? "border-destructive" : ""}`}
           value={
             open
               ? search
               : selected
-                ? recordLabel(selected)
+                ? formatLabel(selected)
                 : selectedId
                   ? query.isFetching
                     ? "Loading selection..."
@@ -293,13 +323,13 @@ export function WorkshopPicker({
               Searching...
             </p>
           )}
-          {query.isError && (
+          {failed && (
             <p role="alert" className="p-3 text-sm text-destructive">
               Could not load options.{" "}
               <button
                 type="button"
                 className="underline"
-                onClick={() => query.refetch()}
+                onClick={() => onRetry ? onRetry() : query.refetch()}
               >
                 Retry
               </button>
@@ -311,29 +341,29 @@ export function WorkshopPicker({
             aria-label={label}
             className="max-h-56 overflow-y-auto overscroll-contain p-1"
           >
-            {!loading && !query.isError && !rows.length && (
+            {!loading && !failed && !rows.length && (
               <li
                 role="presentation"
                 className="p-3 text-sm text-muted-foreground"
               >
-                No matching records. Try another search.
+                {emptyMessage}
               </li>
             )}
-            {!query.isError &&
+            {!failed &&
               rows.map((row, index) => (
                 <li
                   key={row.id}
                   id={`${id}-option-${index}`}
                   role="option"
-                  aria-selected={selectedId === row.id}
-                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${active === index || selectedId === row.id ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+                  aria-selected={selectedId === getOptionId(row)}
+                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${active === index || selectedId === getOptionId(row) ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onMouseMove={() => setActive(index)}
                   onClick={() => {
                     if (!loading) choose(row);
                   }}
                 >
-                  <span className="min-w-0">
+                  {renderOption ? renderOption(row) : <span className="min-w-0">
                     <span className="block break-words font-medium">
                       {recordLabel(row)}
                     </span>
@@ -342,8 +372,8 @@ export function WorkshopPicker({
                         {recordHint(row)}
                       </span>
                     )}
-                  </span>
-                  {selectedId === row.id && (
+                  </span>}
+                  {selectedId === getOptionId(row) && (
                     <Check className="h-4 w-4 shrink-0" />
                   )}
                 </li>
@@ -364,9 +394,9 @@ export function WorkshopPicker({
               Use code &quot;{search.trim().toUpperCase()}&quot;
             </button>
           )}
-          {rows.length === 50 && (
+          {localOptions === undefined && rows.length === requestLimit && (
             <p className="border-t px-3 py-2 text-sm text-muted-foreground">
-              Showing 50 results. Search to narrow the list.
+              Showing {requestLimit} results. Search to narrow the list.
             </p>
           )}
         </div>
