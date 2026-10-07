@@ -47,6 +47,7 @@ export interface ReportResponse<Row extends ReportRow = ReportRow> {
   groups: ReportGroup[];
   totals: Record<string, number>;
   summary?: Record<string, number | string | null>;
+  breakdown?: { key: string; label: string; count: number; amount?: number }[];
   meta: { rowCount: number; truncated: boolean; branch: ReportBranch | "ALL"; timeZone: string };
 }
 
@@ -69,8 +70,12 @@ export interface ReportColumn<Row extends ReportRow = ReportRow> {
   render?: (row: Row) => ReactNode;
   /** Plain value for sorting, print and Excel when it differs from row[key]. */
   value?: (row: Row) => string | number | null | undefined;
+  /** Display text for print, Excel and the default cell when it differs from the formatted value. */
+  text?: (row: Row) => string;
   /** Subtotal/total key in groups[].totals / totals (defaults to key when the column is summed). */
   totalKey?: string;
+  /** Format of the subtotal/total when it differs from the cells (e.g. a count under a date column). */
+  totalFormat?: ColumnFormat;
   /** Shown only when this option is on (e.g. printAddress). */
   whenOption?: string;
   /** Hidden in print (screen-only helper columns). */
@@ -124,6 +129,7 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   options?: OptionDef[];
   /** True when the report has the detail / summary choice. */
   hasMode?: boolean;
+  defaultMode?: ReportMode;
   columns: ReportColumn<Row>[];
   /** Noun for the result count, e.g. ["job card", "job cards"]. */
   noun: [string, string];

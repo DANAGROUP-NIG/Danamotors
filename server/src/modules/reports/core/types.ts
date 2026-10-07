@@ -52,7 +52,16 @@ export interface ReportBody<Row extends ReportRow = ReportRow> {
   totals: Record<string, number>;
   /** Headline counts and amounts for the summary cards. */
   summary?: Record<string, number | string | null>;
+  /** Labelled counts for summary chips (e.g. jobs by service type). */
+  breakdown?: BreakdownItem[];
   truncated?: boolean;
+}
+
+export interface BreakdownItem {
+  key: string;
+  label: string;
+  count: number;
+  amount?: number;
 }
 
 export interface AppliedFilter {

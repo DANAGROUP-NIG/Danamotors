@@ -13,6 +13,7 @@ import { PRESET_LABELS, presetRange } from "../lib/report-dates";
 import type { ReportParams } from "../lib/report-params";
 import type { FilterKey, ReportConfig } from "../types";
 import { AllToggleMultiSelect } from "./AllToggleMultiSelect";
+import { periodLabel } from "./ReportPrintLayout";
 import { SegmentedControl } from "./SegmentedControl";
 
 const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSource }> = {
@@ -120,7 +121,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
           {period.kind === "range" ? (
             <>
               <label className="grid w-full gap-1.5 sm:w-44">
-                <span className="text-sm font-semibold">{period.label} from</span>
+                <span className="text-sm font-semibold">{periodLabel(period, draft.options)} from</span>
                 <DateInput value={draft.from} onChange={(from) => onChange({ ...draft, from })} />
               </label>
               <label className="grid w-full gap-1.5 sm:w-44">

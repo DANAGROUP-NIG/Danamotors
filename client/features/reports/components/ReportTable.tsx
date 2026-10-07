@@ -15,7 +15,13 @@ export function cellValue<Row extends ReportRow>(column: ReportColumn<Row>, row:
 }
 
 export function cellText<Row extends ReportRow>(column: ReportColumn<Row>, row: Row): string {
-  return formatValue(cellValue(column, row), column.format);
+  return column.text ? column.text(row) : formatValue(cellValue(column, row), column.format);
+}
+
+/** Formatted subtotal/total for a column, or "" when the column has none. */
+export function totalText<Row extends ReportRow>(column: ReportColumn<Row>, totals: Record<string, number>): string {
+  const key = column.totalKey ?? column.key;
+  return key in totals ? formatValue(totals[key], column.totalFormat ?? column.format) : "";
 }
 
 function alignOf(column: ReportColumn<ReportRow>) {
@@ -87,10 +93,9 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
       <>
         <td colSpan={span} className={cn("px-3 py-2.5", labelClass)}>{label}</td>
         {columns.slice(span).map((column) => {
-          const key = column.totalKey ?? column.key;
           return (
             <td key={column.key} className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-              {key in totals ? formatValue(totals[key], column.format) : ""}
+              {totalText(column, totals)}
             </td>
           );
         })}

@@ -28,7 +28,7 @@ export interface GroupSpec<R extends ReportRow> {
 }
 
 /** Group rows (keeping each group's rows together) and total each group. */
-export function groupRows<R extends ReportRow>(rows: R[], spec: GroupSpec<R>, sumKeys: readonly string[]): { rows: R[]; groups: ReportGroup[] } {
+export function groupRows<R extends ReportRow>(rows: R[], spec: GroupSpec<R>, sumKeys: readonly string[]): { rows: (R & { groupKey: string })[]; groups: ReportGroup[] } {
   const buckets = new Map<string, { label: string; rows: R[] }>();
   for (const fixed of spec.always ?? []) buckets.set(fixed.key, { label: fixed.label, rows: [] });
   for (const row of rows) {

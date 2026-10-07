@@ -28,6 +28,7 @@ export async function executeReport(
     groups: body.groups,
     totals: body.totals,
     summary: body.summary,
+    breakdown: body.breakdown,
     meta: {
       rowCount: body.rows.length,
       truncated: Boolean(body.truncated),

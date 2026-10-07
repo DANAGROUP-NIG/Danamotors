@@ -81,6 +81,7 @@ export const jobColumnsSql = Prisma.sql`
        ELSE COALESCE(NULLIF(c."companyName", ''), TRIM(CONCAT(c."firstName", ' ', c."lastName"))) END AS "customer",
   NULLIF(CONCAT_WS(', ', NULLIF(c."address", ''), NULLIF(c."city", ''), NULLIF(c."state", '')), '') AS "customerAddress",
   NULLIF(CONCAT_WS(' / ', NULLIF(c."phoneNumber", ''), NULLIF(c."mobile2", ''), NULLIF(c."residencePhone", '')), '') AS "customerPhone",
+  j."serviceTypeId" AS "serviceTypeId",
   st."code" AS "serviceTypeCode",
   COALESCE(st."description", 'Not set') AS "serviceType",
   j."mileage" AS "mileage",

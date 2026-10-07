@@ -20,12 +20,13 @@ export async function exportReportExcel<Row extends ReportRow>(config: ReportCon
 
   const value = (column: (typeof columns)[number], row: Row): Cell => {
     const raw = cellValue(column, row);
+    if (column.text && !isNumericFormat(column.format)) return column.text(row) || null;
     if (raw === null || raw === undefined || raw === "") return null;
     if (isNumericFormat(column.format)) return typeof raw === "number" ? raw : Number(raw);
     if (column.format === "date") return fmtDate(raw);
     if (column.format === "datetime") return fmtDateTime(raw);
     if (column.format === "time") return fmtTime(raw);
-    return String(raw);
+    return column.text ? column.text(row) : String(raw);
   };
   const totalsRow = (totals: Record<string, number>, label: string): Cell[] => {
     const firstTotal = columns.findIndex((column) => (column.totalKey ?? column.key) in totals);
@@ -69,8 +70,9 @@ export async function exportReportExcel<Row extends ReportRow>(config: ReportCon
   const worksheet = XLSX.utils.aoa_to_sheet(sheet);
   // Number formats so amounts stay numeric (sum/filter in Excel) but read like the screen.
   columns.forEach((column, columnIndex) => {
-    if (!isNumericFormat(column.format)) return;
-    const format = column.format === "money" ? "#,##0.00" : column.format === "integer" ? "#,##0" : "#,##0.00";
+    const totalFormat = column.totalFormat ?? column.format;
+    if (!isNumericFormat(column.format) && !isNumericFormat(totalFormat)) return;
+    const format = (column.format === "money" || totalFormat === "money") ? "#,##0.00" : totalFormat === "integer" || column.format === "integer" ? "#,##0" : "#,##0.00";
     for (const rowIndex of numericRows) {
       const cell = worksheet[XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex })];
       if (cell && typeof cell.v === "number") cell.z = format;

@@ -22,7 +22,7 @@ export function defaultParams(config: ReportConfig): ReportParams {
   for (const option of config.options ?? []) {
     options[option.key] = option.kind === "checkbox" ? String(Boolean(option.default)) : String(option.default);
   }
-  if (config.hasMode) options.mode = "both";
+  if (config.hasMode) options.mode = config.defaultMode ?? "both";
   if (config.period.basis) options[config.period.basis.key] = config.period.basis.default;
   return { from, to: config.period.kind === "date" ? from : to, filters: {}, options };
 }

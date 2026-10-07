@@ -2,9 +2,9 @@
 
 import { Fragment } from "react";
 import { cn } from "@/lib/utils";
-import { fmtDate, fmtDateTime, formatValue, isNumericFormat, plural } from "../lib/report-format";
+import { fmtDate, fmtDateTime, isNumericFormat, plural } from "../lib/report-format";
 import type { ReportBranch, ReportConfig, ReportGroup, ReportResponse, ReportRow } from "../types";
-import { cellText, visibleColumns } from "./ReportTable";
+import { cellText, totalText, visibleColumns } from "./ReportTable";
 
 export const COMPANY_NAME = "DANA MOTORS LTD.";
 
@@ -17,10 +17,17 @@ export function branchAddress(branch: ReportBranch | "ALL"): string {
   return [branch.address, branch.city, branch.state].filter(Boolean).join(", ") || branch.name;
 }
 
+/** The period label, following the "Date on" choice when the report has one. */
+export function periodLabel(period: ReportConfig["period"], options: Record<string, string | undefined>): string {
+  if (period.basis) return period.basis.choices.find((choice) => choice.value === options[period.basis!.key])?.label ?? period.label;
+  return period.kind === "date" ? period.dateLabel ?? period.label : period.label;
+}
+
 export function periodText(config: Pick<ReportConfig, "period">, data: Pick<ReportResponse, "filters">): string {
   const query = data.filters.query as Record<string, string>;
-  if (config.period.kind === "date") return `${config.period.dateLabel ?? config.period.label} ${fmtDate(`${query.date}T12:00:00Z`)}`;
-  return `${config.period.label} ${fmtDate(`${query.from}T12:00:00Z`)} to ${fmtDate(`${query.to}T12:00:00Z`)}`;
+  const label = periodLabel(config.period, query);
+  if (config.period.kind === "date") return `${label} ${fmtDate(`${query.date}T12:00:00Z`)}`;
+  return `${label} ${fmtDate(`${query.from}T12:00:00Z`)} to ${fmtDate(`${query.to}T12:00:00Z`)}`;
 }
 
 export function appliedText(data: Pick<ReportResponse, "filters">): string {
@@ -58,10 +65,9 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
     return (
       <tr className={className}>
         <td colSpan={span} className="px-1 py-1 font-bold uppercase">{label}</td>
-        {columns.slice(span).map((column) => {
-          const key = column.totalKey ?? column.key;
-          return <td key={column.key} className="whitespace-nowrap px-1 py-1 text-right font-bold">{key in totals ? formatValue(totals[key], column.format) : ""}</td>;
-        })}
+        {columns.slice(span).map((column) => (
+          <td key={column.key} className="whitespace-nowrap px-1 py-1 text-right font-bold">{totalText(column, totals)}</td>
+        ))}
       </tr>
     );
   }

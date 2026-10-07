@@ -112,3 +112,43 @@ enough. Inactive masters and staff are included and flagged, because old jobs st
    `configs/index.ts`. The hub card, route, filter bar, table, print and Excel follow from it.
 
 ## Reports
+
+### Workshop
+
+**List of job cards open** (`job-cards-open`, 80 col) — job cards opened in a date range (job
+date). Filters: model, variant, service type, service group, received by. Option: print address.
+Shows job no, opened date and time, registration / VIN, customer, model / variant, service type,
+mileage, received by, team, current status and promise time. Totals by service type.
+
+**Workshop status report** (`workshop-status`, 132 col) — every job that was open at some point on
+the *as on* date, with its status **as it stood at the end of that day**:
+- *Delivered* if delivered by then (delivery time, or the delivery recorded in status history);
+- *Billed – not delivered* if a bill was active then (issued, and not cancelled by then);
+- otherwise the latest status-history entry made by then (legacy status text is mapped);
+- a job with no status history at all (e.g. imported) uses its current status from its last
+  update onward, and *Open* before that.
+
+A job cancelled later still shows as open on earlier days. Filters: standard + delivered by.
+Options: only undelivered vehicles; detail / summary. Columns include the bill active that day,
+delivery and days open (red over 7). Summary: counts by status.
+
+**Workshop progress report** (`workshop-progress`, 132 col) — jobs against their promise date and
+time. **Date on**: job date (default) or bill date (as the legacy report did; open question 4 in
+the plan). For each job:
+- delivered → *delivered late* if delivered after the promise, else *delivered on time*;
+- ready, not delivered → judged by when it became ready (*overdue* if ready after the promise);
+- in work → *overdue* once the promise has passed, *due soon* within the chosen hours (default 2),
+  otherwise *on time*.
+
+Overdue rows are red, due-soon rows amber, late deliveries orange. Late reasons come from delivery.
+
+**Service-wise workshop progress** (`service-wise-progress`, 132 col) — the same jobs grouped by
+service type, by bill date (default, as legacy) or job date. Per service type: jobs, ready, billed,
+delivered, delivered on time / late, on-time %, labour and parts billed (net of discount, from the
+job's current bill). Opens in summary mode with a chart of on-time vs late deliveries.
+
+**Vehicles to be ready** (`vehicles-to-be-ready`, 80 col) — vehicles promised for a date and not
+yet delivered, sorted by promised time. *At risk* (red) = past the promise time and not ready.
+
+The engineer and job type filters from the legacy screens are not shown yet: the job card has no
+engineer or job type field (open questions 1 and 2 in the plan).
