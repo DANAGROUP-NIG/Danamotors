@@ -1,7 +1,25 @@
 # Workshop daily reports: analysis and execution plan
 
-Status: **plan only, nothing implemented yet.** Frontend work waits for the design images generated from
-[workshop-reports-ui-prompts.md](workshop-reports-ui-prompts.md).
+Status (2026-10-07): **slices 1, 2, 3, 5, 6 and 7 implemented** on `feature/workshop-reports`
+(14 reports). User guide and API notes: [doc/reports.md](../reports.md).
+
+| Slice | State |
+|---|---|
+| 1 Framework, permissions, hub | Done |
+| 2 Workshop: job cards open, status (as on), progress, service-wise, to be ready | Done |
+| 3 Bookings, service booking report, before first service, mileage wise, report settings | Done |
+| 4 Engineer | **Blocked** — open question 2. Engineer filter and column hidden. |
+| 5 Pre-job estimates, job estimate register | Done |
+| 6 Standard hours, shared technicians, daily and technician productivity | Done |
+| 7 Daily labour register, workshop bill, free service | Done; cash / credit grouping waits for #65 (cash and credit share a group, zero-value bills separate) |
+| 8 PDI bill register | **Blocked** — PDI issue |
+| 9 Consumption report | **Blocked** — open question 5 (and requisition type) |
+| — Repair order control chart | Not built — open question 7 |
+
+Defaults used for the open questions (section 7): job type and engineer hidden; PDI = service type
+category `PDI`; progress report has a job date / bill date choice (job date default), service-wise
+uses bill date; workshop bill report follows the legacy columns with an optional breakdown; PDI
+register not built; consumption and repair order control chart not built.
 
 ---
 
