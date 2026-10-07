@@ -142,7 +142,8 @@ export type JobCard = {
   readyAt?: string | null;
   deliveredAt?: string | null;
   gatePassNumber?: string | null;
-  serviceType?: { description: string } | null;
+  serviceTypeId?: string | null;
+  serviceType?: { description: string; code?: string; chargedTo?: string } | null;
   bay?: { description: string } | null;
   team?: { description: string } | null;
   serviceAdvisorId?: string | null;
