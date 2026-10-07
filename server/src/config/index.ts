@@ -13,6 +13,8 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .url("DATABASE_URL must be a valid connection string"),
+  DB_QUERY_LOG: z.enum(["true", "false"]).default("false"),
+  DB_SLOW_QUERY_MS: z.coerce.number().int().positive().default(500),
   JWT_SECRET: z
     .string()
     .min(8, "JWT_SECRET must be at least 8 characters long"),
