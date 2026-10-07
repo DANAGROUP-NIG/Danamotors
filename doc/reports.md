@@ -113,6 +113,25 @@ enough. Inactive masters and staff are included and flagged, because old jobs st
 
 ## Reports
 
+### Front office
+
+**Service booking report** (`service-booking`, 80 col) — vehicles booked to come in on a date
+(booked-for date). Filters: model, variant, service type. Option: print address. Shows the
+booking no, booked-for date and time, registration / VIN, customer, model / variant, service
+type, mileage, booking requests, estimated amount (parts + labour + oil on the requests) and the
+status: *Booked*, *Arrived* (a job card was opened from the booking, with its job no),
+*No-show* or *Cancelled*. Totals by service type with the number that arrived.
+
+Bookings now record (Appointments → Book / Edit):
+- **Booking no** `BKYYYY######`, given automatically (existing bookings were numbered by date);
+- **Service type** — the workshop service type (paid service, free service, running repair…);
+- **Mileage** given when booking (replaced by the reading taken at check-in);
+- **Booking requests** — complaint code, request and estimated parts / labour / oil;
+- **No-show** — a new status, available while the booking is still pending.
+
+The booking status (booked / converted / cancelled / no-show) follows the appointment status and
+job opening. Existing bookings were set from their status and whether a job was opened.
+
 ### Workshop
 
 **List of job cards open** (`job-cards-open`, 80 col) — job cards opened in a date range (job
@@ -152,3 +171,32 @@ yet delivered, sorted by promised time. *At risk* (red) = past the promise time 
 
 The engineer and job type filters from the legacy screens are not shown yet: the job card has no
 engineer or job type field (open questions 1 and 2 in the plan).
+
+### Vehicle analysis
+
+**Vehicles reported before first service** (`before-first-service`, 80 col) — vehicles **sold**
+in the period (sale date) that came in before their first free service. A job counts when its
+date is after the sale date and before the vehicle's first job whose service type has free
+service no 1 (or the vehicle has had none yet), and its service type is not a free service or
+PDI. Grouped by vehicle; shows days since sale (red under 30) and the customer requests.
+Filters: model, variant, customer request.
+
+**Vehicles visited — mileage wise** (`mileage-wise`, 80 col) — vehicles billed in the period,
+grouped by **mileage band** with a bar chart per band. Filters: model, customer request, labour
+operation and a **mileage from / to** range (as the legacy screen). Options: print customer
+request, address and labour details. Mileage is the odometer reading on the job card.
+
+### Settings and masters used by the reports
+
+- **Settings → Report settings** (`/settings/reports`, permission `report:settings`; also linked
+  from the reports hub): the mileage bands (ascending, no overlaps, only the last open-ended) and
+  the *due soon* threshold for the progress reports (default 2 hours).
+- **Settings → Workshop masters → Service type**:
+  - *Free service* + **Free service no** (1 = first free service). Existing free service types
+    whose code or name says first / second / third (e.g. `F1`, `2FS`, "First free service") were
+    numbered automatically; check the others.
+  - **Category** `PDI` marks the pre-delivery inspection service type, which every report except
+    the PDI bill register leaves out.
+- **Job opening** records the workshop **service type** and the **free service coupon no**
+  (both optional; carried over from the booking). Jobs opened before this change have no service
+  type and show as "Not set" until edited.

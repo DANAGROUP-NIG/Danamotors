@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranchStore } from "@/store/branch.store";
+import { useQuery } from "@tanstack/react-query";
+import { getReportSettingsRequest } from "../api/reports.api";
 import { useReportQuery } from "../hooks/use-reports";
 import { exportReportExcel } from "../lib/report-excel";
 import { fmtDateTime, plural } from "../lib/report-format";
@@ -17,6 +19,11 @@ import { ReportFilterBar } from "./ReportFilterBar";
 import { appliedText, ReportPrintLayout } from "./ReportPrintLayout";
 import { ReportSummaryStrip } from "./ReportSummaryStrip";
 import { ReportTable } from "./ReportTable";
+
+/** Options the user has already changed from the built-in defaults. */
+function pickChanged(current: Record<string, string>, initial: Record<string, string>) {
+  return Object.fromEntries(Object.entries(current).filter(([key, value]) => initial[key] !== value));
+}
 
 function errorMessage(error: unknown): string {
   const response = (error as { response?: { status?: number; data?: { message?: string; errors?: { message: string }[] } } })?.response;
@@ -49,13 +56,21 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   const { user, isAdminOrAbove, hasPermission, isHydrated } = useAuth();
   const activeBranch = useBranchStore((state) => state.activeBranch);
   const genericConfig = config as unknown as ReportConfig;
+  const settingOptions = (config.options ?? []).flatMap((option) => (option.kind === "number" && option.settingDefault ? [option] : []));
+  const settings = useQuery({ queryKey: ["report-settings"], queryFn: getReportSettingsRequest, enabled: settingOptions.length > 0, staleTime: 5 * 60_000 });
 
   const searchKey = searchParams.toString();
   const applied = useMemo(() => parseParams(genericConfig, new URLSearchParams(searchKey)), [genericConfig, searchKey]);
-  const defaults = useMemo<ReportParams>(
-    () => ({ ...defaultParams(genericConfig), branchId: isAdminOrAbove ? activeBranch?.id ?? "ALL" : undefined }),
-    [genericConfig, isAdminOrAbove, activeBranch?.id],
-  );
+  const defaults = useMemo<ReportParams>(() => {
+    const base = defaultParams(genericConfig);
+    for (const option of settingOptions) {
+      const value = settings.data?.[option.settingDefault!];
+      if (typeof value === "number") base.options[option.key] = String(value);
+    }
+    return { ...base, branchId: isAdminOrAbove ? activeBranch?.id ?? "ALL" : undefined };
+    // settingOptions is derived from config.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genericConfig, isAdminOrAbove, activeBranch?.id, settings.data]);
   const [draft, setDraft] = useState<ReportParams>(() => applied ?? defaults);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +78,11 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   useEffect(() => {
     if (applied) setDraft(applied);
   }, [applied]);
+
+  // Before the first run, pick up defaults that arrive later (report settings).
+  useEffect(() => {
+    if (!applied) setDraft((current) => ({ ...current, options: { ...defaults.options, ...pickChanged(current.options, defaultParams(genericConfig).options) } }));
+  }, [defaults, applied, genericConfig]);
 
   const apiQuery = useMemo(() => (applied ? toApiQuery(genericConfig, applied) : null), [genericConfig, applied]);
   const report = useReportQuery(config.slug, apiQuery);

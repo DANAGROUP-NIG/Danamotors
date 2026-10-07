@@ -55,6 +55,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/warranty": [WARRANTY_PERMISSIONS.READ],
   "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
   "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
+  "/settings/reports": [REPORT_PERMISSIONS.SETTINGS],
   "/settings": ["role:read"],
 };
 

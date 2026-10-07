@@ -41,6 +41,8 @@ export interface CreateJobCardPayload {
   serviceAdvisorId: string;
   technicianId?: string;
   teamId?: string;
+  serviceTypeId?: string;
+  freeServiceCouponNo?: string;
   mileage: number;
   promisedAt: string;
   complaints: {

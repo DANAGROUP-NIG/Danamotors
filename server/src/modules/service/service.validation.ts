@@ -25,8 +25,27 @@ export const estimateIdParamSchema = z.object({
   }),
 });
 
+const moneyField = z.number().min(0).max(1e12).multipleOf(0.01);
+const bookingRequests = z
+  .array(
+    z
+      .object({
+        complaintCodeId: z.string().uuid().optional(),
+        description: z.string().trim().min(1, "Describe the request").max(500),
+        estimatedParts: moneyField.optional(),
+        estimatedLabour: moneyField.optional(),
+        estimatedOil: moneyField.optional(),
+      })
+      .strict(),
+  )
+  .max(30);
+
 export const createAppointmentSchema = z.object({
   body: z.object({
+    // Workshop service type (SERVICE_TYPE master), odometer reading and requests at booking.
+    serviceTypeId: z.string().uuid("Invalid service type").optional(),
+    mileage: mileageField.optional(),
+    requests: bookingRequests.optional(),
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),
@@ -48,6 +67,9 @@ export const updateAppointmentSchema = z.object({
     status: z.string().optional(),
     // Odometer reading taken at check-in (status 'Checked In').
     mileage: mileageField.optional(),
+    serviceTypeId: z.string().uuid("Invalid service type").nullable().optional(),
+    // Replaces the booking requests when sent.
+    requests: bookingRequests.optional(),
     ...acknowledgementFields,
   }),
 
@@ -115,6 +137,9 @@ export const jobOpeningBody = z
     serviceAdvisorId: z.string().uuid(),
     technicianId: z.string().uuid().optional(),
     teamId: z.string().uuid().optional(),
+    // Workshop service type (SERVICE_TYPE master: paid service, free service, running repair...).
+    serviceTypeId: z.string().uuid().optional(),
+    freeServiceCouponNo: z.string().trim().max(50).optional(),
     promisedAt: z.string().datetime(),
 
     complaints: z
@@ -211,6 +236,8 @@ export const jobUpdateBody = z
       .enum(["IN_PROGRESS", "QC", "READY", "DELIVERED", "CANCELLED"])
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
+    serviceTypeId: z.string().uuid().nullable().optional(),
+    freeServiceCouponNo: z.string().trim().max(50).nullable().optional(),
     deliveryAdvisorId: z.string().uuid().optional(),
     lateReasonIds: z
       .array(z.string().uuid())

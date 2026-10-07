@@ -176,7 +176,7 @@ export const workshopProgressConfig: ReportConfig = {
   icon: Timer,
   period: { kind: "range", label: "Job date", presets: RANGE_PRESETS, defaultPreset: "thisWeek", basis: BASIS("job") },
   filters: STD_WITH_DELIVERED,
-  options: [printAddressOption, { kind: "number", key: "dueSoonHours", label: "Due soon within", suffix: "hours", min: 0, max: 72, default: 2 }],
+  options: [printAddressOption, { kind: "number", key: "dueSoonHours", label: "Due soon within", suffix: "hours", min: 0, max: 72, default: 2, settingDefault: "dueSoonHours" }],
   hasMode: true,
   noun: ["job", "jobs"],
   columns: [

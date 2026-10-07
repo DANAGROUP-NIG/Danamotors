@@ -16,6 +16,7 @@ import { dateQuery, flag, rangeQuery } from './core/filters';
 import { capRows, countBy, groupRows, MAX_REPORT_ROWS, sumFields } from './core/shape';
 import { activeInvoiceSql, canonicalStatusSql, J, jobColumnsSql, jobFilterSql, jobFromSql, moneySql } from './core/sql';
 import type { BreakdownItem, FilterKey, ReportDefinition, ReportRow } from './core/types';
+import { getDueSoonHours, MAX_DUE_SOON_HOURS } from './settings';
 
 const STD_FILTERS: FilterKey[] = ['model', 'variant', 'serviceType', 'team', 'receivedBy'];
 const STD_WITH_DELIVERED: FilterKey[] = [...STD_FILTERS, 'deliveredBy'];
@@ -213,7 +214,8 @@ const basis = (fallback: 'job' | 'bill') => z.enum(['job', 'bill']).default(fall
 
 const workshopProgressQuery = rangeQuery(STD_WITH_DELIVERED, {
   basis: basis('job'),
-  dueSoonHours: z.coerce.number().int().min(0).max(72).default(2),
+  // Omitted = the threshold in report settings.
+  dueSoonHours: z.coerce.number().int().min(0).max(MAX_DUE_SOON_HOURS).optional(),
 });
 
 /** WHERE condition for "date on job date / bill date". Bill basis needs currentBillJoin. */
@@ -235,7 +237,7 @@ export const workshopProgressReport: ReportDefinition<z.infer<typeof workshopPro
   filterKeys: STD_WITH_DELIVERED,
   params: [
     { name: 'basis', description: 'job (job date, default) or bill (bill date).', schema: { type: 'string', enum: ['job', 'bill'], default: 'job' } },
-    { name: 'dueSoonHours', description: 'Jobs due within this many hours are "due soon" (0–72).', schema: { type: 'integer', default: 2 } },
+    { name: 'dueSoonHours', description: 'Jobs due within this many hours are "due soon" (0–72). Omitted = the report settings value (default 2).', schema: { type: 'integer' } },
   ],
   example: {
     rows: [{ jobNumber: '2026004655', promiseState: 'OVERDUE', minutesToPromise: -200, lateReasons: 'Parts awaited', groupKey: 'OVERDUE' }],
@@ -254,8 +256,9 @@ export const workshopProgressReport: ReportDefinition<z.infer<typeof workshopPro
       ${LIMIT}`);
     const { rows: capped, truncated } = capRows(result);
     const now = new Date();
+    const dueSoonHours = q.dueSoonHours ?? (await getDueSoonHours(db));
     const withState = capped.map((row) => {
-      const state = promiseState({ promisedAt: row.promisedAt, readyAt: row.readyAt, deliveredAt: row.deliveredAt }, now, q.dueSoonHours);
+      const state = promiseState({ promisedAt: row.promisedAt, readyAt: row.readyAt, deliveredAt: row.deliveredAt }, now, dueSoonHours);
       return { ...row, promiseState: state.state, minutesToPromise: state.minutes };
     });
     withState.sort((a, b) => (a.minutesToPromise ?? Infinity) - (b.minutesToPromise ?? Infinity));
@@ -266,7 +269,7 @@ export const workshopProgressReport: ReportDefinition<z.infer<typeof workshopPro
       rows: grouped.rows,
       groups: grouped.groups.map((group) => ({ ...group, totals: { count: group.count } })),
       totals: { count: withState.length },
-      summary: { ...summary, dueSoonHours: q.dueSoonHours },
+      summary: { ...summary, dueSoonHours },
       truncated,
     };
   },

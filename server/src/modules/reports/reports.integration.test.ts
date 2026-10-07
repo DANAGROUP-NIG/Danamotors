@@ -17,6 +17,9 @@ import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
 import { startOfLocalDay } from './core/dates';
 import type { ReportDb, ReportDefinition, ReportMode, ReportScope } from './core/types';
+import { serviceBookingReport } from './front-office.reports';
+import { getReportSettings, saveReportSettings } from './settings';
+import { beforeFirstServiceReport, mileageWiseReport } from './vehicle-analysis.reports';
 import { jobCardsOpenReport, serviceWiseProgressReport, vehiclesToBeReadyReport, workshopProgressReport, workshopStatusReport } from './workshop.reports';
 
 const integration = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -122,7 +125,7 @@ async function seedWorkshop(tx: ReportDb) {
   const elsewhere = await tx.jobCard.create({ data: { jobNumber: `X${suffix}`, description: 'Other branch', branchId: otherBranch.id, createdAt: at(D, '09:00'), serviceTypeId: paid.id } });
 
   const scope: ReportScope = { branchIds: [branch.id], branch: null, timeZone: 'Africa/Lagos' };
-  return { D, scope, branch, paid, model, variant, team, advisor, jobs: { inProgress, delivered, rebilled, legacy, pdiJob, cancelled, elsewhere } };
+  return { D, suffix, scope, branch, otherBranch, paid, pdi, model, variant, team, advisor, customer, vehicle, master, bill, jobs: { inProgress, delivered, rebilled, legacy, pdiJob, cancelled, elsewhere } };
 }
 
 async function run<Q extends { branchId?: string; mode?: ReportMode }>(tx: ReportDb, report: ReportDefinition<Q>, scope: ReportScope, query: Record<string, unknown>) {
@@ -217,6 +220,107 @@ integration('Workshop reports against the database', () => {
       const result = await run(tx, vehiclesToBeReadyReport, w.scope, { date: w.D });
       expect(numbers(result.rows)).toEqual([w.jobs.inProgress.jobNumber]);
       expect(result.summary).toMatchObject({ promised: 1, ready: 0, inWork: 1 });
+    });
+  });
+});
+
+integration('Booking and vehicle analysis reports against the database', () => {
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('lists bookings for the day with requests, estimates and whether they arrived', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      const book = (status: string, bookingStatus: 'BOOKED' | 'CONVERTED' | 'CANCELLED' | 'NO_SHOW', time: string, extra: Partial<Prisma.ServiceAppointmentUncheckedCreateInput> = {}) =>
+        tx.serviceAppointment.create({
+          data: { customerId: w.customer.id, vehicleId: w.vehicle.id, branchId: w.branch.id, scheduledAt: at(w.D, time), status, bookingStatus, serviceTypeId: w.paid.id, bookingNumber: `BK${randomUUID().slice(0, 10)}`, ...extra },
+        });
+      const arrived = await book('Checked In', 'CONVERTED', '08:30', { mileage: 1020 });
+      await tx.appointmentRequest.createMany({
+        data: [
+          { appointmentId: arrived.id, description: 'Oil change', estimatedParts: 20_000, estimatedLabour: 5_000 },
+          { appointmentId: arrived.id, description: 'AC noise', estimatedLabour: 7_500, estimatedOil: 500 },
+        ],
+      });
+      await tx.jobCard.update({ where: { id: w.jobs.inProgress.id }, data: { appointmentId: arrived.id } });
+      await book('Pending', 'BOOKED', '09:00');
+      await book('No Show', 'NO_SHOW', '10:00');
+      await book('Cancelled', 'CANCELLED', '11:00');
+      await book('Pending', 'BOOKED', '12:00', { serviceTypeId: w.pdi.id });
+      await book('Pending', 'BOOKED', '23:30', { scheduledAt: at('2026-10-01', '00:30') });
+
+      const result = await run(tx, serviceBookingReport, w.scope, { date: w.D });
+      expect(result.rows).toHaveLength(4);
+      const first = result.rows[0];
+      expect(first).toMatchObject({ bookingStatus: 'CONVERTED', jobNumber: w.jobs.inProgress.jobNumber, requests: 'AC noise; Oil change', estimatedAmount: 33_000, mileage: 1020 });
+      expect(result.summary).toMatchObject({ total: 4, CONVERTED: 1, BOOKED: 1, NO_SHOW: 1, CANCELLED: 1 });
+      expect(result.groups).toEqual([expect.objectContaining({ key: w.paid.id, totals: { count: 4, arrived: 1, estimatedAmount: 33_000 } })]);
+    });
+  });
+
+  it('counts only visits between the sale date and the first free service', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      const firstFree = await w.master('SERVICE_TYPE', 'F1', { freeService: true, freeServiceNo: 1 });
+      const complaint = await w.master('COMPLAINT', 'AC');
+      await tx.vehicle.update({ where: { id: w.vehicle.id }, data: { saleDate: new Date('2026-03-12T00:00:00Z') } });
+      const mk = (n: string, createdAt: Date, extra: Partial<Prisma.JobCardUncheckedCreateInput> = {}) =>
+        tx.jobCard.create({ data: { jobNumber: `${n}${randomUUID().slice(0, 6)}`, description: 'x', branchId: w.branch.id, vehicleId: w.vehicle.id, customerId: w.customer.id, serviceTypeId: w.paid.id, createdAt, mileage: 640, ...extra } });
+      const early = await mk('EARLY', at('2026-04-02', '09:00'));
+      await tx.jobComplaint.create({ data: { jobCardId: early.id, complaintCodeId: complaint.id, description: 'AC not cooling' } });
+      await mk('SALEDAY', at('2026-03-12', '15:00'));
+      await mk('FREE1', at('2026-05-01', '09:00'), { serviceTypeId: firstFree.id });
+      await mk('AFTER', at('2026-06-01', '09:00'));
+
+      const result = await run(tx, beforeFirstServiceReport, w.scope, { from: '2026-03-01', to: '2026-03-31' });
+      // Fixture jobs from seedWorkshop are dated September, after the first free service.
+      expect(result.rows.map((row) => String(row.jobNumber).slice(0, 5))).toEqual(['EARLY']);
+      expect(result.rows[0]).toMatchObject({ daysSinceSale: 21, requests: 'AC not cooling', saleDate: '2026-03-12' });
+      expect(result.summary).toMatchObject({ vehicles: 1, visits: 1, topRequest: 'AC not cooling' });
+
+      const byComplaint = await run(tx, beforeFirstServiceReport, w.scope, { from: '2026-03-01', to: '2026-03-31', complaint: randomUUID() });
+      expect(byComplaint.rows).toHaveLength(0);
+      const outsideSalePeriod = await run(tx, beforeFirstServiceReport, w.scope, { from: '2026-04-01', to: '2026-04-30' });
+      expect(outsideSalePeriod.rows).toHaveLength(0);
+    });
+  });
+
+  it('groups billed visits by the mileage bands in settings', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      await saveReportSettings(
+        tx,
+        { mileageBands: [{ fromKm: 0, toKm: 5000, label: 'Up to 5,000', active: true }, { fromKm: 5001, toKm: null, label: 'Over 5,000', active: true }] },
+        w.advisor.id,
+      );
+      await tx.jobCard.update({ where: { id: w.jobs.delivered.id }, data: { mileage: 12_000 } });
+      const low = await tx.jobCard.create({ data: { jobNumber: `LOW${randomUUID().slice(0, 6)}`, description: 'x', branchId: w.branch.id, serviceTypeId: w.paid.id, vehicleId: w.vehicle.id, customerId: w.customer.id, mileage: 900, createdAt: at('2026-09-29', '08:00') } });
+      await w.bill(low.id, at('2026-09-29', '12:00'), 10_000);
+      await w.bill(w.jobs.pdiJob.id, at('2026-09-29', '12:00'), 10_000);
+
+      const result = await run(tx, mileageWiseReport, w.scope, { from: '2026-09-29', to: '2026-09-29' });
+      expect(result.groups.map((group) => [group.label, group.count])).toEqual([['Up to 5,000', 1], ['Over 5,000', 1]]);
+      expect(result.breakdown).toEqual([expect.objectContaining({ label: 'Up to 5,000', count: 1 }), expect.objectContaining({ label: 'Over 5,000', count: 1 })]);
+      const ranged = await run(tx, mileageWiseReport, w.scope, { from: '2026-09-29', to: '2026-09-29', mileageFrom: '1000' });
+      expect(ranged.rows.map((row) => row.mileage)).toEqual([12_000]);
+    });
+  });
+
+  it('saves report settings and uses the due-soon threshold when none is given', async () => {
+    await inRollback(async (tx) => {
+      const w = await seedWorkshop(tx);
+      await expect(
+        saveReportSettings(tx, { mileageBands: [{ fromKm: 0, toKm: 1000, label: 'A', active: true }, { fromKm: 900, toKm: null, label: 'B', active: true }] }, w.advisor.id),
+      ).rejects.toThrow('overlaps');
+      await saveReportSettings(tx, { dueSoonHours: 30 }, w.advisor.id);
+      expect((await getReportSettings(tx)).dueSoonHours).toBe(30);
+      const now = Date.now();
+      const due = await tx.jobCard.create({ data: { jobNumber: `DUE${randomUUID().slice(0, 6)}`, description: 'x', branchId: w.branch.id, serviceTypeId: w.paid.id, createdAt: new Date(now - 3_600_000), promisedAt: new Date(now + 20 * 3_600_000) } });
+      const today = new Date(now).toISOString().slice(0, 10);
+      const result = await run(tx, workshopProgressReport, w.scope, { from: '2026-09-28', to: today });
+      expect(result.rows.find((row) => row.jobNumber === due.jobNumber)?.promiseState).toBe('DUE_SOON');
+      expect(result.summary?.dueSoonHours).toBe(30);
     });
   });
 });

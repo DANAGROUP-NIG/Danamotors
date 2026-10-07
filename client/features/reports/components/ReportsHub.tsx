@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, FileText, Search, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronRight, FileText, Search, Settings2, Wallet, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ const ENTRIES: HubEntry[] = [
 ];
 
 export function ReportsHub() {
-  const { hasAnyPermission } = useAuth();
+  const { hasAnyPermission, hasPermission } = useAuth();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ReportCategory | "All">("All");
 
@@ -80,6 +80,13 @@ export function ReportsHub() {
           <h1 className="text-xl font-bold text-foreground">Reports</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Workshop, billing and finance reports for your branch.</p>
         </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        {hasPermission(REPORT_PERMISSIONS.SETTINGS) && (
+          <Link href="/settings/reports" className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-semibold hover:bg-muted">
+            <Settings2 className="size-4" />
+            Report settings
+          </Link>
+        )}
         <label className="relative w-full sm:w-72">
           <span className="sr-only">Search reports</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -90,6 +97,7 @@ export function ReportsHub() {
             className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </label>
+        </div>
       </div>
 
       {categories.length > 1 && (

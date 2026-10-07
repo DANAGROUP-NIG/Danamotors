@@ -351,6 +351,17 @@ model ServiceAppointment {
   status String @default("Pending")
   source String @default("WalkIn")
 
+  // Booking number (BKYYYY######) shown on the service booking report.
+  bookingNumber String?              @unique
+  // The workshop service type (SERVICE_TYPE master) the vehicle is booked for.
+  serviceTypeId String?
+  serviceType   WorkshopMaster?      @relation("AppointmentServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  // Odometer reading given at booking (or recorded at check-in).
+  mileage       Int?
+  // Reporting status, kept in step with `status` and job opening.
+  bookingStatus BookingStatus        @default(BOOKED)
+  requests      AppointmentRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -364,6 +375,31 @@ model ServiceAppointment {
   @@index([customerId])
   @@index([vehicleId])
   @@index([branchId, scheduledAt])
+  @@index([serviceTypeId])
+}
+
+enum BookingStatus {
+  BOOKED
+  // A job card was opened from the booking.
+  CONVERTED
+  CANCELLED
+  NO_SHOW
+}
+
+/// What the customer asked for when booking (legacy booking request grid).
+model AppointmentRequest {
+  id              String             @id @default(uuid())
+  appointmentId   String
+  appointment     ServiceAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  complaintCodeId String?
+  complaintCode   WorkshopMaster?    @relation("AppointmentRequestComplaint", fields: [complaintCodeId], references: [id], onDelete: Restrict)
+  description     String
+  estimatedParts  Float              @default(0)
+  estimatedLabour Float              @default(0)
+  estimatedOil    Float              @default(0)
+  createdAt       DateTime           @default(now())
+
+  @@index([appointmentId])
 }
 
 // ============================================================
@@ -414,6 +450,8 @@ model JobCard {
   deliveredAt        DateTime?
   gatePassNumber     String?                @unique
   lateReasonIds      String[]               @default([])
+  // Coupon from the free service booklet (free service jobs).
+  freeServiceCouponNo String?
   creditApprovedById String?
   creditApprovedBy   User?                  @relation("JobCreditApprover", fields: [creditApprovedById], references: [id], onDelete: Restrict)
   complaints         JobComplaint[]
@@ -1186,6 +1224,29 @@ model DocumentSequence {
   updatedAt DateTime @updatedAt
 }
 
+/// Odometer bands for the "vehicles visited, mileage wise" report (Settings → Reports).
+model MileageBand {
+  id        String   @id @default(uuid())
+  fromKm    Int
+  /// null = and above.
+  toKm      Int?
+  label     String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
+/// Report thresholds, e.g. key "progress.dueSoonHours".
+model ReportSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
 // ============================================================
 // PAYMENT
 // ============================================================
@@ -1496,6 +1557,8 @@ model WorkshopMaster {
   category         String?
   chargedTo        String           @default("CUSTOMER")
   freeService      Boolean          @default(false)
+  // 1st, 2nd, 3rd... free service, for SERVICE_TYPE masters flagged freeService.
+  freeServiceNo    Int?
   parentId         String?
   parent           WorkshopMaster?  @relation("MasterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children         WorkshopMaster[] @relation("MasterHierarchy")
@@ -1513,6 +1576,8 @@ model WorkshopMaster {
   vehicles         Vehicle[]        @relation("VehicleCatalogue")
   colouredVehicles Vehicle[]        @relation("VehicleColour")
   labourRates      LabourRate[]
+  appointmentServiceTypes      ServiceAppointment[] @relation("AppointmentServiceType")
+  appointmentRequestComplaints AppointmentRequest[] @relation("AppointmentRequestComplaint")
 
   @@unique([kind, code])
   @@index([kind, active])

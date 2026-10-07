@@ -36,6 +36,7 @@ export type PickerRecord = {
   durationMins?: number | null;
   price?: number;
   serviceId?: string | null;
+  serviceTypeId?: string | null;
   parentId?: string | null;
   currency?: string;
   lines?: { type: string; description: string; amount: number }[];

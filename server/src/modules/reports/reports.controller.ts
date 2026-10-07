@@ -8,6 +8,7 @@ import { resolveReportScope } from './core/scope';
 import { applyMode } from './core/shape';
 import type { ReportDb, ReportDefinition, ReportMode, ReportResponse } from './core/types';
 import { listLookup, type LookupSource } from './lookups';
+import { getReportSettings, saveReportSettings } from './settings';
 
 const STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '30s'";
 
@@ -81,6 +82,25 @@ export async function lookupHandler(req: Request, res: Response, next: NextFunct
       return listLookup(tx, scope, req.params.source as LookupSource);
     });
     res.status(200).json({ status: 'success', statusCode: 200, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getSettingsHandler(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    res.status(200).json({ status: 'success', statusCode: 200, data: await getReportSettings(prisma) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function saveSettingsHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) throw new UnauthorizedError();
+    const userId = req.user.userId;
+    const data = await prisma.$transaction((tx) => saveReportSettings(tx, req.body, userId));
+    res.status(200).json({ status: 'success', statusCode: 200, message: 'Report settings saved', data });
   } catch (error) {
     next(error);
   }

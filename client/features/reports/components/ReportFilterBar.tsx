@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Info, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/forms/DateInput";
@@ -67,6 +67,36 @@ function FilterField({ filterKey, value, onChange, branchId, modelIds }: {
   );
 }
 
+/** From/to number filter with an "All" toggle (blank = no limit). */
+function RangeField({ label, unit, from, to, onChange }: { label: string; unit?: string; from: string; to: string; onChange: (from: string, to: string) => void }) {
+  const [open, setOpen] = useState(from !== "" || to !== "");
+  const all = !open && from === "" && to === "";
+  const box = "h-10 w-full min-w-0 rounded-md border border-border px-3 text-sm tabular-nums outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/60";
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">{label}</span>
+        <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            className="size-4 cursor-pointer rounded border-border accent-[var(--primary)]"
+            checked={all}
+            onChange={(event) => {
+              setOpen(!event.target.checked);
+              if (event.target.checked) onChange("", "");
+            }}
+          />
+          All
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input type="number" min={0} disabled={all} aria-label={`${label} from`} placeholder={all ? "Any" : `From${unit ? ` (${unit})` : ""}`} className={box} value={from} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""), to)} />
+        <input type="number" min={0} disabled={all} aria-label={`${label} to`} placeholder={all ? "Any" : `To${unit ? ` (${unit})` : ""}`} className={box} value={to} onChange={(event) => onChange(from, event.target.value.replace(/\D/g, ""))} />
+      </div>
+    </div>
+  );
+}
+
 interface ReportFilterBarProps {
   config: ReportConfig;
   draft: ReportParams;
@@ -85,6 +115,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
   const branches = useBranchStore((state) => state.branches);
   const { period } = config;
   const lookupBranch = canChooseBranch ? draft.branchId : undefined;
+  const rangeOptions = (config.options ?? []).flatMap((option) => (option.kind === "range" ? [option] : []));
 
   const setOption = (key: string, value: string) => onChange({ ...draft, options: { ...draft.options, [key]: value } });
   const setFilter = (key: FilterKey, value: string[] | undefined) => {
@@ -173,9 +204,19 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
         </div>
       </Section>
 
-      {config.filters.length > 0 && (
+      {(config.filters.length > 0 || rangeOptions.length > 0) && (
         <Section label="Filters">
           <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+            {rangeOptions.map((option) => (
+              <RangeField
+                key={option.key}
+                label={option.label}
+                unit={option.unit}
+                from={draft.options[option.fromKey] ?? ""}
+                to={draft.options[option.toKey] ?? ""}
+                onChange={(from, to) => onChange({ ...draft, options: { ...draft.options, [option.fromKey]: from, [option.toKey]: to } })}
+              />
+            ))}
             {config.filters.map((key) => (
               <FilterField
                 key={key}
@@ -193,6 +234,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
       <Section label="Options">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           {(config.options ?? []).map((option) => {
+            if (option.kind === "range") return null;
             if (option.kind === "checkbox")
               return (
                 <label key={option.key} className="inline-flex cursor-pointer items-center gap-2 text-sm">

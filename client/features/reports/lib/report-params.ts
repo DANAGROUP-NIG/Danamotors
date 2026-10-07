@@ -20,7 +20,10 @@ export function defaultParams(config: ReportConfig): ReportParams {
   const { from, to } = presetRange(config.period.defaultPreset);
   const options: Record<string, string> = {};
   for (const option of config.options ?? []) {
-    options[option.key] = option.kind === "checkbox" ? String(Boolean(option.default)) : String(option.default);
+    if (option.kind === "range") {
+      options[option.fromKey] = "";
+      options[option.toKey] = "";
+    } else options[option.key] = option.kind === "checkbox" ? String(Boolean(option.default)) : String(option.default);
   }
   if (config.hasMode) options.mode = config.defaultMode ?? "both";
   if (config.period.basis) options[config.period.basis.key] = config.period.basis.default;
@@ -46,6 +49,13 @@ export function parseParams(config: ReportConfig, search: URLSearchParams): Repo
 
   const options = { ...base.options };
   for (const option of config.options ?? []) {
+    if (option.kind === "range") {
+      for (const key of [option.fromKey, option.toKey]) {
+        const value = search.get(key);
+        if (value && /^\d{1,9}$/.test(value)) options[key] = value;
+      }
+      continue;
+    }
     const raw = search.get(option.key);
     if (raw === null) continue;
     if (option.kind === "checkbox") options[option.key] = String(raw === "true");
@@ -78,7 +88,7 @@ export function toSearch(config: ReportConfig, params: ReportParams): string {
     search.set("to", params.to);
   } else search.set("date", params.from);
   for (const key of config.filters) if (params.filters[key]?.length) search.set(key, params.filters[key]!.join(","));
-  for (const [key, value] of Object.entries(params.options)) search.set(key, value);
+  for (const [key, value] of Object.entries(params.options)) if (value !== "") search.set(key, value);
   if (params.branchId) search.set("branchId", params.branchId);
   return search.toString();
 }
@@ -92,7 +102,8 @@ export function toApiQuery(config: ReportConfig, params: ReportParams): Record<s
     query.to = params.to;
   } else query.date = params.from;
   for (const key of config.filters) if (params.filters[key]?.length) query[key] = params.filters[key]!.join(",");
-  for (const [key, value] of Object.entries(params.options)) if (!local.has(key)) query[key] = value;
+  // Blank values (e.g. an "All" range) are left out.
+  for (const [key, value] of Object.entries(params.options)) if (!local.has(key) && value !== "") query[key] = value;
   if (params.branchId) query.branchId = params.branchId;
   return query;
 }
@@ -104,6 +115,12 @@ export function validateParams(config: ReportConfig, params: ReportParams): stri
     const span = daysBetween(params.from, params.to);
     if (span < 0) return "The end date must be on or after the start date.";
     if (span + 1 > MAX_RANGE_DAYS) return `The period cannot be longer than ${MAX_RANGE_DAYS} days.`;
+  }
+  for (const option of config.options ?? []) {
+    if (option.kind !== "range") continue;
+    const from = params.options[option.fromKey];
+    const to = params.options[option.toKey];
+    if (from !== "" && to !== "" && Number(to) < Number(from)) return `${option.label}: the upper value must be at least the lower value.`;
   }
   return null;
 }

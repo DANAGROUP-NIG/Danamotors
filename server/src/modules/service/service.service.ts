@@ -12,6 +12,16 @@ import { ROLES } from '../../shared/constants/roles';
 import { NotificationService } from '../notification/notification.service';
 import { assertMileage } from '../warranty/warranty.logic';
 import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
+import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
+
+/** The booked service type and the complaint codes on booking requests must be active masters. */
+async function assertBookingMasters(db: Prisma.TransactionClient | typeof prisma, serviceTypeId?: string, requests?: AppointmentRequestInput[]) {
+  if (serviceTypeId && !(await db.workshopMaster.findFirst({ where: { id: serviceTypeId, kind: 'SERVICE_TYPE', active: true }, select: { id: true } })))
+    throw new BadRequestError('Select an active service type');
+  const codes = Array.from(new Set((requests ?? []).map((request) => request.complaintCodeId).filter((code): code is string => Boolean(code))));
+  if (codes.length && (await db.workshopMaster.count({ where: { id: { in: codes }, kind: 'COMPLAINT', active: true } })) !== codes.length)
+    throw new BadRequestError('Select active complaint codes for the booking requests');
+}
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -20,7 +30,7 @@ import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warran
  * - SuperAdmin users can bypass this map (see updateAppointment).
  */
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
-  'Pending':           ['Checked In', 'Cancelled'],
+  'Pending':           ['Checked In', 'No Show', 'Cancelled'],
   'Checked In':        ['Inspection', 'Cancelled'],
   'Inspection':        ['Awaiting Approval', 'Cancelled'],
   'Awaiting Approval': ['In Repair', 'Cancelled'],
@@ -29,6 +39,8 @@ export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   'Ready':             ['Completed'],
   'Completed':         [],
   'Cancelled':         [],
+  // The vehicle did not come in; book again if the customer still wants the service.
+  'No Show':           [],
 };
 
 export class ServiceService {
@@ -48,6 +60,9 @@ export class ServiceService {
     notes?: string;
     status?: string;
     createdById?: string;
+    serviceTypeId?: string;
+    mileage?: number;
+    requests?: AppointmentRequestInput[];
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) throw new NotFoundError('Customer not found');
@@ -67,7 +82,7 @@ export class ServiceService {
       where: {
         customerId: data.customerId,
         vehicleId: data.vehicleId,
-        status: { notIn: ['Closed', 'Cancelled', 'Completed'] },
+        status: { notIn: ['Closed', 'Cancelled', 'Completed', 'No Show'] },
       },
     });
     if (activeAppointment) {
@@ -76,6 +91,7 @@ export class ServiceService {
       );
     }
 
+    await assertBookingMasters(prisma, data.serviceTypeId, data.requests);
     const appointment = await this.serviceRepository.createAppointment({
       customerId: data.customerId,
       vehicleId: data.vehicleId,
@@ -87,6 +103,9 @@ export class ServiceService {
       notes: data.notes,
       status: data.status ?? 'Pending',
       source: 'WalkIn',
+      serviceTypeId: data.serviceTypeId,
+      mileage: data.mileage,
+      requests: data.requests,
     });
 
     const notificationService = new NotificationService();
@@ -166,6 +185,8 @@ export class ServiceService {
     mileage?: number;
     warrantyAcknowledged?: boolean;
     acknowledgedCampaignIds?: string[];
+    serviceTypeId?: string | null;
+    requests?: AppointmentRequestInput[];
   }) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
@@ -231,6 +252,11 @@ export class ServiceService {
         });
         checkInCampaigns = openCampaigns.map((c) => ({ code: c.code, title: c.title }));
       }
+      await assertBookingMasters(tx, data.serviceTypeId ?? undefined, data.requests);
+      if (data.requests !== undefined) {
+        await tx.appointmentRequest.deleteMany({ where: { appointmentId: id } });
+        if (data.requests.length) await tx.appointmentRequest.createMany({ data: data.requests.map((request) => ({ ...request, appointmentId: id })) });
+      }
       return tx.serviceAppointment.update({
         where: { id },
         data: {
@@ -238,6 +264,10 @@ export class ServiceService {
           durationMins: data.durationMins,
           notes: data.notes,
           status: data.status,
+          serviceTypeId: data.serviceTypeId,
+          // The odometer reading taken at check-in replaces the one given when booking.
+          mileage: data.mileage,
+          ...(data.status !== undefined && { bookingStatus: bookingStatusFor(data.status, appointment.bookingStatus) }),
         },
       });
     });

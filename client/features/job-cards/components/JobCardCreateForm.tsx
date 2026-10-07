@@ -67,6 +67,8 @@ function defaults(
   return {
     branchName,
     serviceId: "",
+    serviceTypeId: "",
+    freeServiceCouponNo: "",
     complaints: [emptyRequest()],
 
     tyres: Array.from(
@@ -291,6 +293,11 @@ export function JobCardCreateForm({
         shouldValidate: true,
       });
     }
+
+    // The booking's workshop service type carries over to the job.
+    if (record.serviceTypeId) {
+      setValue("serviceTypeId", record.serviceTypeId, { shouldDirty: true });
+    }
   };
 
   const applyEstimate = () => {
@@ -418,6 +425,8 @@ export function JobCardCreateForm({
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
           teamId: values.teamId || undefined,
+          serviceTypeId: values.serviceTypeId || undefined,
+          freeServiceCouponNo: values.freeServiceCouponNo?.trim() || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,
@@ -481,7 +490,7 @@ export function JobCardCreateForm({
   );
 
   const masterPicker = (
-    name: "bayId" | "teamId",
+    name: "bayId" | "teamId" | "serviceTypeId",
     label: string,
     kind: string,
     required = false,
@@ -804,6 +813,12 @@ export function JobCardCreateForm({
                     />
                   )}
                 />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {masterPicker("serviceTypeId", "Service type", "SERVICE_TYPE")}
+                  <OpeningField label="Free service coupon no" error={errors.freeServiceCouponNo?.message}>
+                    <input className={openingInput} placeholder="Only for free services" {...register("freeServiceCouponNo")} />
+                  </OpeningField>
+                </div>
                 {vehicle && (
                   <p className="mt-3 text-sm text-muted-foreground">
                     Previous odometer:{" "}

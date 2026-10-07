@@ -1,4 +1,6 @@
 import prisma from '../../prisma/client';
+import { nextDocumentNumber } from '../finance/document-number';
+import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
 import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
@@ -21,9 +23,21 @@ export class ServiceRepository {
     notes?: string;
     status?: string;
     source?: string;
+    serviceTypeId?: string;
+    mileage?: number;
+    requests?: AppointmentRequestInput[];
   }): Promise<ServiceAppointment> {
-    return prisma.serviceAppointment.create({
-      data: { ...data, source: data.source ?? 'WalkIn' },
+    const { requests, ...fields } = data;
+    // Every booking gets a number (BKYYYY######) for the service booking report.
+    return prisma.$transaction(async (tx) =>
+      tx.serviceAppointment.create({
+      data: {
+        ...fields,
+        source: data.source ?? 'WalkIn',
+        bookingNumber: await nextDocumentNumber(tx, 'BOOKING'),
+        bookingStatus: bookingStatusFor(data.status),
+        ...(requests?.length ? { requests: { create: requests } } : {}),
+      },
       include: {
         service: {
           select: {
@@ -35,8 +49,9 @@ export class ServiceRepository {
             price: true,
           },
         },
+        requests: true,
       },
-    });
+    }));
   }
 
   async listAppointments(params: {
@@ -154,6 +169,8 @@ export class ServiceRepository {
     return prisma.serviceAppointment.findUnique({
       where: { id },
       include: {
+        serviceType: { select: { id: true, code: true, description: true, freeService: true } },
+        requests: { include: { complaintCode: { select: { id: true, code: true, description: true } } }, orderBy: { createdAt: 'asc' } },
         customer: {
           select: {
             id: true,

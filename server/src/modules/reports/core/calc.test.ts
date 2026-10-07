@@ -1,4 +1,4 @@
-import { daysOpen, promiseState, statusAsOn } from './calc';
+import { daysOpen, isBeforeFirstService, mileageBandFor, promiseState, statusAsOn } from './calc';
 
 const t = (iso: string) => new Date(iso);
 const asOf = t('2026-09-30T23:00:00Z');
@@ -73,5 +73,43 @@ describe('daysOpen', () => {
   it('counts whole days and never goes negative', () => {
     expect(daysOpen(t('2026-09-22T08:00:00Z'), t('2026-09-30T23:00:00Z'))).toBe(8);
     expect(daysOpen(t('2026-09-30T08:00:00Z'), t('2026-09-30T07:00:00Z'))).toBe(0);
+  });
+});
+
+describe('mileageBandFor', () => {
+  const bands = [
+    { id: 'a', label: '0–1,000 km', fromKm: 0, toKm: 1000 },
+    { id: 'b', label: '1,001–5,000 km', fromKm: 1001, toKm: 5000 },
+    { id: 'c', label: '5,000+ km', fromKm: 5001, toKm: null },
+  ];
+
+  it('puts a mileage in the band that contains it, edges included', () => {
+    expect(mileageBandFor(0, bands)?.id).toBe('a');
+    expect(mileageBandFor(1000, bands)?.id).toBe('a');
+    expect(mileageBandFor(1001, bands)?.id).toBe('b');
+    expect(mileageBandFor(5000, bands)?.id).toBe('b');
+    expect(mileageBandFor(250_000, bands)?.id).toBe('c');
+  });
+
+  it('returns null for unrecorded mileage or a gap between bands', () => {
+    expect(mileageBandFor(null, bands)).toBeNull();
+    expect(mileageBandFor(undefined, bands)).toBeNull();
+    expect(mileageBandFor(1500, [bands[0], { ...bands[1], fromKm: 2000 }])).toBeNull();
+  });
+});
+
+describe('isBeforeFirstService', () => {
+  const job = (iso: string, localDate: string) => ({ at: t(iso), localDate });
+
+  it('counts jobs after the sale date and before the first free service', () => {
+    expect(isBeforeFirstService(job('2026-04-02T09:00:00Z', '2026-04-02'), '2026-03-12', t('2026-05-01T09:00:00Z'))).toBe(true);
+    expect(isBeforeFirstService(job('2026-04-02T09:00:00Z', '2026-04-02'), '2026-03-12', null)).toBe(true);
+  });
+
+  it('excludes jobs on or before the sale date, and from the first free service on', () => {
+    expect(isBeforeFirstService(job('2026-03-12T09:00:00Z', '2026-03-12'), '2026-03-12', null)).toBe(false);
+    expect(isBeforeFirstService(job('2026-05-01T09:00:00Z', '2026-05-01'), '2026-03-12', t('2026-05-01T09:00:00Z'))).toBe(false);
+    expect(isBeforeFirstService(job('2026-06-01T09:00:00Z', '2026-06-01'), '2026-03-12', t('2026-05-01T09:00:00Z'))).toBe(false);
+    expect(isBeforeFirstService(job('2026-04-02T09:00:00Z', '2026-04-02'), null, null)).toBe(false);
   });
 });

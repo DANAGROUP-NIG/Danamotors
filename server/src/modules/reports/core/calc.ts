@@ -104,3 +104,27 @@ export function promiseState(input: PromiseInput, now: Date, dueSoonHours: numbe
   if (minutes <= dueSoonHours * 60) return { state: 'DUE_SOON', minutes };
   return { state: 'ON_TIME', minutes };
 }
+
+export interface Band {
+  id: string;
+  label: string;
+  fromKm: number;
+  /** null = and above. */
+  toKm: number | null;
+}
+
+/** The band a mileage falls in (bands checked in order), or null when unrecorded or outside every band. */
+export function mileageBandFor<B extends Band>(mileage: number | null | undefined, bands: B[]): B | null {
+  if (mileage === null || mileage === undefined || !Number.isFinite(mileage)) return null;
+  return bands.find((band) => mileage >= band.fromKm && (band.toKm === null || mileage <= band.toKm)) ?? null;
+}
+
+/**
+ * "Reported before first service": the job's local date is after the sale date, and it was
+ * opened before the vehicle's first free service job (or there has been none yet).
+ */
+export function isBeforeFirstService(job: { at: Date; localDate: string }, saleDate: string | null, firstServiceAt: Date | null): boolean {
+  if (!saleDate) return false;
+  if (job.localDate <= saleDate) return false;
+  return !firstServiceAt || job.at < firstServiceAt;
+}

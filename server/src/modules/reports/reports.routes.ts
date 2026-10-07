@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission } from '../../middleware/authorize';
 import { validateRequest } from '../../middleware/requestValidator';
-import { lookupHandler, reportHandler, requireAnyReportPermission } from './reports.controller';
+import { PERMISSIONS } from '../../shared/constants/roles';
+import { getSettingsHandler, lookupHandler, reportHandler, requireAnyReportPermission, saveSettingsHandler } from './reports.controller';
+import { saveSettingsSchema } from './settings';
 import { REPORTS } from './reports.registry';
 import { lookupSchema } from './lookups';
 
@@ -12,6 +14,8 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/lookups/:source', requireAnyReportPermission, validateRequest(lookupSchema), lookupHandler);
+router.get('/settings', requireAnyReportPermission, getSettingsHandler);
+router.put('/settings', requirePermission(PERMISSIONS.REPORT_SETTINGS), validateRequest(saveSettingsSchema), saveSettingsHandler);
 
 for (const definition of REPORTS) {
   router.get(

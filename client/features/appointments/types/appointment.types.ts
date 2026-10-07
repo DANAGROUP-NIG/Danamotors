@@ -7,7 +7,20 @@ export type AppointmentStatus =
   | "Quality Check"
   | "Ready"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | "No Show";
+
+export type BookingStatus = "BOOKED" | "CONVERTED" | "CANCELLED" | "NO_SHOW";
+
+export type AppointmentRequest = {
+  id?: string;
+  complaintCodeId?: string | null;
+  complaintCode?: { id: string; code: string; description: string } | null;
+  description: string;
+  estimatedParts?: number;
+  estimatedLabour?: number;
+  estimatedOil?: number;
+};
 
 
   export type AppointmentSource = 'WalkIn' | 'OnlineBooking';
@@ -50,6 +63,12 @@ export type Appointment = {
     email: string;
   } | null;
   jobCards?: unknown[];
+  bookingNumber?: string | null;
+  bookingStatus?: BookingStatus;
+  serviceTypeId?: string | null;
+  serviceType?: { id: string; code: string; description: string; freeService?: boolean } | null;
+  mileage?: number | null;
+  requests?: AppointmentRequest[];
 };
 
 export type CreateAppointmentPayload = {
@@ -61,6 +80,9 @@ export type CreateAppointmentPayload = {
   durationMins?: number;
   notes?: string;
   createdById?: string;
+  serviceTypeId?: string;
+  mileage?: number;
+  requests?: AppointmentRequest[];
 };
 
 export type UpdateAppointmentPayload = {
@@ -72,6 +94,8 @@ export type UpdateAppointmentPayload = {
   mileage?: number;
   warrantyAcknowledged?: boolean;
   acknowledgedCampaignIds?: string[];
+  serviceTypeId?: string | null;
+  requests?: AppointmentRequest[];
 };
 
 export type AppointmentListResponse = {

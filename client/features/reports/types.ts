@@ -87,7 +87,19 @@ export type OptionDef = (
   | { kind: "checkbox"; key: string; label: string; default?: boolean }
   | { kind: "segmented"; key: string; label?: string; choices: { value: string; label: string }[]; default: string }
   | { kind: "select"; key: string; label: string; choices: { value: string; label: string }[]; default: string }
-  | { kind: "number"; key: string; label: string; suffix?: string; min: number; max: number; default: number }
+  | {
+      kind: "number";
+      key: string;
+      label: string;
+      suffix?: string;
+      min: number;
+      max: number;
+      default: number;
+      /** Start from this report setting (Settings → Reports) instead of `default`. */
+      settingDefault?: "dueSoonHours";
+    }
+  /** A from/to numeric filter with an "All" toggle (e.g. mileage). Shown with the filters. */
+  | { kind: "range"; key: string; label: string; fromKey: string; toKey: string; unit?: string }
 ) & {
   /** Display-only option: kept in the URL but not sent to the server (e.g. print address). */
   local?: boolean;

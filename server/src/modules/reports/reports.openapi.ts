@@ -65,6 +65,42 @@ export function buildReportPaths(reports: ReportDefinition[]): Record<string, un
     },
   };
 
+  paths['/reports/settings'] = {
+    get: {
+      tags: ['Reports'],
+      summary: 'Report settings: mileage bands and the due-soon threshold',
+      description: 'Requires any report permission.',
+      security: [{ BearerAuth: [] }],
+      responses: {
+        200: {
+          description: 'Settings',
+          content: { 'application/json': { schema: responseSchema({ mileageBands: [{ id: 'uuid', fromKm: 0, toKm: 1000, label: '0–1,000 km', active: true, sortOrder: 1 }], dueSoonHours: 2 }) } },
+        },
+      },
+    },
+    put: {
+      tags: ['Reports'],
+      summary: 'Save report settings',
+      description: 'Requires `report:settings`. mileageBands replaces the whole list (ascending, no overlaps, only the last open-ended).',
+      security: [{ BearerAuth: [] }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                mileageBands: { type: 'array', items: { type: 'object', properties: { fromKm: { type: 'integer' }, toKm: { type: 'integer', nullable: true }, label: { type: 'string' }, active: { type: 'boolean' } } } },
+                dueSoonHours: { type: 'integer', minimum: 0, maximum: 72 },
+              },
+            },
+          },
+        },
+      },
+      responses: { 200: { description: 'Saved settings' }, 400: { description: 'Overlapping or out-of-order bands' }, 403: { description: 'Missing report:settings' } },
+    },
+  };
+
   for (const definition of reports) {
     const params = [
       ...dateParams(definition),

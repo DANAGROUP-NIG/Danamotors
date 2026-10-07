@@ -193,7 +193,7 @@ export class JobCardWorkflowService {
             "Appointment must match the vehicle and branch",
           );
 
-        if (["Cancelled", "Completed", "Closed"].includes(appointment.status))
+        if (["Cancelled", "Completed", "Closed", "No Show"].includes(appointment.status))
           throw new BadRequestError("Appointment is no longer open");
 
         if (
@@ -219,6 +219,7 @@ export class JobCardWorkflowService {
       if (!service) throw new BadRequestError("Select an active service");
 
       if (data.teamId) await requireMaster(tx, data.teamId, "TEAM");
+      if (data.serviceTypeId) await requireMaster(tx, data.serviceTypeId, "SERVICE_TYPE");
 
       await requireStaff(
         tx,
@@ -397,6 +398,10 @@ export class JobCardWorkflowService {
         },
       });
 
+      // The booking arrived: it now counts as converted on the service booking report.
+      if (data.appointmentId)
+        await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: "CONVERTED" } });
+
       if (openCampaigns.length > 0) {
         await tx.jobCardCampaign.createMany({
           data: openCampaigns.map((c) => ({
@@ -479,9 +484,13 @@ export class JobCardWorkflowService {
           data.description !== undefined ||
           data.observations !== undefined ||
           data.workDone !== undefined ||
-          data.serviceCharge !== undefined)
+          data.serviceCharge !== undefined ||
+          data.serviceTypeId !== undefined ||
+          data.freeServiceCouponNo !== undefined)
       )
         throw new BadRequestError("Billed job cards can only be delivered");
+
+      if (data.serviceTypeId) await requireMaster(tx, data.serviceTypeId, "SERVICE_TYPE");
 
       const now = new Date();
 
@@ -490,6 +499,8 @@ export class JobCardWorkflowService {
         observations: data.observations,
         workDone: data.workDone,
         serviceCharge: data.serviceCharge,
+        serviceTypeId: data.serviceTypeId,
+        freeServiceCouponNo: data.freeServiceCouponNo === undefined ? undefined : data.freeServiceCouponNo || null,
         ...(data.serviceCharge !== undefined ? { estimatedCost: [current.estimatedParts, current.estimatedOil, current.estimatedLabour, data.serviceCharge].reduce<number>((sum, value) => sum + Math.round((value ?? 0) * 100), 0) / 100 } : {}),
       };
 
