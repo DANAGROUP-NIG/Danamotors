@@ -35,7 +35,7 @@ export function FinancePage() {
         title="Finance"
         description="Revenue, invoicing, and payment management."
       />
-      <section className="rounded-xl border bg-background p-5"><h2 className="font-semibold">Receipts</h2><div className="mt-3 flex flex-wrap gap-4 text-sm">{hasPermission("receipt:create") && <Link className="font-medium text-primary hover:underline" href="/payments">Payment receipt</Link>}{hasPermission("receipt:adjust") && <Link className="font-medium text-primary hover:underline" href="/finance/receipts/advance-adjustment">Advance adjustment</Link>}</div></section>
+      <section className="rounded-xl border bg-background p-5"><h2 className="font-semibold">Receipts</h2><div className="mt-3 flex flex-wrap gap-4 text-sm">{hasPermission("receipt:create") && <Link className="font-medium text-primary hover:underline" href="/payments">Payment receipt</Link>}{hasPermission("receipt:adjust") && <Link className="font-medium text-primary hover:underline" href="/finance/receipts/advance-adjustment">Advance adjustment</Link>}{["debit","credit"].map(kind=>(hasPermission(kind+"note:read")||hasPermission(kind+"note:create"))&&<Link key={kind} className="font-medium text-primary hover:underline" href={"/finance/receipts/"+kind+"-notes"}>{kind==="debit"?"Debit Note":"Credit Note"}</Link>)}</div></section>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FINANCE_CARDS.map(({ title, href, description }) => (
           <Link

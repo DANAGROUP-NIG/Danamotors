@@ -72,3 +72,5 @@ export class PartyReportController{
   if(!count)await write(res,'<p>No records match these filters.</p>');res.end('</body></html>');
  }catch(e){if(res.headersSent)res.destroy(e instanceof Error?e:undefined);else next(e);}};
 }
+
+export { write as writeReport };

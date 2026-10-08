@@ -125,6 +125,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     permissions: [
+      "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create", "report:debit-note-register", "report:credit-note-register",
       "invoice:read",
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
@@ -176,7 +177,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        permissions: ["invoice:read"],
+        permissions: ["invoice:read", "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create"],
       },
       {
         label: "Advance Adjustment",
@@ -218,7 +219,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill"],
+        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
       },
     ],
   },

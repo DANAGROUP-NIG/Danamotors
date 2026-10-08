@@ -1,3 +1,5 @@
+import { PartyNoteController, requireNoteCreate, requireNoteRegister, requireNoteRead, requireAnyNoteCreate } from './party-note.controller';
+import { createPartyNoteSchema, noteIdSchema, cancelPartyNoteSchema, noteRegisterSchema, noteReceiptQuerySchema, notePartyQuerySchema, noteLedgerQuerySchema } from './party-note.validation';
 import { z } from 'zod';
 import { PartyReportController, requirePartyReport, requireAnyPartyReport } from './party-report.controller';
 import { partyReportSchema, reportSettingsSchema, reportPartySearchSchema } from './party-report.validation';
@@ -33,6 +35,21 @@ const router = Router();
 const controller = new FinanceController();
 
 router.use(authMiddleware);
+
+const partyNotes=new PartyNoteController();
+router.get('/party-notes/parties', requireAnyNoteCreate, validateRequest(notePartyQuerySchema), partyNotes.parties);
+router.get('/party-notes/customers/:id', requireAnyNoteCreate, validateRequest(noteIdSchema), partyNotes.customer);
+router.get('/party-notes/receipts', requireAnyNoteCreate, validateRequest(noteReceiptQuerySchema), partyNotes.receipts);
+router.get('/party-notes/ledgers', requireAnyNoteCreate, validateRequest(noteLedgerQuerySchema), partyNotes.ledgers);
+router.get('/party-notes/register/export', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.export);
+router.get('/party-notes/register/print', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.printRegister);
+router.get('/party-notes/register', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.register);
+router.get('/party-notes', requireNoteRead, validateRequest(noteRegisterSchema), partyNotes.register);
+router.post('/party-notes', requireNoteCreate, validateRequest(createPartyNoteSchema), partyNotes.create);
+router.get('/party-notes/:id/print', validateRequest(noteIdSchema), partyNotes.print);
+router.post('/party-notes/:id/cancel', validateRequest(cancelPartyNoteSchema), partyNotes.cancel);
+router.get('/party-notes/:id', validateRequest(noteIdSchema), partyNotes.get);
+
 const partyReports = new PartyReportController();
 router.get('/party-reports/parties', requireAnyPartyReport, validateRequest(reportPartySearchSchema), partyReports.search);
 router.get('/party-reports/export', requirePartyReport, validateRequest(partyReportSchema), partyReports.export);
@@ -350,7 +367,7 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *       - in: query
  *         name: type
  *         required: true
- *         schema: { type: string, enum: [JOB_BILL, RECEIPT] }
+ *         schema: { type: string, enum: [JOB_BILL, RECEIPT, DEBIT_NOTE, CREDIT_NOTE] }
  *     responses:
  *       200: { description: Documents with mapping readiness and skip reasons }
  * /finance/tally/post:
@@ -866,4 +883,185 @@ export default router;
  *       200: { description: Settings saved }
  *       400: { description: Limits must be strictly increasing }
  *       403: { description: Admin role and age report permission required }
+ */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     PartyNote:
+ *       type: object
+ *       properties: {id: {type: string, format: uuid}, number: {type: string, example: '2026000001'}, direction: {type: string, enum: [DEBIT, CREDIT]}, type: {type: string, enum: [AMOUNT, RECEIPT]}, date: {type: string, format: date-time}, amount: {type: string, example: '1250.50'}, remainingAmount: {type: string}, narration: {type: string}, status: {type: string, enum: [ACTIVE, CANCELLED]}, cancelRemark: {type: string, nullable: true}, cancelledAt: {type: string, format: date-time, nullable: true}, tallyPostedAt: {type: string, format: date-time, nullable: true}, tallyVoucherNo: {type: string, nullable: true}, partyCode: {type: string, nullable: true}, partyName: {type: string, nullable: true}, partyAddress: {type: string, nullable: true}, partyCity: {type: string, nullable: true}, partyState: {type: string, nullable: true}, receiptLines: {type: array, items: {type: object, properties: {receiptId: {type: string, format: uuid}, receiptNumber: {type: string}, receiptDate: {type: string, format: date-time}, chequeNumber: {type: string, nullable: true}, receiptAmount: {type: string}, narration: {type: string}, amount: {type: string}}}}, accountLines: {type: array, items: {type: object, properties: {ledgerId: {type: string, format: uuid}, accountCode: {type: string}, accountName: {type: string}, narration: {type: string}, amount: {type: string}}}}}
+ *     CreatePartyNote:
+ *       type: object
+ *       required: [customerId, branchId, direction, type, date, amount, narration, idempotencyKey]
+ *       properties: {customerId: {type: string, format: uuid}, branchId: {type: string, format: uuid}, direction: {type: string, enum: [DEBIT, CREDIT]}, type: {type: string, enum: [AMOUNT, RECEIPT], description: CREDIT requires AMOUNT}, date: {type: string, format: date, description: 'Africa/Lagos date, not in the future'}, amount: {type: number, exclusiveMinimum: 0, maximum: 1000000000000, multipleOf: 0.01}, narration: {type: string, minLength: 1, maxLength: 2000}, idempotencyKey: {type: string, format: uuid}, receiptLines: {type: array, maxItems: 200, items: {type: object, required: [receiptId, amount], properties: {receiptId: {type: string, format: uuid}, amount: {type: number, exclusiveMinimum: 0, multipleOf: 0.01}}}}, accountLines: {type: array, minItems: 1, maxItems: 200, items: {type: object, required: [ledgerId, amount], properties: {ledgerId: {type: string, format: uuid}, narration: {type: string, maxLength: 1000}, amount: {type: number, exclusiveMinimum: 0, multipleOf: 0.01}}}}}
+ *       description: Receipt debit and credit account lines must equal the note amount. Receipt lines cannot exceed each receipt amount. Plain amount debits have no lines.
+ * /finance/party-notes:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: List notes with paginated rows and all-result totals
+ *     description: >-
+ *       Requires the direction-specific note read permission. Opening balances are excluded. Face amount totals include
+ *       cancelled notes; balances/status are current.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: 'notes, totals.amount/remaining and pagination meta', content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *   post:
+ *     tags:
+ *       - Finance
+ *     summary: Create an immutable debit or credit note
+ *     description: >-
+ *       Requires debitnote:create or creditnote:create. Serializable locks, audit and idempotent retries. Receipt notes
+ *       leave the receipt and paid bills unchanged.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {$ref: '#/components/schemas/CreatePartyNote'}, example: {customerId: 550e8400-e29b-41d4-a716-446655440000, branchId: 550e8400-e29b-41d4-a716-446655440001, direction: CREDIT, type: AMOUNT, date: '2026-10-08', amount: 100, narration: Goodwill allowance, idempotencyKey: 550e8400-e29b-41d4-a716-446655440002, accountLines: [{ledgerId: 550e8400-e29b-41d4-a716-446655440003, amount: 100, narration: Goodwill}]}}}
+ *     responses:
+ *       '201': {description: Created or previously created note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '400': {description: 'Invalid lines, receipt, account, date or party'}
+ *       '409': {description: Request key reused with different details}
+ * /finance/party-notes/{id}:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Read a note with saved party and line snapshots
+ *     description: Requires the note direction read permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '403': {description: Access denied}
+ *       '404': {description: Note not found}
+ * /finance/party-notes/{id}/cancel:
+ *   post:
+ *     tags:
+ *       - Finance
+ *     summary: Cancel an unadjusted note with a remark
+ *     description: >-
+ *       Requires debitnote:cancel or creditnote:cancel. Rejects active adjustments, partial balances, opening balances and
+ *       Tally-posted notes. Sets cancellation date and zero remaining balance; invalidates unconfirmed XML.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {type: object, required: [remark], properties: {remark: {type: string, minLength: 1, maxLength: 1000}}}, example: {remark: Duplicate; XML was not imported}}}
+ *     responses:
+ *       '200': {description: Cancelled note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '400': {description: 'Adjusted, posted, opening or already cancelled'}
+ * /finance/party-notes/{id}/print:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Print a note with its saved details
+ *     description: Requires direction-specific note read permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: Escaped printable HTML, content: {text/html: {schema: {type: string}}}}
+ * /finance/party-notes/register:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Debit or credit note register
+ *     description: Requires report:debit-note-register or report:credit-note-register. Lagos date range; current balances/status.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: 'notes, all-result totals and pagination', content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/register/export:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Stream all matching notes as an Excel XML workbook
+ *     description: >-
+ *       Same register permission/scope. Bounded pages in one repeatable-read snapshot. Text is formula-safe; page/pageSize
+ *       do not restrict export.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: SpreadsheetML .xml workbook, content: {application/vnd.ms-excel: {schema: {type: string}}}}
+ * /finance/party-notes/register/print:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Print all matching register rows and totals
+ *     description: Same register permission/scope. Escaped HTML with repeated table headers.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: Printable HTML, content: {text/html: {schema: {type: string}}}}
+ * /finance/party-notes/parties:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Search debtor parties by code/name for note creation
+ *     description: Requires either note create permission.
+ *     parameters:
+ *       - {in: query, name: branchId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: order, schema: {type: string, enum: [name, code]}}
+ *       - {in: query, name: limit, schema: {type: integer, maximum: 100}}
+ *     responses:
+ *       '200': {description: customers code/name rows, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/customers/{id}:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Read the selected party address for note creation
+ *     description: Requires either note create permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: customer code and address fields, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/receipts:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: List active receipts for a receipt debit note
+ *     description: Requires debitnote:create. Includes fully adjusted/Tally-posted receipts, 25 per page.
+ *     parameters:
+ *       - {in: query, name: customerId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: branchId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: page, schema: {type: integer, default: 1}}
+ *     responses:
+ *       '200': {description: receipts and pagination meta, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/ledgers:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Search active Tally codes/names for credit account lines
+ *     description: Requires creditnote:create; bounded to 100 rows.
+ *     parameters:
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: limit, schema: {type: integer, maximum: 100}}
+ *     responses:
+ *       '200': {description: ledgers, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
  */

@@ -130,7 +130,7 @@ export const receiptRegisterQuerySchema = z.object({
 export const tallyDocumentsQuerySchema = z.object({
   query: z.object({
     date: z.string().date(),
-    type: z.enum(['JOB_BILL', 'RECEIPT']),
+    type: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
   }),
 });
 
@@ -146,7 +146,7 @@ export const importTallyLedgersSchema = z.object({
 export const saveTallyMappingsSchema = z.object({
   body: z.object({
     mappings: z.array(z.object({
-      documentType: z.enum(['JOB_BILL', 'RECEIPT']),
+      documentType: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
       accountType: z.string().trim().min(1).max(50),
       tallyLedgerCode: z.string().trim().min(1).max(100),
       tallyLedgerName: z.string().trim().min(1).max(300),
@@ -157,7 +157,7 @@ export const saveTallyMappingsSchema = z.object({
 export const exportTallyBatchSchema = z.object({
   body: z.object({
     documents: z.array(z.object({
-      type: z.enum(['JOB_BILL', 'RECEIPT']),
+      type: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
       id: z.string().uuid(),
     }).strict()).min(1).max(500),
   }).strict(),
@@ -167,7 +167,7 @@ export const confirmTallyBatchSchema = z.object({
   body: z.object({
     batchId: z.string().uuid(),
     documents: z.array(z.object({
-      type: z.enum(['JOB_BILL', 'RECEIPT']),
+      type: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
       id: z.string().uuid(),
       voucherNumber: z.string().trim().min(1).max(100),
     }).strict()).min(1).max(500),

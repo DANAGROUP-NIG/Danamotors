@@ -16,6 +16,14 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
+  DEBIT_NOTE_READ: "debitnote:read",
+  DEBIT_NOTE_CREATE: "debitnote:create",
+  DEBIT_NOTE_CANCEL: "debitnote:cancel",
+  CREDIT_NOTE_READ: "creditnote:read",
+  CREDIT_NOTE_CREATE: "creditnote:create",
+  CREDIT_NOTE_CANCEL: "creditnote:cancel",
+  DEBIT_NOTE_REGISTER_READ: "report:debit-note-register",
+  CREDIT_NOTE_REGISTER_READ: "report:credit-note-register",
   // ── Dashboard ───────────────────────────────────────────────────────────────
   DASHBOARD_READ: "dashboard:read",
 
@@ -301,6 +309,14 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_CREATE,
     PERMISSIONS.CAMPAIGN_UPDATE,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.DEBIT_NOTE_READ,
+    PERMISSIONS.DEBIT_NOTE_CREATE,
+    PERMISSIONS.DEBIT_NOTE_CANCEL,
+    PERMISSIONS.CREDIT_NOTE_READ,
+    PERMISSIONS.CREDIT_NOTE_CREATE,
+    PERMISSIONS.CREDIT_NOTE_CANCEL,
+    PERMISSIONS.DEBIT_NOTE_REGISTER_READ,
+    PERMISSIONS.CREDIT_NOTE_REGISTER_READ,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -425,6 +441,14 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.RECEIPT_READ,
     PERMISSIONS.FINANCE_REPORT_READ,
     PERMISSIONS.WARRANTY_READ,
+    PERMISSIONS.DEBIT_NOTE_READ,
+    PERMISSIONS.DEBIT_NOTE_CREATE,
+    PERMISSIONS.DEBIT_NOTE_CANCEL,
+    PERMISSIONS.CREDIT_NOTE_READ,
+    PERMISSIONS.CREDIT_NOTE_CREATE,
+    PERMISSIONS.CREDIT_NOTE_CANCEL,
+    PERMISSIONS.DEBIT_NOTE_REGISTER_READ,
+    PERMISSIONS.CREDIT_NOTE_REGISTER_READ,
   ],
 
   [ROLES.BILLING_OFFICER]: [

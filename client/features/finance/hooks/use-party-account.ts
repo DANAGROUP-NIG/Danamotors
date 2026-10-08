@@ -13,6 +13,8 @@ export function usePartyMutations(customerId: string) {
   const invalidate = (documentsChanged = true) => {
     void queryClient.invalidateQueries({ queryKey: partyAccountKeys.customer(customerId) });
     void queryClient.invalidateQueries({ queryKey: creditKeys.customer(customerId) });
+    void queryClient.invalidateQueries({ queryKey: ['party-notes'] });
+    void queryClient.invalidateQueries({ queryKey: ['party-report'] });
     if (!documentsChanged) return;
     void queryClient.invalidateQueries({ queryKey: ['invoices'] });
     void queryClient.invalidateQueries({ queryKey: ['job-cards'] });

@@ -1276,6 +1276,7 @@ model Receipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  debitNoteLines PartyNoteReceiptLine[]
   allocations ReceiptAllocation[]
   editLogs    ReceiptEditLog[]
   payments    Payment[]           @relation("PaymentReceiptLink")
@@ -1349,9 +1350,18 @@ model PartyNote {
   legacyKey         String?             @unique
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  cancelRemark String?
+  partyCode String?
+  partyName String?
+  partyAddress String?
+  partyCity String?
+  partyState String?
+  receiptLines PartyNoteReceiptLine[]
+  accountLines PartyNoteAccountLine[]
   debitAdjustments  ReceiptAllocation[] @relation("DebitNoteAdjustments")
   creditAdjustments ReceiptAllocation[] @relation("CreditNoteAdjustments")
 
+  @@index([branchId, direction, date])
   @@unique([direction, number])
   @@index([customerId, direction, date])
   @@index([branchId, status, date])
@@ -1409,6 +1419,7 @@ model TallyLedger {
   updatedAt  DateTime @updatedAt
 
   customers Customer[]
+  noteAccountLines PartyNoteAccountLine[]
 }
 
 model TallyAccountMapping {
@@ -2823,4 +2834,36 @@ model FinanceSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+model PartyNoteReceiptLine {
+  id String @id @default(uuid())
+  noteId String
+  note PartyNote @relation(fields:[noteId],references:[id],onDelete:Restrict)
+  receiptId String
+  receipt Receipt @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  position Int
+  amount Decimal @db.Decimal(18,2)
+  receiptNumber String
+  receiptDate DateTime
+  chequeNumber String?
+  receiptAmount Decimal @db.Decimal(18,2)
+  narration String
+  @@unique([noteId,receiptId])
+  @@unique([noteId,position])
+  @@index([receiptId])
+}
+model PartyNoteAccountLine {
+  id String @id @default(uuid())
+  noteId String
+  note PartyNote @relation(fields:[noteId],references:[id],onDelete:Restrict)
+  ledgerId String
+  ledger TallyLedger @relation(fields:[ledgerId],references:[id],onDelete:Restrict)
+  position Int
+  accountCode String
+  accountName String
+  narration String
+  amount Decimal @db.Decimal(18,2)
+  @@unique([noteId,position])
+  @@index([ledgerId])
 }

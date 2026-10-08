@@ -1,7 +1,9 @@
+import { assertNotePermission,noteScope } from './party-note.controller';
+import type { TallyDocumentType } from './tally-xml';
 import { Request, Response, NextFunction } from 'express';
 import { FinanceService } from './finance.service';
 import prisma from '../../prisma/client';
-import { ROLES } from '../../shared/constants/roles';
+import { ROLES, PERMISSIONS } from '../../shared/constants/roles';
 import { JobBillingService } from './job-billing.service';
 import { ReceiptService } from './receipt.service';
 import { TallyService } from './tally.service';
@@ -274,18 +276,23 @@ export class FinanceController {
     try {
       const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId;
       if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
-      const batches = await this.tallyService.pendingBatches(branchId ?? undefined);
+      const noteDirections: Array<'DEBIT'|'CREDIT'>=[];
+      if(req.user?.permissions?.includes(PERMISSIONS.DEBIT_NOTE_READ))noteDirections.push('DEBIT');
+      if(req.user?.permissions?.includes(PERMISSIONS.CREDIT_NOTE_READ))noteDirections.push('CREDIT');
+      const batches = await this.tallyService.pendingBatches(branchId ?? undefined,noteDirections);
       res.json({ status: 'success', data: { batches } });
     } catch (error) { next(error); }
   };
 
   listTallyDocuments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const noteType=req.query.type==='DEBIT_NOTE'||req.query.type==='CREDIT_NOTE';
+      if(noteType)assertNotePermission(req,req.query.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
+      const branchId = noteType?noteScope(req,req.query.branchId as string|undefined):req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!noteType && req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const documents = await this.tallyService.listDocuments({
         date: req.query.date as string,
-        type: req.query.type as 'JOB_BILL' | 'RECEIPT',
+        type: req.query.type as TallyDocumentType,
         branchId,
       });
       res.status(200).json({ status: 'success', statusCode: 200, data: { documents } });
@@ -296,14 +303,17 @@ export class FinanceController {
 
   exportTallyBatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const documents = req.body.documents as Array<{ type: 'JOB_BILL' | 'RECEIPT'; id: string }>;
+      const documents = req.body.documents as Array<{ type: TallyDocumentType; id: string }>;
+      for (const document of documents) {
+        if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')assertNotePermission(req,document.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
+      }
       if (req.user?.role !== ROLES.SUPER_ADMIN) {
         for (const document of documents) {
           const branchId = document.type === 'JOB_BILL'
             ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
               ?? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId
-            : (await prisma.receipt.findUnique({ where: { id: document.id }, select: { branchId: true } }))?.branchId;
-          assertBillingBranch(req, branchId);
+            : document.type === 'RECEIPT' ? (await prisma.receipt.findUnique({ where: { id: document.id }, select: { branchId: true } }))?.branchId : (await prisma.partyNote.findUnique({where:{id:document.id},select:{branchId:true}}))?.branchId;
+          if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')noteScope(req,branchId??undefined);else assertBillingBranch(req, branchId);
         }
       }
       const result = await this.tallyService.exportBatch({ documents, postedById: req.user!.userId });
@@ -324,14 +334,17 @@ export class FinanceController {
 
   confirmTallyBatch = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const documents = req.body.documents as Array<{ type: 'JOB_BILL' | 'RECEIPT'; id: string; voucherNumber: string }>;
+      const documents = req.body.documents as Array<{ type: TallyDocumentType; id: string; voucherNumber: string }>;
+      for (const document of documents) {
+        if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')assertNotePermission(req,document.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
+      }
       if (req.user?.role !== ROLES.SUPER_ADMIN) {
         for (const document of documents) {
           const branchId = document.type === 'JOB_BILL'
             ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
               ?? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { customer: { select: { branchId: true } } } }))?.customer.branchId
-            : (await prisma.receipt.findUnique({ where: { id: document.id }, select: { branchId: true } }))?.branchId;
-          assertBillingBranch(req, branchId);
+            : document.type === 'RECEIPT' ? (await prisma.receipt.findUnique({ where: { id: document.id }, select: { branchId: true } }))?.branchId : (await prisma.partyNote.findUnique({where:{id:document.id},select:{branchId:true}}))?.branchId;
+          if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')noteScope(req,branchId??undefined);else assertBillingBranch(req, branchId);
         }
       }
       const result = await this.tallyService.confirmBatch({ ...req.body, postedById: req.user!.userId });

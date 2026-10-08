@@ -227,3 +227,66 @@ Apply migrations and regenerate the Prisma client before application rollout. Re
 Stop after phase 3 as requested in the delivery brief. Phase 4 is debit/credit note forms, registers and Tally vouchers; begin only after the user says continue. Maintain the frontend guide through phases 4 and 5, then create and visually verify the final Word .docx testing and flow walkthrough.
 
 Proposed PR title: Add historical party reports, ageing, print and Excel exports (#77, phase 3).
+
+
+## Phase 4 — debit/credit notes, registers and Tally (2026-10-08)
+
+### Plan and delivered scope
+
+Extend the canonical PartyNote header, add receipt/account snapshot lines and cancellation metadata, expose creation/detail/cancellation/register APIs, and extend existing Tally document types. Reuse the current party transaction, allocation store, wallet triggers, reports, shared UI and bounded exports. No second allocation mechanism or new dependency was added.
+
+- Implemented RECEIPT and AMOUNT debit notes, credit account splits, generated numbers and idempotent creation.
+- Added saved party/address, receipt and account display snapshots; notes are immutable after saving.
+- Validated exact Decimal line totals, positive two-decimal money, receipt limits/ownership/active status, active ledgers and Lagos note dates.
+- Added audited cancellation with current balance/active-adjustment/Tally guards and dated history. Cancelling unconfirmed exports invalidates their pending XML.
+- Added paginated debit/credit note screens and registers, database totals, note/register print and streamed Excel XML.
+- Added default note/register grants to Accountant/Admin/SuperAdmin, direction-specific API checks and assigned-branch scope. Tally pending payloads respect note-read permissions too.
+- Extended Tally listing/export/confirmation with Debit Note / Credit Note vouchers, debit-type mappings, credit account splits, reference allocations and posting audits.
+- Added modern forms, active receipt grid, account picker, live footer totals, detail/cancellation views, navigation and affected-query invalidation.
+- Maintained billing/Swagger documentation and phase 4 frontend test steps for the final Word guide.
+
+### Files by area
+
+Backend: party-note.ts, party-note.validation.ts, party-note.service.ts, party-note.controller.ts; finance routes/validation/controller; existing Tally service/XML; shared report backpressure writer export; role constants.
+
+Frontend: party-note.api.ts, PartyNoteForm.tsx, party-notes-workspace.tsx; two Finance receipt note routes; Finance report dynamic route/navigation; finance/Tally workspaces; route/sidebar permissions; party account invalidation; shared bounded report output helpers.
+
+Database: PartyNote fields and PartyNoteReceiptLine/PartyNoteAccountLine relations; 20261008200000_party_notes migration; disposable-only party-note-migration-fixture.sql and party-note-migration-assertions.sql.
+
+Tests: party-note.test.ts (totals/limits/cancellation/permissions), party-note.integration.test.ts (receipt debit, credit-to-bill, wallet/history/register/Tally), tally-notes.service.test.ts (pending XML permission isolation), tally-xml.test.ts (voucher types, signs and references).
+
+### Assumptions and acceptance status
+
+Done: receipt-type debit totals create a new outstanding debit without reopening paid bills; account splits create one available credit; notes join the existing adjustment/report store; active-adjusted and Tally-posted notes reject cancellation; posted-document adjustments reject reversal; note vouchers use correct Tally types/signs; registers support screen/print/Excel with totals and scope.
+
+Receipt line bounds apply per note against each current receipt's full amount, not cumulative prior notes. A receipt can be linked on its own calendar day. After an eligible adjustment is reversed, a fully restored unposted note can be cancelled. Header narration is required for both directions. No edit/delete route exists for saved notes.
+
+Registers use document-date ranges with current balances/status; historical party reports remain as-on. Register face totals include cancelled notes. Notes print saved party/account/receipt display text; Tally resolves current active ledger master names. Excel stays SpreadsheetML .xml using the existing phase 3 streaming helper. Opening balances stay excluded and adjustments still generate no journal.
+
+Manual browser/Excel/print-preview and external Tally-company acceptance are pending; they are explicit checklist steps, not claimed automated evidence. No production migration, deployment, PR or external message was performed.
+
+
+### Executed verification
+
+- Backend TypeScript noEmit and production compilation passed.
+- Final full Jest run against the migrated disposable PostgreSQL database: **573 passed, 1 skipped, 574 total; 46 suites passed**. The opt-in catalog integration suite remains skipped without CATALOG_DATABASE_TEST=1.
+- Focused final note/XML/security run: **35 tests passed** across four suites. PostgreSQL flow verifies a posted/fully paid receipt can be referenced without reopening its bill, exact fractional credit account splits, credit-note adjustment/reversal, derived wallet, cancellation history, registers, Debit/Credit Note XML, confirmation, posting guards and invalidation of cancelled pending XML.
+- Frontend ESLint: **0 errors, 70 existing warnings**. Production Next webpack build passed, including TypeScript and **60 static pages**, the new note routes and register routes. The documented Windows NVM/Turbopack workaround remains unchanged.
+- Prisma client generation and schema validation passed. **All 43 migrations** applied cleanly to an empty disposable database.
+- Populated migration fixture and assertions passed before/after the note migration rerun, preserving both note headers, receipt/account snapshots, remaining amounts, derived wallet and eight unique permissions.
+- Built Swagger verification passed: **all 11 note paths**, PartyNote and CreatePartyNote schemas are present. Existing Tally schemas include the new document types.
+- git diff --check and all added-file whitespace checks passed. Generated Next metadata was restored to HEAD. The loopback-only isolated PostgreSQL 18 cluster on port 55478 was stopped and its verified workspace cache directory removed.
+
+Commands (server): node node_modules/typescript/bin/tsc --noEmit; node node_modules/typescript/bin/tsc; node node_modules/jest/bin/jest.js --runInBand with TEST_DATABASE_URL/DATABASE_URL supplied only to child processes; Prisma generate/validate/migrate deploy. The loaded Windows engine DLL required generation to a same-depth temporary client output, followed by copying generated code/types and removing the temporary schema/output.
+
+Commands (client): node node_modules/eslint/bin/eslint.js .; node node_modules/next/dist/bin/next build --webpack with the installed Node directory prepended to PATH.
+
+Migration rerun workflow (disposable database only): apply all migrations; execute prisma/party-note-migration-fixture.sql; execute prisma/party-note-migration-assertions.sql; rerun 20261008200000_party_notes/migration.sql with psql -v ON_ERROR_STOP=1; rerun assertions. Fixtures must never be executed against production.
+
+### Risks and next phase
+
+Apply migration and regenerate before application rollout; verify on a disposable production snapshot first. The app cannot discover an XML import in Tally until the accountant confirms the voucher reference. Manual browser/Excel/print-preview and actual Tally-company import remain pending in the maintained frontend checklist.
+
+Stop after phase 4 per the delivery brief. Phase 5 is Update Outstanding preview/apply, credit days/overdue processing and outstanding letters. Begin only when the user says continue. After phase 5, deliver the requested Word .docx frontend testing/flow guide with rendered visual verification.
+
+Proposed PR title: Add debit and credit notes, registers and Tally vouchers (#77, phase 4).
