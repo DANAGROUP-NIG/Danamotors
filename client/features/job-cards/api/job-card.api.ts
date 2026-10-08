@@ -42,6 +42,9 @@ export interface CreateJobCardPayload {
   serviceAdvisorId: string;
   technicianId?: string;
   teamId?: string;
+  freeServiceCouponNo?: string;
+  /** A pre-job estimate the job is opened from. */
+  estimateId?: string;
   mileage: number;
   promisedAt: string;
   complaints: {

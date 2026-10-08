@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Download, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Download, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -26,7 +27,7 @@ const COLUMNS = [
 
 const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 
-export function ReportsPage() {
+export function ReceiptRegisterPage() {
   const branchId = useBranchStore((state) => state.activeBranch?.id);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -61,6 +62,11 @@ export function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
+      <nav aria-label="Breadcrumb" className="-mb-4 flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/reports" className="hover:text-foreground">Reports</Link>
+        <ChevronRight className="size-3.5" aria-hidden />
+        <span>Finance</span>
+      </nav>
       <PageHeader
         title="Receipt Register"
         description="Receipts, allocations, and totals by payment mode."

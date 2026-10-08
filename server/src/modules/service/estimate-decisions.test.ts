@@ -18,6 +18,8 @@ it('records approval of the latest revision and carries its service charge into 
   await new ServiceService().addApproval('latest', { customerId: 'customer', approved: true });
   expect((prisma.$queryRaw as jest.Mock).mock.calls[0][0].sql).toContain('"JobCard"');
   expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id: 'job' }, data: { serviceCharge: 500 } });
+  // An approved revision becomes the job's scope: it is closed as converted.
+  expect(prisma.estimate.update).toHaveBeenCalledWith({ where: { id: 'latest' }, data: { status: 'Approved', estimateStatus: 'CLOSED', closedReason: 'CONVERTED' } });
   expect(prisma.customerApproval.create).toHaveBeenCalledWith({ data: expect.objectContaining({ estimateId: 'latest', approved: true, status: 'Approved', decisionDate: expect.any(Date) }) });
 });
 it('rejects approval of a superseded estimate', async () => {
@@ -41,7 +43,7 @@ it('cannot authorize work for another customer', async () => {
 it('declines without changing the service charge', async () => {
   await new ServiceService().addApproval('latest', { customerId: 'customer', approved: false });
   expect(prisma.jobCard.update).not.toHaveBeenCalled();
-  expect(prisma.estimate.update).toHaveBeenCalledWith({ where: { id: 'latest' }, data: { status: 'Declined' } });
+  expect(prisma.estimate.update).toHaveBeenCalledWith({ where: { id: 'latest' }, data: { status: 'Declined', estimateStatus: 'CLOSED', closedReason: 'DECLINED' } });
 });
 it('rejects decisions after billing', async () => {
   (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValue({ id: 'job', customerId: 'customer', billedAt: new Date(), status: 'BILLED' });

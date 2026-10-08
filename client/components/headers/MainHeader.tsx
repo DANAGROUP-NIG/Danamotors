@@ -19,7 +19,7 @@ export default function MainHeader({ setSidebarOpen }: mainHeaderProbs) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[#e8edf3] bg-white px-4 lg:px-6">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-[#e8edf3] bg-white px-4 lg:px-6 print:hidden">
       {/* Mobile hamburger */}
       <button
         className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:hidden"

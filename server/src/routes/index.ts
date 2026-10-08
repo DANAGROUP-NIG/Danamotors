@@ -22,6 +22,7 @@ import auditRoutes from '../modules/audit/audit.routes';
 import warrantyRoutes, { vehicleModelRouter, vehicleWarrantyRouter } from '../modules/warranty/warranty.routes';
 import campaignRoutes from '../modules/campaign/campaign.routes';
 import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
+import reportRoutes from '../modules/reports/reports.routes';
 
 import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
@@ -94,5 +95,6 @@ router.use('/enquiries', enquiryRoutes);
 router.use('/audit', auditRoutes);
 router.use('/warranty', warrantyRoutes);
 router.use('/campaigns', campaignRoutes);
+router.use('/reports', reportRoutes);
 
 export default router;

@@ -19,6 +19,18 @@ const STATUS_FLOW: readonly string[] = [
 ];
 
 export function AppointmentStatusStepper({ currentStatus }: AppointmentStatusStepperProps) {
+  if (currentStatus === "No Show") {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <Ban className="size-5 text-slate-500" />
+        <div>
+          <span className="font-semibold text-slate-700">No-show</span>
+          <span className="ml-2 text-sm text-muted-foreground">The vehicle did not come in for this booking</span>
+        </div>
+      </div>
+    );
+  }
+
   // Handle cancelled status
   if (currentStatus === "Cancelled") {
     return (

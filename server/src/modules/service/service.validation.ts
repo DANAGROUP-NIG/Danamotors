@@ -25,8 +25,27 @@ export const estimateIdParamSchema = z.object({
   }),
 });
 
+const moneyField = z.number().min(0).max(1e12).multipleOf(0.01);
+const bookingRequests = z
+  .array(
+    z
+      .object({
+        complaintCodeId: z.string().uuid().optional(),
+        description: z.string().trim().min(1, "Describe the request").max(500),
+        estimatedParts: moneyField.optional(),
+        estimatedLabour: moneyField.optional(),
+        estimatedOil: moneyField.optional(),
+      })
+      .strict(),
+  )
+  .max(30);
+
 export const createAppointmentSchema = z.object({
   body: z.object({
+    // Workshop service type (SERVICE_TYPE master), odometer reading and requests at booking.
+    serviceTypeId: z.string().uuid("Invalid service type").optional(),
+    mileage: mileageField.optional(),
+    requests: bookingRequests.optional(),
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),
@@ -48,6 +67,9 @@ export const updateAppointmentSchema = z.object({
     status: z.string().optional(),
     // Odometer reading taken at check-in (status 'Checked In').
     mileage: mileageField.optional(),
+    serviceTypeId: z.string().uuid("Invalid service type").nullable().optional(),
+    // Replaces the booking requests when sent.
+    requests: bookingRequests.optional(),
     ...acknowledgementFields,
   }),
 
@@ -101,6 +123,8 @@ export const listJobCardsSchema = z.object({
 export const jobOpeningBody = z
   .object({
     appointmentId: z.string().uuid().optional(),
+    // A pre-job estimate the job is opened from.
+    estimateId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
     serviceTypeId: z.string().uuid(),
     customerId: z.string().uuid(),
@@ -116,6 +140,7 @@ export const jobOpeningBody = z
     serviceAdvisorId: z.string().uuid(),
     technicianId: z.string().uuid().optional(),
     teamId: z.string().uuid().optional(),
+    freeServiceCouponNo: z.string().trim().max(50).optional(),
     promisedAt: z.string().datetime(),
 
     complaints: z
@@ -212,6 +237,8 @@ export const jobUpdateBody = z
       .enum(["IN_PROGRESS", "QC", "READY", "DELIVERED", "CANCELLED"])
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
+    serviceTypeId: z.string().uuid().nullable().optional(),
+    freeServiceCouponNo: z.string().trim().max(50).nullable().optional(),
     deliveryAdvisorId: z.string().uuid().optional(),
     lateReasonIds: z
       .array(z.string().uuid())
@@ -330,6 +357,27 @@ export const updateLabourItemSchema = z.object({
   }),
 });
 
+/**
+ * Technicians on a labour line (at most three, as on the legacy labour slip). Shares are
+ * optional; when given for one they must be given for all and add up to 100.
+ */
+export const labourTechniciansField = z
+  .array(
+    z
+      .object({
+        technicianId: z.string().uuid("Invalid technician ID"),
+        sharePercent: z.number().gt(0, "A share must be more than 0").max(100).optional(),
+      })
+      .strict(),
+  )
+  .max(3, "At most three technicians per labour line")
+  .refine((list) => new Set(list.map((item) => item.technicianId)).size === list.length, "Each technician can appear once")
+  .refine((list) => {
+    const shares = list.filter((item) => item.sharePercent !== undefined);
+    if (!shares.length) return true;
+    return shares.length === list.length && Math.abs(shares.reduce((sum, item) => sum + item.sharePercent!, 0) - 100) < 0.001;
+  }, "Give a share for every technician, adding up to 100%, or none for an even split");
+
 export const createJobCardLabourSchema = z.object({
   body: z
     .object({
@@ -337,6 +385,7 @@ export const createJobCardLabourSchema = z.object({
       hours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       technicianId: z.string().uuid("Invalid technician ID").optional(),
+      technicians: labourTechniciansField.optional(),
     })
     .strict(),
 
@@ -356,6 +405,7 @@ export const updateJobCardLabourSchema = z.object({
         .uuid("Invalid technician ID")
         .nullable()
         .optional(),
+      technicians: labourTechniciansField.optional(),
     })
     .strict()
     .refine(

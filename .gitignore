@@ -1,0 +1,5 @@
+# Legacy report screenshots and sample outputs contain real customer data.
+doc/plans/legacy-reports/
+# Generated design references (large images, kept locally).
+doc/plans/report-designs/
+*:Zone.Identifier

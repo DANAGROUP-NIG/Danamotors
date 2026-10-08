@@ -279,7 +279,12 @@ export class AdminService {
     const groupsMap = new Map<string, typeof permissions>();
     for (const permission of permissions) {
       const prefix = permission.name.split(':')[0];
-      const module = MODULE_LABELS[prefix] || `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Management`;
+      const module =
+        permission.name === 'report:receipt-register'
+          ? MODULE_LABELS.financereport
+          : prefix === 'report'
+            ? 'Reports — Workshop'
+            : MODULE_LABELS[prefix] || `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Management`;
       if (!groupsMap.has(module)) {
         groupsMap.set(module, []);
       }

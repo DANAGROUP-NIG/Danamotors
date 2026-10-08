@@ -3,7 +3,8 @@ import { ServiceService } from './service.service';
 import { assertBranchOwnership } from '../../middleware/authorize';
 import { ROLES } from '../../shared/constants/roles';
 import prisma from '../../prisma/client';
-import { ForbiddenError } from '../../shared/errors/appError';
+import { ForbiddenError, NotFoundError } from '../../shared/errors/appError';
+import { cancelPreJobEstimate, createPreJobEstimate } from './pre-job-estimate.service';
 import { LabourService } from './labour.service';
 
 export class ServiceController {
@@ -286,11 +287,9 @@ export class ServiceController {
         throw new ForbiddenError('Only workshop roles can record approvals');
       }
       const { id } = req.params;
-      const estimate = await prisma.estimate.findUnique({
-        where: { id },
-        select: { jobCard: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      const estimate = await prisma.estimate.findUnique({ where: { id }, select: { branchId: true, jobCard: { select: { branchId: true } } } });
+      if (!estimate) throw new NotFoundError('Estimate not found');
+      assertBranchOwnership(req, estimate.branchId ?? estimate.jobCard?.branchId);
       const result = await this.serviceService.addApproval(id, req.body, req.user?.userId);
       res.status(201).json({ status: 'success', statusCode: 201, message: 'Customer approval recorded successfully', data: { approval: result } });
     } catch (error) {
@@ -301,11 +300,9 @@ export class ServiceController {
   getApprovals = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const estimate = await prisma.estimate.findUnique({
-        where: { id },
-        select: { jobCard: { select: { branchId: true } } },
-      });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      const estimate = await prisma.estimate.findUnique({ where: { id }, select: { branchId: true, jobCard: { select: { branchId: true } } } });
+      if (!estimate) throw new NotFoundError('Estimate not found');
+      assertBranchOwnership(req, estimate.branchId ?? estimate.jobCard?.branchId);
       const result = await this.serviceService.getApprovals(id);
       res.status(200).json({ status: 'success', statusCode: 200, data: { approvals: result } });
     } catch (error) {
@@ -327,6 +324,33 @@ export class ServiceController {
 
       const result = await this.serviceService.listInspections({ page, limit, branchId, search, status });
       res.status(200).json({ status: 'success', statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createPreJobEstimate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) throw new ForbiddenError('Sign in to prepare estimates');
+      const { branchId: requested, ...body } = req.body;
+      const canChoose = req.user.role === ROLES.SUPER_ADMIN || req.user.role === ROLES.ADMIN;
+      const branchId = canChoose && requested ? requested : req.user.branchId;
+      if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const estimate = await createPreJobEstimate(body, branchId, req.user.userId);
+      res.status(201).json({ status: 'success', statusCode: 201, message: 'Estimate created', data: { estimate } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancelEstimate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) throw new ForbiddenError('Sign in to cancel estimates');
+      const estimate = await prisma.estimate.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      if (!estimate) throw new NotFoundError('Estimate not found');
+      assertBranchOwnership(req, estimate.branchId);
+      const result = await cancelPreJobEstimate(req.params.id, req.body.reason, req.user.userId);
+      res.status(200).json({ status: 'success', statusCode: 200, message: 'Estimate cancelled', data: { estimate: result } });
     } catch (error) {
       next(error);
     }

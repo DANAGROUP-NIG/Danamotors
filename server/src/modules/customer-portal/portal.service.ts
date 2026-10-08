@@ -428,7 +428,9 @@ export class PortalService {
       },
     });
 
-    if (!estimate || estimate.jobCard.customerId !== customerId) {
+    const ownerId = estimate?.jobCard?.customerId ?? estimate?.customerId;
+    const branchId = estimate?.jobCard?.branchId ?? estimate?.branchId;
+    if (!estimate || ownerId !== customerId || !branchId) {
       throw new NotFoundError("Estimate not found");
     }
 
@@ -439,18 +441,20 @@ export class PortalService {
     const notificationService = new NotificationService();
     await notificationService.notifyRole(
       ROLES.SERVICE_ADVISOR,
-      estimate.jobCard.branchId,
+      branchId,
       {
         type: "ESTIMATE_DECISION",
         title: data.approved ? "Estimate approved" : "Estimate rejected",
-        message: `Customer ${data.approved ? "approved" : "rejected"} the estimate on job card ${estimate.jobCard.jobNumber}.`,
-        link: `/job-cards/${estimate.jobCard.id}`,
+        message: estimate.jobCard
+          ? `Customer ${data.approved ? "approved" : "rejected"} the estimate on job card ${estimate.jobCard.jobNumber}.`
+          : `Customer ${data.approved ? "approved" : "rejected"} estimate ${estimate.estimateNumber ?? ""}.`,
+        link: estimate.jobCard ? `/job-cards/${estimate.jobCard.id}` : "/quotations",
       },
     );
 
     return {
       estimateId,
-      jobCardId: estimate.jobCard.id,
+      jobCardId: estimate.jobCard?.id ?? null,
       status,
       decisionDate,
     };

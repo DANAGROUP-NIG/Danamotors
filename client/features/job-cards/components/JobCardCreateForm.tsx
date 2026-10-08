@@ -67,7 +67,9 @@ function defaults(
 ): Partial<CreateJobCardFormValues> {
   return {
     branchName,
+    serviceId: "",
     serviceTypeId: "",
+    freeServiceCouponNo: "",
     complaints: [emptyRequest()],
 
     tyres: Array.from(
@@ -130,6 +132,8 @@ export function JobCardCreateForm({
     "new" | "undo" | "estimate" | null
   >(null);
   const [estimate, setEstimate] = useState<PickerRecord>();
+  // A pre-job estimate whose lines were loaded: the job is opened from it.
+  const [openedFromEstimateId, setOpenedFromEstimateId] = useState<string>();
   const [find, setFind] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
@@ -280,6 +284,11 @@ export function JobCardCreateForm({
         shouldValidate: true,
       });
     }
+
+    // The booking's workshop service type carries over to the job.
+    if (record.serviceTypeId) {
+      setValue("serviceTypeId", record.serviceTypeId, { shouldDirty: true });
+    }
   };
 
   const applyEstimate = () => {
@@ -291,18 +300,23 @@ export function JobCardCreateForm({
     resetVehicle();
     setValue("appointmentId", "");
 
-    setValue("customerId", estimate.jobCard?.customer?.id ?? "", {
+    setValue("customerId", estimate.jobCard?.customer?.id ?? estimate.customerId ?? "", {
       shouldDirty: true,
     });
 
-    setValue("vehicleId", estimate.jobCard?.vehicle?.id ?? "", {
+    setValue("vehicleId", estimate.jobCard?.vehicle?.id ?? estimate.vehicleId ?? "", {
       shouldDirty: true,
     });
 
-    if (estimate.jobCard?.branch?.name)
-      setValue("branchName", estimate.jobCard.branch.name, {
+    const estimateBranch = estimate.jobCard?.branch?.name ?? estimate.branch?.name;
+    if (estimateBranch)
+      setValue("branchName", estimateBranch, {
         shouldDirty: true,
       });
+
+    // Opening from an estimate prepared before the job closes that estimate as converted.
+    // A closed one (cancelled, declined, already used) only serves as a template.
+    setOpenedFromEstimateId(estimate.jobCardId === null && !estimate.jobCard && estimate.estimateStatus !== "CLOSED" ? estimate.id : undefined);
 
     setValue("serviceAdvisorId", "");
     setValue("technicianId", "");
@@ -340,6 +354,7 @@ export function JobCardCreateForm({
 
     reset(initial.current);
     setEstimate(undefined);
+    setOpenedFromEstimateId(undefined);
     setTab("Vehicle Details");
     create.reset();
   };
@@ -407,6 +422,8 @@ export function JobCardCreateForm({
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
           teamId: values.teamId || undefined,
+          estimateId: openedFromEstimateId,
+          freeServiceCouponNo: values.freeServiceCouponNo?.trim() || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,
@@ -560,7 +577,10 @@ export function JobCardCreateForm({
                     selectedRecord={estimate}
                     disabled={!branchId || !hasPermission("estimate:read")}
                     onChange={(id) => {
-                      if (!id) setEstimate(undefined);
+                      if (!id) {
+                        setEstimate(undefined);
+                        setOpenedFromEstimateId(undefined);
+                      }
                     }}
                     onSelect={setEstimate}
                   />
@@ -793,6 +813,11 @@ export function JobCardCreateForm({
                     />
                   )}
                 />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <OpeningField label="Free service coupon no" error={errors.freeServiceCouponNo?.message}>
+                    <input className={openingInput} placeholder="Only for free services" {...register("freeServiceCouponNo")} />
+                  </OpeningField>
+                </div>
                 {vehicle && (
                   <p className="mt-3 text-sm text-muted-foreground">
                     Previous odometer:{" "}

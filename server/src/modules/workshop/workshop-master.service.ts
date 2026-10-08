@@ -84,10 +84,18 @@ export class WorkshopMasterService {
       throw new BadRequestError('This master cannot have a parent');
   }
 
+  /** A free service number only makes sense on a service type flagged as a free service. */
+  private validateFreeServiceNo(kind: string, freeService: boolean, freeServiceNo: number | null | undefined) {
+    if (freeServiceNo == null) return;
+    if (kind !== 'SERVICE_TYPE' || !freeService)
+      throw new BadRequestError('Only service types flagged as free service can have a free service number');
+  }
+
   async create(data: MasterInput) {
     if (data.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
       throw new BadRequestError('Display order and pre-delivery apply only to service types');
     await this.validateParent(data);
+    this.validateFreeServiceNo(data.kind, Boolean(data.freeService), data.freeServiceNo);
 
     return prisma.workshopMaster.create({
       data,
@@ -109,6 +117,11 @@ export class WorkshopMasterService {
     // Reparenting would silently change the meaning of existing vehicles and rates.
     if (data.parentId !== undefined && data.parentId !== existing.parentId)
       throw new BadRequestError('Create a new catalogue entry to change its parent');
+
+    const freeService = data.freeService ?? existing.freeService;
+    this.validateFreeServiceNo(existing.kind, freeService, data.freeServiceNo === undefined ? existing.freeServiceNo : data.freeServiceNo);
+    // Turning off "free service" clears the number with it.
+    if (!freeService) data = { ...data, freeServiceNo: null };
 
     return prisma.workshopMaster.update({
       where: {
