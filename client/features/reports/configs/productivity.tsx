@@ -1,7 +1,7 @@
 import { Gauge, UserCog } from "lucide-react";
 import { REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { cn } from "@/lib/utils";
-import { fmtMoney, fmtNumber } from "../lib/report-format";
+import { fmtMoney, fmtNumber, plural } from "../lib/report-format";
 import type { ReportColumn, ReportConfig, ReportGroup, ReportResponse } from "../types";
 import { jobColumn, modelColumn, RANGE_PRESETS, registrationColumn, str } from "./shared";
 
@@ -46,7 +46,7 @@ const lineColumns: ReportColumn[] = [
 ];
 
 function technicianSubtotal(group: ReportGroup) {
-  return `${group.label} · ${fmtNumber(group.totals.jobs ?? 0, "integer")} jobs · ${fmtNumber(group.count, "integer")} lines`;
+  return `${group.label} · ${plural(group.totals.jobs ?? 0, ["job", "jobs"])} · ${plural(group.count, ["line", "lines"])}`;
 }
 
 function productivityCards(data: ReportResponse) {

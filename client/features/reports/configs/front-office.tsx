@@ -203,7 +203,7 @@ export const jobEstimateRegisterConfig: ReportConfig = {
         ),
     },
   ],
-  rowDetail: (row, options) => (options.withLines === "true" && Array.isArray(row.lines) ? <EstimateLines lines={row.lines as EstimateLineRow[]} /> : null),
+  rowDetail: (row, options) => (options.withLines === "true" && Array.isArray(row.lines) && row.lines.length ? <EstimateLines lines={row.lines as EstimateLineRow[]} /> : null),
   summaryCards: (data) => {
     const s = data.summary ?? {};
     return [

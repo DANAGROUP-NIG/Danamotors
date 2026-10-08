@@ -154,7 +154,8 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
                     const tone = config.rowTone?.(row);
                     const detail = config.rowDetail?.(row, options);
                     return (
-                      <Fragment key={String(row.id ?? row.jobId ?? `${group.key}-${index}`)}>
+                      // Several rows can share a job (one per labour line or technician), so the index is part of the key.
+                      <Fragment key={`${group.key}-${String(row.id ?? row.lineId ?? row.jobId ?? "")}-${index}`}>
                         <tr className={cn("border-b border-[#e8edf3] hover:bg-muted/30", tone && TONE[tone])}>
                           {columns.map((column) => {
                             const align = alignOf(column as ReportColumn<ReportRow>);

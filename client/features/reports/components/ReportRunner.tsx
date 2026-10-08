@@ -60,17 +60,23 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   const settings = useQuery({ queryKey: ["report-settings"], queryFn: getReportSettingsRequest, enabled: settingOptions.length > 0, staleTime: 5 * 60_000 });
 
   const searchKey = searchParams.toString();
-  const applied = useMemo(() => parseParams(genericConfig, new URLSearchParams(searchKey)), [genericConfig, searchKey]);
+  // Admins without a branch in the URL get their own branch, as the server does, so the
+  // Branch filter shows the branch the report really covers.
+  const ownBranch = user?.branchId ?? "ALL";
+  const applied = useMemo(() => {
+    const parsed = parseParams(genericConfig, new URLSearchParams(searchKey));
+    return parsed && isAdminOrAbove && !parsed.branchId ? { ...parsed, branchId: ownBranch } : parsed;
+  }, [genericConfig, searchKey, isAdminOrAbove, ownBranch]);
   const defaults = useMemo<ReportParams>(() => {
     const base = defaultParams(genericConfig);
     for (const option of settingOptions) {
       const value = settings.data?.[option.settingDefault!];
       if (typeof value === "number") base.options[option.key] = String(value);
     }
-    return { ...base, branchId: isAdminOrAbove ? activeBranch?.id ?? "ALL" : undefined };
+    return { ...base, branchId: isAdminOrAbove ? activeBranch?.id ?? ownBranch : undefined };
     // settingOptions is derived from config.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genericConfig, isAdminOrAbove, activeBranch?.id, settings.data]);
+  }, [genericConfig, isAdminOrAbove, activeBranch?.id, ownBranch, settings.data]);
   const [draft, setDraft] = useState<ReportParams>(() => applied ?? defaults);
   const [error, setError] = useState<string | null>(null);
 

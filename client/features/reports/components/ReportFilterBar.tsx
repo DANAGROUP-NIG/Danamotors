@@ -162,19 +162,11 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
             </>
           ) : (
             <label className="grid w-full gap-1.5 sm:w-48">
-              <span className="flex items-center gap-1.5 text-sm font-semibold">
-                {period.dateLabel ?? period.label}
-                {period.hint && (
-                  <span title={period.hint} className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                    <Info className="size-3.5" aria-hidden />
-                    <span className="hidden sm:inline">{period.hint}</span>
-                  </span>
-                )}
-              </span>
+              <span className="text-sm font-semibold">{period.dateLabel ?? period.label}</span>
               <DateInput value={draft.from} onChange={(date) => onChange({ ...draft, from: date, to: date })} />
             </label>
           )}
-          <div className="flex flex-wrap gap-2" aria-label="Quick dates">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Quick dates">
             {period.presets.map((preset) => (
               <button
                 key={preset}
@@ -190,23 +182,29 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
               </button>
             ))}
           </div>
-          {canChooseBranch && (
-            <label className="grid w-full gap-1.5 sm:ml-auto sm:w-56">
-              <span className="text-sm font-semibold">Branch</span>
-              <select className={inputCls} value={draft.branchId ?? "ALL"} onChange={(event) => onChange({ ...draft, branchId: event.target.value })}>
-                <option value="ALL">All branches</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}</option>
-                ))}
-              </select>
-            </label>
-          )}
         </div>
+        {period.hint && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0" aria-hidden />
+            {period.hint}
+          </p>
+        )}
       </Section>
 
-      {(config.filters.length > 0 || rangeOptions.length > 0) && (
+      {(config.filters.length > 0 || rangeOptions.length > 0 || canChooseBranch) && (
         <Section label="Filters">
           <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+            {canChooseBranch && (
+              <label className="grid min-w-0 gap-1.5">
+                <span className="text-sm font-semibold">Branch</span>
+                <select className={inputCls} value={draft.branchId ?? "ALL"} onChange={(event) => onChange({ ...draft, branchId: event.target.value })}>
+                  <option value="ALL">All branches</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {rangeOptions.map((option) => (
               <RangeField
                 key={option.key}
