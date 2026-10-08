@@ -311,6 +311,45 @@ router.post('/estimates/:id/approval', validateRequest(estimateApprovalSchema), 
 
 router.get('/credit', controller.getCredit);
 router.get('/credit/applications', controller.getCreditApplications);
+/**
+ * @openapi
+ * /portal/credit/applications/{id}/decision:
+ *   post:
+ *     tags: [Customer Portal]
+ *     summary: Approve or decline a pending customer credit application
+ *     description: Approval atomically records a Credit payment, deducts customer credit, reduces invoice outstandingAmount, and sets Paid or Partially Paid from the remaining balance. Only the authenticated customer's pending application can be decided. An application can be decided once.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [approved]
+ *             properties:
+ *               approved: { type: boolean }
+ *               comments: { type: string }
+ *           example: { approved: true, comments: Apply my credit to this invoice }
+ *     responses:
+ *       200:
+ *         description: Decision saved; invoice status reflects the updated outstanding balance
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StandardResponse'
+ *       400:
+ *         description: Invalid input or cancelled invoice
+ *       404:
+ *         description: Application not found for this customer
+ *       409:
+ *         description: Already decided, insufficient customer credit, or amount exceeds current invoice outstanding
+ */
 router.post('/credit/applications/:id/decision', validateRequest(creditDecisionSchema), controller.decideCreditApplication);
 
 export default router;

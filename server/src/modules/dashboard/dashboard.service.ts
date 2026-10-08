@@ -252,10 +252,10 @@ export class DashboardService {
       }),
       prisma.invoice.aggregate({
         where: {
-          status: { in: ['Unpaid', 'Partially Paid'] },
-          ...(branchId ? { jobCard: { branchId } } : {}),
+          status: { notIn: ['Cancelled', 'CANCELLED', 'CANCELED', 'VOID'] },
+          ...(branchId ? { OR: [{ jobCard: { branchId } }, { jobCardId: null, customer: { branchId } }] } : {}),
         },
-        _sum: { total: true },
+        _sum: { outstandingAmount: true },
       }),
       prisma.payment.aggregate({
         where: {
@@ -448,7 +448,7 @@ export class DashboardService {
       ? Math.round((((monthBookings as number) - (lastMonthBookings as number)) / (lastMonthBookings as number)) * 100 * 10) / 10
       : (monthBookings as number) > 0 ? 100 : 0;
 
-    const totalOutstandingAmount = Number((totalOutstanding as any)._sum?.total ?? 0);
+    const totalOutstandingAmount = Number(totalOutstanding._sum.outstandingAmount ?? 0);
     const monthlyRevenueAmount = Number((monthlyRevenue as any)._sum?.amount ?? 0);
 
     return {

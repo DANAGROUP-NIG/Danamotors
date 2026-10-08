@@ -55,12 +55,12 @@ router.use(authMiddleware);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [customerId, requestedLimit]
+ *             required: [customerId, invoiceId, amount]
  *             properties:
  *               customerId: { type: string }
- *               requestedLimit: { type: number, example: 200000 }
- *               purpose: { type: string }
- *               notes: { type: string }
+ *               invoiceId: { type: string, format: uuid }
+ *               amount: { type: number, example: 50000, description: Must not exceed the invoice outstanding or available customer credit }
+ *               comments: { type: string }
  *     responses:
  *       201:
  *         description: Credit application created

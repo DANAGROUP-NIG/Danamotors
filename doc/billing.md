@@ -47,3 +47,13 @@ Selecting a catalogue service pre-fills its price as the job-card service charge
 7. Receive payment against the bill. Delivery requires a fully paid bill or explicit admin credit approval; credit can be approved for Ready or Billed jobs. Receipts and bill cancellation retain their existing accounting safeguards.
 
 Existing issued bills are unchanged. Existing unbilled jobs must obtain an approved estimate before additional work or billing. This change uses the existing estimate tables and requires no schema migration. Included package components are stored as INCLUDED_PART / INCLUDED_LABOUR estimate line types. Drafts are local until submitted; every saved submission is a new immutable revision.
+
+## Credit application approval (issue #77, phase 1)
+
+Credit application requests validate against `Invoice.outstandingAmount`, including receipt allocations, rather than recomputing outstanding from `Payment` rows. Amounts use the existing Decimal-backed money helpers. Requests that round below 0.01 and applications against cancelled invoices are rejected.
+
+Approval through `POST /api/portal/credit/applications/:id/decision` locks and rechecks the application, customer, and invoice in a serializable transaction. It checks the current available credit and invoice outstanding before writing a Credit payment, a USED credit transaction, the wallet deduction, the reduced invoice outstanding, the invoice status, and a `CREDIT_APPLICATION_APPROVED` audit record. Zero outstanding means Paid; a remaining balance means Partially Paid, matching receipt settlement. Confirmed P2034 serialization rollbacks retry at most twice with backoff, with 5-second acquisition and 15-second execution limits. Timeouts are not replayed. A repeated decision returns a conflict without another financial write. Declining uses a conditional Pending update so it cannot overwrite an approval. Notifications run after commit.
+
+The accountant dashboard sums active invoice `outstandingAmount`, including standalone customer invoices and overdue balances, under the existing branch scope. Portal credit decisions already invalidate invoice, credit, dashboard, and profile queries, so phase 1 requires no frontend change.
+
+This phase needs no migration and does not repair historical approvals. Wallet unification and historical balance repair are delivered in later issue #77 phases.
