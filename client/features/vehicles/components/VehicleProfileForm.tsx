@@ -3,7 +3,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
-import { VehicleModelFields, type ModelSelection } from "./VehicleModelFields";
+import { VehicleIdentityFields, type VehicleIdentitySelection } from "./VehicleIdentityFields";
 import { VehicleCustomerField } from "./VehicleCustomerField";
 import { useVehicleModels } from "@/features/warranty/hooks/use-warranty";
 import { createVehicleSchema, vehicleProfileSchema, type CreateVehicleFormValues } from "../schemas/vehicle.schema";
@@ -39,6 +39,8 @@ export function VehicleProfileForm(
     defaultValues: vehicle ? {
       vin: vehicle.vin,
       registrationNumber: vehicle.registrationNumber ?? "",
+      catalogueId: vehicle.catalogueId ?? null,
+      colourId: vehicle.colourId ?? null,
       modelId: vehicle.modelId ?? null,
       generationId: vehicle.generationId ?? null,
       engineId: vehicle.engineId ?? null,
@@ -56,18 +58,28 @@ export function VehicleProfileForm(
     } : {},
   });
 
-  const selection: ModelSelection = {
-    modelId: watch("modelId"), generationId: watch("generationId"), engineId: watch("engineId"), customModel: watch("customModel"), customMake: watch("customMake"),
-  };
-  function updateSelection(next: ModelSelection) {
-    for (const key of ["modelId", "generationId", "engineId", "customModel", "customMake"] as const) setValue(key, next[key], { shouldDirty: true, shouldValidate: true });
+  const catalogueId = watch("catalogueId");
+  function updateIdentity(next: VehicleIdentitySelection) {
+    for (const key of ["catalogueId", "colourId", "modelId", "generationId", "engineId", "customModel", "customMake"] as const) {
+      setValue(key, next[key], { shouldDirty: true, shouldValidate: true });
+    }
   }
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(values => {
       const payload = { ...values };
-      if (vehicle && (values.modelId ?? null) === (vehicle.modelId ?? null) && (values.generationId ?? null) === (vehicle.generationId ?? null) && (values.engineId ?? null) === (vehicle.engineId ?? null) && (values.customModel || null) === (vehicle.modelId ? null : vehicle.customModel || vehicle.model || "Unspecified (legacy)") && (values.customMake || null) === (vehicle.customMake || vehicle.make || null)) {
+      const unchangedCatalogue = vehicle && (values.catalogueId ?? null) === (vehicle.catalogueId ?? null) && (values.colourId ?? null) === (vehicle.colourId ?? null);
+      const unchangedModel = vehicle && ['modelId', 'generationId', 'engineId', 'customModel', 'customMake'].every(key => {
+        const field = key as keyof VehicleIdentitySelection;
+        const initial = field === 'customMake' ? vehicle.customMake ?? vehicle.make ?? ''
+          : field === 'customModel' ? vehicle.modelId ? null : vehicle.customModel || vehicle.model || 'Unspecified (legacy)'
+          : vehicle[field] ?? null;
+        return (values[field] || null) === (initial || null);
+      });
+      if (values.catalogueId || (unchangedCatalogue && unchangedModel)) {
         delete payload.modelId; delete payload.generationId; delete payload.engineId; delete payload.customModel; delete payload.customMake;
       }
+      if (unchangedCatalogue) { delete payload.catalogueId; delete payload.colourId; }
+      if (values.catalogueId) delete payload.color;
       if (vehicle && (values.vehicleModelId || null) === (vehicle.vehicleModelId ?? null)) delete payload.vehicleModelId;
       onSubmit(payload);
     })}>
@@ -91,8 +103,12 @@ export function VehicleProfileForm(
       <Field label="VIN"><input className={inputCls} readOnly={!!vehicle} {...register("vin")} /></Field>
       <Field label="Registration (optional)"><input className={inputCls} {...register("registrationNumber")} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2"><VehicleModelFields value={selection} onChange={updateSelection} selectedName={vehicle?.model} error={errors.customModel?.message || errors.modelId?.message} /></div>
-        <Field label="Colour (optional)"><input className={inputCls} {...register("color")} /></Field>
+        <div className="sm:col-span-2"><VehicleIdentityFields value={{ catalogueId, colourId: watch('colourId'), modelId: watch('modelId'), generationId: watch('generationId'), engineId: watch('engineId'), customModel: watch('customModel'), customMake: watch('customMake') }}
+          selectedName={vehicle?.model} disabled={pending} onChange={updateIdentity}
+          modelError={errors.modelId?.message || errors.customModel?.message} catalogueError={errors.catalogueId?.message} colourError={errors.colourId?.message} />
+          {vehicle && !catalogueId && <p className="mt-2 text-sm text-muted-foreground">Current vehicle: {[vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" / ")}. Choose a model above to update its specifications.</p>}
+        </div>
+        {!catalogueId && <Field label="Colour (optional)"><input className={inputCls} {...register('color')} /></Field>}
         <Field label="Warranty policy model">
           <select className={inputCls} {...register("vehicleModelId")}>
             <option value="">Not linked</option>

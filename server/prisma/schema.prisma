@@ -529,6 +529,10 @@ model JobCard {
   @@index([appointmentId])
   @@index([branchId, createdAt])
   @@index([branchId, promisedAt])
+  @@index([createdAt, id])
+  @@index([branchId, createdAt, id])
+  @@index([branchId, status, createdAt, id])
+  @@index([customerId, createdAt, id])
 }
 
 // ============================================================
@@ -1628,6 +1632,8 @@ model WorkshopMaster {
   freeService      Boolean          @default(false)
   // 1st, 2nd, 3rd... free service, for SERVICE_TYPE masters flagged freeService.
   freeServiceNo    Int?
+  displayOrder     Int?
+  preDelivery      Boolean          @default(false)
   parentId         String?
   parent           WorkshopMaster?  @relation("MasterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children         WorkshopMaster[] @relation("MasterHierarchy")
@@ -1647,10 +1653,27 @@ model WorkshopMaster {
   labourRates      LabourRate[]
   appointmentServiceTypes      ServiceAppointment[] @relation("AppointmentServiceType")
   appointmentRequestComplaints AppointmentRequest[] @relation("AppointmentRequestComplaint")
+  serviceTypeSettings ServiceTypeModelSetting[] @relation("ServiceTypeSettings")
+  modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
   @@unique([kind, code])
   @@index([kind, active])
   @@index([parentId])
+}
+
+model ServiceTypeModelSetting {
+  id             String         @id @default(uuid())
+  serviceTypeId  String
+  serviceType    WorkshopMaster @relation("ServiceTypeSettings", fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  modelId        String
+  model          WorkshopMaster @relation("ModelServiceSettings", fields: [modelId], references: [id], onDelete: Restrict)
+  serviceCharge  Float
+  previousCharge Float?
+  effectiveFrom  DateTime?
+  active         Boolean        @default(true)
+
+  @@unique([serviceTypeId, modelId])
+  @@index([modelId, active, serviceTypeId])
 }
 
 model JobComplaint {

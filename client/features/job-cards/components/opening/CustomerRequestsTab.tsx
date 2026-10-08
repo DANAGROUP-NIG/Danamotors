@@ -69,7 +69,7 @@ export function CustomerRequestsTab(
   return (
     <div className="space-y-5"><OpeningCard
         title="Customer requests"
-        description="Select a defect or enter a custom code. Amounts update the opening estimate automatically."
+        description="Select a database defect code to fill the description, then add request details. Amounts update the opening estimate automatically."
         action={<Button
           type="button"
           variant="outline"
@@ -114,7 +114,7 @@ export function CustomerRequestsTab(
                     });
                   }}><Trash2 className="h-4 w-4" /></button></div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"><Controller
-                  name={`complaints.${index}.complaintCodeId`}
+                  name={`complaints.${index}.defectCode`}
                   control={control}
                   render={(
                     {
@@ -123,28 +123,22 @@ export function CustomerRequestsTab(
                   ) => <WorkshopPicker
                     label="Defect"
                     required
-                    endpoint="/workshop-masters?kind=COMPLAINT"
+                    endpoint="/job-cards/defect-codes"
                     collection="items"
-                    value={field.value || rows[index]?.defectCode || ""}
-                    selectedRecord={!field.value && rows[index]?.defectCode ? {
-                      id: rows[index].defectCode,
-                      code: rows[index].defectCode,
-                      description: "Custom code",
+                    requestLimit={20} staleTime={60_000} loadOnValue={false}
+                    getOptionId={record => record.code ?? record.id}
+                    value={field.value || ""}
+                    selectedRecord={field.value ? {
+                      id: field.value,
+                      code: field.value,
+                      description: rows[index]?.description,
                     } : undefined}
                     onBlur={field.onBlur}
                     error={errors.complaints?.[index]?.defectCode?.message}
                     onChange={id => {
                       field.onChange(id);
 
-                      if (!id) setValue(`complaints.${index}.defectCode`, "", {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
-                    }}
-                    onCustom={code => {
-                      field.onChange("");
-
-                      setValue(`complaints.${index}.defectCode`, code, {
+                      setValue(`complaints.${index}.complaintCodeId`, "", {
                         shouldDirty: true,
                         shouldValidate: true,
                       });
@@ -155,7 +149,7 @@ export function CustomerRequestsTab(
                         shouldValidate: true,
                       });
 
-                      if (!getValues(`complaints.${index}.description`)) setValue(`complaints.${index}.description`, record.description ?? "", {
+                      setValue(`complaints.${index}.description`, record.description ?? "", {
                         shouldDirty: true,
                         shouldValidate: true,
                       });

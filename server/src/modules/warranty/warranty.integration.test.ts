@@ -39,6 +39,8 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
   let bay: { id: string };
   let team: { id: string };
   let catalogService: { id: string };
+  let serviceType: { id: string };
+  let workshopModel: { id: string };
   let harnessOp: { id: string; code: string };
   let serviceOp: { id: string; code: string };
 
@@ -51,6 +53,7 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
         model: "Sportage",
         customMake: "Kia",
         customModel: "Sportage",
+        catalogueId: workshopModel.id,
         vehicleModelId: data.model === null ? null : sportage.id,
         saleDate: data.startDate === undefined ? new Date(Date.now() - 400 * 86_400_000) : data.startDate,
         lastRecordedMileage: data.lastMileage === undefined ? 30_000 : data.lastMileage,
@@ -62,6 +65,7 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
       vehicleId,
       customerId: customer.id,
       serviceId: catalogService.id,
+      serviceTypeId: serviceType.id,
       branchName: branch.name,
       description: "Engine warning light on, rough idle when cold",
       bayId: bay.id,
@@ -127,6 +131,8 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     });
     const master = (kind: string) => prisma.workshopMaster.create({ data: { kind, code: `${kind}-${run}`, description: kind } });
     [bay, team] = await Promise.all([master("BAY"), master("TEAM")]);
+    [serviceType, workshopModel] = await Promise.all([master("SERVICE_TYPE"), master("MODEL")]);
+    await prisma.serviceTypeModelSetting.create({ data: { serviceTypeId: serviceType.id, modelId: workshopModel.id, serviceCharge: 0 } });
     catalogService = await prisma.service.create({ data: { name: `Warranty test service ${run}`, price: 0 } });
     harnessOp = await prisma.labourItem.create({ data: { code: `HRN-${run}`, description: "Harness inspection", defaultHours: 1.2, rate: 15_000 } });
     serviceOp = await prisma.labourItem.create({ data: { code: `SRV-${run}`, description: "Periodic service 60k", defaultHours: 2, rate: 24_000 } });

@@ -25,9 +25,12 @@ import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
 import reportRoutes from '../modules/reports/reports.routes';
 
 import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
+import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
 router.use('/workshop-masters', workshopMasterRoutes);
+router.use('/job-cards', serviceTypeOptionsRouter);
+router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 
 // Base health check
 /**

@@ -16,7 +16,8 @@ npm run vehicles:review-custom
 npm test -- --runInBand
 ```
 
-The catalogue seed is explicit; it does not run unrelated application seeds. It
+The standalone catalogue seed does not run unrelated application seeds. The full
+database seed also includes it so new database setups have Kia reference data. It
 validates the whole file, takes a transaction-scoped advisory lock and performs
 parameterized batches of 100 rows in one transaction. An error rolls back the
 entire import. Output distinguishes inserted and updated rows per table. A repeat

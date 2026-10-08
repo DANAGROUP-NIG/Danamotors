@@ -1,4 +1,5 @@
 import { latestEstimateQuery } from './estimate-approval';
+import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { lineAmount, sumMoney } from '../finance/money';
 import { EstimateCloseReason, EstimateStatus, Prisma, WarrantyCoverageStatus } from '@prisma/client';
 import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
@@ -477,13 +478,14 @@ export class ServiceService {
     const data = estimateBody.parse(input);
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
-      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { vehicle: { include: { catalogue: true } } } });
+      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { serviceType: { select: { description: true } }, vehicle: { include: { catalogue: true } } } });
       if (!card) throw new NotFoundError('Job card not found');
       if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to unbilled jobs');
       const billable = data.lines.filter(line => line.type !== 'COMPLAINT');
       if (new Set(billable.map(line => `${line.type}:${line.referenceId}`)).size !== billable.length) throw new BadRequestError('Each service, part or labour operation can appear only once per estimate');
       const services = billable.filter(line => line.type === 'SERVICE');
-      if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
+      const chargeReference = serviceChargeReference(card);
+      if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
       if (data.lines.some(line => line.includedInService && !['PART', 'LABOUR'].includes(line.type))) throw new BadRequestError('Only parts and labour can be included in the service charge');
       if (data.lines.some(line => line.includedInService) && services.length !== 1) throw new BadRequestError('Package inclusions require the selected service line');
       const lines = [];
@@ -504,9 +506,14 @@ export class ServiceService {
           description = item.description; rate = modelRate?.rate ?? item.rate;
           quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
         } else if (line.type === 'SERVICE') {
-          const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
-          if (!service) throw new BadRequestError('Select an active service');
-          description = service.name; rate = card.serviceCharge ?? service.price;
+          if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
+            description = serviceChargeDescription(card);
+            rate = card.serviceCharge ?? 0;
+          } else {
+            const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
+            if (!service) throw new BadRequestError('Select an active service');
+            description = service.name; rate = card.serviceCharge ?? service.price;
+          }
         } else if (line.referenceId) {
           const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
           if (!complaint) throw new BadRequestError('Complaint must belong to this job');
@@ -570,7 +577,8 @@ export class ServiceService {
       const status = data.approved ? 'Approved' : 'Declined';
       if (data.approved) {
         const services = estimate.lines.filter(line => line.type === 'SERVICE');
-        if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
+        const chargeReference = serviceChargeReference(card);
+        if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
         if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
       }
       // The decision closes the revision: approved = the job's scope, declined = rejected.

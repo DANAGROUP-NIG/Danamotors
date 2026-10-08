@@ -113,6 +113,10 @@ integration("Workshop database flow", () => {
           const bay = await master("BAY");
           const team = await master("TEAM");
           const late = await master("LATE_REASON");
+          const serviceType = await master("SERVICE_TYPE");
+          const model = await master("MODEL");
+          await tx.vehicle.update({ where: { id: vehicle.id }, data: { catalogueId: model.id } });
+          await tx.serviceTypeModelSetting.create({ data: { serviceTypeId: serviceType.id, modelId: model.id, serviceCharge: 1000 } });
           const catalogService = await tx.service.create({
             data: { name: `Test service ${suffix}`, price: 1000 },
           });
@@ -158,6 +162,7 @@ integration("Workshop database flow", () => {
               customerId: customer.id,
               vehicleId: vehicle.id,
               serviceId: catalogService.id,
+              serviceTypeId: serviceType.id,
               branchName: branch.name,
               description: "Inspection",
               bayId: bay.id,

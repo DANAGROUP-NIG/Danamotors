@@ -36,6 +36,7 @@ import {
   type CreateJobCardFormValues,
 } from "../schemas/job-card.schema";
 import { WorkshopPicker, type PickerRecord } from "./WorkshopPicker";
+import { ServiceTypePicker } from "./ServiceTypePicker";
 import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
 import {
   CustomerRequestsTab,
@@ -101,7 +102,7 @@ export function JobCardCreateForm({
 }) {
   const create = useCreateJobCard();
 
-  const { hasPermission, isSuperAdmin, user } = useAuth();
+  const { hasPermission, isSuperAdmin, isAdminOrAbove, user } = useAuth();
   const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -125,19 +126,6 @@ export function JobCardCreateForm({
 
     formState: { errors, isDirty },
   } = form;
-
-  const selectedServiceId = watch("serviceId");
-  const selectedServiceCharge = watch("serviceCharge");
-  const serviceQuery = useQuery({
-    queryKey: ["job-opening-service", selectedServiceId],
-    queryFn: () => apiGet<{ service: { price: number } }>(`/services/${selectedServiceId}`),
-    enabled: !!selectedServiceId,
-  });
-  useEffect(() => {
-    if (serviceQuery.data && selectedServiceCharge === undefined) {
-      setValue("serviceCharge", serviceQuery.data.service.price, { shouldValidate: true });
-    }
-  }, [serviceQuery.data, selectedServiceCharge, setValue]);
 
   const [tab, setTab] = useState<Tab>("Vehicle Details");
   const [confirmation, setConfirmation] = useState<
@@ -259,6 +247,7 @@ export function JobCardCreateForm({
     });
 
     setValue("mileage", Number.NaN);
+    setValue("serviceId", "");
     setValue("odometerReplaced", false);
     setValue("odometerReplacedReason", "");
     setValue("acType", "NONE");
@@ -433,7 +422,6 @@ export function JobCardCreateForm({
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
           teamId: values.teamId || undefined,
-          serviceTypeId: values.serviceTypeId || undefined,
           estimateId: openedFromEstimateId,
           freeServiceCouponNo: values.freeServiceCouponNo?.trim() || undefined,
           estimatedParts: totals.spare,
@@ -499,7 +487,7 @@ export function JobCardCreateForm({
   );
 
   const masterPicker = (
-    name: "bayId" | "teamId" | "serviceTypeId",
+    name: "bayId" | "teamId",
     label: string,
     kind: string,
     required = false,
@@ -809,24 +797,23 @@ export function JobCardCreateForm({
                   </OpeningField>
                 </div>
                 <Controller
-                  name="serviceId"
+                  name="serviceTypeId"
                   control={control}
                   render={({ field }) => (
-                    <WorkshopPicker
-                      label="Service"
-                      required
-                      endpoint="/services?isActive=true"
-                      collection="services"
-                      value={field.value ?? ""}
+                    <ServiceTypePicker
+                      canConfigure={isAdminOrAbove}
+                      vehicleId={vehicleId}
+                      date={localDate(openedAt)}
+                      value={field.value}
+                      serviceCharge={watch("serviceCharge")}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
-                      onSelect={(service) => setValue("serviceCharge", service.price ?? 0, { shouldDirty: true, shouldValidate: true })}
-                      error={errors.serviceId?.message}
+                      onCharge={charge => setValue("serviceCharge", charge, { shouldDirty: true, shouldValidate: true })}
+                      error={errors.serviceTypeId?.message}
                     />
                   )}
                 />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {masterPicker("serviceTypeId", "Service type", "SERVICE_TYPE")}
                   <OpeningField label="Free service coupon no" error={errors.freeServiceCouponNo?.message}>
                     <input className={openingInput} placeholder="Only for free services" {...register("freeServiceCouponNo")} />
                   </OpeningField>

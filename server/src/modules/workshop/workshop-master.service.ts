@@ -92,6 +92,8 @@ export class WorkshopMasterService {
   }
 
   async create(data: MasterInput) {
+    if (data.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
+      throw new BadRequestError('Display order and pre-delivery apply only to service types');
     await this.validateParent(data);
     this.validateFreeServiceNo(data.kind, Boolean(data.freeService), data.freeServiceNo);
 
@@ -109,6 +111,8 @@ export class WorkshopMasterService {
 
     if (!existing)
       throw new NotFoundError('Master not found');
+    if (existing.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
+      throw new BadRequestError('Display order and pre-delivery apply only to service types');
 
     // Reparenting would silently change the meaning of existing vehicles and rates.
     if (data.parentId !== undefined && data.parentId !== existing.parentId)

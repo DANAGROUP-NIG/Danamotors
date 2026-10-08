@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Search, Loader2 } from "lucide-react";
 import { Field, inputCls } from "@/components/forms/FormField";
 import {
-  getCatalogModels, getCatalogOptions, matchesModel, normalizeCatalogName,
+  getCatalogModels, getCatalogOptions, matchesModel, isExactModelMatch,
   type CatalogModel,
 } from "../api/vehicle-catalog.api";
 
@@ -23,8 +23,8 @@ type Props = {
   error?: string;
 };
 const catalogCache = {
-  staleTime: Infinity,
-  gcTime: Infinity,
+  staleTime: 60_000,
+  gcTime: 300_000,
   retry: false,
   refetchOnWindowFocus: false,
 } as const;
@@ -34,22 +34,29 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [active, setActive] = useState(-1);
+  const refreshRequested = useRef(false);
   const models = useQuery({
     queryKey: ["vehicle-catalog", "models"],
-    queryFn: getCatalogModels,
+    queryFn: ({ signal }) => {
+      const refresh = refreshRequested.current;
+      refreshRequested.current = false;
+      return getCatalogModels(signal, refresh);
+    },
     ...catalogCache,
   });
+  function refreshModels() {
+    refreshRequested.current = true;
+    void models.refetch();
+  }
   const options = useQuery({
     queryKey: ["vehicle-catalog", "options", value.modelId],
-    queryFn: () => getCatalogOptions(value.modelId!),
+    queryFn: ({ signal }) => getCatalogOptions(value.modelId!, signal),
     enabled: !!value.modelId,
     ...catalogCache,
   });
   const selected = models.data?.find(model => model.id === value.modelId);
   const filtered = (models.data ?? []).filter(model => matchesModel(model, search)).slice(0, 8);
-  const exact = (models.data ?? []).some(model =>
-    [model.searchName, ...model.aliases].includes(normalizeCatalogName(search)),
-  );
+  const exact = (models.data ?? []).some(model => isExactModelMatch(model, search));
   const customName = search.trim().replace(/\s+/g, " ");
   const canCreate = !models.isPending && !!customName && !exact && customName.length <= 80;
   const count = filtered.length + (canCreate ? 1 : 0);
@@ -57,6 +64,8 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
     ? selected?.name || selectedName || "Selected catalog model"
     : value.customModel || "";
   const engines = options.data?.find(generation => generation.id === value.generationId)?.engines ?? [];
+  const generation = options.data?.find(item => item.id === value.generationId);
+  const engine = engines.find(item => item.id === value.engineId);
 
   function commit(model?: CatalogModel) {
     onChange({
@@ -77,13 +86,6 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
     }
   }, [open, active, id]);
 
-  // Preserve input typed while the initial request was still pending if it fails.
-  useEffect(() => {
-    if (models.isError && !value.modelId && search && value.customModel !== search) {
-      onChange({ ...value, customModel: search });
-    }
-  }, [models.isError, value, search, onChange]);
-
   return (
     <div className="space-y-4">
       <div className="relative space-y-1.5" onBlur={event => {
@@ -96,34 +98,26 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <input
             id={id}
-            role={models.isError ? undefined : "combobox"}
-            aria-expanded={models.isError ? undefined : open}
-            aria-controls={!models.isError && open ? `${id}-options` : undefined}
-            aria-autocomplete={models.isError ? undefined : "list"}
-            aria-activedescendant={!models.isError && open && active >= 0 ? `${id}-${active}` : undefined}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={open ? `${id}-options` : undefined}
+            aria-autocomplete="list"
+            aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined}
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-error` : undefined}
             autoComplete="off"
             maxLength={80}
             className={`${inputCls} pl-9 pr-9`}
             value={open ? search : label || search}
-            placeholder="Search a model or enter your own"
+            placeholder="Search Kia models, e.g. Kia Rio or Sportage"
             onFocus={() => { setSearch(label || search); setOpen(true); }}
             onChange={event => {
               const text = event.target.value;
               setSearch(text);
               setOpen(true);
               setActive(-1);
-              onChange({
-                modelId: null,
-                customModel: models.isError ? text : "",
-                customMake: value.customMake,
-                generationId: null,
-                engineId: null,
-              });
             }}
             onKeyDown={event => {
-              if (models.isError) return;
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
                 setOpen(true);
@@ -141,7 +135,7 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
           />
           {models.isFetching && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
-        {open && !models.isError && (
+        {open && (
           <ul id={`${id}-options`} role="listbox" aria-label="Vehicle models"
             className="absolute z-30 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg">
             {models.isPending && <li role="presentation" className="p-3 text-sm text-muted-foreground">Loading catalogue...</li>}
@@ -173,10 +167,16 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
             )}
           </ul>
         )}
+        {models.isSuccess && models.data.length === 0 && (
+          <p role="status" className="text-sm text-muted-foreground">
+            No vehicle models have been loaded yet. You can add a custom model or retry after the catalogue is available.{" "}
+            <button type="button" className="underline" disabled={models.isFetching} onClick={refreshModels}>Refresh catalogue</button>
+          </p>
+        )}
         {models.isError && (
           <p role="status" className="text-sm text-muted-foreground">
-            Catalogue unavailable. Type your model to save it as a custom entry.{" "}
-            <button type="button" className="underline" onClick={() => models.refetch()}>Retry catalogue</button>
+            Catalogue unavailable. Retry or explicitly add a custom model.{" "}
+            <button type="button" className="underline" disabled={models.isFetching} onClick={refreshModels}>Retry catalogue</button>
           </p>
         )}
         {error && <p role="alert" id={`${id}-error`} className="text-sm text-destructive">{error}</p>}
@@ -189,6 +189,7 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
       )}
       {!!value.modelId && (
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Make"><input className={inputCls} readOnly value={selected?.make ?? ""} /></Field>
           <Field label="Generation (optional)">
             <select className={inputCls} value={value.generationId ?? ""}
               disabled={options.isPending || options.isError}
@@ -219,6 +220,12 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
               <button type="button" className="underline" onClick={() => options.refetch()}>Retry</button>
             </p>
           )}
+          {generation && <p className="text-sm text-muted-foreground sm:col-span-2">{generation.bodyType || 'Body type not recorded'} · {generation.yearStart}–{generation.yearEnd ?? 'present'}</p>}
+          {engine && <dl className="grid grid-cols-2 gap-3 text-sm sm:col-span-2">
+            {Object.entries({ Fuel: engine.fuelType, Transmission: engine.transmission, Drivetrain: engine.drivetrain,
+              'Power (hp)': engine.powerHp, Cylinders: engine.cylinders, 'Displacement (cc)': engine.displacementCc }).map(([label, value]) =>
+              <div key={label}><dt className="text-muted-foreground">{label}</dt><dd>{value ?? 'Not recorded'}</dd></div>)}
+          </dl>}
         </div>
       )}
     </div>

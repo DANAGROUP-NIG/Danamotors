@@ -1,3 +1,4 @@
+import { seedKiaCatalog } from "./vehicle-catalog";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -35,6 +36,9 @@ async function main() {
   const services = await seedServices(prisma);
 
   await seedWorkshop(prisma);
+
+  console.log("Seeding Kia vehicle models, generations and engines...");
+  console.log(await seedKiaCatalog(prisma));
 
   // 5. Spare parts
   console.log("\nSeeding spare parts...");

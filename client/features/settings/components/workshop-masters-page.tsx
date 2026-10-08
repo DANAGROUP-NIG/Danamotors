@@ -11,6 +11,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { ServiceTypeModelSettings } from "./service-type-model-settings";
 
 type Master = {
   id: string;
@@ -22,6 +23,8 @@ type Master = {
   chargedTo?: string;
   freeService?: boolean;
   freeServiceNo?: number | null;
+  displayOrder?: number | null;
+  preDelivery?: boolean;
   fuel?: string | null;
   gearbox?: string | null;
   acFitted?: boolean;
@@ -87,6 +90,8 @@ export function WorkshopMastersPage() {
         chargedTo: record.chargedTo,
         freeService: record.freeService,
         ...(kind === "SERVICE_TYPE" && { freeServiceNo: record.freeService ? record.freeServiceNo ?? null : null }),
+        displayOrder: kind === "SERVICE_TYPE" ? record.displayOrder : undefined,
+        preDelivery: kind === "SERVICE_TYPE" ? record.preDelivery : undefined,
         fuel: record.fuel,
         gearbox: record.gearbox,
         acFitted: record.acFitted,
@@ -110,6 +115,7 @@ export function WorkshopMastersPage() {
       queryClient.invalidateQueries({
         queryKey: ["workshop-picker"],
       });
+      queryClient.invalidateQueries({ queryKey: ["job-card-service-types"] });
     },
   });
 
@@ -164,7 +170,7 @@ export function WorkshopMastersPage() {
           header: "Actions",
           render: row => isAdminOrAbove && <Button variant="outline" size="sm" onClick={() => setForm(row)}>Edit</Button>,
         }]} />
-      <ModalFame isOpen={!!form} title={form?.id ? "Edit master" : "Create master"} onClose={() => setForm(null)}>{form && <form
+      <ModalFame isOpen={!!form} size={kind === "SERVICE_TYPE" ? "wide" : "default"} title={form?.id ? "Edit master" : "Create master"} onClose={() => setForm(null)}>{form && <form
           className="grid gap-3 p-5"
           onSubmit={e => {
             e.preventDefault();
@@ -226,6 +232,12 @@ export function WorkshopMastersPage() {
                   ...form,
                   category: e.target.value,
                 })} /></Field></>}
+          {kind === "SERVICE_TYPE" && <>
+            <Field label="Display order"><input className={inputCls} type="number" min="0" max="100000" step="1"
+              value={form.displayOrder ?? ""} onChange={event => setForm({ ...form, displayOrder: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+            <label className="flex gap-2"><input type="checkbox" checked={form.preDelivery ?? false}
+              onChange={event => setForm({ ...form, preDelivery: event.target.checked })} />Pre-delivery service (unsold vehicles only)</label>
+          </>}
           {kind === "BAY" && <Field label="Category"><input
               className={inputCls}
               value={form.category ?? ""}
@@ -264,7 +276,10 @@ export function WorkshopMastersPage() {
               })} />Active</label>
           {save.isError && <p role="alert" className="text-red-600">Could not save. Check unique code and parent selection.</p>}
           <Button disabled={save.isPending}>Save master</Button>
-        </form>}</ModalFame>
+        </form>}
+        {form?.id && kind === "SERVICE_TYPE" && <ServiceTypeModelSettings key={form.id} serviceTypeId={form.id} />}
+        {form && !form.id && kind === "SERVICE_TYPE" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the service type first, then edit it to configure model charges.</p>}
+      </ModalFame>
     </div>
   );
 }

@@ -26,6 +26,13 @@ it('rejects approval of a superseded estimate', async () => {
   await expect(new ServiceService().addApproval('old', { customerId: 'customer', approved: true })).rejects.toThrow('latest');
   expect(prisma.customerApproval.create).not.toHaveBeenCalled();
 });
+it('records approval for a workshop-only service type without an appointment service', async () => {
+  (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+    id: 'job', customerId: 'customer', serviceId: null, serviceTypeId: 'service', status: 'QC',
+  });
+  await new ServiceService().addApproval('latest', { customerId: 'customer', approved: true });
+  expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id: 'job' }, data: { serviceCharge: 500 } });
+});
 it('preserves immutable decisions and requires a revision', async () => {
   (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ ...latest, approvals: [{ approved: false }] }]);
   await expect(new ServiceService().addApproval('latest', { customerId: 'customer', approved: true })).rejects.toThrow('already has a decision');

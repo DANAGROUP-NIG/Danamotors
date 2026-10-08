@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { seedServiceTypes } from './service-type-data';
 
 export default async function seedWorkshop(prisma: PrismaClient) {
   const master = (
@@ -9,6 +10,7 @@ export default async function seedWorkshop(prisma: PrismaClient) {
       parentId?: string;
       chargedTo?: string;
       freeService?: boolean;
+      preDelivery?: boolean;
       category?: string;
       warrantyDays?: number;
       warrantyKm?: number;
@@ -33,15 +35,6 @@ export default async function seedWorkshop(prisma: PrismaClient) {
       ...extra,
     },
   });
-
-  await master('SERVICE_TYPE', 'PS', 'Paid service');
-
-  await master('SERVICE_TYPE', 'F1', 'First free service', {
-    chargedTo: 'COMPANY',
-    freeService: true,
-  });
-
-  await master('SERVICE_TYPE', 'RR', 'Running repair');
 
   await prisma.workshopMaster.updateMany({
     where: { kind: 'BAY', code: { in: ['S01', 'E01'] } },
@@ -71,6 +64,7 @@ export default async function seedWorkshop(prisma: PrismaClient) {
     warrantyDays: 1825,
     warrantyKm: 100000,
   });
+  await seedServiceTypes(prisma, model.id);
 
   await master('VARIANT', 'RIO-AT', 'Rio automatic petrol', {
     parentId: model.id,

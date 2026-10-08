@@ -29,7 +29,8 @@ const vehicleFields = z.object({
 });
 
 export const vehicleProfileSchema = vehicleFields.superRefine((values, ctx) => {
-  if (!values.modelId && !values.customModel?.trim() && !values.catalogueId) ctx.addIssue({ code: "custom", path: ["customModel"], message: "Select a model or add a custom model" });
+  if (values.catalogueId && !values.colourId) ctx.addIssue({ code: "custom", path: ["colourId"], message: "Select a catalogue colour" });
+  if (!values.modelId && !values.customModel?.trim() && !values.catalogueId) ctx.addIssue({ code: "custom", path: ["modelId"], message: "Select a model or enter a custom model" });
 });
 // Existing stock vehicles remain editable; every new frontend vehicle requires a customer.
 export const createVehicleSchema = vehicleProfileSchema.superRefine((values, ctx) => {

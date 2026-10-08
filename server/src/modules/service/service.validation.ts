@@ -125,7 +125,8 @@ export const jobOpeningBody = z
     appointmentId: z.string().uuid().optional(),
     // A pre-job estimate the job is opened from.
     estimateId: z.string().uuid().optional(),
-    serviceId: z.string().uuid(),
+    serviceId: z.string().uuid().optional(),
+    serviceTypeId: z.string().uuid(),
     customerId: z.string().uuid(),
     vehicleId: z.string().uuid(),
     branchName: z.string().trim().min(1),
@@ -139,8 +140,6 @@ export const jobOpeningBody = z
     serviceAdvisorId: z.string().uuid(),
     technicianId: z.string().uuid().optional(),
     teamId: z.string().uuid().optional(),
-    // Workshop service type (SERVICE_TYPE master: paid service, free service, running repair...).
-    serviceTypeId: z.string().uuid().optional(),
     freeServiceCouponNo: z.string().trim().max(50).optional(),
     promisedAt: z.string().datetime(),
 
@@ -157,7 +156,7 @@ export const jobOpeningBody = z
           })
           .strict()
           .refine(
-            (c) => !!c.complaintCodeId || !!c.description,
+            (c) => !!c.complaintCodeId || !!c.defectCode || !!c.description,
             "Enter a complaint code or description",
           ),
       )

@@ -25,6 +25,8 @@ export const masterBody = z.object({
   freeService: z.boolean().optional(),
   // 1st, 2nd, 3rd... free service (SERVICE_TYPE masters flagged freeService).
   freeServiceNo: z.number().int().min(1).max(20).nullable().optional(),
+  displayOrder: z.number().int().min(0).max(100000).nullable().optional(),
+  preDelivery: z.boolean().optional(),
   parentId: z.string().uuid().nullable().optional(),
   fuel: z.string().trim().max(50).nullable().optional(),
   gearbox: z.string().trim().max(50).nullable().optional(),

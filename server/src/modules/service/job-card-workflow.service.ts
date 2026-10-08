@@ -11,6 +11,8 @@ import {
 import { ROLES } from "../../shared/constants/roles";
 import { nextDocumentNumber } from "../finance/document-number";
 import { requireMaster } from "../workshop/workshop-master.service";
+import { ServiceTypeService } from "../workshop/service-type.service";
+import { resolveJobComplaints } from './job-card-complaints';
 import { jobOpeningBody, jobUpdateBody } from "./service.validation";
 import { linkEstimateToOpenedJob } from "./pre-job-estimate.service";
 import { NOTIFICATION_TYPES, NotificationService } from "../notification/notification.service";
@@ -213,11 +215,14 @@ export class JobCardWorkflowService {
 
       await requireMaster(tx, data.bayId, "BAY");
 
-      const service = await tx.service.findFirst({
-        where: { id: data.serviceId, isActive: true },
-        select: { id: true, price: true },
-      });
-      if (!service) throw new BadRequestError("Select an active service");
+      const serviceType = await new ServiceTypeService().requireAvailable(
+        tx, vehicle.id, data.serviceTypeId, new Date(),
+      );
+      // Appointment services remain a separate catalogue and are never used
+      // to determine the opening dropdown or its model-specific charge.
+      if (data.serviceId && !(await tx.service.findFirst({
+        where: { id: data.serviceId, isActive: true }, select: { id: true },
+      }))) throw new BadRequestError("Select an active appointment service");
 
       if (data.teamId) await requireMaster(tx, data.teamId, "TEAM");
       if (data.serviceTypeId) await requireMaster(tx, data.serviceTypeId, "SERVICE_TYPE");
@@ -254,29 +259,7 @@ export class JobCardWorkflowService {
           );
       }
 
-      const complaints: {
-        complaintCodeId?: string;
-        defectCode?: string;
-        description: string;
-        spare: number;
-        oil: number;
-        labour: number;
-      }[] = [];
-
-      for (const complaint of data.complaints) {
-        const code = complaint.complaintCodeId
-          ? await requireMaster(tx, complaint.complaintCodeId, "COMPLAINT")
-          : null;
-
-        complaints.push({
-          complaintCodeId: code?.id,
-          defectCode: code?.code ?? complaint.defectCode,
-          spare: complaint.spare ?? 0,
-          oil: complaint.oil ?? 0,
-          labour: complaint.labour ?? 0,
-          description: complaint.description || code!.description,
-        });
-      }
+      const complaints = await resolveJobComplaints(tx, data.complaints);
 
       const tyres = data.tyres
         ? await Promise.all(
@@ -327,7 +310,7 @@ export class JobCardWorkflowService {
       } = data;
       const now = new Date();
 
-      const serviceCharge = data.serviceCharge ?? service.price ?? 0;
+      const serviceCharge = data.serviceCharge ?? serviceType.serviceCharge;
       const card = await tx.jobCard.create({
         data: {
           ...fields,
