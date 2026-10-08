@@ -1,3 +1,5 @@
+import { PartyReportService } from './party-report.service';
+import { partyReportQuery } from './party-report.validation';
 // Only run against an explicitly supplied, migrated disposable database.
 if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL=process.env.TEST_DATABASE_URL;
 import { randomUUID } from 'crypto';
@@ -43,7 +45,7 @@ integration('Party adjustments in PostgreSQL',()=>{
     await expect(service.reverse(batch.id,'Again',actor.id)).rejects.toThrow('already been reversed');
     await receipts.cancelReceipt(receipt.id,'Not needed',actor.id);expect(await availablePartyCredit(tx,customer.id)).toBe(20);
     expect(await tx.auditLog.count({where:{userId:actor.id,action:{in:['PARTY_ADJUSTMENT_CREATED','PARTY_ADJUSTMENT_REVERSED']}}})).toBe(2);
-    const movedBatch=await service.createAdjustment({...input,idempotencyKey:randomUUID(),debits:[{id:invoice.id,kind:'INVOICE',amount:10}],credits:[{id:credit.id,kind:'NOTE',amount:10}]},actor.id);
+    const movedBatch=await service.createAdjustment({...input,date:new Date().toISOString(),idempotencyKey:randomUUID(),debits:[{id:invoice.id,kind:'INVOICE',amount:10}],credits:[{id:credit.id,kind:'NOTE',amount:10}]},actor.id);
     const targetBranch=await tx.branch.create({data:{name:'target-'+suffix}});
     const target=await tx.customer.create({data:{firstName:'Test',lastName:'Target',branchId:targetBranch.id}});
     await new CustomerService().merge(customer.id,target.id,actor.id);
@@ -54,6 +56,35 @@ integration('Party adjustments in PostgreSQL',()=>{
     expect((await tx.customer.findUniqueOrThrow({where:{id:target.id}})).creditBalance).toBe(20);
     expect((await tx.partyNote.findUniqueOrThrow({where:{id:credit.id}})).customerId).toBe(target.id);
     expect((await tx.partyAdjustmentBatch.findUniqueOrThrow({where:{id:batch.id}})).customerId).toBe(target.id);
+    const reports=new PartyReportService();const asOn=new Date().toISOString().slice(0,10);
+    const outstanding=await reports.report(partyReportQuery.parse({kind:'outstanding',customerId:target.id,branchId:branch.id,asOn}));
+    expect(outstanding.rows[0].net).toBe(60);expect(outstanding.rows[0].debits).toBe(80);expect(outstanding.rows[0].credits).toBe(20);
+    const ledger=await reports.report(partyReportQuery.parse({kind:'ledger',customerId:target.id,branchId:branch.id,from:new Date(Date.now()-5*86400000).toISOString().slice(0,10),to:asOn,pageSize:100}));
+    expect(ledger.rows.at(-1)?.closing).toBe(outstanding.rows[0].net);
+    expect(ledger.rows.some(row=>row.kind==='CANCELLATION')).toBe(true);
+    const age=await reports.report(partyReportQuery.parse({kind:'age',customerId:target.id,branchId:branch.id,asOn,ageLimits:'5,10,15,20,25'}));
+    expect(age.rows[0].bucket0).toBe(80);
+    const bill=await reports.report(partyReportQuery.parse({kind:'bill',customerId:target.id,branchId:branch.id,asOn}));
+    expect(bill.rows.filter(row=>row.side==='DEBIT').map(row=>row.balance)).toEqual([80]);
+    const earlier=new Date(Date.now()-86400000).toISOString().slice(0,10);
+    const historical=await reports.report(partyReportQuery.parse({kind:'outstanding',customerId:target.id,branchId:branch.id,asOn:earlier}));
+    expect(historical.rows[0].net).toBe(-40);
+    const streamed:Array<{net:string|number|null}>=[];
+    await reports.stream(partyReportQuery.parse({kind:'outstanding',customerId:target.id,branchId:branch.id,asOn}),async rows=>{streamed.push(...rows.map(row=>({net:row.net})));});
+    expect(streamed).toEqual([{net:60}]);
+    const editParty=await tx.customer.create({data:{firstName:'History',lastName:'Edits',branchId:branch.id}});
+    const edited=await receipts.createReceipt({customerId:editParty.id,branchId:branch.id,issuedById:actor.id,issuedAt:new Date(Date.now()-4*86400000).toISOString(),mode:'CASH',category:'SERVICE_PARTS',amount:0.3,allocations:[],idempotencyKey:randomUUID()});
+    const pastFilter=partyReportQuery.parse({kind:'outstanding',customerId:editParty.id,branchId:branch.id,asOn:earlier});
+    expect((await reports.report(pastFilter)).rows[0].credits).toBe(0.3);
+    await receipts.updateReceipt(edited.id,{amount:0.5,editedById:actor.id});
+    expect((await reports.report(pastFilter)).rows[0].credits).toBe(0.3);
+    expect((await reports.report({...pastFilter,asOn})).rows[0].credits).toBe(0.5);
+    await receipts.cancelReceipt(edited.id,'History check',actor.id);
+    expect((await reports.report(pastFilter)).rows[0].credits).toBe(0.3);
+    const editLedger=await reports.report(partyReportQuery.parse({kind:'ledger',customerId:editParty.id,branchId:branch.id,from:new Date(Date.now()-5*86400000).toISOString().slice(0,10),to:asOn,pageSize:100}));
+    expect(editLedger.rows.at(-1)?.closing).toBe(0);expect(editLedger.rows.some(row=>row.kind==='RECEIPT_EDIT')).toBe(true);
+
+
    } finally {spy.mockRestore();}
    throw rollback;
   },{isolationLevel:'Serializable',timeout:30000})).rejects.toBe(rollback);

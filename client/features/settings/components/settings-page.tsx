@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/headers/page-header";
 
 const SETTINGS_CARDS = [
+  { title: "Party reports", description: "Set company defaults for ageing limits.", href: "/settings/party-reports" },
   {
     title: "Users & Roles",
     description: "Manage staff accounts and permission levels.",

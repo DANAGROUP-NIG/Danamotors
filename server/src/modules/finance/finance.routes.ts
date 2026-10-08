@@ -1,3 +1,6 @@
+import { z } from 'zod';
+import { PartyReportController, requirePartyReport, requireAnyPartyReport } from './party-report.controller';
+import { partyReportSchema, reportSettingsSchema, reportPartySearchSchema } from './party-report.validation';
 import { Router } from 'express';
 import { PartyAccountController } from './party-account.controller';
 import { partyAccountSchema, partySearchSchema, partyDocumentsSchema, fifoAdjustmentSchema, createAdjustmentSchema, reverseAdjustmentSchema, openingBalanceSchema } from './party-account.validation';
@@ -30,6 +33,14 @@ const router = Router();
 const controller = new FinanceController();
 
 router.use(authMiddleware);
+const partyReports = new PartyReportController();
+router.get('/party-reports/parties', requireAnyPartyReport, validateRequest(reportPartySearchSchema), partyReports.search);
+router.get('/party-reports/export', requirePartyReport, validateRequest(partyReportSchema), partyReports.export);
+router.get('/party-reports/print', requirePartyReport, validateRequest(partyReportSchema), partyReports.print);
+router.get('/party-reports', requirePartyReport, validateRequest(partyReportSchema), partyReports.report);
+router.get('/settings/party-reports', requireAnyPartyReport, validateRequest(z.object({query:z.object({}).strict()})), partyReports.settings);
+router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OUTSTANDING_AGE_READ), validateRequest(reportSettingsSchema), partyReports.saveSettings);
+
 
 /**
  * @openapi
@@ -585,3 +596,274 @@ router.post('/opening-balances', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), req
 
 export default router;
 
+
+/**
+ * @openapi
+ * components:
+ *   parameters:
+ *     PartyReportKind:
+ *       in: query
+ *       name: kind
+ *       description: "Report-specific permission is required."
+ *       schema: {"type":"string","enum":["ledger","outstanding","age","bill"],"default":"outstanding"}
+ *     PartyReportBranch:
+ *       in: query
+ *       name: branchId
+ *       description: "Admin may omit for all branches; other roles are forced to their assigned branch."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportCustomer:
+ *       in: query
+ *       name: customerId
+ *       description: "Optional single party, including the customer Account tab ledger link."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportFromParty:
+ *       in: query
+ *       name: fromCustomerId
+ *       description: "Inclusive range start in the selected name/code order."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportToParty:
+ *       in: query
+ *       name: toCustomerId
+ *       description: "Inclusive range end in the selected name/code order."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportOrder:
+ *       in: query
+ *       name: order
+ *       description: "Stable ordering by selected value then party ID."
+ *       schema: {"type":"string","enum":["name","code"],"default":"name"}
+ *     PartyReportStatus:
+ *       in: query
+ *       name: partyStatus
+ *       description: "Party classification; vendors excluded."
+ *       schema: {"type":"string","enum":["ALL","CUSTOMER","DEALER","FA_PARTY"],"default":"ALL"}
+ *     PartyReportSide:
+ *       in: query
+ *       name: side
+ *       description: "Creditors remain disabled until vendor parties exist."
+ *       schema: {"type":"string","enum":["DEBTORS"],"default":"DEBTORS"}
+ *     PartyReportFrom:
+ *       in: query
+ *       name: from
+ *       description: "Required for ledger; opening balance excludes this day's events."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportTo:
+ *       in: query
+ *       name: to
+ *       description: "Required for ledger; inclusive Africa/Lagos calendar date."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportAsOn:
+ *       in: query
+ *       name: asOn
+ *       description: "Required for outstanding, age and bill. Inclusive Africa/Lagos date; future dates rejected."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportCredit:
+ *       in: query
+ *       name: showCredit
+ *       description: "Age and bill hide net-credit parties unless true."
+ *       schema: {"type":"string","enum":["true","false"],"default":"false"}
+ *     PartyReportAges:
+ *       in: query
+ *       name: ageLimits
+ *       description: "Exactly five increasing whole days (1–3650); omitted uses company settings."
+ *       schema: {"type":"string","example":"30,60,90,120,180"}
+ *     PartyReportPage:
+ *       in: query
+ *       name: page
+ *       description: "JSON page; print/export include all matching rows."
+ *       schema: {"type":"integer","minimum":1,"maximum":100000,"default":1}
+ *     PartyReportPageSize:
+ *       in: query
+ *       name: pageSize
+ *       description: "Rows per JSON page. Ledger/bill pages may continue a party."
+ *       schema: {"type":"integer","minimum":1,"maximum":100,"default":25}
+ *   schemas:
+ *     PartyReportRow:
+ *       type: object
+ *       description: Monetary values are numeric NGN from PostgreSQL numeric aggregation; negative net means credit balance.
+ *       properties:
+ *         customerId: { type: string, format: uuid }
+ *         code: { type: string, nullable: true }
+ *         name: { type: string }
+ *         date: { type: string, format: date-time }
+ *         number: { type: string }
+ *         kind: { type: string }
+ *         narration: { type: string }
+ *         side: { type: string, enum: [DEBIT, CREDIT] }
+ *         debits: { type: number }
+ *         credits: { type: number }
+ *         net: { type: number }
+ *         amount: { type: number }
+ *         adjusted: { type: number }
+ *         balance: { type: number }
+ *         age: { type: integer }
+ *         opening: { type: number }
+ *         closing: { type: number }
+ *         debit: { type: number }
+ *         credit: { type: number }
+ *         runningBalance: { type: number }
+ *         bucket0: { type: number }
+ *         bucket1: { type: number }
+ *         bucket2: { type: number }
+ *         bucket3: { type: number }
+ *         bucket4: { type: number }
+ *         bucket5: { type: number }
+ *     PartyReportResult:
+ *       type: object
+ *       properties:
+ *         rows: { type: array, items: { $ref: '#/components/schemas/PartyReportRow' } }
+ *         totals: { type: object, additionalProperties: { type: number }, description: Totals cover all filtered rows, not the page }
+ *         ageLimits: { type: array, minItems: 5, maxItems: 5, items: { type: integer } }
+ *         meta:
+ *           type: object
+ *           properties:
+ *             page: { type: integer }
+ *             pageSize: { type: integer }
+ *             total: { type: integer }
+ *             totalPages: { type: integer }
+ * /finance/party-reports:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Paginated party ledger or outstanding report
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. Africa/Lagos inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Paginated party ledger or outstanding report
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data: { $ref: '#/components/schemas/PartyReportResult' }
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/export:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Stream all matching rows as an Excel XML workbook (.xml), with a numeric total row
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. UTC inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Stream all matching rows as an Excel XML workbook (.xml), with a numeric total row
+ *         content:
+ *           application/vnd.ms-excel:
+ *             schema:
+ *               type: string
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/print:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Stream professional HTML print layout; ledger and bill start each party on a new page
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. UTC inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Stream professional HTML print layout; ledger and bill start each party on a new page
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Bounded debtor lookup for report ranges
+ *     description: Any party report permission; add kind to require one specific report permission.
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+ *     responses:
+ *       200:
+ *         description: Scoped code/name choices
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { customers: [{ id: '00000000-0000-4000-8000-000000000001', code: 'C0001', name: 'Example Party' }] } }
+ *       403: { description: Missing report permission or foreign branch }
+ * /finance/settings/party-reports:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read company ageing defaults
+ *     description: Requires any party report permission.
+ *     responses:
+ *       200:
+ *         description: Five default day limits
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { ageLimits: [30,60,90,120,180] } }
+ *       403: { description: Missing report permission }
+ *   put:
+ *     tags: [Finance]
+ *     summary: Save company ageing defaults with audit
+ *     description: Admin or SuperAdmin with report:party-outstanding-age permission.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ageLimits]
+ *             properties:
+ *               ageLimits: { type: array, minItems: 5, maxItems: 5, items: { type: integer, minimum: 1, maximum: 3650 }, example: [30,60,90,120,180] }
+ *     responses:
+ *       200: { description: Settings saved }
+ *       400: { description: Limits must be strictly increasing }
+ *       403: { description: Admin role and age report permission required }
+ */

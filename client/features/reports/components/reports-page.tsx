@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceReportNav } from "./finance-report-nav";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
@@ -33,10 +34,12 @@ export function ReportsPage() {
   const [category, setCategory] = useState<"ALL" | "SERVICE_PARTS" | "SALES_ENQUIRY">("ALL");
   const [managedReceipt, setManagedReceipt] = useState<ReceiptRegisterRow | null>(null);
   const { hasPermission } = useAuth();
+  const canReadReceipts = hasPermission("report:receipt-register") || hasPermission("financereport:read");
   const canManageReceipts = hasPermission("receipt:update") || hasPermission("receipt:cancel");
   const canEditReceipts = hasPermission("receipt:update");
   const canCancelReceipts = hasPermission("receipt:cancel");
   const report = useQuery({
+    enabled: canReadReceipts,
     queryKey: ["receipt-register", branchId, from, to, category],
     queryFn: () => getReceiptRegisterRequest({ branchId, from: from || undefined, to: to || undefined, category }),
   });
@@ -59,8 +62,11 @@ export function ReportsPage() {
     );
   }
 
+  if (!canReadReceipts) return <div className="flex flex-col gap-5 p-4 lg:p-6"><FinanceReportNav /><PageHeader title="Finance Reports" description="Choose a report to review party balances." /></div>;
+
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
+      <FinanceReportNav />
       <PageHeader
         title="Receipt Register"
         description="Receipts, allocations, and totals by payment mode."

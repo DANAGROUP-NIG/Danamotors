@@ -1,13 +1,16 @@
 BEGIN;
 -- Fail safely on source data that cannot be represented as currency; do not silently round away a wallet.
-DO $ BEGIN
+DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM "Customer" WHERE "creditBalance"::text IN ('NaN','Infinity','-Infinity') OR ABS("creditBalance"::numeric - ROUND("creditBalance"::numeric,2)) > 0.000001) THEN
     RAISE EXCEPTION 'Legacy wallet contains invalid currency. Review party-adjustment-preflight.sql before migration.';
   END IF;
   IF EXISTS (SELECT 1 FROM "CustomerCreditApplication" WHERE status='Approved' AND (amount::text IN ('NaN','Infinity','-Infinity') OR amount < 0.01 OR ABS(amount::numeric - ROUND(amount::numeric,2)) > 0.000001)) THEN
     RAISE EXCEPTION 'An approved credit application contains invalid currency. Review before migration.';
   END IF;
-END $;
+  IF EXISTS (SELECT 1 FROM "Receipt" WHERE status='ACTIVE' AND ("advanceAmount"::text IN ('NaN','Infinity','-Infinity') OR "advanceAmount"<0 OR "advanceAmount">amount OR ABS("advanceAmount"::numeric-ROUND("advanceAmount"::numeric,2))>0.000001)) THEN
+    RAISE EXCEPTION 'An active receipt contains an invalid advance. Review party-adjustment-preflight.sql before migration.';
+  END IF;
+END $$;
 -- One adjustment store: retain ReceiptAllocation IDs and existing receipt/invoice links.
 ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "partyStatus" TEXT NOT NULL DEFAULT 'CUSTOMER';
 CREATE TABLE IF NOT EXISTS "PartyNote" (
@@ -53,6 +56,7 @@ UPDATE "ReceiptAllocation" a SET "adjustedAt" = r."issuedAt" FROM "Receipt" r WH
 UPDATE "ReceiptAllocation" SET "adjustedAt" = "createdAt" WHERE "adjustedAt" IS NULL;
 ALTER TABLE "ReceiptAllocation" ALTER COLUMN "adjustedAt" SET DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "ReceiptAllocation" ALTER COLUMN "adjustedAt" SET NOT NULL;
+ALTER TABLE "ReceiptAllocation" DROP CONSTRAINT IF EXISTS "ReceiptAllocation_receiptId_invoiceId_key";
 DROP INDEX IF EXISTS "ReceiptAllocation_receiptId_invoiceId_key";
 -- Multiple dated adjustments may use the same pair. Keep the legacy entry uniqueness only for live receipt-entry lines.
 CREATE UNIQUE INDEX IF NOT EXISTS "ReceiptAllocation_live_entry_key" ON "ReceiptAllocation"("receiptId","invoiceId") WHERE "batchId" IS NULL AND "reversedAt" IS NULL;

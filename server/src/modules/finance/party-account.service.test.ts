@@ -17,7 +17,7 @@ const batch={id:'batch',...input,amount:new Prisma.Decimal(40),reversedAt:null,t
 beforeEach(()=>{
   jest.resetAllMocks();
   (prisma.$transaction as jest.Mock).mockImplementation(callback=>callback(prisma));
-  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>query.sql.startsWith('SELECT * FROM (') ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? [invoice] : [receipt]) : Promise.resolve(query.sql.includes('AS amount') ? [{ amount:new Prisma.Decimal(50) }] : []));
+  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM (')) ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? [invoice] : [receipt]) : Promise.resolve(query.sql.includes('AS amount') ? [{ amount:new Prisma.Decimal(50) }] : []));
   (prisma.customer.findUnique as jest.Mock).mockResolvedValue({id:customerId,branchId});
   (prisma.branch.findFirst as jest.Mock).mockResolvedValue({id:branchId});
   (prisma.partyAdjustmentBatch.findUnique as jest.Mock).mockResolvedValue(null);
@@ -43,7 +43,7 @@ it('same key returns the original batch and rejects different details',async()=>
   expect(prisma.receiptAllocation.createMany).toHaveBeenCalledTimes(1);
 });
 it.each(['overdrawn','foreign','later date'])('rejects %s documents before financial writes',async scenario=>{
-  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>query.sql.startsWith('SELECT * FROM (') ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? scenario==='foreign'?[]:[{...invoice,balance:scenario==='overdrawn'?30:60,date:scenario==='later date'?new Date('2026-02-01'):invoice.date}] : [receipt]) : Promise.resolve([]));
+  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM (')) ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? scenario==='foreign'?[]:[{...invoice,balance:scenario==='overdrawn'?30:60,date:scenario==='later date'?new Date('2026-02-01'):invoice.date}] : [receipt]) : Promise.resolve([]));
   await expect(new PartyAccountService().createAdjustment(input,'actor')).rejects.toThrow();
   expect(prisma.partyAdjustmentBatch.create).not.toHaveBeenCalled();expect(prisma.invoice.update).not.toHaveBeenCalled();
 });
@@ -69,7 +69,7 @@ it('rejects an opening in a different party branch',async()=>{
 });
 it('reverses once, restores both balances and retains dated rows with the remark',async()=>{
   (prisma.partyAdjustmentBatch.findUnique as jest.Mock).mockResolvedValue(batch);
-  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>query.sql.startsWith('SELECT * FROM (') ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? [{...invoice,balance:20}] : [{...receipt,balance:30}]) : Promise.resolve([]));
+  (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM (')) ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? [{...invoice,balance:20}] : [{...receipt,balance:30}]) : Promise.resolve([]));
   await new PartyAccountService().reverse('batch','Correct allocation','actor');
   expect(prisma.invoice.update).toHaveBeenCalledWith({where:{id:invoiceId},data:{outstandingAmount:60,status:'Partially Paid'}});
   expect(prisma.receipt.update).toHaveBeenCalledWith({where:{id:receiptId},data:{advanceAmount:70}});
@@ -100,7 +100,7 @@ it('retries serialization rollbacks but does not replay uncertain timeouts',asyn
 
 it('records note-to-opening-debit pairs through the same allocation store',async()=>{
  const noteDebit={...invoice,id:invoiceId,kind:'NOTE'};const noteCredit={...receipt,id:noteId,kind:'NOTE'};
- (prisma.$queryRaw as jest.Mock).mockImplementation(query=>query.sql.startsWith('SELECT * FROM (')?Promise.resolve(query.sql.includes('FROM "Invoice"')?[noteDebit]:[noteCredit]):Promise.resolve([]));
+ (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM ('))?Promise.resolve(query.sql.includes('FROM "Invoice"')?[noteDebit]:[noteCredit]):Promise.resolve([]));
  await new PartyAccountService().createAdjustment({...input,debits:[{id:invoiceId,kind:'NOTE',amount:40}],credits:[{id:noteId,kind:'NOTE',amount:40}]},'actor');
  expect(prisma.receiptAllocation.createMany).toHaveBeenCalledWith({data:[expect.objectContaining({debitNoteId:invoiceId,creditNoteId:noteId,invoiceId:undefined,receiptId:undefined,amount:40})]});
  expect(prisma.partyNote.update).toHaveBeenCalledWith({where:{id:invoiceId},data:{remainingAmount:new Prisma.Decimal(20)}});
@@ -115,7 +115,7 @@ it('blocks vendor parties from adjustment and opening entry',async()=>{
 
 it('reverses migrated credit-note approvals and removes their linked legacy Payment atomically',async()=>{
  (prisma.partyAdjustmentBatch.findUnique as jest.Mock).mockResolvedValue({...batch,source:'CREDIT_APPLICATION',legacyPaymentId:'legacy-payment',allocations:[{invoiceId,receiptId:null,debitNoteId:null,creditNoteId:noteId,amount:40}]});
- (prisma.$queryRaw as jest.Mock).mockImplementation(query=>query.sql.startsWith('SELECT * FROM (')?Promise.resolve(query.sql.includes('FROM "Invoice"')?[{...invoice,balance:20}]:[{...receipt,id:noteId,kind:'NOTE',amount:40,balance:0}]):Promise.resolve([]));
+ (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM ('))?Promise.resolve(query.sql.includes('FROM "Invoice"')?[{...invoice,balance:20}]:[{...receipt,id:noteId,kind:'NOTE',amount:40,balance:0}]):Promise.resolve([]));
  await new PartyAccountService().reverse('batch','Correct legacy approval','actor');
  expect(prisma.partyNote.update).toHaveBeenCalledWith({where:{id:noteId},data:{remainingAmount:new Prisma.Decimal(40)}});
  expect(prisma.payment.deleteMany).toHaveBeenCalledWith({where:{id:'legacy-payment',method:'Credit'}});
@@ -136,4 +136,10 @@ it('reads account debit and credit totals from one decimal database snapshot',as
  expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
  const query=(prisma.$queryRaw as jest.Mock).mock.calls[0][0];expect(query.sql).toContain('AS outstanding');expect(query.sql).toContain('AS "availableCredit"');
  expect(query.values).toEqual(expect.arrayContaining([customerId,branchId]));
+});
+
+it('rejects reusing a restored balance before its recorded reversal date',async()=>{
+ (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM ('))?Promise.resolve(query.sql.includes('FROM "Invoice"')?[invoice]:[{...receipt,latestActivityAt:new Date('2026-01-03')}]):Promise.resolve([]));
+ await expect(new PartyAccountService().createAdjustment(input,'actor')).rejects.toThrow('latest balance change');
+ expect(prisma.partyAdjustmentBatch.create).not.toHaveBeenCalled();expect(prisma.receipt.update).not.toHaveBeenCalled();
 });

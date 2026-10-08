@@ -34,7 +34,7 @@ beforeEach(() => {
   (prisma.partyAdjustmentBatch.findUnique as jest.Mock).mockResolvedValue(null);
   (prisma.partyAdjustmentBatch.create as jest.Mock).mockImplementation(({data})=>Promise.resolve({id:'batch',...data}));
   (prisma.$queryRaw as jest.Mock).mockImplementation(async query=> {
-    if (!query.sql.startsWith('SELECT * FROM (')) return query.sql.includes('AS amount') ? [{amount:new Prisma.Decimal(60)}] : [];
+    if (!(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM ('))) return query.sql.includes('AS amount') ? [{amount:new Prisma.Decimal(60)}] : [];
     if (query.sql.includes('FROM "Invoice"')) { const current = await prisma.invoice.findUnique({where:{id:invoice.id}}); return [{...current,kind:'INVOICE',number:current!.invoiceNumber,date:current!.issuedDate,amount:current!.total,balance:current!.outstandingAmount}]; }
     return [{id:'receipt',kind:'RECEIPT',number:'2026000002',date:new Date('2026-01-01'),amount:100,balance:100}];
   });
@@ -148,7 +148,7 @@ it('removes the independent hand-edit wallet path', async () => {
 
 it('approves using a combination of receipt advance and opening credit',async()=>{
  (prisma.$queryRaw as jest.Mock).mockImplementation(async query=>{
-  if(!query.sql.startsWith('SELECT * FROM ('))return query.sql.includes('AS amount') ? [{amount:new Prisma.Decimal(0)}] : [];
+  if(!(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM (')))return query.sql.includes('AS amount') ? [{amount:new Prisma.Decimal(0)}] : [];
   if(query.sql.includes('FROM "Invoice"'))return [{...invoice,kind:'INVOICE',number:invoice.invoiceNumber,date:invoice.issuedDate,amount:invoice.total,balance:invoice.outstandingAmount}];
   return [{id:'receipt',kind:'RECEIPT',number:'001',date:new Date('2026-01-01'),amount:20,balance:20},{id:'opening',kind:'NOTE',number:'002',date:new Date('2026-01-02'),amount:20,balance:20}];
  });

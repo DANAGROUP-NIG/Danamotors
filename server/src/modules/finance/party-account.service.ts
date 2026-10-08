@@ -52,13 +52,19 @@ function documentQuery(customerId: string, branchId: string | undefined, side: '
     i.total AS amount, i."outstandingAmount" AS balance FROM "Invoice" i LEFT JOIN "JobCard" j ON j.id=i."jobCardId"
     JOIN "Customer" c ON c.id=i."customerId" WHERE i."customerId" = ${customerId}
     AND UPPER(i.status) NOT IN ('CANCELLED','CANCELED','VOID')
-    ${branchId ? Prisma.sql`AND COALESCE(j."branchId",c."branchId") = ${branchId}` : Prisma.empty} UNION ALL ${notes}`;
+    ${branchId ? Prisma.sql`AND COALESCE(i."reportBranchId",j."branchId",c."branchId") = ${branchId}` : Prisma.empty} UNION ALL ${notes}`;
 }
 
 async function selectedDocuments(transaction: Prisma.TransactionClient, customerId: string, branchId: string | undefined, side: 'DEBIT' | 'CREDIT', selections: AdjustmentSelection[]) {
   const keys = selections.map(line => Prisma.sql`(${line.kind},${line.id})`);
   const query = documentQuery(customerId, branchId, side);
-  return transaction.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT * FROM (${query}) d WHERE (d.kind,d.id) IN (${Prisma.join(keys)})`);
+  return transaction.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT d.*,activity."latestActivityAt" FROM (${query}) d
+    LEFT JOIN LATERAL (SELECT MAX(event.date) "latestActivityAt" FROM (
+      SELECT GREATEST(a."adjustedAt",a."reversedAt") date FROM "ReceiptAllocation" a
+      WHERE (d.kind='INVOICE' AND a."invoiceId"=d.id) OR (d.kind='RECEIPT' AND a."receiptId"=d.id)
+        OR (d.kind='NOTE' AND (a."debitNoteId"=d.id OR a."creditNoteId"=d.id))
+      UNION ALL SELECT e."createdAt" FROM "ReceiptEditLog" e WHERE d.kind='RECEIPT' AND e."receiptId"=d.id AND e."oldAmount"<>e."newAmount"
+    ) event) activity ON TRUE WHERE (d.kind,d.id) IN (${Prisma.join(keys)})`);
 }
 
 async function lockSelectedDocuments(transaction: Prisma.TransactionClient, selections: AdjustmentSelection[]) {
@@ -152,6 +158,7 @@ export class PartyAccountService {
     validateAdjustmentSelections(input.debits,debits);
     validateAdjustmentSelections(input.credits,credits);
     if ([...debits,...credits].some(document => document.date > date)) throw new BadRequestError('Adjustment date cannot precede a selected document');
+    if ([...debits,...credits].some(document => document.latestActivityAt && document.latestActivityAt > date)) throw new BadRequestError('Adjustment date cannot precede the latest balance change on a selected document');
     const pairs = pairAdjustments(input.debits,input.credits);
     const batch = await transaction.partyAdjustmentBatch.create({ data: { customerId: input.customerId, branchId: input.branchId, date, source: input.source, amount: new Prisma.Decimal(sumMoney(input.debits.map(line => line.amount))), actorId, idempotencyKey: input.idempotencyKey, requestHash } });
     await transaction.receiptAllocation.createMany({ data: pairs.map(pair => ({

@@ -282,6 +282,7 @@ model Customer {
   warrantyCases WarrantyCase[]
 
   @@index([branchId])
+  @@index([branchId, partyStatus, code])
   @@index([phoneNumber])
   @@index([mergedIntoId])
 }
@@ -1079,6 +1080,7 @@ model Invoice {
   jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
 
   invoiceNumber String @unique
+  reportBranchId String?
 
   issuedDate DateTime  @default(now())
   dueDate    DateTime?
@@ -1128,6 +1130,8 @@ model Invoice {
 
   @@index([customerId])
   @@index([jobCardId])
+  @@index([customerId, issuedDate])
+  @@index([reportBranchId, issuedDate])
 }
 
 model LabourItem {
@@ -1257,6 +1261,7 @@ model Receipt {
   advanceAmount Float     @default(0)
   status        String    @default("ACTIVE")
   cancelRemark  String?
+  cancelledAt   DateTime?
 
   tallyVoucherNo  String?
   tallyPostedAt   DateTime?
@@ -1316,6 +1321,7 @@ model ReceiptAllocation {
   @@index([debitNoteId, adjustedAt])
   @@index([creditNoteId, adjustedAt])
   @@index([batchId])
+  @@index([adjustedAt, reversedAt])
 }
 
 model PartyNote {
@@ -1332,6 +1338,7 @@ model PartyNote {
   amount            Decimal             @db.Decimal(18, 2)
   remainingAmount   Decimal             @db.Decimal(18, 2)
   status            String              @default("ACTIVE")
+  cancelledAt       DateTime?
   tallyVoucherNo    String?
   tallyPostedAt     DateTime?
   tallyExcluded     Boolean             @default(true)
@@ -2810,4 +2817,10 @@ model JobCardCampaign {
 
   @@id([jobCardId, campaignId])
   @@index([campaignId])
+}
+
+model FinanceSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }

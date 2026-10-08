@@ -46,7 +46,11 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],
-  "/reports": ["financereport:read", "report:receipt-register"],
+  "/reports/finance/party-ledger": ["report:party-ledger"],
+  "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
+  "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
+  "/reports/finance/party-outstanding": ["report:party-outstanding"],
+  "/reports": ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
@@ -54,6 +58,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/warranty": [WARRANTY_PERMISSIONS.READ],
   "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
   "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
+  "/settings/party-reports": ["role:read", "report:party-outstanding-age"],
   "/settings": ["role:read"],
 };
 

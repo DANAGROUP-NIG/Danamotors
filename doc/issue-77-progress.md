@@ -162,3 +162,68 @@ Receipt advances and opening credits now fund invoices through one dated Receipt
 Assumptions: preserve legacy wallet/advance sources independently; date unknown wallet provenance at UTC cutover; keep existing Float columns/statuses while using Decimal operations; no adjustment Tally journal; bounded preview/history; vendors remain outside scope; repair historical outstanding in phase 5.
 
 Stop after phase 2 per the brief. Phase 3 (party reports, ledger link, print and Excel) begins only when the user says continue.
+
+
+## Phase 3 — party reports (2026-10-08)
+
+### Delivered
+
+- Added Party Ledger, Party Outstanding, Age-wise Outstanding and Bill-wise Outstanding with paginated rows and totals over the complete filtered result.
+- Shared filters support Lagos calendar dates, branch, party, inclusive party ranges, name/code order, Customer/Dealer/FA party status and debtor-only scope. Age/bill reports optionally include net-credit parties.
+- Historical SQL views preserve receipt amount edits, cancellation timing and allocation/reversal timing. Ledger includes opening, running and closing balances and neutral matching events. Invoice branch snapshots survive customer reassignment/merge.
+- Ageing has five editable, increasing limits (default 30/60/90/120/180) and six bands; Admin/SuperAdmin can save audited defaults.
+- Added streamed, snapshot-consistent print and Excel-compatible SpreadsheetML exports. Ledger/bill printing starts each party on a new page. Server cursor fetches 500 rows at a time; browser disk streaming avoids loading a complete large export into memory.
+- Added report-specific permission checks for JSON, print and export, assigned-branch enforcement, report navigation and Customer Account → View ledger.
+- Aligned receipt edit/cancellation and allocation timestamps; rejected adjustments backdated before the latest balance-changing activity.
+- Executed additive migrations against both a fresh database and a populated legacy fixture, including reruns. Corrected previously unexecuted phase 2 dollar-quote and constraint-owned-index defects and added its advance preflight guard.
+
+### Files and documentation
+
+Backend: finance/party-report validation, calculations, service, controller and tests; finance routes/Swagger; party-account and receipt historical guards; role constants and customer validation.
+
+Frontend: report API/navigation/page/settings components; dynamic finance report route; party report settings route; sidebar/layout access; customer status form and ledger link.
+
+Database: schema and 20261008180000_party_reports migration; guarded corrections to 20261008120000_party_adjustments; disposable-only party-report-migration-fixture.sql and party-report-migration-assertions.sql.
+
+Documentation: billing.md records endpoints, historical semantics and export behavior; issue-77-frontend-testing.md maintains the frontend flow/checklist for the final Word guide.
+
+Integration fixture maintenance: warranty/workshop service references now use the canonical selected service type. Workshop preflight identity/stock reads are redirected into its rollback fixture transaction. No workshop/warranty production behavior changed.
+
+### Assumptions and acceptance status
+
+Implemented: four reports, shared filters, dated balances, age limits/default settings, hidden creditors, permissions, branch scope, totals, customer ledger link, print and Excel-compatible export.
+
+Excel output is a real SpreadsheetML .xml workbook, using existing dependencies; users may Save As .xlsx in Excel. Browsers without a file-system streaming API have a 20 MB fallback cap and must narrow larger exports.
+
+Dates use Africa/Lagos. Current party identity/status is used for historical reporting; newly entered backdated documents can intentionally restate historical balances. Missing legacy cancellation provenance uses the migration cutover timestamp. Unknown wallet provenance and previously deleted allocation history cannot be reconstructed. Legacy invoice outstanding repair remains phase 5.
+
+Live browser/Excel/manual print acceptance remains pending. The documented checklist is planned manual verification, distinct from executed automated checks. No production database, deployment, GitHub comment or PR was changed.
+
+### Migration verification workflow
+
+Use a disposable database only. For the legacy fixture: apply the 40 baseline migrations before party adjustments; execute prisma/party-report-migration-fixture.sql; apply phase 2 and phase 3 migrations; run prisma/party-report-migration-assertions.sql; rerun both migrations and assertions. Verified positive/negative wallet backfill, receipt advance, old allocation identity/date, approved legacy application, single backfill audit, retained legacy invoice cache and receipt cancellation audit timing.
+
+A separate empty disposable database successfully applied all 42 migrations with Prisma migrate deploy. Local PostgreSQL 18 ran on loopback port 55477; neither .env nor the application database URL was changed. Test processes received TEST_DATABASE_URL explicitly.
+
+
+### Executed verification
+
+- Backend: TypeScript noEmit and production compilation passed. Full Jest run with TEST_DATABASE_URL against the freshly migrated disposable database: **539 passed, 1 skipped, 540 total; 43 suites passed**. The skipped catalog integration suite requires its separate CATALOG_DATABASE_TEST=1 opt-in.
+- Report tests cover strict filters, permissions (including omitted-kind default), Lagos date boundaries, age buckets, fractional money, opening/running balances, scoped SQL and bounded cursors. PostgreSQL integration verifies adjustments/reversals, retained branch ownership, receipt amount edit/cancellation historical stability and a real SQL cursor.
+- Frontend: ESLint passed with **0 errors / 70 existing warnings**. Next production webpack build passed, including TypeScript and the new finance report/settings routes. Default Turbopack retains the previously documented Windows NVM worker issue.
+- Prisma generation and schema validation passed; all **42 migrations** applied cleanly to an empty test database. Populated legacy assertions and both additive migration reruns passed.
+- Built OpenAPI verification passed: all five party report/settings paths and PartyReportResult schema are present.
+- git diff --check and added-file whitespace checks passed. Generated Next metadata was restored to HEAD.
+- The isolated PostgreSQL cluster was stopped and its verified workspace cache directory removed after testing.
+
+Commands (server): node node_modules/typescript/bin/tsc --noEmit; node node_modules/typescript/bin/tsc; node node_modules/jest/bin/jest.js --runInBand (TEST_DATABASE_URL and DATABASE_URL supplied only to the child test process); Prisma CLI generate/validate/migrate deploy. Legacy migration fixture, migration reruns and assertions executed with PostgreSQL psql -v ON_ERROR_STOP=1.
+
+Commands (client): node node_modules/eslint/bin/eslint.js .; node node_modules/next/dist/bin/next build --webpack, with the installed Node directory prepended to PATH.
+
+### Risks and next phase
+
+Apply migrations and regenerate the Prisma client before application rollout. Review the backfill against a disposable production snapshot first. Production was not migrated here. Legacy cancellation/history limits and phase 5 cache repairs remain documented; the frontend browser/Excel/print checklist remains to be executed.
+
+Stop after phase 3 as requested in the delivery brief. Phase 4 is debit/credit note forms, registers and Tally vouchers; begin only after the user says continue. Maintain the frontend guide through phases 4 and 5, then create and visually verify the final Word .docx testing and flow walkthrough.
+
+Proposed PR title: Add historical party reports, ageing, print and Excel exports (#77, phase 3).

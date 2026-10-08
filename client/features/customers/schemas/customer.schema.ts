@@ -6,6 +6,7 @@ export const customerFields = z.object({
   email: z.union([z.string().trim().email("Enter a valid email"), z.literal("")]).optional(),
   phoneNumber: z.string().trim().min(1, "Mobile is required"),
   branchId: z.string().min(1, "Home branch is required"),
+  partyStatus: z.enum(["CUSTOMER","DEALER","FA_PARTY"]).optional(),
   type: z.enum(["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"]).optional(),
   salutation: z.enum(["", "Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."]).optional(),
   code: z.string().optional(),

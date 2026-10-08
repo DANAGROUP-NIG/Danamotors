@@ -22,6 +22,7 @@ export const customerBody = z.object({
   email: z.preprocess(v => v === '' ? null : v, z.string().trim().toLowerCase().email().nullable().optional()),
   phoneNumber: z.string().trim().min(1).max(30),
   code: z.string().trim().min(1).max(50).optional(),
+  partyStatus: z.enum(['CUSTOMER','DEALER','FA_PARTY']).optional(),
   type: z.enum(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'VENDOR']).default('INDIVIDUAL'),
   salutation: z.enum(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Chief', 'M/S.']).nullable().optional(),
   companyName: z.string().trim().max(200).nullable().optional(),

@@ -7,6 +7,7 @@ export type Customer = {
   preferredFollowupDay?: string | null;
   preferredFollowupTime?: string | null;
   code?: string | null;
+  partyStatus?: "CUSTOMER" | "DEALER" | "FA_PARTY";
   type?: "INDIVIDUAL" | "CORPORATE" | "GOVERNMENT" | "VENDOR";
   salutation?: string | null;
   companyName?: string | null;
@@ -49,6 +50,7 @@ export type Customer = {
 };
 
 export type CreateCustomerPayload = {
+  partyStatus?: "CUSTOMER" | "DEALER" | "FA_PARTY";
   firstName: string;
   lastName: string;
   email?: string;

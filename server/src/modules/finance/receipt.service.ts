@@ -231,18 +231,19 @@ export class ReceiptService {
       if (receipt.tallyPostedAt || await transaction.tallyPostingLog.findFirst({ where: { documentType: 'RECEIPT', documentId: id, status: { in: ['EXPORTED', 'POSTED'] } } })) {
         throw new BadRequestError('A receipt exported or posted to Tally cannot be edited');
       }
+      const changedAt = new Date();
       const oldAmount = receipt.amount;
       const oldNarration = receipt.notes;
       const newAmount = money(input.amount ?? oldAmount);
       const newNarration = input.narration ?? oldNarration;
       if (newAmount <= 0) throw new BadRequestError('Receipt amount must be positive');
-      await transaction.auditLog.create({ data: { userId: input.editedById, action: 'RECEIPT_UPDATED', details: JSON.stringify({ receiptId: id, oldAmount, newAmount, oldNarration, newNarration }) } });
+      await transaction.auditLog.create({ data: { userId: input.editedById, action: 'RECEIPT_UPDATED', createdAt: changedAt, details: JSON.stringify({ receiptId: id, oldAmount, newAmount, oldNarration, newNarration }) } });
       await transaction.tallyPostingLog.updateMany({
         where: { documentType: 'RECEIPT', documentId: id, status: 'EXPORTED' },
         data: { status: 'INVALIDATED' },
       });
       if (newAmount === oldAmount) {
-        await transaction.receiptEditLog.create({ data: { receiptId: id, editedById: input.editedById, oldAmount, newAmount, oldNarration, newNarration } });
+        await transaction.receiptEditLog.create({ data: { receiptId: id, editedById: input.editedById, oldAmount, newAmount, oldNarration, newNarration, createdAt: changedAt } });
         return transaction.receipt.update({ where: { id }, data: { notes: newNarration }, include: { allocations: { where: { reversedAt: null }, include: { invoice: true, debitNote: true } }, bank: true, customer: true } });
       }
       if (receipt.allocations.some(allocation => allocation.batchId)) throw new ConflictError('Reverse later adjustment batches before changing this receipt amount');
@@ -255,7 +256,7 @@ export class ReceiptService {
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
         await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
       }
-      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: new Date() } });
+      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: changedAt } });
 
       const allocationPlan = recalculateReceiptAllocations(newAmount, receipt.allocations.map((allocation) => {
         const invoice = invoiceById.get(allocation.invoiceId!)!;
@@ -265,12 +266,12 @@ export class ReceiptService {
         const invoice = invoiceById.get(allocation.invoiceId!)!;
         const previousAmount = receipt.allocations.find((item) => item.invoiceId === allocation.invoiceId)!.amount;
         const available = money(invoice.outstandingAmount + previousAmount);
-        await transaction.receiptAllocation.create({ data: { receiptId: id, invoiceId: invoice.id, amount: allocation.amount } });
+        await transaction.receiptAllocation.create({ data: { receiptId: id, invoiceId: invoice.id, amount: allocation.amount, adjustedAt: changedAt } });
         await updateInvoiceBalance(transaction, invoice.id, available - allocation.amount, invoice.total);
       }
 
       await transaction.receiptEditLog.create({
-        data: { receiptId: id, editedById: input.editedById, oldAmount, newAmount, oldNarration, newNarration },
+        data: { receiptId: id, editedById: input.editedById, oldAmount, newAmount, oldNarration, newNarration, createdAt: changedAt },
       });
       return transaction.receipt.update({
         where: { id },
@@ -294,6 +295,7 @@ export class ReceiptService {
         throw new BadRequestError('A receipt exported or posted to Tally cannot be cancelled');
       }
       if (receipt.allocations.some(allocation => allocation.batchId)) throw new ConflictError('Reverse later adjustment batches before cancelling this receipt');
+      const changedAt = new Date();
       await transaction.tallyPostingLog.updateMany({
         where: { documentType: 'RECEIPT', documentId: id, status: 'EXPORTED' },
         data: { status: 'INVALIDATED' },
@@ -305,9 +307,9 @@ export class ReceiptService {
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
         await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
       }
-      await transaction.auditLog.create({ data: { userId: actorId, action: 'RECEIPT_CANCELLED', details: JSON.stringify({ receiptId: id, remark, amount: receipt.amount }) } });
-      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: new Date() } });
-      return transaction.receipt.update({ where: { id }, data: { status: 'CANCELLED', cancelRemark: remark, advanceAmount: 0 } });
+      await transaction.auditLog.create({ data: { userId: actorId, action: 'RECEIPT_CANCELLED', createdAt: changedAt, details: JSON.stringify({ receiptId: id, remark, amount: receipt.amount }) } });
+      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: changedAt } });
+      return transaction.receipt.update({ where: { id }, data: { status: 'CANCELLED', cancelRemark: remark, cancelledAt: changedAt, advanceAmount: 0 } });
     });
   }
 }

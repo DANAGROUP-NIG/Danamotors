@@ -218,7 +218,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register"],
+        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill"],
       },
     ],
   },
