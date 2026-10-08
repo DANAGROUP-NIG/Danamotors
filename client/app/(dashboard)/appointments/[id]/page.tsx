@@ -332,6 +332,12 @@ export default function AppointmentDetailPage() {
           <div className="space-y-4">
             <SectionTitle icon={<Clock className="size-4" />} title="Timing" />
             <div className="grid gap-3 sm:grid-cols-2">
+              <DetailField label="Booking no" value={appointment.bookingNumber ?? null} />
+              <DetailField label="Service type" value={appointment.serviceType?.description ?? null} />
+              <DetailField
+                label="Mileage"
+                value={appointment.mileage != null ? `${appointment.mileage.toLocaleString("en-NG")} km` : null}
+              />
               <DetailField
                 label="Duration"
                 value={
@@ -359,6 +365,26 @@ export default function AppointmentDetailPage() {
             </div>
           </div>
         </div>
+
+        {!!appointment.requests?.length && (
+          <div className="mt-6 border-t border-slate-100 pt-6">
+            <SectionTitle icon={<FileText className="size-4" />} title="Booking requests" />
+            <ul className="mt-2 divide-y divide-slate-100 text-sm">
+              {appointment.requests.map((request, index) => {
+                const estimate = (request.estimatedParts ?? 0) + (request.estimatedLabour ?? 0) + (request.estimatedOil ?? 0);
+                return (
+                  <li key={request.id ?? index} className="flex flex-wrap justify-between gap-2 py-2">
+                    <span className="text-slate-700">
+                      {request.complaintCode && <span className="mr-2 font-mono text-xs text-slate-400">{request.complaintCode.code}</span>}
+                      {request.description}
+                    </span>
+                    {estimate > 0 && <span className="tabular-nums text-slate-500">Est. ₦{estimate.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {appointment.notes && (
           <div className="mt-6 border-t border-slate-100 pt-6">

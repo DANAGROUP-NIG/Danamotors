@@ -36,6 +36,7 @@ import {
   type CreateJobCardFormValues,
 } from "../schemas/job-card.schema";
 import { WorkshopPicker, type PickerRecord } from "./WorkshopPicker";
+import { ServiceTypePicker } from "./ServiceTypePicker";
 import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
 import {
   CustomerRequestsTab,
@@ -67,6 +68,8 @@ function defaults(
   return {
     branchName,
     serviceId: "",
+    serviceTypeId: "",
+    freeServiceCouponNo: "",
     complaints: [emptyRequest()],
 
     tyres: Array.from(
@@ -99,7 +102,7 @@ export function JobCardCreateForm({
 }) {
   const create = useCreateJobCard();
 
-  const { hasPermission, isSuperAdmin, user } = useAuth();
+  const { hasPermission, isSuperAdmin, isAdminOrAbove, user } = useAuth();
   const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -124,24 +127,13 @@ export function JobCardCreateForm({
     formState: { errors, isDirty },
   } = form;
 
-  const selectedServiceId = watch("serviceId");
-  const selectedServiceCharge = watch("serviceCharge");
-  const serviceQuery = useQuery({
-    queryKey: ["job-opening-service", selectedServiceId],
-    queryFn: () => apiGet<{ service: { price: number } }>(`/services/${selectedServiceId}`),
-    enabled: !!selectedServiceId,
-  });
-  useEffect(() => {
-    if (serviceQuery.data && selectedServiceCharge === undefined) {
-      setValue("serviceCharge", serviceQuery.data.service.price, { shouldValidate: true });
-    }
-  }, [serviceQuery.data, selectedServiceCharge, setValue]);
-
   const [tab, setTab] = useState<Tab>("Vehicle Details");
   const [confirmation, setConfirmation] = useState<
     "new" | "undo" | "estimate" | null
   >(null);
   const [estimate, setEstimate] = useState<PickerRecord>();
+  // A pre-job estimate whose lines were loaded: the job is opened from it.
+  const [openedFromEstimateId, setOpenedFromEstimateId] = useState<string>();
   const [find, setFind] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
@@ -255,6 +247,7 @@ export function JobCardCreateForm({
     });
 
     setValue("mileage", Number.NaN);
+    setValue("serviceId", "");
     setValue("odometerReplaced", false);
     setValue("odometerReplacedReason", "");
     setValue("acType", "NONE");
@@ -291,6 +284,11 @@ export function JobCardCreateForm({
         shouldValidate: true,
       });
     }
+
+    // The booking's workshop service type carries over to the job.
+    if (record.serviceTypeId) {
+      setValue("serviceTypeId", record.serviceTypeId, { shouldDirty: true });
+    }
   };
 
   const applyEstimate = () => {
@@ -302,18 +300,23 @@ export function JobCardCreateForm({
     resetVehicle();
     setValue("appointmentId", "");
 
-    setValue("customerId", estimate.jobCard?.customer?.id ?? "", {
+    setValue("customerId", estimate.jobCard?.customer?.id ?? estimate.customerId ?? "", {
       shouldDirty: true,
     });
 
-    setValue("vehicleId", estimate.jobCard?.vehicle?.id ?? "", {
+    setValue("vehicleId", estimate.jobCard?.vehicle?.id ?? estimate.vehicleId ?? "", {
       shouldDirty: true,
     });
 
-    if (estimate.jobCard?.branch?.name)
-      setValue("branchName", estimate.jobCard.branch.name, {
+    const estimateBranch = estimate.jobCard?.branch?.name ?? estimate.branch?.name;
+    if (estimateBranch)
+      setValue("branchName", estimateBranch, {
         shouldDirty: true,
       });
+
+    // Opening from an estimate prepared before the job closes that estimate as converted.
+    // A closed one (cancelled, declined, already used) only serves as a template.
+    setOpenedFromEstimateId(estimate.jobCardId === null && !estimate.jobCard && estimate.estimateStatus !== "CLOSED" ? estimate.id : undefined);
 
     setValue("serviceAdvisorId", "");
     setValue("technicianId", "");
@@ -351,6 +354,7 @@ export function JobCardCreateForm({
 
     reset(initial.current);
     setEstimate(undefined);
+    setOpenedFromEstimateId(undefined);
     setTab("Vehicle Details");
     create.reset();
   };
@@ -418,6 +422,8 @@ export function JobCardCreateForm({
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
           teamId: values.teamId || undefined,
+          estimateId: openedFromEstimateId,
+          freeServiceCouponNo: values.freeServiceCouponNo?.trim() || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,
@@ -571,7 +577,10 @@ export function JobCardCreateForm({
                     selectedRecord={estimate}
                     disabled={!branchId || !hasPermission("estimate:read")}
                     onChange={(id) => {
-                      if (!id) setEstimate(undefined);
+                      if (!id) {
+                        setEstimate(undefined);
+                        setOpenedFromEstimateId(undefined);
+                      }
                     }}
                     onSelect={setEstimate}
                   />
@@ -788,22 +797,27 @@ export function JobCardCreateForm({
                   </OpeningField>
                 </div>
                 <Controller
-                  name="serviceId"
+                  name="serviceTypeId"
                   control={control}
                   render={({ field }) => (
-                    <WorkshopPicker
-                      label="Service"
-                      required
-                      endpoint="/services?isActive=true"
-                      collection="services"
-                      value={field.value ?? ""}
+                    <ServiceTypePicker
+                      canConfigure={isAdminOrAbove}
+                      vehicleId={vehicleId}
+                      date={localDate(openedAt)}
+                      value={field.value}
+                      serviceCharge={watch("serviceCharge")}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
-                      onSelect={(service) => setValue("serviceCharge", service.price ?? 0, { shouldDirty: true, shouldValidate: true })}
-                      error={errors.serviceId?.message}
+                      onCharge={charge => setValue("serviceCharge", charge, { shouldDirty: true, shouldValidate: true })}
+                      error={errors.serviceTypeId?.message}
                     />
                   )}
                 />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <OpeningField label="Free service coupon no" error={errors.freeServiceCouponNo?.message}>
+                    <input className={openingInput} placeholder="Only for free services" {...register("freeServiceCouponNo")} />
+                  </OpeningField>
+                </div>
                 {vehicle && (
                   <p className="mt-3 text-sm text-muted-foreground">
                     Previous odometer:{" "}

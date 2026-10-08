@@ -23,17 +23,43 @@ export type EstimateJobCard = {
   };
 };
 
+export type EstimateLifecycle = "ACTIVE" | "PENDING_APPROVAL" | "CLOSED";
+export type EstimateCloseReason = "CONVERTED" | "DECLINED" | "CANCELLED" | "SUPERSEDED";
+
 export type Quotation = {
   id: string;
-  jobCardId: string;
+  /** Null for an estimate prepared before a job card exists. */
+  jobCardId: string | null;
+  estimateNumber?: string | null;
+  estimateDate?: string | null;
+  estimateStatus?: EstimateLifecycle;
+  closedReason?: EstimateCloseReason | null;
   description: string;
   amount: number;
+  discountAmount?: number;
   currency: string;
+  /** Customer decision: Pending, Approved, Declined. */
   status: string;
   createdAt: string;
   updatedAt: string;
-  jobCard: EstimateJobCard;
+  branchId?: string | null;
+  jobCard: EstimateJobCard | null;
+  customer?: { id: string; firstName: string; lastName: string; companyName?: string | null } | null;
+  vehicle?: EstimateJobCard["vehicle"] | null;
+  branch?: { id: string; name: string } | null;
+  openedJobCard?: { id: string; jobNumber: string } | null;
   approvals: EstimateApproval[];
+};
+
+export type PreJobEstimateLine = { type: "PART" | "LABOUR" | "SERVICE"; referenceId: string; quantity: number };
+
+export type CreatePreJobEstimatePayload = {
+  customerId: string;
+  vehicleId: string;
+  description: string;
+  discountAmount?: number;
+  lines: PreJobEstimateLine[];
+  branchId?: string;
 };
 
 export type QuotationListResponse = {

@@ -29,6 +29,7 @@ import {
   createJobCardLabourSchema,
   updateJobCardLabourSchema,
 } from "./service.validation";
+import { cancelEstimateSchema, createPreJobEstimateSchema } from "./pre-job-estimate.service";
 
 const router = Router();
 const controller = new ServiceController();
@@ -450,14 +451,15 @@ router.delete(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [branchName, customerId, vehicleId, description, serviceId, mileage, bayId, serviceAdvisorId, promisedAt, complaints]
+ *             required: [branchName, customerId, vehicleId, description, serviceTypeId, mileage, bayId, serviceAdvisorId, promisedAt, complaints]
  *             properties:
  *               branchName: { type: string, example: Ikeja }
  *               customerId: { type: string, format: uuid }
  *               vehicleId: { type: string, format: uuid }
  *               appointmentId: { type: string, format: uuid }
  *               description: { type: string, example: Brake inspection }
- *               serviceId: { type: string, format: uuid, description: Active catalog service selected for this job card }
+ *               serviceTypeId: { type: string, format: uuid, description: Eligible WorkshopMaster SERVICE_TYPE for this vehicle model }
+ *               serviceId: { type: string, format: uuid, description: Optional separate appointment service; does not set the opening charge }
  *               bayId: { type: string, format: uuid }
  *               serviceAdvisorId: { type: string, format: uuid }
  *               technicianId: { type: string, format: uuid, description: Required when teamId is absent }
@@ -812,6 +814,46 @@ router.get(
   "/estimates",
   requirePermission(PERMISSIONS.ESTIMATE_READ),
   controller.listEstimates,
+);
+/**
+ * @openapi
+ * /service/estimates:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Prepare an estimate before a job card exists
+ *     description: Priced like a job estimate (part retail rate, model labour rate, service price). Gets an estimate number (YYYY######) and waits for the customer's decision. Admin and SuperAdmin may pass branchId; others use their own branch.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { customerId: 'uuid', vehicleId: 'uuid', description: '20,000 km service and brake pads', discountAmount: 5000, lines: [{ type: 'SERVICE', referenceId: 'uuid' }, { type: 'PART', referenceId: 'uuid', quantity: 2 }, { type: 'LABOUR', referenceId: 'uuid', quantity: 1.5 }] }
+ *     responses:
+ *       201: { description: Estimate created }
+ *       400: { description: Invalid lines, unpriced part or discount above the amount }
+ * /service/estimates/{id}/cancel:
+ *   patch:
+ *     tags: [Service & Job Cards]
+ *     summary: Cancel an open pre-job estimate
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { reason: 'Customer will not proceed' }
+ *     responses:
+ *       200: { description: Estimate cancelled }
+ *       409: { description: Already closed }
+ */
+router.post(
+  "/estimates",
+  requirePermission(PERMISSIONS.ESTIMATE_CREATE),
+  validateRequest(createPreJobEstimateSchema),
+  controller.createPreJobEstimate,
+);
+router.patch(
+  "/estimates/:id/cancel",
+  requirePermission(PERMISSIONS.ESTIMATE_CREATE),
+  validateRequest(cancelEstimateSchema),
+  controller.cancelEstimate,
 );
 router.post(
   "/job-cards/:id/estimates",

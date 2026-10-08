@@ -35,6 +35,11 @@ const SETTINGS_CARDS = [
     href: "/warranty/settings",
   },
   {
+    title: "Report Settings",
+    description: "Mileage bands and thresholds used by the workshop reports.",
+    href: "/settings/reports",
+  },
+  {
     title: "Audit Log",
     description: "Review a history of system actions and changes.",
     href: "/settings/audit-log",

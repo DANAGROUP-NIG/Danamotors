@@ -13,6 +13,7 @@ export function useUpdateVehicle(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: vehicleKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: vehicleKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["job-card-service-types", id] });
       toast.success("Vehicle updated");
     },
     onError: (error: unknown) => {

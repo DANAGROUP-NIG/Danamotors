@@ -6,11 +6,13 @@ export const createJobCardSchema = z
     appointmentId: z.union([z.string().uuid(), z.literal("")]).optional(),
     customerId: z.string().uuid("Select a customer"),
     vehicleId: z.string().uuid("Select a vehicle"),
-    serviceId: z.string().uuid("Select a service"),
+    serviceId: z.union([z.string().uuid(), z.literal("")]).optional(),
+    serviceTypeId: z.string().uuid("Select a service type"),
     bayId: z.string().uuid("Select a bay"),
     serviceAdvisorId: z.string().uuid("Select a service advisor"),
     technicianId: z.union([z.string().uuid(), z.literal("")]).optional(),
     teamId: z.union([z.string().uuid(), z.literal("")]).optional(),
+    freeServiceCouponNo: z.string().trim().max(50, "Coupon numbers are at most 50 characters").optional(),
     mileage: z
       .number({ invalid_type_error: "Enter the current odometer reading" })
       .int()

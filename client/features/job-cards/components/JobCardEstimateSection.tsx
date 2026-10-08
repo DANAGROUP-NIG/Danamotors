@@ -27,16 +27,18 @@ const money = (value: number) =>
 export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const serviceReference = jobCard.serviceId ?? jobCard.serviceTypeId;
+  const serviceDescription = jobCard.serviceType?.description ?? jobCard.service?.name ?? "Service charge";
   const estimates = jobCard.estimates ?? [];
   const latest = estimates[0];
   const [editing, setEditing] = useState(!latest);
   const [lines, setLines] = useState<Line[]>(
-    jobCard.serviceId
+    serviceReference
       ? [
           {
             type: "SERVICE",
-            referenceId: jobCard.serviceId,
-            description: jobCard.service?.name,
+            referenceId: serviceReference,
+            description: serviceDescription,
             quantity: 1,
           },
         ]
@@ -100,11 +102,11 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         quantity: line.quantity,
         includedInService: line.type.startsWith("INCLUDED_"),
       })) ?? [];
-    if (jobCard.serviceId && !draft.some((line) => line.type === "SERVICE"))
+    if (serviceReference && !draft.some((line) => line.type === "SERVICE"))
       draft.unshift({
         type: "SERVICE",
-        referenceId: jobCard.serviceId,
-        description: jobCard.service?.name ?? "Service",
+        referenceId: serviceReference,
+        description: serviceDescription,
         quantity: 1,
         includedInService: false,
       });
@@ -213,7 +215,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
             <input
               type="checkbox"
               checked={includedInService}
-              disabled={!jobCard.serviceId}
+              disabled={!serviceReference}
               onChange={(event) => setIncluded(event.target.checked)}
             />
             Included in the service charge (no additional charge)

@@ -12,9 +12,12 @@ import { useServices } from "@/features/services/hooks/use-services";
 import { CustomerSelectWithCreate } from "@/features/customers/components/CustomerSelectWithCreate";
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
 import {
+  blankToUndefined,
   createAppointmentSchema,
   type CreateAppointmentFormValues,
 } from "../schemas/appointment.schema";
+import type { Control, FieldErrors, UseFormRegister } from "react-hook-form";
+import { BookingRequestsEditor, cleanRequests, ServiceTypeField, type BookingFields } from "./BookingDetailsFields";
 
 interface AppointmentCreateFormProps {
   onSuccess?: () => void;
@@ -53,6 +56,8 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
     const payload = {
       ...values,
       scheduledAt: new Date(values.scheduledAt).toISOString(),
+      serviceTypeId: values.serviceTypeId || undefined,
+      requests: cleanRequests(values.requests),
     };
     create.mutate(payload, {
       onSuccess: () => {
@@ -114,6 +119,17 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           </p>
         )}
       </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ServiceTypeField control={control as unknown as Control<BookingFields>} error={errors.serviceTypeId?.message} />
+        <Field label="Mileage (km, optional)" error={errors.mileage?.message}>
+          <input type="number" min={0} className={inputCls} placeholder="Odometer reading the customer gave" {...register("mileage", { setValueAs: blankToUndefined })} />
+        </Field>
+      </div>
+      <BookingRequestsEditor
+        control={control as unknown as Control<BookingFields>}
+        register={register as unknown as UseFormRegister<BookingFields>}
+        errors={errors as FieldErrors<BookingFields>}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Branch" error={errors.branchName?.message}>
           {isSuperAdmin ? (

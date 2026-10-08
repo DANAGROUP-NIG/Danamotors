@@ -1,8 +1,13 @@
 import { Prisma } from '@prisma/client';
 
+// Bookings carry a prefix so their numbers are never mistaken for job or bill numbers.
+const PREFIX: Partial<Record<DocumentType, string>> = { BOOKING: 'BK' };
+
+export type DocumentType = 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS' | 'BOOKING' | 'ESTIMATE';
+
 export async function nextDocumentNumber(
   transaction: Prisma.TransactionClient,
-  type: 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS',
+  type: DocumentType,
   date = new Date(),
 ): Promise<string> {
   const year = date.getUTCFullYear();
@@ -13,5 +18,5 @@ export async function nextDocumentNumber(
   });
 
   if (sequence.value > 999999) throw new Error('Annual document sequence exhausted');
-  return `${year}${String(sequence.value).padStart(6, '0')}`;
+  return `${PREFIX[type] ?? ''}${year}${String(sequence.value).padStart(6, '0')}`;
 }

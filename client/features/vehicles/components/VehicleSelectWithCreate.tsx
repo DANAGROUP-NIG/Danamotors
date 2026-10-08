@@ -1,6 +1,6 @@
 "use client";
 import { VehicleCustomerField } from "./VehicleCustomerField";
-import { VehicleModelFields } from "./VehicleModelFields";
+import { VehicleIdentityFields } from "./VehicleIdentityFields";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -163,8 +163,8 @@ export function VehicleSelectWithCreate({
       registrationNumber: initialVehicle?.registrationNumber ?? searchQuery.trim() ?? "",
       make: initialVehicle?.make ?? searchQuery.split(" ")[0] ?? "",
       model: initialVehicle?.model ?? "",
-      customModel: initialVehicle?.model ?? "",
-      customMake: initialVehicle?.make ?? "",
+      catalogueId: null,
+      colourId: null,
       year: initialVehicle?.year,
       trim: "",
       color: "",
@@ -445,7 +445,10 @@ export function VehicleSelectWithCreate({
                   />
                 </Field>
 
-                <div><VehicleModelFields value={{ modelId: watchVehicle("modelId"), customModel: watchVehicle("customModel"), customMake: watchVehicle("customMake"), generationId: watchVehicle("generationId"), engineId: watchVehicle("engineId") }} onChange={next => { for (const key of ["modelId", "customModel", "customMake", "generationId", "engineId"] as const) setValue(key, next[key], { shouldDirty: true, shouldValidate: true }); }} error={vehicleErrors.customModel?.message || vehicleErrors.modelId?.message} /></div>
+                <VehicleIdentityFields value={{ catalogueId: watchVehicle('catalogueId'), colourId: watchVehicle('colourId'), modelId: watchVehicle('modelId'), generationId: watchVehicle('generationId'), engineId: watchVehicle('engineId'), customModel: watchVehicle('customModel'), customMake: watchVehicle('customMake') }}
+                  disabled={createVehicleMutation.isPending} modelError={vehicleErrors.modelId?.message || vehicleErrors.customModel?.message}
+                  catalogueError={vehicleErrors.catalogueId?.message} colourError={vehicleErrors.colourId?.message}
+                  onChange={next => { for (const key of ['catalogueId', 'colourId', 'modelId', 'generationId', 'engineId', 'customModel', 'customMake'] as const) setValue(key, next[key], { shouldDirty: true, shouldValidate: true }); }} />
                 <Field label="VIN" error={vehicleErrors.vin?.message}>
                   <input className={inputCls} placeholder="Vehicle identification number" {...registerVehicle("vin")} />
                 </Field>

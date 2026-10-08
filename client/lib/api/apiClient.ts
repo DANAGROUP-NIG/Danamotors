@@ -13,8 +13,8 @@ export type ApiErrorResponse = {
   message: string;
 };
 
-export async function apiGet<T>(url: string): Promise<T> {
-  const { data } = await api.get<ApiSuccessResponse<T>>(url);
+export async function apiGet<T>(url: string, options?: { signal?: AbortSignal }): Promise<T> {
+  const { data } = await api.get<ApiSuccessResponse<T>>(url, options);
   return data.data;
 }
 

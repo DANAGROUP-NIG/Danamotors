@@ -1,5 +1,7 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
+import { buildReportPaths } from '../modules/reports/reports.openapi';
+import { REPORTS } from '../modules/reports/reports.registry';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -42,6 +44,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
       },
     ],
     tags: [
+      {
+        name: 'Reports',
+        description: 'Workshop daily reports: one endpoint per report, branch-scoped, aggregated on the server.',
+      },
       {
         name: 'Health',
         description: 'API health check endpoint',
@@ -500,6 +506,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
   ],
 };
 
-const swaggerSpec = swaggerJsdoc(options);
+const swaggerSpec = swaggerJsdoc(options) as { paths?: Record<string, unknown> };
+// Report endpoints are generated from the report registry, so their docs come from it too.
+swaggerSpec.paths = { ...(swaggerSpec.paths ?? {}), ...buildReportPaths(REPORTS) };
 
 export default swaggerSpec;

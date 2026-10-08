@@ -13,7 +13,13 @@ import {
   MessageCircle,
   Link2,
   Eye,
+  Plus,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { PreJobEstimateDialog } from "./PreJobEstimateDialog";
+import { EstimateDecisionDialog, type EstimateAction } from "./EstimateDecisionDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -61,13 +67,38 @@ function formatMoney(q: Quotation) {
   return `${symbol}${q.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
+/** Job revisions and pre-job estimates expose the same details through these helpers. */
+function quoteRef(q: Quotation) {
+  return q.estimateNumber ?? q.jobCard?.jobNumber ?? q.id.slice(0, 8);
+}
+function quoteCustomer(q: Quotation) {
+  const customer = q.customer ?? q.jobCard?.customer;
+  if (!customer) return "";
+  const company = (customer as { companyName?: string | null }).companyName;
+  return company || `${customer.firstName} ${customer.lastName}`;
+}
+function quoteVehicle(q: Quotation) {
+  const vehicle = q.vehicle ?? q.jobCard?.vehicle;
+  return vehicle ? [vehicle.make, vehicle.model].filter(Boolean).join(" ") || vehicle.registrationNumber || vehicle.vin : "";
+}
+/** The job card behind the estimate (its own, or the one opened from it). */
+function quoteJob(q: Quotation) {
+  return q.jobCard ? { id: q.jobCard.id, jobNumber: q.jobCard.jobNumber } : q.openedJobCard ?? null;
+}
+function quoteHref(q: Quotation) {
+  const job = quoteJob(q);
+  return job ? `/job-cards/${job.id}` : "/quotations";
+}
+/** A pre-job estimate still open for a decision or cancellation. */
+function isOpenPreJob(q: Quotation) {
+  return !q.jobCardId && q.estimateStatus !== "CLOSED";
+}
+
 function formatQuotationText(q: Quotation) {
-  const vehicle =
-    [q.jobCard.vehicle.make, q.jobCard.vehicle.model].filter(Boolean).join(" ") ||
-    q.jobCard.vehicle.vin;
+  const vehicle = quoteVehicle(q);
   return [
-    `*Quotation ${q.jobCard.jobNumber}*`,
-    `Customer: ${q.jobCard.customer.firstName} ${q.jobCard.customer.lastName}`,
+    `*Quotation ${quoteRef(q)}*`,
+    `Customer: ${quoteCustomer(q)}`,
     `Vehicle: ${vehicle}`,
     `Description: ${q.description}`,
     `Amount: ${formatMoney(q)}`,
@@ -78,7 +109,7 @@ function formatQuotationText(q: Quotation) {
 
 function exportColumns() {
   return [
-    { key: "jobNumber", label: "Job #" },
+    { key: "jobNumber", label: "Estimate / job #" },
     { key: "customer", label: "Customer" },
     { key: "vehicle", label: "Vehicle" },
     { key: "description", label: "Description" },
@@ -93,11 +124,9 @@ function quotationToExportable(
   q: Quotation,
 ): Record<string, string | number | null | undefined> {
   return {
-    jobNumber: q.jobCard.jobNumber,
-    customer: `${q.jobCard.customer.firstName} ${q.jobCard.customer.lastName}`,
-    vehicle:
-      [q.jobCard.vehicle.make, q.jobCard.vehicle.model].filter(Boolean).join(" ") ||
-      q.jobCard.vehicle.vin,
+    jobNumber: quoteRef(q),
+    customer: quoteCustomer(q),
+    vehicle: quoteVehicle(q),
     description: q.description,
     amount: q.amount,
     currency: q.currency,
@@ -115,7 +144,7 @@ function ExportQuotationsButton() {
   const { data } = useQuotations({ page: 1, limit: 1000 });
   const all = data?.estimates ?? [];
   const quotations = activeBranch
-    ? all.filter((q) => q.jobCard.branchId === activeBranch.id)
+    ? all.filter((q) => (q.branchId ?? q.jobCard?.branchId) === activeBranch.id)
     : all;
   const disabled = quotations.length === 0;
 
@@ -158,6 +187,9 @@ export function QuotationsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+  const [action, setAction] = useState<EstimateAction>(null);
+  const { hasPermission } = useAuth();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -214,30 +246,29 @@ export function QuotationsPage() {
   const columns: Column<Quotation>[] = [
     {
       header: "Quote",
-      render: (q) => (
-        <Link
-          href={`/job-cards/${q.jobCardId}`}
-          className="flex items-center gap-2 text-blue-600 hover:underline"
-        >
-          <FileText className="size-4 text-muted-foreground" />
-          <span className="font-mono text-sm font-medium">{q.jobCard.jobNumber}</span>
-        </Link>
-      ),
+      render: (q) => {
+        const job = quoteJob(q);
+        return (
+          <div>
+            <Link href={quoteHref(q)} className="flex items-center gap-2 text-blue-600 hover:underline">
+              <FileText className="size-4 text-muted-foreground" />
+              <span className="font-mono text-sm font-medium">{quoteRef(q)}</span>
+            </Link>
+            <p className="mt-0.5 pl-6 text-xs text-muted-foreground">{job ? `Job ${job.jobNumber}` : "Before job card"}</p>
+          </div>
+        );
+      },
     },
     {
       header: "Customer",
       render: (q) => (
-        <span className="text-muted-foreground">
-          {q.jobCard.customer.firstName} {q.jobCard.customer.lastName}
-        </span>
+        <span className="text-muted-foreground">{quoteCustomer(q)}</span>
       ),
     },
     {
       header: "Vehicle",
       render: (q) => (
-        <span className="text-muted-foreground">
-          {[q.jobCard.vehicle.make, q.jobCard.vehicle.model].filter(Boolean).join(" ") || q.jobCard.vehicle.vin}
-        </span>
+        <span className="text-muted-foreground">{quoteVehicle(q)}</span>
       ),
     },
     {
@@ -253,9 +284,13 @@ export function QuotationsPage() {
     {
       header: "Status",
       render: (q) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[q.status] || ""}`}>
-          {q.status}
-        </span>
+        <div>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[q.status] || ""}`}>
+            {q.status}
+          </span>
+          {q.closedReason === "CANCELLED" && <p className="mt-0.5 text-xs text-red-600">Cancelled</p>}
+          {!q.jobCardId && q.estimateStatus === "ACTIVE" && <p className="mt-0.5 text-xs text-muted-foreground">Awaiting job card</p>}
+        </div>
       ),
     },
     {
@@ -274,8 +309,14 @@ export function QuotationsPage() {
               id: "view",
               label: "View details",
               icon: <Eye className="size-4" />,
-              onClick: () => router.push(`/job-cards/${q.jobCardId}`),
+              onClick: () => router.push(quoteHref(q)),
             },
+            ...(isOpenPreJob(q) && hasPermission("estimate:approve") && q.estimateStatus === "PENDING_APPROVAL"
+              ? [{ id: "decision", label: "Record decision", icon: <CheckCircle2 className="size-4" />, onClick: () => setAction({ kind: "decision" as const, quotation: q }) }]
+              : []),
+            ...(isOpenPreJob(q) && hasPermission("estimate:create")
+              ? [{ id: "cancel", label: "Cancel estimate", icon: <XCircle className="size-4" />, onClick: () => setAction({ kind: "cancel" as const, quotation: q }) }]
+              : []),
             {
               id: "download",
               label: "Download CSV",
@@ -288,7 +329,7 @@ export function QuotationsPage() {
               icon: <Share2 className="size-4" />,
               onClick: () =>
                 shareItems({
-                  title: `Quotation ${q.jobCard.jobNumber}`,
+                  title: `Quotation ${quoteRef(q)}`,
                   text: formatQuotationText(q),
                 }),
             },
@@ -298,7 +339,7 @@ export function QuotationsPage() {
               icon: <Mail className="size-4" />,
               onClick: () =>
                 openMailto({
-                  subject: `Quotation ${q.jobCard.jobNumber} from Dana Motors`,
+                  subject: `Quotation ${quoteRef(q)} from Dana Motors`,
                   body: formatQuotationText(q),
                 }),
             },
@@ -315,7 +356,7 @@ export function QuotationsPage() {
               shortcut: "⌘C",
               onClick: () =>
                 copyToClipboard(
-                  `${window.location.origin}/job-cards/${q.jobCardId}`,
+                  `${window.location.origin}${quoteHref(q)}`,
                   "Quotation link copied",
                 ),
             },
@@ -348,8 +389,20 @@ export function QuotationsPage() {
             ? `${data.meta.total} ${data.meta.total === 1 ? "quotation" : "quotations"} on record`
             : "Service cost estimates awaiting customer approval."
         }
-        actions={<ExportQuotationsButton />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportQuotationsButton />
+            {hasPermission("estimate:create") && (
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-4" />
+                New estimate
+              </Button>
+            )}
+          </div>
+        }
       />
+      <PreJobEstimateDialog isOpen={creating} onClose={() => setCreating(false)} />
+      <EstimateDecisionDialog action={action} onClose={() => setAction(null)} />
 
       <DataTable
         columns={columns}
@@ -375,7 +428,7 @@ export function QuotationsPage() {
             onSearchChange={setSearch}
             onSearch={commitSearch}
             onClearSearch={clearSearch}
-            placeholder="Search by job #, customer, or description…"
+            placeholder="Search by estimate #, job #, customer, registration or description…"
             filters={<DataTableFilterChips options={STATUS_FILTER_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />}
           />
 

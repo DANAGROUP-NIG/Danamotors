@@ -1,4 +1,7 @@
 import prisma from '../../prisma/client';
+import { nextDocumentNumber } from '../finance/document-number';
+import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
+import { estimateListWhere } from './pre-job-estimate.service';
 import { jobStatusFilter } from './job-card-workflow.service';
 import {
   Prisma,
@@ -21,9 +24,21 @@ export class ServiceRepository {
     notes?: string;
     status?: string;
     source?: string;
+    serviceTypeId?: string;
+    mileage?: number;
+    requests?: AppointmentRequestInput[];
   }): Promise<ServiceAppointment> {
-    return prisma.serviceAppointment.create({
-      data: { ...data, source: data.source ?? 'WalkIn' },
+    const { requests, ...fields } = data;
+    // Every booking gets a number (BKYYYY######) for the service booking report.
+    return prisma.$transaction(async (tx) =>
+      tx.serviceAppointment.create({
+      data: {
+        ...fields,
+        source: data.source ?? 'WalkIn',
+        bookingNumber: await nextDocumentNumber(tx, 'BOOKING'),
+        bookingStatus: bookingStatusFor(data.status),
+        ...(requests?.length ? { requests: { create: requests } } : {}),
+      },
       include: {
         service: {
           select: {
@@ -35,8 +50,9 @@ export class ServiceRepository {
             price: true,
           },
         },
+        requests: true,
       },
-    });
+    }));
   }
 
   async listAppointments(params: {
@@ -154,6 +170,8 @@ export class ServiceRepository {
     return prisma.serviceAppointment.findUnique({
       where: { id },
       include: {
+        serviceType: { select: { id: true, code: true, description: true, freeService: true } },
+        requests: { include: { complaintCode: { select: { id: true, code: true, description: true } } }, orderBy: { createdAt: 'asc' } },
         customer: {
           select: {
             id: true,
@@ -261,20 +279,16 @@ export class ServiceRepository {
 
     return prisma.jobCard.findMany({
       where,
-      skip: params?.skip,
-      take: params?.take,
+      skip: params?.skip ?? 0,
+      take: params?.take ?? 50,
       include: {
-        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
         service: true,
         serviceType: true,
         bay: true,
         team: true,
-        complaints: { include: { complaintCode: true } },
-        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
-        appointment: true,
-        branch: true,
+        branch: { select: { id: true, name: true } },
         customer: {
           select: {
             id: true,
@@ -293,10 +307,8 @@ export class ServiceRepository {
         technician: {
           select: { id: true, firstName: true, lastName: true },
         },
-        inspections: true,
-        estimates: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
 
@@ -491,27 +503,8 @@ export class ServiceRepository {
     status?: string;
     search?: string;
   }) {
-    const where: Record<string, unknown> = {};
-
-    if (params.branchId) {
-      where.jobCard = { branchId: params.branchId };
-    }
-
-    if (params.status) {
-      where.status = params.status;
-    }
-
-    if (params.search) {
-      where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
-      ];
-    }
-
     return prisma.estimate.findMany({
-      where,
+      where: estimateListWhere(params),
       skip: params.skip,
       take: params.take,
       include: {
@@ -537,6 +530,11 @@ export class ServiceRepository {
           },
         },
         approvals: true,
+        // Pre-job estimates have no job card: who and what they are for come from here.
+        customer: { select: { id: true, firstName: true, lastName: true, companyName: true } },
+        vehicle: { select: { id: true, make: true, model: true, registrationNumber: true, vin: true } },
+        branch: { select: { id: true, name: true } },
+        openedJobCard: { select: { id: true, jobNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

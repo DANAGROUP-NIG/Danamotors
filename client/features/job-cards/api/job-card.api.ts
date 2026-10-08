@@ -36,11 +36,15 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 
 export interface CreateJobCardPayload {
   branchName: string;
-  serviceId: string;
+  serviceId?: string;
+  serviceTypeId: string;
   bayId: string;
   serviceAdvisorId: string;
   technicianId?: string;
   teamId?: string;
+  freeServiceCouponNo?: string;
+  /** A pre-job estimate the job is opened from. */
+  estimateId?: string;
   mileage: number;
   promisedAt: string;
   complaints: {
@@ -92,6 +96,7 @@ export async function createJobCardRequest(
     API_ROUTES.service.jobCards.base,
     {
       ...data,
+      serviceId: data.serviceId || undefined,
       appointmentId: data.appointmentId || undefined,
       customerId: data.customerId || undefined,
       vehicleId: data.vehicleId || undefined,

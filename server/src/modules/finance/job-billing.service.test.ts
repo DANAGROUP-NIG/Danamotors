@@ -55,6 +55,21 @@ describe('Job billing after delivery on credit', () => {
     expect(data.lines.createMany.data.filter((line: { type: string }) => line.type === 'SERVICE')).toHaveLength(1);
   });
 
+  it('bills the workshop-only service charge using its approved type reference', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card,
+      serviceId: null, serviceTypeId: 'service-type', serviceType: { description: 'PAID SERVICE', chargedTo: 'CUSTOMER' },
+      serviceCharge: 15100, estimates: [{ ...approved, lines: [approved.lines[0], {
+        type: 'SERVICE', referenceId: 'service-type', description: 'PAID SERVICE', quantity: 1, rate: 15100, amount: 15100,
+      }] }],
+    });
+    const preview = await new JobBillingService().previewJobBill(input);
+    expect(preview.lines.filter(line => line.type === 'SERVICE')).toEqual([expect.objectContaining({
+      referenceId: 'service-type', description: 'PAID SERVICE', amount: 15100,
+    })]);
+    await new JobBillingService().createJobBill(input);
+    expect(prisma.invoice.create).toHaveBeenCalled();
+  });
+
   it('keeps an explicitly waived service visible without adding a charge', async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, service: { name: 'Full service' }, serviceCharge: 0 });
     const preview = await new JobBillingService().previewJobBill(input);

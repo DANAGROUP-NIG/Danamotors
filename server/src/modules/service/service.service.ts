@@ -1,6 +1,7 @@
 import { latestEstimateQuery } from './estimate-approval';
+import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { lineAmount, sumMoney } from '../finance/money';
-import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
+import { EstimateCloseReason, EstimateStatus, Prisma, WarrantyCoverageStatus } from '@prisma/client';
 import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
 import { z } from 'zod';
 import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
@@ -12,6 +13,18 @@ import { ROLES } from '../../shared/constants/roles';
 import { NotificationService } from '../notification/notification.service';
 import { assertMileage } from '../warranty/warranty.logic';
 import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
+import { bookingStatusFor, type AppointmentRequestInput } from './booking-status';
+import { decidePreJobEstimate, estimateListWhere } from './pre-job-estimate.service';
+import { nextDocumentNumber } from '../finance/document-number';
+
+/** The booked service type and the complaint codes on booking requests must be active masters. */
+async function assertBookingMasters(db: Prisma.TransactionClient | typeof prisma, serviceTypeId?: string, requests?: AppointmentRequestInput[]) {
+  if (serviceTypeId && !(await db.workshopMaster.findFirst({ where: { id: serviceTypeId, kind: 'SERVICE_TYPE', active: true }, select: { id: true } })))
+    throw new BadRequestError('Select an active service type');
+  const codes = Array.from(new Set((requests ?? []).map((request) => request.complaintCodeId).filter((code): code is string => Boolean(code))));
+  if (codes.length && (await db.workshopMaster.count({ where: { id: { in: codes }, kind: 'COMPLAINT', active: true } })) !== codes.length)
+    throw new BadRequestError('Select active complaint codes for the booking requests');
+}
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -20,7 +33,7 @@ import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warran
  * - SuperAdmin users can bypass this map (see updateAppointment).
  */
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
-  'Pending':           ['Checked In', 'Cancelled'],
+  'Pending':           ['Checked In', 'No Show', 'Cancelled'],
   'Checked In':        ['Inspection', 'Cancelled'],
   'Inspection':        ['Awaiting Approval', 'Cancelled'],
   'Awaiting Approval': ['In Repair', 'Cancelled'],
@@ -29,6 +42,8 @@ export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   'Ready':             ['Completed'],
   'Completed':         [],
   'Cancelled':         [],
+  // The vehicle did not come in; book again if the customer still wants the service.
+  'No Show':           [],
 };
 
 export class ServiceService {
@@ -48,6 +63,9 @@ export class ServiceService {
     notes?: string;
     status?: string;
     createdById?: string;
+    serviceTypeId?: string;
+    mileage?: number;
+    requests?: AppointmentRequestInput[];
   }) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) throw new NotFoundError('Customer not found');
@@ -67,7 +85,7 @@ export class ServiceService {
       where: {
         customerId: data.customerId,
         vehicleId: data.vehicleId,
-        status: { notIn: ['Closed', 'Cancelled', 'Completed'] },
+        status: { notIn: ['Closed', 'Cancelled', 'Completed', 'No Show'] },
       },
     });
     if (activeAppointment) {
@@ -76,6 +94,7 @@ export class ServiceService {
       );
     }
 
+    await assertBookingMasters(prisma, data.serviceTypeId, data.requests);
     const appointment = await this.serviceRepository.createAppointment({
       customerId: data.customerId,
       vehicleId: data.vehicleId,
@@ -87,6 +106,9 @@ export class ServiceService {
       notes: data.notes,
       status: data.status ?? 'Pending',
       source: 'WalkIn',
+      serviceTypeId: data.serviceTypeId,
+      mileage: data.mileage,
+      requests: data.requests,
     });
 
     const notificationService = new NotificationService();
@@ -166,6 +188,8 @@ export class ServiceService {
     mileage?: number;
     warrantyAcknowledged?: boolean;
     acknowledgedCampaignIds?: string[];
+    serviceTypeId?: string | null;
+    requests?: AppointmentRequestInput[];
   }) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
@@ -231,6 +255,11 @@ export class ServiceService {
         });
         checkInCampaigns = openCampaigns.map((c) => ({ code: c.code, title: c.title }));
       }
+      await assertBookingMasters(tx, data.serviceTypeId ?? undefined, data.requests);
+      if (data.requests !== undefined) {
+        await tx.appointmentRequest.deleteMany({ where: { appointmentId: id } });
+        if (data.requests.length) await tx.appointmentRequest.createMany({ data: data.requests.map((request) => ({ ...request, appointmentId: id })) });
+      }
       return tx.serviceAppointment.update({
         where: { id },
         data: {
@@ -238,6 +267,10 @@ export class ServiceService {
           durationMins: data.durationMins,
           notes: data.notes,
           status: data.status,
+          serviceTypeId: data.serviceTypeId,
+          // The odometer reading taken at check-in replaces the one given when booking.
+          mileage: data.mileage,
+          ...(data.status !== undefined && { bookingStatus: bookingStatusFor(data.status, appointment.bookingStatus) }),
         },
       });
     });
@@ -445,13 +478,14 @@ export class ServiceService {
     const data = estimateBody.parse(input);
     return prisma.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
-      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { vehicle: { include: { catalogue: true } } } });
+      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { serviceType: { select: { description: true } }, vehicle: { include: { catalogue: true } } } });
       if (!card) throw new NotFoundError('Job card not found');
       if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to unbilled jobs');
       const billable = data.lines.filter(line => line.type !== 'COMPLAINT');
       if (new Set(billable.map(line => `${line.type}:${line.referenceId}`)).size !== billable.length) throw new BadRequestError('Each service, part or labour operation can appear only once per estimate');
       const services = billable.filter(line => line.type === 'SERVICE');
-      if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
+      const chargeReference = serviceChargeReference(card);
+      if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
       if (data.lines.some(line => line.includedInService && !['PART', 'LABOUR'].includes(line.type))) throw new BadRequestError('Only parts and labour can be included in the service charge');
       if (data.lines.some(line => line.includedInService) && services.length !== 1) throw new BadRequestError('Package inclusions require the selected service line');
       const lines = [];
@@ -472,9 +506,14 @@ export class ServiceService {
           description = item.description; rate = modelRate?.rate ?? item.rate;
           quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
         } else if (line.type === 'SERVICE') {
-          const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
-          if (!service) throw new BadRequestError('Select an active service');
-          description = service.name; rate = card.serviceCharge ?? service.price;
+          if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
+            description = serviceChargeDescription(card);
+            rate = card.serviceCharge ?? 0;
+          } else {
+            const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
+            if (!service) throw new BadRequestError('Select an active service');
+            description = service.name; rate = card.serviceCharge ?? service.price;
+          }
         } else if (line.referenceId) {
           const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
           if (!complaint) throw new BadRequestError('Complaint must belong to this job');
@@ -490,7 +529,28 @@ export class ServiceService {
       const previous = (await tx.estimate.findMany({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { createdAt: true } }))?.[0];
       // Strict ordering under the shared row lock, including transactions started earlier.
       const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1));
-      return tx.estimate.create({ data: { createdAt, jobCardId, description: data.description, currency: 'NGN', status: 'Pending', amount: sumMoney(lines.map(line => line.amount)), lines: { createMany: { data: lines } } }, include: { lines: true } });
+      await tx.estimate.updateMany({
+        where: { jobCardId, OR: [{ closedReason: null }, { closedReason: { not: EstimateCloseReason.SUPERSEDED } }] },
+        data: { estimateStatus: EstimateStatus.CLOSED, closedReason: EstimateCloseReason.SUPERSEDED },
+      });
+      return tx.estimate.create({
+        data: {
+          createdAt,
+          jobCardId,
+          branchId: card.branchId,
+          customerId: card.customerId,
+          vehicleId: card.vehicleId,
+          estimateNumber: await nextDocumentNumber(tx, 'ESTIMATE', createdAt),
+          estimateDate: createdAt,
+          estimateStatus: EstimateStatus.PENDING_APPROVAL,
+          description: data.description,
+          currency: 'NGN',
+          status: 'Pending',
+          amount: sumMoney(lines.map(line => line.amount)),
+          lines: { createMany: { data: lines } },
+        },
+        include: { lines: true },
+      });
     }, { maxWait: 5000, timeout: 15000 });
   }
 
@@ -503,22 +563,29 @@ export class ServiceService {
   }, actorId?: string) {
     const identity = await prisma.estimate.findUnique({ where: { id: estimateId }, select: { jobCardId: true } });
     if (!identity) throw new NotFoundError('Estimate not found');
+    if (!identity.jobCardId) return decidePreJobEstimate(estimateId, data, actorId);
+    const jobCardId = identity.jobCardId;
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`);
-      const estimates = await tx.estimate.findMany({ where: { jobCardId: identity.jobCardId }, ...latestEstimateQuery });
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
+      const estimates = await tx.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery });
       const estimate = estimates[0];
       if (!estimate || estimate.id !== estimateId) throw new ConflictError('Only the latest estimate revision can receive a decision');
-      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: identity.jobCardId } });
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId } });
       if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('This job is closed for estimate decisions');
       if (card.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
       if (estimate.approvals.length) throw new ConflictError('This revision already has a decision. Create a new revision to change scope.');
       const status = data.approved ? 'Approved' : 'Declined';
       if (data.approved) {
         const services = estimate.lines.filter(line => line.type === 'SERVICE');
-        if (card.serviceId && (services.length !== 1 || services[0].referenceId !== card.serviceId || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
+        const chargeReference = serviceChargeReference(card);
+        if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
         if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
       }
-      await tx.estimate.update({ where: { id: estimateId }, data: { status } });
+      // The decision closes the revision: approved = the job's scope, declined = rejected.
+      await tx.estimate.update({
+        where: { id: estimateId },
+        data: { status, estimateStatus: EstimateStatus.CLOSED, closedReason: data.approved ? EstimateCloseReason.CONVERTED : EstimateCloseReason.DECLINED },
+      });
       if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: 'ESTIMATE_DECISION_RECORDED', details: JSON.stringify({ jobCardId: card.id, estimateId, customerId: data.customerId, status, comments: data.comments }) } });
       return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
     }, { maxWait: 5000, timeout: 15000 });
@@ -591,18 +658,7 @@ export class ServiceService {
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
-    if (params?.branchId) where.jobCard = { branchId: params.branchId };
-    if (params?.status) where.status = params.status;
-
-    if (params?.search) {
-      where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
-      ];
-    }
+    const where = estimateListWhere({ branchId: params?.branchId, status: params?.status, search: params?.search });
 
     const [estimates, total] = await Promise.all([
       this.serviceRepository.listEstimates({

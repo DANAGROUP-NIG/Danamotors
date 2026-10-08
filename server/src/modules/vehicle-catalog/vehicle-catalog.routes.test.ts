@@ -7,7 +7,7 @@ import { gzipSync } from 'zlib';
 import { randomUUID } from 'crypto';
 import { parseCatalog, normalizeCatalogName, catalogAliases } from './catalog-source';
 jest.mock('../../middleware/authMiddleware', () => ({ authMiddleware: (_req: unknown, _res: unknown, next: () => void) => next() }));
-jest.mock('../../prisma/client', () => ({ __esModule: true, default: { vehicleCatalogModel: { findMany: jest.fn(), findUnique: jest.fn() } } }));
+jest.mock('../../prisma/client', () => ({ __esModule: true, default: { $queryRaw: jest.fn(), vehicleCatalogModel: { findMany: jest.fn(), findUnique: jest.fn() } } }));
 import prisma from '../../prisma/client';
 import router from './vehicle-catalog.routes';
 const findMany = prisma.vehicleCatalogModel.findMany as jest.Mock;
@@ -26,7 +26,7 @@ it('returns a small model list without specs, caches it and supports ETag revali
   findMany.mockResolvedValue(source.makes.flatMap(make => make.models.map(model => ({ id: randomUUID(), name: model.name, searchName: normalizeCatalogName(model.name), aliases: catalogAliases(model.name), yearStart: model.yearStart, yearEnd: model.yearEnd, make: { name: make.name } }))));
   const response = await fetch(`${base}/models`);
   expect(response.status).toBe(200);
-  expect(response.headers.get('cache-control')).toBe('public, max-age=86400');
+  expect(response.headers.get('cache-control')).toBe('private, max-age=60');
   const body = await response.text();
   expect(JSON.parse(body).data).toHaveLength(47);
   expect(body).not.toContain('specs');
@@ -47,4 +47,46 @@ it('returns compact options without selecting specs and returns 404 for missing 
   expect(findUnique.mock.calls[0][0].select.generations.select.engines.select).not.toHaveProperty('specs');
   findUnique.mockResolvedValueOnce(null);
   expect((await fetch(`${base}/models/${randomUUID()}/options`)).status).toBe(404);
+});
+
+it('searches workshop variants in one bounded query and rejects oversized requests', async () => {
+  const raw = prisma.$queryRaw as jest.Mock;
+  raw.mockResolvedValue([{ id: randomUUID(), code: 'RIO-AT', description: 'Automatic', make: 'Kia', model: 'Rio' }]);
+  const response = await fetch(`${base}/workshop-variants?search=Kia%20Rio&limit=20`);
+  expect(response.status).toBe(200);
+  const body = await response.json() as { data: { items: unknown[] } };
+  expect(body.data.items).toHaveLength(1);
+  expect(raw).toHaveBeenCalledTimes(1);
+  const sql = raw.mock.calls[0][0];
+  expect(sql.text).toContain('LIMIT');
+  expect(sql.values).toEqual(['Kia', 'Rio', 20]);
+  expect((await fetch(`${base}/workshop-variants?limit=1000`)).status).toBe(400);
+  expect((await fetch(`${base}/workshop-variants?search=${'a'.repeat(101)}`)).status).toBe(400);
+  expect(raw).toHaveBeenCalledTimes(1);
+});
+it('loads any saved variant directly, including inactive labels, and rejects unknown IDs', async () => {
+  const raw = prisma.$queryRaw as jest.Mock;
+  raw.mockResolvedValueOnce([{ id: randomUUID(), active: false, colours: [] }]);
+  const response = await fetch(`${base}/workshop-variants/${randomUUID()}`);
+  expect(response.status).toBe(200);
+  const body = await response.json() as { data: { item: { active: boolean } } };
+  expect(body.data.item.active).toBe(false);
+  raw.mockResolvedValueOnce([]);
+  expect((await fetch(`${base}/workshop-variants/${randomUUID()}`)).status).toBe(404);
+});
+
+it('refreshes past a cached catalogue and never caches an empty catalogue', async () => {
+  findMany.mockResolvedValueOnce([]);
+  const empty = await fetch(`${base}/models?refresh=1&request=1`);
+  expect(await empty.json()).toMatchObject({ data: [] });
+  expect(empty.headers.get('cache-control')).toBe('private, no-store');
+  const model = { id: randomUUID(), name: 'Rio', make: { name: 'Kia' }, searchName: 'rio', aliases: ['rio'], yearStart: 2000, yearEnd: null };
+  findMany.mockResolvedValueOnce([model]);
+  const populated = await fetch(`${base}/models`);
+  expect(await populated.json()).toMatchObject({ data: [{ id: model.id }] });
+  expect(findMany).toHaveBeenCalledTimes(2);
+  findMany.mockResolvedValueOnce([{ ...model, name: 'Updated Rio' }]);
+  const refreshed = await fetch(`${base}/models?refresh=1&request=2`);
+  expect(await refreshed.json()).toMatchObject({ data: [{ name: 'Updated Rio' }] });
+  expect(findMany).toHaveBeenCalledTimes(3);
 });
