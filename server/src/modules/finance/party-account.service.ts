@@ -1,3 +1,4 @@
+import { invoiceStatus } from './credit-terms';
 import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -44,12 +45,12 @@ const branchClause = (alias: string, branchId?: string) => branchId ? Prisma.sql
 
 function documentQuery(customerId: string, branchId: string | undefined, side: 'DEBIT' | 'CREDIT') {
   const notes = Prisma.sql`SELECT n.id, 'NOTE'::text AS kind, n.number, n.date, n.amount::double precision AS amount,
-    n."remainingAmount"::double precision AS balance FROM "PartyNote" n
+    n."remainingAmount"::double precision AS balance, NULL::timestamp AS "dueDate" FROM "PartyNote" n
     WHERE n."customerId" = ${customerId} AND n.direction = ${side} AND n.status = 'ACTIVE' ${branchClause('n', branchId)}`;
   if (side === 'CREDIT') return Prisma.sql`SELECT r.id, 'RECEIPT'::text AS kind, r."receiptNumber" AS number, r."issuedAt" AS date,
-    r.amount, r."advanceAmount" AS balance FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' ${branchClause('r', branchId)} UNION ALL ${notes}`;
+    r.amount, r."advanceAmount" AS balance, NULL::timestamp AS "dueDate" FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' ${branchClause('r', branchId)} UNION ALL ${notes}`;
   return Prisma.sql`SELECT i.id, 'INVOICE'::text AS kind, i."invoiceNumber" AS number, i."issuedDate" AS date,
-    i.total AS amount, i."outstandingAmount" AS balance FROM "Invoice" i LEFT JOIN "JobCard" j ON j.id=i."jobCardId"
+    i.total AS amount, i."outstandingAmount" AS balance, i."dueDate" FROM "Invoice" i LEFT JOIN "JobCard" j ON j.id=i."jobCardId"
     JOIN "Customer" c ON c.id=i."customerId" WHERE i."customerId" = ${customerId}
     AND UPPER(i.status) NOT IN ('CANCELLED','CANCELED','VOID')
     ${branchId ? Prisma.sql`AND COALESCE(i."reportBranchId",j."branchId",c."branchId") = ${branchId}` : Prisma.empty} UNION ALL ${notes}`;
@@ -82,7 +83,7 @@ async function changeBalance(transaction: Prisma.TransactionClient, selection: A
   const balance = sumMoney([document.balance, reverse ? selection.amount : -selection.amount]);
   if (balance < 0 || balance > money(document.amount)) throw new ConflictError('The document balance cannot support this adjustment');
   if (selection.kind === 'INVOICE') {
-    await transaction.invoice.update({ where: { id: selection.id }, data: { outstandingAmount: balance, status: balance <= 0 ? 'Paid' : balance < document.amount ? 'Partially Paid' : 'Unpaid' } });
+    await transaction.invoice.update({ where: { id: selection.id }, data: { outstandingAmount: balance, status: invoiceStatus(balance, document.amount, document.dueDate) } });
   } else if (selection.kind === 'RECEIPT') {
     await transaction.receipt.update({ where: { id: selection.id }, data: { advanceAmount: balance } });
   } else {

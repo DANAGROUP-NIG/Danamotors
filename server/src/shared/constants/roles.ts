@@ -169,6 +169,8 @@ export const PERMISSIONS = {
   RECEIPT_CREATE: "receipt:create",
   RECEIPT_UPDATE: "receipt:update",
   RECEIPT_CANCEL: "receipt:cancel",
+  OUTSTANDING_RECALCULATE: "outstanding:recalculate",
+  OUTSTANDING_LETTER: "letter:outstanding",
   PARTY_LEDGER_READ: "report:party-ledger",
   PARTY_OUTSTANDING_READ: "report:party-outstanding",
   PARTY_OUTSTANDING_AGE_READ: "report:party-outstanding-age",
@@ -221,6 +223,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.OUTSTANDING_RECALCULATE,
+    PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
     PERMISSIONS.PARTY_OUTSTANDING_READ,
     PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,
@@ -423,6 +427,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
     PERMISSIONS.PARTY_OUTSTANDING_READ,
     PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,
@@ -452,6 +457,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   [ROLES.BILLING_OFFICER]: [
+    PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
     PERMISSIONS.PARTY_OUTSTANDING_READ,
     PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,

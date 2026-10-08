@@ -230,6 +230,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
+            creditDays: { type: 'integer', nullable: true, minimum: 0, maximum: 3650, description: 'Null uses company default credit days for future job bills' },
+            partyStatus: { type: 'string', enum: ['CUSTOMER','DEALER','FA_PARTY'], default: 'CUSTOMER' },
             firstName: { type: 'string', example: 'Adaeze' },
             lastName: { type: 'string', example: 'Okafor' },
             email: { type: 'string', format: 'email', nullable: true },

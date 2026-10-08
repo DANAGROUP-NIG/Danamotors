@@ -10,7 +10,7 @@ type RawRow={ [key:string]:string|number|bigint|Date|Prisma.Decimal|null };
 const normalize=(row:RawRow):ReportRow => Object.fromEntries(Object.entries(row).map(([k,v])=>[k,v instanceof Prisma.Decimal?Number(v):v instanceof Date?v.toISOString():typeof v==='bigint'?Number(v):v])) as ReportRow;
 const nameSql=Prisma.sql`COALESCE(NULLIF(c."companyName",''),TRIM(c."firstName" || ' ' || c."lastName"))`;
 
-async function partyScope(tx:Prisma.TransactionClient,input:PartyReportInput) {
+export async function partyScope(tx:Prisma.TransactionClient,input:PartyReportInput) {
  const order=input.order==='code'?Prisma.sql`COALESCE(c.code,'')`:Prisma.sql`LOWER(${nameSql})`;
  const filters=[Prisma.sql`c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR'`];
  if(input.customerId) filters.push(Prisma.sql`c.id=${input.customerId}`);
@@ -24,7 +24,7 @@ async function partyScope(tx:Prisma.TransactionClient,input:PartyReportInput) {
  }
  return {order,where:Prisma.join(filters,' AND ')};
 }
-async function reportQuery(tx:Prisma.TransactionClient,input:PartyReportInput,limits:number[]) {
+export async function reportQuery(tx:Prisma.TransactionClient,input:PartyReportInput,limits:number[]) {
  const {order,where}=await partyScope(tx,input);
  const end=reportEnd(input.kind==='ledger'?input.to!:input.asOn!);
  const branch=input.branchId?Prisma.sql`AND d."branchId"=${input.branchId}`:Prisma.empty;

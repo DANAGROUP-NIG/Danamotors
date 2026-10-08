@@ -5,6 +5,8 @@ jest.mock('../../prisma/client', () => ({
     jobCard: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn() },
     invoice: { create: jest.fn() },
+    customer: { findUniqueOrThrow: jest.fn() },
+    financeSetting: { findUnique: jest.fn() },
     documentSequence: { upsert: jest.fn() },
   },
 }));
@@ -26,6 +28,8 @@ const card = {
 describe('Job billing after delivery on credit', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({ creditDays: null });
+    (prisma.financeSetting.findUnique as jest.Mock).mockResolvedValue({ value: 30 });
     (prisma.$transaction as jest.Mock).mockImplementation((callback) => callback(prisma));
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(card);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'advisor', role: { name: ROLES.SERVICE_ADVISOR }, isActive: true, branchId: 'branch' });
@@ -118,6 +122,8 @@ const prismaFailure = (code: string) => new Prisma.PrismaClientKnownRequestError
 describe('Job-bill transaction resilience', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({ creditDays: null });
+    (prisma.financeSetting.findUnique as jest.Mock).mockResolvedValue({ value: 30 });
     (prisma.$transaction as jest.Mock).mockImplementation((callback) => callback(prisma));
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(card);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'advisor', role: { name: ROLES.SERVICE_ADVISOR }, isActive: true, branchId: 'branch' });
@@ -125,6 +131,14 @@ describe('Job-bill transaction resilience', () => {
     (prisma.invoice.create as jest.Mock).mockResolvedValue({ id: 'invoice' });
   });
 
+  it('uses customer terms before the company default', async () => {
+    (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({ creditDays: 0 });
+    await new JobBillingService().createJobBill(input);
+    const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.dueDate).toBeInstanceOf(Date);
+    expect(new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos'}).format(data.dueDate)).toBe(new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos'}).format(data.issuedDate));
+    expect(prisma.financeSetting.findUnique).not.toHaveBeenCalled();
+  });
   it('uses bounded transaction limits and bulk inserts line snapshots', async () => {
     await new JobBillingService().createJobBill(input);
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', maxWait: 5000, timeout: 15000 });

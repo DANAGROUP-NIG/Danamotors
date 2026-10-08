@@ -1,3 +1,4 @@
+import { creditDueDate, defaultCreditDays } from './credit-terms';
 import { latestEstimateQuery, reviewApprovedScope } from '../service/estimate-approval';
 import { serviceChargeDescription, serviceChargeReference } from '../service/job-service-charge';
 import { Prisma } from "@prisma/client";
@@ -257,11 +258,16 @@ export class JobBillingService {
               transaction,
               "JOB_BILL",
             );
+            const issuedDate = new Date();
+            const customerTerms = await transaction.customer.findUniqueOrThrow({ where: { id: customerId }, select: { creditDays: true } });
+            const dueDate = creditDueDate(issuedDate, customerTerms.creditDays ?? await defaultCreditDays(transaction));
             const invoice = await transaction.invoice.create({
               data: {
                 customerId,
                 jobCardId: jobCard.id,
                 invoiceNumber,
+                issuedDate,
+                dueDate,
                 subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]),
                 tax: totals.vatAmount,
                 total: totals.total,

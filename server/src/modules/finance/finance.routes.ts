@@ -1,3 +1,5 @@
+import { OutstandingController,requireOutstandingTools } from './outstanding.controller';
+import { repairSchema,maintenanceSettingsSchema,lettersPreviewSchema,lettersGenerateSchema,savedLettersSchema,letterPrintSchema } from './outstanding.validation';
 import { PartyNoteController, requireNoteCreate, requireNoteRegister, requireNoteRead, requireAnyNoteCreate } from './party-note.controller';
 import { createPartyNoteSchema, noteIdSchema, cancelPartyNoteSchema, noteRegisterSchema, noteReceiptQuerySchema, notePartyQuerySchema, noteLedgerQuerySchema } from './party-note.validation';
 import { z } from 'zod';
@@ -35,6 +37,19 @@ const router = Router();
 const controller = new FinanceController();
 
 router.use(authMiddleware);
+const outstanding=new OutstandingController();
+const repairAccess=[requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE)];
+router.get('/outstanding-letters/parties', requireOutstandingTools, validateRequest(reportPartySearchSchema), outstanding.search);
+router.post('/outstanding/recalculate/preview',...repairAccess,validateRequest(repairSchema),outstanding.previewRepair);
+router.post('/outstanding/recalculate/apply',...repairAccess,validateRequest(repairSchema),outstanding.applyRepair);
+router.get('/settings/outstanding',requireOutstandingTools,validateRequest(z.object({query:z.object({}).strict()})),outstanding.settings);
+router.put('/settings/outstanding',requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE),validateRequest(maintenanceSettingsSchema),outstanding.saveSettings);
+router.post('/outstanding-letters/preview',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersPreviewSchema),outstanding.previewLetters);
+router.post('/outstanding-letters/generate',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersGenerateSchema),outstanding.generate);
+router.get('/outstanding-letters',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(savedLettersSchema),outstanding.saved);
+router.post('/outstanding-letters/print',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.print);
+router.post('/outstanding-letters/printed',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.markPrinted);
+
 
 const partyNotes=new PartyNoteController();
 router.get('/party-notes/parties', requireAnyNoteCreate, validateRequest(notePartyQuerySchema), partyNotes.parties);
@@ -1064,4 +1079,111 @@ export default router;
  *       - {in: query, name: limit, schema: {type: integer, maximum: 100}}
  *     responses:
  *       '200': {description: ledgers, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ */
+
+/**
+ * @openapi
+ * /finance/outstanding/recalculate/preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview document and wallet balance repairs
+ *     description: Admin or SuperAdmin with outstanding:recalculate. At most 2000 documents. Branch and inclusive party ranges apply. Returns differences and a snapshot hash.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { order: code, partyStatus: ALL, branchId: 550e8400-e29b-41d4-a716-446655440000 }
+ *           schema: { type: object, properties: { branchId: {type: string, format: uuid}, customerId: {type: string, format: uuid}, fromCustomerId: {type: string, format: uuid}, toCustomerId: {type: string, format: uuid}, order: {type: string, enum: [name, code]}, partyStatus: {type: string, enum: [ALL, CUSTOMER, DEALER, FA_PARTY]} } }
+ *     responses:
+ *       '200': {description: 'previewHash, checked, changes with stored/expected/status, wallets'}
+ *       '409': {description: Invalid active allocations require reconciliation}
+ * /finance/outstanding/recalculate/apply:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Apply the reviewed repair snapshot with an audit entry per change
+ *     description: Same filters and previewHash are required. Serializable row locks and retries. Does not alter document amounts, allocations, dates or Tally vouchers.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {order: code, partyStatus: ALL, previewHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'}}}
+ *     responses:
+ *       '200': {description: 'checked, changed and walletsChanged'}
+ *       '409': {description: Preview changed; preview again}
+ * /finance/settings/outstanding:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read default credit days and outstanding letter settings
+ *     responses:
+ *       '200': {description: 'defaultCreditDays (30), letterPrefix (DML), letterTemplate'}
+ *   put:
+ *     tags: [Finance]
+ *     summary: Admin saves future bill credit terms and future letter defaults
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: {defaultCreditDays: 30, letterPrefix: DML, letterTemplate: 'Dear {{customerName}}, {{address}}. As on {{asOn}}, NGN {{totalOutstanding}} is outstanding. {{billTable}}'}
+ *           schema: {type: object, required: [defaultCreditDays, letterPrefix, letterTemplate], properties: {defaultCreditDays: {type: integer, minimum: 0, maximum: 3650}, letterPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$'}, letterTemplate: {type: string, maxLength: 10000}}}
+ *     responses:
+ *       '200': {description: Settings saved and audited}
+ * /finance/outstanding-letters/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Search code and name for letter and repair range endpoints
+ *     responses:
+ *       '200': {description: Bounded branch scoped customers}
+ * /finance/outstanding-letters/preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview parties over a net outstanding threshold
+ *     description: Requires letter:outstanding. Non administrators are forced to their branch. Excludes FA parties and previously printed parties by default. Dated report balances; max 100 parties and 10000 document rows per run.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: {asOn: '2026-10-08', threshold: 1000, order: name, partyStatus: CUSTOMER, includePrinted: false}
+ *           schema: {type: object, required: [asOn, threshold], properties: {asOn: {type: string, format: date}, threshold: {type: number, minimum: 0}, order: {type: string, enum: [name, code]}, partyStatus: {type: string, enum: [ALL, CUSTOMER, DEALER]}, includePrinted: {type: boolean, default: false}, branchId: {type: string, format: uuid}, fromCustomerId: {type: string, format: uuid}, toCustomerId: {type: string, format: uuid}}}
+ *     responses:
+ *       '200': {description: 'previewHash and parties with net and bill count'}
+ * /finance/outstanding-letters/generate:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Save immutable numbered letters from a reviewed preview
+ *     description: Same preview filters plus previewHash and UUID idempotencyKey. Retry the identical request after a network error. Each saved letter contains bill rows and safe rendered template content.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {asOn: '2026-10-08', threshold: 1000, order: name, partyStatus: CUSTOMER, includePrinted: false, idempotencyKey: 550e8400-e29b-41d4-a716-446655440000, previewHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'}}}
+ *     responses:
+ *       '200': {description: Saved letters or the previous identical result}
+ *       '409': {description: Changed preview or conflicting request key}
+ * /finance/outstanding-letters:
+ *   get:
+ *     tags: [Finance]
+ *     summary: List saved letters in an inclusive reference range
+ *     parameters:
+ *       - {in: query, name: fromRef, schema: {type: string}, example: DML000001}
+ *       - {in: query, name: toRef, schema: {type: string}, example: DML000025}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *     responses:
+ *       '200': {description: 'letters and pagination metadata, 25 per page'}
+ * /finance/outstanding-letters/print:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Print saved content on the saved letterhead
+ *     description: One party starts per page. Large bill tables continue with repeated headers. Does not mark printed automatically.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {type: object, required: [ids], properties: {ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, format: uuid}}}}}}
+ *     responses:
+ *       '200': {description: Saved printable content, content: {text/html: {schema: {type: string}}}}
+ * /finance/outstanding-letters/printed:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Confirm successful printing with an audit entry
+ *     description: Explicit user confirmation after successful printing. Repeated confirmation does not change the original printed timestamp.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {ids: [550e8400-e29b-41d4-a716-446655440000]}}}
+ *     responses:
+ *       '200': {description: Number newly marked printed}
  */

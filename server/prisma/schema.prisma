@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Branch {
+  outstandingLetters OutstandingLetter[]
   partyNotes             PartyNote[]
   partyAdjustmentBatches PartyAdjustmentBatch[]
   receipts Receipt[]
@@ -212,6 +213,7 @@ model AuditLog {
 // ============================================================
 
 model Customer {
+  outstandingLetters OutstandingLetter[]
   id                     String    @id @default(uuid())
   firstName              String
   lastName               String
@@ -250,6 +252,7 @@ model Customer {
 
   // Read-only compatibility cache, derived by financial-document triggers.
   creditBalance     Float                  @default(0)
+  creditDays        Int?
   partyStatus       String                 @default("CUSTOMER")
   partyNotes        PartyNote[]
   adjustmentBatches PartyAdjustmentBatch[]
@@ -1128,6 +1131,7 @@ model Invoice {
   creditApplications CustomerCreditApplication[]
 
 
+  @@index([dueDate, status])
   @@index([customerId])
   @@index([jobCardId])
   @@index([customerId, issuedDate])
@@ -2866,4 +2870,25 @@ model PartyNoteAccountLine {
   amount Decimal @db.Decimal(18,2)
   @@unique([noteId,position])
   @@index([ledgerId])
+}
+
+model OutstandingLetter {
+  id String @id @default(uuid())
+  reference String @unique
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  asOn DateTime
+  totalOutstanding Decimal @db.Decimal(18, 2)
+  snapshot Json
+  content String
+  requestKey String @unique
+  requestHash String
+  createdById String
+  createdAt DateTime @default(now())
+  printedAt DateTime?
+  printedById String?
+  @@index([branchId, reference])
+  @@index([customerId, printedAt])
 }

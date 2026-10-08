@@ -290,3 +290,30 @@ Apply migration and regenerate before application rollout; verify on a disposabl
 Stop after phase 4 per the delivery brief. Phase 5 is Update Outstanding preview/apply, credit days/overdue processing and outstanding letters. Begin only when the user says continue. After phase 5, deliver the requested Word .docx frontend testing/flow guide with rendered visual verification.
 
 Proposed PR title: Add debit and credit notes, registers and Tally vouchers (#77, phase 4).
+
+## Phase 5 completed
+
+Implemented Update Outstanding, customer/company credit days, due dates and overdue status, and saved outstanding letters. Frontend actions are under Finance → Receipts with permission checks and branch scoping. Letter settings and credit terms are editable by administrators. Customer forms and invoice date display/edit were updated.
+
+The repair preview shows document/status changes and available-credit cache changes, including customers without documents. Apply locks parties and documents in a serializable transaction, rejects stale snapshots, and audits each change. It correctly counts allocations between debit and credit notes on both sides. SQL allocation aggregation is bounded to the selected document set. Invalid allocations are not silently clamped.
+
+Letters reuse dated report balances, apply a strictly greater net threshold, exclude printed parties by default, save immutable content/bill/party/branch snapshots and allocate configurable DML references. Identical retries return saved letters. Reference range lookup supports reprints, and explicit successful-print confirmation preserves the original printed timestamp. Customer merges preserve letter ownership and saved content.
+
+Overdue behavior is covered by pure date-rule tests, database triggers, the daily startup/hourly sweep and receipt/adjustment status updates. PostgreSQL UTC timestamps are explicitly converted to Lagos dates. A regression runs with an America/New_York database session: a bill due at today's Lagos midnight stays Unpaid, becomes Overdue after its due date is moved to yesterday, stays Overdue after a partial payment, and becomes Paid at zero.
+
+Validation completed on 8 October 2026:
+
+- Backend build/type checks passed.
+- Full PostgreSQL-backed suite: 49 suites passed, 1 suite skipped; 588 tests passed, 1 test skipped. The skip is the existing catalog integration test requiring its separate opt-in flag.
+- Focused outstanding authorization/validation/integration tests passed, including stale previews, note-to-note repairs, empty-party wallet repair, threshold equality, printed exclusion, idempotent generation, branch rejection, FA exclusion, immutable reprints and the daily overdue sweep.
+- Frontend type check and production webpack build passed; 62 static pages generated.
+- Frontend lint: 0 errors, 70 existing warnings, unchanged from Phase 4.
+- All 44 migrations applied from scratch on an isolated PostgreSQL database.
+- A database upgraded from the 43-migration baseline retained a legacy invoice's complete snapshot and customer financial identity/cache fields. The final migration SQL was rerun successfully without changing those records.
+- Compiled Swagger contains all 9 new maintenance/letter paths and CustomerDTO.creditDays.
+- git diff --check passed. Generated next-env/tsbuildinfo changes were restored.
+- No production migration, deployment, commit, PR or external message was performed. The disposable PostgreSQL cluster and temporary generation artifacts were cleaned up.
+
+Documentation delivered: billing.md covers architecture, limits, assumptions, API behavior and deployment. issue-77-frontend-testing.md is the complete frontend flow and acceptance walkthrough. Dana-Motors-Frontend-Testing-Guide.rtf is its Word-compatible copy, with 67 numbered checks, headings, monetary emphasis and page numbers. RTF structure and source coverage were checked. The managed DOCX runtime/renderer was unavailable in this Windows session, so no visually verified DOCX was produced or claimed.
+
+Manual browser, Excel, print-preview and external Tally-company acceptance are documented for the tester; automated test results do not claim those manual checks were executed.

@@ -144,3 +144,43 @@ TallyDocumentType now includes DEBIT_NOTE and CREDIT_NOTE. Debit vouchers debit 
 Use the existing Tally export/confirm endpoints. XML export records a pending log and audit; confirmed voucher reference sets tallyPostedAt and a posting audit. Note read permission is required for note listing/export/confirmation, and pending batch payloads omit note types the user cannot read. Cancelled/excluded notes are never eligible. An XML file that has already been imported must be confirmed promptly; the app cannot detect an unconfirmed external Tally import. Advance adjustments still generate no journal.
 
 Frontend: Finance → Receipts → Debit Note / Credit Note; Reports → Finance → note registers. Forms use the shared modal, fields, table and picker, read-only party address, editable receipt/account grids and live sticky-footer totals. Account line Enter adds a line. Note details offer print, eligible cancellation with remark, and the existing party adjustment link. Mutations refresh affected party wallet, note, report and Tally query caches.
+
+## Issue 77 Phase 5 outstanding repairs credit terms and letters
+
+### Credit days and overdue status
+
+Customer.creditDays is nullable and accepts whole days from 0 to 3650. Null uses FinanceSetting.defaultCreditDays, default 30. Every newly created unpaid job bill receives an explicit issuedDate and dueDate based on its Lagos calendar bill date. Zero means due on the same calendar day. Existing due dates and existing null due dates are preserved; customer/default changes affect future bills only.
+
+credit-terms.ts centralizes status calculation. A zero balance is Paid; a positive balance past its inclusive due date is Overdue; otherwise it is Partially Paid or Unpaid. Receipts and party adjustments use this helper. PostgreSQL timestamps are stored as UTC without time-zone tags; SQL explicitly converts UTC to Africa/Lagos before comparing calendar dates, independent of database session time zone. The Invoice_credit_due_status database trigger keeps persisted statuses consistent on balance/due-date/status changes. Cancelled/void bills remain excluded.
+
+server.ts starts the overdue sweep after schema validation and stops its timer on shutdown. It runs at startup and checks hourly for the next Lagos day, retries failures on subsequent ticks, processes 500 rows per transaction, locks rows, and uses a PostgreSQL advisory lock to coordinate server instances. It never marks a zero-balance or cancelled bill overdue. Each changed batch records INVOICES_MARKED_OVERDUE with the prior statuses.
+
+### Update outstanding
+
+POST /finance/outstanding/recalculate/preview and /apply require Admin/SuperAdmin plus outstanding:recalculate. Filters are branch, exact party or inclusive From/To range, name/code order and party status. Branch scope follows retained invoice reportBranchId with legacy fallbacks. A run supports 2000 documents and 2000 parties, including parties without documents whose wallet cache needs repair; narrow the range beyond those limits.
+
+SQL aggregates active, unreversed ReceiptAllocation rows separately for invoice debits, receipt credits, debit notes and credit notes. A note-to-note adjustment contributes to both note balances. Face amounts and active allocations determine expected outstanding/unadjusted balances; cancelled headers expect zero. Invalid overallocations or active allocations against cancelled headers block the run.
+
+Preview includes document old/new balances and statuses plus global Customer.creditBalance cache differences. The preview hash covers the Lagos day, submitted filters, document values and wallet values. Apply uses the existing serializable retry helper and deterministic party/document row locks, then recomputes and compares the hash. A stale preview returns 409 and requires another preview. Each document/cache change is audited. Repairs alter cached balances/statuses, never amounts, allocations, document dates or Tally vouchers. Posted voucher amounts therefore remain intact.
+
+### Outstanding letters
+
+Permissions: letter:outstanding goes to Accountant, BillingOfficer, Admin and SuperAdmin; outstanding:recalculate goes only to Admin/SuperAdmin. The migration seeds both permissions and default grants without replacing custom role grants. The party picker/settings read endpoint accepts either letter permission or administrator repair access. Non administrators require a branch and cannot select a foreign branch.
+
+The preview/generate filters include asOn, inclusive party range/order, CUSTOMER/DEALER or both, nonnegative net threshold, branch and includePrinted. Net must be strictly greater than the threshold. FA/Vendor parties and credit/zero-net parties are excluded. As-on balances reuse the Phase 3 SQL query, including receipt edits, dated allocations, reversals and cancellations. Invalid negative document balances are rejected. Printed-party exclusion checks saved printed timestamps within the selected branch, or all branches when unscoped.
+
+Each run is bounded to 100 parties and 10000 open document rows. Generate requires the reviewed previewHash and UUID idempotencyKey. Serializable retries and a request-key advisory lock return previously saved letters for an identical retry; conflicting details return 409. DocumentSequence keys OUTSTANDING_LETTER_<prefix> allocate <prefix><six digits>, default DML. A prefix owns its continuing sequence. Exhausted six-digit sequences require a new prefix.
+
+OutstandingLetter stores the party ID, branch, asOn, generation timestamp, net Decimal(18,2), request hash, escaped rendered content, and immutable JSON snapshots of party identity/address, branch letterhead, original template and bill rows. Credit rows are labelled available credit so the recipient can reconcile the net. Snapshot JSON provides saved letter lines without separate mutable references. Customer merges reassign ownership while retaining saved content/identity/branch snapshots.
+
+GET /finance/outstanding-letters accepts inclusive fromRef/toRef and page; 25 rows per page. POST /print accepts at most 100 saved IDs and writes saved HTML with backpressure. Each letter starts on a new page; long tables continue with repeated headings. POST /printed is an explicit user confirmation after successful printing, is idempotent, preserves the first print timestamp and audits changes. Opening/cancelling a browser print dialog alone does not mark a letter printed. The app records printing, not delivery.
+
+GET/PUT /finance/settings/outstanding manage defaultCreditDays, letterPrefix and letterTemplate. PUT requires administrator repair access. Templates are plain text, max 10000 characters, and must contain exactly the supported placeholder names (repetition is allowed): {{customerName}}, {{address}}, {{asOn}}, {{totalOutstanding}}, {{billTable}}. Unknown/missing placeholders fail validation. HTML and party text are escaped; only the generated bill table becomes HTML. New settings affect new letters; reprints use stored content.
+
+Frontend entries: Finance → Receipts → Update Outstanding and Outstanding Letters, with matching sidebar and route guards. Both use code/name party search, explicit previews, changing-filter reminders, loading/errors and bounded tables. Letter flow adds saved-reference lookup, selection, print and a separate successful-print confirmation. Settings are on those pages for administrators. Customer forms include credit days. Invoice display/export/edit uses Africa/Lagos so midnight due dates do not shift to the previous day in another computer time zone.
+
+### Deployment and testing
+
+Migration 20261008220000_outstanding_maintenance_letters is additive, transactional and rerunnable. It adds creditDays, saved letters, indexes, company defaults, overdue trigger and permissions. Apply with the existing server npm run db:prepare workflow before startup; checkDatabaseSchema rejects a stale database. No production migration or deployment was performed during this implementation.
+
+Automated validation and frontend acceptance steps are recorded in issue-77-progress.md and issue-77-frontend-testing.md. The Word-compatible walkthrough is Dana-Motors-Frontend-Testing-Guide.rtf. It covers startup, fixture preparation, advances/FIFO/reversal, credit applications, notes, reports, Tally, credit days/overdue, repair preview/apply, letter generation/reprints and access checks. Manual browser/Excel/printing/external-Tally results remain for the tester to record separately.

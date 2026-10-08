@@ -466,6 +466,7 @@ export class CustomerService {
         },
       });
 
+      await tx.outstandingLetter.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
       await tx.partyNote.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
       await tx.partyAdjustmentBatch.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
 

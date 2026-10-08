@@ -1,10 +1,25 @@
-# Issue #77 frontend test walkthrough — source notes
+# Dana Motors receipts and party accounts frontend testing guide
 
-This working document supplies the final Word walkthrough requested by the user. Export and visually verify the completed .docx after all five implementation phases. Do not describe unfinished flows as available.
+This guide explains the complete receipts and party-account flow for issue 77 and gives frontend acceptance steps with expected balances. Start with a disposable test environment and follow the scenarios in order.
+
+## How the flow works
+
+A job bill creates a debit owed by the customer. A payment receipt creates credit; any unallocated remainder stays available as an advance. Credit notes and opening credits add to that same available credit. Debit notes and opening debits add outstanding debt. An adjustment matches equal debit and credit amounts, reducing both without changing the party net. Reports reconstruct balances at the chosen date. Letters save a snapshot of that dated net and its documents.
+
+## Start the local test application
+
+Use the repository's configured test environment, with dependencies already installed. In a terminal at server, run npm run db:prepare to apply migrations and generate Prisma, then npm run dev. In a second terminal at client, run npm run dev. The default browser address is http://localhost:3000 and the backend default is http://localhost:8000. Use your approved test staff accounts; this guide does not create or disclose passwords. Restart the backend and sign in again after migrations/permission changes.
 
 ## Prerequisites
 
 Use a migrated test database and staff accounts for Admin, Accountant/BillingOfficer, and a user without receipt:adjust. Refresh sessions after permission changes. Select the intended branch in the header. Create a test customer and unposted invoices/receipts. Keep a second branch/customer for access tests. Do not run testing against production financial records.
+
+## Prepare a bill and receipt through the frontend
+
+1. Create or choose a test customer and vehicle in the selected branch. Have a job card ready for billing with its latest estimate approved and a service advisor assigned. Complete the existing workshop job flow first; a delivered job requires its approved credit exception.
+2. Open Finance → Invoices → New invoice. Choose the billable job card and advisor, review the server-calculated lines, discounts, VAT and total, then create the job bill. Record its number, total, outstanding and due date. A job cannot have two active bills.
+3. Open Finance → Receipts → Payment receipt. Choose the same customer, receiving mode/bank, amount and narration. Leave allocation empty for an advance, or choose invoice allocation amounts within the current outstanding. Save and record the receipt number and remaining advance.
+4. The numeric examples below assume test invoices with totals exactly 10,000 or 5,000. Have those fixtures prepared, or substitute your actual server-calculated totals and recompute expected balances. A line price of 10,000 before VAT is not an invoice total of 10,000. Do not manually overwrite invoice amounts to match an example.
 
 ## Phase 2: advances, openings and adjustments
 
@@ -23,13 +38,9 @@ Use a migrated test database and staff accounts for Admin, Accountant/BillingOff
 
 Evidence to capture: before/after Account totals, invoice outstanding, debit/credit grids, FIFO amounts, reversal reason/status, permission/access errors, and Tally reversal rejection. Browser screenshots and executed manual results will be recorded separately from automated test evidence.
 
-## Remaining walkthrough coverage
-
-Phase 3 reports and phase 4 note/register/Tally checks are included below. Add phase 5 recalculation/overdue/letters, then generate and visually verify the final Word document.
-
 Accountant access check: the customer directory and customer detail/document/history reads must stay within the assigned branch. An Accountant without a branch cannot read these screens. Global duplicate lookup is unavailable to Accountant. Admin can open another branch’s customer Account tab.
 
-## Phase 3: party reports and flow (planned frontend checks)
+## Phase 3: party reports and flow
 
 1. Refresh the staff session after applying the phase 3 migration/permission grants. Open Reports → Finance and choose Party Outstanding. Select the branch and an as-on date, then Run report. Filters are submitted together; changing them displays a reminder and disables output until rerun. Verify the totals cover all pages.
 2. Use the phase 2 fixture before FIFO: invoice outstanding 7,000; available credits 4,000; net outstanding 3,000. Party Outstanding should show debits 7,000, credits 4,000 and net 3,000. After the remaining 4,000 is matched, debits 3,000 and credits 0 leave the same net.
@@ -43,7 +54,7 @@ Accountant access check: the customer directory and customer detail/document/his
 10. Test Accountant/BillingOfficer own-branch reports and Admin all/selected-branch reports. Direct foreign-branch calls and missing report permissions must fail on JSON, print and export. Only Admin/SuperAdmin can change ageing defaults. Check loading, empty, error/retry states and phone-width scrolling. PostgreSQL-backed report, historical edit/cancellation, cursor and migration checks passed on an isolated disposable database. Browser, Excel and print-preview checks remain pending; automated tests do not substitute for these steps.
 
 
-## Phase 4: debit/credit notes, registers and Tally (planned frontend checks)
+## Phase 4: debit/credit notes, registers and Tally
 
 Use an isolated test database with migrations applied and a refreshed staff session. These are manual frontend acceptance steps; automated PostgreSQL evidence is recorded in the progress log.
 
@@ -65,4 +76,46 @@ Use an isolated test database with migrations applied and a refreshed staff sess
 16. Test permissions: Accountant can create/read/cancel eligible notes and use registers; BillingOfficer has no note grants by default. Removing only debit read must hide debit documents and their pending XML while leaving permitted credit access intact. Register access does not grant cancellation. Direct JSON/print/export/create/cancel calls from a foreign or missing branch must fail. Admin can read selected/all branches and creates notes for parties in the selected branch.
 17. Check loading skeletons, empty results, failed lookup/report Retry actions, phone-width horizontal table scrolling, keyboard party/account search, and disabled Save while submitting. Retrying identical create details must return the same note number, with no duplicate wallet credit.
 
-Capture before/after invoice, receipt, wallet and report totals; note numbers/status; print previews; workbook cells; Tally skip/confirm results; and permission failures. Browser, Excel, print preview and external Tally-company execution remain pending. The final Word guide will combine delivered phases after phase 5.
+Capture before/after invoice, receipt, wallet and report totals; note numbers/status; print previews; workbook cells; Tally skip/confirm results; and permission failures. Browser, Excel, print preview and external Tally-company execution remain pending.
+## Phase 5 outstanding repair credit terms and letters
+
+### Credit terms and overdue bills
+
+1. Sign in as Admin and open Finance → Receipts → Outstanding Letters or Update Outstanding. In Credit terms and letter settings, save company default credit days **30**. Keep letter prefix **DML**.
+2. Open a test customer's edit form. Leave Credit days blank and save. Complete a billable job and create its job bill from Finance. On the invoice list verify the due date is the bill's Lagos calendar date plus 30 days.
+3. Set another customer's Credit days to **0**, create a new job bill, and verify its due date is today. It remains Unpaid or Partially Paid throughout the due date. Changing customer terms or the company default affects future bills, not previously saved due dates.
+4. For an unposted unpaid test invoice, use its existing Edit action to set Due date to yesterday. Refresh the invoice list; it should show **Overdue**. Receive a partial payment or apply a credit, then refresh: it should stay Overdue while any amount remains. Pay the remaining amount: status becomes Paid.
+5. Open the dashboard/finance overview and check its overdue count against the unpaid past-due bills. The server performs an overdue sweep on startup and checks for a new Lagos day hourly. If the server was stopped at midnight, the startup sweep catches up. Existing invoices with no due date are preserved; edit the due date explicitly when appropriate.
+
+### Preview and apply an outstanding repair
+
+1. As Admin, select the intended branch, then Finance → Receipts → Update Outstanding. Choose Name wise or Code wise, optionally Party status, From party and To party. Ranges are inclusive. All branches is available to Admin/SuperAdmin.
+2. Click **Preview differences**. A healthy account should show checked document count and zero differences. Review any document's old/new balance and status, and the separate customer available-credit cache table. The customer credit cache is global; the document repair respects the selected branch.
+3. Click **Apply reviewed differences** only after reviewing the preview. Expect a success message, updated amounts/statuses and an audit event for every changed document/cache. Preview again: no differences should remain.
+4. For a controlled repair test, ask the developer to corrupt a cached balance in the disposable database, without changing its face amount or allocations. For example, a 10,000 invoice with active allocations of 3,000 should recalculate to **7,000**, regardless of an incorrect stored 6,000. A receipt of 5,000 with allocations of 3,000 should have an advance of **2,000**. Never simulate this by changing production financial data.
+5. Preview, then use another session to make a real payment against that party. Applying the older preview must fail with **Balances changed after preview**. Run a new preview and review it again.
+6. Invalid active allocations, overallocated documents, and cancelled documents with active allocations are rejected for reconciliation; the repair does not hide them by forcing a zero balance. For a large selection, narrow the party range: each preview supports at most **2,000 documents and 2,000 parties**.
+7. Accountant and BillingOfficer must have no Update Outstanding action or direct access. Custom roles need both an Admin/SuperAdmin role and outstanding:recalculate. Repair changes cached balances and statuses; original amounts, allocations, dates and Tally vouchers stay as recorded.
+
+### Generate and print outstanding letters
+
+1. Use the Phase 2 account state with net outstanding **3,000**, or a separate known fixture. Open Finance → Receipts → Outstanding Letters.
+2. Choose today's As on date, Name wise/Code wise, Customer/Dealer or both, and an optional From/To party range. Use threshold **3,000** and click **Preview parties**. The party with net exactly 3,000 must be excluded.
+3. Change the threshold to **2,999.99** and preview again. That party must appear with net 3,000. FA parties are excluded. Credits reduce net outstanding; a credit-only or zero-net party is excluded at threshold 0.
+4. Click **Generate saved letters**. Expect one reference per selected party, such as DML000001. Record the actual references. Each run supports at most **100 parties and 10,000 open document rows**; narrow ranges for larger runs.
+5. Select the generated letters and click **Print selected letters**. Allow the print window. Check the saved company/branch letterhead, reference, generation date, As on date, name/address, net outstanding and bill table. The table shows open debits and available credits so the net amount can be reconciled. Each party starts on a new page; long tables continue with repeated headers.
+6. If the print dialog is cancelled, do not confirm. After successful printing or saving to PDF, click **Confirm printed successfully**. Expect Printed = Yes in saved letters. The app records printing, not email/post delivery.
+7. Preview the same filters with Include parties with previously printed letters off. The printed party must be absent. Enable it and preview: the party reappears if still over the threshold. Print exclusion applies within the selected branch; All branches considers any printed letter for the party.
+8. In Saved letters and reprints enter From reference and To reference, then **Find saved letters**. Select the earlier letter and print it again. The saved name, address, table, amounts and content must stay identical even after later payments, customer edits or template changes. A repeated print confirmation preserves the first printed timestamp.
+9. Test a future As on date, negative/non-numeric threshold, inverted reference range and a foreign-branch letter. Expect validation/access errors without creating or exposing letters. After a network error, retry Generate with the same filters before starting another preview. That retry returns the original letters, not new references. After reloading the page, check saved letters first.
+10. As Admin, edit Letter content using all five placeholders: `{{customerName}}`, `{{address}}`, `{{asOn}}`, `{{totalOutstanding}}`, `{{billTable}}`. Save settings and generate a new preview/letter. The changed content affects new letters only. Unknown/missing placeholders are rejected; typed HTML is treated as text.
+11. Change the prefix to a separate test series such as DMT, save and generate a new letter. It should use DMT with six digits. Restore DML afterwards. References continue their own sequence when a previous prefix is restored.
+12. Test Accountant/BillingOfficer letters within their assigned branch, and Admin selected/all branches. Removing letter:outstanding must hide and reject generation, lookup, print and print confirmation. Only Admin/SuperAdmin can save company settings.
+
+## Record the acceptance results
+
+For each scenario record tester, date, role, branch, customer code, document/reference numbers, expected result, actual result and Pass/Fail. Attach before/after screenshots, print previews, workbook results and Tally test-company voucher references where relevant. Record any failure with exact reproduction steps and the visible error text.
+
+Recommended execution order: customer setup → opening/advance → manual adjustment → FIFO/reversal → credit application → notes → reports → Tally → overdue → repair → letters → role/branch/mobile checks. Use separate fixtures for destructive cancellation/reversal checks so the main numeric examples remain reproducible.
+
+The automated suite verifies financial and database behavior. Browser navigation, print layout, Excel opening and actual Tally import need the manual steps above; these are not implied to have been executed by automated tests.

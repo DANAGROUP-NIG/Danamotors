@@ -1,3 +1,4 @@
+import { invoiceStatus } from './credit-terms';
 import { createHash } from 'crypto';
 import { createReceiptSchema } from './finance.validation';
 import { money, sumMoney } from './money';
@@ -27,13 +28,14 @@ async function updateInvoiceBalance(
   invoiceId: string,
   outstandingAmount: number,
   total: number,
+  dueDate?: Date | null,
 ) {
   const balance = money(Math.max(outstandingAmount, 0));
   await transaction.invoice.update({
     where: { id: invoiceId },
     data: {
       outstandingAmount: balance,
-      status: balance <= 0 ? 'Paid' : balance < total ? 'Partially Paid' : 'Unpaid',
+      status: invoiceStatus(balance, total, dueDate),
     },
   });
 }
@@ -134,14 +136,14 @@ export class ReceiptService {
 
         for (const allocation of input.allocations) {
           const invoice = invoiceById.get(allocation.invoiceId!)!;
-          await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount - allocation.amount, invoice.total);
+          await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount - allocation.amount, invoice.total, invoice.dueDate);
         }
         await transaction.auditLog.create({ data: { userId: input.issuedById, action: 'RECEIPT_CREATED', details: JSON.stringify({ receiptId: receipt.id, customerId: customer.id, amount: receipt.amount, advanceAmount: receipt.advanceAmount, allocations: input.allocations }) } });
         // Return invoice balances after their updates, not the pre-payment snapshot.
         return { ...receipt, allocations: receipt.allocations.map((allocation) => {
           const original = invoiceById.get(allocation.invoiceId!)!;
           const balance = money(original.outstandingAmount - allocation.amount);
-          return { ...allocation, invoice: { ...allocation.invoice, outstandingAmount: balance, status: balance <= 0 ? 'Paid' : balance < original.total ? 'Partially Paid' : 'Unpaid' } };
+          return { ...allocation, invoice: { ...allocation.invoice, outstandingAmount: balance, status: invoiceStatus(balance, original.total, original.dueDate) } };
         }) };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5_000, timeout: 15_000 });
       } catch (error) {
@@ -254,7 +256,7 @@ export class ReceiptService {
       for (const allocation of receipt.allocations) {
         const invoice = invoiceById.get(allocation.invoiceId!);
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
-        await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
+        await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total, invoice.dueDate);
       }
       await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: changedAt } });
 
@@ -267,7 +269,7 @@ export class ReceiptService {
         const previousAmount = receipt.allocations.find((item) => item.invoiceId === allocation.invoiceId)!.amount;
         const available = money(invoice.outstandingAmount + previousAmount);
         await transaction.receiptAllocation.create({ data: { receiptId: id, invoiceId: invoice.id, amount: allocation.amount, adjustedAt: changedAt } });
-        await updateInvoiceBalance(transaction, invoice.id, available - allocation.amount, invoice.total);
+        await updateInvoiceBalance(transaction, invoice.id, available - allocation.amount, invoice.total, invoice.dueDate);
       }
 
       await transaction.receiptEditLog.create({
@@ -305,7 +307,7 @@ export class ReceiptService {
       for (const allocation of receipt.allocations) {
         const invoice = invoiceById.get(allocation.invoiceId!);
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
-        await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
+        await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total, invoice.dueDate);
       }
       await transaction.auditLog.create({ data: { userId: actorId, action: 'RECEIPT_CANCELLED', createdAt: changedAt, details: JSON.stringify({ receiptId: id, remark, amount: receipt.amount }) } });
       await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: changedAt } });

@@ -3,7 +3,7 @@ import { BadRequestError, ConflictError } from '../../shared/errors/appError';
 import { money, sumMoney } from './money';
 
 export type PartyDocumentKind = 'INVOICE' | 'RECEIPT' | 'NOTE';
-export type PartyDocument = { id: string; kind: PartyDocumentKind; number: string; date: Date; amount: number; balance: number; latestActivityAt?: Date | null };
+export type PartyDocument = { id: string; kind: PartyDocumentKind; number: string; date: Date; amount: number; balance: number; dueDate?: Date | null; latestActivityAt?: Date | null };
 export type AdjustmentSelection = { id: string; kind: PartyDocumentKind; amount: number };
 export type AdjustmentPair = { debit: AdjustmentSelection; credit: AdjustmentSelection; amount: number };
 
