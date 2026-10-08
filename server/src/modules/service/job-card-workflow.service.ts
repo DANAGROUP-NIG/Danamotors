@@ -12,6 +12,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { nextDocumentNumber } from "../finance/document-number";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { jobOpeningBody, jobUpdateBody } from "./service.validation";
+import { linkEstimateToOpenedJob } from "./pre-job-estimate.service";
 import { NOTIFICATION_TYPES, NotificationService } from "../notification/notification.service";
 import { assertMileage } from "../warranty/warranty.logic";
 import { OpenCampaign, buildCheck, findOpenCampaigns, loadVehicleForWarranty } from "../warranty/warranty.coverage";
@@ -193,7 +194,7 @@ export class JobCardWorkflowService {
             "Appointment must match the vehicle and branch",
           );
 
-        if (["Cancelled", "Completed", "Closed"].includes(appointment.status))
+        if (["Cancelled", "Completed", "Closed", "No Show"].includes(appointment.status))
           throw new BadRequestError("Appointment is no longer open");
 
         if (
@@ -219,6 +220,7 @@ export class JobCardWorkflowService {
       if (!service) throw new BadRequestError("Select an active service");
 
       if (data.teamId) await requireMaster(tx, data.teamId, "TEAM");
+      if (data.serviceTypeId) await requireMaster(tx, data.serviceTypeId, "SERVICE_TYPE");
 
       await requireStaff(
         tx,
@@ -319,6 +321,7 @@ export class JobCardWorkflowService {
         odometerReplacedReason,
         warrantyAcknowledged: _warrantyAcknowledged,
         acknowledgedCampaignIds: _acknowledgedCampaignIds,
+        estimateId,
         promisedAt,
         ...fields
       } = data;
@@ -396,6 +399,13 @@ export class JobCardWorkflowService {
           lastMileageAt: now,
         },
       });
+
+      // The job was opened from a pre-job estimate: it is now converted.
+      if (estimateId) await linkEstimateToOpenedJob(tx, estimateId, { id: card.id, vehicleId: vehicle.id, branchId: branch.id });
+
+      // The booking arrived: it now counts as converted on the service booking report.
+      if (data.appointmentId)
+        await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: "CONVERTED" } });
 
       if (openCampaigns.length > 0) {
         await tx.jobCardCampaign.createMany({
@@ -479,9 +489,13 @@ export class JobCardWorkflowService {
           data.description !== undefined ||
           data.observations !== undefined ||
           data.workDone !== undefined ||
-          data.serviceCharge !== undefined)
+          data.serviceCharge !== undefined ||
+          data.serviceTypeId !== undefined ||
+          data.freeServiceCouponNo !== undefined)
       )
         throw new BadRequestError("Billed job cards can only be delivered");
+
+      if (data.serviceTypeId) await requireMaster(tx, data.serviceTypeId, "SERVICE_TYPE");
 
       const now = new Date();
 
@@ -490,6 +504,8 @@ export class JobCardWorkflowService {
         observations: data.observations,
         workDone: data.workDone,
         serviceCharge: data.serviceCharge,
+        serviceTypeId: data.serviceTypeId,
+        freeServiceCouponNo: data.freeServiceCouponNo === undefined ? undefined : data.freeServiceCouponNo || null,
         ...(data.serviceCharge !== undefined ? { estimatedCost: [current.estimatedParts, current.estimatedOil, current.estimatedLabour, data.serviceCharge].reduce<number>((sum, value) => sum + Math.round((value ?? 0) * 100), 0) / 100 } : {}),
       };
 

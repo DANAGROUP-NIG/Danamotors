@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
+import { ANY_REPORT_PERMISSION, CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -212,7 +212,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register"],
+        permissions: ANY_REPORT_PERMISSION,
       },
     ],
   },

@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { ANY_REPORT_PERMISSION, CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, REPORT_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -45,7 +45,9 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],
-  "/reports": ["financereport:read", "report:receipt-register"],
+  "/reports/receipt-register": [REPORT_PERMISSIONS.RECEIPT_REGISTER, "financereport:read"],
+  // Each report page also checks its own permission.
+  "/reports": ANY_REPORT_PERMISSION,
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
@@ -53,6 +55,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/warranty": [WARRANTY_PERMISSIONS.READ],
   "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
   "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
+  "/settings/reports": [REPORT_PERMISSIONS.SETTINGS],
   "/settings": ["role:read"],
 };
 
@@ -67,7 +70,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f4f8]">
+    <div className="flex h-screen overflow-hidden bg-[#f0f4f8] print:block print:h-auto print:overflow-visible print:bg-white">
       {/* ── Mobile backdrop ─────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
@@ -85,12 +88,12 @@ export default function DashboardLayout({
       />
 
       {/* ── Right column ────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a] print:block print:overflow-visible print:bg-white">
         {/* ── Top header ──────────────────────────────────────────── */}
         <MainHeader setSidebarOpen={setSidebarOpen} />
 
         {/* ── Page content ────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto" id="main-content">
+        <main className="flex-1 overflow-y-auto print:overflow-visible" id="main-content">
           <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
         </main>
 

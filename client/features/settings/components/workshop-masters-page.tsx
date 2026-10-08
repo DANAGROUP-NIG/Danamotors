@@ -21,6 +21,7 @@ type Master = {
   category?: string | null;
   chargedTo?: string;
   freeService?: boolean;
+  freeServiceNo?: number | null;
   fuel?: string | null;
   gearbox?: string | null;
   acFitted?: boolean;
@@ -85,6 +86,7 @@ export function WorkshopMastersPage() {
         category: record.category,
         chargedTo: record.chargedTo,
         freeService: record.freeService,
+        ...(kind === "SERVICE_TYPE" && { freeServiceNo: record.freeService ? record.freeServiceNo ?? null : null }),
         fuel: record.fuel,
         gearbox: record.gearbox,
         acFitted: record.acFitted,
@@ -207,7 +209,23 @@ export function WorkshopMastersPage() {
                 onChange={e => setForm({
                   ...form,
                   freeService: e.target.checked,
-                })} />Free service</label></>}
+                })} />Free service</label>{form.freeService && <Field label="Free service no (1 = first)"><input
+                type="number"
+                min="1"
+                max="20"
+                className={inputCls}
+                value={form.freeServiceNo ?? ""}
+                onChange={e => setForm({
+                  ...form,
+                  freeServiceNo: e.target.value ? Number(e.target.value) : null,
+                })} /></Field>}<Field label="Category (PDI marks pre-delivery inspection)"><input
+                className={inputCls}
+                value={form.category ?? ""}
+                placeholder="e.g. PDI"
+                onChange={e => setForm({
+                  ...form,
+                  category: e.target.value,
+                })} /></Field></>}
           {kind === "BAY" && <Field label="Category"><input
               className={inputCls}
               value={form.category ?? ""}

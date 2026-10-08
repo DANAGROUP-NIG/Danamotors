@@ -150,7 +150,7 @@ export default function SideNav({
     <aside
       className={cn(
         // base
-        "fixed inset-y-0 left-0 z-40 flex flex-col",
+        "fixed inset-y-0 left-0 z-40 flex flex-col print:hidden",
         "border-r border-white/10",
         "transition-all duration-300 ease-in-out",
         // desktop: always visible, width driven by collapsed
