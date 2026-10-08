@@ -1,4 +1,5 @@
 import { latestEstimateQuery, reviewApprovedScope } from '../service/estimate-approval';
+import { serviceChargeDescription, serviceChargeReference } from '../service/job-service-charge';
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import {
@@ -117,7 +118,7 @@ export class JobBillingService {
       customerPaid: customerPays(line.chargeLine),
     }));
     const serviceLines = jobCard.serviceCharge == null ? [] : [{
-      type: "SERVICE", referenceId: jobCard.serviceId, description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : "Service charge", quantity: 1, rate: money(jobCard.serviceCharge),
+      type: "SERVICE", referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
       amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,
     }];
     const lines = [...partLines, ...labourLines, ...serviceLines];

@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { BadRequestError } from '../../shared/errors/appError';
 import { money, sumMoney } from '../finance/money';
 
@@ -49,9 +50,10 @@ export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobC
 }
 
 export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardId: string) {
-  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, partIssuances: { include: { sparePart: true, returns: true } }, labourLines: true } });
+  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true } }, labourLines: true } });
   const lines: ScopeLine[] = [];
-  if (card.serviceId) lines.push({ type: 'SERVICE', referenceId: card.serviceId, description: card.service?.name ?? 'Service charge', quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
+  const chargeReference = serviceChargeReference(card);
+  if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
   for (const row of card.partIssuances) {
     const quantity = row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((sum, r) => sum + r.quantity, 0);
     if (quantity > 0) {

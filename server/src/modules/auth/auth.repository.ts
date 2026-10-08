@@ -33,7 +33,7 @@ export class AuthRepository {
           include: {
             permissions: {
               include: {
-                permission: true,
+                permission: { select: { name: true } },
               },
             },
           },
@@ -50,7 +50,7 @@ export class AuthRepository {
           include: {
             permissions: {
               include: {
-                permission: true,
+                permission: { select: { name: true } },
               },
             },
           },
@@ -169,7 +169,7 @@ export class AuthRepository {
           include: {
             permissions: {
               include: {
-                permission: true,
+                permission: { select: { name: true } },
               },
             },
           },
@@ -204,7 +204,7 @@ export class AuthRepository {
               include: {
                 permissions: {
                   include: {
-                    permission: true,
+                    permission: { select: { name: true } },
                   },
                 },
               },

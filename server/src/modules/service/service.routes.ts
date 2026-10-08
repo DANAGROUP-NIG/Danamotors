@@ -450,14 +450,15 @@ router.delete(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [branchName, customerId, vehicleId, description, serviceId, mileage, bayId, serviceAdvisorId, promisedAt, complaints]
+ *             required: [branchName, customerId, vehicleId, description, serviceTypeId, mileage, bayId, serviceAdvisorId, promisedAt, complaints]
  *             properties:
  *               branchName: { type: string, example: Ikeja }
  *               customerId: { type: string, format: uuid }
  *               vehicleId: { type: string, format: uuid }
  *               appointmentId: { type: string, format: uuid }
  *               description: { type: string, example: Brake inspection }
- *               serviceId: { type: string, format: uuid, description: Active catalog service selected for this job card }
+ *               serviceTypeId: { type: string, format: uuid, description: Eligible WorkshopMaster SERVICE_TYPE for this vehicle model }
+ *               serviceId: { type: string, format: uuid, description: Optional separate appointment service; does not set the opening charge }
  *               bayId: { type: string, format: uuid }
  *               serviceAdvisorId: { type: string, format: uuid }
  *               technicianId: { type: string, format: uuid, description: Required when teamId is absent }

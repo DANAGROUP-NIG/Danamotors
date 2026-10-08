@@ -261,20 +261,16 @@ export class ServiceRepository {
 
     return prisma.jobCard.findMany({
       where,
-      skip: params?.skip,
-      take: params?.take,
+      skip: params?.skip ?? 0,
+      take: params?.take ?? 50,
       include: {
-        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
         service: true,
         serviceType: true,
         bay: true,
         team: true,
-        complaints: { include: { complaintCode: true } },
-        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
-        appointment: true,
-        branch: true,
+        branch: { select: { id: true, name: true } },
         customer: {
           select: {
             id: true,
@@ -293,10 +289,8 @@ export class ServiceRepository {
         technician: {
           select: { id: true, firstName: true, lastName: true },
         },
-        inspections: true,
-        estimates: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
 

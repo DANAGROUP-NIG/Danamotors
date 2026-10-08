@@ -60,11 +60,41 @@ it('rejects catalog child IDs attached to a legacy-only create request', async (
   expect(tx.vehicle.create).not.toHaveBeenCalled();
 });
 
+const variantId = '00000000-0000-4000-a000-000000000004';
+const colourId = '00000000-0000-4000-a000-000000000005';
+const variant = { id: variantId, code: 'RIO-AT', description: 'Automatic', make: 'Kia', model: 'Rio', active: true,
+  colours: [{ id: colourId, code: 'WHITE', description: 'White', active: true }] };
+it('creates a workshop-linked vehicle with one hierarchy lookup and server-derived labels', async () => {
+  tx.$queryRaw.mockResolvedValue([variant]);
+  const result = await new VehicleService().createVehicle({ vin: 'WORKSHOP', catalogueId: variantId, colourId, color: 'wrong' });
+  expect(result).toMatchObject({ catalogueId: variantId, colourId, make: 'Kia', model: 'Rio', trim: 'Automatic', color: 'White', modelId: null });
+  expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  expect(tx.vehicleCatalogModel.findUnique).not.toHaveBeenCalled();
+});
+it('changes an existing vehicle from the separate model catalog to the workshop catalog', async () => {
+  tx.$queryRaw.mockResolvedValue([variant]);
+  expect(await new VehicleService().updateVehicle('vehicle', { catalogueId: variantId, colourId })).toMatchObject({
+    catalogueId: variantId, colourId, modelId: null, generationId: null, engineId: null, customModel: 'Rio', color: 'White',
+  });
+  expect(tx.$queryRaw).toHaveBeenCalledTimes(2); // Row lock and one hierarchy lookup.
+});
+it('rejects colours outside the selected model and inactive variants before writing', async () => {
+  tx.$queryRaw.mockResolvedValue([variant]);
+  await expect(new VehicleService().createVehicle({ vin: 'WRONG', catalogueId: variantId, colourId: modelId })).rejects.toThrow('belonging');
+  tx.$queryRaw.mockResolvedValue([{ ...variant, active: false }]);
+  await expect(new VehicleService().createVehicle({ vin: 'INACTIVE', catalogueId: variantId, colourId })).rejects.toThrow('active catalogue');
+  expect(tx.vehicle.create).not.toHaveBeenCalled();
+});
+it('rejects conflicting catalog identities instead of silently choosing one', async () => {
+  await expect(new VehicleService().createVehicle({ vin: 'CONFLICT', catalogueId: variantId, colourId, modelId })).rejects.toThrow('one vehicle catalogue');
+  expect(tx.vehicle.create).not.toHaveBeenCalled();
+});
+
 it('links the new vehicle and initial ownership to the same existing customer', async () => {
   const customerId = modelId;
   const result = await new VehicleService().createVehicle({ vin: 'OWNED', customerId, customModel: 'Rio' });
   expect(result.customerId).toBe(customerId);
-  expect(tx.customer.findFirst).toHaveBeenCalledWith({ where: { id: customerId, mergedIntoId: null } });
+  expect(tx.customer.findFirst).toHaveBeenCalledWith({ select: { id: true }, where: { id: customerId, mergedIntoId: null } });
   expect(tx.vehicleOwnership.create).toHaveBeenCalledWith({ data: expect.objectContaining({ vehicleId: 'vehicle', customerId, status: 'Current' }) });
 });
 it('rejects a missing or merged customer before creating a vehicle or ownership', async () => {
