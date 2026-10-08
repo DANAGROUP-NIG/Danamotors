@@ -51,7 +51,7 @@ export function ReportsPage() {
         customer: receipt.customer.companyName || `${receipt.customer.firstName} ${receipt.customer.lastName}`,
         mode: receipt.mode,
         bank: receipt.bank?.name ?? "",
-        invoices: receipt.allocations.map((allocation) => allocation.invoice.invoiceNumber).join(", "),
+        invoices: receipt.allocations.map((allocation) => allocation.invoice?.invoiceNumber ?? allocation.debitNote?.number ?? "").join(", "),
         advance: receipt.advanceAmount,
         amount: receipt.amount,
       })),
@@ -119,7 +119,7 @@ export function ReportsPage() {
                   <td className="px-3 py-3">{receipt.customer.companyName || `${receipt.customer.firstName} ${receipt.customer.lastName}`}</td>
                   <td className="px-3 py-3">{receipt.mode.replaceAll("_", " ")}</td>
                   <td className="px-3 py-3">{receipt.bank?.name ?? "-"}</td>
-                  <td className="px-3 py-3">{receipt.allocations.map((allocation) => allocation.invoice.invoiceNumber).join(", ") || "Advance"}</td>
+                  <td className="px-3 py-3">{receipt.allocations.map((allocation) => allocation.invoice?.invoiceNumber ?? allocation.debitNote?.number ?? "").join(", ") || "Advance"}</td>
                   <td className="px-3 py-3 text-right">{currency.format(receipt.advanceAmount)}</td>
                   <td className="px-3 py-3 text-right font-medium">{currency.format(receipt.amount)}</td>
                   {canManageReceipts && <td className="px-3 py-3 text-right"><Button variant="outline" size="sm" disabled={Boolean(receipt.status && receipt.status !== "ACTIVE")} onClick={() => setManagedReceipt(receipt)}>Manage</Button></td>}

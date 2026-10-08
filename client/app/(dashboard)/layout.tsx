@@ -42,6 +42,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
+  "/finance/receipts/advance-adjustment": ["receipt:adjust"],
   "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read"],
   "/credit-applications": ["credit:application:create"],

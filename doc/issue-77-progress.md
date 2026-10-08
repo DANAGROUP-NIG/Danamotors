@@ -77,3 +77,88 @@ Validation: backend typecheck/build pass; backend suite and separate dashboard r
 5. Recalculation, overdue rules, letters.
 
 Stop after phase 1 per the attached brief; resume phase 2 when the user says continue.
+
+## Phase 2 — party adjustments and unified credit
+
+Plan: extend ReceiptAllocation as the single adjustment store; introduce PartyAdjustmentBatch and PartyNote for opening balances; migrate legacy wallet/approved applications; add account, paged document, FIFO preview, save, reverse and opening endpoints; implement shared adjustment UI and customer Account entry points. No adjustment Tally journal is generated. Validation and acceptance evidence will be recorded as work completes.
+
+### Built
+
+- Generalized ReceiptAllocation into the single dated adjustment store, retaining existing IDs and receipt-entry rows. Added PartyNote openings and PartyAdjustmentBatch source/actor/key/reversal metadata.
+- Implemented manual save, bounded editable FIFO preview and Admin reversal. Serializable transactions, stable party/document locks, bounded rollback retries, currency/date/ownership checks and atomic financial audits protect writes.
+- Unified available credit across receipt advances and active credit notes/opening credits. Numeric SQL sums avoid binary-float aggregation; Account debit/credit totals use one database snapshot. Customer.creditBalance remains a trigger-maintained read-only compatibility cache.
+- Changed customer approval to consume canonical credit documents and reduce outstanding in the same transaction, without creating a second Payment. Disabled the manual wallet edit endpoint and removed its UI.
+- Added Admin opening debit/credit capture, numbered by direction and excluded from Tally. Migrated legacy wallets and approved applications with stable legacy keys, existing Payment linkage and a one-time backfill marker.
+- Added the responsive paired adjustment workspace, searchable branch-scoped name/code party picker, positive-balance filters, editable amounts, inline errors, sticky totals, retry-safe dates/keys, refresh and reversal reasons.
+- Added the customer Account tab, Finance/sidebar links and invoice payment entry point. Adapted staff/portal invoice and receipt-register displays for generalized allocations and scoped credit-cache invalidation.
+- Preserved allocation history during receipt edits/cancellation, blocked changes while later batches are active, and moved canonical notes/batches during customer merges. Admin reversal follows original document IDs after a merge.
+
+### Assumptions and decisions
+
+- Legacy wallet balances and receipt advances are preserved as independent credit sources, per the brief. Positive wallet values become opening credits; negative values become opening debits. Review source overlap during snapshot reconciliation rather than guessing a destructive deduplication.
+- Wallet openings use the UTC migration cutover date because reliable provenance for the remaining legacy wallet is unavailable. Legacy approved applications use decisionDate with createdAt fallback. Legacy note numbers use the UTC cutover year; new openings use their effective year and separate debit/credit series.
+- Preserve existing Float money columns and the invoice settlement statuses for compatibility; new note/batch amounts are Decimal(18,2). Arithmetic uses money helpers and numeric database sums. The existing supported monetary limit is NGN 1e12; FIFO caps a batch before converting its Decimal aggregate.
+- Adjustments create no Tally journal and keep tallyPostedAt null. Any involved exported/posted document or batch blocks reversal. Opening balances are excluded from Tally.
+- Vendor parties are excluded from lookup and financial entry. The hidden creditor selector belongs to the phase 3 report filters.
+- Party/document branch validation applies to new adjustments. Reversal is Admin-only and restores the original IDs after a merge, even when a standalone invoice now derives a different branch from its customer. Receipt/note branch snapshots stay intact.
+- The grid paginates up to 100 rows per page (UI uses 25), selections/FIFO are bounded to 200 per side, and the recent-history view shows 20 batches. The reversal API accepts any batch ID.
+- Original customer approvals remain decision history when their batches are reversed. A linked legacy Credit Payment is removed atomically on reversal; new approvals never create that compatibility Payment.
+
+### Acceptance evidence
+
+| Phase 2 criterion | Status / evidence |
+| --- | --- |
+| One adjustment store with debit/credit document sides | Implemented: schema, check constraints, dated ReceiptAllocation writes; party-account.service.test.ts — records canonical pairs and note-to-opening-debit pairs |
+| Manual equal-total adjustment updates both balances | Done: service/rule tests cover Decimal currency, overdraw, foreign documents, duplicate selection, date limits, equal/positive totals and audit |
+| FIFO oldest date then number, partial last match, editable preview | Done: party-adjustment.test.ts; UI prefill remains editable and save revalidates balances |
+| Exactly-once creation and bounded transaction retries | Done: service idempotency, changed-key-details conflict and rollback/timeout tests; receipt-create.test.ts remains green |
+| Admin reversal, required remark, no Tally-posted reversal | Done: role/permission tests plus batch/invoice/receipt/note/export guards, duplicate reversal, restored balances, retained rows and legacy Payment cleanup |
+| Reuse receipt advances and derive the wallet | Done: numeric sum test; mixed receipt/opening credit approval test; database trigger implementation. PostgreSQL execution is pending a test URL |
+| Admin opening debit/credit with date/narration, excluded from Tally | Done: schemas, role gates, numbered/excluded/idempotent opening tests, branch/future-date guards and opening modal |
+| Branch access and debtor-only scope | Done: party-account.controller.test.ts and vendor entry guards |
+| Account tab, entry points, grids/loading/empty/error/success states | Implemented; frontend lint/build pass. Browser execution against a migrated database remains pending |
+| Safe, idempotent legacy backfill | Implemented: transactional guarded SQL, stable keys/IDs, backfill marker, preserved advances, sequence seeding, source checks, audit and read-only preflight. Migration execution/rerun on a snapshot remains pending |
+| Swagger and billing documentation | Done: eight new endpoint paths, selection schema, disabled wallet response and canonical approval descriptions verified |
+
+The new PostgreSQL integration test exercises receipt advance reuse, opening idempotency, paired allocations, derived-cache protection, Tally/duplicate reversal guards, receipt cancellation and credit preservation/reversal after a cross-branch merge. It rolls all fixtures back and only runs against an explicitly supplied migrated TEST_DATABASE_URL.
+
+### Files (phase 2)
+
+- Backend additions: server/src/modules/finance/party-adjustment.ts; party-account.validation.ts; party-account.service.ts; party-account.controller.ts.
+- Backend integration: finance.routes.ts; receipt.service.ts; finance.repository.ts; job-billing.service.ts; document-number.ts; tally.service.ts; credit/credit.service.ts, credit.controller.ts and credit.routes.ts; customer/customer.service.ts, customer.controller.ts, customer.repository.ts, customer.routes.ts and customer-read-scope.ts; customer-portal/portal.service.ts, portal.repository.ts and portal.routes.ts; shared/constants/roles.ts; prisma/seed/portal.ts.
+- Frontend additions: app/(dashboard)/finance/receipts/advance-adjustment/page.tsx; features/finance/api/party-account.api.ts; hooks/use-party-account.ts; components/party-adjustment-workspace.tsx and OpeningBalanceModal.tsx.
+- Frontend integration: customer Account tab/card; Finance/sidebar/route guard/API routes; invoice receipt capture/manage hooks and generalized allocation types/displays; receipt register; portal invoice totals/allocations.
+- Migrations: server/prisma/schema.prisma; prisma/migrations/20261008120000_party_adjustments/migration.sql; prisma/party-adjustment-preflight.sql.
+- Tests: finance/party-adjustment.test.ts; party-account.service.test.ts; party-account.controller.test.ts; party-account.integration.test.ts; customer/customer-read-scope.test.ts; updated credit.service.test.ts and receipt-create.test.ts.
+- Documentation: doc/billing.md; this log; doc/issue-77-frontend-testing.md (working source for the final Word walkthrough).
+
+### Validation
+
+Commands use the actual installed Node runtime, as in phase 1. No production database writes or Tally posting occurred.
+
+- Backend: TypeScript no-emit check and build pass. Final Jest: 34 suites passed, 465 tests passed; 7 database-dependent suites / 36 tests skipped.
+- Frontend: ESLint passes with 0 errors and 70 existing warnings; Next.js production webpack build passes, including TypeScript and 57 static pages. The existing Windows NVM worker issue still requires the webpack build workaround described in phase 1.
+- Prisma: client generation and schema validation pass. No migration was applied; database-backed tests skip without TEST_DATABASE_URL.
+- Browser testing remains planned, not executed. See the maintained frontend testing source.
+
+Final permission review: Accountant receives customer:read for the Account tab, with assigned-branch filtering on customer rows/count and ownership checks on detail/nested reads. Global duplicate lookup is unavailable to Accountant. Existing roles retain their previous customer-directory behavior; new finance endpoints enforce their own branch rules. Tests cover foreign/missing branches, own-branch access, Admin access and matching list/count predicates.
+
+Commands: server `node node_modules/typescript/bin/tsc --noEmit`; `node node_modules/typescript/bin/tsc`; `node node_modules/jest/bin/jest.js --runInBand`; client `node node_modules/eslint/bin/eslint.js .`; `node node_modules/next/dist/bin/next build --webpack` with the installed Node directory prepended to PATH. Prisma generation/validation used the installed CLI. `git diff --check` and untracked-file whitespace checks pass.
+
+### Risks and next phase
+
+- Apply migrations and regenerate before deploying/testing this application version. Run preflight, migration and its rerun on a production snapshot/disposable database first; this environment has no TEST_DATABASE_URL.
+- Stored outstanding from legacy approvals is preserved, not repaired here. Phase 5 previews/audits corrections; inconsistent legacy reversal is rejected by document balance bounds.
+- Historical unspent-wallet provenance and previously deleted receipt allocation versions cannot be reconstructed. Phase 3 reports must document the cutover boundary and retain cancellation timing, using available audit timestamps for legacy receipt cancellation backfill.
+- No live browser walkthrough or Tally company import has been executed in this environment. The testing source distinguishes planned frontend checks from automated evidence.
+- The final .docx frontend testing/flow guide is requested for completion of the entire implementation. Source steps are maintained now; add phases 3–5 and render/verify the Word document at final delivery.
+
+### Proposed PR
+
+Title: Add canonical party adjustments, advance reuse and opening balances (#77, phase 2)
+
+Receipt advances and opening credits now fund invoices through one dated ReceiptAllocation store. Manual/FIFO adjustment and Admin reversal maintain both balances with serializable locks, retry keys, posting guards and financial audits. The wallet is derived from canonical credits, legacy balances/applications are preserved by guarded backfill, and customer approval uses the same adjustment service. The customer Account tab and paired adjustment UI expose these flows in the existing design.
+
+Assumptions: preserve legacy wallet/advance sources independently; date unknown wallet provenance at UTC cutover; keep existing Float columns/statuses while using Decimal operations; no adjustment Tally journal; bounded preview/history; vendors remain outside scope; repair historical outstanding in phase 5.
+
+Stop after phase 2 per the brief. Phase 3 (party reports, ledger link, print and Excel) begins only when the user says continue.

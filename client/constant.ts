@@ -179,6 +179,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: ["invoice:read"],
       },
       {
+        label: "Advance Adjustment",
+        href: "/finance/receipts/advance-adjustment",
+        icon: Wallet,
+        permissions: ["receipt:adjust"],
+      },
+      {
         label: "Tally",
         href: "/finance/tally",
         icon: Landmark,

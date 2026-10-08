@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 
 export async function nextDocumentNumber(
   transaction: Prisma.TransactionClient,
-  type: 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS',
+  type: 'JOB_BILL' | 'RECEIPT' | 'JOB_CARD' | 'GATE_PASS' | 'DEBIT_NOTE' | 'CREDIT_NOTE',
   date = new Date(),
 ): Promise<string> {
   const year = date.getUTCFullYear();

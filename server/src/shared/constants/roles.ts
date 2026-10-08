@@ -161,6 +161,9 @@ export const PERMISSIONS = {
   RECEIPT_CREATE: "receipt:create",
   RECEIPT_UPDATE: "receipt:update",
   RECEIPT_CANCEL: "receipt:cancel",
+  RECEIPT_ADJUST: "receipt:adjust",
+  RECEIPT_ADJUST_REVERSE: "receipt:adjust:reverse",
+  PARTY_OPENING_CREATE: "party:opening:create",
 
   // ── Finance — Reports ─────────────────────────────────────────────────────
   FINANCE_REPORT_READ: "financereport:read",
@@ -206,6 +209,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.RECEIPT_ADJUST,
+    PERMISSIONS.RECEIPT_ADJUST_REVERSE,
+    PERMISSIONS.PARTY_OPENING_CREATE,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -393,6 +399,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.RECEIPT_ADJUST,
+    PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -408,6 +416,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   [ROLES.BILLING_OFFICER]: [
+    PERMISSIONS.RECEIPT_ADJUST,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,

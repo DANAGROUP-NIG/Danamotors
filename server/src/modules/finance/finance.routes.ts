@@ -1,9 +1,11 @@
 import { Router } from 'express';
+import { PartyAccountController } from './party-account.controller';
+import { partyAccountSchema, partySearchSchema, partyDocumentsSchema, fifoAdjustmentSchema, createAdjustmentSchema, reverseAdjustmentSchema, openingBalanceSchema } from './party-account.validation';
 import { FinanceController } from './finance.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission } from '../../middleware/authorize';
-import { PERMISSIONS } from '../../shared/constants/roles';
+import { requirePermission, requireRole } from '../../middleware/authorize';
+import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
 import {
   updateInvoiceSchema,
   invoiceIdParamSchema,
@@ -413,6 +415,173 @@ router.get('/reports/summary', requirePermission(PERMISSIONS.FINANCE_REPORT_READ
 router.get('/reports/invoices', requirePermission(PERMISSIONS.FINANCE_REPORT_READ), validateRequest(reportQuerySchema), controller.getInvoiceReport);
 router.get('/reports/receipt-register', requirePermission(PERMISSIONS.RECEIPT_REGISTER_READ), validateRequest(receiptRegisterQuerySchema), controller.listReceipts);
 router.get('/dashboard/overview', requirePermission(PERMISSIONS.INVOICE_READ), controller.getDashboardOverview);
+
+
+/**
+ * @openapi
+ * /finance/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Search debtor parties by name or code
+ *     description: "Requires receipt:adjust. Merged customers and vendors are excluded. Admin/SuperAdmin may select any branch; other users are restricted to their assigned branch."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"order","schema":{"type":"string","enum":["name","code"],"default":"name"}}
+ *       - {"in":"query","name":"search","schema":{"type":"string","maxLength":100}}
+ *       - {"in":"query","name":"limit","schema":{"type":"integer","minimum":1,"maximum":100,"default":50}}
+ *     responses:
+ *       200: { description: "customers array (id, code, name), bounded by limit" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/account:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read the current party debit and credit totals
+ *     description: "Requires customer:read and party branch access. outstanding is invoices plus opening debits; availableCredit is receipt advances plus active credit notes/opening credits; netOutstanding is debit minus credit."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *     responses:
+ *       200: { description: "account with customer, outstanding, availableCredit and netOutstanding" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/documents:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read a paginated debit or credit document grid
+ *     description: "Requires receipt:adjust and branch access. These are current balances. Historical as-on reports ship separately."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"side","schema":{"type":"string","enum":["DEBIT","CREDIT"],"default":"DEBIT"}}
+ *       - {"in":"query","name":"openOnly","schema":{"type":"string","enum":["true","false"],"default":"true"}}
+ *       - {"in":"query","name":"page","schema":{"type":"integer","minimum":1,"default":1}}
+ *       - {"in":"query","name":"pageSize","schema":{"type":"integer","minimum":1,"maximum":100,"default":25}}
+ *     responses:
+ *       200: { description: "documents array (id, kind, number, date, amount, balance) and pagination meta" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/adjustments:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read the latest 20 party adjustment batches
+ *     description: "Requires receipt:adjust and party/branch access. Returns reversal metadata. No adjustment batch creates a Tally journal."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *     responses:
+ *       200: { description: "batches array, latest first" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/adjustments/fifo-preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview editable FIFO allocations without saving
+ *     description: "Requires receipt:adjust. Matches at most 200 open documents per side, oldest date then number. Excludes documents after the effective date; balances are revalidated on save."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","date"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"date":{"type":"string","format":"date-time"}}}
+ *     responses:
+ *       200: { description: "preview with debit/credit selections, matched amount and both document arrays" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/adjustments:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Save a manual or FIFO party adjustment
+ *     description: "Requires receipt:adjust. Each side contains 1-200 unique documents. Debit and credit totals must be equal and positive, at most two decimal places, within current balances, owned by the same party/branch. Date cannot precede a selected document or be in the future. Serializable transaction, row locks and at most two P2034 retries. Reuse the same UUID key and identical details after an uncertain response; a changed request returns 409. No Tally journal or duplicate Payment row is created."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","date","idempotencyKey","debits","credits"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"date":{"type":"string","format":"date-time"},"idempotencyKey":{"type":"string","format":"uuid"},"source":{"type":"string","enum":["ADVANCE_ADJUSTMENT","FIFO"],"default":"ADVANCE_ADJUSTMENT"},"debits":{"$ref":"#/components/schemas/PartyAdjustmentSelections"},"credits":{"$ref":"#/components/schemas/PartyAdjustmentSelections"}}}
+ *     responses:
+ *       201: { description: "batch with effective date, amount, source and retry key" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/adjustments/{id}/reverse:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Reverse an unposted party adjustment with a remark
+ *     description: "Admin/SuperAdmin only, with receipt:adjust:reverse. Restores original document balances once and retains allocation rows with reversedAt. Any involved document or batch exported/posted to Tally blocks reversal. Original customer approval remains decision history."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"id","required":true,"schema":{"type":"string","format":"uuid"}}
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["remark"],"properties":{"remark":{"type":"string","minLength":1,"maxLength":1000}}}
+ *     responses:
+ *       200: { description: "batch with reversedAt, reversedById and reverseRemark" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/opening-balances:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Record an opening debit or credit balance
+ *     description: "Admin/SuperAdmin only, with party:opening:create. The branch must be the customer branch. Creates a numbered OPENING PartyNote, excluded from Tally, with positive currency, effective date and narration. Reuse the same UUID key and identical details for retries."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","direction","date","amount","narration","idempotencyKey"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"direction":{"type":"string","enum":["DEBIT","CREDIT"]},"date":{"type":"string","format":"date-time"},"amount":{"type":"number","minimum":0.01,"maximum":1000000000000,"multipleOf":0.01},"narration":{"type":"string","minLength":1,"maxLength":2000},"idempotencyKey":{"type":"string","format":"uuid"}}}
+ *     responses:
+ *       201: { description: "note with number, direction, type OPENING, amount, remainingAmount and tallyExcluded true" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * components:
+ *   schemas:
+ *     PartyAdjustmentSelections:
+ *       type: array
+ *       minItems: 1
+ *       maxItems: 200
+ *       items:
+ *         type: object
+ *         required: [id, kind, amount]
+ *         properties:
+ *           id: { type: string, format: uuid }
+ *           kind: { type: string, enum: [INVOICE, RECEIPT, NOTE] }
+ *           amount: { type: number, minimum: 0.01, maximum: 1000000000000, multipleOf: 0.01 }
+ */
+const partyAccount = new PartyAccountController();
+router.get('/parties', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partySearchSchema), partyAccount.search);
+router.get('/parties/:customerId/account', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(partyAccountSchema), partyAccount.account);
+router.get('/parties/:customerId/documents', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyDocumentsSchema), partyAccount.documents);
+router.get('/parties/:customerId/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyAccountSchema), partyAccount.batches);
+router.post('/adjustments/fifo-preview', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(fifoAdjustmentSchema), partyAccount.fifo);
+router.post('/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(createAdjustmentSchema), partyAccount.create);
+router.post('/adjustments/:id/reverse', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.RECEIPT_ADJUST_REVERSE), validateRequest(reverseAdjustmentSchema), partyAccount.reverse);
+router.post('/opening-balances', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OPENING_CREATE), validateRequest(openingBalanceSchema), partyAccount.opening);
 
 export default router;
 

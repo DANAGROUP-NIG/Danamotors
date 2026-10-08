@@ -6,6 +6,7 @@ import prisma from '../../prisma/client';
 import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { nextDocumentNumber } from './document-number';
 import { recalculateReceiptAllocations } from './receipt-allocation';
+import { lockParty, withPartyTransaction } from './party-account.service';
 
 type ReceiptAllocationInput = { invoiceId: string; amount: number };
 type ReceiptMode = 'POS' | 'BANK_TRANSFER' | 'CHEQUE' | 'CASH';
@@ -69,13 +70,13 @@ export class ReceiptService {
         if (input.idempotencyKey) {
           // Serialize retries before checking or changing any invoice balance.
           await transaction.$queryRaw(Prisma.sql`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${input.idempotencyKey}, 0))`);
-          const existing = await transaction.receipt.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { allocations: { include: { invoice: true } }, bank: true, customer: true } });
+          const existing = await transaction.receipt.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { allocations: { where: { reversedAt: null }, include: { invoice: true, debitNote: true } }, bank: true, customer: true } });
           if (existing) {
             if (existing.requestHash !== requestHash) throw new ConflictError('This receipt request was already used with different details');
             return existing;
           }
         }
-        const customer = await transaction.customer.findUnique({ where: { id: input.customerId } });
+        const customer = await lockParty(transaction, input.customerId);
         if (!customer || customer.mergedIntoId) throw new NotFoundError('Customer not found');
         const branchId = input.branchId ?? customer.branchId;
         if (!branchId || !(await transaction.branch.findFirst({ where: { id: branchId, isActive: true } }))) throw new BadRequestError('Select an active receiving branch');
@@ -89,7 +90,7 @@ export class ReceiptService {
         const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
         let allocatedAmount = 0;
         for (const allocation of input.allocations) {
-          const invoice = invoiceById.get(allocation.invoiceId)!;
+          const invoice = invoiceById.get(allocation.invoiceId!)!;
           if ((invoice.jobCard?.branchId ?? invoice.customer.branchId) !== branchId) throw new BadRequestError('Allocated bills must belong to the receiving branch');
           if (invoice.customerId !== customer.id) throw new BadRequestError('All allocated invoices must belong to the selected customer');
           if (['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase())) {
@@ -100,7 +101,7 @@ export class ReceiptService {
           }
           allocatedAmount = sumMoney([allocatedAmount, allocation.amount]);
         }
-        if (input.allocations.some((allocation) => invoiceById.get(allocation.invoiceId)!.jobCardId) && input.category !== 'SERVICE_PARTS') {
+        if (input.allocations.some((allocation) => invoiceById.get(allocation.invoiceId!)!.jobCardId) && input.category !== 'SERVICE_PARTS') {
           throw new BadRequestError('Receipts allocated to job bills belong to the Service and parts register');
         }
         if (allocatedAmount > input.amount + 0.000001) {
@@ -126,18 +127,19 @@ export class ReceiptService {
             advanceAmount: money(input.amount - allocatedAmount),
             notes: input.narration,
             issuedAt: input.issuedAt ? new Date(input.issuedAt) : undefined,
-            allocations: { createMany: { data: input.allocations } },
+            allocations: { createMany: { data: input.allocations.map(allocation => ({ ...allocation, adjustedAt: input.issuedAt ? new Date(input.issuedAt) : new Date() })) } },
           },
-          include: { allocations: { include: { invoice: true } }, bank: true, customer: true },
+          include: { allocations: { where: { reversedAt: null }, include: { invoice: true, debitNote: true } }, bank: true, customer: true },
         });
 
         for (const allocation of input.allocations) {
-          const invoice = invoiceById.get(allocation.invoiceId)!;
+          const invoice = invoiceById.get(allocation.invoiceId!)!;
           await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount - allocation.amount, invoice.total);
         }
+        await transaction.auditLog.create({ data: { userId: input.issuedById, action: 'RECEIPT_CREATED', details: JSON.stringify({ receiptId: receipt.id, customerId: customer.id, amount: receipt.amount, advanceAmount: receipt.advanceAmount, allocations: input.allocations }) } });
         // Return invoice balances after their updates, not the pre-payment snapshot.
         return { ...receipt, allocations: receipt.allocations.map((allocation) => {
-          const original = invoiceById.get(allocation.invoiceId)!;
+          const original = invoiceById.get(allocation.invoiceId!)!;
           const balance = money(original.outstandingAmount - allocation.amount);
           return { ...allocation, invoice: { ...allocation.invoice, outstandingAmount: balance, status: balance <= 0 ? 'Paid' : balance < original.total ? 'Partially Paid' : 'Unpaid' } };
         }) };
@@ -162,7 +164,7 @@ export class ReceiptService {
         customer: true,
         bank: true,
         issuedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-        allocations: { include: { invoice: { include: { jobCard: true } } } },
+        allocations: { where: { reversedAt: null }, include: { invoice: { include: { jobCard: true } }, debitNote: true } },
         editLogs: { orderBy: { createdAt: 'desc' } },
       },
     });
@@ -198,7 +200,7 @@ export class ReceiptService {
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, companyName: true, branchId: true } },
         bank: true,
-        allocations: { include: { invoice: { select: { id: true, invoiceNumber: true, jobCardId: true } } } },
+        allocations: { where: { reversedAt: null }, include: { invoice: { select: { id: true, invoiceNumber: true, jobCardId: true } }, debitNote: { select: { number: true } } } },
         issuedBy: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: [{ issuedAt: 'desc' }, { receiptNumber: 'desc' }],
@@ -215,11 +217,14 @@ export class ReceiptService {
   }
 
   async updateReceipt(id: string, input: { amount?: number; narration?: string; editedById: string }) {
-    return prisma.$transaction(async (transaction) => {
+    return withPartyTransaction(async (transaction) => {
+      const owner = await transaction.receipt.findUnique({ where: { id }, select: { customerId: true } });
+      if (!owner) throw new NotFoundError('Receipt not found');
+      await lockParty(transaction, owner.customerId);
       await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${id} FOR UPDATE`);
       const receipt = await transaction.receipt.findUnique({
         where: { id },
-        include: { allocations: { orderBy: { createdAt: 'asc' } } },
+        include: { allocations: { where: { reversedAt: null }, orderBy: { createdAt: 'asc' } } },
       });
       if (!receipt) throw new NotFoundError('Receipt not found');
       if (receipt.status !== 'ACTIVE') throw new BadRequestError('Only active receipts can be edited');
@@ -230,31 +235,34 @@ export class ReceiptService {
       const oldNarration = receipt.notes;
       const newAmount = money(input.amount ?? oldAmount);
       const newNarration = input.narration ?? oldNarration;
+      if (newAmount <= 0) throw new BadRequestError('Receipt amount must be positive');
+      await transaction.auditLog.create({ data: { userId: input.editedById, action: 'RECEIPT_UPDATED', details: JSON.stringify({ receiptId: id, oldAmount, newAmount, oldNarration, newNarration }) } });
       await transaction.tallyPostingLog.updateMany({
         where: { documentType: 'RECEIPT', documentId: id, status: 'EXPORTED' },
         data: { status: 'INVALIDATED' },
       });
       if (newAmount === oldAmount) {
         await transaction.receiptEditLog.create({ data: { receiptId: id, editedById: input.editedById, oldAmount, newAmount, oldNarration, newNarration } });
-        return transaction.receipt.update({ where: { id }, data: { notes: newNarration }, include: { allocations: { include: { invoice: true } }, bank: true, customer: true } });
+        return transaction.receipt.update({ where: { id }, data: { notes: newNarration }, include: { allocations: { where: { reversedAt: null }, include: { invoice: true, debitNote: true } }, bank: true, customer: true } });
       }
-      const invoiceIds = receipt.allocations.map((allocation) => allocation.invoiceId);
+      if (receipt.allocations.some(allocation => allocation.batchId)) throw new ConflictError('Reverse later adjustment batches before changing this receipt amount');
+      const invoiceIds = receipt.allocations.map((allocation) => allocation.invoiceId!);
       const invoices = await lockInvoices(transaction, invoiceIds);
       const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
 
       for (const allocation of receipt.allocations) {
-        const invoice = invoiceById.get(allocation.invoiceId);
+        const invoice = invoiceById.get(allocation.invoiceId!);
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
         await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
       }
-      await transaction.receiptAllocation.deleteMany({ where: { receiptId: id } });
+      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: new Date() } });
 
       const allocationPlan = recalculateReceiptAllocations(newAmount, receipt.allocations.map((allocation) => {
-        const invoice = invoiceById.get(allocation.invoiceId)!;
-        return { invoiceId: allocation.invoiceId, amount: allocation.amount, outstandingAmount: invoice.outstandingAmount };
+        const invoice = invoiceById.get(allocation.invoiceId!)!;
+        return { invoiceId: allocation.invoiceId!, amount: allocation.amount, outstandingAmount: invoice.outstandingAmount };
       }));
       for (const allocation of allocationPlan.allocations) {
-        const invoice = invoiceById.get(allocation.invoiceId)!;
+        const invoice = invoiceById.get(allocation.invoiceId!)!;
         const previousAmount = receipt.allocations.find((item) => item.invoiceId === allocation.invoiceId)!.amount;
         const available = money(invoice.outstandingAmount + previousAmount);
         await transaction.receiptAllocation.create({ data: { receiptId: id, invoiceId: invoice.id, amount: allocation.amount } });
@@ -267,33 +275,39 @@ export class ReceiptService {
       return transaction.receipt.update({
         where: { id },
         data: { amount: newAmount, advanceAmount: allocationPlan.advanceAmount, notes: newNarration },
-        include: { allocations: { include: { invoice: true } }, bank: true, customer: true },
+        include: { allocations: { where: { reversedAt: null }, include: { invoice: true, debitNote: true } }, bank: true, customer: true },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
   }
 
   async cancelReceipt(id: string, remark: string, actorId?: string) {
-    return prisma.$transaction(async (transaction) => {
+    if (!remark.trim()) throw new BadRequestError('A cancellation remark is required');
+    return withPartyTransaction(async (transaction) => {
+      const owner = await transaction.receipt.findUnique({ where: { id }, select: { customerId: true } });
+      if (!owner) throw new NotFoundError('Receipt not found');
+      await lockParty(transaction, owner.customerId);
       await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${id} FOR UPDATE`);
-      const receipt = await transaction.receipt.findUnique({ where: { id }, include: { allocations: true } });
+      const receipt = await transaction.receipt.findUnique({ where: { id }, include: { allocations: { where: { reversedAt: null } } } });
       if (!receipt) throw new NotFoundError('Receipt not found');
       if (receipt.status !== 'ACTIVE') throw new BadRequestError('Only active receipts can be cancelled');
       if (receipt.tallyPostedAt || await transaction.tallyPostingLog.findFirst({ where: { documentType: 'RECEIPT', documentId: id, status: { in: ['EXPORTED', 'POSTED'] } } })) {
         throw new BadRequestError('A receipt exported or posted to Tally cannot be cancelled');
       }
+      if (receipt.allocations.some(allocation => allocation.batchId)) throw new ConflictError('Reverse later adjustment batches before cancelling this receipt');
       await transaction.tallyPostingLog.updateMany({
         where: { documentType: 'RECEIPT', documentId: id, status: 'EXPORTED' },
         data: { status: 'INVALIDATED' },
       });
-      const invoices = await lockInvoices(transaction, receipt.allocations.map((allocation) => allocation.invoiceId));
+      const invoices = await lockInvoices(transaction, receipt.allocations.map((allocation) => allocation.invoiceId!));
       const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
       for (const allocation of receipt.allocations) {
-        const invoice = invoiceById.get(allocation.invoiceId);
+        const invoice = invoiceById.get(allocation.invoiceId!);
         if (!invoice) throw new ConflictError('An allocated invoice no longer exists');
         await updateInvoiceBalance(transaction, invoice.id, invoice.outstandingAmount + allocation.amount, invoice.total);
       }
-      if (actorId) await transaction.auditLog.create({ data: { userId: actorId, action: 'RECEIPT_CANCELLED', details: JSON.stringify({ receiptId: id, remark, amount: receipt.amount }) } });
-      return transaction.receipt.update({ where: { id }, data: { status: 'CANCELLED', cancelRemark: remark } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      await transaction.auditLog.create({ data: { userId: actorId, action: 'RECEIPT_CANCELLED', details: JSON.stringify({ receiptId: id, remark, amount: receipt.amount }) } });
+      await transaction.receiptAllocation.updateMany({ where: { receiptId: id, reversedAt: null }, data: { reversedAt: new Date() } });
+      return transaction.receipt.update({ where: { id }, data: { status: 'CANCELLED', cancelRemark: remark, advanceAmount: 0 } });
+    });
   }
 }

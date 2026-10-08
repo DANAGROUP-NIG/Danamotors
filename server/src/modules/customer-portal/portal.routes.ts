@@ -317,7 +317,7 @@ router.get('/credit/applications', controller.getCreditApplications);
  *   post:
  *     tags: [Customer Portal]
  *     summary: Approve or decline a pending customer credit application
- *     description: Approval atomically records a Credit payment, deducts customer credit, reduces invoice outstandingAmount, and sets Paid or Partially Paid from the remaining balance. Only the authenticated customer's pending application can be decided. An application can be decided once.
+ *     description: Approval atomically consumes the oldest available receipt advances and note credits through dated ReceiptAllocation rows, reduces invoice outstandingAmount, and sets Paid or Partially Paid from the remaining balance. Only the authenticated customer's pending application can be decided. An application can be decided once.
  *     security:
  *       - BearerAuth: []
  *     parameters:

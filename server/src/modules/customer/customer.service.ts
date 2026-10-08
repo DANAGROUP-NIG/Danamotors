@@ -1,3 +1,4 @@
+import { withPartyTransaction } from "../finance/party-account.service";
 import { z } from 'zod';
 import { customerBody, validateCustomerIdentity } from './customer.validation';
 import { Prisma } from '@prisma/client';
@@ -328,7 +329,7 @@ export class CustomerService {
     if (sourceId === targetId)
       throw new ConflictError('Select two different customers');
 
-    return prisma.$transaction(async tx => {
+    return withPartyTransaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Customer" WHERE id IN (${sourceId}, ${targetId}) ORDER BY id FOR UPDATE`);
 
       const records = await tx.customer.findMany({
@@ -465,6 +466,9 @@ export class CustomerService {
         },
       });
 
+      await tx.partyNote.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
+      await tx.partyAdjustmentBatch.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
+
       await tx.customerCreditTransaction.updateMany({
         where: {
           customerId: sourceId,
@@ -492,7 +496,6 @@ export class CustomerService {
 
         data: {
           mergedIntoId: targetId,
-          creditBalance: 0,
         },
       });
 
@@ -514,10 +517,6 @@ export class CustomerService {
         },
 
         data: {
-          creditBalance: {
-            increment: source.creditBalance,
-          },
-
           tallyLedgerId: target.tallyLedgerId ?? source.tallyLedgerId,
           tallyPartyCode: target.tallyPartyCode ?? source.tallyPartyCode,
         },

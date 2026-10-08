@@ -83,7 +83,7 @@ export type ReceiptRegisterRow = {
   status: string;
   customer: { id: string; firstName: string; lastName: string; companyName?: string | null };
   bank?: { id: string; name: string } | null;
-  allocations: Array<{ invoice: { invoiceNumber: string } }>;
+  allocations: Array<{ invoice: { invoiceNumber: string } | null; debitNote?: { number: string } | null }>;
 };
 export type ReceiptRegisterResponse = {
   receipts: ReceiptRegisterRow[];

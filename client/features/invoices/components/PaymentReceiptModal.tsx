@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ModalFame from "@/components/modals/ModalFame";
@@ -18,6 +20,7 @@ export function PaymentReceiptModal({ isOpen, onClose, invoiceId }: { isOpen: bo
 }
 
 function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId?: string }) {
+  const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((state) => state.activeBranch?.id);
   const create = useCreateReceipt();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
@@ -77,6 +80,7 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
   return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title="Payment receipt">
     <form className="grid gap-4" onSubmit={submit} inert={create.isPending}>
       {invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
+      {customerId && hasPermission("receipt:adjust") && <Link className="text-sm font-medium text-primary hover:underline" href={"/finance/receipts/advance-adjustment?customerId="+customerId}>Use existing advances or credits</Link>}
       {!branchId && <p role="alert" className="text-sm text-destructive">Select a receiving branch from the app header.</p>}
       <section className="grid gap-2"><h3 className="text-sm font-semibold">Unpaid bills</h3>
         {invoiceQuery.isFetching && <p role="status" className="text-sm">Loading balances...</p>}

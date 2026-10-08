@@ -48,12 +48,56 @@ Selecting a catalogue service pre-fills its price as the job-card service charge
 
 Existing issued bills are unchanged. Existing unbilled jobs must obtain an approved estimate before additional work or billing. This change uses the existing estimate tables and requires no schema migration. Included package components are stored as INCLUDED_PART / INCLUDED_LABOUR estimate line types. Drafts are local until submitted; every saved submission is a new immutable revision.
 
-## Credit application approval (issue #77, phase 1)
+## Credit application approval (issue #77, phases 1–2)
 
 Credit application requests validate against `Invoice.outstandingAmount`, including receipt allocations, rather than recomputing outstanding from `Payment` rows. Amounts use the existing Decimal-backed money helpers. Requests that round below 0.01 and applications against cancelled invoices are rejected.
 
-Approval through `POST /api/portal/credit/applications/:id/decision` locks and rechecks the application, customer, and invoice in a serializable transaction. It checks the current available credit and invoice outstanding before writing a Credit payment, a USED credit transaction, the wallet deduction, the reduced invoice outstanding, the invoice status, and a `CREDIT_APPLICATION_APPROVED` audit record. Zero outstanding means Paid; a remaining balance means Partially Paid, matching receipt settlement. Confirmed P2034 serialization rollbacks retry at most twice with backoff, with 5-second acquisition and 15-second execution limits. Timeouts are not replayed. A repeated decision returns a conflict without another financial write. Declining uses a conditional Pending update so it cannot overwrite an approval. Notifications run after commit.
+Approval through `POST /api/portal/credit/applications/:id/decision` locks and rechecks the application, customer, and invoice in a serializable transaction. It checks the current available credit and invoice outstanding before writing a dated adjustment batch, canonical ReceiptAllocation pairs, the consumed receipt/note balances, a compatibility USED credit transaction, the reduced invoice outstanding, the invoice status, and a `CREDIT_APPLICATION_APPROVED` audit record. Phase 2 does not insert a duplicate Credit Payment or hand-edit a separate wallet. Zero outstanding means Paid; a remaining balance means Partially Paid, matching receipt settlement. Confirmed P2034 serialization rollbacks retry at most twice with backoff, with 5-second acquisition and 15-second execution limits. Timeouts are not replayed. A repeated decision returns a conflict without another financial write. Declining uses a conditional Pending update so it cannot overwrite an approval. Notifications run after commit.
 
 The accountant dashboard sums active invoice `outstandingAmount`, including standalone customer invoices and overdue balances, under the existing branch scope. Portal credit decisions already invalidate invoice, credit, dashboard, and profile queries, so phase 1 requires no frontend change.
 
-This phase needs no migration and does not repair historical approvals. Wallet unification and historical balance repair are delivered in later issue #77 phases.
+Phase 1 required no migration. Phase 2 uses the party_adjustments migration below; historical outstanding repair remains phase 5.
+
+## Party accounts and advance adjustment (issue #77, phase 2)
+
+Available customer credit is the sum of active receipt advances and unadjusted credit notes/opening credits. Customer.creditBalance is retained as a read-only compatibility cache maintained by database triggers. Account and portal reads also aggregate the canonical documents. The legacy manual wallet endpoint is disabled. Legacy CustomerCreditTransaction records remain historical compatibility records; they are not the source of available credit.
+
+Open **Finance → Advance Adjustment** (also in the sidebar), or **Customer → Account → Adjust balances**. Invoice payment capture has a preselected **Use existing advances / credits** link. Select the branch in the header, search the party by name/code, then select debit and credit documents. Both sides accept editable positive amounts with two decimal places. Save becomes available only when debit and credit adjusted totals are equal, positive and within current balances. The grids are paginated; selections persist across pages up to 200 per side. Each batch is capped at NGN 1,000,000,000,000 to keep currency totals within safe API numeric bounds.
+
+FIFO previews the oldest 200 open documents per side in date/number order, matching the smaller total. It fills amounts for review and editing; it does not save automatically. Save and repeat for larger parties. Recent history shows 20 batches. Admin/SuperAdmin can reverse a batch with a remark; the API supports any batch ID. Reversal restores both document balances and retains each allocation with its reversal timestamp. Any involved invoice, receipt, note or batch exported/posted to Tally prevents reversal. No adjustment journal is produced.
+
+All adjustments use ReceiptAllocation, including receipt advances applied after receipt capture and approved credit applications. PartyAdjustmentBatch groups the dated pairs and stores source, actor, amount, retry key and reversal metadata. Invoice status follows Paid/Partially Paid/Unpaid from its remaining balance; overdue calculation follows in phase 5. Financial writes lock the party and selected documents inside a bounded serializable transaction with at most two confirmed P2034 retries. Timeouts are not replayed. Retry with the same key **and identical date/details** after an uncertain response. A changed request with an already committed key returns 409. Refresh balances clears the current selection and starts a new request.
+
+Receipt amount edits/cancellation are blocked while any later adjustment batch is active. Reverse those batches first. Narration-only receipt edits preserve allocations. Receipt editing and cancellation retain old rows with reversedAt instead of deleting allocation history; new entry adjustments use their edit date. Customer merges move canonical notes and batches along with receipts and invoices, retaining document branch snapshots and using the same serializable retry wrapper. Admin reversal follows the stored document IDs across the merged party, preserving receipt/note branch snapshots. New adjustments still require all selected documents in one branch. Standalone invoices continue to derive their branch from the customer, as in existing billing.
+
+### Opening balances
+
+Admin/SuperAdmin, with party:opening:create, can use **Customer → Account → Record opening balance**. Choose Debit (party owes us) or Credit (available to the party), opening date, positive amount and narration. The opening must belong to the customer branch. It creates a numbered PartyNote with type OPENING, its full remaining balance and tallyExcluded=true. Openings appear in the appropriate adjustment grid. Opening balances are excluded from Tally because they represent balances brought forward there. Full commercial debit/credit note capture and vouchers are phase 4.
+
+### Permissions and endpoints
+
+| Endpoint under /api/finance | Permission / restriction |
+| --- | --- |
+| GET /parties | receipt:adjust; bounded debtor lookup |
+| GET /parties/:customerId/account | customer:read |
+| GET /parties/:customerId/documents | receipt:adjust; pageSize ≤ 100 |
+| GET /parties/:customerId/adjustments | receipt:adjust; latest 20 |
+| POST /adjustments/fifo-preview | receipt:adjust |
+| POST /adjustments | receipt:adjust |
+| POST /adjustments/:id/reverse | Admin/SuperAdmin + receipt:adjust:reverse |
+| POST /opening-balances | Admin/SuperAdmin + party:opening:create |
+
+Branch users can only access their own branch and parties registered there. Admin/SuperAdmin can read all branches or select one; saves always name a branch and every selected document must belong to it. Default adjustment grants go to Admin, Accountant and BillingOfficer; reversal/opening grants go only to Admin (SuperAdmin bypass applies). Accountant also receives customer:read to use the Account tab. Refresh staff sessions after migration so new permission grants are reflected.
+
+### Phase 2 deployment and reconciliation
+
+1. Pause financial writes and take a database backup/snapshot. Run server/prisma/party-adjustment-preflight.sql on that snapshot. Review invalid currency, active advances, wallet credits/debits, approved credit applications and their matching legacy Payments. Invalid wallet/application currency aborts migration instead of silently losing value.
+2. Apply 20261008120000_party_adjustments with prisma migrate deploy and generate the client, then deploy this application version before resuming writes. Do not use schema push: SQL check constraints, triggers, the partial receipt-entry index and backfill marker are required.
+3. Positive legacy wallet balances become opening credits; negative balances become opening debits. Existing receipt advances remain their own independent credits. The expected available credit after cutover is the old positive wallet plus existing active receipt advances. Negative wallet obligations remain visible as debits. No net obligation is discarded.
+4. Already approved legacy applications become fully consumed opening credits plus dated batches/allocations, linked to their matching Credit Payment when identifiable. Current invoice outstanding is **not repaired** by this migration. Legacy approvals created before the phase 1 fix must be reconciled in phase 5 before reversal; balance bounds deliberately reject an inconsistent restoration. If a legacy batch is reversed, its linked compatibility Credit Payment is removed atomically to avoid leaving a false payment.
+5. Wallet opening dates use migration cutover time because original unspent-credit provenance is unavailable. Historical approval rows use decisionDate (createdAt fallback). Existing receipt allocations use receipt issuedAt; later edits/reversals now retain dates. Old deleted allocation versions cannot be reconstructed.
+6. The backfill marker, stable legacy IDs/keys, sequence seeding and guarded inserts make rerunning the migration idempotent. Review PARTY_CREDIT_MIGRATED audit totals, then compare receipt advances plus active credit-note remaining amounts with Customer.creditBalance. Test the migrated snapshot using TEST_DATABASE_URL before production cutover.
+
+New note amounts/batches use Decimal(18,2). Existing Float money columns are retained for compatibility and operated on through the Decimal-backed money helpers. Index comments explain party/date, branch/status, document-side/date and batch-history access paths. Historical as-on reports and their ledger link are phase 3; vendors remain outside scope.
+
+Accountant customer-directory access introduced for the Account tab is restricted to the assigned branch, including detail, document and history reads. Missing branch assignment and global duplicate lookup are rejected for this role. Existing directory privileges for other roles are unchanged; finance account/adjustment endpoints independently enforce the finance branch policy.

@@ -382,7 +382,7 @@ export class JobBillingService {
               where: { invoiceId: id, status: "ACTIVE" },
             }),
             transaction.receiptAllocation.count({
-              where: { invoiceId: id, receipt: { status: "ACTIVE" } },
+              where: { invoiceId: id, reversedAt: null },
             }),
           ]);
         if (paymentCount + legacyReceiptCount + allocationCount > 0) {

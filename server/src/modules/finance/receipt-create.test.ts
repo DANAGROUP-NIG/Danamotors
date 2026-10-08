@@ -1,5 +1,5 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
-  $transaction: jest.fn(), $queryRaw: jest.fn(),
+  $transaction: jest.fn(), $queryRaw: jest.fn(), auditLog: { create: jest.fn() },
   receipt: { findUnique: jest.fn(), create: jest.fn() },
   customer: { findUnique: jest.fn() }, branch: { findFirst: jest.fn() },
   invoice: { findMany: jest.fn(), update: jest.fn() }, documentSequence: { upsert: jest.fn() },

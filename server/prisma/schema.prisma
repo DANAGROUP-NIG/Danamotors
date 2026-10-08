@@ -8,6 +8,8 @@ datasource db {
 }
 
 model Branch {
+  partyNotes             PartyNote[]
+  partyAdjustmentBatches PartyAdjustmentBatch[]
   receipts Receipt[]
   id          String   @id @default(uuid())
   name        String   @unique
@@ -60,6 +62,9 @@ model Branch {
 // ============================================================
 
 model User {
+  createdPartyNotes              PartyNote[]            @relation("PartyNoteCreator")
+  partyAdjustmentBatches         PartyAdjustmentBatch[] @relation("PartyAdjustmentActor")
+  reversedPartyAdjustmentBatches PartyAdjustmentBatch[] @relation("PartyAdjustmentReverser")
   id           String  @id @default(uuid())
   email        String  @unique
   passwordHash String
@@ -243,7 +248,11 @@ model Customer {
   tallyPartyCode String?
   mergedIntoId   String?
 
-  creditBalance Float @default(0)
+  // Read-only compatibility cache, derived by financial-document triggers.
+  creditBalance     Float                  @default(0)
+  partyStatus       String                 @default("CUSTOMER")
+  partyNotes        PartyNote[]
+  adjustmentBatches PartyAdjustmentBatch[]
 
   branchId    String
   createdById String?
@@ -1285,17 +1294,89 @@ model Bank {
 }
 
 model ReceiptAllocation {
-  id        String   @id @default(uuid())
-  receiptId String
-  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  amount    Float
-  createdAt DateTime @default(now())
+  id           String                @id @default(uuid())
+  receiptId    String?
+  receipt      Receipt?              @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  invoiceId    String?
+  invoice      Invoice?              @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  debitNoteId  String?
+  debitNote    PartyNote?            @relation("DebitNoteAdjustments", fields: [debitNoteId], references: [id], onDelete: Restrict)
+  creditNoteId String?
+  creditNote   PartyNote?            @relation("CreditNoteAdjustments", fields: [creditNoteId], references: [id], onDelete: Restrict)
+  batchId      String?
+  batch        PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  amount       Float
+  adjustedAt   DateTime              @default(now())
+  reversedAt   DateTime?
+  createdAt    DateTime              @default(now())
 
-  @@unique([receiptId, invoiceId])
   @@index([invoiceId])
+  @@index([invoiceId, adjustedAt])
+  @@index([receiptId, adjustedAt])
+  @@index([debitNoteId, adjustedAt])
+  @@index([creditNoteId, adjustedAt])
+  @@index([batchId])
 }
+
+model PartyNote {
+  id                String              @id @default(uuid())
+  number            String
+  customerId        String
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId          String
+  branch            Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  direction         String
+  type              String              @default("OPENING")
+  date              DateTime
+  narration         String
+  amount            Decimal             @db.Decimal(18, 2)
+  remainingAmount   Decimal             @db.Decimal(18, 2)
+  status            String              @default("ACTIVE")
+  tallyVoucherNo    String?
+  tallyPostedAt     DateTime?
+  tallyExcluded     Boolean             @default(true)
+  createdById       String?
+  createdBy         User?               @relation("PartyNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  idempotencyKey    String?             @unique
+  requestHash       String?
+  legacyKey         String?             @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  debitAdjustments  ReceiptAllocation[] @relation("DebitNoteAdjustments")
+  creditAdjustments ReceiptAllocation[] @relation("CreditNoteAdjustments")
+
+  @@unique([direction, number])
+  @@index([customerId, direction, date])
+  @@index([branchId, status, date])
+}
+
+model PartyAdjustmentBatch {
+  id              String                     @id @default(uuid())
+  customerId      String
+  customer        Customer                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId        String
+  branch          Branch                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  date            DateTime
+  source          String
+  amount          Decimal                    @db.Decimal(18, 2)
+  actorId         String?
+  actor           User?                      @relation("PartyAdjustmentActor", fields: [actorId], references: [id], onDelete: SetNull)
+  idempotencyKey  String                     @unique
+  requestHash     String
+  tallyPostedAt   DateTime?
+  reversedAt      DateTime?
+  reversedById    String?
+  reversedBy      User?                      @relation("PartyAdjustmentReverser", fields: [reversedById], references: [id], onDelete: SetNull)
+  reverseRemark   String?
+  legacyPaymentId String?                    @unique
+  createdAt       DateTime                   @default(now())
+  allocations     ReceiptAllocation[]
+  application     CustomerCreditApplication?
+
+  @@index([customerId, date])
+  @@index([branchId, date])
+}
+
 
 model ReceiptEditLog {
   id           String   @id @default(uuid())
@@ -1383,6 +1464,8 @@ model CustomerCreditTransaction {
 }
 
 model CustomerCreditApplication {
+  batchId String?               @unique
+  batch   PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
 
   customerId String

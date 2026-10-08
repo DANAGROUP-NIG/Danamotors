@@ -94,7 +94,7 @@ router.use(authMiddleware);
  *     tags:
  *       - Credit
  *     summary: Get customer's current credit account
- *     description: Returns the customer's credit limit, balance, and aging analysis.
+ *     description: Returns the derived customer.creditBalance (active receipt advances plus unadjusted credit notes/opening credits) and historical compatibility transactions. This is not a separately editable wallet.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -114,10 +114,17 @@ router.use(authMiddleware);
  *                 data:
  *                   type: object
  *                   properties:
- *                     creditLimit: { type: number }
- *                     usedCredit: { type: number }
- *                     availableCredit: { type: number }
- *                     overdueAmount: { type: number }
+ *                     credit:
+ *                       type: object
+ *                       properties:
+ *                         customer:
+ *                           type: object
+ *                           properties:
+ *                             id: { type: string, format: uuid }
+ *                             creditBalance: { type: number, readOnly: true }
+ *                         transactions:
+ *                           type: array
+ *                           items: { type: object, description: Historical compatibility credit transaction }
  *       404:
  *         description: No credit account found for this customer
  *         content:
@@ -127,8 +134,9 @@ router.use(authMiddleware);
  *   post:
  *     tags:
  *       - Credit
- *     summary: Adjust customer credit account
- *     description: Update the credit limit or record a credit adjustment for a customer.
+ *     summary: Deprecated manual wallet adjustment (disabled)
+ *     deprecated: true
+ *     description: Credit is derived from receipts and notes. This endpoint returns 400 without financial writes; use receipt capture or an Admin opening balance.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -148,8 +156,8 @@ router.use(authMiddleware);
  *               amount: { type: number, example: 50000 }
  *               reason: { type: string }
  *     responses:
- *       200:
- *         description: Credit adjusted
+ *       400:
+ *         description: Manual wallet writes are disabled
  *         content:
  *           application/json:
  *             schema:

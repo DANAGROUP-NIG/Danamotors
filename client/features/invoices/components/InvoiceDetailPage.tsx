@@ -23,7 +23,7 @@ export function InvoiceDetailPage() {
   if (isError || !invoice) return <div className="p-8 text-center"><p role="alert" className="text-sm text-destructive">Bill could not be loaded.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button></div>;
 
   const cancelled = invoice.status.toLowerCase() === "cancelled";
-  const activeAllocations = invoice.allocations.filter((allocation) => allocation.receipt.status !== "CANCELLED");
+  const activeAllocations = invoice.allocations.filter((allocation) => !allocation.reversedAt && allocation.receipt?.status !== "CANCELLED" && allocation.creditNote?.status !== "CANCELLED");
   const paidAmount = Math.max(invoice.total - invoice.outstandingAmount, 0);
 
   return (
@@ -66,7 +66,7 @@ export function InvoiceDetailPage() {
 
       <section className="grid gap-3 border-t pt-4">
         <h2 className="font-semibold">Receipts allocated</h2>
-        {activeAllocations.length === 0 ? <p className="text-sm text-muted-foreground">No receipts have been allocated.</p> : activeAllocations.map((allocation) => <div key={allocation.id} className="flex flex-wrap justify-between gap-2 text-sm"><span>{allocation.receipt.receiptNumber ?? "Receipt"} · {allocation.receipt.mode ?? ""} · {new Date(allocation.receipt.issuedAt).toLocaleDateString("en-NG")}</span><span>{currency.format(allocation.amount)}</span></div>)}
+        {activeAllocations.length === 0 ? <p className="text-sm text-muted-foreground">No credits have been applied.</p> : activeAllocations.map((allocation) => <div key={allocation.id} className="flex flex-wrap justify-between gap-2 text-sm"><span>{allocation.receipt?.receiptNumber ?? allocation.creditNote?.number ?? "Credit"} · {allocation.receipt?.mode ?? allocation.creditNote?.status ?? ""} · {new Date(allocation.receipt?.issuedAt ?? allocation.creditNote?.date ?? invoice.issuedDate).toLocaleDateString("en-NG")}</span><span>{currency.format(allocation.amount)}</span></div>)}
       </section>
 
       {invoice.tallyPostedAt && <p className="border-t pt-4 text-sm text-muted-foreground">Posted to Tally as {invoice.tallyVoucherNo ?? "voucher"} on {new Date(invoice.tallyPostedAt).toLocaleString("en-NG")}.</p>}

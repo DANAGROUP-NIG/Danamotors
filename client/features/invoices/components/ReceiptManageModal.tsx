@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ModalFame from "@/components/modals/ModalFame";
+import { creditKeys } from "@/features/credit/api/credit.keys";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { cancelReceiptRequest, updateReceiptRequest, type ReceiptRegisterRow } from "../api/invoice.api";
@@ -23,6 +24,9 @@ export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { r
   }, [receipt]);
 
   const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["party-account", receipt?.customer.id] });
+    if (receipt) queryClient.invalidateQueries({ queryKey: creditKeys.customer(receipt.customer.id) });
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["receipt-register"] });
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   };

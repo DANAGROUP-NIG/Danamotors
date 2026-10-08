@@ -7,6 +7,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { VehicleService } from "../vehicle/vehicle.service";
 import { ServiceService } from "../service/service.service";
 import { CreditService } from "../credit/credit.service";
+import { availablePartyCredit } from "../finance/party-account.service";
 import { coverageFor, vehicleWarrantySelect } from "../warranty/warranty.coverage";
 
 export class PortalService {
@@ -34,7 +35,7 @@ export class PortalService {
       postalCode: customer.postalCode,
       country: customer.country,
       preferredContactMethod: customer.preferredContactMethod,
-      creditBalance: customer.creditBalance,
+      creditBalance: await availablePartyCredit(prisma, customerId),
       branch: customer.branch,
       createdAt: customer.createdAt,
     };
@@ -142,8 +143,8 @@ export class PortalService {
         },
       }),
       prisma.invoice.aggregate({
-        where: { customerId, status: { in: ["Unpaid", "Partially Paid"] } },
-        _sum: { total: true },
+        where: { customerId, status: { notIn: ["Cancelled", "CANCELLED", "CANCELED", "VOID"] } },
+        _sum: { outstandingAmount: true },
       }),
       prisma.jobCard.findMany({
         where: { customerId },
@@ -182,10 +183,7 @@ export class PortalService {
           payments: true,
         },
       }),
-      prisma.customer.findUnique({
-        where: { id: customerId },
-        select: { creditBalance: true },
-      }),
+      availablePartyCredit(prisma, customerId),
       prisma.customerCreditApplication.count({
         where: { customerId, status: "Pending" },
       }),
@@ -196,8 +194,8 @@ export class PortalService {
       activeJobCount,
       completedJobCount,
       upcomingAppointments,
-      outstandingTotal: outstandingAgg._sum.total ?? 0,
-      creditBalance: creditAgg?.creditBalance ?? 0,
+      outstandingTotal: outstandingAgg._sum.outstandingAmount ?? 0,
+      creditBalance: creditAgg,
       pendingCreditCount,
       recentJobCards,
       recentInvoices,

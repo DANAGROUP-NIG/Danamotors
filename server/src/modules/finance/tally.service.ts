@@ -228,7 +228,7 @@ export class TallyService {
         } else {
           const receipt = await transaction.receipt.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } }, allocations: { include: { invoice: { select: { invoiceNumber: true } } } } },
+            include: { customer: { include: { tallyLedger: true } }, allocations: { where: { reversedAt: null }, include: { invoice: { select: { invoiceNumber: true } }, debitNote: { select: { number: true } } } } },
           });
           if (!receipt || receipt.status !== 'ACTIVE' || receipt.tallyPostedAt) {
             skipped.push({ ...selected, reason: 'Receipt is missing or cancelled' });
@@ -247,7 +247,7 @@ export class TallyService {
           }
           const entries: LedgerEntry[] = [
             { name: accountName, amount: receipt.amount },
-            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount, bills: [...receipt.allocations.map((allocation) => ({ name: allocation.invoice.invoiceNumber, type: 'Agst Ref' as const, amount: -money(allocation.amount) })), ...(receipt.advanceAmount > 0 ? [{ name: receipt.receiptNumber, type: 'Advance' as const, amount: -receipt.advanceAmount }] : [])] },
+            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount, bills: [...receipt.allocations.map((allocation) => ({ name: allocation.invoice?.invoiceNumber ?? allocation.debitNote?.number ?? receipt.receiptNumber, type: 'Agst Ref' as const, amount: -money(allocation.amount) })), ...(receipt.advanceAmount > 0 ? [{ name: receipt.receiptNumber, type: 'Advance' as const, amount: -receipt.advanceAmount }] : [])] },
           ];
           payload = generateTallyVoucherXml({ type: selected.type, number: receipt.receiptNumber, id: receipt.id, date: receipt.issuedAt, party: receipt.customer.tallyLedger.name, entries });
         }

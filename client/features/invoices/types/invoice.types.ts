@@ -46,7 +46,9 @@ export type InvoiceLine = {
 export type InvoiceReceiptAllocation = {
   id: string;
   amount: number;
-  receipt: InvoiceReceipt;
+  receipt: InvoiceReceipt | null;
+  creditNote?: { number: string; date: string; status: string } | null;
+  reversedAt?: string | null;
 };
 
 export type Invoice = {
