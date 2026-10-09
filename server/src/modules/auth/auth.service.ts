@@ -11,7 +11,6 @@ import {
 } from "../../shared/errors/appError";
 import { LoginResponse } from "./auth.types";
 import { ROLES } from "../../shared/constants/roles";
-import { JWTPayload } from "@/shared/types";
 
 // Roles users are allowed to request during public self-registration.
 // Privileged roles (admins, managers, accountants) must be assigned by an
@@ -32,11 +31,11 @@ export class AuthService {
     this.authRepository = new AuthRepository();
   }
 
+  // Permissions are not embedded — see loadStaffUser in authMiddleware.
   private generateAccessToken(payload: {
     userId: string;
     email: string;
     role: string;
-    permissions: string[];
     branchId?: string | null;
   }): string {
     return jwt.sign(payload, config.JWT_SECRET, {
@@ -146,11 +145,10 @@ export class AuthService {
 
     const permissions = newUser.role.permissions.map((p) => p.permission.name);
 
-    const jwtPayload: JWTPayload = {
+    const jwtPayload = {
       userId: newUser.id,
       email: newUser.email,
       role: newUser.role.name,
-      permissions,
       branchId: newUser.branchId ?? null,
     };
 
@@ -216,7 +214,6 @@ export class AuthService {
         userId: user.id,
         email: user.email,
         role: user.role.name,
-        permissions,
         branchId: user.branchId ?? null,
       };
 
@@ -365,7 +362,6 @@ export class AuthService {
     }
 
     const user = dbToken.user;
-    const permissions = user.role.permissions.map((p) => p.permission.name);
 
     if (!user.isActive) {
       await this.authRepository.deleteRefreshToken(tokenHash);
@@ -376,7 +372,6 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       role: user.role.name,
-      permissions,
       branchId: user.branchId ?? null,
     };
 
