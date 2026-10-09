@@ -123,11 +123,11 @@ export class PartyAccountService {
   }
 
   async fundingCredits(transaction: Prisma.TransactionClient, customerId: string, branchId: string, date: Date) {
-    return transaction.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT * FROM (${documentQuery(customerId,branchId,'CREDIT')}) d WHERE balance > 0 AND date <= ${date} ORDER BY date,number,id LIMIT 200`);
+    return transaction.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT * FROM (${documentQuery(customerId,branchId,'CREDIT')}) d WHERE balance > 0 AND d.date::date <= ${date}::date ORDER BY date,number,id LIMIT 200`);
   }
 
   async fifo(customerId: string, branchId: string, date: Date) {
-    const read = (side: 'DEBIT' | 'CREDIT') => prisma.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT * FROM (${documentQuery(customerId, branchId, side)}) d WHERE balance > 0 AND date <= ${date} ORDER BY date,number,id LIMIT 200`);
+    const read = (side: 'DEBIT' | 'CREDIT') => prisma.$queryRaw<PartyDocument[]>(Prisma.sql`SELECT * FROM (${documentQuery(customerId, branchId, side)}) d WHERE balance > 0 AND d.date::date <= ${date}::date ORDER BY date,number,id LIMIT 200`);
     const [debitDocuments, creditDocuments] = await Promise.all([read('DEBIT'), read('CREDIT')]);
     return { ...fifoAdjustments(debitDocuments, creditDocuments), debitDocuments, creditDocuments, limit: 200 };
   }
@@ -158,8 +158,32 @@ export class PartyAccountService {
     ]);
     validateAdjustmentSelections(input.debits,debits);
     validateAdjustmentSelections(input.credits,credits);
-    if ([...debits,...credits].some(document => document.date > date)) throw new BadRequestError('Adjustment date cannot precede a selected document');
-    if ([...debits,...credits].some(document => document.latestActivityAt && document.latestActivityAt > date)) throw new BadRequestError('Adjustment date cannot precede the latest balance change on a selected document');
+
+    // The UI captures an adjustment *date* (not a timestamp), and our stored document
+    // timestamps come from a mix of app-generated ISO strings and DB-generated defaults.
+    // When Postgres timestamps are stored without timezone, comparing full timestamps can
+    // reject valid same-day adjustments (e.g. when a document appears "later" due to TZ).
+    // Compare on calendar-day boundaries (UTC) to match the frontend semantics.
+    const utcDay = (value: Date | string | null | undefined) => {
+      if (!value) return null;
+      const parsed = value instanceof Date ? value : new Date(value);
+      return Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+    };
+    const adjustmentDay = utcDay(date)!;
+
+    if ([...debits, ...credits].some(document => {
+      const documentDay = utcDay(document.date);
+      return documentDay !== null && documentDay > adjustmentDay;
+    })) {
+      throw new BadRequestError('Adjustment date cannot precede a selected document');
+    }
+
+    if ([...debits, ...credits].some(document => {
+      const activityDay = utcDay(document.latestActivityAt);
+      return activityDay !== null && activityDay > adjustmentDay;
+    })) {
+      throw new BadRequestError('Adjustment date cannot precede the latest balance change on a selected document');
+    }
     const pairs = pairAdjustments(input.debits,input.credits);
     const batch = await transaction.partyAdjustmentBatch.create({ data: { customerId: input.customerId, branchId: input.branchId, date, source: input.source, amount: new Prisma.Decimal(sumMoney(input.debits.map(line => line.amount))), actorId, idempotencyKey: input.idempotencyKey, requestHash } });
     await transaction.receiptAllocation.createMany({ data: pairs.map(pair => ({

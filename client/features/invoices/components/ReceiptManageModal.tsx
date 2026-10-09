@@ -28,6 +28,7 @@ export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { r
     if (receipt) queryClient.invalidateQueries({ queryKey: creditKeys.customer(receipt.customer.id) });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["receipt-register"] });
+    queryClient.invalidateQueries({ queryKey: ["payments"] });
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   };
   const update = useMutation({
