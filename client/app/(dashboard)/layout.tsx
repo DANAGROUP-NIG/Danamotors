@@ -48,7 +48,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/receipts/credit-notes": ["creditnote:read", "creditnote:create"],
   "/finance/receipts/advance-adjustment": ["receipt:adjust"],
   "/finance/tally": ["tally:post", "tally:import"],
-  "/finance": ["invoice:read", "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create"],
+  "/finance": ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
   "/credit-applications": ["credit:application:create"],
   "/reports/finance/debit-note-register": ["report:debit-note-register"],
   "/reports/finance/credit-note-register": ["report:credit-note-register"],

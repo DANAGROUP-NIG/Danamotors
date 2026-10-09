@@ -125,6 +125,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     permissions: [
+      "invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create","financereport:read","report:receipt-register","report:party-ledger","report:party-outstanding","report:party-outstanding-age","report:party-outstanding-bill","report:debit-note-register","report:credit-note-register",
       "outstanding:recalculate", "letter:outstanding",
       "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create", "report:debit-note-register", "report:credit-note-register",
       "invoice:read",
@@ -178,25 +179,45 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        permissions: ["invoice:read", "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create"],
-      },
-      {
-        label: "Update Outstanding",
-        href: "/finance/receipts/update-outstanding",
-        icon: Wallet,
-        permissions: ["outstanding:recalculate"],
-      },
-      {
-        label: "Outstanding Letters",
-        href: "/finance/receipts/outstanding-letters",
-        icon: Wallet,
-        permissions: ["letter:outstanding"],
-      },
-      {
-        label: "Advance Adjustment",
-        href: "/finance/receipts/advance-adjustment",
-        icon: Wallet,
-        permissions: ["receipt:adjust"],
+        permissions: ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
+        children: [
+          {
+            label: "Overview",
+            href: "/finance",
+            icon: BarChart2,
+            permissions: ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
+          },
+          {
+            label: "Debit Notes",
+            href: "/finance/receipts/debit-notes",
+            icon: ReceiptText,
+            permissions: ["debitnote:read", "debitnote:create"],
+          },
+          {
+            label: "Credit Notes",
+            href: "/finance/receipts/credit-notes",
+            icon: ReceiptText,
+            permissions: ["creditnote:read", "creditnote:create"],
+          },
+          {
+            label: "Update Outstanding",
+            href: "/finance/receipts/update-outstanding",
+            icon: Wallet,
+            permissions: ["outstanding:recalculate"],
+          },
+          {
+            label: "Outstanding Letters",
+            href: "/finance/receipts/outstanding-letters",
+            icon: Wallet,
+            permissions: ["letter:outstanding"],
+          },
+          {
+            label: "Advance Adjustment",
+            href: "/finance/receipts/advance-adjustment",
+            icon: Wallet,
+            permissions: ["receipt:adjust"],
+          },
+        ],
       },
       {
         label: "Tally",
