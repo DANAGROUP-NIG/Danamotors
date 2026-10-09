@@ -15,6 +15,7 @@ export function useCreateReceipt() {
       queryClient.invalidateQueries({ queryKey: ["party-account", payload.customerId] });
       queryClient.invalidateQueries({ queryKey: creditKeys.customer(payload.customerId) });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
       toast.success("Payment receipt created");
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
       queryClient.invalidateQueries({ queryKey: ["receipt-invoice"] });
