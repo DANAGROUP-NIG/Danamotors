@@ -40,7 +40,7 @@ export function EditInvoiceModal({ isOpen, onClose, invoice }: EditInvoiceModalP
   useEffect(() => {
     if (isOpen) {
       reset({
-        dueDate: invoice.dueDate ? invoice.dueDate.slice(0, 10) : "",
+        dueDate: invoice.dueDate ? new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(invoice.dueDate)) : "",
         notes: invoice.notes ?? "",
       });
     }
@@ -51,7 +51,7 @@ export function EditInvoiceModal({ isOpen, onClose, invoice }: EditInvoiceModalP
       {
         id: invoice.id,
         payload: {
-          dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
+          dueDate: values.dueDate ? new Date(values.dueDate + "T00:00:00+01:00").toISOString() : undefined,
           notes: values.notes || undefined,
         },
       },

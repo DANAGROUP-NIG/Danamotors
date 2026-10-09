@@ -60,6 +60,7 @@ function formatCurrency(amount: number) {
 function formatDate(dateStr?: string) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-NG", {
+    timeZone: "Africa/Lagos",
     day: "2-digit",
     month: "short",
     year: "numeric",

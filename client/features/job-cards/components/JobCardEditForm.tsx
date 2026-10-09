@@ -35,8 +35,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const [status, setStatus] = useState("");
   const [remarks, setRemarks] = useState("");
   const [observations, setObservations] = useState(jobCard.observations ?? "");
-  const [serviceTypeId, setServiceTypeId] = useState(jobCard.serviceTypeId ?? "");
-  const [couponNo, setCouponNo] = useState(jobCard.freeServiceCouponNo ?? "");
   const [workDone, setWorkDone] = useState(jobCard.workDone ?? "");
   const [advisor, setAdvisor] = useState(jobCard.serviceAdvisorId ?? "");
   const [reasons, setReasons] = useState<string[]>([]);
@@ -71,8 +69,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           ? {}
           : {
               ...(Number(serviceCharge) !== (jobCard.serviceCharge ?? 0) ? { serviceCharge: Number(serviceCharge) } : {}),
-              ...(serviceTypeId !== (jobCard.serviceTypeId ?? "") ? { serviceTypeId: serviceTypeId || null } : {}),
-              ...(couponNo.trim() !== (jobCard.freeServiceCouponNo ?? "") ? { freeServiceCouponNo: couponNo.trim() || null } : {}),
               observations,
               workDone,
             }),
@@ -137,10 +133,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       </ol>
       {!billed && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <WorkshopPicker label="Service type" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={serviceTypeId} onChange={setServiceTypeId} />
-            <Field label="Free service coupon no"><input className={inputCls} maxLength={50} value={couponNo} onChange={(event) => setCouponNo(event.target.value)} /></Field>
-          </div>
           <Field label="Service charge (NGN)"><input type="number" min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
           <Field label="Observations">
             <textarea

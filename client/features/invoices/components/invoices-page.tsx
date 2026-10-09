@@ -35,9 +35,9 @@ function invoiceToExportable(
     customerName: `${inv.customer.firstName} ${inv.customer.lastName}`,
     jobCardNumber: inv.jobCard?.jobNumber ?? "",
     issuedDate: inv.issuedDate
-      ? new Date(inv.issuedDate).toLocaleDateString("en-NG")
+      ? new Date(inv.issuedDate).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })
       : "",
-    dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-NG") : "",
+    dueDate: inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" }) : "",
     subtotal: inv.subtotal,
     tax: inv.tax,
     total: inv.total,

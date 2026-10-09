@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { ANY_REPORT_PERMISSION, CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -125,6 +125,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     permissions: [
+      "outstanding:recalculate", "letter:outstanding",
+      "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create", "report:debit-note-register", "report:credit-note-register",
       "invoice:read",
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
@@ -176,7 +178,25 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        permissions: ["invoice:read"],
+        permissions: ["invoice:read", "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create"],
+      },
+      {
+        label: "Update Outstanding",
+        href: "/finance/receipts/update-outstanding",
+        icon: Wallet,
+        permissions: ["outstanding:recalculate"],
+      },
+      {
+        label: "Outstanding Letters",
+        href: "/finance/receipts/outstanding-letters",
+        icon: Wallet,
+        permissions: ["letter:outstanding"],
+      },
+      {
+        label: "Advance Adjustment",
+        href: "/finance/receipts/advance-adjustment",
+        icon: Wallet,
+        permissions: ["receipt:adjust"],
       },
       {
         label: "Tally",
@@ -212,7 +232,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ANY_REPORT_PERMISSION,
+        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
       },
     ],
   },

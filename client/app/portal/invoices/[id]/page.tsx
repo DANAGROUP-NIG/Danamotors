@@ -89,6 +89,7 @@ export default function PortalInvoiceDetailPage() {
                 <dd className="mt-1 font-medium">{formatDate(invoice.dueDate)}</dd>
               </div>
             </dl>
+            <div className="mt-4 flex flex-wrap gap-6 text-sm"><span>Paid: <strong>{formatCurrency(Math.max(invoice.total - invoice.outstandingAmount, 0))}</strong></span><span>Outstanding: <strong>{formatCurrency(invoice.outstandingAmount)}</strong></span></div>
             {invoice.notes && (
               <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {invoice.notes}
@@ -117,6 +118,8 @@ export default function PortalInvoiceDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {!!invoice.allocations?.length && <Card><CardHeader><CardTitle>Applied receipts and credits</CardTitle></CardHeader><CardContent><SimpleTable headers={["Document", "Applied amount", "Date"]} rows={invoice.allocations.filter(row => row.receipt?.status !== "CANCELLED" && row.creditNote?.status !== "CANCELLED").map(row => [row.receipt?.receiptNumber ?? row.creditNote?.number ?? "Credit", formatCurrency(row.amount), formatDate(row.adjustedAt)])} /></CardContent></Card>}
 
       {invoice.receipts && invoice.receipts.length > 0 && (
         <Card>

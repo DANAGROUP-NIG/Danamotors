@@ -154,6 +154,19 @@ integration("Workshop database flow", () => {
               callback: (client: Prisma.TransactionClient) => Promise<unknown>,
             ) => callback(tx)) as typeof prisma.$transaction);
 
+          // Service preflight reads must see this rollback transaction's uncommitted fixtures.
+          const estimateReadSpy = jest.spyOn(prisma.estimate, "findUnique").mockImplementation(tx.estimate.findUnique.bind(tx.estimate) as typeof prisma.estimate.findUnique);
+
+          const sparePartReadSpy = jest.spyOn(prisma.sparePart, "findUnique").mockImplementation(tx.sparePart.findUnique.bind(tx.sparePart) as typeof prisma.sparePart.findUnique);
+          const userReadSpy = jest.spyOn(prisma.user, "findUnique").mockImplementation(tx.user.findUnique.bind(tx.user) as typeof prisma.user.findUnique);
+          const jobCardReadSpy = jest.spyOn(prisma.jobCard, "findUnique").mockImplementation(tx.jobCard.findUnique.bind(tx.jobCard) as typeof prisma.jobCard.findUnique);
+          const branchReadSpy = jest.spyOn(prisma.branch, "findUnique").mockImplementation(tx.branch.findUnique.bind(tx.branch) as typeof prisma.branch.findUnique);
+          const customerReadSpy = jest.spyOn(prisma.customer, "findUnique").mockImplementation(tx.customer.findUnique.bind(tx.customer) as typeof prisma.customer.findUnique);
+
+          const inventoryStockReadSpy = jest.spyOn(prisma.inventoryStock, "findUnique").mockImplementation(tx.inventoryStock.findUnique.bind(tx.inventoryStock) as typeof prisma.inventoryStock.findUnique);
+
+          const partIssuanceReadSpy = jest.spyOn(prisma.partIssuance, "findUnique").mockImplementation(tx.partIssuance.findUnique.bind(tx.partIssuance) as typeof prisma.partIssuance.findUnique);
+
           try {
             const jobs = new ServiceService();
 
@@ -183,7 +196,7 @@ integration("Workshop database flow", () => {
             expect(job.jobNumber).toMatch(/^\d{10}$/);
 
             const estimate = await jobs.addEstimate(job.id, { description: 'Approved scope', lines: [
-              { type: 'SERVICE', referenceId: catalogService.id, quantity: 1 },
+              { type: 'SERVICE', referenceId: serviceType.id, quantity: 1 },
               { type: 'PART', referenceId: part.id, quantity: 2 },
               { type: 'LABOUR', referenceId: operation.id, quantity: 1 },
             ] });
@@ -313,6 +326,14 @@ integration("Workshop database flow", () => {
               ).customerId,
             ).toBe(duplicate.id);
           } finally {
+            sparePartReadSpy.mockRestore();
+            userReadSpy.mockRestore();
+            jobCardReadSpy.mockRestore();
+            branchReadSpy.mockRestore();
+            customerReadSpy.mockRestore();
+            inventoryStockReadSpy.mockRestore();
+            partIssuanceReadSpy.mockRestore();
+            estimateReadSpy.mockRestore();
             transactionSpy.mockRestore();
           }
 

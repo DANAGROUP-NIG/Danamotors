@@ -82,7 +82,7 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
   const approve = async (jobCardId: string, scope: { type: "PART" | "LABOUR"; referenceId: string; quantity: number }[]) => {
     const estimate = await service.addEstimate(jobCardId, {
       description: "Approved scope",
-      lines: [{ type: "SERVICE", referenceId: catalogService.id, quantity: 1 }, ...scope],
+      lines: [{ type: "SERVICE", referenceId: serviceType.id, quantity: 1 }, ...scope],
     });
     await service.addApproval(estimate.id, { customerId: customer.id, approved: true });
   };

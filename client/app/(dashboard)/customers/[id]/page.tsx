@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { CustomerMergeCard } from "@/features/customers/components/CustomerMergeCard";
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 
 export default function CustomerDetailPage() {
+  const [tab, setTab] = useState<"profile" | "account">("profile");
   const { id } = useParams<{ id: string }>();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branchId = activeBranch?.id;
@@ -74,6 +76,11 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-6">
+      <nav aria-label="Customer tabs" className="flex gap-2 border-b pb-3">
+        <button type="button" aria-current={tab === "profile" ? "page" : undefined} className="rounded px-4 py-2 text-sm aria-[current=page]:bg-primary aria-[current=page]:text-white" onClick={() => setTab("profile")}>Profile</button>
+        <button type="button" aria-current={tab === "account" ? "page" : undefined} className="rounded px-4 py-2 text-sm aria-[current=page]:bg-primary aria-[current=page]:text-white" onClick={() => setTab("account")}>Account</button>
+      </nav>
+      {tab === "account" ? <CustomerCreditCard customer={customer} /> : <>
       <CustomerMergeCard customer={customer} />
       <Link
         href="/customers"
@@ -114,7 +121,6 @@ export default function CustomerDetailPage() {
 
       <CustomerPortalAccessCard customer={customer} />
 
-      <CustomerCreditCard customer={customer} />
 
       <CustomerTallyLedgerCard customer={customer} />
 
@@ -345,6 +351,7 @@ export default function CustomerDetailPage() {
           </div>
         )}
       </Section>
+      </>}
     </div>
   );
 }

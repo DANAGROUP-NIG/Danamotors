@@ -34,7 +34,7 @@ export class FinanceRepository {
         payments: true,
         receipts: true,
         lines: true,
-        allocations: { include: { receipt: true } },
+        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { issuedDate: 'desc' },
@@ -60,7 +60,7 @@ export class FinanceRepository {
         payments: true,
         receipts: true,
         lines: true,
-        allocations: { include: { receipt: true } },
+        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
       },
     });
