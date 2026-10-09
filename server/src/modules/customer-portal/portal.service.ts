@@ -7,6 +7,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { VehicleService } from "../vehicle/vehicle.service";
 import { ServiceService } from "../service/service.service";
 import { CreditService } from "../credit/credit.service";
+import { availablePartyCredit } from "../finance/party-account.service";
 import { coverageFor, vehicleWarrantySelect } from "../warranty/warranty.coverage";
 
 export class PortalService {
@@ -34,7 +35,7 @@ export class PortalService {
       postalCode: customer.postalCode,
       country: customer.country,
       preferredContactMethod: customer.preferredContactMethod,
-      creditBalance: customer.creditBalance,
+      creditBalance: await availablePartyCredit(prisma, customerId),
       branch: customer.branch,
       createdAt: customer.createdAt,
     };
@@ -142,8 +143,8 @@ export class PortalService {
         },
       }),
       prisma.invoice.aggregate({
-        where: { customerId, status: { in: ["Unpaid", "Partially Paid"] } },
-        _sum: { total: true },
+        where: { customerId, status: { notIn: ["Cancelled", "CANCELLED", "CANCELED", "VOID"] } },
+        _sum: { outstandingAmount: true },
       }),
       prisma.jobCard.findMany({
         where: { customerId },
@@ -182,10 +183,7 @@ export class PortalService {
           payments: true,
         },
       }),
-      prisma.customer.findUnique({
-        where: { id: customerId },
-        select: { creditBalance: true },
-      }),
+      availablePartyCredit(prisma, customerId),
       prisma.customerCreditApplication.count({
         where: { customerId, status: "Pending" },
       }),
@@ -196,8 +194,8 @@ export class PortalService {
       activeJobCount,
       completedJobCount,
       upcomingAppointments,
-      outstandingTotal: outstandingAgg._sum.total ?? 0,
-      creditBalance: creditAgg?.creditBalance ?? 0,
+      outstandingTotal: outstandingAgg._sum.outstandingAmount ?? 0,
+      creditBalance: creditAgg,
       pendingCreditCount,
       recentJobCards,
       recentInvoices,
@@ -428,9 +426,7 @@ export class PortalService {
       },
     });
 
-    const ownerId = estimate?.jobCard?.customerId ?? estimate?.customerId;
-    const branchId = estimate?.jobCard?.branchId ?? estimate?.branchId;
-    if (!estimate || ownerId !== customerId || !branchId) {
+    if (!estimate || estimate.jobCard.customerId !== customerId) {
       throw new NotFoundError("Estimate not found");
     }
 
@@ -441,20 +437,18 @@ export class PortalService {
     const notificationService = new NotificationService();
     await notificationService.notifyRole(
       ROLES.SERVICE_ADVISOR,
-      branchId,
+      estimate.jobCard.branchId,
       {
         type: "ESTIMATE_DECISION",
         title: data.approved ? "Estimate approved" : "Estimate rejected",
-        message: estimate.jobCard
-          ? `Customer ${data.approved ? "approved" : "rejected"} the estimate on job card ${estimate.jobCard.jobNumber}.`
-          : `Customer ${data.approved ? "approved" : "rejected"} estimate ${estimate.estimateNumber ?? ""}.`,
-        link: estimate.jobCard ? `/job-cards/${estimate.jobCard.id}` : "/quotations",
+        message: `Customer ${data.approved ? "approved" : "rejected"} the estimate on job card ${estimate.jobCard.jobNumber}.`,
+        link: `/job-cards/${estimate.jobCard.id}`,
       },
     );
 
     return {
       estimateId,
-      jobCardId: estimate.jobCard?.id ?? null,
+      jobCardId: estimate.jobCard.id,
       status,
       decisionDate,
     };

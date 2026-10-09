@@ -8,6 +8,9 @@ datasource db {
 }
 
 model Branch {
+  outstandingLetters OutstandingLetter[]
+  partyNotes             PartyNote[]
+  partyAdjustmentBatches PartyAdjustmentBatch[]
   receipts Receipt[]
   id          String   @id @default(uuid())
   name        String   @unique
@@ -53,7 +56,6 @@ model Branch {
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
-  estimates     Estimate[]
 }
 
 // ============================================================
@@ -61,6 +63,9 @@ model Branch {
 // ============================================================
 
 model User {
+  createdPartyNotes              PartyNote[]            @relation("PartyNoteCreator")
+  partyAdjustmentBatches         PartyAdjustmentBatch[] @relation("PartyAdjustmentActor")
+  reversedPartyAdjustmentBatches PartyAdjustmentBatch[] @relation("PartyAdjustmentReverser")
   id           String  @id @default(uuid())
   email        String  @unique
   passwordHash String
@@ -104,7 +109,6 @@ model User {
   recordedPayments       Payment[]         @relation("UserRecordedPayments")
   issuedReceipts         Receipt[]         @relation("UserIssuedReceipts")
   jobCardLabourLines     JobCardLabour[]
-  labourLineShares       JobCardLabourTechnician[] @relation("LabourLineTechnicians")
   serviceAdvisorInvoices Invoice[]         @relation("InvoiceServiceAdvisor")
   cancelledInvoices      Invoice[]         @relation("InvoiceCancelledBy")
   tallyPostedInvoices    Invoice[]         @relation("InvoiceTallyPostedBy")
@@ -209,6 +213,7 @@ model AuditLog {
 // ============================================================
 
 model Customer {
+  outstandingLetters OutstandingLetter[]
   id                     String    @id @default(uuid())
   firstName              String
   lastName               String
@@ -245,7 +250,12 @@ model Customer {
   tallyPartyCode String?
   mergedIntoId   String?
 
-  creditBalance Float @default(0)
+  // Read-only compatibility cache, derived by financial-document triggers.
+  creditBalance     Float                  @default(0)
+  creditDays        Int?
+  partyStatus       String                 @default("CUSTOMER")
+  partyNotes        PartyNote[]
+  adjustmentBatches PartyAdjustmentBatch[]
 
   branchId    String
   createdById String?
@@ -273,9 +283,9 @@ model Customer {
   creditApplications CustomerCreditApplication[]
 
   warrantyCases WarrantyCase[]
-  estimates     Estimate[]
 
   @@index([branchId])
+  @@index([branchId, partyStatus, code])
   @@index([phoneNumber])
   @@index([mergedIntoId])
 }
@@ -354,17 +364,6 @@ model ServiceAppointment {
   status String @default("Pending")
   source String @default("WalkIn")
 
-  // Booking number (BKYYYY######) shown on the service booking report.
-  bookingNumber String?              @unique
-  // The workshop service type (SERVICE_TYPE master) the vehicle is booked for.
-  serviceTypeId String?
-  serviceType   WorkshopMaster?      @relation("AppointmentServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
-  // Odometer reading given at booking (or recorded at check-in).
-  mileage       Int?
-  // Reporting status, kept in step with `status` and job opening.
-  bookingStatus BookingStatus        @default(BOOKED)
-  requests      AppointmentRequest[]
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -377,32 +376,6 @@ model ServiceAppointment {
   @@index([branchId])
   @@index([customerId])
   @@index([vehicleId])
-  @@index([branchId, scheduledAt])
-  @@index([serviceTypeId])
-}
-
-enum BookingStatus {
-  BOOKED
-  // A job card was opened from the booking.
-  CONVERTED
-  CANCELLED
-  NO_SHOW
-}
-
-/// What the customer asked for when booking (legacy booking request grid).
-model AppointmentRequest {
-  id              String             @id @default(uuid())
-  appointmentId   String
-  appointment     ServiceAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  complaintCodeId String?
-  complaintCode   WorkshopMaster?    @relation("AppointmentRequestComplaint", fields: [complaintCodeId], references: [id], onDelete: Restrict)
-  description     String
-  estimatedParts  Float              @default(0)
-  estimatedLabour Float              @default(0)
-  estimatedOil    Float              @default(0)
-  createdAt       DateTime           @default(now())
-
-  @@index([appointmentId])
 }
 
 // ============================================================
@@ -453,8 +426,6 @@ model JobCard {
   deliveredAt        DateTime?
   gatePassNumber     String?                @unique
   lateReasonIds      String[]               @default([])
-  // Coupon from the free service booklet (free service jobs).
-  freeServiceCouponNo String?
   creditApprovedById String?
   creditApprovedBy   User?                  @relation("JobCreditApprover", fields: [creditApprovedById], references: [id], onDelete: Restrict)
   complaints         JobComplaint[]
@@ -508,8 +479,7 @@ model JobCard {
   updatedAt DateTime @updatedAt
 
   inspections   Inspection[]
-  estimates     Estimate[]     @relation("JobCardEstimates")
-  openedFromEstimates Estimate[] @relation("EstimateOpenedJob")
+  estimates     Estimate[]
   partIssuances PartIssuance[]
   invoices      Invoice[]
   labourLines   JobCardLabour[]
@@ -527,8 +497,6 @@ model JobCard {
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
   @@index([appointmentId])
-  @@index([branchId, createdAt])
-  @@index([branchId, promisedAt])
   @@index([createdAt, id])
   @@index([branchId, createdAt, id])
   @@index([branchId, status, createdAt, id])
@@ -565,36 +533,13 @@ model Inspection {
 model Estimate {
   id String @id @default(uuid())
 
-  // Set for a revision of a job card's scope. Null for an estimate prepared before a job
-  // exists (the legacy estimate register); see openedJobCardId for the job opened from it.
-  jobCardId String?
-  jobCard   JobCard? @relation("JobCardEstimates", fields: [jobCardId], references: [id], onDelete: Cascade)
+  jobCardId String
+  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
 
-  // Who and what the estimate is for (copied from the job card for revisions).
-  branchId   String?
-  branch     Branch?   @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  vehicleId  String?
-  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-
-  // Estimate number (YYYY######) and date, shown on the job estimate register.
-  estimateNumber String?   @unique
-  estimateDate   DateTime?
-
-  description    String
-  amount         Float
-  discountAmount Float  @default(0)
-  currency       String @default("NGN")
-  // Customer decision: Pending, Approved, Declined.
-  status         String @default("Pending")
-
-  estimateStatus EstimateStatus       @default(PENDING_APPROVAL)
-  closedReason   EstimateCloseReason?
-
-  // The job card opened from a pre-job estimate.
-  openedJobCardId String?
-  openedJobCard   JobCard? @relation("EstimateOpenedJob", fields: [openedJobCardId], references: [id], onDelete: SetNull)
+  description String
+  amount      Float
+  currency    String @default("USD")
+  status      String @default("Pending")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -603,25 +548,6 @@ model Estimate {
   approvals CustomerApproval[]
 
   @@index([jobCardId])
-  @@index([branchId, estimateDate])
-  @@index([vehicleId])
-  @@index([openedJobCardId])
-}
-
-enum EstimateStatus {
-  // Approved (or not needing approval) and still open.
-  ACTIVE
-  PENDING_APPROVAL
-  CLOSED
-}
-
-enum EstimateCloseReason {
-  // A job card was opened from it (or it was approved as a job card's scope).
-  CONVERTED
-  DECLINED
-  CANCELLED
-  // A later revision of the same job card replaced it.
-  SUPERSEDED
 }
 
 model CustomerApproval {
@@ -720,7 +646,6 @@ model Vehicle {
   jobCards         JobCard[]
   warrantyCases    WarrantyCase[]
   campaignVehicles CampaignVehicle[]
-  estimates        Estimate[]
 
   @@index([customerId])
   @@index([modelId])
@@ -1158,6 +1083,7 @@ model Invoice {
   jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
 
   invoiceNumber String @unique
+  reportBranchId String?
 
   issuedDate DateTime  @default(now())
   dueDate    DateTime?
@@ -1205,9 +1131,11 @@ model Invoice {
   creditApplications CustomerCreditApplication[]
 
 
+  @@index([dueDate, status])
   @@index([customerId])
   @@index([jobCardId])
-  @@index([issuedDate])
+  @@index([customerId, issuedDate])
+  @@index([reportBranchId, issuedDate])
 }
 
 model LabourItem {
@@ -1233,17 +1161,11 @@ model JobCardLabour {
   labourItemId String
   labourItem   LabourItem @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
   description  String
-  // Charged hours.
   hours        Float
-  // Standard (flat-rate) hours from the model labour rate or the labour item when the line was
-  // added; compared with charged hours for technician efficiency.
-  standardHours Float?
   rate         Float
   amount       Float
-  // First technician, kept for existing screens; all technicians are in `technicians`.
   technicianId String?
   technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
-  technicians  JobCardLabourTechnician[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -1254,22 +1176,6 @@ model JobCardLabour {
 
   @@index([jobCardId])
   @@index([labourItemId])
-}
-
-/// Technicians who worked a labour line (legacy labour slip: up to three). Without a recorded
-/// share the line's hours and amount are split evenly.
-model JobCardLabourTechnician {
-  id              String        @id @default(uuid())
-  jobCardLabourId String
-  jobCardLabour   JobCardLabour @relation(fields: [jobCardLabourId], references: [id], onDelete: Cascade)
-  technicianId    String
-  technician      User          @relation("LabourLineTechnicians", fields: [technicianId], references: [id], onDelete: Restrict)
-  // Percentage of the line credited to this technician; null = an even split.
-  sharePercent    Float?
-  createdAt       DateTime      @default(now())
-
-  @@unique([jobCardLabourId, technicianId])
-  @@index([technicianId])
 }
 
 model InvoiceLine {
@@ -1295,29 +1201,6 @@ model DocumentSequence {
   key       String   @id
   value     Int      @default(0)
   updatedAt DateTime @updatedAt
-}
-
-/// Odometer bands for the "vehicles visited, mileage wise" report (Settings → Reports).
-model MileageBand {
-  id        String   @id @default(uuid())
-  fromKm    Int
-  /// null = and above.
-  toKm      Int?
-  label     String
-  sortOrder Int      @default(0)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([sortOrder])
-}
-
-/// Report thresholds, e.g. key "progress.dueSoonHours".
-model ReportSetting {
-  key         String   @id
-  value       Json
-  updatedById String?
-  updatedAt   DateTime @updatedAt
 }
 
 // ============================================================
@@ -1382,6 +1265,7 @@ model Receipt {
   advanceAmount Float     @default(0)
   status        String    @default("ACTIVE")
   cancelRemark  String?
+  cancelledAt   DateTime?
 
   tallyVoucherNo  String?
   tallyPostedAt   DateTime?
@@ -1396,6 +1280,7 @@ model Receipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  debitNoteLines PartyNoteReceiptLine[]
   allocations ReceiptAllocation[]
   editLogs    ReceiptEditLog[]
   payments    Payment[]           @relation("PaymentReceiptLink")
@@ -1419,17 +1304,100 @@ model Bank {
 }
 
 model ReceiptAllocation {
-  id        String   @id @default(uuid())
-  receiptId String
-  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  amount    Float
-  createdAt DateTime @default(now())
+  id           String                @id @default(uuid())
+  receiptId    String?
+  receipt      Receipt?              @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  invoiceId    String?
+  invoice      Invoice?              @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  debitNoteId  String?
+  debitNote    PartyNote?            @relation("DebitNoteAdjustments", fields: [debitNoteId], references: [id], onDelete: Restrict)
+  creditNoteId String?
+  creditNote   PartyNote?            @relation("CreditNoteAdjustments", fields: [creditNoteId], references: [id], onDelete: Restrict)
+  batchId      String?
+  batch        PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  amount       Float
+  adjustedAt   DateTime              @default(now())
+  reversedAt   DateTime?
+  createdAt    DateTime              @default(now())
 
-  @@unique([receiptId, invoiceId])
   @@index([invoiceId])
+  @@index([invoiceId, adjustedAt])
+  @@index([receiptId, adjustedAt])
+  @@index([debitNoteId, adjustedAt])
+  @@index([creditNoteId, adjustedAt])
+  @@index([batchId])
+  @@index([adjustedAt, reversedAt])
 }
+
+model PartyNote {
+  id                String              @id @default(uuid())
+  number            String
+  customerId        String
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId          String
+  branch            Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  direction         String
+  type              String              @default("OPENING")
+  date              DateTime
+  narration         String
+  amount            Decimal             @db.Decimal(18, 2)
+  remainingAmount   Decimal             @db.Decimal(18, 2)
+  status            String              @default("ACTIVE")
+  cancelledAt       DateTime?
+  tallyVoucherNo    String?
+  tallyPostedAt     DateTime?
+  tallyExcluded     Boolean             @default(true)
+  createdById       String?
+  createdBy         User?               @relation("PartyNoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  idempotencyKey    String?             @unique
+  requestHash       String?
+  legacyKey         String?             @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  cancelRemark String?
+  partyCode String?
+  partyName String?
+  partyAddress String?
+  partyCity String?
+  partyState String?
+  receiptLines PartyNoteReceiptLine[]
+  accountLines PartyNoteAccountLine[]
+  debitAdjustments  ReceiptAllocation[] @relation("DebitNoteAdjustments")
+  creditAdjustments ReceiptAllocation[] @relation("CreditNoteAdjustments")
+
+  @@index([branchId, direction, date])
+  @@unique([direction, number])
+  @@index([customerId, direction, date])
+  @@index([branchId, status, date])
+}
+
+model PartyAdjustmentBatch {
+  id              String                     @id @default(uuid())
+  customerId      String
+  customer        Customer                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId        String
+  branch          Branch                     @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  date            DateTime
+  source          String
+  amount          Decimal                    @db.Decimal(18, 2)
+  actorId         String?
+  actor           User?                      @relation("PartyAdjustmentActor", fields: [actorId], references: [id], onDelete: SetNull)
+  idempotencyKey  String                     @unique
+  requestHash     String
+  tallyPostedAt   DateTime?
+  reversedAt      DateTime?
+  reversedById    String?
+  reversedBy      User?                      @relation("PartyAdjustmentReverser", fields: [reversedById], references: [id], onDelete: SetNull)
+  reverseRemark   String?
+  legacyPaymentId String?                    @unique
+  createdAt       DateTime                   @default(now())
+  allocations     ReceiptAllocation[]
+  application     CustomerCreditApplication?
+
+  @@index([customerId, date])
+  @@index([branchId, date])
+}
+
 
 model ReceiptEditLog {
   id           String   @id @default(uuid())
@@ -1455,6 +1423,7 @@ model TallyLedger {
   updatedAt  DateTime @updatedAt
 
   customers Customer[]
+  noteAccountLines PartyNoteAccountLine[]
 }
 
 model TallyAccountMapping {
@@ -1517,6 +1486,8 @@ model CustomerCreditTransaction {
 }
 
 model CustomerCreditApplication {
+  batchId String?               @unique
+  batch   PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
 
   customerId String
@@ -1630,8 +1601,6 @@ model WorkshopMaster {
   category         String?
   chargedTo        String           @default("CUSTOMER")
   freeService      Boolean          @default(false)
-  // 1st, 2nd, 3rd... free service, for SERVICE_TYPE masters flagged freeService.
-  freeServiceNo    Int?
   displayOrder     Int?
   preDelivery      Boolean          @default(false)
   parentId         String?
@@ -1651,8 +1620,6 @@ model WorkshopMaster {
   vehicles         Vehicle[]        @relation("VehicleCatalogue")
   colouredVehicles Vehicle[]        @relation("VehicleColour")
   labourRates      LabourRate[]
-  appointmentServiceTypes      ServiceAppointment[] @relation("AppointmentServiceType")
-  appointmentRequestComplaints AppointmentRequest[] @relation("AppointmentRequestComplaint")
   serviceTypeSettings ServiceTypeModelSetting[] @relation("ServiceTypeSettings")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
@@ -2865,4 +2832,63 @@ model JobCardCampaign {
 
   @@id([jobCardId, campaignId])
   @@index([campaignId])
+}
+
+model FinanceSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model PartyNoteReceiptLine {
+  id String @id @default(uuid())
+  noteId String
+  note PartyNote @relation(fields:[noteId],references:[id],onDelete:Restrict)
+  receiptId String
+  receipt Receipt @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  position Int
+  amount Decimal @db.Decimal(18,2)
+  receiptNumber String
+  receiptDate DateTime
+  chequeNumber String?
+  receiptAmount Decimal @db.Decimal(18,2)
+  narration String
+  @@unique([noteId,receiptId])
+  @@unique([noteId,position])
+  @@index([receiptId])
+}
+model PartyNoteAccountLine {
+  id String @id @default(uuid())
+  noteId String
+  note PartyNote @relation(fields:[noteId],references:[id],onDelete:Restrict)
+  ledgerId String
+  ledger TallyLedger @relation(fields:[ledgerId],references:[id],onDelete:Restrict)
+  position Int
+  accountCode String
+  accountName String
+  narration String
+  amount Decimal @db.Decimal(18,2)
+  @@unique([noteId,position])
+  @@index([ledgerId])
+}
+
+model OutstandingLetter {
+  id String @id @default(uuid())
+  reference String @unique
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  asOn DateTime
+  totalOutstanding Decimal @db.Decimal(18, 2)
+  snapshot Json
+  content String
+  requestKey String @unique
+  requestHash String
+  createdById String
+  createdAt DateTime @default(now())
+  printedAt DateTime?
+  printedById String?
+  @@index([branchId, reference])
+  @@index([customerId, printedAt])
 }

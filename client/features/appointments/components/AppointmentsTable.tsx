@@ -52,7 +52,6 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
   Ready: "Ready",
   Completed: "Completed",
   Cancelled: "Cancelled",
-  "No Show": "No-show",
 };
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
@@ -65,7 +64,6 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
   Ready: "bg-emerald-50 text-emerald-700",
   Completed: "bg-green-50 text-green-700",
   Cancelled: "bg-red-50 text-red-600",
-  "No Show": "bg-gray-100 text-gray-600",
 };
 
 const SOURCE_LABELS: Record<AppointmentSource, string> = {

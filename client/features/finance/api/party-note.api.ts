@@ -1,0 +1,16 @@
+import { apiGet,apiPost } from '@/lib/api/apiClient';
+export type NoteDirection='DEBIT'|'CREDIT';
+export type NoteCustomer={id:string;code:string|null;branchId:string;firstName:string;lastName:string;companyName:string|null;house:string|null;street:string|null;address:string|null;city:string|null;state:string|null};
+export type NoteReceipt={id:string;receiptNumber:string;issuedAt:string;chequeNumber:string|null;amount:number;notes:string|null};
+export type NoteLedger={id:string;code:string;name:string};
+export type PartyNote={id:string;number:string;direction:NoteDirection;type:'AMOUNT'|'RECEIPT';date:string;amount:string;remainingAmount:string;narration:string;status:string;tallyPostedAt:string|null;tallyVoucherNo:string|null;cancelRemark:string|null;partyCode:string|null;partyName:string|null;partyAddress:string|null;partyCity:string|null;partyState:string|null;branch:{id:string;name:string};customer:NoteCustomer;receiptLines:Array<{id:string;receiptId:string;receiptNumber:string;receiptDate:string;chequeNumber:string|null;receiptAmount:string;narration:string;amount:string}>;accountLines:Array<{id:string;ledgerId:string;accountCode:string;accountName:string;narration:string;amount:string}>};
+export type NoteFilters={direction:NoteDirection;from:string;to:string;branchId?:string;page:number;pageSize:number};
+export type NoteRegister={notes:PartyNote[];totals:{amount:string;remaining:string};meta:{page:number;pageSize:number;total:number;totalPages:number}};
+export type NoteInput={customerId:string;branchId:string;date:string;amount:number;narration:string;idempotencyKey:string}&({direction:'DEBIT';type:'AMOUNT'|'RECEIPT';receiptLines:Array<{receiptId:string;amount:number}>}|{direction:'CREDIT';type:'AMOUNT';accountLines:Array<{ledgerId:string;narration:string;amount:number}>});
+export const noteQuery=(filters:NoteFilters)=>new URLSearchParams(Object.entries(filters).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)])).toString();
+export const getNoteRegister=(filters:NoteFilters,register=true,signal?:AbortSignal)=>apiGet<NoteRegister>('/finance/party-notes'+(register?'/register':'')+'?'+noteQuery(filters),{signal});
+export const createPartyNote=(input:NoteInput)=>apiPost<{note:PartyNote}>('/finance/party-notes',input);
+export const cancelPartyNote=(id:string,remark:string)=>apiPost<{note:PartyNote}>('/finance/party-notes/'+id+'/cancel',{remark});
+export const getNoteCustomer=(id:string)=>apiGet<{customer:NoteCustomer}>('/finance/party-notes/customers/'+id);
+export const getNoteReceipts=(customerId:string,branchId:string,page:number,search:string)=>apiGet<{receipts:NoteReceipt[];meta:{page:number;total:number;totalPages:number}}>('/finance/party-notes/receipts?'+new URLSearchParams({customerId,branchId,page:String(page),search}));
+export const getNoteLedgers=(search:string)=>apiGet<{ledgers:NoteLedger[]}>('/finance/party-notes/ledgers?search='+encodeURIComponent(search));

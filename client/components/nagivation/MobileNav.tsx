@@ -18,7 +18,7 @@ export default function () {
 
   return (
     <nav
-      className="flex h-16 shrink-0 items-center justify-around border-t border-[#e8edf3] bg-white px-2 lg:hidden print:hidden"
+      className="flex h-16 shrink-0 items-center justify-around border-t border-[#e8edf3] bg-white px-2 lg:hidden"
       aria-label="Mobile navigation"
     >
       {BOTTOM_NAV.filter((item) =>

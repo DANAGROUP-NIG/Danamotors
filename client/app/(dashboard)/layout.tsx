@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { ANY_REPORT_PERMISSION, CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, REPORT_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -42,12 +42,21 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
+  "/finance/receipts/update-outstanding": ["outstanding:recalculate"],
+  "/finance/receipts/outstanding-letters": ["letter:outstanding"],
+  "/finance/receipts/debit-notes": ["debitnote:read", "debitnote:create"],
+  "/finance/receipts/credit-notes": ["creditnote:read", "creditnote:create"],
+  "/finance/receipts/advance-adjustment": ["receipt:adjust"],
   "/finance/tally": ["tally:post", "tally:import"],
-  "/finance": ["invoice:read"],
+  "/finance": ["invoice:read", "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create"],
   "/credit-applications": ["credit:application:create"],
-  "/reports/receipt-register": [REPORT_PERMISSIONS.RECEIPT_REGISTER, "financereport:read"],
-  // Each report page also checks its own permission.
-  "/reports": ANY_REPORT_PERMISSION,
+  "/reports/finance/debit-note-register": ["report:debit-note-register"],
+  "/reports/finance/credit-note-register": ["report:credit-note-register"],
+  "/reports/finance/party-ledger": ["report:party-ledger"],
+  "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
+  "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
+  "/reports/finance/party-outstanding": ["report:party-outstanding"],
+  "/reports": ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
@@ -55,7 +64,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/warranty": [WARRANTY_PERMISSIONS.READ],
   "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
   "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
-  "/settings/reports": [REPORT_PERMISSIONS.SETTINGS],
+  "/settings/party-reports": ["role:read", "report:party-outstanding-age"],
   "/settings": ["role:read"],
 };
 
@@ -70,7 +79,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f4f8] print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex h-screen overflow-hidden bg-[#f0f4f8]">
       {/* ── Mobile backdrop ─────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
@@ -88,12 +97,12 @@ export default function DashboardLayout({
       />
 
       {/* ── Right column ────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a] print:block print:overflow-visible print:bg-white">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">
         {/* ── Top header ──────────────────────────────────────────── */}
         <MainHeader setSidebarOpen={setSidebarOpen} />
 
         {/* ── Page content ────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto print:overflow-visible" id="main-content">
+        <main className="flex-1 overflow-y-auto" id="main-content">
           <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
         </main>
 

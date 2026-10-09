@@ -1,3 +1,4 @@
+import { accountantCustomerReadScope } from './customer-read-scope';
 import { listCustomerSchema } from './customer.validation';
 import { z } from 'zod';
 import { CustomerService } from './customer.service';
@@ -23,6 +24,7 @@ const router = Router();
 const controller = new CustomerController();
 
 router.use(authMiddleware);
+router.use(accountantCustomerReadScope);
 router.get('/duplicates', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: z.object({ phoneNumber: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), companyName: z.string().optional() }) })), async (req, res, next) => {
   try { res.json({ status: 'success', data: { customers: await new CustomerService().findDuplicates(req.query) } }); } catch (error) { next(error); }
 });

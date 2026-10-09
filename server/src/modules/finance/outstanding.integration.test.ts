@@ -1,0 +1,86 @@
+if(process.env.TEST_DATABASE_URL)process.env.DATABASE_URL=process.env.TEST_DATABASE_URL;
+import {randomUUID} from 'crypto';
+import {Prisma} from '@prisma/client';
+import prisma from '../../prisma/client';
+import {OutstandingService} from './outstanding.service';
+import {letterFilters,maintenanceFilters} from './outstanding.validation';
+import {lagosDay,refreshOverdueInvoices,creditDueDate} from './credit-terms';
+const integration=process.env.TEST_DATABASE_URL?describe:describe.skip;
+integration('Outstanding repair and saved letters',()=>{
+ afterAll(async()=>{await prisma.$disconnect();});
+ it('repairs only derived balances, enforces thresholds, replays requests and preserves saved letter snapshots',async()=>{
+  const rollback=new Error('ROLLBACK_OUTSTANDING_FIXTURES'),original=prisma.$transaction.bind(prisma);
+  await expect(original(async tx=>{
+   const suffix=randomUUID(),branch=await tx.branch.create({data:{name:'letters-'+suffix,address:'12 Test Road'}});
+   const role=await tx.role.upsert({where:{name:'Admin'},create:{name:'Admin'},update:{}});
+   const actor=await tx.user.create({data:{email:suffix+'@example.test',firstName:'Test',lastName:'Admin',passwordHash:'test-only',roleId:role.id,branchId:branch.id}});
+   const customer=await tx.customer.create({data:{code:'letters-'+suffix,firstName:'A & B',lastName:'<Customer>',branchId:branch.id}});
+   const invoice=await tx.invoice.create({data:{customerId:customer.id,invoiceNumber:'letters-bill-'+suffix,subtotal:100,tax:0,total:100,outstandingAmount:90,status:'Unpaid',issuedDate:new Date(Date.now()-86400000),dueDate:new Date(Date.now()-86400000)}});
+   const spy=jest.spyOn(prisma,'$transaction').mockImplementation(((callback:(client:Prisma.TransactionClient)=>Promise<unknown>)=>callback(tx)) as typeof prisma.$transaction);
+   try{
+    const service=new OutstandingService(),filters=maintenanceFilters.parse({branchId:branch.id,customerId:customer.id});
+    const preview=await service.previewRepair(filters);expect(preview.checked).toBe(1);expect(preview.changes[0].expected.toNumber()).toBe(100);
+    expect(preview.changes[0].status).toBe('Overdue');
+    await tx.invoice.update({where:{id:invoice.id},data:{outstandingAmount:80}});
+    await expect(service.applyRepair(filters,preview.previewHash,actor.id)).rejects.toThrow('changed after preview');
+    const next=await service.previewRepair(filters);expect((await service.applyRepair(filters,next.previewHash,actor.id)).changed).toBe(1);
+    expect((await tx.invoice.findUniqueOrThrow({where:{id:invoice.id}})).outstandingAmount).toBe(100);
+    expect((await service.previewRepair(filters)).changes).toHaveLength(0);
+    // Simulate the status left at yesterday's day boundary, with the trigger restored before the sweep.
+    await tx.$executeRawUnsafe('ALTER TABLE "Invoice" DISABLE TRIGGER "Invoice_credit_due_status"');
+    await tx.invoice.update({where:{id:invoice.id},data:{status:'Unpaid'}});
+    await tx.$executeRawUnsafe('ALTER TABLE "Invoice" ENABLE TRIGGER "Invoice_credit_due_status"');
+    expect(await refreshOverdueInvoices()).toBe(1);
+    expect((await tx.invoice.findUniqueOrThrow({where:{id:invoice.id}})).status).toBe('Overdue');
+    expect(await refreshOverdueInvoices()).toBe(0);
+    const debit=await tx.partyNote.create({data:{customerId:customer.id,branchId:branch.id,number:'repair-debit-'+suffix,direction:'DEBIT',type:'OPENING',date:new Date(Date.now()-86400000),amount:50,remainingAmount:47,narration:'Opening debit',idempotencyKey:randomUUID(),requestHash:'fixture',createdById:actor.id,tallyExcluded:true}});
+    const credit=await tx.partyNote.create({data:{customerId:customer.id,branchId:branch.id,number:'repair-credit-'+suffix,direction:'CREDIT',type:'OPENING',date:new Date(Date.now()-86400000),amount:50,remainingAmount:40,narration:'Opening credit',idempotencyKey:randomUUID(),requestHash:'fixture',createdById:actor.id,tallyExcluded:true}});
+    await tx.receiptAllocation.create({data:{debitNoteId:debit.id,creditNoteId:credit.id,amount:3}});
+    const notePreview=await service.previewRepair(filters);
+    expect(notePreview.changes.map(r=>[r.id,r.expected.toNumber()])).toEqual([[credit.id,47]]);
+    expect(notePreview.wallets[0].expected.toNumber()).toBe(47);
+    await service.applyRepair(filters,notePreview.previewHash,actor.id);
+    expect((await tx.customer.findUniqueOrThrow({where:{id:customer.id}})).creditBalance).toBe(47);
+    expect((await service.previewRepair(filters)).changes).toHaveLength(0);
+    const letterInput=letterFilters.parse({...filters,asOn:lagosDay(new Date()),threshold:100});
+    expect((await service.previewLetters(letterInput)).parties).toHaveLength(0);
+    letterInput.threshold=99;
+    const letterPreview=await service.previewLetters(letterInput);expect(letterPreview.parties).toHaveLength(1);
+    const key=randomUUID(),letters=await service.generate(letterInput,letterPreview.previewHash,key,actor.id);
+    expect(letters).toHaveLength(1);expect(letters[0].reference).toMatch(/^DML\d{6}$/);
+    expect(letters[0].content).toContain('A &amp; B');expect(letters[0].content).toContain('&lt;Customer&gt;');
+    expect((await service.generate(letterInput,letterPreview.previewHash,key,actor.id))[0].id).toBe(letters[0].id);
+    await expect(service.generate({...letterInput,threshold:0},letterPreview.previewHash,key,actor.id)).rejects.toThrow('Request key');
+    await tx.customer.update({where:{id:customer.id},data:{firstName:'Renamed'}});
+    expect((await service.letters([letters[0].id],branch.id,tx))[0].content).toBe(letters[0].content);
+    await service.markPrinted([letters[0].id],actor.id,branch.id);
+    expect((await service.previewLetters(letterInput)).parties).toHaveLength(0);
+    expect((await service.previewLetters({...letterInput,includePrinted:true})).parties).toHaveLength(1);
+    await expect(service.letters([letters[0].id],randomUUID(),tx)).rejects.toThrow('unavailable');
+    await tx.customer.update({where:{id:customer.id},data:{partyStatus:'FA_PARTY'}});
+    expect((await service.previewLetters({...letterInput,partyStatus:'ALL',includePrinted:true})).parties).toHaveLength(0);
+    const empty=await tx.customer.create({data:{code:'empty-'+suffix,firstName:'Empty',lastName:'Account',branchId:branch.id}});
+    await tx.$executeRawUnsafe('ALTER TABLE "Customer" DISABLE TRIGGER "Customer_derived_credit"');
+    await tx.customer.update({where:{id:empty.id},data:{creditBalance:123.45}});
+    await tx.$executeRawUnsafe('ALTER TABLE "Customer" ENABLE TRIGGER "Customer_derived_credit"');
+    const emptyFilters={...filters,customerId:empty.id};
+    const emptyPreview=await service.previewRepair(emptyFilters);
+    expect(emptyPreview.checked).toBe(0);expect(emptyPreview.wallets[0].expected.toNumber()).toBe(0);
+    expect((await service.applyRepair(emptyFilters,emptyPreview.previewHash,actor.id)).walletsChanged).toBe(1);
+    expect((await tx.customer.findUniqueOrThrow({where:{id:empty.id}})).creditBalance).toBe(0);
+    // Prisma timestamps are stored as UTC without a time-zone tag; SQL must convert UTC before Lagos.
+    await tx.$executeRawUnsafe("SET LOCAL TIME ZONE 'America/New_York'");
+    const todayDue=creditDueDate(new Date(),0);
+    const boundary=await tx.invoice.create({data:{customerId:empty.id,invoiceNumber:'midnight-'+suffix,issuedDate:new Date(),dueDate:todayDue,subtotal:10,total:10,outstandingAmount:10,status:'Unpaid'}});
+    expect(boundary.status).toBe('Unpaid');
+    expect(await refreshOverdueInvoices()).toBe(0);
+    const pastDue=new Date(todayDue.getTime()-86400000);
+    expect((await tx.invoice.update({where:{id:boundary.id},data:{dueDate:pastDue}})).status).toBe('Overdue');
+    expect((await tx.invoice.update({where:{id:boundary.id},data:{outstandingAmount:7,status:'Partially Paid'}})).status).toBe('Overdue');
+    expect((await tx.invoice.update({where:{id:boundary.id},data:{outstandingAmount:0,status:'Paid'}})).status).toBe('Paid');
+    await tx.$executeRawUnsafe("SET LOCAL TIME ZONE 'UTC'");
+   } finally {spy.mockRestore();}
+   throw rollback;
+  },{timeout:60000})).rejects.toBe(rollback);
+ });
+});

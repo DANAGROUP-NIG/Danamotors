@@ -16,6 +16,14 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
+  DEBIT_NOTE_READ: "debitnote:read",
+  DEBIT_NOTE_CREATE: "debitnote:create",
+  DEBIT_NOTE_CANCEL: "debitnote:cancel",
+  CREDIT_NOTE_READ: "creditnote:read",
+  CREDIT_NOTE_CREATE: "creditnote:create",
+  CREDIT_NOTE_CANCEL: "creditnote:cancel",
+  DEBIT_NOTE_REGISTER_READ: "report:debit-note-register",
+  CREDIT_NOTE_REGISTER_READ: "report:credit-note-register",
   // ── Dashboard ───────────────────────────────────────────────────────────────
   DASHBOARD_READ: "dashboard:read",
 
@@ -161,28 +169,19 @@ export const PERMISSIONS = {
   RECEIPT_CREATE: "receipt:create",
   RECEIPT_UPDATE: "receipt:update",
   RECEIPT_CANCEL: "receipt:cancel",
+  OUTSTANDING_RECALCULATE: "outstanding:recalculate",
+  OUTSTANDING_LETTER: "letter:outstanding",
+  PARTY_LEDGER_READ: "report:party-ledger",
+  PARTY_OUTSTANDING_READ: "report:party-outstanding",
+  PARTY_OUTSTANDING_AGE_READ: "report:party-outstanding-age",
+  PARTY_OUTSTANDING_BILL_READ: "report:party-outstanding-bill",
+  RECEIPT_ADJUST: "receipt:adjust",
+  RECEIPT_ADJUST_REVERSE: "receipt:adjust:reverse",
+  PARTY_OPENING_CREATE: "party:opening:create",
 
   // ── Finance — Reports ─────────────────────────────────────────────────────
   FINANCE_REPORT_READ: "financereport:read",
   RECEIPT_REGISTER_READ: "report:receipt-register",
-
-  // ── Reports — Workshop (one permission per report) ────────────────────────
-  REPORT_SERVICE_BOOKING: "report:service-booking",
-  REPORT_JOB_ESTIMATE_REGISTER: "report:job-estimate-register",
-  REPORT_JOB_CARDS_OPEN: "report:job-cards-open",
-  REPORT_WORKSHOP_STATUS: "report:workshop-status",
-  REPORT_WORKSHOP_PROGRESS: "report:workshop-progress",
-  REPORT_SERVICE_WISE_PROGRESS: "report:service-wise-progress",
-  REPORT_VEHICLES_TO_BE_READY: "report:vehicles-to-be-ready",
-  REPORT_DAILY_PRODUCTIVITY: "report:daily-productivity",
-  REPORT_TECHNICIAN_PRODUCTIVITY: "report:technician-productivity",
-  REPORT_DAILY_LABOUR_REGISTER: "report:daily-labour-register",
-  REPORT_WORKSHOP_BILL: "report:workshop-bill",
-  REPORT_FREE_SERVICE: "report:free-service",
-  REPORT_BEFORE_FIRST_SERVICE: "report:before-first-service",
-  REPORT_MILEAGE_WISE: "report:mileage-wise",
-  // Mileage bands and report thresholds.
-  REPORT_SETTINGS: "report:settings",
 
   // ── Tally ─────────────────────────────────────────────────────────────────
   TALLY_POST: "tally:post",
@@ -217,32 +216,6 @@ export const PERMISSIONS = {
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-// Default report grants (the issue's role table). Admin and SuperAdmin get every report.
-const FRONT_DESK_REPORTS: PermissionType[] = [
-  PERMISSIONS.REPORT_SERVICE_BOOKING,
-  PERMISSIONS.REPORT_JOB_ESTIMATE_REGISTER,
-  PERMISSIONS.REPORT_JOB_CARDS_OPEN,
-  PERMISSIONS.REPORT_VEHICLES_TO_BE_READY,
-];
-const WORKSHOP_MANAGER_REPORTS: PermissionType[] = [
-  ...FRONT_DESK_REPORTS,
-  PERMISSIONS.REPORT_WORKSHOP_STATUS,
-  PERMISSIONS.REPORT_WORKSHOP_PROGRESS,
-  PERMISSIONS.REPORT_SERVICE_WISE_PROGRESS,
-  PERMISSIONS.REPORT_DAILY_PRODUCTIVITY,
-  PERMISSIONS.REPORT_TECHNICIAN_PRODUCTIVITY,
-  PERMISSIONS.REPORT_FREE_SERVICE,
-  PERMISSIONS.REPORT_BEFORE_FIRST_SERVICE,
-  PERMISSIONS.REPORT_MILEAGE_WISE,
-  PERMISSIONS.REPORT_SETTINGS,
-];
-const BILLING_REPORTS: PermissionType[] = [
-  PERMISSIONS.REPORT_DAILY_LABOUR_REGISTER,
-  PERMISSIONS.REPORT_WORKSHOP_BILL,
-  PERMISSIONS.REPORT_FREE_SERVICE,
-];
-const ALL_WORKSHOP_REPORTS: PermissionType[] = Array.from(new Set([...WORKSHOP_MANAGER_REPORTS, ...BILLING_REPORTS]));
-
 // Mapping roles to their default initial permissions for seeding
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Full access
@@ -250,6 +223,15 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.OUTSTANDING_RECALCULATE,
+    PERMISSIONS.OUTSTANDING_LETTER,
+    PERMISSIONS.PARTY_LEDGER_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_BILL_READ,
+    PERMISSIONS.RECEIPT_ADJUST,
+    PERMISSIONS.RECEIPT_ADJUST_REVERSE,
+    PERMISSIONS.PARTY_OPENING_CREATE,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -331,7 +313,14 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_CREATE,
     PERMISSIONS.CAMPAIGN_UPDATE,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
-    ...ALL_WORKSHOP_REPORTS,
+    PERMISSIONS.DEBIT_NOTE_READ,
+    PERMISSIONS.DEBIT_NOTE_CREATE,
+    PERMISSIONS.DEBIT_NOTE_CANCEL,
+    PERMISSIONS.CREDIT_NOTE_READ,
+    PERMISSIONS.CREDIT_NOTE_CREATE,
+    PERMISSIONS.CREDIT_NOTE_CANCEL,
+    PERMISSIONS.DEBIT_NOTE_REGISTER_READ,
+    PERMISSIONS.CREDIT_NOTE_REGISTER_READ,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -434,11 +423,17 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
-    ...WORKSHOP_MANAGER_REPORTS,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.OUTSTANDING_LETTER,
+    PERMISSIONS.PARTY_LEDGER_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_BILL_READ,
+    PERMISSIONS.RECEIPT_ADJUST,
+    PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -451,10 +446,23 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.RECEIPT_READ,
     PERMISSIONS.FINANCE_REPORT_READ,
     PERMISSIONS.WARRANTY_READ,
-    ...BILLING_REPORTS,
+    PERMISSIONS.DEBIT_NOTE_READ,
+    PERMISSIONS.DEBIT_NOTE_CREATE,
+    PERMISSIONS.DEBIT_NOTE_CANCEL,
+    PERMISSIONS.CREDIT_NOTE_READ,
+    PERMISSIONS.CREDIT_NOTE_CREATE,
+    PERMISSIONS.CREDIT_NOTE_CANCEL,
+    PERMISSIONS.DEBIT_NOTE_REGISTER_READ,
+    PERMISSIONS.CREDIT_NOTE_REGISTER_READ,
   ],
 
   [ROLES.BILLING_OFFICER]: [
+    PERMISSIONS.OUTSTANDING_LETTER,
+    PERMISSIONS.PARTY_LEDGER_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_AGE_READ,
+    PERMISSIONS.PARTY_OUTSTANDING_BILL_READ,
+    PERMISSIONS.RECEIPT_ADJUST,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -471,7 +479,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TALLY_POST,
     PERMISSIONS.TALLY_IMPORT,
     PERMISSIONS.CUSTOMER_TALLY_MAPPING,
-    ...BILLING_REPORTS,
   ],
 
   // Handles estimates, approvals, customer liaison during service
@@ -507,7 +514,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
-    ...FRONT_DESK_REPORTS,
   ],
 
   // Executes repairs, updates job card progress
@@ -548,7 +554,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
-    ...FRONT_DESK_REPORTS,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments

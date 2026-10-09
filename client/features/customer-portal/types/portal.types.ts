@@ -227,6 +227,8 @@ export type PortalCreditDecisionPayload = {
 };
 
 export type PortalInvoice = {
+  outstandingAmount: number;
+  allocations?: Array<{ id: string; amount: number; adjustedAt: string; receipt: { receiptNumber: string; status: string } | null; creditNote: { number: string; status: string } | null }>;
   id: string;
   invoiceNumber: string;
   status: string;
