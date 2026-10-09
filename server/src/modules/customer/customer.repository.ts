@@ -4,6 +4,7 @@ import { Customer, CustomerDocument, ServiceHistory, Prisma } from '@prisma/clie
 export class CustomerRepository {
   async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
     const where: Prisma.CustomerWhereInput = { mergedIntoId: null };
+    if (params.branchId) where.branchId = params.branchId;
 
     if (params.search) {
       const nameParts = params.search.trim().split(/\s+/);

@@ -1,167 +1,24 @@
 "use client";
+import Link from 'next/link';
+import { useState } from 'react';
+import { Wallet } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { usePartyAccount } from '@/features/finance/hooks/use-party-account';
+import { OpeningBalanceModal } from '@/features/finance/components/OpeningBalanceModal';
+import type { Customer } from '../types/customer.types';
 
-import { useState } from "react";
-import { Wallet, Plus, Minus, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/auth.store";
-import {
-  useAdjustCustomerCredit,
-  useCustomerCredit,
-} from "@/features/credit/hooks/use-credit";
-import type { Customer } from "../types/customer.types";
-
+const currency = new Intl.NumberFormat('en-NG',{ style: 'currency',currency: 'NGN' });
 export function CustomerCreditCard({ customer }: { customer: Customer }) {
-  const { data, isLoading } = useCustomerCredit(customer.id);
-  const adjust = useAdjustCustomerCredit(customer.id);
-  const canAdjust = useAuthStore(
-    (s) =>
-      !!s.user &&
-      (s.user.permissions.includes("finance:create") ||
-        s.user.permissions.includes("finance:update")),
-  );
-
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value === 0) return;
-    adjust.mutate(
-      { amount: value, description: description || undefined },
-      {
-        onSuccess: () => {
-          setAmount("");
-          setDescription("");
-        },
-      },
-    );
-  }
-
-  const balance = data?.customer.creditBalance ?? 0;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Wallet className="size-4" />
-          Customer credit
-        </div>
-        <span className="text-lg font-bold text-primary">
-          ₦{balance.toLocaleString("en-NG")}
-        </span>
-      </div>
-
-      {canAdjust && (
-        <form
-          onSubmit={onSubmit}
-          className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 sm:flex-row sm:items-end"
-        >
-          <label className="grid flex-1 gap-1">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-400">
-              Amount (₦) — positive adds, negative deducts
-            </span>
-            <input
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="e.g. 10000"
-              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          <label className="grid flex-1 gap-1">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-400">
-              Description
-            </span>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Refund, goodwill credit"
-              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          <Button
-            type="submit"
-            disabled={
-              adjust.isPending ||
-              !Number.isFinite(Number(amount)) ||
-              Number(amount) === 0
-            }
-            className="gap-2"
-          >
-            {adjust.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : Number(amount) > 0 ? (
-              <Plus className="size-4" />
-            ) : (
-              <Minus className="size-4" />
-            )}
-            Update
-          </Button>
-        </form>
-      )}
-
-      <div>
-        <p className="mb-2 text-sm font-medium uppercase tracking-wider text-slate-400">
-          Ledger
-        </p>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="size-5 animate-spin text-slate-300" />
-          </div>
-        ) : !data || data.transactions.length === 0 ? (
-          <p className="py-3 text-sm text-slate-400">No credit transactions.</p>
-        ) : (
-          <div className="max-h-64 overflow-y-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b text-sm font-medium uppercase tracking-wider text-slate-400">
-                  <th className="py-2 pr-4">Date</th>
-                  <th className="py-2 pr-4">Type</th>
-                  <th className="py-2 pr-4">Description</th>
-                  <th className="py-2 pr-4">Amount</th>
-                  <th className="py-2 pr-4">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.transactions.map((tx) => (
-                  <tr key={tx.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 text-slate-500">
-                      {new Date(tx.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${
-                          tx.amount < 0
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {tx.type.replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="max-w-[200px] truncate py-2 pr-4 text-slate-600">
-                      {tx.description ?? "—"}
-                    </td>
-                    <td
-                      className={`py-2 pr-4 font-medium ${
-                        tx.amount < 0 ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      {tx.amount < 0 ? "−" : "+"}₦
-                      {Math.abs(tx.amount).toLocaleString("en-NG")}
-                    </td>
-                    <td className="py-2 pr-4 text-slate-700">
-                      ₦{tx.balanceAfter.toLocaleString("en-NG")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const account = usePartyAccount(customer.id,customer.branchId);
+  const { user,hasPermission } = useAuth();
+  const [opening,setOpening] = useState(false);
+  const canOpen = (user?.role==='Admin'||user?.role==='SuperAdmin')&&hasPermission('party:opening:create');
+  return <section className="grid gap-5 rounded-xl border bg-background p-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2 font-semibold"><Wallet className="size-4" />Party account</h2><div className="flex flex-wrap gap-2">{hasPermission('report:party-ledger')&&<Button asChild variant="outline" size="sm"><Link href={'/reports/finance/party-ledger?customerId='+customer.id+'&branchId='+customer.branchId}>View ledger</Link></Button>}{hasPermission('receipt:adjust')&&<Button asChild size="sm"><Link href={'/finance/receipts/advance-adjustment?customerId='+customer.id}>Adjust balances</Link></Button>}{canOpen&&<Button variant="outline" size="sm" onClick={()=>setOpening(true)}>Record opening balance</Button>}</div></div>
+    <p className="text-sm font-medium">{customer.companyName || [customer.firstName,customer.lastName].filter(Boolean).join(' ')}</p>
+    {account.isLoading?<div aria-busy="true" className="h-20 animate-pulse rounded-md bg-muted" />:account.isError?<div role="alert"><p className="text-sm text-destructive">Account could not be loaded.</p><Button variant="outline" size="sm" onClick={()=>account.refetch()}>Retry</Button></div>:account.data&&<dl className="grid gap-4 sm:grid-cols-3"><div><dt className="text-sm text-muted-foreground">Outstanding debits</dt><dd className="mt-1 text-xl font-semibold">{currency.format(account.data.outstanding)}</dd></div><div><dt className="text-sm text-muted-foreground">Unadjusted credits</dt><dd className="mt-1 text-xl font-semibold">{currency.format(account.data.availableCredit)}</dd></div><div><dt className="text-sm text-muted-foreground">Net outstanding</dt><dd className="mt-1 text-xl font-semibold">{currency.format(account.data.netOutstanding)}</dd></div></dl>}
+    <p className="text-sm text-muted-foreground">Available credit includes receipt advances, credit notes, and opening credits.</p>
+    {opening&&<OpeningBalanceModal customerId={customer.id} branchId={customer.branchId} onClose={()=>setOpening(false)} />}
+  </section>;
 }

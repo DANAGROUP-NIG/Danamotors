@@ -37,7 +37,7 @@ export class CreditController {
 
   adjustCredit = async (
     req: Request,
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
@@ -46,17 +46,11 @@ export class CreditController {
         select: { branchId: true },
       });
       assertBranchOwnership(req, customer?.branchId);
-      const result = await this.creditService.adjustCredit({
+      await this.creditService.adjustCredit({
         customerId: req.params.customerId,
         amount: req.body.amount,
         description: req.body.description,
         recordedById: req.user!.userId,
-      });
-      res.status(200).json({
-        status: "success",
-        statusCode: 200,
-        message: "Customer credit updated successfully",
-        data: { credit: result },
       });
     } catch (error) {
       next(error);

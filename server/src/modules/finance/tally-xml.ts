@@ -1,4 +1,4 @@
-export type TallyDocumentType = 'JOB_BILL' | 'RECEIPT';
+export type TallyDocumentType = 'JOB_BILL' | 'RECEIPT' | 'DEBIT_NOTE' | 'CREDIT_NOTE';
 export type LedgerEntry = { name: string; amount: number; bills?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' | 'On Account'; amount: number }[] };
 
 const escapeXml = (value: string) => value.replace(/[<>&"']/g, (character) => ({
@@ -17,7 +17,7 @@ export function generateTallyVoucherXml(input: {
   party: string;
   entries: LedgerEntry[];
 }) {
-  const voucherType = input.type === 'JOB_BILL' ? 'Sales' : 'Receipt';
+  const voucherType = { JOB_BILL: 'Sales', RECEIPT: 'Receipt', DEBIT_NOTE: 'Debit Note', CREDIT_NOTE: 'Credit Note' }[input.type];
   const ledgerEntries = input.entries.map((entry) => `
         <ALLLEDGERENTRIES.LIST>
           <LEDGERNAME>${escapeXml(entry.name)}</LEDGERNAME>

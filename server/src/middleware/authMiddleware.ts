@@ -5,6 +5,39 @@ import prisma from '../prisma/client';
 import { UnauthorizedError } from '../shared/errors/appError';
 import { JWTPayload } from '../shared/types';
 
+// Permissions are deliberately not embedded in the access token: a role with
+// many permissions (e.g. super_admin) pushes the JWT past the browser's 4KB
+// cookie limit, the cookie is silently dropped and login loops back to /login.
+// Role, branch and permissions are loaded fresh here instead, which also means
+// role changes take effect without waiting for the token to be refreshed.
+export async function loadStaffUser(userId: string): Promise<JWTPayload | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      isActive: true,
+      branchId: true,
+      role: {
+        select: {
+          name: true,
+          permissions: { select: { permission: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+
+  if (!user || !user.isActive) return null;
+
+  return {
+    userId: user.id,
+    email: user.email,
+    role: user.role.name,
+    permissions: user.role.permissions.map((p) => p.permission.name),
+    branchId: user.branchId ?? null,
+  };
+}
+
 export const authMiddleware = async (
   req: Request,
   _res: Response,
@@ -31,16 +64,13 @@ export const authMiddleware = async (
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, isActive: true },
-    });
+    const user = await loadStaffUser(decoded.userId);
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return next(new UnauthorizedError('Your account has been deactivated'));
     }
 
-    req.user = decoded;
+    req.user = user;
     next();
   } catch (error) {
     next(error);

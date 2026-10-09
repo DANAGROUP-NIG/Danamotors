@@ -1,4 +1,8 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
+import { money } from "../finance/money";
+import { PartyAccountService, availablePartyCredit, lockParty, withPartyTransaction } from "../finance/party-account.service";
+import { fifoAdjustments } from "../finance/party-adjustment";
 import {
   NotFoundError,
   BadRequestError,
@@ -37,53 +41,8 @@ export class CreditService {
     this.notificationService = new NotificationService();
   }
 
-  /**
-   * Staff adjusts a customer's credit balance.
-   * amount is positive to add credit, negative to deduct/adjust down.
-   */
-  async adjustCredit(data: {
-    customerId: string;
-    amount: number;
-    description?: string;
-    recordedById: string;
-  }) {
-    if (!Number.isFinite(data.amount) || data.amount === 0) {
-      throw new BadRequestError("Amount must be a non-zero number");
-    }
-
-    const customer = await prisma.customer.findUnique({
-      where: { id: data.customerId },
-    });
-    if (!customer) {
-      throw new NotFoundError("Customer not found");
-    }
-
-    const newBalance = customer.creditBalance + data.amount;
-    if (newBalance < 0) {
-      throw new BadRequestError(
-        "Cannot deduct more credit than the customer's current balance",
-      );
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.customer.update({
-        where: { id: customer.id },
-        data: { creditBalance: newBalance },
-      });
-      await tx.customerCreditTransaction.create({
-        data: {
-          customerId: customer.id,
-          amount: data.amount,
-          balanceAfter: newBalance,
-          type: data.amount > 0 ? "CREDIT_IN" : "ADJUSTMENT",
-          description: data.description,
-          recordedById: data.recordedById,
-        },
-      });
-      return result;
-    });
-
-    return updated;
+  async adjustCredit(_data: { customerId: string; amount: number; description?: string; recordedById: string }) {
+    throw new BadRequestError("Credit is derived from receipts and credit notes. Record a receipt, credit note, or admin opening balance instead.");
   }
 
   async getCustomerCredit(customerId: string) {
@@ -112,7 +71,8 @@ export class CreditService {
       },
     });
 
-    return { customer, transactions };
+    const creditBalance = await availablePartyCredit(prisma, customerId);
+    return { customer: { ...customer, creditBalance }, transactions };
   }
 
   async listApplications(params?: { status?: string; branchId?: string }) {
@@ -158,7 +118,7 @@ export class CreditService {
 
     const invoice = await prisma.invoice.findUnique({
       where: { id: data.invoiceId },
-      include: { payments: true },
+      include: { jobCard: { select: { branchId: true } } },
     });
     if (!invoice) {
       throw new NotFoundError("Invoice not found");
@@ -169,23 +129,25 @@ export class CreditService {
       );
     }
 
-    const paidAmount = invoice.payments.reduce(
-      (sum, payment) => sum + payment.amount,
-      0,
-    );
-    const outstanding = invoice.total - paidAmount;
+    const outstanding = money(invoice.outstandingAmount);
     if (outstanding <= 0) {
       throw new BadRequestError("This invoice has no outstanding balance");
     }
     if (!Number.isFinite(data.amount) || data.amount <= 0) {
       throw new BadRequestError("Amount must be a positive number");
     }
-    if (data.amount > outstanding) {
+    const amount = money(data.amount);
+    if (amount <= 0) throw new BadRequestError("Amount must be at least 0.01");
+    if (["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase())) {
+      throw new BadRequestError("Cannot apply credit to a cancelled invoice");
+    }
+    if (amount > outstanding) {
       throw new BadRequestError(
         "Amount exceeds the outstanding balance of the invoice",
       );
     }
-    if (data.amount > customer.creditBalance) {
+    const availableCredit = await availablePartyCredit(prisma, customer.id, invoice.jobCard?.branchId ?? customer.branchId);
+    if (amount > availableCredit) {
       throw new BadRequestError(
         "Amount exceeds the customer's available credit balance",
       );
@@ -208,7 +170,7 @@ export class CreditService {
       data: {
         customerId: customer.id,
         invoiceId: invoice.id,
-        amount: data.amount,
+        amount,
         comments: data.comments,
         requestedById: data.requestedById,
       },
@@ -218,8 +180,8 @@ export class CreditService {
 
   /**
    * The customer decides on a pending credit application from the portal.
-   * On approval: a 'Credit' payment is recorded against the invoice and the
-   * customer's credit balance is debited atomically.
+   * On approval: dated adjustments consume the party's oldest available
+   * credits and reduce invoice outstanding atomically.
    */
   async decideApplication(
     customerId: string,
@@ -245,9 +207,13 @@ export class CreditService {
     const decisionDate = new Date();
 
     if (!data.approved) {
-      const declined = await prisma.customerCreditApplication.update({
-        where: { id: applicationId },
-        data: { status: "Declined", decisionDate, comments: data.comments },
+      const declined = await prisma.$transaction(async (tx) => {
+        const decision = await tx.customerCreditApplication.updateMany({
+          where: { id: applicationId, customerId, status: "Pending" },
+          data: { status: "Declined", decisionDate, comments: data.comments },
+        });
+        if (decision.count !== 1) throw new ConflictError("This credit application has already been decided");
+        return tx.customerCreditApplication.findUniqueOrThrow({ where: { id: applicationId } });
       });
 
       await this.notificationService.notifyUsers([application.requestedById], {
@@ -264,71 +230,33 @@ export class CreditService {
       return declined;
     }
 
-    const approved = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.findUnique({
-        where: { id: customerId },
+    const approved = await withPartyTransaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${applicationId},0))`);
+      const customer = await lockParty(tx,customerId);
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "CustomerCreditApplication" WHERE id = ${applicationId} FOR UPDATE`);
+      const currentApplication = await tx.customerCreditApplication.findUnique({ where: { id: applicationId } });
+      if (!currentApplication || currentApplication.customerId !== customerId) throw new NotFoundError("Credit application not found");
+      if (currentApplication.status !== "Pending") throw new ConflictError("This credit application has already been decided");
+      const amount = money(currentApplication.amount);
+      if (amount <= 0) throw new BadRequestError("Amount must be at least 0.01");
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "Invoice" WHERE id = ${currentApplication.invoiceId} FOR UPDATE`);
+      const invoice = await tx.invoice.findUnique({ where: { id: currentApplication.invoiceId }, include: { jobCard: { select: { branchId: true } } } });
+      if (!invoice) throw new NotFoundError("Invoice not found");
+      if (invoice.customerId !== customerId || ["CANCELLED","CANCELED","VOID"].includes(invoice.status.toUpperCase())) throw new BadRequestError("Cannot apply credit to this invoice");
+      if (amount > money(invoice.outstandingAmount)) throw new ConflictError("Amount exceeds the outstanding balance of the invoice");
+      const branchId = invoice.jobCard?.branchId ?? customer.branchId;
+      const partyAccount = new PartyAccountService();
+      const credits = await partyAccount.fundingCredits(tx,customerId,branchId,decisionDate);
+      const plan = fifoAdjustments([{ id: invoice.id, kind: 'INVOICE', number: invoice.invoiceNumber, date: invoice.issuedDate, amount: invoice.total, balance: amount }],credits);
+      if (plan.amount !== amount) throw new ConflictError("Insufficient credit balance to approve this application; adjust older credits first if more than 200 credits are needed");
+      const batch = await partyAccount.applyAdjustment(tx,{
+        customerId, branchId, date: decisionDate.toISOString(), source: 'CREDIT_APPLICATION', idempotencyKey: applicationId,
+        debits: plan.debits, credits: plan.credits,
       });
-      if (!customer) {
-        throw new NotFoundError("Customer not found");
-      }
-      if (customer.creditBalance < application.amount) {
-        throw new ConflictError(
-          "Insufficient credit balance to approve this application",
-        );
-      }
-
-      const invoice = await tx.invoice.findUnique({
-        where: { id: application.invoiceId },
-        include: { payments: true },
-      });
-      if (!invoice) {
-        throw new NotFoundError("Invoice not found");
-      }
-
-      const paidBefore = invoice.payments.reduce(
-        (sum, payment) => sum + payment.amount,
-        0,
-      );
-      const paidAfter = paidBefore + application.amount;
-      const newStatus = paidAfter >= invoice.total ? "Paid" : "Partially Paid";
-      const newBalance = customer.creditBalance - application.amount;
-
-      await tx.customer.update({
-        where: { id: customerId },
-        data: { creditBalance: newBalance },
-      });
-
-      await tx.customerCreditTransaction.create({
-        data: {
-          customerId,
-          amount: -application.amount,
-          balanceAfter: newBalance,
-          type: "USED",
-          description: `Credit applied to invoice ${invoice.invoiceNumber}`,
-          referenceId: applicationId,
-        },
-      });
-
-      await tx.payment.create({
-        data: {
-          invoiceId: application.invoiceId,
-          amount: application.amount,
-          method: "Credit",
-          reference: `CREDIT-${applicationId.slice(0, 8).toUpperCase()}`,
-          notes: data.comments ?? "Customer credit application approved",
-        },
-      });
-
-      await tx.invoice.update({
-        where: { id: application.invoiceId },
-        data: { status: newStatus },
-      });
-
-      return tx.customerCreditApplication.update({
-        where: { id: applicationId },
-        data: { status: "Approved", decisionDate, comments: data.comments },
-        include: APPLICATION_INCLUDE,
-      });
+      const balanceAfter = await availablePartyCredit(tx,customerId);
+      await tx.customerCreditTransaction.create({ data: { customerId, amount: -amount, balanceAfter, type: "USED", description: `Credit applied to invoice ${invoice.invoiceNumber}`, referenceId: applicationId } });
+      await tx.auditLog.create({ data: { action: "CREDIT_APPLICATION_APPROVED", details: JSON.stringify({ customerId,applicationId,batchId: batch.id,invoiceId: invoice.id,amount,outstandingBefore: invoice.outstandingAmount,outstandingAfter: money(invoice.outstandingAmount-amount) }) } });
+      return tx.customerCreditApplication.update({ where: { id: applicationId }, data: { status: "Approved",decisionDate,comments: data.comments,batchId: batch.id }, include: APPLICATION_INCLUDE });
     });
 
     const customer = await prisma.customer.findUnique({

@@ -142,7 +142,7 @@ export default function SideNav({
 
   function isItemActive(href: string, pathname: string) {
     if (href === "/logout") return false;
-    if (href === exactRoot) return pathname === href;
+    if (href === exactRoot || href === "/finance") return pathname === href;
     return isActive(href, pathname);
   }
 
@@ -150,7 +150,7 @@ export default function SideNav({
     <aside
       className={cn(
         // base
-        "fixed inset-y-0 left-0 z-40 flex flex-col print:hidden",
+        "fixed inset-y-0 left-0 z-40 flex flex-col",
         "border-r border-white/10",
         "transition-all duration-300 ease-in-out",
         // desktop: always visible, width driven by collapsed
@@ -280,7 +280,12 @@ export default function SideNav({
                       )}
                     >
                       {visibleItems.map((item) => {
-                        const { label, href, icon: Icon, badge, children } = item as any;
+                        const { label, href, icon: Icon, badge } = item;
+                        const children = item.children?.filter((child) =>
+                          child.permissions?.length
+                            ? hasAnyPermission(child.permissions)
+                            : hasAccess(child.roles ?? []),
+                        );
                         const isLogout = href === "/logout";
                         const active = href ? isItemActive(href, pathname) : false;
                         const hasChildren = Array.isArray(children) && children.length > 0;
@@ -360,6 +365,7 @@ export default function SideNav({
                           return (
                             <div key={label} className="w-full">
                               <button
+                                aria-expanded={expanded}
                                 onClick={() =>
                                   setOpenGroups((s) => {
                                     const current = Object.prototype.hasOwnProperty.call(s, label)

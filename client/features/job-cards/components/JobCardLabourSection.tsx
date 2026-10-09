@@ -19,86 +19,16 @@ type LabourItem = {
   defaultHours: number;
   rate: number;
 };
-type Person = { id: string; firstName: string; lastName: string };
 type LabourLine = {
   id: string;
   labourItemId: string;
   description: string;
   hours: number;
-  standardHours?: number | null;
   rate: number;
   amount: number;
   technicianId?: string | null;
-  technician?: Person | null;
-  technicians?: { technicianId: string; sharePercent: number | null; technician: Person }[];
+  technician?: { id: string; firstName: string; lastName: string } | null;
 };
-
-/** Technicians picked for a line; share "" = even split. */
-type TechPick = { technicianId: string; share: string };
-
-const MAX_TECHNICIANS = 3;
-
-function linePicks(line: LabourLine): TechPick[] {
-  if (line.technicians?.length) return line.technicians.map((t) => ({ technicianId: t.technicianId, share: t.sharePercent == null ? "" : String(t.sharePercent) }));
-  return line.technicianId ? [{ technicianId: line.technicianId, share: "" }] : [];
-}
-
-/** Payload for the API, or an error message. Shares: all or none, adding up to 100. */
-function techniciansPayload(picks: TechPick[]): { technicians: { technicianId: string; sharePercent?: number }[] } | { error: string } {
-  const chosen = picks.filter((pick) => pick.technicianId);
-  if (new Set(chosen.map((pick) => pick.technicianId)).size !== chosen.length) return { error: "Pick each technician once" };
-  const withShare = chosen.filter((pick) => pick.share.trim() !== "");
-  if (withShare.length && withShare.length !== chosen.length) return { error: "Give a share for every technician, or none for an even split" };
-  if (withShare.length) {
-    const total = withShare.reduce((sum, pick) => sum + Number(pick.share), 0);
-    if (withShare.some((pick) => !(Number(pick.share) > 0)) || Math.abs(total - 100) > 0.001) return { error: "Shares must add up to 100%" };
-  }
-  return { technicians: chosen.map((pick) => ({ technicianId: pick.technicianId, ...(withShare.length ? { sharePercent: Number(pick.share) } : {}) })) };
-}
-
-function TechniciansPicker({ value, onChange, options, disabled }: { value: TechPick[]; onChange: (value: TechPick[]) => void; options: Person[]; disabled?: boolean }) {
-  const rows = value.length ? value : [{ technicianId: "", share: "" }];
-  const update = (index: number, patch: Partial<TechPick>) => onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  return (
-    <div className="grid gap-1.5">
-      <span className="text-sm font-semibold">Technicians</span>
-      {rows.map((row, index) => (
-        <div key={index} className="flex items-center gap-1.5">
-          <select className={inputCls} aria-label={`Technician ${index + 1}`} value={row.technicianId} disabled={disabled} onChange={(event) => update(index, { technicianId: event.target.value })}>
-            <option value="">{index === 0 ? "Unassigned" : "Select technician"}</option>
-            {options.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.firstName} {person.lastName}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min="1"
-            max="100"
-            aria-label={`Technician ${index + 1} share %`}
-            placeholder="%"
-            title="Share % (leave blank for an even split)"
-            className="h-10 w-16 shrink-0 rounded-md border border-border bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:bg-muted/60"
-            value={row.share}
-            disabled={disabled || rows.length < 2}
-            onChange={(event) => update(index, { share: event.target.value })}
-          />
-          {rows.length > 1 && !disabled && (
-            <Button type="button" size="icon" variant="ghost" aria-label={`Remove technician ${index + 1}`} onClick={() => onChange(rows.filter((_, i) => i !== index))}>
-              <Trash2 className="size-4" />
-            </Button>
-          )}
-        </div>
-      ))}
-      {!disabled && rows.length < MAX_TECHNICIANS && rows[rows.length - 1].technicianId && (
-        <button type="button" className="justify-self-start text-sm font-medium text-primary hover:underline" onClick={() => onChange([...rows, { technicianId: "", share: "" }])}>
-          + Add technician
-        </button>
-      )}
-    </div>
-  );
-}
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
@@ -131,9 +61,9 @@ export function JobCardLabourSection({
     ].includes(status.toLowerCase());
   const [labourItemId, setLabourItemId] = useState("");
   const [hours, setHours] = useState("");
-  const [picks, setPicks] = useState<TechPick[]>([]);
+  const [technicianId, setTechnicianId] = useState("");
   const [editing, setEditing] = useState<
-    Record<string, { hours: string; rate: string; picks: TechPick[] }>
+    Record<string, { hours: string; rate: string; technicianId: string }>
   >({});
   const lines = useQuery({
     queryKey: ["job-card-labour", jobCardId],
@@ -163,17 +93,17 @@ export function JobCardLabourSection({
     queryClient.invalidateQueries({ queryKey: jobCardKeys.detail(jobCardId) });
   }
   const addLine = useMutation({
-    mutationFn: (technicians: { technicianId: string; sharePercent?: number }[]) =>
+    mutationFn: () =>
       apiPost(API_ROUTES.service.jobCardLabour(jobCardId), {
         labourItemId,
         hours: hours ? Number(hours) : undefined,
-        technicians,
+        technicianId: technicianId || undefined,
       }),
     onSuccess: () => {
       toast.success("Labour line added");
       setLabourItemId("");
       setHours("");
-      setPicks([]);
+      setTechnicianId("");
       refresh();
     },
     onError: (error) => toast.error(isAxiosError(error) ? error.response?.data?.message || "Could not add labour line" : "Could not add labour line"),
@@ -184,7 +114,7 @@ export function JobCardLabourSection({
       values,
     }: {
       id: string;
-      values: { hours: number; rate: number; technicians: { technicianId: string; sharePercent?: number }[] };
+      values: { hours: number; rate: number; technicianId: string | null };
     }) =>
       apiPut(API_ROUTES.service.jobCardLabourLine(id), {
         ...values,
@@ -232,10 +162,8 @@ export function JobCardLabourSection({
         const form = editing[line.id] ?? {
           hours: String(line.hours),
           rate: String(line.rate),
-          picks: linePicks(line),
+          technicianId: line.technicianId ?? "",
         };
-        const lineTechnicians = line.technicians?.length ? line.technicians.map((t) => t.technician) : line.technician ? [line.technician] : [];
-        const technicianOptions = [...technicians, ...lineTechnicians.filter((person) => !technicians.some((t) => t.id === person.id))];
         return (
           <div
             key={line.id}
@@ -245,7 +173,6 @@ export function JobCardLabourSection({
               <p className="truncate text-sm font-medium">{line.description}</p>
               <p className="text-sm text-slate-500">
                 {formatMoney(line.amount)}
-                {line.standardHours != null && <span className="ml-2 text-xs">Std {line.standardHours} h</span>}
               </p>
             </div>
             <Field label="Hours">
@@ -280,12 +207,27 @@ export function JobCardLabourSection({
                 }
               />
             </Field>
-            <TechniciansPicker
-              value={form.picks}
-              options={technicianOptions}
-              disabled={!canEdit}
-              onChange={(next) => setEditing((current) => ({ ...current, [line.id]: { ...form, picks: next } }))}
-            />
+            <Field label="Technician">
+              <select
+                className={inputCls}
+                value={form.technicianId}
+                disabled={!canEdit}
+                onChange={(event) =>
+                  setEditing((current) => ({
+                    ...current,
+                    [line.id]: { ...form, technicianId: event.target.value },
+                  }))
+                }
+              >
+                <option value="">Unassigned</option>
+                {line.technician && !technicians.some((technician) => technician.id === line.technician?.id) && <option value={line.technician.id}>{line.technician.firstName} {line.technician.lastName}</option>}
+                {technicians.map((technician) => (
+                  <option key={technician.id} value={technician.id}>
+                    {technician.firstName} {technician.lastName}
+                  </option>
+                ))}
+              </select>
+            </Field>
             {canEdit && (
               <div className="flex gap-1 print:hidden">
                 <Button
@@ -293,18 +235,16 @@ export function JobCardLabourSection({
                   size="sm"
                   variant="outline"
                   disabled={saveLine.isPending || removeLine.isPending || !Number.isFinite(Number(form.hours)) || Number(form.hours) <= 0 || !form.rate.trim() || !Number.isFinite(Number(form.rate)) || Number(form.rate) < 0}
-                  onClick={() => {
-                    const payload = techniciansPayload(form.picks);
-                    if ("error" in payload) return toast.error(payload.error);
+                  onClick={() =>
                     saveLine.mutate({
                       id: line.id,
                       values: {
                         hours: Number(form.hours),
                         rate: Number(form.rate),
-                        technicians: payload.technicians,
+                        technicianId: form.technicianId || null,
                       },
-                    });
-                  }}
+                    })
+                  }
                 >
                   Save
                 </Button>
@@ -328,10 +268,7 @@ export function JobCardLabourSection({
           className="grid gap-3 border-t pt-4 md:grid-cols-[minmax(180px,1fr)_100px_1fr_auto] md:items-end print:hidden"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!labourItemId) return;
-            const payload = techniciansPayload(picks);
-            if ("error" in payload) return toast.error(payload.error);
-            addLine.mutate(payload.technicians);
+            if (labourItemId) addLine.mutate();
           }}
         >
           <Field label="Labour item">
@@ -365,7 +302,20 @@ export function JobCardLabourSection({
               placeholder="Default"
             />
           </Field>
-          <TechniciansPicker value={picks} onChange={setPicks} options={technicians} />
+          <Field label="Technician">
+            <select
+              className={inputCls}
+              value={technicianId}
+              onChange={(event) => setTechnicianId(event.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {technicians.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.firstName} {technician.lastName}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Button type="submit" disabled={!labourItemId || addLine.isPending}>
             <Plus className="size-4" />
             Add labour

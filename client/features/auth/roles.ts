@@ -59,29 +59,6 @@ export const CAMPAIGN_PERMISSIONS = {
 
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
-/** One permission per report (server: PERMISSIONS.REPORT_* in shared/constants/roles.ts). */
-export const REPORT_PERMISSIONS = {
-  RECEIPT_REGISTER: "report:receipt-register",
-  SERVICE_BOOKING: "report:service-booking",
-  JOB_ESTIMATE_REGISTER: "report:job-estimate-register",
-  JOB_CARDS_OPEN: "report:job-cards-open",
-  WORKSHOP_STATUS: "report:workshop-status",
-  WORKSHOP_PROGRESS: "report:workshop-progress",
-  SERVICE_WISE_PROGRESS: "report:service-wise-progress",
-  VEHICLES_TO_BE_READY: "report:vehicles-to-be-ready",
-  DAILY_PRODUCTIVITY: "report:daily-productivity",
-  TECHNICIAN_PRODUCTIVITY: "report:technician-productivity",
-  DAILY_LABOUR_REGISTER: "report:daily-labour-register",
-  WORKSHOP_BILL: "report:workshop-bill",
-  FREE_SERVICE: "report:free-service",
-  BEFORE_FIRST_SERVICE: "report:before-first-service",
-  MILEAGE_WISE: "report:mileage-wise",
-  SETTINGS: "report:settings",
-} as const;
-
-/** Any of these opens the reports hub. */
-export const ANY_REPORT_PERMISSION: string[] = ["financereport:read", ...Object.values(REPORT_PERMISSIONS)];
-
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import prisma from '../prisma/client';
 import { UnauthorizedError } from '../shared/errors/appError';
-import { JWTPayload } from '../shared/types';
+import { loadStaffUser } from './authMiddleware';
 
 const CUSTOMER_ROLE = 'customer';
 
@@ -106,16 +106,13 @@ export const combinedAuthMiddleware = async (
       return next();
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId as string },
-      select: { id: true, isActive: true },
-    });
+    const user = await loadStaffUser(decoded.userId as string);
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return next(new UnauthorizedError('Your account has been deactivated'));
     }
 
-    req.user = decoded as unknown as JWTPayload;
+    req.user = user;
     next();
   } catch (error) {
     next(error);

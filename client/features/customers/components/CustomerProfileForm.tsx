@@ -49,6 +49,7 @@ export function CustomerProfileForm(
       lastName: "",
       email: "",
       type: "INDIVIDUAL",
+      partyStatus: "CUSTOMER",
       branchId: activeBranch?.id ?? "",
       ...defaults,
     },
@@ -107,6 +108,8 @@ export function CustomerProfileForm(
       }))}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Customer type"><select className={inputCls} {...register("type")}>{["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"].map(value => <option key={value}>{value}</option>)}</select></Field>
+        <Field label="Credit days (blank uses company default)" error={errors.creditDays?.message}><input className={inputCls} type="number" min="0" max="3650" {...register("creditDays", { setValueAs: value => value === "" ? null : Number(value) })} /></Field>
+        <Field label="Party status" error={errors.partyStatus?.message}><select className={inputCls} {...register("partyStatus")}><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option><option value="FA_PARTY">FA party</option></select></Field>
         <Field label="Salutation">{type === "CORPORATE" ? <input className={inputCls} value="M/S." readOnly /> : <select className={inputCls} {...register("salutation")}><option value="">Select salutation</option>{["Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."].map(value => <option key={value}>{value}</option>)}</select>}</Field>
         {fields.map(
           ([key, label]) => <Field key={key} label={label} error={errors[key]?.message}><input className={inputCls} type={key === "email" ? "email" : "text"} {...register(key)} /></Field>,

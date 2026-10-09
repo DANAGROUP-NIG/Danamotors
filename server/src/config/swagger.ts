@@ -1,7 +1,5 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
-import { buildReportPaths } from '../modules/reports/reports.openapi';
-import { REPORTS } from '../modules/reports/reports.registry';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -44,10 +42,6 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
       },
     ],
     tags: [
-      {
-        name: 'Reports',
-        description: 'Workshop daily reports: one endpoint per report, branch-scoped, aggregated on the server.',
-      },
       {
         name: 'Health',
         description: 'API health check endpoint',
@@ -236,6 +230,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
+            creditDays: { type: 'integer', nullable: true, minimum: 0, maximum: 3650, description: 'Null uses company default credit days for future job bills' },
+            partyStatus: { type: 'string', enum: ['CUSTOMER','DEALER','FA_PARTY'], default: 'CUSTOMER' },
             firstName: { type: 'string', example: 'Adaeze' },
             lastName: { type: 'string', example: 'Okafor' },
             email: { type: 'string', format: 'email', nullable: true },
@@ -506,8 +502,6 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
   ],
 };
 
-const swaggerSpec = swaggerJsdoc(options) as { paths?: Record<string, unknown> };
-// Report endpoints are generated from the report registry, so their docs come from it too.
-swaggerSpec.paths = { ...(swaggerSpec.paths ?? {}), ...buildReportPaths(REPORTS) };
+const swaggerSpec = swaggerJsdoc(options);
 
 export default swaggerSpec;

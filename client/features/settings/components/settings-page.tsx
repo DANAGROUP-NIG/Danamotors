@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/headers/page-header";
 
 const SETTINGS_CARDS = [
+  { title: "Party reports", description: "Set company defaults for ageing limits.", href: "/settings/party-reports" },
   {
     title: "Users & Roles",
     description: "Manage staff accounts and permission levels.",
@@ -33,11 +34,6 @@ const SETTINGS_CARDS = [
     title: "Warranty",
     description: "Model warranty policies and manufacturer claim codes.",
     href: "/warranty/settings",
-  },
-  {
-    title: "Report Settings",
-    description: "Mileage bands and thresholds used by the workshop reports.",
-    href: "/settings/reports",
   },
   {
     title: "Audit Log",

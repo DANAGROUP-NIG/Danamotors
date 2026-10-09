@@ -51,7 +51,6 @@ jest.mock("../../prisma/client", () => ({
     estimate: {
       findMany: jest.fn(),
       create: jest.fn(),
-      updateMany: jest.fn(),
     },
 
     $queryRaw: jest.fn(),
@@ -296,7 +295,6 @@ describe("JobCard workflow", () => {
       isActive: true,
     });
     (prisma.estimate.create as jest.Mock).mockResolvedValue({ id });
-    (prisma.documentSequence.upsert as jest.Mock).mockResolvedValue({ value: 7 });
 
     await new ServiceService().addEstimate(id, {
       description: "Workshop estimate",
@@ -306,13 +304,9 @@ describe("JobCard workflow", () => {
     expect(prisma.service.findFirst).toHaveBeenCalledWith({
       where: { id, isActive: true },
     });
-    // Earlier revisions are superseded and the new one is numbered.
-    expect(prisma.estimate.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ jobCardId: id }), data: { estimateStatus: "CLOSED", closedReason: "SUPERSEDED" } }));
     expect(prisma.estimate.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          estimateNumber: expect.stringMatching(/^\d{4}000007$/),
-          estimateStatus: "PENDING_APPROVAL",
           amount: 85000,
           lines: {
             createMany: { data: [

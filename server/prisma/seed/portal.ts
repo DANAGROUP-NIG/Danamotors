@@ -1,3 +1,4 @@
+import { nextDocumentNumber } from "../../src/modules/finance/document-number";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "./helpers";
 
@@ -93,12 +94,14 @@ export default async function seedCustomerPortal(
         where: { customerId: customer.id },
       });
       if (!existingTx) {
-        await prisma.$transaction([
-          prisma.customer.update({ where: { id: customer.id }, data: { creditBalance: demo.creditBalance } }),
-          prisma.customerCreditTransaction.create({
-            data: { customerId: customer.id, amount: demo.creditBalance, balanceAfter: demo.creditBalance, type: "CREDIT_IN", description: "Initial credit (demo)" },
-          }),
-        ]);
+        await prisma.$transaction(async tx => {
+          await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${customer.id} FOR UPDATE`;
+          const date = new Date();
+          const number = await nextDocumentNumber(tx, "CREDIT_NOTE", date);
+          const note = await tx.partyNote.create({ data: { customerId: customer.id, branchId: branch.id, number, direction: "CREDIT", type: "OPENING", date, amount: demo.creditBalance!, remainingAmount: demo.creditBalance!, narration: "Initial credit (demo)", legacyKey: "DEMO:" + customer.id } });
+          await tx.customerCreditTransaction.create({ data: { customerId: customer.id, amount: demo.creditBalance!, balanceAfter: demo.creditBalance!, type: "CREDIT_IN", description: "Initial credit (demo)" } });
+          await tx.auditLog.create({ data: { action: "PARTY_OPENING_SEEDED", details: JSON.stringify({ customerId: customer.id, noteId: note.id, amount: demo.creditBalance }) } });
+        }, { isolationLevel: "Serializable" });
       }
     }
 

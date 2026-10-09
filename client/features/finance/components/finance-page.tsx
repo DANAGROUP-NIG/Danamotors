@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { PageHeader } from "@/components/headers/page-header";
 
 const FINANCE_CARDS = [
@@ -26,15 +28,17 @@ const FINANCE_CARDS = [
 ];
 
 export function FinancePage() {
+  const { hasPermission } = useAuth();
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
         title="Finance"
         description="Revenue, invoicing, and payment management."
       />
+      <section className="rounded-xl border bg-background p-5"><h2 className="font-semibold">Receipts</h2><div className="mt-3 flex flex-wrap gap-4 text-sm">{hasPermission("receipt:create") && <Link className="font-medium text-primary hover:underline" href="/payments">Payment receipt</Link>}{hasPermission("outstanding:recalculate") && <Link className="font-medium text-primary hover:underline" href="/finance/receipts/update-outstanding">Update outstanding</Link>}{hasPermission("letter:outstanding") && <Link className="font-medium text-primary hover:underline" href="/finance/receipts/outstanding-letters">Outstanding letters</Link>}{hasPermission("receipt:adjust") && <Link className="font-medium text-primary hover:underline" href="/finance/receipts/advance-adjustment">Advance adjustment</Link>}{["debit","credit"].map(kind=>(hasPermission(kind+"note:read")||hasPermission(kind+"note:create"))&&<Link key={kind} className="font-medium text-primary hover:underline" href={"/finance/receipts/"+kind+"-notes"}>{kind==="debit"?"Debit Note":"Credit Note"}</Link>)}</div></section>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FINANCE_CARDS.map(({ title, href, description }) => (
-          <a
+          <Link
             key={title}
             href={href}
             className="group rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm transition hover:border-primary/30 hover:shadow-md"
@@ -46,7 +50,7 @@ export function FinancePage() {
             <span className="mt-4 block text-sm font-semibold text-primary">
               Open →
             </span>
-          </a>
+          </Link>
         ))}
       </div>
     </div>

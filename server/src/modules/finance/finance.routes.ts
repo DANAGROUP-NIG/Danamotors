@@ -1,9 +1,18 @@
+import { OutstandingController,requireOutstandingTools } from './outstanding.controller';
+import { repairSchema,maintenanceSettingsSchema,lettersPreviewSchema,lettersGenerateSchema,savedLettersSchema,letterPrintSchema } from './outstanding.validation';
+import { PartyNoteController, requireNoteCreate, requireNoteRegister, requireNoteRead, requireAnyNoteCreate } from './party-note.controller';
+import { createPartyNoteSchema, noteIdSchema, cancelPartyNoteSchema, noteRegisterSchema, noteReceiptQuerySchema, notePartyQuerySchema, noteLedgerQuerySchema } from './party-note.validation';
+import { z } from 'zod';
+import { PartyReportController, requirePartyReport, requireAnyPartyReport } from './party-report.controller';
+import { partyReportSchema, reportSettingsSchema, reportPartySearchSchema } from './party-report.validation';
 import { Router } from 'express';
+import { PartyAccountController } from './party-account.controller';
+import { partyAccountSchema, partySearchSchema, partyDocumentsSchema, fifoAdjustmentSchema, createAdjustmentSchema, reverseAdjustmentSchema, openingBalanceSchema } from './party-account.validation';
 import { FinanceController } from './finance.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission } from '../../middleware/authorize';
-import { PERMISSIONS } from '../../shared/constants/roles';
+import { requirePermission, requireRole } from '../../middleware/authorize';
+import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
 import {
   updateInvoiceSchema,
   invoiceIdParamSchema,
@@ -28,6 +37,42 @@ const router = Router();
 const controller = new FinanceController();
 
 router.use(authMiddleware);
+const outstanding=new OutstandingController();
+const repairAccess=[requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE)];
+router.get('/outstanding-letters/parties', requireOutstandingTools, validateRequest(reportPartySearchSchema), outstanding.search);
+router.post('/outstanding/recalculate/preview',...repairAccess,validateRequest(repairSchema),outstanding.previewRepair);
+router.post('/outstanding/recalculate/apply',...repairAccess,validateRequest(repairSchema),outstanding.applyRepair);
+router.get('/settings/outstanding',requireOutstandingTools,validateRequest(z.object({query:z.object({}).strict()})),outstanding.settings);
+router.put('/settings/outstanding',requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE),validateRequest(maintenanceSettingsSchema),outstanding.saveSettings);
+router.post('/outstanding-letters/preview',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersPreviewSchema),outstanding.previewLetters);
+router.post('/outstanding-letters/generate',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersGenerateSchema),outstanding.generate);
+router.get('/outstanding-letters',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(savedLettersSchema),outstanding.saved);
+router.post('/outstanding-letters/print',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.print);
+router.post('/outstanding-letters/printed',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.markPrinted);
+
+
+const partyNotes=new PartyNoteController();
+router.get('/party-notes/parties', requireAnyNoteCreate, validateRequest(notePartyQuerySchema), partyNotes.parties);
+router.get('/party-notes/customers/:id', requireAnyNoteCreate, validateRequest(noteIdSchema), partyNotes.customer);
+router.get('/party-notes/receipts', requireAnyNoteCreate, validateRequest(noteReceiptQuerySchema), partyNotes.receipts);
+router.get('/party-notes/ledgers', requireAnyNoteCreate, validateRequest(noteLedgerQuerySchema), partyNotes.ledgers);
+router.get('/party-notes/register/export', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.export);
+router.get('/party-notes/register/print', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.printRegister);
+router.get('/party-notes/register', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.register);
+router.get('/party-notes', requireNoteRead, validateRequest(noteRegisterSchema), partyNotes.register);
+router.post('/party-notes', requireNoteCreate, validateRequest(createPartyNoteSchema), partyNotes.create);
+router.get('/party-notes/:id/print', validateRequest(noteIdSchema), partyNotes.print);
+router.post('/party-notes/:id/cancel', validateRequest(cancelPartyNoteSchema), partyNotes.cancel);
+router.get('/party-notes/:id', validateRequest(noteIdSchema), partyNotes.get);
+
+const partyReports = new PartyReportController();
+router.get('/party-reports/parties', requireAnyPartyReport, validateRequest(reportPartySearchSchema), partyReports.search);
+router.get('/party-reports/export', requirePartyReport, validateRequest(partyReportSchema), partyReports.export);
+router.get('/party-reports/print', requirePartyReport, validateRequest(partyReportSchema), partyReports.print);
+router.get('/party-reports', requirePartyReport, validateRequest(partyReportSchema), partyReports.report);
+router.get('/settings/party-reports', requireAnyPartyReport, validateRequest(z.object({query:z.object({}).strict()})), partyReports.settings);
+router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OUTSTANDING_AGE_READ), validateRequest(reportSettingsSchema), partyReports.saveSettings);
+
 
 /**
  * @openapi
@@ -337,7 +382,7 @@ router.use(authMiddleware);
  *       - in: query
  *         name: type
  *         required: true
- *         schema: { type: string, enum: [JOB_BILL, RECEIPT] }
+ *         schema: { type: string, enum: [JOB_BILL, RECEIPT, DEBIT_NOTE, CREDIT_NOTE] }
  *     responses:
  *       200: { description: Documents with mapping readiness and skip reasons }
  * /finance/tally/post:
@@ -414,5 +459,731 @@ router.get('/reports/invoices', requirePermission(PERMISSIONS.FINANCE_REPORT_REA
 router.get('/reports/receipt-register', requirePermission(PERMISSIONS.RECEIPT_REGISTER_READ), validateRequest(receiptRegisterQuerySchema), controller.listReceipts);
 router.get('/dashboard/overview', requirePermission(PERMISSIONS.INVOICE_READ), controller.getDashboardOverview);
 
+
+/**
+ * @openapi
+ * /finance/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Search debtor parties by name or code
+ *     description: "Requires receipt:adjust. Merged customers and vendors are excluded. Admin/SuperAdmin may select any branch; other users are restricted to their assigned branch."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"order","schema":{"type":"string","enum":["name","code"],"default":"name"}}
+ *       - {"in":"query","name":"search","schema":{"type":"string","maxLength":100}}
+ *       - {"in":"query","name":"limit","schema":{"type":"integer","minimum":1,"maximum":100,"default":50}}
+ *     responses:
+ *       200: { description: "customers array (id, code, name), bounded by limit" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/account:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read the current party debit and credit totals
+ *     description: "Requires customer:read and party branch access. outstanding is invoices plus opening debits; availableCredit is receipt advances plus active credit notes/opening credits; netOutstanding is debit minus credit."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *     responses:
+ *       200: { description: "account with customer, outstanding, availableCredit and netOutstanding" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/documents:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read a paginated debit or credit document grid
+ *     description: "Requires receipt:adjust and branch access. These are current balances. Historical as-on reports ship separately."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"side","schema":{"type":"string","enum":["DEBIT","CREDIT"],"default":"DEBIT"}}
+ *       - {"in":"query","name":"openOnly","schema":{"type":"string","enum":["true","false"],"default":"true"}}
+ *       - {"in":"query","name":"page","schema":{"type":"integer","minimum":1,"default":1}}
+ *       - {"in":"query","name":"pageSize","schema":{"type":"integer","minimum":1,"maximum":100,"default":25}}
+ *     responses:
+ *       200: { description: "documents array (id, kind, number, date, amount, balance) and pagination meta" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/parties/{customerId}/adjustments:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read the latest 20 party adjustment batches
+ *     description: "Requires receipt:adjust and party/branch access. Returns reversal metadata. No adjustment batch creates a Tally journal."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"customerId","required":true,"schema":{"type":"string","format":"uuid"}}
+ *       - {"in":"query","name":"branchId","schema":{"type":"string","format":"uuid"}}
+ *     responses:
+ *       200: { description: "batches array, latest first" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ * /finance/adjustments/fifo-preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview editable FIFO allocations without saving
+ *     description: "Requires receipt:adjust. Matches at most 200 open documents per side, oldest date then number. Excludes documents after the effective date; balances are revalidated on save."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","date"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"date":{"type":"string","format":"date-time"}}}
+ *     responses:
+ *       200: { description: "preview with debit/credit selections, matched amount and both document arrays" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/adjustments:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Save a manual or FIFO party adjustment
+ *     description: "Requires receipt:adjust. Each side contains 1-200 unique documents. Debit and credit totals must be equal and positive, at most two decimal places, within current balances, owned by the same party/branch. Date cannot precede a selected document or be in the future. Serializable transaction, row locks and at most two P2034 retries. Reuse the same UUID key and identical details after an uncertain response; a changed request returns 409. No Tally journal or duplicate Payment row is created."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","date","idempotencyKey","debits","credits"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"date":{"type":"string","format":"date-time"},"idempotencyKey":{"type":"string","format":"uuid"},"source":{"type":"string","enum":["ADVANCE_ADJUSTMENT","FIFO"],"default":"ADVANCE_ADJUSTMENT"},"debits":{"$ref":"#/components/schemas/PartyAdjustmentSelections"},"credits":{"$ref":"#/components/schemas/PartyAdjustmentSelections"}}}
+ *     responses:
+ *       201: { description: "batch with effective date, amount, source and retry key" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/adjustments/{id}/reverse:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Reverse an unposted party adjustment with a remark
+ *     description: "Admin/SuperAdmin only, with receipt:adjust:reverse. Restores original document balances once and retains allocation rows with reversedAt. Any involved document or batch exported/posted to Tally blocks reversal. Original customer approval remains decision history."
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - {"in":"path","name":"id","required":true,"schema":{"type":"string","format":"uuid"}}
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["remark"],"properties":{"remark":{"type":"string","minLength":1,"maxLength":1000}}}
+ *     responses:
+ *       200: { description: "batch with reversedAt, reversedById and reverseRemark" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * /finance/opening-balances:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Record an opening debit or credit balance
+ *     description: "Admin/SuperAdmin only, with party:opening:create. The branch must be the customer branch. Creates a numbered OPENING PartyNote, excluded from Tally, with positive currency, effective date and narration. Reuse the same UUID key and identical details for retries."
+ *     security: [{ BearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: {"type":"object","required":["customerId","branchId","direction","date","amount","narration","idempotencyKey"],"properties":{"customerId":{"type":"string","format":"uuid"},"branchId":{"type":"string","format":"uuid"},"direction":{"type":"string","enum":["DEBIT","CREDIT"]},"date":{"type":"string","format":"date-time"},"amount":{"type":"number","minimum":0.01,"maximum":1000000000000,"multipleOf":0.01},"narration":{"type":"string","minLength":1,"maxLength":2000},"idempotencyKey":{"type":"string","format":"uuid"}}}
+ *     responses:
+ *       201: { description: "note with number, direction, type OPENING, amount, remainingAmount and tallyExcluded true" }
+ *       400: { description: Invalid input or document state }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Party or document not found }
+ *       409: { description: Stale balance, duplicate reversal, or changed retry details }
+ *       503: { description: Database busy; check balances and reuse the same key and details }
+ * components:
+ *   schemas:
+ *     PartyAdjustmentSelections:
+ *       type: array
+ *       minItems: 1
+ *       maxItems: 200
+ *       items:
+ *         type: object
+ *         required: [id, kind, amount]
+ *         properties:
+ *           id: { type: string, format: uuid }
+ *           kind: { type: string, enum: [INVOICE, RECEIPT, NOTE] }
+ *           amount: { type: number, minimum: 0.01, maximum: 1000000000000, multipleOf: 0.01 }
+ */
+const partyAccount = new PartyAccountController();
+router.get('/parties', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partySearchSchema), partyAccount.search);
+router.get('/parties/:customerId/account', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(partyAccountSchema), partyAccount.account);
+router.get('/parties/:customerId/documents', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyDocumentsSchema), partyAccount.documents);
+router.get('/parties/:customerId/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyAccountSchema), partyAccount.batches);
+router.post('/adjustments/fifo-preview', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(fifoAdjustmentSchema), partyAccount.fifo);
+router.post('/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(createAdjustmentSchema), partyAccount.create);
+router.post('/adjustments/:id/reverse', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.RECEIPT_ADJUST_REVERSE), validateRequest(reverseAdjustmentSchema), partyAccount.reverse);
+router.post('/opening-balances', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OPENING_CREATE), validateRequest(openingBalanceSchema), partyAccount.opening);
+
 export default router;
 
+
+/**
+ * @openapi
+ * components:
+ *   parameters:
+ *     PartyReportKind:
+ *       in: query
+ *       name: kind
+ *       description: "Report-specific permission is required."
+ *       schema: {"type":"string","enum":["ledger","outstanding","age","bill"],"default":"outstanding"}
+ *     PartyReportBranch:
+ *       in: query
+ *       name: branchId
+ *       description: "Admin may omit for all branches; other roles are forced to their assigned branch."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportCustomer:
+ *       in: query
+ *       name: customerId
+ *       description: "Optional single party, including the customer Account tab ledger link."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportFromParty:
+ *       in: query
+ *       name: fromCustomerId
+ *       description: "Inclusive range start in the selected name/code order."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportToParty:
+ *       in: query
+ *       name: toCustomerId
+ *       description: "Inclusive range end in the selected name/code order."
+ *       schema: {"type":"string","format":"uuid"}
+ *     PartyReportOrder:
+ *       in: query
+ *       name: order
+ *       description: "Stable ordering by selected value then party ID."
+ *       schema: {"type":"string","enum":["name","code"],"default":"name"}
+ *     PartyReportStatus:
+ *       in: query
+ *       name: partyStatus
+ *       description: "Party classification; vendors excluded."
+ *       schema: {"type":"string","enum":["ALL","CUSTOMER","DEALER","FA_PARTY"],"default":"ALL"}
+ *     PartyReportSide:
+ *       in: query
+ *       name: side
+ *       description: "Creditors remain disabled until vendor parties exist."
+ *       schema: {"type":"string","enum":["DEBTORS"],"default":"DEBTORS"}
+ *     PartyReportFrom:
+ *       in: query
+ *       name: from
+ *       description: "Required for ledger; opening balance excludes this day's events."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportTo:
+ *       in: query
+ *       name: to
+ *       description: "Required for ledger; inclusive Africa/Lagos calendar date."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportAsOn:
+ *       in: query
+ *       name: asOn
+ *       description: "Required for outstanding, age and bill. Inclusive Africa/Lagos date; future dates rejected."
+ *       schema: {"type":"string","format":"date"}
+ *     PartyReportCredit:
+ *       in: query
+ *       name: showCredit
+ *       description: "Age and bill hide net-credit parties unless true."
+ *       schema: {"type":"string","enum":["true","false"],"default":"false"}
+ *     PartyReportAges:
+ *       in: query
+ *       name: ageLimits
+ *       description: "Exactly five increasing whole days (1–3650); omitted uses company settings."
+ *       schema: {"type":"string","example":"30,60,90,120,180"}
+ *     PartyReportPage:
+ *       in: query
+ *       name: page
+ *       description: "JSON page; print/export include all matching rows."
+ *       schema: {"type":"integer","minimum":1,"maximum":100000,"default":1}
+ *     PartyReportPageSize:
+ *       in: query
+ *       name: pageSize
+ *       description: "Rows per JSON page. Ledger/bill pages may continue a party."
+ *       schema: {"type":"integer","minimum":1,"maximum":100,"default":25}
+ *   schemas:
+ *     PartyReportRow:
+ *       type: object
+ *       description: Monetary values are numeric NGN from PostgreSQL numeric aggregation; negative net means credit balance.
+ *       properties:
+ *         customerId: { type: string, format: uuid }
+ *         code: { type: string, nullable: true }
+ *         name: { type: string }
+ *         date: { type: string, format: date-time }
+ *         number: { type: string }
+ *         kind: { type: string }
+ *         narration: { type: string }
+ *         side: { type: string, enum: [DEBIT, CREDIT] }
+ *         debits: { type: number }
+ *         credits: { type: number }
+ *         net: { type: number }
+ *         amount: { type: number }
+ *         adjusted: { type: number }
+ *         balance: { type: number }
+ *         age: { type: integer }
+ *         opening: { type: number }
+ *         closing: { type: number }
+ *         debit: { type: number }
+ *         credit: { type: number }
+ *         runningBalance: { type: number }
+ *         bucket0: { type: number }
+ *         bucket1: { type: number }
+ *         bucket2: { type: number }
+ *         bucket3: { type: number }
+ *         bucket4: { type: number }
+ *         bucket5: { type: number }
+ *     PartyReportResult:
+ *       type: object
+ *       properties:
+ *         rows: { type: array, items: { $ref: '#/components/schemas/PartyReportRow' } }
+ *         totals: { type: object, additionalProperties: { type: number }, description: Totals cover all filtered rows, not the page }
+ *         ageLimits: { type: array, minItems: 5, maxItems: 5, items: { type: integer } }
+ *         meta:
+ *           type: object
+ *           properties:
+ *             page: { type: integer }
+ *             pageSize: { type: integer }
+ *             total: { type: integer }
+ *             totalPages: { type: integer }
+ * /finance/party-reports:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Paginated party ledger or outstanding report
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. Africa/Lagos inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Paginated party ledger or outstanding report
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: success }
+ *                 data: { $ref: '#/components/schemas/PartyReportResult' }
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/export:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Stream all matching rows as an Excel XML workbook (.xml), with a numeric total row
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. UTC inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Stream all matching rows as an Excel XML workbook (.xml), with a numeric total row
+ *         content:
+ *           application/vnd.ms-excel:
+ *             schema:
+ *               type: string
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/print:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Stream professional HTML print layout; ledger and bill start each party on a new page
+ *     description: Dated documents and allocations reconstruct history. Receipt edits and cancellation reversals are retained. UTC inclusive dates. One snapshot per result/export; 500-row streaming chunks. Example ledger query - kind=ledger&from=2026-01-01&to=2026-01-31.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportCustomer'
+ *       - $ref: '#/components/parameters/PartyReportFromParty'
+ *       - $ref: '#/components/parameters/PartyReportToParty'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - $ref: '#/components/parameters/PartyReportStatus'
+ *       - $ref: '#/components/parameters/PartyReportSide'
+ *       - $ref: '#/components/parameters/PartyReportFrom'
+ *       - $ref: '#/components/parameters/PartyReportTo'
+ *       - $ref: '#/components/parameters/PartyReportAsOn'
+ *       - $ref: '#/components/parameters/PartyReportCredit'
+ *       - $ref: '#/components/parameters/PartyReportAges'
+ *       - $ref: '#/components/parameters/PartyReportPage'
+ *       - $ref: '#/components/parameters/PartyReportPageSize'
+ *     responses:
+ *       200:
+ *         description: Stream professional HTML print layout; ledger and bill start each party on a new page
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       400: { description: Invalid dates, limits or filters }
+ *       403: { description: Missing report permission or foreign branch }
+ *       404: { description: Party range endpoint unavailable }
+ * /finance/party-reports/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Bounded debtor lookup for report ranges
+ *     description: Any party report permission; add kind to require one specific report permission.
+ *     parameters:
+ *       - $ref: '#/components/parameters/PartyReportKind'
+ *       - $ref: '#/components/parameters/PartyReportBranch'
+ *       - $ref: '#/components/parameters/PartyReportOrder'
+ *       - { in: query, name: search, schema: { type: string, maxLength: 100 } }
+ *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+ *     responses:
+ *       200:
+ *         description: Scoped code/name choices
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { customers: [{ id: '00000000-0000-4000-8000-000000000001', code: 'C0001', name: 'Example Party' }] } }
+ *       403: { description: Missing report permission or foreign branch }
+ * /finance/settings/party-reports:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read company ageing defaults
+ *     description: Requires any party report permission.
+ *     responses:
+ *       200:
+ *         description: Five default day limits
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { ageLimits: [30,60,90,120,180] } }
+ *       403: { description: Missing report permission }
+ *   put:
+ *     tags: [Finance]
+ *     summary: Save company ageing defaults with audit
+ *     description: Admin or SuperAdmin with report:party-outstanding-age permission.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ageLimits]
+ *             properties:
+ *               ageLimits: { type: array, minItems: 5, maxItems: 5, items: { type: integer, minimum: 1, maximum: 3650 }, example: [30,60,90,120,180] }
+ *     responses:
+ *       200: { description: Settings saved }
+ *       400: { description: Limits must be strictly increasing }
+ *       403: { description: Admin role and age report permission required }
+ */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     PartyNote:
+ *       type: object
+ *       properties: {id: {type: string, format: uuid}, number: {type: string, example: '2026000001'}, direction: {type: string, enum: [DEBIT, CREDIT]}, type: {type: string, enum: [AMOUNT, RECEIPT]}, date: {type: string, format: date-time}, amount: {type: string, example: '1250.50'}, remainingAmount: {type: string}, narration: {type: string}, status: {type: string, enum: [ACTIVE, CANCELLED]}, cancelRemark: {type: string, nullable: true}, cancelledAt: {type: string, format: date-time, nullable: true}, tallyPostedAt: {type: string, format: date-time, nullable: true}, tallyVoucherNo: {type: string, nullable: true}, partyCode: {type: string, nullable: true}, partyName: {type: string, nullable: true}, partyAddress: {type: string, nullable: true}, partyCity: {type: string, nullable: true}, partyState: {type: string, nullable: true}, receiptLines: {type: array, items: {type: object, properties: {receiptId: {type: string, format: uuid}, receiptNumber: {type: string}, receiptDate: {type: string, format: date-time}, chequeNumber: {type: string, nullable: true}, receiptAmount: {type: string}, narration: {type: string}, amount: {type: string}}}}, accountLines: {type: array, items: {type: object, properties: {ledgerId: {type: string, format: uuid}, accountCode: {type: string}, accountName: {type: string}, narration: {type: string}, amount: {type: string}}}}}
+ *     CreatePartyNote:
+ *       type: object
+ *       required: [customerId, branchId, direction, type, date, amount, narration, idempotencyKey]
+ *       properties: {customerId: {type: string, format: uuid}, branchId: {type: string, format: uuid}, direction: {type: string, enum: [DEBIT, CREDIT]}, type: {type: string, enum: [AMOUNT, RECEIPT], description: CREDIT requires AMOUNT}, date: {type: string, format: date, description: 'Africa/Lagos date, not in the future'}, amount: {type: number, exclusiveMinimum: 0, maximum: 1000000000000, multipleOf: 0.01}, narration: {type: string, minLength: 1, maxLength: 2000}, idempotencyKey: {type: string, format: uuid}, receiptLines: {type: array, maxItems: 200, items: {type: object, required: [receiptId, amount], properties: {receiptId: {type: string, format: uuid}, amount: {type: number, exclusiveMinimum: 0, multipleOf: 0.01}}}}, accountLines: {type: array, minItems: 1, maxItems: 200, items: {type: object, required: [ledgerId, amount], properties: {ledgerId: {type: string, format: uuid}, narration: {type: string, maxLength: 1000}, amount: {type: number, exclusiveMinimum: 0, multipleOf: 0.01}}}}}
+ *       description: Receipt debit and credit account lines must equal the note amount. Receipt lines cannot exceed each receipt amount. Plain amount debits have no lines.
+ * /finance/party-notes:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: List notes with paginated rows and all-result totals
+ *     description: >-
+ *       Requires the direction-specific note read permission. Opening balances are excluded. Face amount totals include
+ *       cancelled notes; balances/status are current.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: 'notes, totals.amount/remaining and pagination meta', content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *   post:
+ *     tags:
+ *       - Finance
+ *     summary: Create an immutable debit or credit note
+ *     description: >-
+ *       Requires debitnote:create or creditnote:create. Serializable locks, audit and idempotent retries. Receipt notes
+ *       leave the receipt and paid bills unchanged.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {$ref: '#/components/schemas/CreatePartyNote'}, example: {customerId: 550e8400-e29b-41d4-a716-446655440000, branchId: 550e8400-e29b-41d4-a716-446655440001, direction: CREDIT, type: AMOUNT, date: '2026-10-08', amount: 100, narration: Goodwill allowance, idempotencyKey: 550e8400-e29b-41d4-a716-446655440002, accountLines: [{ledgerId: 550e8400-e29b-41d4-a716-446655440003, amount: 100, narration: Goodwill}]}}}
+ *     responses:
+ *       '201': {description: Created or previously created note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '400': {description: 'Invalid lines, receipt, account, date or party'}
+ *       '409': {description: Request key reused with different details}
+ * /finance/party-notes/{id}:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Read a note with saved party and line snapshots
+ *     description: Requires the note direction read permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '403': {description: Access denied}
+ *       '404': {description: Note not found}
+ * /finance/party-notes/{id}/cancel:
+ *   post:
+ *     tags:
+ *       - Finance
+ *     summary: Cancel an unadjusted note with a remark
+ *     description: >-
+ *       Requires debitnote:cancel or creditnote:cancel. Rejects active adjustments, partial balances, opening balances and
+ *       Tally-posted notes. Sets cancellation date and zero remaining balance; invalidates unconfirmed XML.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {type: object, required: [remark], properties: {remark: {type: string, minLength: 1, maxLength: 1000}}}, example: {remark: Duplicate; XML was not imported}}}
+ *     responses:
+ *       '200': {description: Cancelled note, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ *       '400': {description: 'Adjusted, posted, opening or already cancelled'}
+ * /finance/party-notes/{id}/print:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Print a note with its saved details
+ *     description: Requires direction-specific note read permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: Escaped printable HTML, content: {text/html: {schema: {type: string}}}}
+ * /finance/party-notes/register:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Debit or credit note register
+ *     description: Requires report:debit-note-register or report:credit-note-register. Lagos date range; current balances/status.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: 'notes, all-result totals and pagination', content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/register/export:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Stream all matching notes as an Excel XML workbook
+ *     description: >-
+ *       Same register permission/scope. Bounded pages in one repeatable-read snapshot. Text is formula-safe; page/pageSize
+ *       do not restrict export.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: SpreadsheetML .xml workbook, content: {application/vnd.ms-excel: {schema: {type: string}}}}
+ * /finance/party-notes/register/print:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Print all matching register rows and totals
+ *     description: Same register permission/scope. Escaped HTML with repeated table headers.
+ *     parameters:
+ *       - {in: query, name: direction, required: true, schema: {type: string, enum: [DEBIT, CREDIT]}}
+ *       - {in: query, name: from, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: to, required: true, schema: {type: string, format: date}}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}, description: Admin/SuperAdmin can select a branch or all; others are forced to their branch}
+ *       - {in: query, name: customerId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *       - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+ *     responses:
+ *       '200': {description: Printable HTML, content: {text/html: {schema: {type: string}}}}
+ * /finance/party-notes/parties:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Search debtor parties by code/name for note creation
+ *     description: Requires either note create permission.
+ *     parameters:
+ *       - {in: query, name: branchId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: order, schema: {type: string, enum: [name, code]}}
+ *       - {in: query, name: limit, schema: {type: integer, maximum: 100}}
+ *     responses:
+ *       '200': {description: customers code/name rows, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/customers/{id}:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Read the selected party address for note creation
+ *     description: Requires either note create permission and branch access.
+ *     parameters:
+ *       - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+ *     responses:
+ *       '200': {description: customer code and address fields, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/receipts:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: List active receipts for a receipt debit note
+ *     description: Requires debitnote:create. Includes fully adjusted/Tally-posted receipts, 25 per page.
+ *     parameters:
+ *       - {in: query, name: customerId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: branchId, required: true, schema: {type: string, format: uuid}}
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: page, schema: {type: integer, default: 1}}
+ *     responses:
+ *       '200': {description: receipts and pagination meta, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ * /finance/party-notes/ledgers:
+ *   get:
+ *     tags:
+ *       - Finance
+ *     summary: Search active Tally codes/names for credit account lines
+ *     description: Requires creditnote:create; bounded to 100 rows.
+ *     parameters:
+ *       - {in: query, name: search, schema: {type: string}}
+ *       - {in: query, name: limit, schema: {type: integer, maximum: 100}}
+ *     responses:
+ *       '200': {description: ledgers, content: {application/json: {schema: {$ref: '#/components/schemas/StandardResponse'}}}}
+ */
+
+/**
+ * @openapi
+ * /finance/outstanding/recalculate/preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview document and wallet balance repairs
+ *     description: Admin or SuperAdmin with outstanding:recalculate. At most 2000 documents. Branch and inclusive party ranges apply. Returns differences and a snapshot hash.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { order: code, partyStatus: ALL, branchId: 550e8400-e29b-41d4-a716-446655440000 }
+ *           schema: { type: object, properties: { branchId: {type: string, format: uuid}, customerId: {type: string, format: uuid}, fromCustomerId: {type: string, format: uuid}, toCustomerId: {type: string, format: uuid}, order: {type: string, enum: [name, code]}, partyStatus: {type: string, enum: [ALL, CUSTOMER, DEALER, FA_PARTY]} } }
+ *     responses:
+ *       '200': {description: 'previewHash, checked, changes with stored/expected/status, wallets'}
+ *       '409': {description: Invalid active allocations require reconciliation}
+ * /finance/outstanding/recalculate/apply:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Apply the reviewed repair snapshot with an audit entry per change
+ *     description: Same filters and previewHash are required. Serializable row locks and retries. Does not alter document amounts, allocations, dates or Tally vouchers.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {order: code, partyStatus: ALL, previewHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'}}}
+ *     responses:
+ *       '200': {description: 'checked, changed and walletsChanged'}
+ *       '409': {description: Preview changed; preview again}
+ * /finance/settings/outstanding:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Read default credit days and outstanding letter settings
+ *     responses:
+ *       '200': {description: 'defaultCreditDays (30), letterPrefix (DML), letterTemplate'}
+ *   put:
+ *     tags: [Finance]
+ *     summary: Admin saves future bill credit terms and future letter defaults
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: {defaultCreditDays: 30, letterPrefix: DML, letterTemplate: 'Dear {{customerName}}, {{address}}. As on {{asOn}}, NGN {{totalOutstanding}} is outstanding. {{billTable}}'}
+ *           schema: {type: object, required: [defaultCreditDays, letterPrefix, letterTemplate], properties: {defaultCreditDays: {type: integer, minimum: 0, maximum: 3650}, letterPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]{1,9}$'}, letterTemplate: {type: string, maxLength: 10000}}}
+ *     responses:
+ *       '200': {description: Settings saved and audited}
+ * /finance/outstanding-letters/parties:
+ *   get:
+ *     tags: [Finance]
+ *     summary: Search code and name for letter and repair range endpoints
+ *     responses:
+ *       '200': {description: Bounded branch scoped customers}
+ * /finance/outstanding-letters/preview:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Preview parties over a net outstanding threshold
+ *     description: Requires letter:outstanding. Non administrators are forced to their branch. Excludes FA parties and previously printed parties by default. Dated report balances; max 100 parties and 10000 document rows per run.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: {asOn: '2026-10-08', threshold: 1000, order: name, partyStatus: CUSTOMER, includePrinted: false}
+ *           schema: {type: object, required: [asOn, threshold], properties: {asOn: {type: string, format: date}, threshold: {type: number, minimum: 0}, order: {type: string, enum: [name, code]}, partyStatus: {type: string, enum: [ALL, CUSTOMER, DEALER]}, includePrinted: {type: boolean, default: false}, branchId: {type: string, format: uuid}, fromCustomerId: {type: string, format: uuid}, toCustomerId: {type: string, format: uuid}}}
+ *     responses:
+ *       '200': {description: 'previewHash and parties with net and bill count'}
+ * /finance/outstanding-letters/generate:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Save immutable numbered letters from a reviewed preview
+ *     description: Same preview filters plus previewHash and UUID idempotencyKey. Retry the identical request after a network error. Each saved letter contains bill rows and safe rendered template content.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {asOn: '2026-10-08', threshold: 1000, order: name, partyStatus: CUSTOMER, includePrinted: false, idempotencyKey: 550e8400-e29b-41d4-a716-446655440000, previewHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'}}}
+ *     responses:
+ *       '200': {description: Saved letters or the previous identical result}
+ *       '409': {description: Changed preview or conflicting request key}
+ * /finance/outstanding-letters:
+ *   get:
+ *     tags: [Finance]
+ *     summary: List saved letters in an inclusive reference range
+ *     parameters:
+ *       - {in: query, name: fromRef, schema: {type: string}, example: DML000001}
+ *       - {in: query, name: toRef, schema: {type: string}, example: DML000025}
+ *       - {in: query, name: branchId, schema: {type: string, format: uuid}}
+ *       - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
+ *     responses:
+ *       '200': {description: 'letters and pagination metadata, 25 per page'}
+ * /finance/outstanding-letters/print:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Print saved content on the saved letterhead
+ *     description: One party starts per page. Large bill tables continue with repeated headers. Does not mark printed automatically.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {schema: {type: object, required: [ids], properties: {ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, format: uuid}}}}}}
+ *     responses:
+ *       '200': {description: Saved printable content, content: {text/html: {schema: {type: string}}}}
+ * /finance/outstanding-letters/printed:
+ *   post:
+ *     tags: [Finance]
+ *     summary: Confirm successful printing with an audit entry
+ *     description: Explicit user confirmation after successful printing. Repeated confirmation does not change the original printed timestamp.
+ *     requestBody:
+ *       required: true
+ *       content: {application/json: {example: {ids: [550e8400-e29b-41d4-a716-446655440000]}}}
+ *     responses:
+ *       '200': {description: Number newly marked printed}
+ */

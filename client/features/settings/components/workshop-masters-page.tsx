@@ -22,7 +22,6 @@ type Master = {
   category?: string | null;
   chargedTo?: string;
   freeService?: boolean;
-  freeServiceNo?: number | null;
   displayOrder?: number | null;
   preDelivery?: boolean;
   fuel?: string | null;
@@ -89,7 +88,6 @@ export function WorkshopMastersPage() {
         category: record.category,
         chargedTo: record.chargedTo,
         freeService: record.freeService,
-        ...(kind === "SERVICE_TYPE" && { freeServiceNo: record.freeService ? record.freeServiceNo ?? null : null }),
         displayOrder: kind === "SERVICE_TYPE" ? record.displayOrder : undefined,
         preDelivery: kind === "SERVICE_TYPE" ? record.preDelivery : undefined,
         fuel: record.fuel,
@@ -215,23 +213,7 @@ export function WorkshopMastersPage() {
                 onChange={e => setForm({
                   ...form,
                   freeService: e.target.checked,
-                })} />Free service</label>{form.freeService && <Field label="Free service no (1 = first)"><input
-                type="number"
-                min="1"
-                max="20"
-                className={inputCls}
-                value={form.freeServiceNo ?? ""}
-                onChange={e => setForm({
-                  ...form,
-                  freeServiceNo: e.target.value ? Number(e.target.value) : null,
-                })} /></Field>}<Field label="Category (PDI marks pre-delivery inspection)"><input
-                className={inputCls}
-                value={form.category ?? ""}
-                placeholder="e.g. PDI"
-                onChange={e => setForm({
-                  ...form,
-                  category: e.target.value,
-                })} /></Field></>}
+                })} />Free service</label></>}
           {kind === "SERVICE_TYPE" && <>
             <Field label="Display order"><input className={inputCls} type="number" min="0" max="100000" step="1"
               value={form.displayOrder ?? ""} onChange={event => setForm({ ...form, displayOrder: event.target.value === "" ? null : Number(event.target.value) })} /></Field>

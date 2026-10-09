@@ -226,6 +226,7 @@ export class PortalRepository {
         },
         payments: true,
         receipts: true,
+        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
         creditApplications: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -261,6 +262,7 @@ export class PortalRepository {
         },
         payments: true,
         receipts: true,
+        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
         creditApplications: {
           orderBy: { createdAt: 'desc' },
           select: {

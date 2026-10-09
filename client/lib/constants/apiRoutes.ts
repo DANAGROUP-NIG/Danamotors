@@ -117,6 +117,12 @@ export const API_ROUTES = {
     jobBills: "/finance/job-bills",
     serviceAdvisors: "/finance/service-advisors",
     receipts: "/finance/receipts",
+    partyAccount: (id: string) => `/finance/parties/${id}/account`,
+    partyDocuments: (id: string) => `/finance/parties/${id}/documents`,
+    partyAdjustments: (id: string) => `/finance/parties/${id}/adjustments`,
+    adjustments: "/finance/adjustments",
+    fifoPreview: "/finance/adjustments/fifo-preview",
+    openingBalances: "/finance/opening-balances",
     banks: "/finance/banks",
     receiptRegister: "/finance/reports/receipt-register",
     tally: {
