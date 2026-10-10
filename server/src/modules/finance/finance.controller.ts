@@ -67,7 +67,7 @@ export class FinanceController {
   cancelJobBill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const invoice = await this.financeService.getInvoice(req.params.id);
-      const branchId = (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
+      const branchId = (invoice as any).reportBranchId ?? (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
       assertBillingBranch(req, branchId);
       const result = await this.jobBillingService.cancelJobBill(req.params.id, req.user!.userId, req.body.remark);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Job bill cancelled', data: { invoice: result } });
@@ -95,7 +95,7 @@ export class FinanceController {
     try {
       const { id } = req.params;
       const result = await this.financeService.getInvoice(id);
-      const branchId = (result as any).jobCard?.branchId ?? (result as any).customer?.branchId;
+      const branchId = (result as any).reportBranchId ?? (result as any).jobCard?.branchId ?? (result as any).customer?.branchId;
       assertBillingBranch(req, branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { invoice: result } });
     } catch (error) {
@@ -107,7 +107,7 @@ export class FinanceController {
     try {
       const { id } = req.params;
       const invoice = await this.financeService.getInvoice(id);
-      const branchId = (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
+      const branchId = (invoice as any).reportBranchId ?? (invoice as any).jobCard?.branchId ?? (invoice as any).customer?.branchId;
       assertBillingBranch(req, branchId);
       const result = await this.financeService.updateInvoice(id, req.body);
       res.status(200).json({ status: 'success', statusCode: 200, message: 'Invoice updated successfully', data: { invoice: result } });

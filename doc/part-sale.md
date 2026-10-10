@@ -38,8 +38,12 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
 - **The bill is an `Invoice`** with no job card, numbered `CS` + year + six digits (for example
   `CS2026000010`). The prefix keeps it apart from job bills, which share the invoice number
   space. Receipts, outstanding, party ledgers, outstanding letters and the invoice screen all
-  treat it as an ordinary bill. `reportBranchId` is the selling branch, so receipts must be
-  taken at that branch.
+  treat it as an ordinary bill. `reportBranchId` is the selling branch (CPD is a branch like any
+  other), so receipts are taken at that branch, and the invoice list, payments, finance summary,
+  invoice report and dashboard all count the bill there (`branchScope` in `finance.repository.ts`).
+  Receipts for counter-sale bills go in the Service and parts register, as for job bills (legacy
+  "Service and Parts" receipts). The legacy parts module had no receipt logic of its own: it
+  shared the Service receipt screens, and CPD took no receipts in the legacy system.
 - **Tally**: counter-sale bills are exported as Sales vouchers. They use the job-bill
   mappings: `PARTS_SALES`, `PARTS_DISCOUNT`, `VAT` and `ROUND_OFF`.
 - **Returns** create a credit note with type `SALE_RETURN`. The credit note is set off

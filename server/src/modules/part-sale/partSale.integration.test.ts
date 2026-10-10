@@ -179,4 +179,31 @@ describeDb("CPD part sale (database)", () => {
     expect((await stockOf(mirror.id)).reservedQuantity).toBe(0);
     await expect(service.pickOrder(row.id)).rejects.toThrow(/can no longer change/);
   });
+  it("takes receipts for counter-sale bills at the selling branch, in the Service and parts register", async () => {
+    const { ReceiptService } = require("../finance/receipt.service");
+    const receipts = new ReceiptService();
+    const order = await service.createOrder(
+      { branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: oil.id, quantity: 1 }] },
+      user.id,
+    );
+    const sale = await service.createCounterSale(
+      { branchId: cpd.id, customerId: customer.id, lines: [{ orderLineId: order.lines[0].id, quantity: 1 }] },
+      user.id,
+    );
+    const receipt = (category: string) => ({
+      customerId: customer.id,
+      branchId: cpd.id,
+      mode: "CASH",
+      category,
+      amount: sale.invoice.total,
+      allocations: [{ invoiceId: sale.invoice.id, amount: sale.invoice.total }],
+      issuedById: user.id,
+    });
+    await expect(receipts.createReceipt(receipt("SALES_ENQUIRY"))).rejects.toThrow(/Service and parts register/);
+    await receipts.createReceipt(receipt("SERVICE_PARTS"));
+    const paid = await service.getCounterSale(sale.id);
+    expect(paid.invoice).toMatchObject({ outstandingAmount: 0, status: "Paid" });
+    // Receipted bills can no longer be cancelled.
+    await expect(service.cancelCounterSale(sale.id, "late", user.id)).rejects.toThrow(/receipts/);
+  });
 });

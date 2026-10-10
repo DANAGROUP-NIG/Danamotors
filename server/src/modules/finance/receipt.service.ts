@@ -20,7 +20,7 @@ async function lockInvoices(transaction: Prisma.TransactionClient, invoiceIds: s
   await transaction.$queryRaw<Array<{ id: string }>>(
     Prisma.sql`SELECT id FROM "Invoice" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`,
   );
-  return transaction.invoice.findMany({ where: { id: { in: ids } }, include: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } });
+  return transaction.invoice.findMany({ where: { id: { in: ids } }, include: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } }, counterSale: { select: { id: true } } } });
 }
 
 async function updateInvoiceBalance(
@@ -104,8 +104,10 @@ export class ReceiptService {
           }
           allocatedAmount = sumMoney([allocatedAmount, allocation.amount]);
         }
-        if (input.allocations.some((allocation) => invoiceById.get(allocation.invoiceId!)!.jobCardId) && input.category !== 'SERVICE_PARTS') {
-          throw new BadRequestError('Receipts allocated to job bills belong to the Service and parts register');
+        // Job bills and CPD counter-sale (parts) bills are both legacy "Service and Parts" receipts.
+        const servicePartsBill = (id: string) => { const invoice = invoiceById.get(id)!; return Boolean(invoice.jobCardId || invoice.counterSale); };
+        if (input.allocations.some((allocation) => servicePartsBill(allocation.invoiceId!)) && input.category !== 'SERVICE_PARTS') {
+          throw new BadRequestError('Receipts allocated to job bills or counter-sale bills belong to the Service and parts register');
         }
         if (allocatedAmount > input.amount + 0.000001) {
           throw new BadRequestError('Receipt allocations cannot exceed the receipt amount');
