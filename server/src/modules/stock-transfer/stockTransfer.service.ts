@@ -88,6 +88,7 @@ const partSelect = {
     partFlag: true,
     priceCategoryCode: true,
     retailRate: true,
+    taxable: true,
   },
 } as const;
 
@@ -199,7 +200,7 @@ interface LockedStock {
   minimumStock: number;
 }
 
-async function lockStock(tx: Tx, branchId: string, partId: string): Promise<LockedStock | null> {
+export async function lockStock(tx: Tx, branchId: string, partId: string): Promise<LockedStock | null> {
   const rows = await tx.$queryRaw<LockedStock[]>`
     SELECT "id", "quantity", "reservedQuantity", "minimumStock"
     FROM "InventoryStock"

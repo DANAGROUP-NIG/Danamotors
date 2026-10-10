@@ -59,6 +59,14 @@ export const CAMPAIGN_PERMISSIONS = {
 
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
+// CPD part sale: customer purchase orders, counter sales and sale returns.
+export const PART_SALE_PERMISSIONS = {
+  READ: "partsale:read",
+  ORDER: "partsale:order",
+  BILL: "partsale:bill",
+  RETURN: "partsale:return",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

@@ -93,7 +93,8 @@ export class ReceiptService {
         let allocatedAmount = 0;
         for (const allocation of input.allocations) {
           const invoice = invoiceById.get(allocation.invoiceId!)!;
-          if ((invoice.jobCard?.branchId ?? invoice.customer.branchId) !== branchId) throw new BadRequestError('Allocated bills must belong to the receiving branch');
+          // reportBranchId is the bill's own branch (e.g. CPD for a counter sale), set when it was created.
+          if ((invoice.reportBranchId ?? invoice.jobCard?.branchId ?? invoice.customer.branchId) !== branchId) throw new BadRequestError('Allocated bills must belong to the receiving branch');
           if (invoice.customerId !== customer.id) throw new BadRequestError('All allocated invoices must belong to the selected customer');
           if (['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase())) {
             throw new BadRequestError(`Invoice ${invoice.invoiceNumber} is cancelled`);

@@ -53,6 +53,10 @@ model Branch {
   mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
   mrnsSourced    MaterialReceiptNote[] @relation("MrnSourceBranch")
 
+  customerOrders CustomerOrder[]
+  counterSales   CounterSale[]
+  saleReturns    CounterSaleReturn[]
+
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
@@ -152,6 +156,10 @@ model User {
   warrantyCaseStatusEvents     WarrantyCaseStatusHistory[] @relation("WarrantyCaseStatusActor")
   campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
+
+  customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
+  counterSalesExecuted  CounterSale[]       @relation("CounterSaleExecutive")
+  saleReturnsCreated    CounterSaleReturn[] @relation("SaleReturnCreatedBy")
 }
 
 model Role {
@@ -283,6 +291,9 @@ model Customer {
   creditApplications CustomerCreditApplication[]
 
   warrantyCases WarrantyCase[]
+
+  customerOrders CustomerOrder[]
+  saleReturns    CounterSaleReturn[]
 
   @@index([branchId])
   @@index([branchId, partyStatus, code])
@@ -747,6 +758,9 @@ model SparePart {
   jobCardLines      JobCardLine[]
   warrantyCaseLines WarrantyCaseLine[]
 
+  customerOrderLines CustomerOrderLine[]
+  saleReturnLines    CounterSaleReturnLine[]
+
   @@index([mainPartId])
 }
 
@@ -1130,6 +1144,8 @@ model Invoice {
 
   creditApplications CustomerCreditApplication[]
 
+  // Set when the invoice is a CPD counter-sale bill (parts sold against customer purchase orders).
+  counterSale CounterSale?
 
   @@index([dueDate, status])
   @@index([customerId])
@@ -1194,7 +1210,15 @@ model InvoiceLine {
   customerPaid    Boolean        @default(true)
   createdAt       DateTime       @default(now())
 
+  // Counter-sale lines: the CPO line billed, the VAT applied, and units returned so far.
+  customerOrderLineId String?
+  customerOrderLine   CustomerOrderLine?      @relation(fields: [customerOrderLineId], references: [id], onDelete: Restrict)
+  vatPercent          Float?
+  returnedQuantity    Int                     @default(0)
+  returnLines         CounterSaleReturnLine[]
+
   @@index([invoiceId])
+  @@index([customerOrderLineId])
 }
 
 model DocumentSequence {
@@ -1364,6 +1388,7 @@ model PartyNote {
   accountLines PartyNoteAccountLine[]
   debitAdjustments  ReceiptAllocation[] @relation("DebitNoteAdjustments")
   creditAdjustments ReceiptAllocation[] @relation("CreditNoteAdjustments")
+  saleReturn        CounterSaleReturn?
 
   @@index([branchId, direction, date])
   @@unique([direction, number])
@@ -2891,4 +2916,147 @@ model OutstandingLetter {
   printedById String?
   @@index([branchId, reference])
   @@index([customerId, printedAt])
+}
+
+// ============================================================
+// PART SALE (CPD): customer purchase order -> counter sale -> return.
+// Legacy CPDAutoEnhancer CUSTOMERORDERHEAD/DETAIL (OrderType C),
+// countersale + csissue (trantype C), csrethead/csretdetail.
+// ============================================================
+
+// Legacy CPO status: A = active, E = executed, C = cancelled.
+enum CustomerOrderStatus {
+  OPEN
+  PARTLY_BILLED
+  BILLED
+  CANCELLED
+}
+
+model CustomerOrder {
+  id        String @id @default(uuid())
+  cpoNumber String @unique
+
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  customerRefNo   String?
+  customerRefDate DateTime?
+  orderDate       DateTime            @default(now())
+  validTill       DateTime?
+  status          CustomerOrderStatus @default(OPEN)
+  remarks         String?
+
+  totalQuantity Int   @default(0)
+  totalAmount   Float @default(0)
+
+  createdById  String?
+  createdBy    User?     @relation("CustomerOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  closedAt     DateTime?
+  cancelledAt  DateTime?
+  cancelRemark String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines CustomerOrderLine[]
+
+  @@index([branchId, status])
+  @@index([customerId])
+}
+
+model CustomerOrderLine {
+  id      String        @id @default(uuid())
+  orderId String
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partId  String
+  part    SparePart     @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  orderedQuantity   Int
+  // Picked = reserved in CPD stock and waiting to be billed.
+  pickedQuantity    Int   @default(0)
+  billedQuantity    Int   @default(0)
+  cancelledQuantity Int   @default(0)
+  retailRate        Float
+  amount            Float
+
+  createdAt DateTime @default(now())
+
+  invoiceLines InvoiceLine[]
+
+  @@unique([orderId, partId])
+  @@index([partId])
+}
+
+// Counter-sale details that a job bill does not have. The bill itself is the Invoice.
+model CounterSale {
+  id        String  @id @default(uuid())
+  invoiceId String  @unique
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  salesExecutiveId String?
+  salesExecutive   User?          @relation("CounterSaleExecutive", fields: [salesExecutiveId], references: [id], onDelete: SetNull)
+  transportMode    TransportMode?
+  transporter      String?
+  grNumber         String?
+  grDate           DateTime?
+  numberOfCases    Int?
+
+  createdAt DateTime @default(now())
+
+  returns CounterSaleReturn[]
+
+  @@index([branchId])
+}
+
+model CounterSaleReturn {
+  id            String      @id @default(uuid())
+  returnNumber  String      @unique
+  counterSaleId String
+  counterSale   CounterSale @relation(fields: [counterSaleId], references: [id], onDelete: Restrict)
+  branchId      String
+  branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  returnDate DateTime @default(now())
+  reason     String?
+
+  grossAmount    Float
+  discountAmount Float
+  vatAmount      Float
+  roundOff       Float
+  total          Float
+
+  // The credit note raised for the return; it is set off against the bill first.
+  creditNoteId String?    @unique
+  creditNote   PartyNote? @relation(fields: [creditNoteId], references: [id], onDelete: Restrict)
+
+  createdById String?
+  createdBy   User?    @relation("SaleReturnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  lines CounterSaleReturnLine[]
+
+  @@index([counterSaleId])
+  @@index([customerId])
+}
+
+model CounterSaleReturnLine {
+  id            String            @id @default(uuid())
+  returnId      String
+  saleReturn    CounterSaleReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  invoiceLineId String
+  invoiceLine   InvoiceLine       @relation(fields: [invoiceLineId], references: [id], onDelete: Restrict)
+  partId        String
+  part          SparePart         @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity      Int
+  rate          Float
+  amount        Float
+
+  @@index([returnId])
+  @@index([invoiceLineId])
 }

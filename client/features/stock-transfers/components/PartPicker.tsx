@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import { inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
-import { useIndentPartSearch } from "../hooks/use-indents";
+import { searchIndentPartsRequest } from "../api/indent.api";
+import { indentKeys } from "../api/indent.keys";
 import type { PartSearchResult } from "../types/indent.types";
+
+export type PartSearchQuery = (search: string) => {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<PartSearchResult[]>;
+};
 
 interface PartPickerProps {
   requestingBranchId?: string;
@@ -13,10 +20,14 @@ interface PartPickerProps {
   onSelect: (part: PartSearchResult) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Search source; defaults to the indent search (stock at both branches). */
+  searchQuery?: PartSearchQuery;
+  /** Right-hand detail for each result; defaults to stock at both branches. */
+  renderMeta?: (part: PartSearchResult) => ReactNode;
 }
 
 /** Search-as-you-type part selector showing stock at both branches. */
-export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, placeholder, disabled }: PartPickerProps) {
+export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, placeholder, disabled, searchQuery, renderMeta }: PartPickerProps) {
   const [text, setText] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -35,7 +46,15 @@ export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, place
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const { data, isFetching } = useIndentPartSearch({ search: debounced, requestingBranchId, sourceBranchId });
+  const indentQuery = {
+    queryKey: indentKeys.partSearch({ search: debounced, requestingBranchId, sourceBranchId }),
+    queryFn: () => searchIndentPartsRequest({ search: debounced, requestingBranchId, sourceBranchId }),
+  };
+  const { data, isFetching } = useQuery({
+    ...(searchQuery ? searchQuery(debounced) : indentQuery),
+    enabled: debounced.length >= 2,
+    staleTime: 30_000,
+  });
   const results = debounced.length >= 2 ? (data ?? []) : [];
 
   return (
@@ -83,10 +102,16 @@ export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, place
                   </span>
                 </span>
                 <span className="shrink-0 text-right text-sm">
-                  <span className={cn("block font-medium", part.sourceAvailable > 0 ? "text-emerald-700" : "text-red-600")}>
-                    {part.sourceAvailable} available
-                  </span>
-                  <span className="block text-muted-foreground">{part.requestingStock} in your stock</span>
+                  {renderMeta ? (
+                    renderMeta(part)
+                  ) : (
+                    <>
+                      <span className={cn("block font-medium", part.sourceAvailable > 0 ? "text-emerald-700" : "text-red-600")}>
+                        {part.sourceAvailable} available
+                      </span>
+                      <span className="block text-muted-foreground">{part.requestingStock} in your stock</span>
+                    </>
+                  )}
                 </span>
               </button>
             ))

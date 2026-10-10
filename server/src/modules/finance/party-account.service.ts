@@ -137,7 +137,7 @@ export class PartyAccountService {
     return withPartyTransaction(transaction => this.applyAdjustment(transaction, body, actorId));
   }
 
-  async applyAdjustment(transaction: Prisma.TransactionClient, input: Omit<CreateAdjustmentInput, 'source'> & { source: 'ADVANCE_ADJUSTMENT' | 'FIFO' | 'CREDIT_APPLICATION' }, actorId?: string) {
+  async applyAdjustment(transaction: Prisma.TransactionClient, input: Omit<CreateAdjustmentInput, 'source'> & { source: 'ADVANCE_ADJUSTMENT' | 'FIFO' | 'CREDIT_APPLICATION' | 'SALE_RETURN' }, actorId?: string) {
     const normalized = { ...input, actorId, debits: [...input.debits].sort((a,b) => a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id)), credits: [...input.credits].sort((a,b) => a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id)) };
     const requestHash = hashRequest(normalized);
     await transaction.$queryRaw(Prisma.sql`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${input.idempotencyKey},0))`);

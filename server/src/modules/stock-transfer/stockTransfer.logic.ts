@@ -18,6 +18,9 @@ export const DOC_TYPES = {
   PACKING: "PACKING",
   MIT: "MIT",
   MRN: "MRN",
+  CPO: "CPO",
+  COUNTER_SALE: "COUNTER_SALE",
+  SALE_RETURN: "SALE_RETURN",
 } as const;
 
 export type DocType = (typeof DOC_TYPES)[keyof typeof DOC_TYPES];

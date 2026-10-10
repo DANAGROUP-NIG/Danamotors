@@ -26,6 +26,7 @@ danamotors/
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving Mobis purchases: MIT file upload, MRN, CPD stock |
+| [part-sale.md](./part-sale.md) | CPD part sale: customer purchase order, picking, counter-sale bill, sale return |
 
 ## Quick start
 

@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -28,6 +28,8 @@ import {
   Ship,
   Landmark,
   Megaphone,
+  ShoppingCart,
+  Undo2,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -132,6 +134,7 @@ export const NAV_GROUPS: NavGroup[] = [
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
       INVENTORY_PERMISSIONS.TRANSFER_READ,
+      PART_SALE_PERMISSIONS.READ,
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
     ],
@@ -156,6 +159,17 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/inventory/mobis-receipts",
         icon: Ship,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Part Sale",
+        href: "/part-sale/orders",
+        icon: ShoppingCart,
+        permissions: [PART_SALE_PERMISSIONS.READ],
+        children: [
+          { label: "Customer Orders", href: "/part-sale/orders", icon: ClipboardList, permissions: [PART_SALE_PERMISSIONS.READ] },
+          { label: "Counter Sales", href: "/part-sale/counter-sales", icon: ReceiptText, permissions: [PART_SALE_PERMISSIONS.READ] },
+          { label: "Sale Returns", href: "/part-sale/returns", icon: Undo2, permissions: [PART_SALE_PERMISSIONS.READ] },
+        ],
       },
       {
         label: "Transfers",

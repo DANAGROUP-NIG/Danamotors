@@ -36,6 +36,7 @@ export type PartRef = {
   partFlag?: string;
   priceCategoryCode?: string | null;
   retailRate?: number | null;
+  taxable?: boolean;
 };
 
 export type LineSummary = {
