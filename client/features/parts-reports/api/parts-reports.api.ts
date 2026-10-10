@@ -3,7 +3,8 @@ import { apiGet } from "@/lib/api/apiClient";
 // Mirrors server/src/modules/parts-report.
 
 export type ColumnType = "text" | "date" | "qty" | "money" | "percent";
-export type ReportColumn = { key: string; label: string; type: ColumnType; total?: boolean };
+/** total "last": a running balance; the subtotal is the group's last value. */
+export type ReportColumn = { key: string; label: string; type: ColumnType; total?: boolean | "last" };
 export type ReportFilterKey =
   | "customer"
   | "vendor"
@@ -17,7 +18,11 @@ export type ReportFilterKey =
   | "option"
   | "fullyExecuted"
   | "includeReturns"
-  | "includeCancelled";
+  | "includeCancelled"
+  | "includeAlternates"
+  | "onlyTransacted"
+  | "days"
+  | "ageLimits";
 
 export type ReportDefinition = {
   kind: string;
@@ -26,7 +31,11 @@ export type ReportDefinition = {
   description: string;
   permission: string;
   filters: ReportFilterKey[];
-  labels?: { branch?: string; search?: string };
+  /** range (default): from and to dates; asOn: one date, sent as from = to; none: today's stock. */
+  period?: "range" | "asOn" | "none";
+  /** Covers every branch; no branch is chosen. */
+  allBranches?: boolean;
+  labels?: { branch?: string; search?: string; option?: string };
   options?: { value: string; label: string }[];
   statuses?: { value: string; label: string }[];
   grouped?: boolean;
@@ -69,6 +78,11 @@ export type ReportParams = {
   fullyExecuted?: boolean;
   includeReturns?: boolean;
   includeCancelled?: boolean;
+  includeAlternates?: boolean;
+  onlyTransacted?: boolean;
+  days?: number;
+  /** Five increasing day limits, comma separated. */
+  ageLimits?: string;
 };
 
 const BASE = "/parts-reports";

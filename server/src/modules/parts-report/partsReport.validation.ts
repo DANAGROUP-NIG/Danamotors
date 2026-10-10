@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ageLimitsSchema } from "../finance/party-report.validation";
 
 const day = z.string().date("Use a YYYY-MM-DD date");
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`).optional();
@@ -28,6 +29,14 @@ export const runReportSchema = z.object({
       fullyExecuted: flag,
       includeReturns: flag,
       includeCancelled: flag,
+      includeAlternates: flag,
+      onlyTransacted: flag,
+      days: z.coerce.number().int().min(1, "Enter at least 1 day").max(3650).optional(),
+      ageLimits: z
+        .string()
+        .transform((v) => v.split(",").map(Number))
+        .pipe(ageLimitsSchema)
+        .optional(),
     })
     .refine((q) => q.from <= q.to, { path: ["to"], message: "The end date must be on or after the start date" }),
 });

@@ -25,7 +25,7 @@ import {
   type ReportResult,
   type ReportRow,
 } from "../api/parts-reports.api";
-import { exportReportXlsx } from "../lib/export-report";
+import { exportReportXlsx, subtotal } from "../lib/export-report";
 
 const lagosToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" }).format(new Date());
 const amount = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -50,12 +50,8 @@ export function formatCell(column: ReportColumn, value: string | number | null |
 }
 
 const numeric = (c: ReportColumn) => c.type === "money" || c.type === "qty" || c.type === "percent";
-
-function subtotal(rows: ReportRow[], columns: ReportColumn[]) {
-  return Object.fromEntries(
-    columns.filter((c) => c.total).map((c) => [c.key, rows.reduce((s, r) => s + (r.status === "Cancelled" ? 0 : Number(r[c.key] ?? 0)), 0)]),
-  );
-}
+const DEFAULT_AGE_LIMITS = "365,730,1095,1460,1825";
+const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
 
 export function PartsReportView({ kind }: { kind: string }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
@@ -65,6 +61,7 @@ export function PartsReportView({ kind }: { kind: string }) {
   const catalog = useQuery({ queryKey: partsReportKeys.catalog(), queryFn: getReportCatalogRequest });
   const lookups = useQuery({ queryKey: partsReportKeys.lookups(), queryFn: getReportLookupsRequest, staleTime: 60_000 });
   const definition = catalog.data?.find((r) => r.kind === kind);
+  const period = definition?.period ?? "range";
 
   const [params, setParams] = useState<ReportParams>(() => ({
     from: `${lagosToday().slice(0, 4)}-01-01`,
@@ -85,24 +82,35 @@ export function PartsReportView({ kind }: { kind: string }) {
   const result = report.data;
   const has = (key: Parameters<NonNullable<typeof definition>["filters"]["includes"]>[0]) => !!definition?.filters.includes(key);
   const branchName = (id?: string) => branches.find((b) => b.id === id)?.name;
-  const scopeLabel = crossBranch
-    ? branchName(applied?.branchId) ?? "All branches"
-    : branchName(user?.branchId ?? undefined) ?? "Your branch";
+  const scopeLabel = definition?.allBranches
+    ? "All branches"
+    : crossBranch
+      ? branchName(applied?.branchId) ?? "All branches"
+      : branchName(user?.branchId ?? undefined) ?? "Your branch";
+  const periodLabel = (p: ReportParams) => (period === "range" ? `${day(p.from)} to ${day(p.to)}` : `As on ${day(p.to)}`);
 
   function run(event: React.FormEvent) {
     event.preventDefault();
-    if (!params.from || !params.to || params.from > params.to) return;
-    setApplied({ ...params, option, customerId: customer?.id, branchId: crossBranch ? params.branchId || undefined : undefined });
+    if (period === "range" && (!params.from || !params.to || params.from > params.to)) return;
+    // Single-date reports send the date as both ends of the range.
+    const on = period === "none" ? lagosToday() : params.to;
+    setApplied({
+      ...params,
+      ...(period !== "range" && { from: on, to: on }),
+      option,
+      customerId: customer?.id,
+      branchId: crossBranch && !definition?.allBranches ? params.branchId || undefined : undefined,
+      includeAlternates: params.partId ? params.includeAlternates : undefined,
+    });
   }
 
   async function exportExcel(r: ReportResult) {
-    const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
     try {
       await exportReportXlsx(r, {
         subtitle: definition?.options?.find((o) => o.value === option)?.label,
         scope: scopeLabel,
-        period: `${day(applied?.from)} to ${day(applied?.to)}`,
-        filename: `${kind}-${applied?.from}-to-${applied?.to}`,
+        period: applied ? periodLabel(applied) : "",
+        filename: period === "range" ? `${kind}-${applied?.from}-to-${applied?.to}` : `${kind}-${applied?.to}`,
       });
     } catch {
       toast.error("The Excel file could not be created");
@@ -165,14 +173,25 @@ export function PartsReportView({ kind }: { kind: string }) {
       </div>
 
       <form onSubmit={run} className="grid gap-4 rounded-xl border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden" aria-label="Report filters">
-        <Field label="From date">
-          <input type="date" required className={inputCls} value={params.from} max={params.to} onChange={(e) => set({ from: e.target.value })} />
-        </Field>
-        <Field label="To date">
-          <input type="date" required className={inputCls} value={params.to} min={params.from} onChange={(e) => set({ to: e.target.value })} />
-        </Field>
+        {period === "range" && (
+          <>
+            <Field label="From date">
+              <input type="date" required className={inputCls} value={params.from} max={params.to} onChange={(e) => set({ from: e.target.value })} />
+            </Field>
+            <Field label="To date">
+              <input type="date" required className={inputCls} value={params.to} min={params.from} onChange={(e) => set({ to: e.target.value })} />
+            </Field>
+          </>
+        )}
+        {period === "asOn" && (
+          <Field label="As on date">
+            <input type="date" required className={inputCls} value={params.to} onChange={(e) => set({ to: e.target.value })} />
+          </Field>
+        )}
         <Field label="Branch">
-          {crossBranch ? (
+          {definition.allBranches ? (
+            <input className={inputCls} readOnly value="All branches" />
+          ) : crossBranch ? (
             <select className={inputCls} value={params.branchId ?? ""} onChange={(e) => set({ branchId: e.target.value })}>
               <option value="">All branches</option>
               {branches.map((b) => (
@@ -243,6 +262,17 @@ export function PartsReportView({ kind }: { kind: string }) {
             formatLabel={(row) => [row.code, row.name].filter(Boolean).join(" · ")}
           />
         )}
+        {has("includeAlternates") && (
+          <label className={cn("flex items-center gap-2 self-end pb-2 text-sm", !params.partId && "opacity-50")}>
+            <input
+              type="checkbox"
+              disabled={!params.partId}
+              checked={!!params.includeAlternates}
+              onChange={(e) => set({ includeAlternates: e.target.checked || undefined })}
+            />
+            Include alternate parts
+          </label>
+        )}
         {has("partFlag") && (
           <Field label="Purchase source (part flag)">
             <select className={inputCls} value={params.partFlag ?? ""} onChange={(e) => set({ partFlag: e.target.value || undefined })}>
@@ -293,8 +323,34 @@ export function PartsReportView({ kind }: { kind: string }) {
             Only fully executed
           </label>
         )}
+        {has("days") && (
+          <Field label="Not issued for (days)">
+            <input
+              type="number"
+              min={1}
+              max={3650}
+              placeholder="90"
+              className={inputCls}
+              value={params.days ?? ""}
+              onChange={(e) => set({ days: Number(e.target.value) || undefined })}
+            />
+          </Field>
+        )}
+        {has("ageLimits") && (
+          <Field label="Age limits (days)">
+            <input
+              className={inputCls}
+              required
+              pattern="\d+(,\d+){4}"
+              title="Five increasing day limits, e.g. 30,60,90,180,365"
+              value={params.ageLimits ?? DEFAULT_AGE_LIMITS}
+              onChange={(e) => set({ ageLimits: e.target.value.replace(/\s/g, "") })}
+            />
+          </Field>
+        )}
         {has("option") && (
-          <fieldset className="flex flex-wrap items-end gap-4 sm:col-span-2">
+          <fieldset className="flex flex-wrap items-end gap-4 sm:col-span-2" aria-label={definition.labels?.option}>
+            {definition.labels?.option && <span className="pb-2 text-sm font-medium">{definition.labels.option}:</span>}
             {(definition.options ?? []).map((o) => (
               <label key={o.value} className="flex items-center gap-2 pb-2 text-sm">
                 <input type="radio" name="report-option" checked={option === o.value} onChange={() => set({ option: o.value })} />
@@ -307,6 +363,12 @@ export function PartsReportView({ kind }: { kind: string }) {
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={params.includeReturns !== false} onChange={(e) => set({ includeReturns: e.target.checked })} />
             Include returns
+          </label>
+        )}
+        {has("onlyTransacted") && (
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input type="checkbox" checked={!!params.onlyTransacted} onChange={(e) => set({ onlyTransacted: e.target.checked || undefined })} />
+            Only transacted parts
           </label>
         )}
         {has("includeCancelled") && (
@@ -346,8 +408,7 @@ export function PartsReportView({ kind }: { kind: string }) {
               {option && definition.options && <span className="font-normal text-muted-foreground"> · {definition.options.find((o) => o.value === option)?.label}</span>}
             </p>
             <p className="text-sm text-muted-foreground">
-              {scopeLabel} · {formatCell({ key: "", label: "", type: "date" }, applied.from)} to {formatCell({ key: "", label: "", type: "date" }, applied.to)} ·{" "}
-              {result.rows.length} line(s)
+              {scopeLabel} · {periodLabel(applied)} · {result.rows.length} line(s)
             </p>
           </div>
           {result.truncated && (

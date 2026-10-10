@@ -13,8 +13,18 @@ function cellValue(column: ReportColumn, value: ReportRow[string] | undefined): 
   return String(value);
 }
 
-function sum(rows: ReportRow[], column: ReportColumn) {
-  return rows.reduce((s, r) => s + (r.status === "Cancelled" ? 0 : Number(r[column.key] ?? 0)), 0);
+/** Group subtotals: sums (cancelled lines left out), or a running balance's last value. */
+export function subtotal(rows: ReportRow[], columns: ReportColumn[]): Record<string, number> {
+  return Object.fromEntries(
+    columns
+      .filter((c) => c.total)
+      .map((c) => [
+        c.key,
+        c.total === "last"
+          ? Number(rows[rows.length - 1]?.[c.key] ?? 0)
+          : rows.reduce((s, r) => s + (r.status === "Cancelled" ? 0 : Number(r[c.key] ?? 0)), 0),
+      ]),
+  );
 }
 
 /**
@@ -42,7 +52,8 @@ export async function exportReportXlsx(
   let groupRows: ReportRow[] = [];
   const closeGroup = () => {
     if (current == null) return;
-    aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Subtotal" : c.total ? sum(groupRows, c) : null))]);
+    const sub = subtotal(groupRows, columns);
+    aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Subtotal" : c.key in sub ? sub[c.key] : null))]);
   };
   for (const row of result.rows) {
     const group = result.grouped && row.group != null ? String(row.group) : null;

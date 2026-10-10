@@ -1,6 +1,6 @@
 # Parts Reports
 
-The legacy Parts module report menus (part sale and part purchase), rebuilt as one screen: **Operations → Parts Reports**.
+The legacy Parts module report menus (part sale, part purchase and stock reports), rebuilt as one screen: **Operations → Parts Reports**.
 Pick a report, set its filters, then **Run report**. Each run shows on screen, with **Print**
 (A4 landscape) and **Export Excel**. Both follow the legacy register layout: report title, branch
 and period, an S.No. column, group headings with subtotals, and a total line. The Excel file is a
@@ -37,6 +37,25 @@ title, filters, options and columns are defined once, in
 | Checklist for Issues | `issue-checklist` | Every issue in bin order, for the store to check against the shelves |
 | SAN Register | `stock-adjustments` | Stock adjustments: Addition, Subtraction or All |
 
+### Stock reports
+
+The legacy **Stock Reports** menu. Reports marked *as on* take one date; *now* reports show today's stock.
+
+| Legacy report | Kind | What it shows |
+|---|---|---|
+| Stock Ledger (Revised) | `stock-ledger` | Per part: opening balance, every receipt and issue with document, party and invoice, and the running balance. FIFO or dealer rate. An issue taken from receipts at different rates prints one line per rate, as on the legacy ledger |
+| Stock Summary (Revised), Stock Value (On FIFO Basis) | `stock-summary` | Per part: opening, receipts, issues and closing, quantity and value. FIFO or dealer rate |
+| Current Stock Balance, List of Opening Balances | `current-stock` | *As on.* Parts in stock with rate and value, at dealer rate (default) or FIFO. Run as on 31 December for the next year's opening balances |
+| List of Zero Balance Items | `zero-balance` | *As on.* Parts the branch stocks with nothing in stock, and their consumption in the 12 months before the date |
+| List of Slow Moving Items | `slow-moving` | *As on.* Parts in stock not issued for the given days (default 90), with the last issue date, at dealer rate |
+| Ageing of Stock | `stock-ageing` | *As on.* Stock and value in six age bands from five day limits (default 1 to 5 years), at dealer rate (default) or FIFO |
+| Negative Stock Balance Between Two Dates | `negative-stock` | Movements that left a balance below zero, with the shortfall at dealer rate |
+| Inventory to Sales Ratio | `inventory-sales-ratio` | Per part: opening and closing stock value against sales at cost, and closing value ÷ sales. FIFO or dealer rate |
+| Branch Wise Stock Report, Store Location Wise Current Stock | `branch-stock` | *Now*, every branch and store location: **Branch wise part value** (a line per branch, grouped by part) or **Total part value** (a line per part), with blocked and available stock, at dealer rate |
+| BIN Location Wise Stock Report | `bin-location-stock` | *Now.* Stock in bin order; filter by bin |
+| List of Parts Blocked | `parts-blocked` | Stock picked for CPOs (until billed) or branch indents (until the STN is made): **Document wise** with picker, or **Part wise** with stock, blocked and available |
+| Item Unavailability Report | `item-unavailability` | Demand the branch could not supply: CPO quantities still unpicked and indent back orders, against free stock now |
+
 **Not included:**
 
 - The purchase order reports: **Pending Order (Vendor Wise / Order Wise, Part Wise)**, **Purchase Order
@@ -47,6 +66,18 @@ title, filters, options and columns are defined once, in
   separate report.
 - The **Dispatch Challan Register**. Dispatch challans (internal fuel and consumable
 issues) are not built yet; see [part-sale.md](./part-sale.md).
+
+Stock reports merged or left out, so that no report repeats another:
+
+- **Stock Value (On FIFO Basis)** has the same columns as the Stock Summary, so it is the Stock Summary on FIFO.
+- **List of Opening Balances** is the Current Stock Balance as on 31 December. The legacy year-end
+  opening (`PARTBAL.opnstock`/`opnamt`) is the closing stock carried forward, so the two match.
+- **Branch Wise Stock Report** and **Store Location Wise Current Stock** were two copies of one list: the
+  first read branch stock uploaded to CPD (`BranchStock`), the second the godowns in the same database.
+  With one database, both are the Branch Wise Stock report.
+- **Only Top Movers** (ledger and summary) is left out: it filtered on the part master's top-N flag, which
+  the new part master does not have.
+- **Part Type** is not a filter, as on the other reports (see below).
 
 The legacy SAN register's **Only Deleted Records** option is also left out. No legacy SAN was
 ever deleted (391 at the branches and 4 at CPD, none cancelled), and stock adjustments here
@@ -80,12 +111,37 @@ cannot be deleted.
 - **Revenue and margin** use the dealer rate recorded on each bill line when it was billed
   (`InvoiceLine.unitCost`). Bills made before this field existed use the part's current dealer rate.
 - **Permissions:** counter-sale and CPO reports need `partsale:read`. Picking, STN, indent and
-  branch-in-transit reports need `transfer:read`. The purchase reports, consumption, issue checklist and
-  SAN need `stock:read`. The menu
-  lists only the reports the user can run.
+  branch-in-transit reports need `transfer:read`. The purchase reports, consumption, issue checklist,
+  SAN and the stock reports need `stock:read`. The menu lists only the reports the user can run.
 - **Size limit:** the screen shows up to 5,000 lines, and the totals always cover every line.
 
+### Stock reports
+
+- **Stock movements** are what changes a branch's stock: MRNs, SRNs, returns, stock adjustments,
+  counter sales, workshop issues and STNs (`StockTransaction`). Each is dated when it was posted.
+- **Opening stock with no movement on record** (migrated or seeded stock) is taken to have been there
+  before the first movement. It is valued at dealer rate and is the oldest stock for ageing.
+- **FIFO**: the oldest units are issued first, so the stock left is always the newest receipts. Vendor
+  MRNs come in at their receipt rate (invoice price × conversion rate), SRNs at the STN rate, and
+  returns, additions and opening stock at the dealer rate. Issues are valued at cost. An issue with no
+  stock to cost against goes out at value 0 ("All values in Issue are at Cost"), and the next receipt
+  makes it good first.
+- **Dealer rate**: every unit at the part's current dealer rate. There is no dealer-rate history, so a
+  past date is valued at today's rate.
+- **Include alternate parts**, with a part chosen, adds its main part and all its alternates.
+- **Only transacted parts** (ledger and summary) leaves out parts with no movement in the period.
+- **All branches** (cross-branch users) lists each branch under its own heading with subtotals. The
+  ledger heads each part with its branch instead. Branch Wise Stock always covers every branch, as Part
+  Query does.
+- **Blocked stock** is stock picked for a CPO or an indent (`InventoryStock.reservedQuantity`). Indent
+  back orders and unpicked CPO quantities are the unavailable demand.
+
 ## Tests
+
+`stockReport.logic.test.ts` covers FIFO and dealer-rate valuation without a database, using the CPD ball
+joint ledger (an STN taken from receipts at ₦39,258 and ₦37,314). `stockReport.integration.test.ts` builds
+opening stock, a Mobis MRN, an indent shipped on an STN and received as an SRN, a billed CPO, a back-ordered
+indent and a negative SAN, and checks every stock report.
 
 `partsReport.integration.test.ts` builds counter sales (including a return and a cancelled FOC
 bill), CPOs, two Mobis MITs (one received with a damaged and a short line, one still in transit),

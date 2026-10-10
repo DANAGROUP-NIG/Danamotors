@@ -3,40 +3,20 @@
  *
  * Dates are calendar days in Africa/Lagos. Counter-sale lines are priced with the same
  * rules as the bill (cash discount, then VAT on taxable lines), so line values agree
- * with the bills; only the bill-level round-off is reported separately.
+ * with the bills; only the bill-level round-off is reported separately. The stock reports
+ * (ledger, summary, balances, ageing…) are built in stockReport.service.ts.
  */
 import { IndentStatus, MitStatus, MrnSource, Prisma, StnStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, NotFoundError } from "../../shared/errors/appError";
-import { reportEnd, reportStart } from "../finance/party-report";
 import { money, sumMoney } from "../finance/money";
 import { priceSale } from "../part-sale/partSale.logic";
-import { columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./partsReport.definitions";
+import { ageingColumns, columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./partsReport.definitions";
+import { dateRange, partWhere, partyName, ReportFilters, Row, userName } from "./partsReport.common";
+import { StockReportService } from "./stockReport.service";
+import { DEFAULT_AGE_LIMITS } from "./stockReport.logic";
 
-export interface ReportFilters {
-  from: string;
-  to: string;
-  /** The branch the report is for; undefined means every branch (cross-branch users only). */
-  branchId?: string;
-  customerId?: string;
-  /** Vendor name on MITs and vendor MRNs. */
-  vendor?: string;
-  executiveId?: string;
-  /** The other branch: receiving branch for STNs, requesting branch for inward indents, supplying
-   * branch for outward indents and in-transit STNs, sending branch for SRNs. */
-  otherBranchId?: string;
-  partId?: string;
-  partFlag?: string;
-  priceCategory?: string;
-  search?: string;
-  status?: string;
-  option?: string;
-  fullyExecuted?: boolean;
-  includeReturns?: boolean;
-  includeCancelled?: boolean;
-}
-
-type Row = Record<string, string | number | null>;
+export type { ReportFilters };
 
 export interface ReportResult {
   kind: string;
@@ -52,9 +32,6 @@ const MAX_ROWS = 5000;
 const LAGOS_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" });
 
 const statusLabel = (status: string) => status.replace("_", " ").toLowerCase();
-const userName = (u?: { firstName: string; lastName: string } | null) => (u ? `${u.firstName} ${u.lastName}`.trim() : "");
-const partyName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
-  c.companyName || `${c.firstName} ${c.lastName}`.trim();
 const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
@@ -68,20 +45,29 @@ function lineValues(quantity: number, rate: number, discountPercent: number, vat
   return { gross: line.gross, discount: line.discount, vat: line.vat, net: money(line.gross - line.discount + line.vat) };
 }
 
+/** The last line of each group: a running balance's closing value. */
+const closingLines = (rows: Row[]) => rows.filter((r, i) => i === rows.length - 1 || rows[i + 1].group !== r.group);
+
 export class PartsReportService {
+  private stock = new StockReportService();
+
   async run(kind: string, filters: ReportFilters): Promise<ReportResult> {
     const definition = reportByKind.get(kind);
     if (!definition) throw new NotFoundError("Report not found");
     if (!filters.from || !filters.to || filters.from > filters.to) throw new BadRequestError("Choose a valid date range");
     const option = filters.option || definition.options?.[0]?.value;
     const rows = await this.rows(definition, { ...filters, option });
-    const columns = columnsFor(definition, option);
+    const columns = kind === "stock-ageing" ? ageingColumns(filters.ageLimits ?? DEFAULT_AGE_LIMITS) : columnsFor(definition, option);
     const totals: Record<string, number> = {};
     for (const column of columns.filter((c) => c.total)) {
-      totals[column.key] = sumMoney(rows.filter((r) => r.status !== "Cancelled").map((r) => Number(r[column.key] ?? 0)));
+      const counted = column.total === "last" ? closingLines(rows) : rows.filter((r) => r.status !== "Cancelled");
+      totals[column.key] = sumMoney(counted.map((r) => Number(r[column.key] ?? 0)));
     }
     if (kind === "counter-sales-revenue") {
       totals.marginPercent = totals.netSales ? money((totals.margin / totals.netSales) * 100) : 0;
+    }
+    if (kind === "inventory-sales-ratio") {
+      totals.ratio = totals.sales > 0 ? money(totals.closingValue / totals.sales) : 0;
     }
     return {
       kind,
@@ -94,19 +80,9 @@ export class PartsReportService {
     };
   }
 
-  private range(f: ReportFilters) {
-    return { gte: reportStart(f.from), lt: reportEnd(f.to) };
-  }
-
-  private partWhere(f: ReportFilters): Prisma.SparePartWhereInput {
-    return {
-      ...(f.partId && { id: f.partId }),
-      ...(f.partFlag && { partFlag: f.partFlag }),
-      ...(f.priceCategory && { priceCategoryCode: f.priceCategory }),
-    };
-  }
-
   private rows(definition: ReportDefinition, f: ReportFilters): Promise<Row[]> {
+    const stockRows = this.stock.rows(definition.kind, f);
+    if (stockRows) return stockRows;
     switch (definition.kind) {
       case "counter-sales":
         return this.counterSalesLines(f);
@@ -162,7 +138,7 @@ export class PartsReportService {
   private saleInvoiceWhere(f: ReportFilters, cancelled = false): Prisma.InvoiceWhereInput {
     return {
       counterSale: { is: { ...(f.branchId && { branchId: f.branchId }), ...(f.executiveId && { salesExecutiveId: f.executiveId }) } },
-      issuedDate: this.range(f),
+      issuedDate: dateRange(f),
       ...(f.customerId && { customerId: f.customerId }),
       ...(cancelled ? {} : { cancelledAt: null }),
     };
@@ -170,7 +146,7 @@ export class PartsReportService {
 
   private async counterSalesLines(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.invoiceLine.findMany({
-      where: { invoice: this.saleInvoiceWhere(f), part: this.partWhere(f) },
+      where: { invoice: this.saleInvoiceWhere(f), part: partWhere(f) },
       include: {
         part: partSelect,
         invoice: { select: { invoiceNumber: true, issuedDate: true, partsDiscountPercent: true, customer: customerSelect } },
@@ -277,9 +253,9 @@ export class PartsReportService {
   private async returns(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.counterSaleReturnLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         saleReturn: {
-          returnDate: this.range(f),
+          returnDate: dateRange(f),
           ...(f.branchId && { branchId: f.branchId }),
           ...(f.customerId && { customerId: f.customerId }),
         },
@@ -343,7 +319,7 @@ export class PartsReportService {
         include: { part: partSelect, invoice: { select: { partsDiscountPercent: true, customer: customerSelect } } },
       }),
       prisma.counterSaleReturnLine.findMany({
-        where: { saleReturn: { returnDate: this.range(f), ...(f.branchId && { branchId: f.branchId }) } },
+        where: { saleReturn: { returnDate: dateRange(f), ...(f.branchId && { branchId: f.branchId }) } },
         include: {
           part: partSelect,
           invoiceLine: { select: { unitCost: true } },
@@ -417,9 +393,9 @@ export class PartsReportService {
   private async cpoRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.customerOrderLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         order: {
-          orderDate: this.range(f),
+          orderDate: dateRange(f),
           ...(f.branchId && { branchId: f.branchId }),
           ...(f.customerId && { customerId: f.customerId }),
           ...(f.search && { cpoNumber: { contains: f.search } }),
@@ -461,10 +437,10 @@ export class PartsReportService {
   private async mrnRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.materialReceiptLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         mrn: {
           source: { not: MrnSource.BRANCH_TRANSFER },
-          receiptDate: this.range(f),
+          receiptDate: dateRange(f),
           ...(f.branchId && { receivingBranchId: f.branchId }),
           ...(f.vendor && { vendor: f.vendor }),
           ...(f.search && { mrnNumber: { contains: f.search } }),
@@ -522,9 +498,9 @@ export class PartsReportService {
   private async mitRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.materialInTransitLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         mit: {
-          transitDate: this.range(f),
+          transitDate: dateRange(f),
           ...(f.branchId && { destinationBranchId: f.branchId }),
           ...(f.vendor && { vendor: f.vendor }),
           ...(f.search && { OR: [{ mitNumber: { contains: f.search } }, { invoiceNumber: { contains: f.search } }] }),
@@ -565,8 +541,8 @@ export class PartsReportService {
     const lines = await prisma.materialReceiptLine.findMany({
       where: {
         receivedQuantity: { gt: 0 },
-        part: this.partWhere(f),
-        mrn: { receiptDate: this.range(f), ...(f.branchId && { receivingBranchId: f.branchId }) },
+        part: partWhere(f),
+        mrn: { receiptDate: dateRange(f), ...(f.branchId && { receivingBranchId: f.branchId }) },
       },
       include: {
         part: partSelect,
@@ -602,10 +578,10 @@ export class PartsReportService {
     const lines = await prisma.materialReceiptLine.findMany({
       where: {
         OR: [{ damagedQuantity: { gt: 0 } }, { shortQuantity: { gt: 0 } }],
-        part: this.partWhere(f),
+        part: partWhere(f),
         mrn: {
           source: srn ? MrnSource.BRANCH_TRANSFER : { not: MrnSource.BRANCH_TRANSFER },
-          receiptDate: this.range(f),
+          receiptDate: dateRange(f),
           ...(f.branchId && { receivingBranchId: f.branchId }),
           ...(f.otherBranchId && { sourceBranchId: f.otherBranchId }),
           ...(f.search && { mrnNumber: { contains: f.search } }),
@@ -656,8 +632,8 @@ export class PartsReportService {
   private async pickingRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.pickingListLine.findMany({
       where: {
-        part: this.partWhere(f),
-        pickingList: { createdAt: this.range(f), ...(f.branchId && { branchId: f.branchId }) },
+        part: partWhere(f),
+        pickingList: { createdAt: dateRange(f), ...(f.branchId && { branchId: f.branchId }) },
       },
       include: {
         part: partSelect,
@@ -693,9 +669,9 @@ export class PartsReportService {
   private async stnRegister(f: ReportFilters, byStore: boolean): Promise<Row[]> {
     const lines = await prisma.stockTransferNoteLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         stn: {
-          documentDate: this.range(f),
+          documentDate: dateRange(f),
           ...(f.branchId && { sourceBranchId: f.branchId }),
           ...(f.otherBranchId && { destinationBranchId: f.otherBranchId }),
         },
@@ -727,8 +703,8 @@ export class PartsReportService {
   private async srnRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.materialReceiptLine.findMany({
       where: {
-        part: this.partWhere(f),
-        mrn: { source: "BRANCH_TRANSFER", receiptDate: this.range(f), ...(f.branchId && { receivingBranchId: f.branchId }) },
+        part: partWhere(f),
+        mrn: { source: "BRANCH_TRANSFER", receiptDate: dateRange(f), ...(f.branchId && { receivingBranchId: f.branchId }) },
       },
       include: {
         part: partSelect,
@@ -757,9 +733,9 @@ export class PartsReportService {
     const pendingOnly = f.option === "PENDING";
     const lines = await prisma.stockTransferNoteLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         stn: {
-          documentDate: this.range(f),
+          documentDate: dateRange(f),
           status: { in: pendingOnly ? open : [...open, StnStatus.RECEIVED] },
           ...(f.branchId && { destinationBranchId: f.branchId }),
           ...(f.otherBranchId && { sourceBranchId: f.otherBranchId }),
@@ -798,9 +774,9 @@ export class PartsReportService {
     const pending: IndentStatus[] = [IndentStatus.SUBMITTED, IndentStatus.APPROVED, IndentStatus.PICKED, IndentStatus.PARTLY_DISPATCHED];
     const lines = await prisma.branchIndentLine.findMany({
       where: {
-        part: this.partWhere(f),
+        part: partWhere(f),
         indent: {
-          orderDate: this.range(f),
+          orderDate: dateRange(f),
           status: { not: IndentStatus.DRAFT },
           ...(f.branchId && (outward ? { requestingBranchId: f.branchId } : { sourceBranchId: f.branchId })),
           ...(f.otherBranchId && (outward ? { sourceBranchId: f.otherBranchId } : { requestingBranchId: f.otherBranchId })),
@@ -842,9 +818,9 @@ export class PartsReportService {
     return prisma.stockTransaction.findMany({
       where: {
         type: { in: types },
-        createdAt: this.range(f),
+        createdAt: dateRange(f),
         ...(f.branchId && { branchId: f.branchId }),
-        part: this.partWhere(f),
+        part: partWhere(f),
       },
       include: { part: partSelect, recordedBy: { select: { firstName: true, lastName: true } } },
       orderBy: { createdAt: "asc" },
