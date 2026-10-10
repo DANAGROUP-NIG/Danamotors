@@ -14,13 +14,25 @@ import { dateRange, partWhere, partyName, ReportFilters, Row } from "./partsRepo
 import { Basis, DEFAULT_AGE_LIMITS, ISSUE_MOVEMENTS, Piece, STOCK_MOVEMENTS, StockValuation, untrackedOpening } from "./stockReport.logic";
 
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, unitPrice: true, priceCategoryCode: true, binLocation: true },
+  select: {
+    id: true,
+    partNumber: true,
+    name: true,
+    uom: true,
+    partFlag: true,
+    unitPrice: true,
+    priceCategoryCode: true,
+    binLocation: true,
+    minLevel: true,
+    maxLevel: true,
+    reorderQty: true,
+  },
 } as const;
 const customerSelect = { select: { companyName: true, firstName: true, lastName: true } } as const;
 
 type Part = Prisma.SparePartGetPayload<typeof partSelect>;
 
-interface Movement {
+export interface Movement {
   id: string;
   type: string;
   quantity: number;
@@ -30,12 +42,15 @@ interface Movement {
 }
 
 /** One branch's stock of one part, with every movement on record (oldest first). */
-interface Holding {
+export interface Holding {
   branchId: string;
   branch: string;
   part: Part;
   quantity: number;
   reserved: number;
+  /** The branch's own stock levels (0 / null when not set there). */
+  minimumStock: number;
+  maximumStock: number | null;
   bin: string;
   binCard: string | null;
   movements: Movement[];
@@ -59,7 +74,7 @@ const TYPE_LABEL: Record<string, string> = {
   TRANSFER_OUT: "STN",
 };
 
-const partColumns = (p: Part) => ({ partNumber: p.partNumber, description: p.name, category: p.priceCategoryCode });
+export const partColumns = (p: Pick<Part, "partNumber" | "name" | "priceCategoryCode">) => ({ partNumber: p.partNumber, description: p.name, category: p.priceCategoryCode });
 const sum = (pieces: Piece[]) => pieces.reduce((s, p) => ({ quantity: s.quantity + p.quantity, value: money(s.value + p.value) }), { quantity: 0, value: 0 });
 const byBranchThenPart = (a: Holding, b: Holding) => a.branch.localeCompare(b.branch) || a.part.partNumber.localeCompare(b.part.partNumber);
 
@@ -105,13 +120,23 @@ export class StockReportService {
     return { ...partWhere({ ...f, partId: undefined }), OR: [{ id: main }, { mainPartId: main }] };
   }
 
-  private async holdings(f: ReportFilters, withMovements = true): Promise<Holding[]> {
+  async holdings(f: ReportFilters, withMovements = true): Promise<Holding[]> {
     const part = await this.partFilter(f);
     const branch = f.branchId ? { branchId: f.branchId } : {};
     const [stocks, movements] = await Promise.all([
       prisma.inventoryStock.findMany({
         where: { ...branch, part },
-        select: { branchId: true, quantity: true, reservedQuantity: true, rackLocation: true, binCard: true, branch: { select: { name: true } }, part: partSelect },
+        select: {
+          branchId: true,
+          quantity: true,
+          reservedQuantity: true,
+          minimumStock: true,
+          maximumStock: true,
+          rackLocation: true,
+          binCard: true,
+          branch: { select: { name: true } },
+          part: partSelect,
+        },
       }),
       withMovements
         ? prisma.stockTransaction.findMany({
@@ -133,6 +158,8 @@ export class StockReportService {
         part: s.part,
         quantity: s.quantity,
         reserved: s.reservedQuantity,
+        minimumStock: s.minimumStock,
+        maximumStock: s.maximumStock,
         bin: s.rackLocation ?? s.part.binLocation ?? "",
         binCard: s.binCard,
         movements: byHolding.get(`${s.branchId}:${s.part.id}`) ?? [],
@@ -141,7 +168,7 @@ export class StockReportService {
   }
 
   /** FIFO receipt rates: what each vendor MRN or SRN line cost, by MRN and part. */
-  private async receiptRates(holdings: Holding[], basis: Basis) {
+  async receiptRates(holdings: Holding[], basis: Basis) {
     if (basis !== "FIFO") return new Map<string, number>();
     const mrnIds = [...new Set(holdings.flatMap((h) => h.movements.filter((m) => (m.type === "RECEIVED" || m.type === "TRANSFER_IN") && m.referenceId).map((m) => m.referenceId!)))];
     const lines = await prisma.materialReceiptLine.findMany({ where: { mrnId: { in: mrnIds } }, select: { mrnId: true, partId: true, unitCost: true } });
@@ -152,7 +179,7 @@ export class StockReportService {
    * Replays a holding up to `end`: the stock at `start` (opening) and at `end` (closing), calling
    * `visit` for each movement from `start` with the stock just after it.
    */
-  private walk(
+  walk(
     h: Holding,
     basis: Basis,
     rates: Map<string, number>,

@@ -20,7 +20,10 @@ router.use(authMiddleware);
  *       indent inward and outward, branch in transit, consumption, checklist for issues and SAN register; and the
  *       stock reports: stock ledger and summary (FIFO or dealer rate), current stock balance, zero balance,
  *       slow moving, ageing, negative stock, inventory to sales ratio, branch wise and bin location wise stock,
- *       parts blocked and item unavailability.
+ *       parts blocked and item unavailability; and the MIS reports: minimum/maximum level (with items below
+ *       minimum and re-order calculated vs entered), maximum consumed parts, model wise mileage wise part
+ *       issue, profitability statement, percent fill, part rate history, part bin location history and the
+ *       packing list cum gate pass report for STNs.
  *       Each report checks its own permission (part sale, transfer or stock read). Dates are Africa/Lagos
  *       calendar days; reports on a single date take it as `to`.
  *
@@ -47,8 +50,11 @@ router.use(authMiddleware);
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, CANCELLED, EXECUTED] } }
  *       - { in: query, name: option, schema: { type: string }, description: "The report's own choice, e.g. STN or SRN, VENDOR or SUMMARY, ALL or PENDING, FIFO or DEALER" }
  *       - { in: query, name: onlyTransacted, schema: { type: boolean }, description: Stock ledger and summary - only parts moved in the period }
- *       - { in: query, name: days, schema: { type: integer, minimum: 1, maximum: 3650 }, description: Slow moving items - not issued for this many days (default 90) }
+ *       - { in: query, name: days, schema: { type: integer, minimum: 1, maximum: 3650 }, description: Slow moving items - not issued for this many days; re-order calculated - consumption over this many days (default 90) }
  *       - { in: query, name: ageLimits, schema: { type: string }, example: "365,730,1095,1460,1825", description: Ageing of stock - five increasing age limits in days }
+ *       - { in: query, name: mileageLimits, schema: { type: string }, example: "10000,20000,40000,60000,100000", description: Mileage wise reports - five increasing limits in km }
+ *       - { in: query, name: topN, schema: { type: integer, minimum: 1, maximum: 1000 }, description: Maximum consumed parts - how many parts per branch (default 10) }
+ *       - { in: query, name: summary, schema: { type: boolean }, description: Only summary - by part category (consumption, profitability) or one line per packing list }
  *     responses: { 200: { description: Columns, rows (up to 5000) and totals } }
  */
 router.get("/", controller.catalog);

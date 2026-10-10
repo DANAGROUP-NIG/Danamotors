@@ -104,7 +104,13 @@ export function untrackedOpening(currentQuantity: number, movements: { quantity:
 /** Legacy default: ageing in years (1 to 5). */
 export const DEFAULT_AGE_LIMITS = [365, 730, 1095, 1460, 1825];
 
-/** Age-band labels for five increasing day limits, e.g. "0–365 days" … "Above 1825 days". */
-export function ageBandLabels(limits: number[]) {
-  return [...limits.map((limit, i) => `${i === 0 ? 0 : limits[i - 1] + 1}–${limit} days`), `Above ${limits[limits.length - 1]} days`];
+/** Band labels for five increasing limits, e.g. "0–365 days" … "Above 1825 days". */
+export function bandLabels(limits: number[], unit = "days") {
+  return [...limits.map((limit, i) => `${i === 0 ? 0 : limits[i - 1] + 1}–${limit} ${unit}`), `Above ${limits[limits.length - 1]} ${unit}`];
+}
+
+/** The band a value falls in: 0 up to the first limit … `limits.length` above the last. */
+export function bandOf(value: number, limits: number[]) {
+  const i = limits.findIndex((limit) => value <= limit);
+  return i < 0 ? limits.length : i;
 }

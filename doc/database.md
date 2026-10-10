@@ -74,6 +74,8 @@ Branch ─┬─ User ── Role ──┬─ Permission
 | `SparePart` | Part catalog (`partNumber`, `name`, `unitPrice`). Stock is NOT stored here anymore. |
 | `InventoryStock` | Per-branch part quantities: `quantity`, `reservedQuantity`, `minimumStock`, `maximumStock`, `rackLocation`. Drives the dashboard inventory alerts. |
 | `StockTransaction` | Ledger of every stock movement (`type`, `quantity`, `referenceId`, `recordedById`). |
+| `PartRateHistory` | Every dealer and retail rate set in Part Master (added, edited, deleted), with who and when. Deleted parts keep their number and description. Read by the Part Rate History report. |
+| `PartBinHistory` | Every bin change: a branch's `rackLocation`, or the Part Master `binLocation` (no branch). Read by the Part Bin Location History report. |
 | `InterBranchTransfer` | Transfer of parts between branches: `requestingBranchId`, `sourceBranchId`, lifecycle `Pending → Approved → Dispatched → Received` (or `Rejected`/`Cancelled`). |
 | `InterBranchTransferItem` | Line items on a transfer. |
 | `PurchaseRequest` | Parts to procure (`status`). |

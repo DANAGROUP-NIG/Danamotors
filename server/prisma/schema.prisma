@@ -60,6 +60,8 @@ model Branch {
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
+
+  partBinChanges PartBinHistory[]
 }
 
 // ============================================================
@@ -140,6 +142,8 @@ model User {
   mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
+  partRateChanges           PartRateHistory[]  @relation("PartRateChangedBy")
+  partBinChanges            PartBinHistory[]   @relation("PartBinChangedBy")
 
   notifications Notification[]
 
@@ -761,7 +765,64 @@ model SparePart {
   customerOrderLines CustomerOrderLine[]
   saleReturnLines    CounterSaleReturnLine[]
 
+  rateHistory PartRateHistory[]
+  binHistory  PartBinHistory[]
+
   @@index([mainPartId])
+}
+
+enum PartChangeAction {
+  ADDED
+  EDITED
+  DELETED
+}
+
+// Legacy PartRateHistory: each dealer and retail rate a part has had, and parts deleted from
+// Part Master. The part number, description, flag and category are kept for deleted parts.
+model PartRateHistory {
+  id String @id @default(uuid())
+
+  partId            String?
+  part              SparePart?       @relation(fields: [partId], references: [id], onDelete: SetNull)
+  partNumber        String
+  description       String
+  partFlag          String
+  priceCategoryCode String?
+  action            PartChangeAction
+
+  oldDealerRate Float?
+  newDealerRate Float?
+  oldRetailRate Float?
+  newRetailRate Float?
+
+  changedById String?
+  changedBy   User?    @relation("PartRateChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now())
+
+  @@index([changedAt])
+  @@index([partId])
+}
+
+// Legacy PartBinHistory: each change of a part's bin, at a branch (its rack location) or the
+// Part Master default bin (no branch).
+model PartBinHistory {
+  id String @id @default(uuid())
+
+  partId String
+  part   SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  oldBin String?
+  newBin String?
+
+  changedById String?
+  changedBy   User?    @relation("PartBinChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now())
+
+  @@index([changedAt])
+  @@index([partId])
 }
 
 // ============================================================

@@ -3,9 +3,10 @@
  * renders its filters and columns from here, and the service builds its rows.
  */
 import { PERMISSIONS } from "../../shared/constants/roles";
-import { ageBandLabels } from "./stockReport.logic";
+import { DEFAULT_MILEAGE_LIMITS, ReportFilters } from "./partsReport.common";
+import { bandLabels, DEFAULT_AGE_LIMITS } from "./stockReport.logic";
 
-export type ColumnType = "text" | "date" | "qty" | "money" | "percent";
+export type ColumnType = "text" | "date" | "datetime" | "qty" | "money" | "percent";
 
 export interface ReportColumn {
   key: string;
@@ -14,6 +15,8 @@ export interface ReportColumn {
   /** Summed into the report total and each group subtotal. "last" (running balances): each group
    * shows its last line's value, and the report total adds up those closing values. */
   total?: boolean | "last";
+  /** Percent columns: the total and subtotals are `of` over the sum of `over`, from their totals. */
+  ratio?: { of: string; over: string[] };
 }
 
 export type ReportFilterKey =
@@ -33,12 +36,15 @@ export type ReportFilterKey =
   | "includeAlternates"
   | "onlyTransacted"
   | "days"
-  | "ageLimits";
+  | "ageLimits"
+  | "mileageLimits"
+  | "topN"
+  | "summary";
 
 export interface ReportDefinition {
   kind: string;
   title: string;
-  group: "Counter sales" | "Customer orders" | "Purchase" | "Transfers" | "Stock movement" | "Stock";
+  group: "Counter sales" | "Customer orders" | "Purchase" | "Transfers" | "Stock movement" | "Stock" | "MIS";
   description: string;
   permission: string;
   filters: ReportFilterKey[];
@@ -46,8 +52,8 @@ export interface ReportDefinition {
   period?: "range" | "asOn" | "none";
   /** Covers every branch; the branch filter does not apply. */
   allBranches?: boolean;
-  /** Labels for the `branch` (the other branch), `search` (document number) and `option` filters. */
-  labels?: { branch?: string; search?: string; option?: string };
+  /** Labels for the `branch` (the other branch), `search` (document number), `option` and `days` filters. */
+  labels?: { branch?: string; search?: string; option?: string; days?: string };
   /** Choices for the `option` filter (legacy radio buttons). The first is the default. */
   options?: { value: string; label: string }[];
   /** Choices for the `status` filter. */
@@ -55,12 +61,16 @@ export interface ReportDefinition {
   /** Rows carry a `group` value; the screen shows a heading and subtotal per group. */
   grouped?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
+  /** With the `summary` filter ticked: these columns instead. */
+  summaryColumns?: ReportColumn[];
 }
 
 const money = (key: string, label: string, total = true): ReportColumn => ({ key, label, type: "money", total });
 const qty = (key: string, label: string, total = true): ReportColumn => ({ key, label, type: "qty", total });
 const text = (key: string, label: string): ReportColumn => ({ key, label, type: "text" });
 const date = (key = "date", label = "Date"): ReportColumn => ({ key, label, type: "date" });
+const datetime = (key: string, label: string): ReportColumn => ({ key, label, type: "datetime" });
+const percent = (key: string, label: string, of: string, ...over: string[]): ReportColumn => ({ key, label, type: "percent", ratio: { of, over } });
 const balance = (key: string, label: string, type: "qty" | "money"): ReportColumn => ({ key, label, type, total: "last" });
 
 const PART_FILTERS: ReportFilterKey[] = ["part", "partFlag", "priceCategory"];
@@ -72,6 +82,14 @@ const FIFO_FIRST = [
 const DEALER_FIRST = [FIFO_FIRST[1], FIFO_FIRST[0]];
 const BASED_ON = { option: "Based on" };
 const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part No"), text("description", "Description"), text("category", "Category")];
+const CATEGORY_COLUMNS: ReportColumn[] = [text("category", "Category"), text("categoryName", "Description")];
+const PROFIT_COLUMNS: ReportColumn[] = [
+  qty("quantity", "Qty"),
+  money("sales", "Sale value"),
+  money("cost", "Cost"),
+  money("margin", "Profit"),
+  percent("marginPercent", "Profit %", "margin", "sales"),
+];
 const ORDER_STATUSES = [
   { value: "", label: "All" },
   { value: "PENDING", label: "Pending" },
@@ -251,7 +269,7 @@ export const REPORTS: ReportDefinition[] = [
       money("netSales", "Net sales"),
       money("cost", "Dealer cost"),
       money("margin", "Margin"),
-      { key: "marginPercent", label: "Margin %", type: "percent" },
+      percent("marginPercent", "Margin %", "margin", "netSales"),
     ],
   },
   {
@@ -388,10 +406,11 @@ export const REPORTS: ReportDefinition[] = [
     kind: "receipt-shortage",
     title: "MRN / SRN Shortage Report",
     group: "Purchase",
-    description: "Receipt lines with damaged or missing quantities: vendor MRNs by invoice and case, or branch-transfer SRNs by STN, packing list and case.",
+    description:
+      "Receipt lines that do not match what was sent (damaged or short): vendor MRNs against their MIT, by invoice and case, or branch-transfer SRNs against their STN, by packing list and case.",
     permission: PERMISSIONS.STOCK_READ,
-    filters: ["search", "branch", ...PART_FILTERS, "option"],
-    labels: { search: "MRN / SRN no. (optional)", branch: "Received from branch" },
+    filters: ["search", "vendor", "branch", ...PART_FILTERS, "option"],
+    labels: { search: "MRN / SRN, MIT or STN no. (optional)", branch: "Received from branch" },
     options: [
       { value: "MRN", label: "MRN (vendor receipts)" },
       { value: "SRN", label: "SRN (branch transfers)" },
@@ -568,9 +587,9 @@ export const REPORTS: ReportDefinition[] = [
     kind: "consumption",
     title: "Consumption Report (Consolidated)",
     group: "Stock movement",
-    description: "Part-wise quantities issued (counter sales, workshop issues) and transferred out, less returns.",
+    description: "Part-wise quantities issued (counter sales, workshop issues) and transferred out, less returns, or the summary by part category.",
     permission: PERMISSIONS.STOCK_READ,
-    filters: [...PART_FILTERS, "includeReturns"],
+    filters: [...PART_FILTERS, "includeReturns", "summary"],
     columns: [
       text("partNumber", "Part No"),
       text("description", "Description"),
@@ -580,6 +599,14 @@ export const REPORTS: ReportDefinition[] = [
       qty("returned", "Returned"),
       qty("net", "Net consumption"),
       money("rate", "Dealer rate", false),
+      money("value", "Value"),
+    ],
+    summaryColumns: [
+      ...CATEGORY_COLUMNS,
+      qty("issued", "Issued"),
+      qty("transferred", "Transferred out"),
+      qty("returned", "Returned"),
+      qty("net", "Net consumption"),
       money("value", "Value"),
     ],
   },
@@ -886,17 +913,256 @@ export const REPORTS: ReportDefinition[] = [
       money("value", "Value"),
     ],
   },
+
+  // ── MIS (legacy Parts > MIS Reports) ──
+  {
+    kind: "stock-levels",
+    title: "Minimum / Maximum Level Report",
+    group: "MIS",
+    description:
+      "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or the re-order quantity worked out from consumption against the one entered.",
+    permission: PERMISSIONS.STOCK_READ,
+    period: "asOn",
+    filters: [...STOCK_PART_FILTERS, "option", "days"],
+    labels: { option: "Show", days: "Re-order: consumption over (days)" },
+    options: [
+      { value: "MIN_MAX", label: "Minimum / maximum level" },
+      { value: "BELOW_MIN", label: "Items falling below minimum level" },
+      { value: "REORDER", label: "Re-order calculated vs entered" },
+    ],
+    grouped: true,
+    columns: {
+      MIN_MAX: [
+        ...PART_COLUMNS,
+        text("bin", "Bin"),
+        qty("minLevel", "Minimum", false),
+        qty("maxLevel", "Maximum", false),
+        qty("reorderQty", "Re-order qty", false),
+        qty("quantity", "Stock"),
+        text("level", "Level"),
+      ],
+      BELOW_MIN: [
+        ...PART_COLUMNS,
+        text("bin", "Bin"),
+        qty("minLevel", "Minimum", false),
+        qty("maxLevel", "Maximum", false),
+        qty("quantity", "Stock"),
+        qty("shortfall", "Below minimum by"),
+        qty("orderQty", "To order (up to maximum)"),
+        money("rate", "Dealer rate", false),
+        money("value", "Order value"),
+      ],
+      REORDER: [
+        ...PART_COLUMNS,
+        qty("quantity", "Stock"),
+        qty("monthly", "Consumed per month", false),
+        qty("calculated", "Calculated re-order"),
+        qty("entered", "Entered re-order"),
+        qty("difference", "Entered − calculated"),
+      ],
+    },
+  },
+  {
+    kind: "max-consumed",
+    title: "Maximum Consumed Parts",
+    group: "MIS",
+    description:
+      "The parts consumed most in the period (counter sales, workshop jobs and STNs, less returns), with workshop issues split by the vehicle's mileage.",
+    permission: PERMISSIONS.STOCK_READ,
+    filters: [...PART_FILTERS, "topN", "option", "mileageLimits"],
+    labels: { option: "Consumed by" },
+    options: [
+      { value: "ALL", label: "All" },
+      { value: "COUNTER_SALE", label: "Counter sales" },
+      { value: "JOB", label: "Workshop jobs" },
+      { value: "STN", label: "STNs" },
+    ],
+    grouped: true,
+    // The mileage-band columns follow the limits asked for; see mileageColumns.
+    columns: [],
+  },
+  {
+    kind: "model-mileage-issue",
+    title: "Model Wise Mileage Wise Part Issue",
+    group: "MIS",
+    description: "Parts issued to workshop jobs (less returns) by vehicle model, split by the vehicle's mileage at the job.",
+    permission: PERMISSIONS.STOCK_READ,
+    filters: [...PART_FILTERS, "mileageLimits"],
+    grouped: true,
+    columns: [],
+  },
+  {
+    kind: "profitability",
+    title: "Profitability Statement",
+    group: "MIS",
+    description:
+      "What parts earned: sale value against cost for counter sales, FOC bills, workshop and PDI jobs, STNs and stock adjustments, with cost FIFO or at dealer rate. Returns are taken off.",
+    permission: PERMISSIONS.STOCK_READ,
+    filters: [...PART_FILTERS, "option", "summary"],
+    options: FIFO_FIRST,
+    labels: BASED_ON,
+    grouped: true,
+    columns: [...PART_COLUMNS, ...PROFIT_COLUMNS],
+    summaryColumns: [...CATEGORY_COLUMNS, ...PROFIT_COLUMNS],
+  },
+  {
+    kind: "percent-fill",
+    title: "Percent Fill Report",
+    group: "MIS",
+    description:
+      "How much of what was ordered from the branch was supplied: CPO quantities billed and branch indent quantities sent on STNs, part by part. Quantities still open are not counted against the fill.",
+    permission: PERMISSIONS.STOCK_READ,
+    filters: [...PART_FILTERS, "option"],
+    labels: { option: "Order type" },
+    options: [
+      { value: "ALL", label: "All" },
+      { value: "CPO", label: "CPO" },
+      { value: "INDENT", label: "Branch indent" },
+    ],
+    grouped: true,
+    columns: [
+      ...PART_COLUMNS,
+      qty("orders", "Order lines"),
+      qty("ordered", "Ordered"),
+      qty("supplied", "Supplied"),
+      qty("notSupplied", "Not supplied"),
+      qty("pending", "Still open"),
+      percent("fill", "Fill %", "supplied", "supplied", "notSupplied"),
+    ],
+  },
+  {
+    kind: "part-rate-history",
+    title: "Part Rate History",
+    group: "MIS",
+    description: "Every dealer and retail rate set in Part Master, with when and by whom, and the parts deleted from Part Master.",
+    permission: PERMISSIONS.STOCK_READ,
+    allBranches: true,
+    filters: [...PART_FILTERS, "option"],
+    labels: { option: "Show" },
+    options: [
+      { value: "BOTH", label: "Both rates" },
+      { value: "RETAIL", label: "Changed retail rate" },
+      { value: "DEALER", label: "Changed dealer rate" },
+      { value: "DELETED", label: "Only deleted records" },
+    ],
+    columns: [
+      datetime("changedAt", "Changed on"),
+      text("partNumber", "Part No"),
+      text("description", "Description"),
+      text("flag", "Flag"),
+      text("category", "Category"),
+      money("oldDealerRate", "Old dealer rate", false),
+      money("newDealerRate", "New dealer rate", false),
+      money("oldRetailRate", "Old retail rate", false),
+      money("newRetailRate", "New retail rate", false),
+      text("action", "Change"),
+      text("by", "Changed by"),
+    ],
+  },
+  {
+    kind: "part-bin-history",
+    title: "Part Bin Location History",
+    group: "MIS",
+    description: "Every change of a part's bin: the branch's rack location, or the default bin in Part Master.",
+    permission: PERMISSIONS.STOCK_READ,
+    filters: [...PART_FILTERS, "option"],
+    labels: { option: "Show" },
+    options: [
+      { value: "ALL", label: "All" },
+      { value: "BRANCH", label: "Branch bin changes" },
+      { value: "PART_MASTER", label: "Part Master bin changes" },
+    ],
+    columns: [
+      datetime("changedAt", "Changed on"),
+      ...PART_COLUMNS,
+      text("location", "Changed in"),
+      text("oldBin", "Old bin"),
+      text("newBin", "New bin"),
+      text("by", "Changed by"),
+    ],
+  },
+  {
+    kind: "packing-list-register",
+    title: "Packing List Cum Gate Pass Report (STN)",
+    group: "MIS",
+    description:
+      "Packing lists (gate passes) for STNs dispatched from the branch, by receiving branch, courier, date or packing list number: each case and part, or one line per packing list.",
+    permission: PERMISSIONS.TRANSFER_READ,
+    filters: ["branch", "option", "summary"],
+    labels: { branch: "To branch", option: "Arrange" },
+    options: [
+      { value: "BRANCH", label: "Branch wise" },
+      { value: "COURIER", label: "Courier name wise" },
+      { value: "DATE", label: "Packing list date wise" },
+      { value: "NUMBER", label: "Packing list no. wise" },
+    ],
+    grouped: true,
+    columns: [
+      text("packingNumber", "Packing No"),
+      date(),
+      text("gatePass", "Gate pass"),
+      text("stnNumber", "STN No"),
+      text("toBranch", "To branch"),
+      text("caseNumber", "Case No"),
+      text("partNumber", "Part No"),
+      text("description", "Description"),
+      qty("quantity", "Qty"),
+      money("rate", "Rate", false),
+      money("value", "Value"),
+    ],
+    summaryColumns: [
+      text("packingNumber", "Packing No"),
+      date(),
+      text("gatePass", "Gate pass"),
+      text("stnNumber", "STN No"),
+      text("toBranch", "To branch"),
+      text("mode", "Dispatch mode"),
+      text("courier", "Courier"),
+      text("waybill", "Waybill"),
+      qty("cases", "Cases"),
+      qty("quantity", "Qty"),
+      qty("weight", "Weight (kg)"),
+      money("value", "Value"),
+      text("status", "Status"),
+    ],
+  },
 ];
 
 export const reportByKind = new Map(REPORTS.map((r) => [r.kind, r]));
 
 /** Ageing of Stock: stock and value in each age band of the limits asked for. */
-export function ageingColumns(limits: number[]): ReportColumn[] {
-  const bands = ageBandLabels(limits).flatMap((label, i) => [qty(`age${i}Qty`, `${label} qty`), money(`age${i}Value`, `${label} value`)]);
+function ageingColumns(limits: number[]): ReportColumn[] {
+  const bands = bandLabels(limits).flatMap((label, i) => [qty(`age${i}Qty`, `${label} qty`), money(`age${i}Value`, `${label} value`)]);
   return [...PART_COLUMNS, qty("quantity", "Stock"), ...bands, money("value", "Total value")];
 }
 
-export function columnsFor(definition: ReportDefinition, option?: string): ReportColumn[] {
+/** Workshop issue quantity in each mileage band, and issues on jobs with no mileage recorded. */
+function mileageColumns(limits: number[]): ReportColumn[] {
+  return [...bandLabels(limits, "km").map((label, i) => qty(`mileage${i}`, label)), qty("mileageNone", "Mileage not recorded")];
+}
+
+/** The report's columns for the filters asked for: per option, the summary, or age and mileage bands. */
+export function columnsFor(definition: ReportDefinition, f: Pick<ReportFilters, "option" | "summary" | "ageLimits" | "mileageLimits">): ReportColumn[] {
+  const mileage = mileageColumns(f.mileageLimits ?? DEFAULT_MILEAGE_LIMITS);
+  switch (definition.kind) {
+    case "stock-ageing":
+      return ageingColumns(f.ageLimits ?? DEFAULT_AGE_LIMITS);
+    case "max-consumed":
+      return [
+        qty("rank", "Rank", false),
+        ...PART_COLUMNS,
+        qty("counterSale", "Counter sales"),
+        qty("job", "Workshop jobs"),
+        qty("stn", "STNs"),
+        qty("quantity", "Total consumed"),
+        money("rate", "Dealer rate", false),
+        money("value", "Value"),
+        ...mileage,
+      ];
+    case "model-mileage-issue":
+      return [...PART_COLUMNS, ...mileage, qty("quantity", "Total issued")];
+  }
+  if (f.summary && definition.summaryColumns) return definition.summaryColumns;
   if (Array.isArray(definition.columns)) return definition.columns;
-  return definition.columns[option ?? ""] ?? Object.values(definition.columns)[0];
+  return definition.columns[f.option ?? ""] ?? Object.values(definition.columns)[0];
 }

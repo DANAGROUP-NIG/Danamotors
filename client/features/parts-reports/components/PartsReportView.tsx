@@ -31,6 +31,7 @@ const lagosToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/La
 const amount = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const whole = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 });
 const dayFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos" });
+const timeFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", dateStyle: "short", timeStyle: "short" });
 
 /** Formats a cell the way the legacy registers print it. */
 export function formatCell(column: ReportColumn, value: string | number | null | undefined) {
@@ -44,6 +45,8 @@ export function formatCell(column: ReportColumn, value: string | number | null |
       return `${amount.format(Number(value))}%`;
     case "date":
       return dayFmt.format(new Date(String(value)));
+    case "datetime":
+      return timeFmt.format(new Date(String(value)));
     default:
       return String(value);
   }
@@ -51,6 +54,7 @@ export function formatCell(column: ReportColumn, value: string | number | null |
 
 const numeric = (c: ReportColumn) => c.type === "money" || c.type === "qty" || c.type === "percent";
 const DEFAULT_AGE_LIMITS = "365,730,1095,1460,1825";
+const DEFAULT_MILEAGE_LIMITS = "10000,20000,40000,60000,100000";
 const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
 
 export function PartsReportView({ kind }: { kind: string }) {
@@ -323,8 +327,21 @@ export function PartsReportView({ kind }: { kind: string }) {
             Only fully executed
           </label>
         )}
+        {has("topN") && (
+          <Field label="Top N consumed parts">
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              placeholder="10"
+              className={inputCls}
+              value={params.topN ?? ""}
+              onChange={(e) => set({ topN: Number(e.target.value) || undefined })}
+            />
+          </Field>
+        )}
         {has("days") && (
-          <Field label="Not issued for (days)">
+          <Field label={definition.labels?.days ?? "Not issued for (days)"}>
             <input
               type="number"
               min={1}
@@ -345,6 +362,18 @@ export function PartsReportView({ kind }: { kind: string }) {
               title="Five increasing day limits, e.g. 30,60,90,180,365"
               value={params.ageLimits ?? DEFAULT_AGE_LIMITS}
               onChange={(e) => set({ ageLimits: e.target.value.replace(/\s/g, "") })}
+            />
+          </Field>
+        )}
+        {has("mileageLimits") && (
+          <Field label="Mileage limits (km)">
+            <input
+              className={inputCls}
+              required
+              pattern="\d+(,\d+){4}"
+              title="Five increasing mileage limits, e.g. 10000,20000,40000,60000,100000"
+              value={params.mileageLimits ?? DEFAULT_MILEAGE_LIMITS}
+              onChange={(e) => set({ mileageLimits: e.target.value.replace(/\s/g, "") })}
             />
           </Field>
         )}
@@ -369,6 +398,12 @@ export function PartsReportView({ kind }: { kind: string }) {
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={!!params.onlyTransacted} onChange={(e) => set({ onlyTransacted: e.target.checked || undefined })} />
             Only transacted parts
+          </label>
+        )}
+        {has("summary") && (
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input type="checkbox" checked={!!params.summary} onChange={(e) => set({ summary: e.target.checked || undefined })} />
+            Only summary
           </label>
         )}
         {has("includeCancelled") && (
@@ -444,7 +479,7 @@ export function PartsReportView({ kind }: { kind: string }) {
                       <tr key={i} className={cn("border-b last:border-0 hover:bg-muted/20", row.status === "Cancelled" && "text-muted-foreground line-through")}>
                         <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{g.start + i + 1}</td>
                         {result.columns.map((c) => (
-                          <td key={c.key} className={cn("px-3 py-1.5", numeric(c) ? "whitespace-nowrap text-right tabular-nums" : "", c.type === "date" && "whitespace-nowrap")}>
+                          <td key={c.key} className={cn("px-3 py-1.5", numeric(c) ? "whitespace-nowrap text-right tabular-nums" : "", (c.type === "date" || c.type === "datetime") && "whitespace-nowrap")}>
                             {formatCell(c, row[c.key])}
                           </td>
                         ))}

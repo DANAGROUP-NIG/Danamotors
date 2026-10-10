@@ -6,7 +6,7 @@ import { FileBarChart, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { getReportCatalogRequest, partsReportKeys, type ReportDefinition } from "../api/parts-reports.api";
 
-const GROUP_ORDER = ["Counter sales", "Customer orders", "Purchase", "Transfers", "Stock movement", "Stock"];
+const GROUP_ORDER = ["Counter sales", "Customer orders", "Purchase", "Transfers", "Stock movement", "Stock", "MIS"];
 
 /** Legacy Parts module report menu: every report the user may run, by area. */
 export function PartsReportsPage() {
@@ -19,7 +19,7 @@ export function PartsReportsPage() {
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
         title="Parts Reports"
-        description="Counter sales, customer orders, purchase receipts, transfers, stock movement registers, and stock ledgers, balances and ageing. Choose a report, set its filters and run it."
+        description="Counter sales, customer orders, purchase receipts, transfers, stock movement registers, stock ledgers, balances and ageing, and the MIS reports. Choose a report, set its filters and run it."
       />
       {isLoading ? (
         <div className="flex justify-center py-16">

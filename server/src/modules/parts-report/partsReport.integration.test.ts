@@ -177,6 +177,10 @@ describeDb("Parts reports (database)", () => {
 
     const shortage = await report("receipt-shortage");
     expect(shortage.rows).toEqual([expect.objectContaining({ partNumber: `RPT-O-${run}`, caseNumber: "C2", expected: 6, damaged: 1, short: 1, value: 20000 })]);
+    // Legacy MIT and MRN Mismatch Report: found by the MIT number and vendor.
+    const byMit = await report("receipt-shortage", { search: String(shortage.rows[0].mitNumber), vendor: "MOBIS" });
+    expect(byMit.rows).toHaveLength(1);
+    expect((await report("receipt-shortage", { vendor: "OTHER VENDOR" })).rows).toHaveLength(0);
 
     const checklist = await report("receipt-checklist");
     // The oil has no bin, so it sorts before the mirror in 53B3.

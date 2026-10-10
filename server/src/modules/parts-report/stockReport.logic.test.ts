@@ -1,4 +1,4 @@
-import { ageBandLabels, StockValuation, untrackedOpening } from "./stockReport.logic";
+import { bandLabels, bandOf, StockValuation, untrackedOpening } from "./stockReport.logic";
 
 const day = (d: string) => new Date(`${d}T10:00:00+01:00`);
 
@@ -76,9 +76,9 @@ describe("untrackedOpening", () => {
   });
 });
 
-describe("ageBandLabels", () => {
+describe("bandLabels", () => {
   it("labels five limits as six bands", () => {
-    expect(ageBandLabels([30, 60, 90, 180, 365])).toEqual([
+    expect(bandLabels([30, 60, 90, 180, 365])).toEqual([
       "0–30 days",
       "31–60 days",
       "61–90 days",
@@ -86,5 +86,13 @@ describe("ageBandLabels", () => {
       "181–365 days",
       "Above 365 days",
     ]);
+  });
+});
+
+describe("bandOf", () => {
+  it("puts a value in the first band whose limit it does not pass", () => {
+    const limits = [10000, 20000, 40000, 60000, 100000];
+    expect([0, 10000, 10001, 59999, 100000, 100001].map((km) => bandOf(km, limits))).toEqual([0, 0, 1, 3, 4, 5]);
+    expect(bandLabels(limits, "km")[5]).toBe("Above 100000 km");
   });
 });

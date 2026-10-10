@@ -4,17 +4,17 @@
  * Dates are calendar days in Africa/Lagos. Counter-sale lines are priced with the same
  * rules as the bill (cash discount, then VAT on taxable lines), so line values agree
  * with the bills; only the bill-level round-off is reported separately. The stock reports
- * (ledger, summary, balances, ageing…) are built in stockReport.service.ts.
+ * (ledger, summary, balances, ageing…) are built in stockReport.service.ts, and the MIS
+ * reports in misReport.service.ts.
  */
 import { IndentStatus, MitStatus, MrnSource, Prisma, StnStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, NotFoundError } from "../../shared/errors/appError";
 import { money, sumMoney } from "../finance/money";
-import { priceSale } from "../part-sale/partSale.logic";
-import { ageingColumns, columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./partsReport.definitions";
-import { dateRange, partWhere, partyName, ReportFilters, Row, userName } from "./partsReport.common";
+import { columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./partsReport.definitions";
+import { dateRange, lineValues, partWhere, partyName, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
+import { MisReportService } from "./misReport.service";
 import { StockReportService } from "./stockReport.service";
-import { DEFAULT_AGE_LIMITS } from "./stockReport.logic";
 
 export type { ReportFilters };
 
@@ -31,7 +31,6 @@ export interface ReportResult {
 const MAX_ROWS = 5000;
 const LAGOS_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" });
 
-const statusLabel = (status: string) => status.replace("_", " ").toLowerCase();
 const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
@@ -39,17 +38,12 @@ const partSelect = {
   select: { id: true, partNumber: true, name: true, binLocation: true, unitPrice: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
 } as const;
 
-/** Bill line values, priced exactly as the bill was (discount first, then VAT). */
-function lineValues(quantity: number, rate: number, discountPercent: number, vatPercent: number | null) {
-  const [line] = priceSale([{ quantity, rate, vatPercent: vatPercent ?? 0 }], Math.min(100, Math.max(0, discountPercent))).lines;
-  return { gross: line.gross, discount: line.discount, vat: line.vat, net: money(line.gross - line.discount + line.vat) };
-}
-
 /** The last line of each group: a running balance's closing value. */
 const closingLines = (rows: Row[]) => rows.filter((r, i) => i === rows.length - 1 || rows[i + 1].group !== r.group);
 
 export class PartsReportService {
   private stock = new StockReportService();
+  private mis = new MisReportService(this.stock);
 
   async run(kind: string, filters: ReportFilters): Promise<ReportResult> {
     const definition = reportByKind.get(kind);
@@ -57,14 +51,15 @@ export class PartsReportService {
     if (!filters.from || !filters.to || filters.from > filters.to) throw new BadRequestError("Choose a valid date range");
     const option = filters.option || definition.options?.[0]?.value;
     const rows = await this.rows(definition, { ...filters, option });
-    const columns = kind === "stock-ageing" ? ageingColumns(filters.ageLimits ?? DEFAULT_AGE_LIMITS) : columnsFor(definition, option);
+    const columns = columnsFor(definition, { ...filters, option });
     const totals: Record<string, number> = {};
     for (const column of columns.filter((c) => c.total)) {
       const counted = column.total === "last" ? closingLines(rows) : rows.filter((r) => r.status !== "Cancelled");
       totals[column.key] = sumMoney(counted.map((r) => Number(r[column.key] ?? 0)));
     }
-    if (kind === "counter-sales-revenue") {
-      totals.marginPercent = totals.netSales ? money((totals.margin / totals.netSales) * 100) : 0;
+    for (const { key, ratio } of columns.filter((c) => c.ratio)) {
+      const over = sumMoney(ratio!.over.map((k) => totals[k] ?? 0));
+      totals[key] = over ? money(((totals[ratio!.of] ?? 0) / over) * 100) : 0;
     }
     if (kind === "inventory-sales-ratio") {
       totals.ratio = totals.sales > 0 ? money(totals.closingValue / totals.sales) : 0;
@@ -81,7 +76,7 @@ export class PartsReportService {
   }
 
   private rows(definition: ReportDefinition, f: ReportFilters): Promise<Row[]> {
-    const stockRows = this.stock.rows(definition.kind, f);
+    const stockRows = this.stock.rows(definition.kind, f) ?? this.mis.rows(definition.kind, f);
     if (stockRows) return stockRows;
     switch (definition.kind) {
       case "counter-sales":
@@ -584,7 +579,14 @@ export class PartsReportService {
           receiptDate: dateRange(f),
           ...(f.branchId && { receivingBranchId: f.branchId }),
           ...(f.otherBranchId && { sourceBranchId: f.otherBranchId }),
-          ...(f.search && { mrnNumber: { contains: f.search } }),
+          ...(f.vendor && !srn && { vendor: f.vendor }),
+          ...(f.search && {
+            OR: [
+              { mrnNumber: { contains: f.search } },
+              { mit: { mitNumber: { contains: f.search } } },
+              { stn: { stnNumber: { contains: f.search } } },
+            ],
+          }),
         },
       },
       include: {
@@ -832,9 +834,11 @@ export class PartsReportService {
     const txns = await this.stockTransactions(f, ["ISSUED", "TRANSFER_OUT", "RETURNED"]);
     const byPart = new Map<string, Row>();
     for (const t of txns) {
-      const row = byPart.get(t.partId) ?? {
-        partNumber: t.part.partNumber,
-        description: t.part.name,
+      const key = f.summary ? (t.part.priceCategoryCode ?? "") : t.partId;
+      const row = byPart.get(key) ?? {
+        ...(f.summary
+          ? { categoryName: t.part.priceCategory?.description ?? "No price category" }
+          : { partNumber: t.part.partNumber, description: t.part.name }),
         category: t.part.priceCategoryCode,
         issued: 0,
         transferred: 0,
@@ -846,14 +850,17 @@ export class PartsReportService {
       if (t.type === "ISSUED") row.issued = Number(row.issued) + Math.abs(t.quantity);
       else if (t.type === "TRANSFER_OUT") row.transferred = Number(row.transferred) + Math.abs(t.quantity);
       else row.returned = Number(row.returned) + Math.abs(t.quantity);
-      byPart.set(t.partId, row);
+      // Valued at each part's dealer rate, so a category adds up its parts.
+      const sign = t.type === "RETURNED" ? (includeReturns ? -1 : 0) : 1;
+      row.value = money(Number(row.value) + sign * Math.abs(t.quantity) * t.part.unitPrice);
+      byPart.set(key, row);
     }
     return [...byPart.values()]
       .map((row): Row => {
         const net = Number(row.issued) + Number(row.transferred) - (includeReturns ? Number(row.returned) : 0);
-        return { ...row, ...(includeReturns ? {} : { returned: 0 }), net, value: money(net * Number(row.rate)) };
+        return { ...row, ...(includeReturns ? {} : { returned: 0 }), net };
       })
-      .sort((a, b) => String(a.partNumber).localeCompare(String(b.partNumber)));
+      .sort((a, b) => String(a.partNumber ?? a.category ?? "").localeCompare(String(b.partNumber ?? b.category ?? "")));
   }
 
   private async issueChecklist(f: ReportFilters): Promise<Row[]> {

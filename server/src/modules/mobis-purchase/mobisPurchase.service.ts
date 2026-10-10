@@ -13,6 +13,7 @@ import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
+import { recordPartChange } from "../inventory/partHistory";
 import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
 import {
@@ -124,6 +125,7 @@ export class MobisPurchaseService {
             partStatus: PartStatus.ACTIVE,
           },
         });
+        await recordPartChange(tx, null, part, actorId);
         partIdByNumber.set(partNumber, part.id);
         created.add(partNumber);
       }

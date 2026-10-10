@@ -2,9 +2,18 @@ import { apiGet } from "@/lib/api/apiClient";
 
 // Mirrors server/src/modules/parts-report.
 
-export type ColumnType = "text" | "date" | "qty" | "money" | "percent";
-/** total "last": a running balance; the subtotal is the group's last value. */
-export type ReportColumn = { key: string; label: string; type: ColumnType; total?: boolean | "last" };
+export type ColumnType = "text" | "date" | "datetime" | "qty" | "money" | "percent";
+/**
+ * total "last": a running balance; the subtotal is the group's last value.
+ * ratio: a percent whose subtotal and total are `of` over the sum of `over`.
+ */
+export type ReportColumn = {
+  key: string;
+  label: string;
+  type: ColumnType;
+  total?: boolean | "last";
+  ratio?: { of: string; over: string[] };
+};
 export type ReportFilterKey =
   | "customer"
   | "vendor"
@@ -22,7 +31,10 @@ export type ReportFilterKey =
   | "includeAlternates"
   | "onlyTransacted"
   | "days"
-  | "ageLimits";
+  | "ageLimits"
+  | "mileageLimits"
+  | "topN"
+  | "summary";
 
 export type ReportDefinition = {
   kind: string;
@@ -35,11 +47,12 @@ export type ReportDefinition = {
   period?: "range" | "asOn" | "none";
   /** Covers every branch; no branch is chosen. */
   allBranches?: boolean;
-  labels?: { branch?: string; search?: string; option?: string };
+  labels?: { branch?: string; search?: string; option?: string; days?: string };
   options?: { value: string; label: string }[];
   statuses?: { value: string; label: string }[];
   grouped?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
+  summaryColumns?: ReportColumn[];
 };
 
 export type ReportRow = Record<string, string | number | null>;
@@ -83,6 +96,10 @@ export type ReportParams = {
   days?: number;
   /** Five increasing day limits, comma separated. */
   ageLimits?: string;
+  /** Five increasing mileage limits in km, comma separated. */
+  mileageLimits?: string;
+  topN?: number;
+  summary?: boolean;
 };
 
 const BASE = "/parts-reports";

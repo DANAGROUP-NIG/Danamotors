@@ -4,6 +4,10 @@ import { ageLimitsSchema } from "../finance/party-report.validation";
 const day = z.string().date("Use a YYYY-MM-DD date");
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`).optional();
 const flag = z.enum(["true", "false"]).optional().transform((v) => (v === undefined ? undefined : v === "true"));
+const mileageLimitsSchema = z
+  .array(z.number().int().min(1).max(2_000_000))
+  .length(5)
+  .refine((v) => v.every((n, i) => i === 0 || n > v[i - 1]), "Enter five increasing mileage limits");
 
 export const partSearchSchema = z.object({
   query: z.object({ search: z.string().trim().max(40).optional(), limit: z.coerce.number().optional() }),
@@ -31,11 +35,18 @@ export const runReportSchema = z.object({
       includeCancelled: flag,
       includeAlternates: flag,
       onlyTransacted: flag,
+      summary: flag,
+      topN: z.coerce.number().int().min(1, "List at least 1 part").max(1000).optional(),
       days: z.coerce.number().int().min(1, "Enter at least 1 day").max(3650).optional(),
       ageLimits: z
         .string()
         .transform((v) => v.split(",").map(Number))
         .pipe(ageLimitsSchema)
+        .optional(),
+      mileageLimits: z
+        .string()
+        .transform((v) => v.split(",").map(Number))
+        .pipe(mileageLimitsSchema)
         .optional(),
     })
     .refine((q) => q.from <= q.to, { path: ["to"], message: "The end date must be on or after the start date" }),

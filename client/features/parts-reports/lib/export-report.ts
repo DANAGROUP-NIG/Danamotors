@@ -4,18 +4,24 @@ import type { ReportColumn, ReportResult, ReportRow } from "../api/parts-reports
 type Cell = string | number | Date | null;
 
 const numeric = (c: ReportColumn) => c.type === "money" || c.type === "qty" || c.type === "percent";
-const NUMBER_FORMAT: Partial<Record<ReportColumn["type"], string>> = { money: "#,##0.00", qty: "#,##0.##", percent: "0.00\"%\"" };
+const NUMBER_FORMAT: Partial<Record<ReportColumn["type"], string>> = {
+  money: "#,##0.00",
+  qty: "#,##0.##",
+  percent: "0.00\"%\"",
+  date: "dd/mm/yyyy",
+  datetime: "dd/mm/yyyy hh:mm",
+};
 
 function cellValue(column: ReportColumn, value: ReportRow[string] | undefined): Cell {
   if (value === null || value === undefined || value === "") return null;
-  if (column.type === "date") return new Date(String(value));
+  if (column.type === "date" || column.type === "datetime") return new Date(String(value));
   if (numeric(column)) return Number(value);
   return String(value);
 }
 
-/** Group subtotals: sums (cancelled lines left out), or a running balance's last value. */
+/** Group subtotals: sums (cancelled lines left out), a running balance's last value, or a percent of two sums. */
 export function subtotal(rows: ReportRow[], columns: ReportColumn[]): Record<string, number> {
-  return Object.fromEntries(
+  const sums: Record<string, number> = Object.fromEntries(
     columns
       .filter((c) => c.total)
       .map((c) => [
@@ -25,6 +31,11 @@ export function subtotal(rows: ReportRow[], columns: ReportColumn[]): Record<str
           : rows.reduce((s, r) => s + (r.status === "Cancelled" ? 0 : Number(r[c.key] ?? 0)), 0),
       ]),
   );
+  for (const { key, ratio } of columns.filter((c) => c.ratio)) {
+    const over = ratio!.over.reduce((s, k) => s + (sums[k] ?? 0), 0);
+    sums[key] = over ? ((sums[ratio!.of] ?? 0) / over) * 100 : 0;
+  }
+  return sums;
 }
 
 /**
@@ -73,7 +84,7 @@ export async function exportReportXlsx(
   const sheet = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true, dateNF: "dd/mm/yyyy" });
   // Number formats per column, below the column header.
   columns.forEach((c, i) => {
-    const format = NUMBER_FORMAT[c.type] ?? (c.type === "date" ? "dd/mm/yyyy" : undefined);
+    const format = NUMBER_FORMAT[c.type];
     if (!format) return;
     for (let r = headerRow + 1; r < aoa.length; r++) {
       const cell = sheet[XLSX.utils.encode_cell({ r, c: i + 1 })];
