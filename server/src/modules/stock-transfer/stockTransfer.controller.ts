@@ -129,7 +129,34 @@ export class StockTransferController {
     const branches = await this.service.getIndentBranches(req.params.id);
     assertInventoryBranchAccess(req, [branches.sourceBranchId]);
     const indent = await this.service.dispatchIndent(req.params.id, req.user!.userId, req.body);
-    ok(res, { indent }, "Dispatched: STN, cases, packing list and MIT created");
+    ok(res, { indent }, "Dispatched: STN, cases and packing list cum gate pass created");
+  });
+
+  closeIndent = handle(async (req, res) => {
+    const branches = await this.service.getIndentBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const indent = await this.service.closeBackOrder(req.params.id, req.user!.userId, req.body.reason);
+    ok(res, { indent }, "Back order closed");
+  });
+
+  dispatchStn = handle(async (req, res) => {
+    const branches = await this.service.getDispatchBranches(req.body.indentIds);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const stn = await this.service.dispatchIndents(req.body, req.user!.userId);
+    ok(res, { stn }, `STN ${stn.stnNumber} dispatched`, 201);
+  });
+
+  createDirectStn = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [req.body.sourceBranchId]);
+    const stn = await this.service.createDirectStn(req.body, req.user!.userId);
+    ok(res, { stn }, `Direct STN ${stn.stnNumber} dispatched`, 201);
+  });
+
+  receiveStn = handle(async (req, res) => {
+    const branches = await this.service.getStnBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.destinationBranchId]);
+    const stn = await this.service.receiveStn(req.params.id, req.user!.userId, req.body);
+    ok(res, { stn }, "Receipt posted: MRN generated and stock updated", 201);
   });
 
   receiveIndent = handle(async (req, res) => {

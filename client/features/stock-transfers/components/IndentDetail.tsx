@@ -15,6 +15,7 @@ import {
   Loader2,
   PackageCheck,
   PackageSearch,
+  PackageX,
   Printer,
   Send,
   Truck,
@@ -40,7 +41,7 @@ import {
 } from "../lib/indent-status";
 import type { Indent } from "../types/indent.types";
 
-type DialogKind = "approve" | "dispatch" | "receive" | "reject" | "cancel" | null;
+type DialogKind = "approve" | "dispatch" | "receive" | "reject" | "cancel" | "close" | null;
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 align-top";
@@ -162,9 +163,15 @@ export function IndentDetail({ id }: { id: string }) {
               <CheckCircle className="size-4" /> Approve
             </Button>
           )}
+          {can.close && (
+            <Button size="sm" variant="outline" onClick={() => setDialog("close")} className="gap-1.5 text-red-600">
+              <PackageX className="size-4" /> Close back order
+            </Button>
+          )}
           {can.pick && (
-            <Button size="sm" disabled={pick.isPending} onClick={() => pick.mutate(indent.id)} className="gap-1.5">
-              <PackageSearch className="size-4" /> Retry picking
+            <Button size="sm" disabled={pick.isPending} onClick={() => pick.mutate({ id: indent.id })} className="gap-1.5">
+              <PackageSearch className="size-4" />
+              {indent.status === "PARTLY_DISPATCHED" ? "Pick back order" : "Retry picking"}
             </Button>
           )}
           {can.dispatch && (
@@ -224,7 +231,16 @@ export function IndentDetail({ id }: { id: string }) {
               {indent.cancellationReason ? `: ${indent.cancellationReason}` : "."}
             </p>
           )}
-          {indent.status === "APPROVED" && !indent.pickingList && (
+          {indent.status === "PARTLY_DISPATCHED" && (
+            <p className="mt-5 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              {indent.lines.reduce((s, l) => s + l.dispatchedQuantity, 0)} of{" "}
+              {indent.lines.reduce((s, l) => s + (l.approvedQuantity ?? 0), 0)} approved units have shipped on{" "}
+              {indent.stns.length} STN(s). Pick the back order when stock arrives at {indent.sourceBranch.name}, or close
+              it if it will not be supplied.
+            </p>
+          )}
+          {indent.status === "APPROVED" && !indent.openPickingList && (
             <p className="mt-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               Nothing could be picked because {indent.sourceBranch.name} has no stock for these parts. Retry picking once
@@ -270,8 +286,9 @@ export function IndentDetail({ id }: { id: string }) {
               </thead>
               <tbody>
                 {indent.lines.map((l) => {
-                  const supplied = indent.stn?.lines.find((s) => s.indentLineId === l.id && s.isAlternate)
-                    ?? indent.pickingList?.lines.find((p) => p.indentLineId === l.id && p.isAlternate);
+                  const supplied =
+                    indent.stns.flatMap((s) => s.lines).find((s) => s.indentLineId === l.id && s.isAlternate) ??
+                    indent.pickingLists.flatMap((p) => p.lines).find((p) => p.indentLineId === l.id && p.isAlternate);
                   return (
                     <tr key={l.id} className="border-t border-slate-100">
                       <td className={cn(tdCls, "text-slate-400")}>{l.lineNumber}</td>
@@ -367,7 +384,7 @@ export function IndentDetail({ id }: { id: string }) {
       {dialog === "approve" && <ApproveIndentDialog indent={indent} open onClose={close} />}
       {dialog === "dispatch" && <DispatchIndentDialog indent={indent} open onClose={close} />}
       {dialog === "receive" && <ReceiveIndentDialog indent={indent} open onClose={close} />}
-      {(dialog === "reject" || dialog === "cancel") && (
+      {(dialog === "reject" || dialog === "cancel" || dialog === "close") && (
         <ReasonDialog indent={indent} open onClose={close} mode={dialog} />
       )}
     </div>
@@ -389,19 +406,18 @@ function DocHeader({ label, number, meta }: { label: string; number: string; met
 }
 
 function Documents({ indent }: { indent: Indent }) {
-  const { pickingList, stn } = indent;
-  if (!pickingList && !stn) return null;
-  const partNo = (stnLineId: string) => stn?.lines.find((l) => l.id === stnLineId)?.part.partNumber ?? "—";
+  const { pickingLists, stns } = indent;
+  if (!pickingLists.length && !stns.length) return null;
 
   return (
     <SectionCard icon={<FileText className="size-4" />} title="Documents">
       <div className="grid gap-5 lg:grid-cols-2">
-        {pickingList && (
-          <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+        {pickingLists.map((pickingList) => (
+          <div key={pickingList.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
             <DocHeader
               label="Picking list"
               number={pickingList.pickingNumber}
-              meta={`${pickingList.status.toLowerCase()} · ${fmtDate(pickingList.createdAt)}`}
+              meta={`${pickingList.status.toLowerCase()} · ${fmtDate(pickingList.createdAt)}${pickingList.pickerName ? ` · ${pickingList.pickerName}` : ""}`}
             />
             <ul className="space-y-1 text-sm text-slate-600">
               {pickingList.lines.map((l) => (
@@ -416,119 +432,125 @@ function Documents({ indent }: { indent: Indent }) {
               ))}
             </ul>
           </div>
-        )}
-
-        {stn && (
-          <div className="space-y-2 rounded-lg border border-slate-200 p-4">
-            <DocHeader
-              label="STN"
-              number={stn.stnNumber}
-              meta={`${fmtDate(stn.documentDate)} · ${personName(stn.dispatchedBy)}`}
-            />
-            <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4">
-              <span>Qty {stn.totalQuantity}</span>
-              <span>{fmtCurrency(stn.totalValue)}</span>
-              <span>{stn.transportMode ? TRANSPORT_MODE_LABELS[stn.transportMode] : "—"}</span>
-              <span>Tax form {stn.taxForm ?? "—"}</span>
-            </div>
-            <p className="text-sm text-emerald-700">
-              {stn.stockDeducted ? `Stock deducted from ${indent.sourceBranch.name}` : "Stock not yet deducted"}
-            </p>
-            {/* The goods travel on the STN; each line shows how much the receiving branch has accounted for. */}
-            <ul className="space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-600">
-              {stn.lines.map((l) => (
-                <li key={l.id} className="flex justify-between gap-2">
-                  <span className="font-mono">{l.part.partNumber}</span>
-                  <span>
-                    {l.receivedQuantity + l.damagedQuantity + l.shortQuantity}/{l.quantity} received on MRN
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {stn?.packingList && (
-          <div className="space-y-2 rounded-lg border border-slate-200 p-4">
-            <DocHeader
-              label="Packing list"
-              number={stn.packingList.packingNumber}
-              meta={fmtDate(stn.packingList.packingDate)}
-            />
-            <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
-              <span>Waybill {stn.packingList.waybillNumber ?? "—"}</span>
-              <span>Courier {stn.packingList.courierName ?? "—"}</span>
-              <span>
-                Mode {stn.packingList.dispatchMode ? TRANSPORT_MODE_LABELS[stn.packingList.dispatchMode] : "—"}
-              </span>
-              <span>Weight {stn.packingList.consignmentWeight != null ? `${stn.packingList.consignmentWeight} kg` : "—"}</span>
-            </div>
-            <div className="space-y-2 pt-1">
-              {stn.cases.map((c) => (
-                <div key={c.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
-                  <p className="flex items-center justify-between gap-2 font-medium text-slate-700">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Boxes className="size-3.5" /> Case <span className="font-mono">{c.caseNumber}</span>
-                    </span>
-                    <span className="font-normal text-slate-500">
-                      {c.totalQuantity} units{c.weight ? ` · ${c.weight} kg` : ""}
-                      {c.packerName ? ` · ${c.packerName}` : ""}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-slate-500">
-                    {c.lines.map((l) => `${partNo(l.stnLineId)} ×${l.quantity}`).join(", ")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {stn?.mrns.map((mrn) => (
-          <div key={mrn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
-            <DocHeader
-              label="MRN"
-              number={mrn.mrnNumber}
-              meta={`${fmtDateTime(mrn.receiptDate)} · ${personName(mrn.receivedBy)}`}
-            />
-            <div className="flex flex-wrap gap-3 text-xs">
-              <span className="text-emerald-700">{mrn.totalReceived} received</span>
-              {mrn.totalDamaged > 0 && <span className="text-red-600">{mrn.totalDamaged} damaged</span>}
-              {mrn.totalShort > 0 && <span className="text-red-600">{mrn.totalShort} short</span>}
-              <span className="text-slate-500">{fmtCurrency(mrn.totalValue)}</span>
-            </div>
-            <ul className="space-y-1 text-xs text-slate-600">
-              {mrn.lines.map((l) => (
-                <li key={l.id} className="flex justify-between gap-2">
-                  <span className="font-mono">{l.part.partNumber}</span>
-                  <span>
-                    {l.receivedQuantity} good
-                    {l.damagedQuantity > 0 && ` · ${l.damagedQuantity} damaged`}
-                    {l.shortQuantity > 0 && ` · ${l.shortQuantity} short`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
         ))}
 
-        {stn?.srns.map((srn) => (
-          <div key={srn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
-            <DocHeader
-              label="SRN"
-              number={srn.srnNumber}
-              meta={`${fmtDateTime(srn.receiptDate)} · ${personName(srn.receivedBy)}`}
-            />
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span className="text-emerald-700">{srn.totalReceived} received</span>
-              {srn.totalDamaged > 0 && <span className="text-red-600">{srn.totalDamaged} damaged</span>}
-              {srn.totalShort > 0 && <span className="text-red-600">{srn.totalShort} short</span>}
-            </div>
-            {srn.remarks && <p className="text-sm text-slate-500">{srn.remarks}</p>}
-          </div>
+        {stns.map((stn) => (
+          <StnDocuments key={stn.id} stn={stn} indent={indent} />
         ))}
       </div>
     </SectionCard>
   );
+}
 
+function StnDocuments({ stn, indent }: { stn: Indent["stns"][number]; indent: Indent }) {
+  const partNo = (stnLineId: string) => stn.lines.find((l) => l.id === stnLineId)?.part.partNumber ?? "—";
+  const others = stn.indents.filter((i) => i.id !== indent.id);
+  // Only this indent's lines; a shared STN also carries other indents.
+  const lines = stn.lines.filter((l) => indent.lines.some((il) => il.id === l.indentLineId));
+
+  return (
+    <>
+      <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+        <DocHeader
+          label="STN"
+          number={stn.stnNumber}
+          meta={`${fmtDate(stn.documentDate)} · ${personName(stn.dispatchedBy)}`}
+        />
+        <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4">
+          <span>Qty {stn.totalQuantity}</span>
+          <span>{fmtCurrency(stn.totalValue)}</span>
+          <span>{stn.transportMode ? TRANSPORT_MODE_LABELS[stn.transportMode] : "—"}</span>
+          <span>Tax form {stn.taxForm ?? "—"}</span>
+        </div>
+        {others.length > 0 && (
+          <p className="text-sm text-slate-500">
+            Shipped together with indent{others.length > 1 ? "s" : ""}{" "}
+            {others.map((o, i) => (
+              <span key={o.id}>
+                {i > 0 && ", "}
+                <Link href={`/transfers/indents/${o.id}`} className="font-mono text-primary hover:underline">
+                  {o.indentNumber}
+                </Link>
+              </span>
+            ))}
+            .{" "}
+            <Link href={`/transfers/stn/${stn.id}`} className="text-primary hover:underline">
+              View STN
+            </Link>
+          </p>
+        )}
+        {/* The goods travel on the STN; each line shows how much the receiving branch has accounted for. */}
+        <ul className="space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-600">
+          {lines.map((l) => (
+            <li key={l.id} className="flex justify-between gap-2">
+              <span className="font-mono">{l.part.partNumber}</span>
+              <span>
+                {l.receivedQuantity + l.damagedQuantity + l.shortQuantity}/{l.quantity} received on MRN
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {stn.packingList && (
+        <div className="space-y-2 rounded-lg border border-slate-200 p-4">
+          <DocHeader
+            label="Packing list cum gate pass"
+            number={stn.packingList.packingNumber}
+            meta={`${fmtDate(stn.packingList.packingDate)}${stn.packingList.gatePassNumber ? ` · gate pass ${stn.packingList.gatePassNumber}` : ""}`}
+          />
+          <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
+            <span>Waybill {stn.packingList.waybillNumber ?? "—"}</span>
+            <span>Courier {stn.packingList.courierName ?? "—"}</span>
+            <span>Mode {stn.packingList.dispatchMode ? TRANSPORT_MODE_LABELS[stn.packingList.dispatchMode] : "—"}</span>
+            <span>Weight {stn.packingList.consignmentWeight != null ? `${stn.packingList.consignmentWeight} kg` : "—"}</span>
+          </div>
+          <div className="space-y-2 pt-1">
+            {stn.cases.map((c) => (
+              <div key={c.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
+                <p className="flex items-center justify-between gap-2 font-medium text-slate-700">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Boxes className="size-3.5" /> Case <span className="font-mono">{c.caseNumber}</span>
+                  </span>
+                  <span className="font-normal text-slate-500">
+                    {c.totalQuantity} units{c.weight ? ` · ${c.weight} kg` : ""}
+                    {c.packerName ? ` · ${c.packerName}` : ""}
+                  </span>
+                </p>
+                <p className="mt-1 text-slate-500">{c.lines.map((l) => `${partNo(l.stnLineId)} ×${l.quantity}`).join(", ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stn.mrns.map((mrn) => (
+        <div key={mrn.id} className="space-y-2 rounded-lg border border-slate-200 p-4">
+          <DocHeader
+            label="MRN"
+            number={mrn.mrnNumber}
+            meta={`STN ${stn.stnNumber} · ${fmtDateTime(mrn.receiptDate)} · ${personName(mrn.receivedBy)}`}
+          />
+          <div className="flex flex-wrap gap-3 text-xs">
+            <span className="text-emerald-700">{mrn.totalReceived} received</span>
+            {mrn.totalDamaged > 0 && <span className="text-red-600">{mrn.totalDamaged} damaged</span>}
+            {mrn.totalShort > 0 && <span className="text-red-600">{mrn.totalShort} short</span>}
+            <span className="text-slate-500">{fmtCurrency(mrn.totalValue)}</span>
+          </div>
+          <ul className="space-y-1 text-xs text-slate-600">
+            {mrn.lines.map((l) => (
+              <li key={l.id} className="flex justify-between gap-2">
+                <span className="font-mono">{l.part.partNumber}</span>
+                <span>
+                  {l.receivedQuantity} good
+                  {l.damagedQuantity > 0 && ` · ${l.damagedQuantity} damaged`}
+                  {l.shortQuantity > 0 && ` · ${l.shortQuantity} short`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
 }

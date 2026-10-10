@@ -18,6 +18,7 @@ export const DOC_TYPES = {
   PACKING: "PACKING",
   MIT: "MIT",
   MRN: "MRN",
+  GATE_PASS: "GATE_PASS",
   CPO: "CPO",
   COUNTER_SALE: "COUNTER_SALE",
   SALE_RETURN: "SALE_RETURN",
@@ -42,14 +43,14 @@ export type IndentAction =
   | "reject"
   | "cancel"
   | "dispatch"
-  | "receive";
+  | "close";
 
 /** The statuses from which each user action is allowed. */
 export const ALLOWED_FROM: Record<IndentAction, IndentStatus[]> = {
   submit: [IndentStatus.DRAFT],
   approve: [IndentStatus.SUBMITTED],
-  // Re-running picking is only possible for an approved indent that has nothing picked yet.
-  pick: [IndentStatus.APPROVED],
+  // Picking runs again for the back order: before the first dispatch or after a partial one.
+  pick: [IndentStatus.APPROVED, IndentStatus.PARTLY_DISPATCHED],
   reject: [IndentStatus.SUBMITTED],
   cancel: [
     IndentStatus.DRAFT,
@@ -58,8 +59,40 @@ export const ALLOWED_FROM: Record<IndentAction, IndentStatus[]> = {
     IndentStatus.PICKED,
   ],
   dispatch: [IndentStatus.PICKED],
-  receive: [IndentStatus.IN_TRANSIT, IndentStatus.PARTIALLY_RECEIVED],
+  // Stop supplying the rest: the back order is written off and the indent closes once received.
+  close: [IndentStatus.APPROVED, IndentStatus.PICKED, IndentStatus.PARTLY_DISPATCHED],
 };
+
+/** Statuses an indent may be in while STNs against it are still being received. */
+export const RECEIVABLE_STATUSES: IndentStatus[] = [
+  IndentStatus.PICKED,
+  IndentStatus.PARTLY_DISPATCHED,
+  IndentStatus.IN_TRANSIT,
+  IndentStatus.PARTIALLY_RECEIVED,
+];
+
+export interface IndentLineTally {
+  approvedQuantity: number | null;
+  dispatchedQuantity: number;
+  /** Received + damaged + short across every STN line for this indent line. */
+  accountedQuantity: number;
+}
+
+/**
+ * The supply-side status follows the quantities once the indent is approved:
+ * an open pick wins, then anything still to ship keeps it PARTLY_DISPATCHED,
+ * and a fully shipped indent moves through IN_TRANSIT to COMPLETED as STNs are received.
+ */
+export function deriveIndentStatus(lines: IndentLineTally[], hasOpenPick: boolean): IndentStatus {
+  if (hasOpenPick) return IndentStatus.PICKED;
+  const approved = lines.reduce((s, l) => s + (l.approvedQuantity ?? 0), 0);
+  const dispatched = lines.reduce((s, l) => s + l.dispatchedQuantity, 0);
+  const accounted = lines.reduce((s, l) => s + l.accountedQuantity, 0);
+  if (dispatched === 0) return IndentStatus.APPROVED;
+  if (dispatched < approved) return IndentStatus.PARTLY_DISPATCHED;
+  if (accounted >= dispatched) return IndentStatus.COMPLETED;
+  return accounted > 0 ? IndentStatus.PARTIALLY_RECEIVED : IndentStatus.IN_TRANSIT;
+}
 
 export function assertTransition(current: IndentStatus, action: IndentAction): void {
   const allowed = ALLOWED_FROM[action];
@@ -137,7 +170,7 @@ export function resolveDispatchQuantities(
     const line = byId.get(override.pickingLineId);
     if (!line) {
       throw new BadRequestError(
-        `Picking line ${override.pickingLineId} does not belong to this indent`,
+        `Picking line ${override.pickingLineId} is not on the picking lists being dispatched`,
       );
     }
     if (seen.has(override.pickingLineId)) {
@@ -383,7 +416,7 @@ export const PROGRESS_STEPS: { key: string; label: string; statuses: IndentStatu
   {
     key: "DISPATCHED",
     label: "Dispatched (in transit)",
-    statuses: [IndentStatus.DISPATCHED, IndentStatus.IN_TRANSIT],
+    statuses: [IndentStatus.DISPATCHED, IndentStatus.IN_TRANSIT, IndentStatus.PARTLY_DISPATCHED],
   },
   { key: "MRN_CREATED", label: "MRN created", statuses: [IndentStatus.MRN_CREATED] },
   {

@@ -1809,6 +1809,8 @@ enum IndentStatus {
   APPROVED
   PICKING
   PICKED
+  // Part of the approved quantity is shipped; the back order is still to be picked or closed.
+  PARTLY_DISPATCHED
   STN_CREATED
   PACKED
   DISPATCHED
@@ -1931,8 +1933,9 @@ model BranchIndent {
 
   lines         BranchIndentLine[]
   statusHistory TransferStatusHistory[]
-  pickingList   PickingList?
-  stn           StockTransferNote?
+  // One picking list per pick round; the back order can be picked and dispatched later.
+  pickingLists  PickingList[]
+  stns          StockTransferNote[]     @relation("StnIndents")
 
   @@index([requestingBranchId])
   @@index([sourceBranchId])
@@ -1961,7 +1964,10 @@ model BranchIndentLine {
   requestedQuantity  Int
 
   approvedQuantity  Int?
+  // Approved but neither shipped nor reserved on an open picking list.
   backOrderQuantity Int  @default(0)
+  // Shipped so far, across every STN for this indent.
+  dispatchedQuantity Int @default(0)
 
   // Snapshots taken from Part Master and branch stock when the line is created.
   unitRate     Float
@@ -2013,13 +2019,21 @@ model PickingList {
   id            String @id @default(uuid())
   pickingNumber String @unique
 
-  indentId String       @unique
+  // An indent can be picked again for its back order after each dispatch; at most one
+  // picking list per indent is OPEN at a time (partial unique index in the migration).
+  indentId String
   indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Cascade)
 
   branchId String
   branch   Branch @relation("PickingListBranch", fields: [branchId], references: [id], onDelete: Restrict)
 
   status PickingListStatus @default(OPEN)
+  // Who physically picked the parts (legacy HHDC picker), if different from the user.
+  pickerName String?
+
+  // The STN this picking list shipped on. One STN can ship several indents' picking lists.
+  stnId String?
+  stn   StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: SetNull)
 
   createdById   String?
   createdBy     User?     @relation("PickingListCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -2031,8 +2045,9 @@ model PickingList {
   updatedAt DateTime @updatedAt
 
   lines PickingListLine[]
-  stn   StockTransferNote?
 
+  @@index([indentId])
+  @@index([stnId])
   @@index([branchId])
   @@index([status])
 }
@@ -2069,11 +2084,10 @@ model StockTransferNote {
   id        String @id @default(uuid())
   stnNumber String @unique
 
-  indentId String       @unique
-  indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Restrict)
-
-  pickingListId String      @unique
-  pickingList   PickingList @relation(fields: [pickingListId], references: [id], onDelete: Restrict)
+  // Indents shipped on this STN: one or several of the same branch. None for a direct STN
+  // (CPD sends stock without an indent, e.g. the monthly Microcat recharge).
+  indents      BranchIndent[] @relation("StnIndents")
+  pickingLists PickingList[]
 
   sourceBranchId String
   sourceBranch   Branch @relation("StnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
@@ -2117,10 +2131,11 @@ model StockTransferNoteLine {
   stnId String
   stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
 
-  indentLineId  String
-  indentLine    BranchIndentLine @relation(fields: [indentLineId], references: [id], onDelete: Restrict)
-  pickingLineId String           @unique
-  pickingLine   PickingListLine  @relation(fields: [pickingLineId], references: [id], onDelete: Restrict)
+  // Empty on a direct STN, which ships free stock without an indent or picking list.
+  indentLineId  String?
+  indentLine    BranchIndentLine? @relation(fields: [indentLineId], references: [id], onDelete: Restrict)
+  pickingLineId String?           @unique
+  pickingLine   PickingListLine?  @relation(fields: [pickingLineId], references: [id], onDelete: Restrict)
 
   requestedPartId String
   requestedPart   SparePart @relation("StnRequestedPart", fields: [requestedPartId], references: [id], onDelete: Restrict)
@@ -2202,6 +2217,8 @@ model PackingList {
 
   status            PackingListStatus @default(PACKED)
   dispatchMode      TransportMode?
+  // Legacy "Packing List cum Gate Pass": the number security checks at the gate.
+  gatePassNumber    String?           @unique
   waybillNumber     String?
   courierName       String?
   consignmentWeight Float?
