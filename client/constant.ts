@@ -29,6 +29,7 @@ import {
   Landmark,
   Megaphone,
   ShoppingCart,
+  FileBarChart,
   Undo2,
 } from "lucide-react";
 
@@ -170,6 +171,13 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "Counter Sales", href: "/part-sale/counter-sales", icon: ReceiptText, permissions: [PART_SALE_PERMISSIONS.READ] },
           { label: "Sale Returns", href: "/part-sale/returns", icon: Undo2, permissions: [PART_SALE_PERMISSIONS.READ] },
         ],
+      },
+      {
+        label: "Parts Reports",
+        href: "/parts-reports",
+        icon: FileBarChart,
+        // Counter-sale, transfer and stock registers; each report checks its own permission.
+        permissions: [PART_SALE_PERMISSIONS.READ, INVENTORY_PERMISSIONS.TRANSFER_READ, INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
         label: "Transfers",

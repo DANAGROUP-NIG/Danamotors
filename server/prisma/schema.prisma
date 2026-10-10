@@ -1214,6 +1214,8 @@ model InvoiceLine {
   customerOrderLineId String?
   customerOrderLine   CustomerOrderLine?      @relation(fields: [customerOrderLineId], references: [id], onDelete: Restrict)
   vatPercent          Float?
+  // Dealer rate when billed, so revenue and margin reports do not move with later price changes.
+  unitCost            Float?
   returnedQuantity    Int                     @default(0)
   returnLines         CounterSaleReturnLine[]
 

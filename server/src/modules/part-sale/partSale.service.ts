@@ -90,7 +90,7 @@ const customerSelect = {
   },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, binLocation: true, partFlag: true, taxable: true },
+  select: { id: true, partNumber: true, name: true, uom: true, binLocation: true, partFlag: true, taxable: true, unitPrice: true },
 } as const;
 
 const customerName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
@@ -459,6 +459,7 @@ export class PartSaleService {
                 amount: priced.lines[index].gross,
                 customerOrderLineId: line.id,
                 vatPercent: priced.lines[index].vatPercent,
+                unitCost: line.part.unitPrice,
               })),
             },
           },
