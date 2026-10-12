@@ -34,11 +34,18 @@ import type { Payment } from "../types/payment.types";
 const PAGE_SIZE = 10;
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+  }).format(amount);
 }
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function customerName(p: Payment) {
@@ -98,14 +105,22 @@ export function PaymentsTable() {
   const allPayments = data?.payments ?? [];
   const filtered = debouncedSearch
     ? allPayments.filter((p) =>
-        [p.reference, p.invoice?.invoiceNumber, p.invoice?.customer?.firstName, p.invoice?.customer?.lastName]
+        [
+          p.reference,
+          p.invoice?.invoiceNumber,
+          p.invoice?.customer?.firstName,
+          p.invoice?.customer?.lastName,
+        ]
           .filter((f): f is string => Boolean(f))
           .some((f) => f.toLowerCase().includes(debouncedSearch.toLowerCase())),
       )
     : allPayments;
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const paginatedPayments = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedPayments = filtered.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   const selection = useDataTableSelection<Payment>({
     data: paginatedPayments,
@@ -115,15 +130,30 @@ export function PaymentsTable() {
   const today = new Date().toISOString().split("T")[0];
   const filename = `payments-${today}`;
 
-  function commitSearch() { setDebouncedSearch(search); setPage(1); }
-  function clearSearch() { setSearch(""); setDebouncedSearch(""); setPage(1); }
+  function commitSearch() {
+    setDebouncedSearch(search);
+    setPage(1);
+  }
+  function clearSearch() {
+    setSearch("");
+    setDebouncedSearch("");
+    setPage(1);
+  }
 
   function exportSelected(items: Payment[]) {
-    downloadCsv(filename, items.map(toPaymentExportRow), paymentExportColumns());
+    downloadCsv(
+      filename,
+      items.map(toPaymentExportRow),
+      paymentExportColumns(),
+    );
   }
 
   function exportSelectedExcel(items: Payment[]) {
-    downloadExcel(filename, items.map(toPaymentExportRow), paymentExportColumns());
+    downloadExcel(
+      filename,
+      items.map(toPaymentExportRow),
+      paymentExportColumns(),
+    );
   }
 
   function shareSelected(items: Payment[]) {
@@ -150,8 +180,7 @@ export function PaymentsTable() {
   const columns: Column<Payment>[] = [
     {
       header: "Reference",
-      render: (p) =>
-        p.reference ?? <span className="text-border">—</span>,
+      render: (p) => p.reference ?? <span className="text-border">—</span>,
       className: "font-medium",
     },
     {

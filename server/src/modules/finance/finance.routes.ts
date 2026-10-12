@@ -38,7 +38,9 @@ const controller = new FinanceController();
 
 router.use(authMiddleware);
 const outstanding=new OutstandingController();
+// const finance=new FinanceController();
 const repairAccess=[requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE)];
+// router.get('/', requirePermission(PERMISSIONS.FINANCE_REPORT_READ), finance.getDashboardOverview);
 router.get('/outstanding-letters/parties', requireOutstandingTools, validateRequest(reportPartySearchSchema), outstanding.search);
 router.post('/outstanding/recalculate/preview',...repairAccess,validateRequest(repairSchema),outstanding.previewRepair);
 router.post('/outstanding/recalculate/apply',...repairAccess,validateRequest(repairSchema),outstanding.applyRepair);

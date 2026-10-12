@@ -27,7 +27,7 @@ export function TopTechniciansCard({ technicians }: TopTechniciansCardProps) {
       {technicians.length > 0 ? (
         <>
           <ul className="flex flex-col gap-3">
-            {technicians.map((t) => {
+            {technicians.map((t, index) => {
               const initials =
                 t.avatar ||
                 t.name
@@ -36,7 +36,7 @@ export function TopTechniciansCard({ technicians }: TopTechniciansCardProps) {
                   .join("");
 
               return (
-                <li key={t.name} className="flex items-center gap-3">
+                <li key={index} className="flex items-center gap-3">
                   <span className="w-4 shrink-0 text-center text-sm font-bold text-muted-foreground">
                     {t.rank}
                   </span>

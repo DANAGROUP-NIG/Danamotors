@@ -134,18 +134,7 @@ export class FinanceController {
     try {
       const { id } = req.params;
       const result = await this.financeService.getPayment(id);
-      const payment = await prisma.payment.findUnique({
-        where: { id },
-        select: {
-          invoice: {
-            select: {
-              jobCard: { select: { branchId: true } },
-              customer: { select: { branchId: true } },
-            },
-          },
-        },
-      });
-      assertBillingBranch(req, payment?.invoice?.jobCard?.branchId ?? payment?.invoice?.customer?.branchId);
+      assertBillingBranch(req, result.invoice?.jobCard?.branchId ?? result.invoice?.customer?.branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { payment: result } });
     } catch (error) {
       next(error);

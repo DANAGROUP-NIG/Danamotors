@@ -6,7 +6,7 @@ export const invoiceIdParamSchema = z.object({
 });
 
 export const paymentIdParamSchema = z.object({
-  params: z.object({ id: z.string().uuid('Invalid payment ID') }),
+  params: z.object({ id: z.string().refine(value => z.string().uuid().safeParse(value.startsWith('receipt-allocation:') ? value.slice('receipt-allocation:'.length) : value).success, 'Invalid payment ID') }),
 });
 
 export const receiptIdParamSchema = z.object({

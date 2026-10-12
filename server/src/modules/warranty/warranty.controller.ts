@@ -1,5 +1,5 @@
 import { NextFunction, Request, RequestHandler, Response } from "express";
-import { assertBranchOwnership } from "../../middleware/authorize";
+import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { checkVehicleWarranty } from "./warranty.coverage";
@@ -24,10 +24,11 @@ const ok = (res: Response, data: unknown, message?: string, statusCode = 200) =>
 const has = (req: Request, permission: string) =>
   req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(permission) === true;
 
-/** Users assigned to a branch see that branch's cases; SuperAdmin and central (branchless) officers see all. */
+/** Users without all-branch access must have a home branch. */
 function caseScope(req: Request): string | undefined {
-  if (req.user?.role === ROLES.SUPER_ADMIN) return undefined;
-  return req.user?.branchId ?? undefined;
+  if (canAccessAllBranches(req.user)) return undefined;
+  if (!req.user?.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+  return req.user.branchId;
 }
 
 export class WarrantyController {

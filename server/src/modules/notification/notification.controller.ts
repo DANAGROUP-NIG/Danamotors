@@ -1,12 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationService } from './notification.service';
-import { ROLES } from '../../shared/constants/roles';
+import { Request, Response, NextFunction } from "express";
+import { NotificationService } from "./notification.service";
+import { ForbiddenError } from "../../shared/errors/appError";
+import { canAccessAllBranches } from "../../middleware/authorize";
 
-const CROSS_BRANCH_ROLES = new Set<string>([
-  ROLES.SUPER_ADMIN,
-  ROLES.GENERAL_STORE_MANAGER,
-  ROLES.RECEPTION_MANAGER,
-]);
 
 export class NotificationController {
   private notificationService: NotificationService;
@@ -17,51 +13,67 @@ export class NotificationController {
 
   private resolveBranchId(req: Request): string | undefined {
     const queryBranchId = req.query.branchId as string | undefined;
-    const role = req.user!.role;
-    if (!CROSS_BRANCH_ROLES.has(role)) {
-      return req.user!.branchId ?? undefined;
+    if (!canAccessAllBranches(req.user)) {
+      if (!req.user?.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      return req.user.branchId;
     }
     return queryBranchId || undefined;
   }
 
-  list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  list = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const userId = req.user!.userId;
       const result = await this.notificationService.list({
         userId,
         page: Number(req.query.page) || 1,
         limit: Number(req.query.limit) || 20,
-        unreadOnly: req.query.unreadOnly === 'true',
+        unreadOnly: req.query.unreadOnly === "true",
         branchId: this.resolveBranchId(req),
       });
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
   };
 
-  getUnreadCount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getUnreadCount = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const userId = req.user!.userId;
       const count = await this.notificationService.getUnreadCount(
         userId,
         this.resolveBranchId(req),
       );
-      res.status(200).json({ status: 'success', statusCode: 200, data: { count } });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: { count } });
     } catch (error) {
       next(error);
     }
   };
 
-  markRead = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  markRead = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const userId = req.user!.userId;
       await this.notificationService.markRead(id, userId);
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
-        message: 'Notification marked as read',
+        message: "Notification marked as read",
         data: null,
       });
     } catch (error) {
@@ -69,14 +81,18 @@ export class NotificationController {
     }
   };
 
-  markAllRead = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  markAllRead = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const userId = req.user!.userId;
       await this.notificationService.markAllRead(userId);
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
-        message: 'All notifications marked as read',
+        message: "All notifications marked as read",
         data: null,
       });
     } catch (error) {
