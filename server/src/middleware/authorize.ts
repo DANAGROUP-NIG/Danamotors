@@ -56,14 +56,15 @@ export function assertBranchOwnership(
     throw new UnauthorizedError();
   }
 
-  if (req.user.role === ROLES.SUPER_ADMIN || req.user.role === ROLES.RECEPTION_MANAGER || req.user.role === ROLES.GENERAL_STORE_MANAGER) {
+  if (
+    req.user.role === ROLES.SUPER_ADMIN ||
+    req.user.role === ROLES.CCU_MANAGER ||
+    req.user.role === ROLES.GENERAL_STORE_MANAGER
+  ) {
     return;
   }
 
-  if (
-    resourceBranchId &&
-    resourceBranchId !== req.user.branchId
-  ) {
+  if (resourceBranchId && resourceBranchId !== req.user.branchId) {
     throw new ForbiddenError(
       "You can only manage resources within your own branch",
     );
@@ -90,10 +91,14 @@ export function assertInventoryBranchAccess(
   }
 
   if (!req.user.branchId || resourceBranchIds.some((branchId) => !branchId)) {
-    throw new ForbiddenError('Your account is not assigned to an authorized branch');
+    throw new ForbiddenError(
+      "Your account is not assigned to an authorized branch",
+    );
   }
 
   if (resourceBranchIds.some((branchId) => branchId !== req.user!.branchId)) {
-    throw new ForbiddenError('You can only access inventory within your own branch');
+    throw new ForbiddenError(
+      "You can only access inventory within your own branch",
+    );
   }
 }

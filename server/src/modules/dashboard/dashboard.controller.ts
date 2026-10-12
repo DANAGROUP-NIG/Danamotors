@@ -1,14 +1,14 @@
-import { Request, Response, NextFunction } from 'express';
-import { DashboardService } from './dashboard.service';
-import { ROLES } from '../../shared/constants/roles';
-import { ForbiddenError } from '../../shared/errors/appError';
+import { Request, Response, NextFunction } from "express";
+import { DashboardService } from "./dashboard.service";
+import { ROLES } from "../../shared/constants/roles";
+import { ForbiddenError } from "../../shared/errors/appError";
 
 // Roles allowed to view dashboard stats for any branch. Everyone else is
 // scoped to their assigned branch.
 const CROSS_BRANCH_ROLES = new Set<string>([
   ROLES.SUPER_ADMIN,
   ROLES.GENERAL_STORE_MANAGER,
-  ROLES.RECEPTION_MANAGER,
+  ROLES.CCU_MANAGER,
 ]);
 
 export class DashboardController {
@@ -18,7 +18,11 @@ export class DashboardController {
     this.dashboardService = new DashboardService();
   }
 
-  getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getStats = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { branchId } = req.query as { branchId?: string };
 
@@ -29,13 +33,15 @@ export class DashboardController {
         branchId !== req.user!.branchId
       ) {
         throw new ForbiddenError(
-          'You can only view dashboards for your own branch',
+          "You can only view dashboards for your own branch",
         );
       }
 
       const userId = req.user!.userId;
       const result = await this.dashboardService.getStats(branchId, userId);
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }

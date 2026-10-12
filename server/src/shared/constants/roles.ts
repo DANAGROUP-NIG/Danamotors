@@ -17,6 +17,7 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
+  PARTS_REPORT_READ: "partsreport:read",
   DEBIT_NOTE_READ: "debitnote:read",
   DEBIT_NOTE_CREATE: "debitnote:create",
   DEBIT_NOTE_CANCEL: "debitnote:cancel",
@@ -224,6 +225,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.PARTS_REPORT_READ,
     PERMISSIONS.OUTSTANDING_RECALCULATE,
     PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
@@ -434,6 +436,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.PARTS_REPORT_READ,
     PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
     PERMISSIONS.PARTY_OUTSTANDING_READ,

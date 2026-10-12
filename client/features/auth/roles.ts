@@ -57,6 +57,8 @@ export const CAMPAIGN_PERMISSIONS = {
   VEHICLE_UPDATE: "campaign:vehicle:update",
 } as const;
 
+export const PARTS_REPORT_READ = "partsreport:read";
+
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
