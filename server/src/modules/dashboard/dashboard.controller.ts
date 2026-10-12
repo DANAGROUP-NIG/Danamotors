@@ -3,10 +3,6 @@ import { DashboardService } from "./dashboard.service";
 import { canAccessAllBranches } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 
-// Roles allowed to view dashboard stats for any branch. Everyone else is
-// scoped to their assigned branch.
-
-
 export class DashboardController {
   private dashboardService: DashboardService;
 

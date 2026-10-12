@@ -267,7 +267,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (result as any).branchId);
+      assertBranchOwnership(req, result.branchId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -286,7 +286,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const appointment = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (appointment as any).branchId);
+      assertBranchOwnership(req, appointment.branchId);
       const result = await this.serviceService.updateAppointment(id, {
         ...req.body,
         requestingUserRole: req.user?.role,
@@ -310,7 +310,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const appointment = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (appointment as any).branchId);
+      assertBranchOwnership(req, appointment.branchId);
       await this.serviceService.deleteAppointment(id);
       res.status(200).json({
         status: "success",
@@ -406,7 +406,7 @@ export class ServiceController {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getJobCard(id);
-      assertBranchOwnership(req, (result as any).branchId);
+      assertBranchOwnership(req, result.branchId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -643,7 +643,7 @@ export class ServiceController {
   };
 }
 
-function zCoerceNumber(val: any, fallback: number): number {
+function zCoerceNumber(val: unknown, fallback: number): number {
   if (val === undefined || val === null) return fallback;
   const num = Number(val);
   return isNaN(num) ? fallback : num;

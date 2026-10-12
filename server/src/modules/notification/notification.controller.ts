@@ -4,7 +4,6 @@ import { ForbiddenError } from "../../shared/errors/appError";
 import { canAccessAllBranches } from "../../middleware/authorize";
 
 
-
 export class NotificationController {
   private notificationService: NotificationService;
 
