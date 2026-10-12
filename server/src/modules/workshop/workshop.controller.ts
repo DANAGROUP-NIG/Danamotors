@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { WorkshopService } from "./workshop.service";
 import { ROLES } from "../../shared/constants/roles";
-import { assertBranchOwnership } from "../../middleware/authorize";
+import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
 import prisma from "../../prisma/client";
 import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 
@@ -36,11 +36,10 @@ export class WorkshopController {
 
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.WORKSHOP_MANAGER &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       const result = await this.workshopService.listTechnicians({

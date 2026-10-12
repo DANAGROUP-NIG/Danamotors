@@ -1,12 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { NotificationService } from "./notification.service";
-import { ROLES } from "../../shared/constants/roles";
+import { ForbiddenError } from "../../shared/errors/appError";
+import { canAccessAllBranches } from "../../middleware/authorize";
 
-const CROSS_BRANCH_ROLES = new Set<string>([
-  ROLES.SUPER_ADMIN,
-  ROLES.GENERAL_STORE_MANAGER,
-  ROLES.CCU_MANAGER,
-]);
+
 
 export class NotificationController {
   private notificationService: NotificationService;
@@ -17,9 +14,9 @@ export class NotificationController {
 
   private resolveBranchId(req: Request): string | undefined {
     const queryBranchId = req.query.branchId as string | undefined;
-    const role = req.user!.role;
-    if (!CROSS_BRANCH_ROLES.has(role)) {
-      return req.user!.branchId ?? undefined;
+    if (!canAccessAllBranches(req.user)) {
+      if (!req.user?.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      return req.user.branchId;
     }
     return queryBranchId || undefined;
   }

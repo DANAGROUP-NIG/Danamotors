@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ServiceService } from "./service.service";
-import { assertBranchOwnership } from "../../middleware/authorize";
+import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import prisma from "../../prisma/client";
 import { ForbiddenError } from "../../shared/errors/appError";
@@ -179,8 +179,7 @@ export class ServiceController {
       // Admin can only create appointments in their own branch
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER &&
+        !canAccessAllBranches(req.user) &&
         req.user.branchId &&
         req.body.branchName
       ) {
@@ -225,13 +224,13 @@ export class ServiceController {
       const source = req.query.source as string | undefined;
       let createdById: string | undefined;
 
-      // Only SuperAdmin and ReceptionManager can see all branches; others are locked to their branch
+      // All-branch access is explicit; other users are locked to their home branch.
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       // Receptionists can only see their own bookings
@@ -375,10 +374,10 @@ export class ServiceController {
 
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       const result = await this.serviceService.listJobCards({
@@ -587,10 +586,10 @@ export class ServiceController {
 
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       const result = await this.serviceService.listInspections({
@@ -622,10 +621,10 @@ export class ServiceController {
 
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       const result = await this.serviceService.listEstimates({

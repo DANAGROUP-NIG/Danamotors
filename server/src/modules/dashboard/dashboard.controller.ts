@@ -1,15 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import { DashboardService } from "./dashboard.service";
-import { ROLES } from "../../shared/constants/roles";
+import { canAccessAllBranches } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 
 // Roles allowed to view dashboard stats for any branch. Everyone else is
 // scoped to their assigned branch.
-const CROSS_BRANCH_ROLES = new Set<string>([
-  ROLES.SUPER_ADMIN,
-  ROLES.GENERAL_STORE_MANAGER,
-  ROLES.CCU_MANAGER,
-]);
+
 
 export class DashboardController {
   private dashboardService: DashboardService;
@@ -24,11 +20,14 @@ export class DashboardController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { branchId } = req.query as { branchId?: string };
+      let branchId = req.query.branchId as string | undefined;
+      if (!canAccessAllBranches(req.user) && !req.user?.branchId) {
+        throw new ForbiddenError("Your account is not assigned to a branch");
+      }
 
       if (
         branchId &&
-        !CROSS_BRANCH_ROLES.has(req.user!.role) &&
+        !canAccessAllBranches(req.user) &&
         req.user!.branchId &&
         branchId !== req.user!.branchId
       ) {
@@ -36,6 +35,8 @@ export class DashboardController {
           "You can only view dashboards for your own branch",
         );
       }
+
+      if (!canAccessAllBranches(req.user)) branchId = req.user!.branchId!;
 
       const userId = req.user!.userId;
       const result = await this.dashboardService.getStats(branchId, userId);

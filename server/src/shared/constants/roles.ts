@@ -50,6 +50,7 @@ export const PERMISSIONS = {
   ROLE_PERMISSION_UPDATE: "role:permission:update",
 
   // ── Branch Management ─────────────────────────────────────────────────────
+  BRANCH_ALL: "branch:all",
   BRANCH_READ: "branch:read",
   BRANCH_CREATE: "branch:create",
   BRANCH_UPDATE: "branch:update",
@@ -328,6 +329,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -388,6 +390,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   [ROLES.WORKSHOP_MANAGER]: [
+    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -528,6 +531,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -603,6 +607,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
+    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -638,6 +643,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
   [ROLES.WARRANTY_OFFICER]: [
+    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,

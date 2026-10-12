@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { EnquiryService } from "./enquiry.service";
-import { assertBranchOwnership } from "../../middleware/authorize";
+import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { ForbiddenError } from "../../shared/errors/appError";
 
@@ -48,10 +48,10 @@ export class EnquiryController {
       let branchId = req.query.branchId as string | undefined;
       if (
         req.user &&
-        req.user.role !== ROLES.SUPER_ADMIN &&
-        req.user.role !== ROLES.CCU_MANAGER
+        !canAccessAllBranches(req.user)
       ) {
-        branchId = req.user.branchId ?? undefined;
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       const result = await this.service.listEnquiries({
