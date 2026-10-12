@@ -5,6 +5,7 @@
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { DEFAULT_MILEAGE_LIMITS, ReportFilters } from "./partsReport.common";
 import { bandLabels, DEFAULT_AGE_LIMITS } from "./stockReport.logic";
+import { BIN_LIMIT } from "../stock-take/stockTake.logic";
 
 export type ColumnType = "text" | "date" | "datetime" | "qty" | "money" | "percent";
 
@@ -39,7 +40,10 @@ export type ReportFilterKey =
   | "ageLimits"
   | "mileageLimits"
   | "topN"
-  | "summary";
+  | "summary"
+  | "countType"
+  | "onlyRemarks"
+  | "includeNotRequired";
 
 export interface ReportDefinition {
   kind: string;
@@ -52,12 +56,14 @@ export interface ReportDefinition {
   period?: "range" | "asOn" | "none";
   /** Covers every branch; the branch filter does not apply. */
   allBranches?: boolean;
-  /** Labels for the `branch` (the other branch), `search` (document number), `option` and `days` filters. */
-  labels?: { branch?: string; search?: string; option?: string; days?: string };
+  /** Labels for the `branch` (the other branch), `search` (document number), `option`, `days` and `countType` filters. */
+  labels?: { branch?: string; search?: string; option?: string; days?: string; countType?: string };
   /** Choices for the `option` filter (legacy radio buttons). The first is the default. */
   options?: { value: string; label: string }[];
   /** Choices for the `status` filter. */
   statuses?: { value: string; label: string }[];
+  /** Choices for the `countType` filter: the stock taking type, or the audit type. */
+  countTypes?: { value: string; label: string }[];
   /** Rows carry a `group` value; the screen shows a heading and subtotal per group. */
   grouped?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
@@ -123,38 +129,27 @@ const STN_COLUMNS: ReportColumn[] = [
   text("status", "Status"),
 ];
 
-/** Shared by the Physical Stock Taking and Stock Audit reports (same rows, filtered by kind). */
-const PHYSICAL_STOCK: ReportDefinition = {
-  kind: "physical-stock",
-  title: "Physical Stock Taking",
-  group: "Stock",
-  description: "Counted against system stock, with shortage and excess at dealer rate. Give a batch number for one count, else counts created in the period.",
-  permission: PERMISSIONS.STOCK_TAKE_READ,
-  filters: [...PART_FILTERS, "search", "option"],
-  labels: { search: "Batch no. (optional)" },
-  options: [
-    { value: "DISCREPANCY", label: "Shortage / excess" },
-    { value: "PART", label: "Part wise" },
-    { value: "BIN", label: "Bin location wise" },
-    { value: "DAMAGE", label: "Damaged parts" },
-  ],
-  grouped: true,
-  columns: {
-    DISCREPANCY: [
-      text("batch", "Batch No"),
-      ...COUNT_PART_COLUMNS,
-      qty("systemQuantity", "System qty"),
-      qty("physicalQuantity", "Physical qty"),
-      qty("excessQuantity", "Excess qty"),
-      money("excessValue", "Excess value"),
-      qty("shortageQuantity", "Shortage qty"),
-      money("shortageValue", "Shortage value"),
-      text("checker", "Checker"),
-      text("remarks", "Remarks"),
-    ],
+/**
+ * Physical stock taking and stock audit reports (legacy Physical Stock Taking and Stock Audit MIS
+ * menus). Both read the same rows (stockTake.report.ts), filtered by kind; on audits the checker is
+ * the auditor.
+ */
+function countColumns(audit: boolean): Record<string, ReportColumn[]> {
+  const batch = text("batch", audit ? "Audit No" : "Batch No");
+  const by = text("checker", audit ? "Auditor" : "Checker");
+  const remarks = text("remarks", "Remarks");
+  const counted: ReportColumn[] = [qty("systemQuantity", "System qty"), qty("physicalQuantity", "Physical qty")];
+  const discrepancy: ReportColumn[] = [
+    qty("excessQuantity", "Excess qty"),
+    money("excessValue", "Excess value"),
+    qty("shortageQuantity", "Shortage qty"),
+    money("shortageValue", "Shortage value"),
+  ];
+  const line = [batch, ...COUNT_PART_COLUMNS];
+  return {
+    DISCREPANCY: [...line, ...counted, ...discrepancy, by, remarks],
     PART: [
-      text("batch", "Batch No"),
-      ...COUNT_PART_COLUMNS,
+      ...line,
       qty("systemQuantity", "System qty"),
       money("systemValue", "System value"),
       qty("physicalQuantity", "Physical qty"),
@@ -162,7 +157,23 @@ const PHYSICAL_STOCK: ReportDefinition = {
       qty("damagedQuantity", "Damaged qty"),
       qty("excessQuantity", "Excess qty"),
       qty("shortageQuantity", "Shortage qty"),
-      text("checker", "Checker"),
+      by,
+      remarks,
+    ],
+    // Grouped by remark (legacy Remarks Wise Stock Audit Report) or by checker (Checker Detail).
+    REMARKS: [...line, ...counted, ...discrepancy, by],
+    CHECKER: [...line, ...counted, ...discrepancy, remarks],
+    // Grouped by part: every count of it in the period (legacy Stock Audit History).
+    HISTORY: [
+      batch,
+      datetime("date", "Counted"),
+      text("type", audit ? "Audit type" : "Type"),
+      text("bin", "Bin"),
+      money("rate", "Dealer rate", false),
+      ...counted,
+      ...discrepancy,
+      by,
+      remarks,
     ],
     BIN: [
       datetime("date", "Counted"),
@@ -171,18 +182,156 @@ const PHYSICAL_STOCK: ReportDefinition = {
       text("description", "Description"),
       qty("physicalQuantity", "Physical qty"),
       qty("damagedQuantity", "Damaged qty"),
-      text("checker", "Checker"),
+      by,
     ],
-    DAMAGE: [
-      text("batch", "Batch No"),
-      ...COUNT_PART_COLUMNS,
+    DAMAGE: [...line, qty("physicalQuantity", "Physical qty"), qty("damagedQuantity", "Damaged qty"), money("damagedValue", "Damaged value"), by, remarks],
+    // One line per count (legacy Summary). All branches gives every branch together (Combined Summary).
+    SUMMARY: [
+      batch,
+      date(),
+      text("type", audit ? "Audit type" : "Type"),
+      text("status", "Status"),
+      qty("parts", "Parts"),
+      qty("countedParts", "Counted"),
+      money("systemValue", "System value"),
+      money("physicalValue", "Physical value"),
+      money("damagedValue", "Damaged value"),
+      money("excessValue", "Excess value"),
+      money("shortageValue", "Shortage value"),
+      money("netValue", "Net excess / (shortage)"),
+      audit ? text("auditors", "Auditor(s)") : text("confirmedBy", "S/E approved by"),
+      audit ? datetime("closedAt", "Completed") : datetime("closedAt", "S/E approved"),
+    ],
+    // Legacy List of Not Defined Parts (wrong part).
+    NOT_DEFINED: [
+      batch,
+      datetime("date", "Counted"),
+      text("partNumber", "Part No (as counted)"),
+      text("bin", "Found in"),
       qty("physicalQuantity", "Physical qty"),
       qty("damagedQuantity", "Damaged qty"),
-      money("damagedValue", "Damaged value"),
+      text("status", "Status"),
+      by,
+      remarks,
+    ],
+    // Legacy List of Batch Parts Not Uploaded.
+    NOT_COUNTED: [...line, qty("systemQuantity", "System qty"), text("sheet", "Count sheet"), by],
+    // Legacy Parts Having Bin Location Exceeds Defined Limit: the bins found will not fit one bin.
+    BIN_LIMIT: [
+      batch,
+      text("partNumber", "Part No"),
+      text("flag", "Flag"),
+      text("description", "Description"),
+      text("recordedBin", "Bin on record"),
+      text("bin", "Found in"),
+      qty("binCount", "Bins", false),
+      qty("binLength", "Characters", false),
+    ],
+  };
+}
+
+const COUNT_OPTIONS: Record<string, string> = {
+  DISCREPANCY: "Shortage / excess",
+  PART: "Part wise",
+  REMARKS: "Remarks wise",
+  HISTORY: "Audit history (part wise)",
+  BIN: "Bin location wise",
+  DAMAGE: "Damaged parts",
+  CHECKER: "Checker wise",
+  SUMMARY: "Summary",
+  NOT_DEFINED: "Part numbers not in Part Master",
+  NOT_COUNTED: "Parts not counted yet",
+  BIN_LIMIT: `Bins over ${BIN_LIMIT} characters`,
+};
+const countOptions = (keys: string[], labels: Record<string, string> = {}) => keys.map((value) => ({ value, label: labels[value] ?? COUNT_OPTIONS[value] }));
+const COUNT_FILTERS: ReportFilterKey[] = ["countType", "search", ...PART_FILTERS, "option", "onlyRemarks", "includeNotRequired"];
+const ALL = { value: "", label: "All" };
+
+const PHYSICAL_STOCK: ReportDefinition = {
+  kind: "physical-stock",
+  title: "Physical Stock Taking",
+  group: "Stock",
+  description: "Counted against system stock, with shortage and excess at dealer rate. Give a batch number for one count, else counts created in the period.",
+  permission: PERMISSIONS.STOCK_TAKE_READ,
+  filters: COUNT_FILTERS,
+  labels: { search: "Batch no. (optional)", option: "Show", countType: "Stock taking" },
+  countTypes: [ALL, { value: "ANNUAL", label: "Annual" }, { value: "PERPETUAL", label: "Perpetual" }],
+  options: countOptions(["DISCREPANCY", "PART", "BIN", "DAMAGE", "CHECKER", "SUMMARY", "NOT_DEFINED", "NOT_COUNTED", "BIN_LIMIT"]),
+  grouped: true,
+  columns: countColumns(false),
+};
+
+const STOCK_AUDIT: ReportDefinition = {
+  ...PHYSICAL_STOCK,
+  kind: "stock-audit",
+  title: "Stock Audit",
+  description: "Audited against system stock, with shortage and excess at dealer rate. Audits never adjust stock. Give an audit number for one audit, else audits created in the period.",
+  permission: PERMISSIONS.STOCK_AUDIT_READ,
+  labels: { search: "Audit no. (optional)", option: "Show", countType: "Audit type" },
+  countTypes: [
+    ALL,
+    { value: "INTERNAL", label: "Internal audit" },
+    { value: "AUDIT_HEAD", label: "Audit by audit head" },
+    { value: "VISITING_MANAGEMENT", label: "Audit by visiting management" },
+  ],
+  // Audits never update bins, so the bin limit does not apply.
+  options: countOptions(["DISCREPANCY", "PART", "REMARKS", "HISTORY", "BIN", "DAMAGE", "CHECKER", "SUMMARY", "NOT_DEFINED", "NOT_COUNTED"], {
+    CHECKER: "Auditor wise",
+  }),
+  columns: countColumns(true),
+};
+
+/** Stock Taking Log and Stock Audit Log: count sheets issued, uploaded and cancelled, and counts corrected. */
+const STOCK_TAKE_LOG: ReportDefinition = {
+  kind: "stock-take-log",
+  title: "Stock Taking Log",
+  group: "Stock",
+  description: "Count sheets issued, uploaded and cancelled, and every count corrected or added on screen, with who did it and when.",
+  permission: PERMISSIONS.STOCK_TAKE_READ,
+  filters: ["countType", "search", "option"],
+  labels: PHYSICAL_STOCK.labels,
+  countTypes: PHYSICAL_STOCK.countTypes,
+  options: [
+    { value: "SHEETS", label: "Count sheets" },
+    { value: "CORRECTIONS", label: "Corrections and added counts" },
+  ],
+  columns: {
+    SHEETS: [
+      text("batch", "Batch No"),
+      text("sheetNumber", "Sheet No"),
+      datetime("issuedAt", "Issued"),
+      text("issuedBy", "Issued by"),
       text("checker", "Checker"),
+      text("criteria", "Selection"),
+      qty("parts", "Parts"),
+      qty("countedParts", "Counted"),
+      text("status", "Status"),
+      datetime("closedAt", "Uploaded / cancelled"),
+      text("closedBy", "Uploaded by"),
+      text("remarks", "Cancel remarks"),
+    ],
+    CORRECTIONS: [
+      text("batch", "Batch No"),
+      datetime("date", "Corrected"),
+      text("partNumber", "Part No"),
+      text("description", "Description"),
+      text("entry", "Entry"),
+      qty("quantity", "Qty change"),
+      qty("damagedQuantity", "Damaged change"),
       text("remarks", "Remarks"),
+      text("by", "Corrected by"),
     ],
   },
+};
+
+const STOCK_AUDIT_LOG: ReportDefinition = {
+  ...STOCK_TAKE_LOG,
+  kind: "stock-audit-log",
+  title: "Stock Audit Log",
+  description: "Audit sheets issued, uploaded and cancelled, and every audit count corrected or added on screen, with who did it and when.",
+  permission: PERMISSIONS.STOCK_AUDIT_READ,
+  labels: STOCK_AUDIT.labels,
+  countTypes: STOCK_AUDIT.countTypes,
 };
 
 export const REPORTS: ReportDefinition[] = [
@@ -933,13 +1082,9 @@ export const REPORTS: ReportDefinition[] = [
     columns: [text("bin", "Bin"), ...PART_COLUMNS, text("binCard", "Bin card"), qty("quantity", "Stock")],
   },
   PHYSICAL_STOCK,
-  {
-    ...PHYSICAL_STOCK,
-    kind: "stock-audit",
-    title: "Stock Audit",
-    description: "Audited against system stock, with shortage and excess at dealer rate. Audits never adjust stock. Give a batch number for one audit, else audits created in the period.",
-    permission: PERMISSIONS.STOCK_AUDIT_READ,
-  },
+  STOCK_TAKE_LOG,
+  STOCK_AUDIT,
+  STOCK_AUDIT_LOG,
   {
     kind: "parts-blocked",
     title: "List of Parts Blocked",

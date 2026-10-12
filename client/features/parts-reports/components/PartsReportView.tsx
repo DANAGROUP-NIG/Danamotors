@@ -253,6 +253,17 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
             </select>
           </Field>
         )}
+        {has("countType") && (
+          <Field label={definition.labels?.countType ?? "Type"}>
+            <select className={inputCls} value={params.countType ?? ""} onChange={(e) => set({ countType: e.target.value || undefined })}>
+              {(definition.countTypes ?? []).map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         {has("search") && (
           <Field label={definition.labels?.search ?? "Document no. (optional)"}>
             <input className={inputCls} maxLength={40} value={params.search ?? ""} onChange={(e) => set({ search: e.target.value || undefined })} />
@@ -406,6 +417,22 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
           <label className="flex items-center gap-2 self-end pb-2 text-sm">
             <input type="checkbox" checked={!!params.summary} onChange={(e) => set({ summary: e.target.checked || undefined })} />
             Only summary
+          </label>
+        )}
+        {has("onlyRemarks") && (
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input type="checkbox" checked={!!params.onlyRemarks} onChange={(e) => set({ onlyRemarks: e.target.checked || undefined })} />
+            Only parts having remarks
+          </label>
+        )}
+        {has("includeNotRequired") && (
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!params.includeNotRequired}
+              onChange={(e) => set({ includeNotRequired: e.target.checked || undefined })}
+            />
+            Include parts identified as not required
           </label>
         )}
         {has("includeCancelled") && (

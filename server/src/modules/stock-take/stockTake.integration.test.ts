@@ -178,6 +178,58 @@ describeDb("Physical stock taking (database)", () => {
     });
   });
 
+  it("reports the count's summary, exceptions and log (legacy Physical Stock Taking MIS)", async () => {
+    const take = await prisma.stockTake.findUniqueOrThrow({ where: { id: takeId } });
+    const { physicalStockRows, stockTakeLogRows } = require("./stockTake.report");
+    const f = { from: "2000-01-01", to: "2000-01-01", branchId: branch.id, search: take.batchNumber };
+
+    expect(await physicalStockRows({ ...f, option: "SUMMARY" })).toEqual([
+      expect.objectContaining({
+        batch: take.batchNumber,
+        type: "Annual",
+        status: "S/E confirmed",
+        parts: 5,
+        countedParts: 5,
+        excessValue: 87700.73,
+        shortageValue: 112434.51,
+        netValue: -24733.78,
+        confirmedBy: "Store Checker",
+      }),
+    ]);
+    expect(await physicalStockRows({ ...f, option: "SUMMARY", countType: "PERPETUAL" })).toHaveLength(0);
+
+    // Remarks: the lamp's damage and the bolt's recount.
+    const remarked = await physicalStockRows({ ...f, option: "PART", onlyRemarks: true });
+    expect(remarked.map((r: { remarks: string }) => r.remarks).sort()).toEqual(["Recounted", "Water damage"]);
+    const byChecker = await physicalStockRows({ ...f, option: "CHECKER" });
+    expect(new Set(byChecker.map((r: { group: string }) => r.group))).toEqual(new Set(["Store Checker", "No checker"]));
+
+    // The unknown part number was set aside as not required.
+    expect(await physicalStockRows({ ...f, option: "NOT_DEFINED" })).toHaveLength(0);
+    const notDefined = await physicalStockRows({ ...f, option: "NOT_DEFINED", includeNotRequired: true });
+    expect(notDefined).toEqual([expect.objectContaining({ partNumber: `NOT-IN-MASTER-${run}`, bin: "N-9Z9", physicalQuantity: 2, status: "Not required" })]);
+    expect(await physicalStockRows({ ...f, option: "PART" })).toHaveLength(5);
+    expect(await physicalStockRows({ ...f, option: "PART", includeNotRequired: true })).toHaveLength(6);
+    expect(await physicalStockRows({ ...f, option: "NOT_COUNTED" })).toHaveLength(0);
+
+    // A part found in more bins than one bin location holds (CPD 2024: 0K20133065A in nine bins).
+    const bins = "29B3/63A3/67B2/73A1/71A3/75C3/75B2/71B4/71B3";
+    await prisma.stockTakeLine.updateMany({ where: { stockTakeId: takeId, partId: parts.seal.id }, data: { countedBins: bins } });
+    expect(await physicalStockRows({ ...f, option: "BIN_LIMIT" })).toEqual([
+      expect.objectContaining({ partNumber: parts.seal.partNumber, bin: bins, binCount: 9, binLength: 44 }),
+    ]);
+
+    const sheets = await stockTakeLogRows({ ...f, option: "SHEETS" }, "COUNT");
+    expect(sheets).toEqual([expect.objectContaining({ parts: 5, countedParts: 5, status: "Uploaded", checker: "Store Checker", closedBy: "Store Checker" })]);
+    const corrections = await stockTakeLogRows({ ...f, option: "CORRECTIONS" }, "COUNT");
+    // The bolt's recount, and the disc taken as none when the count was completed.
+    expect(corrections).toEqual([
+      expect.objectContaining({ partNumber: parts.bolt.partNumber, entry: "Correction", quantity: 1, remarks: "Recounted", by: "Store Checker" }),
+      expect.objectContaining({ partNumber: parts.disc.partNumber, entry: "Correction", quantity: 0, remarks: expect.stringContaining("Not counted") }),
+    ]);
+    expect(await stockTakeLogRows({ ...f, option: "SHEETS" }, "AUDIT")).toHaveLength(0);
+  });
+
   describe("stock audit", () => {
     let auditId = "";
     let perpetualId = "";
@@ -275,6 +327,15 @@ describeDb("Physical stock taking (database)", () => {
         shortageQuantity: 4,
         checker: "Victoria",
       });
+
+      // Stock Audit History: the part's audits, under its own heading.
+      const history = await physicalStockRows({ ...filters, option: "HISTORY" }, "AUDIT");
+      expect(history.map((r: { group: string }) => r.group)).toContain(`${audited.shoe.partNumber} · SHOE`);
+      expect(history.find((r: { partNumber: string }) => r.partNumber === audited.pad.partNumber)).toMatchObject({ type: "Internal audit" });
+      expect(await physicalStockRows({ ...filters, option: "SUMMARY", countType: "INTERNAL" }, "AUDIT")).toEqual([
+        expect.objectContaining({ auditors: "Victoria", countedParts: 2, shortageValue: 32086.86 }),
+      ]);
+      expect(await physicalStockRows({ ...filters, option: "SUMMARY", countType: "AUDIT_HEAD" }, "AUDIT")).toHaveLength(0);
     });
   });
 });

@@ -56,6 +56,9 @@ export const KINDS = {
 
 export const kindOf = (type: StockTakeType): Kind => (type === "AUDIT" ? "AUDIT" : "COUNT");
 
+// Longest bin a branch holds (legacy PARTBAL.bincard); mirrors BIN_LIMIT in stockTake.logic.ts.
+export const BIN_LIMIT = 40;
+
 // Legacy "Source of Purchase" (part flag).
 export const PART_FLAG_LABELS: Record<string, string> = {
   O: "Original",

@@ -15,7 +15,7 @@ import { columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./part
 import { dateRange, lineValues, partWhere, partyName, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
 import { MisReportService } from "./misReport.service";
 import { StockReportService } from "./stockReport.service";
-import { physicalStockRows } from "../stock-take/stockTake.report";
+import { physicalStockRows, stockTakeLogRows } from "../stock-take/stockTake.report";
 
 export type { ReportFilters };
 
@@ -128,6 +128,10 @@ export class PartsReportService {
         return physicalStockRows(f);
       case "stock-audit":
         return physicalStockRows(f, "AUDIT");
+      case "stock-take-log":
+        return stockTakeLogRows(f, "COUNT");
+      case "stock-audit-log":
+        return stockTakeLogRows(f, "AUDIT");
       default:
         throw new NotFoundError("Report not found");
     }

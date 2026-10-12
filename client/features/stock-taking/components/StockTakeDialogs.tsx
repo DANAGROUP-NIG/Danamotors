@@ -19,7 +19,7 @@ import {
   useRecordCounts,
   useUpdateBins,
 } from "../hooks/use-stock-taking";
-import { KINDS, fmtCurrency, kindOf, toCount } from "../lib/stock-taking-format";
+import { BIN_LIMIT, KINDS, fmtCurrency, kindOf, toCount } from "../lib/stock-taking-format";
 import type { Basis, StockTake, StockTakeLine } from "../types/stock-taking.types";
 
 type Close = { onClose: () => void };
@@ -341,7 +341,8 @@ export function BinUpdateDialog({ take, onClose }: Close & { take: StockTake }) 
   const [skip, setSkip] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (proposals) setBins(Object.fromEntries(proposals.map((p) => [p.lineId, p.countedBins])));
+    // A part found in many bins can run past the bin limit; the store picks one for it.
+    if (proposals) setBins(Object.fromEntries(proposals.map((p) => [p.lineId, p.countedBins.length > BIN_LIMIT ? "" : p.countedBins])));
   }, [proposals]);
 
   const lines = (proposals ?? []).filter((p) => !skip.has(p.lineId) && bins[p.lineId]?.trim());
@@ -390,10 +391,13 @@ export function BinUpdateDialog({ take, onClose }: Close & { take: StockTake }) 
                     <td className="px-2 py-1.5">
                       <input
                         className={cn(inputCls, "h-9 w-40 font-mono")}
-                        maxLength={40}
+                        maxLength={BIN_LIMIT}
                         value={bins[p.lineId] ?? ""}
                         onChange={(e) => setBins((prev) => ({ ...prev, [p.lineId]: e.target.value }))}
                       />
+                      {p.countedBins.length > BIN_LIMIT && (
+                        <span className="mt-1 block max-w-56 break-all text-xs text-amber-700">Found in {p.countedBins}. Enter one bin.</span>
+                      )}
                     </td>
                   </tr>
                 ))}

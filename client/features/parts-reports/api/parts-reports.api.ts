@@ -34,7 +34,10 @@ export type ReportFilterKey =
   | "ageLimits"
   | "mileageLimits"
   | "topN"
-  | "summary";
+  | "summary"
+  | "countType"
+  | "onlyRemarks"
+  | "includeNotRequired";
 
 export type ReportDefinition = {
   kind: string;
@@ -47,9 +50,11 @@ export type ReportDefinition = {
   period?: "range" | "asOn" | "none";
   /** Covers every branch; no branch is chosen. */
   allBranches?: boolean;
-  labels?: { branch?: string; search?: string; option?: string; days?: string };
+  labels?: { branch?: string; search?: string; option?: string; days?: string; countType?: string };
   options?: { value: string; label: string }[];
   statuses?: { value: string; label: string }[];
+  /** Stock taking type, or audit type. */
+  countTypes?: { value: string; label: string }[];
   grouped?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
   summaryColumns?: ReportColumn[];
@@ -100,6 +105,9 @@ export type ReportParams = {
   mileageLimits?: string;
   topN?: number;
   summary?: boolean;
+  countType?: string;
+  onlyRemarks?: boolean;
+  includeNotRequired?: boolean;
 };
 
 const BASE = "/parts-reports";

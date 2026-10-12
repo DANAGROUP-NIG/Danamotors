@@ -108,11 +108,35 @@ A Branch Store Manager can read audits but not run them, so a branch never audit
 
 ## Reports
 
-Parts Reports → **Physical Stock Taking** (`physical-stock`). Enter a batch number for one
-count; otherwise the report covers counts created in the period. Options: Shortage / excess,
-Part wise, Bin location wise, Damaged parts. The batch screen's **Report** button opens it for
-that batch. Stock audits have their own report, Parts Reports → **Stock Audit** (`stock-audit`),
-with the same options. The physical stock report leaves audits out.
+Parts Reports → **Physical Stock Taking** (`physical-stock`) and **Stock Audit** (`stock-audit`) replace
+the legacy Physical Stock Taking and Stock Audit MIS menus. Enter a batch (audit) number for one count;
+otherwise the report covers counts created in the period. Filter by **Annual / Perpetual** (audits: the
+audit type) and by part. **Only parts having remarks** and **Include parts identified as not required**
+work as on the legacy screens. The batch screen's **Report** button opens the report for that batch. The
+physical stock report leaves audits out.
+
+| Option | Legacy report | What it shows |
+| --- | --- | --- |
+| Shortage / excess | Stock Taking Report (Detail) | Parts counted above or below system stock, at dealer rate |
+| Part wise | Part Wise Physical Stock Taking, Part Wise Stock Audit | Every part counted: system and physical quantity and value, damaged, excess, shortage |
+| Remarks wise (audits) | Remarks Wise Stock Audit Report | Parts under each remark |
+| Audit history (audits) | Stock Audit History | Each part with every audit of it in the period |
+| Bin location wise | BIN Location Wise Physical Stock Taking | Parts under each bin they were found in |
+| Damaged parts | Damage Parts Report (Stock Taking) | Damaged quantity and value |
+| Checker wise / Auditor wise | Stock Taking Report (Checker Detail) | Parts under the checker who counted them |
+| Summary | Stock Taking Report (Summary, Combined Summary) | One line per count: parts, counted, system, physical, damaged, excess and shortage value, net, and who approved the S/E (audits: the auditors). **All branches** lists every branch together |
+| Part numbers not in Part Master | List of Not Defined Parts | Part numbers counted that are not in Part Master, to resolve or set aside |
+| Parts not counted yet | List of Batch Parts Not Uploaded | Parts in an open count with no count yet, and the sheet each is on |
+| Bins over 40 characters (counts only) | Parts Having Bin Location Exceeds Defined Limit | Parts found in so many bins that the merged bins (`29B3/63A3/...`) are too long for one bin location. On **Update bins** the store enters one bin for each; the field starts empty |
+
+**Stock Taking Log** (`stock-take-log`) and **Stock Audit Log** (`stock-audit-log`) list events by date:
+**Count sheets** (issued, checker, selection, parts, uploaded or cancelled, by whom; legacy HHDC
+downloads and uploads), or **Corrections and added counts** (every count changed or entered on screen,
+with the change, remarks and user, including the zero counts made when a count is completed).
+
+Legacy findings: 209 AutoEnhancer and 2,895 CPD count lines had merged bins over the 40-character
+`PARTBAL.bincard` limit, up to 395 characters (CPD 2024 count: `0K20133065A` in nine bins). 147 and 97
+lines were wrong part numbers (`wrongpart`).
 
 ## Code
 

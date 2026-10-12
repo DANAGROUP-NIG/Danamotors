@@ -53,8 +53,10 @@ The legacy **Stock Reports** menu. Reports marked *as on* take one date; *now* r
 | Inventory to Sales Ratio | `inventory-sales-ratio` | Per part: opening and closing stock value against sales at cost, and closing value ÷ sales. FIFO or dealer rate |
 | Branch Wise Stock Report, Store Location Wise Current Stock | `branch-stock` | *Now*, every branch and store location: **Branch wise part value** (a line per branch, grouped by part) or **Total part value** (a line per part), with blocked and available stock, at dealer rate |
 | BIN Location Wise Stock Report | `bin-location-stock` | *Now.* Stock in bin order; filter by bin |
-| Physical Stock Taking | `physical-stock` | Counted against system stock at dealer rate: **Shortage / excess**, **Part wise**, **Bin location wise** or **Damaged parts**; a batch number picks one count. See [stock-taking.md](./stock-taking.md) |
-| Stock Audit | `stock-audit` | The same report for stock audits only; audits never adjust stock |
+| Stock Taking Report, Part Wise / BIN Location Wise / Damage Parts Physical Stock Taking Report, List of Not Defined Parts, List of Batch Parts Not Uploaded, Parts Having Bin Location Exceeds Defined Limit | `physical-stock` | Counted against system stock at dealer rate; a batch number picks one count. See [stock-taking.md](./stock-taking.md#reports) |
+| Stock Taking Log Report | `stock-take-log` | Count sheets issued, uploaded and cancelled, or counts corrected and added on screen |
+| Part Wise Stock Audit Report, Remarks Wise Stock Audit Report, Stock Audit History | `stock-audit` | The same report for stock audits only, with **Remarks wise** and **Audit history**; audits never adjust stock |
+| Stock Audit Log Report | `stock-audit-log` | The log for stock audits |
 | List of Parts Blocked | `parts-blocked` | Stock picked for CPOs (until billed) or branch indents (until the STN is made): **Document wise** with picker, or **Part wise** with stock, blocked and available |
 | Item Unavailability Report | `item-unavailability` | Demand the branch could not supply: CPO quantities still unpicked and indent back orders, against free stock now |
 
@@ -80,6 +82,15 @@ Stock reports merged or left out, so that no report repeats another:
 - **Only Top Movers** (ledger and summary) is left out: it filtered on the part master's top-N flag, which
   the new part master does not have.
 - **Part Type** is not a filter, as on the other reports (see below).
+
+Physical stock taking and stock audit reports merged or left out:
+
+- The legacy menus had nine report screens over the same count lines. Here they are two reports (physical
+  counts and audits) with options, and two logs. See [stock-taking.md](./stock-taking.md#reports).
+- **Bin Location Updation Mismatch** had the same screen as **Part BIN Location History** (Part Master and
+  PST bin location updation). A stock taking's bin update is a branch bin change on that report.
+- The **S/E Approved By**, **Checker** and **Auditor** filters are left out. The **Summary** shows who
+  approved each count, and **Checker wise** / **Auditor wise** lists each person's parts under their name.
 
 The legacy SAN register's **Only Deleted Records** option is also left out. No legacy SAN was
 ever deleted (391 at the branches and 4 at CPD, none cancelled), and stock adjustments here

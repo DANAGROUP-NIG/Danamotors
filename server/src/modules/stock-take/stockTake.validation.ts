@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { StockAuditLevel, StockTakeStatus, StockTakeType } from "@prisma/client";
+import { BIN_LIMIT } from "./stockTake.logic";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
@@ -155,7 +156,16 @@ export const updateBinsSchema = z.object({
   params: z.object({ id: uuid("stock taking ID") }),
   body: z.object({
     lines: z
-      .array(z.object({ lineId: uuid("line ID"), binLocation: z.string().trim().min(1, "Enter the bin location").max(40) }))
+      .array(
+        z.object({
+          lineId: uuid("line ID"),
+          binLocation: z
+            .string()
+            .trim()
+            .min(1, "Enter the bin location")
+            .max(BIN_LIMIT, `A bin location can be at most ${BIN_LIMIT} characters: pick one bin`),
+        }),
+      )
       .min(1, "Select at least one part")
       .max(50_000)
       .refine((lines) => new Set(lines.map((l) => l.lineId)).size === lines.length, "Each part can appear only once"),

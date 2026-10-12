@@ -46,6 +46,12 @@ export function inRange(value: string | null | undefined, from?: string, to?: st
   return true;
 }
 
+/**
+ * Longest bin location a branch can hold (legacy PARTBAL.bincard). Bins merged from a count can run
+ * past it ("29B3/63A3/67B2/..."); the store must pick one before updating bins.
+ */
+export const BIN_LIMIT = 40;
+
 /** Every bin a part was found in, each once, joined with "/" (legacy FinalBin, e.g. "N-3D3/QSB"). */
 export function mergeBins(existing: string | null | undefined, added: (string | null | undefined)[]): string | null {
   const bins: string[] = [];

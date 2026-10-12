@@ -39,6 +39,12 @@ export interface ReportFilters {
   topN?: number;
   /** Legacy "Only summary": one line per category (or packing list) instead of per part. */
   summary?: boolean;
+  /** Stock taking reports: annual or perpetual counts, or the audit type. */
+  countType?: string;
+  /** Stock taking reports: only parts counted with a remark. */
+  onlyRemarks?: boolean;
+  /** Stock taking reports: also part numbers not in Part Master that the store set aside. */
+  includeNotRequired?: boolean;
 }
 
 /** Mileage bands asked for on the legacy screens are in km; these follow the 10,000 km service interval. */
