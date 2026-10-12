@@ -30,7 +30,7 @@ title, filters, options and columns are defined once, in
 | Picking List Register | `picking-register` | Parts picked for indents, with bin, picker and any alternate supplied |
 | STN/SRN Register | `stn-register` | STNs sent from the branch, or stock receipts (transfer MRNs) into it |
 | Store Wise STN Register | `store-wise-stn` | STNs grouped by receiving branch, with subtotals |
-| Branch Stock Indent Inward Register | `indent-inward-register` | Indents raised on the branch, line by line; Pending, Cancelled or Executed |
+| Branch Stock Indent Inward Register | `indent-inward-register` | Indents raised on the branch, line by line, with the quantity cancelled; Pending, Cancelled (cancelled or rejected indents, and lines with a quantity cancelled) or Executed |
 | Branch Stock Indent Outward Register | `indent-outward-register` | Indents the branch raised on other branches, with the same columns and order filter as the inward register |
 | Branch In Transit Report | `branch-in-transit` | STN lines dispatched to the branch: sent, received, damaged, short and still on the way; **All** or **Pending** |
 | Consumption Report (Consolidated), Consumption Summary (Consolidated) | `consumption` | Part-wise issued and transferred quantities, less returns (optional), at dealer rate. **Only summary** totals them by part category |

@@ -33,6 +33,8 @@ import {
   Undo2,
   ClipboardCheck,
   FileSearch,
+  Database,
+  Ban,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -140,6 +142,8 @@ export const NAV_GROUPS: NavGroup[] = [
       PART_SALE_PERMISSIONS.READ,
       STOCK_TAKE_PERMISSIONS.READ,
       STOCK_AUDIT_PERMISSIONS.READ,
+      INVENTORY_PERMISSIONS.TRANSFER_CANCEL,
+      PART_SALE_PERMISSIONS.ORDER,
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
     ],
@@ -199,6 +203,28 @@ export const NAV_GROUPS: NavGroup[] = [
           INVENTORY_PERMISSIONS.STOCK_READ,
           STOCK_TAKE_PERMISSIONS.READ,
           STOCK_AUDIT_PERMISSIONS.READ,
+        ],
+      },
+      {
+        label: "Data Management",
+        href: "/data-management",
+        icon: Database,
+        permissions: [PART_SALE_PERMISSIONS.ORDER, INVENTORY_PERMISSIONS.TRANSFER_CANCEL, INVENTORY_PERMISSIONS.STOCK_READ],
+        children: [
+          { label: "CPO Cancellation", href: "/data-management/cpo-cancellation", icon: Ban, permissions: [PART_SALE_PERMISSIONS.ORDER] },
+          {
+            label: "Indent From Branch Cancellation",
+            href: "/data-management/indent-inward-cancellation",
+            icon: Ban,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
+          },
+          {
+            label: "Indent To Branch Cancellation",
+            href: "/data-management/indent-outward-cancellation",
+            icon: Ban,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
+          },
+          { label: "Part List", href: "/parts-reports/current-stock", icon: FileBarChart, permissions: [INVENTORY_PERMISSIONS.STOCK_READ] },
         ],
       },
       {

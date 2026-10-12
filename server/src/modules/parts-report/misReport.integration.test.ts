@@ -85,7 +85,7 @@ describeDb("MIS reports (database)", () => {
     const order = await sales.createOrder({ branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: joint.id, quantity: 2 }] }, user.id);
     await sales.createCounterSale({ branchId: cpd.id, customerId: customer.id, lines: [{ orderLineId: order.lines[0].id, quantity: 1 }] }, user.id);
     const cancelled = await sales.createOrder({ branchId: cpd.id, customerId: customer.id, lines: [{ partId: joint.id, quantity: 3 }] }, user.id);
-    await sales.cancelOrder(cancelled.id, "Customer bought elsewhere");
+    await sales.cancelOrder(cancelled.id, "Customer bought elsewhere", user.id);
 
     // Workshop: two ball joints to a Sorento at 15,000 km (one returned), and a bolt to a PDI job.
     const issueToJob = async (jobCardId: string, part: { id: string }, quantity: number, rate: number) => {

@@ -793,8 +793,11 @@ export class PartsReportService {
           ...(f.otherBranchId && (outward ? { sourceBranchId: f.otherBranchId } : { requestingBranchId: f.otherBranchId })),
           ...(f.search && { indentNumber: { contains: f.search } }),
           ...(f.status === "PENDING" && { status: { in: pending } }),
-          ...(f.status === "CANCELLED" && { status: { in: [IndentStatus.CANCELLED, IndentStatus.REJECTED] } }),
         },
+        // Cancelled: whole indents cancelled or rejected, and lines with a quantity cancelled.
+        ...(f.status === "CANCELLED" && {
+          OR: [{ cancelledQuantity: { gt: 0 } }, { indent: { status: { in: [IndentStatus.CANCELLED, IndentStatus.REJECTED] } } }],
+        }),
       },
       include: {
         part: partSelect,
@@ -817,6 +820,7 @@ export class PartsReportService {
         approved: l.approvedQuantity ?? 0,
         dispatched: l.dispatchedQuantity,
         backOrder: l.backOrderQuantity,
+        cancelled: l.cancelledQuantity,
         rate: l.unitRate,
         value: l.amount,
         status: statusLabel(l.indent.status),

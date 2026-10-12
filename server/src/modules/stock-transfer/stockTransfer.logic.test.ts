@@ -6,6 +6,7 @@ import {
   deriveIndentStatus,
   formatDocumentNumber,
   isSameFamily,
+  pendingSupply,
   planCases,
   planPick,
   planReceipt,
@@ -75,6 +76,24 @@ describe("deriveIndentStatus", () => {
     expect(deriveIndentStatus([line(5, 5)], false)).toBe(IndentStatus.IN_TRANSIT);
     expect(deriveIndentStatus([line(5, 5, 3)], false)).toBe(IndentStatus.PARTIALLY_RECEIVED);
     expect(deriveIndentStatus([line(5, 5, 5), line(0, 0)], false)).toBe(IndentStatus.COMPLETED);
+  });
+});
+
+describe("pendingSupply", () => {
+  const line = { requestedQuantity: 10, approvedQuantity: null as number | null, dispatchedQuantity: 0, cancelledQuantity: 0 };
+
+  it("is the request less anything cancelled before approval", () => {
+    expect(pendingSupply(line)).toBe(10);
+    expect(pendingSupply({ ...line, cancelledQuantity: 4 })).toBe(6);
+  });
+
+  it("is the approved quantity less what has shipped after approval", () => {
+    expect(pendingSupply({ ...line, approvedQuantity: 8, dispatchedQuantity: 3 })).toBe(5);
+    expect(pendingSupply({ ...line, approvedQuantity: 3, dispatchedQuantity: 3, cancelledQuantity: 7 })).toBe(0);
+  });
+
+  it("never goes below zero", () => {
+    expect(pendingSupply({ ...line, approvedQuantity: 0 })).toBe(0);
   });
 });
 

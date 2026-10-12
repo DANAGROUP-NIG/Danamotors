@@ -28,6 +28,7 @@ danamotors/
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving Mobis purchases: MIT file upload, MRN, CPD stock |
 | [part-sale.md](./part-sale.md) | CPD part sale: customer purchase order, picking, counter-sale bill, sale return |
 | [stock-taking.md](./stock-taking.md) | Physical stock taking: annual/perpetual batches, count sheets (handheld stand-in), S/E confirmation adjusting stock, bin update; stock audit (report only) |
+| [data-management.md](./data-management.md) | Data Management: cancelling pending CPO and indent lines (legacy CPO and Branch Indent From / To Other Branch Cancellation), Part List, and why Parts Posting is not needed |
 | [parts-reports.md](./parts-reports.md) | Parts reports: counter sales, CPO, purchase, picking, STN/SRN, indents, consumption, issues, SAN, the stock reports (ledger, summary, balances, ageing, blocked) and the MIS reports (levels, consumption, profitability, fill, rate and bin history, packing lists) |
 
 ## Quick start

@@ -37,14 +37,17 @@ import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationPayload, NotificationService } from "../notification/notification.service";
+import { reportEnd, reportStart } from "../finance/party-report";
 import {
   DOC_TYPES,
   DocType,
+  PENDING_SUPPLY_STATUSES,
   assertTransition,
   buildProgress,
   deriveIndentStatus,
   formatDocumentNumber,
   isSameFamily,
+  pendingSupply,
   planCases,
   planPick,
   planReceipt,
@@ -222,6 +225,18 @@ export interface ListFilters {
   search?: string;
   page?: number;
   limit?: number;
+}
+
+export interface PendingLineFilters {
+  /** INWARD: indents other branches raised on `branchId`. OUTWARD: indents `branchId` raised on others. */
+  direction: "INWARD" | "OUTWARD";
+  branchId: string;
+  otherBranchId?: string;
+  /** Order dates, YYYY-MM-DD, inclusive. */
+  from?: string;
+  to?: string;
+  /** Indent number. */
+  search?: string;
 }
 
 // ── Low-level helpers ────────────────────────────────────────────────────────
@@ -409,7 +424,8 @@ export class StockTransferService {
         summary: {
           requested: line.requestedQuantity,
           approved,
-          rejected: approved === null ? 0 : line.requestedQuantity - approved,
+          rejected: approved === null ? 0 : line.requestedQuantity - line.cancelledQuantity - approved,
+          cancelled: line.cancelledQuantity,
           picked,
           backOrder: line.backOrderQuantity,
           dispatched,
@@ -729,15 +745,15 @@ export class StockTransferService {
         }
       }
       for (const line of lines) {
-        const approved = overrides.get(line.id)?.approvedQuantity ?? line.requestedQuantity;
-        if (!Number.isInteger(approved) || approved < 0 || approved > line.requestedQuantity) {
-          throw new BadRequestError(
-            `Line ${line.lineNumber}: approved quantity must be between 0 and ${line.requestedQuantity}`,
-          );
+        // A line cancelled before approval can only be approved for what is left of it.
+        const approvable = line.requestedQuantity - line.cancelledQuantity;
+        const approved = overrides.get(line.id)?.approvedQuantity ?? approvable;
+        if (!Number.isInteger(approved) || approved < 0 || approved > approvable) {
+          throw new BadRequestError(`Line ${line.lineNumber}: approved quantity must be between 0 and ${approvable}`);
         }
         await tx.branchIndentLine.update({ where: { id: line.id }, data: { approvedQuantity: approved } });
       }
-      if (lines.every((l) => (overrides.get(l.id)?.approvedQuantity ?? l.requestedQuantity) === 0)) {
+      if (lines.every((l) => (overrides.get(l.id)?.approvedQuantity ?? l.requestedQuantity - l.cancelledQuantity) === 0)) {
         throw new BadRequestError("At least one line must have an approved quantity; reject the indent instead");
       }
 
@@ -915,18 +931,12 @@ export class StockTransferService {
     const indent = await this.getIndentBranches(id);
     assertTransition(indent.status, "cancel");
     await prisma.$transaction(async (tx) => {
-      const from = indent.status;
+      assertTransition(await lockIndent(tx, id), "cancel");
       const shipped = await tx.branchIndentLine.aggregate({ where: { indentId: id }, _sum: { dispatchedQuantity: true } });
       if ((shipped._sum.dispatchedQuantity ?? 0) > 0) {
         throw new ConflictError("Part of this indent has already shipped. Close the back order instead of cancelling.");
       }
-      await claimStatus(tx, id, [from], IndentStatus.CANCELLED, {
-        cancelledById: actorId,
-        cancelledAt: new Date(),
-        cancellationReason: reason ?? null,
-      });
-      await this.releaseOpenPick(tx, id);
-      await recordHistory(tx, id, [{ from, to: IndentStatus.CANCELLED, remarks: reason }], actorId);
+      await this.cancelLinesInTx(tx, id, actorId, reason ?? null);
     }, TX_OPTIONS);
 
     const full = await prisma.branchIndent.findUniqueOrThrow({ where: { id } });
@@ -946,15 +956,36 @@ export class StockTransferService {
     return this.getIndent(id);
   }
 
-  /** Releases the stock reserved by the indent's open picking list, if any. */
-  private async releaseOpenPick(tx: Tx, indentId: string) {
+  /**
+   * Cancels what is still to supply on lines of one indent (every line when none are given;
+   * legacy cancelledQty): their picked stock is released, approved drops to what has shipped,
+   * and the indent is cancelled when nothing shipped and nothing is left. Returns the units cancelled.
+   */
+  private async cancelLinesInTx(
+    tx: Tx,
+    indentId: string,
+    actorId: string,
+    reason: string | null,
+    lineIds?: string[],
+    historyRemark = (units: number) => `${units} unit(s) cancelled${reason ? `: ${reason}` : ""}`,
+  ): Promise<number> {
+    const from = await lockIndent(tx, indentId);
+    if (!PENDING_SUPPLY_STATUSES.includes(from)) {
+      throw new ConflictError(`This indent is ${from.toLowerCase().replace("_", " ")}; nothing is left to cancel`);
+    }
+    const lines = await tx.branchIndentLine.findMany({ where: { indentId } });
+    const chosen = lineIds ? lines.filter((l) => lineIds.includes(l.id)) : lines;
+
+    // Give back the picked stock of the cancelled lines; the rest of the pick stays.
     const picking = await tx.pickingList.findFirst({
       where: { indentId, status: PickingListStatus.OPEN },
       include: { lines: true },
     });
-    if (!picking) return null;
-    for (const line of picking.lines) {
-      const stock = await lockStock(tx, picking.branchId, line.partId);
+    const released = (picking?.lines ?? [])
+      .filter((p) => chosen.some((l) => l.id === p.indentLineId))
+      .sort((a, b) => a.partId.localeCompare(b.partId));
+    for (const line of released) {
+      const stock = await lockStock(tx, picking!.branchId, line.partId);
       if (!stock || stock.reservedQuantity < line.pickedQuantity) {
         throw new ConflictError("Reserved stock does not match the picking list; contact an administrator");
       }
@@ -962,9 +993,45 @@ export class StockTransferService {
         where: { id: stock.id },
         data: { reservedQuantity: { decrement: line.pickedQuantity } },
       });
+      await tx.pickingListLine.delete({ where: { id: line.id } });
     }
-    await tx.pickingList.update({ where: { id: picking.id }, data: { status: PickingListStatus.CANCELLED } });
-    return picking;
+    if (picking && released.length === picking.lines.length) {
+      await tx.pickingList.update({ where: { id: picking.id }, data: { status: PickingListStatus.CANCELLED } });
+    }
+
+    let total = 0;
+    const now = new Date();
+    for (const line of chosen) {
+      const pending = pendingSupply(line);
+      if (pending === 0) continue;
+      total += pending;
+      await tx.branchIndentLine.update({
+        where: { id: line.id },
+        data: {
+          cancelledQuantity: { increment: pending },
+          approvedQuantity: line.approvedQuantity === null ? null : line.dispatchedQuantity,
+          backOrderQuantity: 0,
+          cancelledAt: now,
+          cancelledById: actorId,
+          cancelRemark: reason,
+        },
+      });
+    }
+
+    const after = await tx.branchIndentLine.findMany({ where: { indentId } });
+    if (after.every((l) => l.dispatchedQuantity === 0 && pendingSupply(l) === 0)) {
+      await claimStatus(tx, indentId, [from], IndentStatus.CANCELLED, {
+        cancelledById: actorId,
+        cancelledAt: now,
+        cancellationReason: reason,
+      });
+      await recordHistory(tx, indentId, [{ from, to: IndentStatus.CANCELLED, remarks: reason }], actorId);
+    } else if (total > 0 && (from === IndentStatus.DRAFT || from === IndentStatus.SUBMITTED)) {
+      await recordHistory(tx, indentId, [{ from, to: from, remarks: historyRemark(total) }], actorId);
+    } else if (total > 0) {
+      await refreshIndentStatus(tx, indentId, actorId, [{ to: from, remarks: historyRemark(total) }]);
+    }
+    return total;
   }
 
   /**
@@ -981,20 +1048,7 @@ export class StockTransferService {
       if (lines.every((l) => l.dispatchedQuantity === 0)) {
         throw new BadRequestError("Nothing has shipped on this indent yet; cancel it instead");
       }
-      await this.releaseOpenPick(tx, id);
-      let total = 0;
-      for (const line of lines) {
-        const left = (line.approvedQuantity ?? 0) - line.dispatchedQuantity;
-        total += Math.max(0, left);
-        await tx.branchIndentLine.update({
-          where: { id: line.id },
-          data: { approvedQuantity: line.dispatchedQuantity, backOrderQuantity: 0 },
-        });
-      }
-      await refreshIndentStatus(tx, id, actorId, [
-        { to: IndentStatus.PARTLY_DISPATCHED, remarks: `Back order closed (${total} unit(s) not supplied): ${reason}` },
-      ]);
-      return total;
+      return this.cancelLinesInTx(tx, id, actorId, reason, undefined, (units) => `Back order closed (${units} unit(s) not supplied): ${reason}`);
     }, TX_OPTIONS);
 
     const full = await prisma.branchIndent.findUniqueOrThrow({ where: { id }, include: { sourceBranch: true } });
@@ -1012,6 +1066,111 @@ export class StockTransferService {
       },
     );
     return this.getIndent(id);
+  }
+
+  // ── Data management: pending indent cancellation ──────────────────────────
+
+  /**
+   * Indents with something still to supply, line by line (legacy Branch Indent From / To Other
+   * Branch Cancellation "Fill Orders").
+   */
+  async listPendingLines(f: PendingLineFilters) {
+    const inward = f.direction === "INWARD";
+    const indents = await prisma.branchIndent.findMany({
+      where: {
+        status: { in: PENDING_SUPPLY_STATUSES },
+        ...(inward ? { sourceBranchId: f.branchId } : { requestingBranchId: f.branchId }),
+        ...(f.otherBranchId && (inward ? { requestingBranchId: f.otherBranchId } : { sourceBranchId: f.otherBranchId })),
+        ...((f.from || f.to) && { orderDate: { ...(f.from && { gte: reportStart(f.from) }), ...(f.to && { lt: reportEnd(f.to) }) } }),
+        ...(f.search && { indentNumber: { contains: f.search } }),
+      },
+      orderBy: [{ orderDate: "asc" }, { indentNumber: "asc" }],
+      take: 500,
+      include: {
+        requestingBranch: branchSelect,
+        sourceBranch: branchSelect,
+        lines: { orderBy: { lineNumber: "asc" }, include: { part: { select: { partNumber: true, name: true } } } },
+        pickingLists: {
+          where: { status: PickingListStatus.OPEN },
+          select: { lines: { select: { indentLineId: true, pickedQuantity: true } } },
+        },
+      },
+    });
+    return indents
+      .map((i) => {
+        const picks = i.pickingLists.flatMap((p) => p.lines);
+        return {
+          id: i.id,
+          number: i.indentNumber,
+          date: i.orderDate,
+          status: i.status,
+          party: (inward ? i.requestingBranch : i.sourceBranch).name,
+          lines: i.lines
+            .map((l) => ({
+              id: l.id,
+              partNumber: l.part.partNumber,
+              description: l.part.name,
+              ordered: l.requestedQuantity,
+              pending: pendingSupply(l),
+              picked: picks.filter((p) => p.indentLineId === l.id).reduce((s, p) => s + p.pickedQuantity, 0),
+            }))
+            .filter((l) => l.pending > 0),
+        };
+      })
+      .filter((i) => i.lines.length > 0);
+  }
+
+  /** The indents the given lines belong to, with both branches, for access checks. */
+  async getLineIndents(lineIds: string[]) {
+    const ids = [...new Set(lineIds)];
+    const lines = await prisma.branchIndentLine.findMany({
+      where: { id: { in: ids } },
+      select: { indent: { select: { id: true, requestingBranchId: true, sourceBranchId: true } } },
+    });
+    if (lines.length !== ids.length) throw new NotFoundError("One or more indent lines were not found");
+    return [...new Map(lines.map((l) => [l.indent.id, l.indent])).values()];
+  }
+
+  /** Cancels the pending quantity of the ticked lines, across one or more indents, with one reason. */
+  async cancelPendingLines(lineIds: string[], actorId: string, reason: string) {
+    // Indents in id order, so two users cancelling overlapping indents queue instead of deadlocking.
+    const indents = (await this.getLineIndents(lineIds)).sort((a, b) => a.id.localeCompare(b.id));
+    const results = await prisma.$transaction(async (tx) => {
+      const done: { indentId: string; units: number }[] = [];
+      for (const indent of indents) {
+        done.push({ indentId: indent.id, units: await this.cancelLinesInTx(tx, indent.id, actorId, reason, lineIds) });
+      }
+      if (done.every((d) => d.units === 0)) throw new BadRequestError("Nothing is left to supply on the selected lines");
+      return done.filter((d) => d.units > 0);
+    }, TX_OPTIONS);
+
+    const full = await prisma.branchIndent.findMany({
+      where: { id: { in: results.map((r) => r.indentId) } },
+      include: { sourceBranch: true },
+      orderBy: { indentNumber: "asc" },
+    });
+    for (const indent of full) {
+      const units = results.find((r) => r.indentId === indent.id)!.units;
+      await this.notifyAudience(
+        {
+          type: TRANSFER_NOTIFICATION_TYPES.INDENT_CANCELLED,
+          title: indent.status === IndentStatus.CANCELLED ? "Indent cancelled" : "Indent lines cancelled",
+          message: `${units} unit(s) of indent ${indent.indentNumber} from ${indent.sourceBranch.name} will not be supplied: ${reason}`,
+          link: this.link(indent.id),
+        },
+        {
+          userIds: [indent.requestedById],
+          roles: [
+            { role: ROLES.BRANCH_STORE_MANAGER, branchId: indent.requestingBranchId },
+            { role: ROLES.BRANCH_STORE_MANAGER, branchId: indent.sourceBranchId },
+          ],
+        },
+      );
+    }
+    return {
+      indents: full.map((i) => ({ id: i.id, indentNumber: i.indentNumber, status: i.status })),
+      units: results.reduce((s, r) => s + r.units, 0),
+    };
   }
 
   // ── 4. Dispatch: STN + cases + packing list + stock deduction ─────────────

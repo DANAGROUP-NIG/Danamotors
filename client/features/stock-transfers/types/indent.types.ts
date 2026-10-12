@@ -44,6 +44,8 @@ export type LineSummary = {
   requested: number;
   approved: number | null;
   rejected: number;
+  /** No longer to be supplied (legacy cancelled qty). */
+  cancelled: number;
   picked: number;
   backOrder: number;
   dispatched: number;
@@ -74,6 +76,9 @@ export type IndentLine = {
   backOrderQuantity: number;
   /** Shipped so far, across every STN for this indent. */
   dispatchedQuantity: number;
+  cancelledQuantity: number;
+  cancelledAt?: string | null;
+  cancelRemark?: string | null;
   unitRate: number;
   amount: number;
   currentStock: number | null;

@@ -133,6 +133,7 @@ model User {
   indentsApproved      BranchIndent[]          @relation("IndentApprovedBy")
   indentsRejected      BranchIndent[]          @relation("IndentRejectedBy")
   indentsCancelled     BranchIndent[]          @relation("IndentCancelledBy")
+  indentLinesCancelled BranchIndentLine[]      @relation("IndentLineCancelledBy")
   transferStatusEvents TransferStatusHistory[] @relation("TransferStatusActor")
   pickingListsCreated  PickingList[]           @relation("PickingListCreatedBy")
   pickingListsDone     PickingList[]           @relation("PickingListCompletedBy")
@@ -164,6 +165,7 @@ model User {
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
 
   customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
+  customerOrderLinesCancelled CustomerOrderLine[] @relation("CustomerOrderLineCancelledBy")
   counterSalesExecuted  CounterSale[]       @relation("CounterSaleExecutive")
   saleReturnsCreated    CounterSaleReturn[] @relation("SaleReturnCreatedBy")
 
@@ -2064,6 +2066,14 @@ model BranchIndentLine {
 
   remarks String?
 
+  // What will no longer be supplied (legacy cancelledQty, CancelBy, CancelDate, CancelRemark).
+  // The latest cancellation is recorded; approvedQuantity drops to what has shipped.
+  cancelledQuantity Int       @default(0)
+  cancelledAt       DateTime?
+  cancelledById     String?
+  cancelledBy       User?     @relation("IndentLineCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark      String?
+
   createdAt DateTime @default(now())
 
   pickingLines PickingListLine[]
@@ -3073,6 +3083,12 @@ model CustomerOrderLine {
   cancelledQuantity Int   @default(0)
   retailRate        Float
   amount            Float
+
+  // Latest cancellation of the line (legacy CancelBy, CancelDate, CancelRemark).
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("CustomerOrderLineCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
 
   createdAt DateTime @default(now())
 

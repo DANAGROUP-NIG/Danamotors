@@ -96,6 +96,29 @@ export function deriveIndentStatus(lines: IndentLineTally[], hasOpenPick: boolea
   return accounted > 0 ? IndentStatus.PARTIALLY_RECEIVED : IndentStatus.IN_TRANSIT;
 }
 
+/** Statuses in which an indent still has something left to supply that can be cancelled. */
+export const PENDING_SUPPLY_STATUSES: IndentStatus[] = [
+  IndentStatus.DRAFT,
+  IndentStatus.SUBMITTED,
+  IndentStatus.APPROVED,
+  IndentStatus.PICKED,
+  IndentStatus.PARTLY_DISPATCHED,
+];
+
+/**
+ * What is still to supply on a line and can be cancelled (legacy pending qty): before approval
+ * the request less anything cancelled, after it the approved quantity less what has shipped.
+ */
+export function pendingSupply(line: {
+  requestedQuantity: number;
+  approvedQuantity: number | null;
+  dispatchedQuantity: number;
+  cancelledQuantity: number;
+}): number {
+  const supplyable = line.approvedQuantity ?? line.requestedQuantity - line.cancelledQuantity;
+  return Math.max(0, supplyable - line.dispatchedQuantity);
+}
+
 export function assertTransition(current: IndentStatus, action: IndentAction): void {
   const allowed = ALLOWED_FROM[action];
   if (!allowed.includes(current)) {

@@ -214,6 +214,27 @@ const pagination = {
   limit: z.coerce.number().int().min(1).max(100).optional(),
 };
 
+const day = z.string().date("Use a YYYY-MM-DD date");
+
+/** Legacy Branch Indent From (INWARD) / To (OUTWARD) Other Branch Cancellation. */
+export const pendingIndentLinesSchema = z.object({
+  query: z.object({
+    direction: z.enum(["INWARD", "OUTWARD"]),
+    branchId: uuid("branch ID"),
+    otherBranchId: uuid("other branch ID").optional(),
+    from: day.optional(),
+    to: day.optional(),
+    search: z.string().trim().max(40).optional(),
+  }),
+});
+
+export const cancelIndentLinesSchema = z.object({
+  body: z.object({
+    lineIds: z.array(uuid("indent line ID")).min(1, "Select at least one line to cancel").max(2000),
+    reason: z.string().trim().min(3, "Say why the lines are cancelled").max(500),
+  }),
+});
+
 export const listIndentsSchema = z.object({
   query: z.object({
     status: z.nativeEnum(IndentStatus).optional(),

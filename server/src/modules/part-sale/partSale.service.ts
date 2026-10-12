@@ -20,6 +20,7 @@ import { nextDocumentNumber as nextFinanceNumber } from "../finance/document-num
 import { creditDueDate, defaultCreditDays } from "../finance/credit-terms";
 import { lockParty, PartyAccountService, withPartyTransaction } from "../finance/party-account.service";
 import { money, sumMoney } from "../finance/money";
+import { reportEnd, reportStart } from "../finance/party-report";
 import {
   addMonths,
   billableQuantity,
@@ -95,6 +96,8 @@ const partSelect = {
 
 const customerName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
   c.companyName || `${c.firstName} ${c.lastName}`.trim();
+
+type LockedOrder = Awaited<ReturnType<PartSaleService["lockOrder"]>>;
 
 export class PartSaleService {
   private parties = new PartyAccountService();
@@ -295,32 +298,124 @@ export class PartSaleService {
   }
 
   /** Cancel what is left on the order. Billed lines stay billed; picked stock is released. */
-  async cancelOrder(id: string, remark: string) {
+  async cancelOrder(id: string, remark: string, actorId: string) {
     await prisma.$transaction(async (tx) => {
       const order = await this.lockOrder(tx, id);
-      await this.releasePicked(tx, order);
-      for (const line of order.lines) {
-        const left = billableQuantity(line);
-        if (left > 0) {
-          await tx.customerOrderLine.update({ where: { id: line.id }, data: { cancelledQuantity: { increment: left }, pickedQuantity: 0 } });
-        }
-      }
-      const billed = order.lines.some((l) => l.billedQuantity > 0);
-      await tx.customerOrder.update({
-        where: { id },
-        data: {
-          status: billed ? CustomerOrderStatus.BILLED : CustomerOrderStatus.CANCELLED,
-          cancelledAt: new Date(),
-          closedAt: new Date(),
-          cancelRemark: remark,
-        },
-      });
+      await this.cancelLinesInTx(tx, order, order.lines, remark, actorId);
+      await this.settleCancelledOrder(tx, id, remark);
     }, TX_OPTIONS);
     return this.getOrder(id);
   }
 
-  private async releasePicked(tx: Tx, order: Awaited<ReturnType<PartSaleService["lockOrder"]>>) {
-    for (const line of [...order.lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
+  // ── Data management: pending CPO cancellation ─────────────────────────────
+
+  /** Open CPOs with their lines still to bill (legacy Customer Purchase Order Cancellation "Fill Orders"). */
+  async listPendingLines(f: { branchId: string; customerId?: string; from?: string; to?: string; search?: string }) {
+    const orders = await prisma.customerOrder.findMany({
+      where: {
+        branchId: f.branchId,
+        status: { in: ACTIVE_ORDER },
+        ...(f.customerId && { customerId: f.customerId }),
+        ...((f.from || f.to) && { orderDate: { ...(f.from && { gte: reportStart(f.from) }), ...(f.to && { lt: reportEnd(f.to) }) } }),
+        ...(f.search && { cpoNumber: { contains: f.search } }),
+      },
+      orderBy: [{ orderDate: "asc" }, { cpoNumber: "asc" }],
+      take: 500,
+      include: {
+        customer: customerSelect,
+        lines: { orderBy: { part: { partNumber: "asc" } }, include: { part: { select: { partNumber: true, name: true } } } },
+      },
+    });
+    return orders
+      .map((o) => ({
+        id: o.id,
+        number: o.cpoNumber,
+        date: o.orderDate,
+        status: o.status,
+        party: customerName(o.customer),
+        lines: o.lines
+          .map((l) => ({
+            id: l.id,
+            partNumber: l.part.partNumber,
+            description: l.part.name,
+            ordered: l.orderedQuantity,
+            pending: billableQuantity(l),
+            picked: l.pickedQuantity,
+          }))
+          .filter((l) => l.pending > 0),
+      }))
+      .filter((o) => o.lines.length > 0);
+  }
+
+  /** The orders the given lines belong to, for access checks. */
+  async getLineOrders(lineIds: string[]) {
+    const ids = [...new Set(lineIds)];
+    const lines = await prisma.customerOrderLine.findMany({
+      where: { id: { in: ids } },
+      select: { order: { select: { id: true, branchId: true } } },
+    });
+    if (lines.length !== ids.length) throw new NotFoundError("One or more CPO lines were not found");
+    return [...new Map(lines.map((l) => [l.order.id, l.order])).values()];
+  }
+
+  /** Cancels what is left to bill on the ticked lines, across one or more CPOs, with one remark. */
+  async cancelPendingLines(lineIds: string[], remark: string, actorId: string) {
+    // Orders in id order, so two users cancelling overlapping orders queue instead of deadlocking.
+    const orderIds = (await this.getLineOrders(lineIds)).map((o) => o.id).sort();
+    const units = await prisma.$transaction(async (tx) => {
+      let total = 0;
+      for (const orderId of orderIds) {
+        const order = await this.lockOrder(tx, orderId);
+        const cancelled = await this.cancelLinesInTx(tx, order, order.lines.filter((l) => lineIds.includes(l.id)), remark, actorId);
+        if (cancelled) await this.settleCancelledOrder(tx, orderId, remark);
+        total += cancelled;
+      }
+      if (!total) throw new BadRequestError("Nothing is left to bill on the selected lines");
+      return total;
+    }, TX_OPTIONS);
+    const orders = await prisma.customerOrder.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, cpoNumber: true, status: true },
+      orderBy: { cpoNumber: "asc" },
+    });
+    return { orders, units };
+  }
+
+  /** Cancels what is left to bill on the lines (legacy cancelledQty); their picked stock is released. */
+  private async cancelLinesInTx(tx: Tx, order: LockedOrder, lines: LockedOrder["lines"], remark: string, actorId: string) {
+    await this.releasePicked(tx, order, lines);
+    let total = 0;
+    const now = new Date();
+    for (const line of lines) {
+      const left = billableQuantity(line);
+      if (left <= 0) continue;
+      total += left;
+      await tx.customerOrderLine.update({
+        where: { id: line.id },
+        data: { cancelledQuantity: { increment: left }, cancelledAt: now, cancelledById: actorId, cancelRemark: remark },
+      });
+    }
+    return total;
+  }
+
+  /** An order with nothing left to bill is closed as cancelled; otherwise its status follows its lines. */
+  private async settleCancelledOrder(tx: Tx, orderId: string, remark: string) {
+    const lines = await tx.customerOrderLine.findMany({ where: { orderId } });
+    if (lines.some((l) => billableQuantity(l) > 0)) return this.refreshOrderStatuses(tx, [orderId]);
+    const now = new Date();
+    await tx.customerOrder.update({
+      where: { id: orderId },
+      data: {
+        status: lines.some((l) => l.billedQuantity > 0) ? CustomerOrderStatus.BILLED : CustomerOrderStatus.CANCELLED,
+        cancelledAt: now,
+        closedAt: now,
+        cancelRemark: remark,
+      },
+    });
+  }
+
+  private async releasePicked(tx: Tx, order: LockedOrder, lines = order.lines) {
+    for (const line of [...lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
       if (line.pickedQuantity <= 0) continue;
       const stock = await lockStock(tx, order.branchId, line.partId);
       if (!stock || stock.reservedQuantity < line.pickedQuantity) {

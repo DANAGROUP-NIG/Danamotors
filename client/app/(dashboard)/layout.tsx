@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -42,6 +42,9 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // More specific paths must come first: the guard uses the first prefix that matches.
   "/transfers/new": [INVENTORY_PERMISSIONS.TRANSFER_CREATE],
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
+  "/data-management/cpo-cancellation": [PART_SALE_PERMISSIONS.ORDER],
+  "/data-management/indent-": [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
+  "/data-management": [PART_SALE_PERMISSIONS.ORDER, INVENTORY_PERMISSIONS.TRANSFER_CANCEL, INVENTORY_PERMISSIONS.STOCK_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
   "/finance/receipts/update-outstanding": ["outstanding:recalculate"],

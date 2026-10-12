@@ -82,7 +82,21 @@ export class PartSaleController {
 
   cancelOrder = handle(async (req, res) => {
     await this.assertOrderAccess(req);
-    ok(res, { order: await this.service.cancelOrder(req.params.id, req.body.remark) }, "Order cancelled");
+    ok(res, { order: await this.service.cancelOrder(req.params.id, req.body.remark, req.user!.userId) }, "Order cancelled");
+  });
+
+  /** Legacy Customer Purchase Order Cancellation: open CPO lines still to bill. */
+  listPendingLines = handle(async (req, res) => {
+    const q = req.query as { branchId: string; customerId?: string; from?: string; to?: string; search?: string };
+    assertInventoryBranchAccess(req, [q.branchId]);
+    ok(res, { orders: await this.service.listPendingLines(q) });
+  });
+
+  cancelPendingLines = handle(async (req, res) => {
+    const orders = await this.service.getLineOrders(req.body.lineIds);
+    assertInventoryBranchAccess(req, orders.map((o) => o.branchId));
+    const result = await this.service.cancelPendingLines(req.body.lineIds, req.body.remark, req.user!.userId);
+    ok(res, result, `${result.units} unit(s) cancelled on ${result.orders.length} CPO(s)`);
   });
 
   private async assertOrderAccess(req: Request) {

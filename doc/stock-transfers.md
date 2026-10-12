@@ -25,6 +25,9 @@ CPD works this way in the legacy data (CPDAutoEnhancer, 2024 to 2026), and the w
   apart. Whatever is not picked or not shipped stays on the indent's back order. **Pick back order**
   (`PATCH /indents/:id/pick`) reserves it again, and the next dispatch creates another STN. When stock
   arrives at the supplier (Mobis MRN or transfer receipt), the supplier is told which back orders it can now pick.
+- **Cancel lines.** Data Management → **Indent From / To Branch Cancellation** cancels what is still to
+  supply on chosen lines, across several indents, with one reason (legacy `cancelledQty`). The line
+  records the cancelled quantity, who and why; see [data-management.md](./data-management.md).
 - **Close back order.** `PATCH /indents/:id/close` with a reason stops supplying the rest of a partly
   shipped indent. Any open pick is released, and the indent completes once its STNs are received.
 - **Several indents on one STN.** 30% of CPD STNs carry two or more indents of the same branch (legacy

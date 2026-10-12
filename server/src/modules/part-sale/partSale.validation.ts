@@ -58,6 +58,26 @@ export const cancelSchema = z.object({
   body: z.object({ remark: z.string().trim().min(1, "A cancellation remark is required").max(500) }),
 });
 
+const day = z.string().date("Use a YYYY-MM-DD date");
+
+/** Legacy Customer Purchase Order Cancellation. */
+export const pendingOrderLinesSchema = z.object({
+  query: z.object({
+    branchId: uuid("branch ID"),
+    customerId: uuid("customer ID").optional(),
+    from: day.optional(),
+    to: day.optional(),
+    search: z.string().trim().max(40).optional(),
+  }),
+});
+
+export const cancelOrderLinesSchema = z.object({
+  body: z.object({
+    lineIds: z.array(uuid("CPO line ID")).min(1, "Select at least one line to cancel").max(2000),
+    remark: z.string().trim().min(1, "A cancellation remark is required").max(500),
+  }),
+});
+
 // ── Counter sales ───────────────────────────────────────────────────────────
 
 export const createCounterSaleSchema = z.object({

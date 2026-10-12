@@ -434,6 +434,71 @@ describeDb("Stock transfer workflow (database)", () => {
     expect(done.status).toBe("COMPLETED");
   });
 
+  it("cancels ticked lines across indents, releasing only their pick", async () => {
+    const picked = await newIndent([
+      { partId: filter.id, stockQuantity: 5 },
+      { partId: unrelated.id, stockQuantity: 3 },
+    ]);
+    await service.approveIndent(picked.id, cpdManager.id);
+    const submitted = await newIndent([
+      { partId: filter.id, stockQuantity: 2 },
+      { partId: unrelated.id, stockQuantity: 1 },
+    ]);
+    const lineOf = (indent: { lines: { id: string; partId: string }[] }, partId: string) =>
+      indent.lines.find((l) => l.partId === partId)!.id;
+
+    // CPD sees both indents from the branch, line by line, with what is picked.
+    const pending = await service.listPendingLines({ direction: "INWARD", branchId: cpd.id, otherBranchId: branch.id });
+    const listed = pending.find((o) => o.id === picked.id)!;
+    expect(listed.lines.map((l) => [l.pending, l.picked])).toEqual([
+      [5, 5],
+      [3, 3],
+    ]);
+    expect(pending.some((o) => o.id === submitted.id)).toBe(true);
+
+    const result = await service.cancelPendingLines(
+      [lineOf(picked, filter.id), lineOf(submitted, filter.id)],
+      cpdManager.id,
+      "Purchased under PL-1",
+    );
+    expect(result.units).toBe(7);
+
+    const after = await service.getIndent(picked.id);
+    expect(after.status).toBe("PICKED");
+    expect(after.lines.find((l) => l.partId === filter.id)).toMatchObject({
+      approvedQuantity: 0,
+      cancelledQuantity: 5,
+      backOrderQuantity: 0,
+      cancelRemark: "Purchased under PL-1",
+    });
+    expect(after.openPickingList?.lines.map((l) => l.partId)).toEqual([unrelated.id]);
+    expect(await stockOf(cpd.id, filter.id)).toMatchObject({ quantity: 52, reservedQuantity: 0 });
+    expect(await stockOf(cpd.id, unrelated.id)).toMatchObject({ reservedQuantity: 3 });
+
+    // The branch's own view (indents to other branches) shows only what is still to come.
+    const outward = await service.listPendingLines({ direction: "OUTWARD", branchId: branch.id, search: picked.indentNumber });
+    expect(outward[0].lines.map((l) => l.partNumber)).toEqual([after.lines.find((l) => l.partId === unrelated.id)!.part.partNumber]);
+
+    // A line cancelled before approval cannot be approved; the rest is approved and picked.
+    await expect(
+      service.approveIndent(submitted.id, cpdManager.id, { lines: [{ lineId: lineOf(submitted, filter.id), approvedQuantity: 1 }] }),
+    ).rejects.toThrow(/between 0 and 0/);
+    const approved = await service.approveIndent(submitted.id, cpdManager.id);
+    expect(approved.lines.find((l) => l.partId === filter.id)).toMatchObject({ approvedQuantity: 0, cancelledQuantity: 2 });
+    expect(approved.lines.find((l) => l.partId === unrelated.id)).toMatchObject({ approvedQuantity: 1 });
+
+    // Cancelling everything left on an indent with nothing shipped cancels the indent.
+    await service.cancelPendingLines([lineOf(submitted, unrelated.id)], cpdManager.id, "Duplicate indent");
+    const cancelled = await service.getIndent(submitted.id);
+    expect(cancelled).toMatchObject({ status: "CANCELLED", cancellationReason: "Duplicate indent" });
+    await expect(service.cancelPendingLines([lineOf(submitted, unrelated.id)], cpdManager.id, "Again")).rejects.toThrow(
+      /nothing is left/,
+    );
+
+    await service.cancelIndent(picked.id, cpdManager.id, "test cleanup");
+    expect(await stockOf(cpd.id, unrelated.id)).toMatchObject({ reservedQuantity: 0 });
+  });
+
   it("supports partial, damaged and short receipts without double posting", async () => {
     const indent = await newIndent([{ partId: filter.id, stockQuantity: 6 }]);
     await service.approveIndent(indent.id, cpdManager.id);

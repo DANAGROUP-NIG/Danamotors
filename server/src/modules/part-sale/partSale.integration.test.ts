@@ -173,11 +173,42 @@ describeDb("CPD part sale (database)", () => {
     const [row] = await service.listOrders({ customerId: customer.id });
     await service.pickOrder(row.id);
     expect((await stockOf(mirror.id)).reservedQuantity).toBe(2);
-    const order = await service.cancelOrder(row.id, "Customer bought elsewhere");
+    const order = await service.cancelOrder(row.id, "Customer bought elsewhere", user.id);
     expect(order.status).toBe("BILLED");
     expect(order.lines[0]).toMatchObject({ pickedQuantity: 0, billedQuantity: 1, cancelledQuantity: 4 });
     expect((await stockOf(mirror.id)).reservedQuantity).toBe(0);
     await expect(service.pickOrder(row.id)).rejects.toThrow(/can no longer change/);
+  });
+
+  it("cancels ticked lines across CPOs and closes a CPO left with nothing to bill", async () => {
+    const filter = await prisma.sparePart.create({
+      data: { partCode: `FLT${run}`, partNumber: `FLT${run}`, name: "FILTER ASSY", unitPrice: 1000, retailRate: 1500, taxable: true },
+    });
+    await prisma.inventoryStock.create({ data: { branchId: cpd.id, partId: filter.id, quantity: 5 } });
+    const picked = await service.createOrder(
+      { branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: filter.id, quantity: 3 }, { partId: oil.id, quantity: 1 }] },
+      user.id,
+    );
+    const open = await service.createOrder({ branchId: cpd.id, customerId: customer.id, lines: [{ partId: filter.id, quantity: 2 }] }, user.id);
+    const lineOf = (order: { lines: { id: string; partId: string }[] }) => order.lines.find((l) => l.partId === filter.id)!.id;
+
+    const pending = await service.listPendingLines({ branchId: cpd.id, customerId: customer.id, search: picked.cpoNumber });
+    expect(pending[0].lines.find((l) => l.id === lineOf(picked))).toMatchObject({ ordered: 3, pending: 3, picked: 3 });
+
+    const result = await service.cancelPendingLines([lineOf(picked), lineOf(open)], "Customer no longer interested", user.id);
+    expect(result.units).toBe(5);
+    expect(result.orders.find((o) => o.id === open.id)?.status).toBe("CANCELLED");
+    const after = await service.getOrder(picked.id);
+    expect(after.status).toBe("OPEN");
+    expect(after.lines.find((l) => l.partId === filter.id)).toMatchObject({
+      pickedQuantity: 0,
+      cancelledQuantity: 3,
+      cancelRemark: "Customer no longer interested",
+    });
+    expect((await stockOf(filter.id)).reservedQuantity).toBe(0);
+    await expect(service.cancelPendingLines([lineOf(open)], "Again", user.id)).rejects.toThrow(/can no longer change/);
+
+    await service.cancelOrder(picked.id, "test cleanup", user.id);
   });
   it("takes receipts for counter-sale bills at the selling branch, in the Service and parts register", async () => {
     const { ReceiptService } = require("../finance/receipt.service");

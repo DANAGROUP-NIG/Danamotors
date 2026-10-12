@@ -62,7 +62,8 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
   and stop a bill line from being returned more than once.
 - **CPO status** follows the lines: Open, then Partly billed, then Billed. Cancelling a CPO
   cancels whatever is still open and releases any picked stock. Lines already billed stay
-  billed.
+  billed. Data Management → **CPO Cancellation** cancels chosen lines across several CPOs
+  with one remark (see [data-management.md](./data-management.md)).
 - **Cancelling a bill** is allowed only when it has no receipts, allocations, returns or Tally
   posting. The stock goes back, and the CPO lines can be billed again.
 - **Who can sell to whom**: any active party can buy, whichever branch registered it.

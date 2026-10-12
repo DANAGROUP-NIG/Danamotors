@@ -2,7 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
-import { StockTransferService } from "./stockTransfer.service";
+import { PendingLineFilters, StockTransferService } from "./stockTransfer.service";
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 
@@ -123,6 +123,21 @@ export class StockTransferController {
     assertEitherBranch(req, branches.requestingBranchId, branches.sourceBranchId);
     const indent = await this.service.cancelIndent(req.params.id, req.user!.userId, req.body?.reason);
     ok(res, { indent }, "Indent cancelled");
+  });
+
+  /** Legacy Branch Indent From / To Other Branch Cancellation: what is still to supply. */
+  listPendingLines = handle(async (req, res) => {
+    const q = req.query as unknown as PendingLineFilters;
+    assertInventoryBranchAccess(req, [q.branchId]);
+    ok(res, { orders: await this.service.listPendingLines(q) });
+  });
+
+  cancelPendingLines = handle(async (req, res) => {
+    for (const indent of await this.service.getLineIndents(req.body.lineIds)) {
+      assertEitherBranch(req, indent.requestingBranchId, indent.sourceBranchId);
+    }
+    const result = await this.service.cancelPendingLines(req.body.lineIds, req.user!.userId, req.body.reason);
+    ok(res, result, `${result.units} unit(s) cancelled on ${result.indents.length} indent(s)`);
   });
 
   dispatchIndent = handle(async (req, res) => {

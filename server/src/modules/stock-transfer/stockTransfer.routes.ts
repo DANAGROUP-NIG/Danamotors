@@ -6,6 +6,7 @@ import { PERMISSIONS } from "../../shared/constants/roles";
 import { StockTransferController } from "./stockTransfer.controller";
 import {
   approveIndentSchema,
+  cancelIndentLinesSchema,
   cancelIndentSchema,
   createIndentSchema,
   dispatchIndentSchema,
@@ -16,6 +17,7 @@ import {
   listStnsSchema,
   partLookupSchema,
   partSearchSchema,
+  pendingIndentLinesSchema,
   pickIndentSchema,
   receiveIndentSchema,
   rejectIndentSchema,
@@ -213,6 +215,45 @@ router.get("/indents/part-search", read, validateRequest(partSearchSchema), cont
  */
 router.post("/indents", requirePermission(PERMISSIONS.TRANSFER_CREATE), validateRequest(createIndentSchema), controller.createIndent);
 router.get("/indents", read, validateRequest(listIndentsSchema), controller.listIndents);
+
+/**
+ * @openapi
+ * /inventory/indents/pending-lines:
+ *   get:
+ *     tags: [Stock Transfers]
+ *     summary: Indent lines still to supply, for cancellation
+ *     description: |
+ *       Legacy Branch Indent From / To Other Branch Cancellation "Fill Orders". INWARD lists the indents other
+ *       branches raised on `branchId` (it supplies); OUTWARD lists the indents `branchId` raised on others.
+ *       Each indent comes with its lines that still have a pending quantity.
+ *     parameters:
+ *       - { in: query, name: direction, required: true, schema: { type: string, enum: [INWARD, OUTWARD] } }
+ *       - { in: query, name: branchId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: otherBranchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: from, schema: { type: string, format: date } }
+ *       - { in: query, name: to, schema: { type: string, format: date } }
+ *       - { in: query, name: search, description: Indent number, schema: { type: string } }
+ *     responses: { 200: { description: "{ orders: [{ id, number, date, status, party, lines: [{ id, partNumber, description, ordered, pending, picked }] }] }" } }
+ * /inventory/indents/pending-lines/cancel:
+ *   patch:
+ *     tags: [Stock Transfers]
+ *     summary: Cancel the pending quantity of ticked indent lines
+ *     description: |
+ *       Works across several indents with one reason. Picked stock on the lines is released and approved drops to what
+ *       has shipped. An indent with nothing shipped and nothing left is cancelled; otherwise it follows its quantities.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { lineIds: [3f2a9a1e-1d2b-4c5d-8e9f-0a1b2c3d4e5f], reason: Purchased under PL-1 }
+ *     responses: { 200: { description: "{ indents: [{ id, indentNumber, status }], units }" } }
+ */
+router.get("/indents/pending-lines", read, validateRequest(pendingIndentLinesSchema), controller.listPendingLines);
+router.patch(
+  "/indents/pending-lines/cancel",
+  requirePermission(PERMISSIONS.TRANSFER_CANCEL),
+  validateRequest(cancelIndentLinesSchema),
+  controller.cancelPendingLines,
+);
 
 /**
  * @openapi

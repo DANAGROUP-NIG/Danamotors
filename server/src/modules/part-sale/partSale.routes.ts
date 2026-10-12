@@ -5,6 +5,7 @@ import { validateRequest } from "../../middleware/requestValidator";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { PartSaleController } from "./partSale.controller";
 import {
+  cancelOrderLinesSchema,
   cancelSchema,
   createCounterSaleSchema,
   createOrderSchema,
@@ -14,6 +15,7 @@ import {
   listCounterSalesSchema,
   listOrdersSchema,
   partSearchSchema,
+  pendingOrderLinesSchema,
   pickOrderSchema,
 } from "./partSale.validation";
 
@@ -104,6 +106,25 @@ const returns = requirePermission(PERMISSIONS.PART_SALE_RETURN);
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
  *     requestBody: { content: { application/json: { example: { remark: Customer bought elsewhere } } } }
  *     responses: { 200: { description: CPO } }
+ * /part-sale/orders/pending-lines:
+ *   get:
+ *     tags: [Part Sale]
+ *     summary: Open CPO lines still to bill, for cancellation
+ *     description: Legacy Customer Purchase Order Cancellation "Fill Orders". Each open CPO comes with its lines that still have a pending quantity.
+ *     parameters:
+ *       - { in: query, name: branchId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: customerId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: from, schema: { type: string, format: date } }
+ *       - { in: query, name: to, schema: { type: string, format: date } }
+ *       - { in: query, name: search, description: CPO number, schema: { type: string } }
+ *     responses: { 200: { description: "{ orders: [{ id, number, date, status, party, lines: [{ id, partNumber, description, ordered, pending, picked }] }] }" } }
+ * /part-sale/orders/pending-lines/cancel:
+ *   patch:
+ *     tags: [Part Sale]
+ *     summary: Cancel what is left to bill on ticked CPO lines
+ *     description: Works across several CPOs with one remark. Picked stock on the lines is released. A CPO with nothing left to bill closes.
+ *     requestBody: { content: { application/json: { example: { lineIds: [3d4e5f6a-7b8c-4d9e-0f1a-2b3c4d5e6f7a], remark: Customer no longer interested } } } }
+ *     responses: { 200: { description: "{ orders: [{ id, cpoNumber, status }], units }" } }
  * /part-sale/counter-sales:
  *   get:
  *     tags: [Part Sale]
@@ -158,6 +179,8 @@ router.get("/parts", read, validateRequest(partSearchSchema), controller.searchP
 
 router.get("/orders", read, validateRequest(listOrdersSchema), controller.listOrders);
 router.post("/orders", order, validateRequest(createOrderSchema), controller.createOrder);
+router.get("/orders/pending-lines", read, validateRequest(pendingOrderLinesSchema), controller.listPendingLines);
+router.patch("/orders/pending-lines/cancel", order, validateRequest(cancelOrderLinesSchema), controller.cancelPendingLines);
 router.get("/orders/:id", read, validateRequest(idParamSchema), controller.getOrder);
 router.patch("/orders/:id/pick", order, validateRequest(pickOrderSchema), controller.pickOrder);
 router.patch("/orders/:id/release", order, validateRequest(idParamSchema), controller.releaseOrder);

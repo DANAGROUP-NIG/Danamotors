@@ -277,6 +277,7 @@ export function IndentDetail({ id }: { id: string }) {
                   <th className={cn(thCls, "text-right")} title="Stock order (15 days consumption)">Stock order</th>
                   <th className={cn(thCls, "text-right")}>Approved</th>
                   <th className={cn(thCls, "text-right")}>Back order</th>
+                  <th className={cn(thCls, "text-right")}>Cancelled</th>
                   <th className={cn(thCls, "text-right")}>Sent</th>
                   <th className={cn(thCls, "text-right")}>Received</th>
                   <th className={cn(thCls, "text-right")}>Damaged</th>
@@ -348,6 +349,7 @@ export function IndentDetail({ id }: { id: string }) {
                       <td className={cn(tdCls, "text-right")}><Qty n={l.stockOrderQuantity} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.approved} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.backOrder} tone="amber" /></td>
+                      <td className={cn(tdCls, "text-right")} title={l.cancelRemark ?? undefined}><Qty n={l.summary.cancelled} tone="red" /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.dispatched} /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.received} tone="emerald" /></td>
                       <td className={cn(tdCls, "text-right")}><Qty n={l.summary.damaged} tone="red" /></td>
