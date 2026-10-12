@@ -1,14 +1,15 @@
 /**
  * Physical stock taking reports (legacy Stock Taking Report with S/E values, Partwise, Bin Location
- * wise and Damage Partwise physical stock reports), run through the parts reports screen.
+ * wise and Damage Partwise physical stock reports), run through the parts reports screen. The same
+ * rows serve the Stock Audit report, for audits only.
  */
-import { StockTakeStatus } from "@prisma/client";
+import { StockTakeStatus, StockTakeType } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { money } from "../finance/money";
 import { dateRange, partWhere, ReportFilters, Row, userName } from "../parts-report/partsReport.common";
-import { discrepancy } from "./stockTake.logic";
+import { discrepancy, Kind } from "./stockTake.logic";
 
-export async function physicalStockRows(f: ReportFilters): Promise<Row[]> {
+export async function physicalStockRows(f: ReportFilters, kind: Kind = "COUNT"): Promise<Row[]> {
   const lines = await prisma.stockTakeLine.findMany({
     where: {
       partId: { not: null },
@@ -17,6 +18,7 @@ export async function physicalStockRows(f: ReportFilters): Promise<Row[]> {
       part: partWhere(f),
       stockTake: {
         status: { not: StockTakeStatus.CANCELLED },
+        type: kind === "AUDIT" ? StockTakeType.AUDIT : { not: StockTakeType.AUDIT },
         ...(f.branchId && { branchId: f.branchId }),
         // A batch number picks one count whatever its date.
         ...(f.search?.trim() ? { batchNumber: f.search.trim() } : { createdAt: dateRange(f) }),
@@ -24,7 +26,7 @@ export async function physicalStockRows(f: ReportFilters): Promise<Row[]> {
     },
     include: {
       part: { select: { partNumber: true, name: true, partFlag: true, unitPrice: true } },
-      stockTake: { select: { batchNumber: true, createdAt: true } },
+      stockTake: { select: { batchNumber: true, createdAt: true, auditors: true } },
       sheet: { select: { checker: { select: { firstName: true, lastName: true } } } },
     },
     orderBy: f.option === "BIN" ? [{ countedBins: "asc" }, { partNumber: "asc" }] : [{ partNumber: "asc" }],
@@ -56,7 +58,7 @@ export async function physicalStockRows(f: ReportFilters): Promise<Row[]> {
         shortageQuantity: Math.max(-diff, 0),
         shortageValue: money(Math.max(-diff, 0) * rate),
         remarks: l.remarks ?? "",
-        checker: userName(l.sheet?.checker),
+        checker: userName(l.sheet?.checker) || (l.stockTake.auditors ?? ""),
         diff,
       };
     })

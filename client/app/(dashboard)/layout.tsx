@@ -9,7 +9,7 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -29,6 +29,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/mobis-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
   "/inventory/mobis-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
+  "/inventory/stock-taking": [STOCK_TAKE_PERMISSIONS.READ],
+  "/inventory/stock-audit": [STOCK_AUDIT_PERMISSIONS.READ],
   "/inventory": [
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,

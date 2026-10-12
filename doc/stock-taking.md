@@ -4,7 +4,8 @@ How a branch counts its parts and corrects system stock from the count. This rep
 legacy Physical Stock Taking screens used in AutoEnhancer and CPDAutoEnhancer: Batch Creation
 for Physical Stock Taking, Physical Stock Taking (Download / Upload for the handheld), Upload
 Physical Stock Data, Upload/Download Status, Stock Increase/Decrease Detail, S/E Confirmation,
-Not Required Part and Bin Location Updation.
+Not Required Part and Bin Location Updation. It also replaces the Stock Audit screens (Internal
+Audit, Audit by Audit Head, Audit by Visiting Management); see [Stock audit](#stock-audit).
 
 | Step | Screen | What happens |
 | --- | --- | --- |
@@ -61,9 +62,37 @@ two calls:
   document, so system stock kept every discrepancy. For example, in the 2024 annual count part
   1864421058N was counted at 18 against a system stock of 57, and the 57 was never corrected.
   The new system posts the adjustment.
-- Not carried over: the Excel upload of batch parts (`XLUpload`, last used 2015). Also not
-  carried over: the stock audit types (internal audit, audit head, visiting management), which
-  were used once, in 2012.
+- Not carried over: the Excel upload of batch parts (`XLUpload`, last used 2015).
+
+## Stock audit
+
+Inventory → **Stock Audit**. An audit is an independent check of a branch's stock. It uses the
+same batch, count sheets and counts as a physical count (type `AUDIT`). Legacy did the same: its
+Batch Creation form served both, and an audit was PSTBatchHead `TranType = S`.
+
+| Step | Screen | What happens |
+| --- | --- | --- |
+| 1. Audit | Stock Audit → **New audit** | Choose **Internal audit**, **Audit by audit head** or **Audit by visiting management**, enter the auditor(s), then select and load the parts as for a batch. |
+| 2. Sheets and counts | Audit detail | As steps 2 to 4 above. Audit sheets never show system stock: the auditor counts blind. |
+| 3. Complete | Audit → **Complete** | Final. The audit reports shortage and excess at dealer rate, and stops there. |
+
+How an audit differs from a physical count:
+
+- **It never changes stock.** There is no S/E confirmation and no bin update, and a completed
+  audit cannot be cancelled. To correct stock after an audit, the store runs its own perpetual
+  count.
+- **It never freezes or holds parts.** Stock keeps moving. A part in an open physical count can
+  be audited, and a part under audit can still join a physical count. The discrepancy is
+  measured against system stock when each part was counted, as for any count.
+- **Auditors are names, not users** (legacy `Auditormast`). Visiting management may have no login.
+  A sheet's checker (optional) is whoever enters the counts.
+- Audits share the batch number series with physical counts.
+
+Legacy usage: AutoEnhancer ran one audit, batch 2012000001 on 22 March 2012 (Internal Audit, 26
+parts, auditors set up that day). It found shortages, for example 5172002000 counted 41 against
+47, and posted nothing. CPDAutoEnhancer and ABJAutoEnhancer have no audits, and audit head and
+visiting management were never used. The legacy "Prepare Device for Stock Audit" option is
+handheld-only (`Preparedevice` was never set) and waits for the HHDC integration.
 
 ## Permissions
 
@@ -72,17 +101,25 @@ two calls:
 | `stocktake:read` | Admin, General/Branch Store Manager, Accountant | View counts, sheets, movements; Physical Stock Taking report |
 | `stocktake:manage` | Admin, General/Branch Store Manager | Create batches, issue/cancel sheets, record and correct counts, complete, cancel, update bins |
 | `stocktake:confirm` | Admin, General Store Manager | S/E confirmation (adjusts stock) |
+| `stockaudit:read` | Admin, General/Branch Store Manager, Accountant | View stock audits; Stock Audit report |
+| `stockaudit:manage` | Admin, General Store Manager, Accountant | Create audits, issue/cancel sheets, record and correct counts, complete, cancel |
+
+A Branch Store Manager can read audits but not run them, so a branch never audits itself.
 
 ## Reports
 
 Parts Reports → **Physical Stock Taking** (`physical-stock`). Enter a batch number for one
 count; otherwise the report covers counts created in the period. Options: Shortage / excess,
 Part wise, Bin location wise, Damaged parts. The batch screen's **Report** button opens it for
-that batch.
+that batch. Stock audits have their own report, Parts Reports → **Stock Audit** (`stock-audit`),
+with the same options. The physical stock report leaves audits out.
 
 ## Code
 
 - Server: `server/src/modules/stock-take/` (`stockTake.logic.ts` for the rules,
   `stockTake.service.ts`, `stockTake.report.ts`), migration `20261011120000_stock_taking`
-  (tables, freeze trigger, permissions).
-- Client: `client/features/stock-taking/`, routes under `/inventory/stock-taking`.
+  (tables, freeze trigger, permissions), migration `20261012120000_stock_audit` (type `AUDIT`, audit
+  level and auditors, `stockaudit` permissions).
+- Client: `client/features/stock-taking/`, routes under `/inventory/stock-taking` and
+  `/inventory/stock-audit`. The same components serve both. `KINDS` in
+  `lib/stock-taking-format.ts` holds what differs.

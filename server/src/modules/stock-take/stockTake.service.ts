@@ -5,11 +5,14 @@
  *   batch (parts chosen; an annual batch freezes their stock) ──► count sheets, one per checker
  *     ──► sheet upload ──► complete ──► S/E confirmation (stock adjusted) ──► bin locations updated
  *
+ * A stock audit (legacy Stock Audit, TranType S) runs the same way up to complete, which is final:
+ * it reports shortage and excess only, and auditors never see system stock on their sheets.
+ *
  * Count sheets stand in for the handheld (HHDC) downloads until the device is integrated; the
  * device will post its scans to the same sheet upload. Legacy stopped adjusting stock after 2012;
  * here the S/E confirmation posts each shortage and excess as an ADJUSTMENT (SAN).
  */
-import { Prisma, StockTakeStatus, StockTakeType, PartStatus } from "@prisma/client";
+import { Prisma, StockAuditLevel, StockTakeStatus, StockTakeType, PartStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { lockStock, nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
@@ -23,6 +26,7 @@ import {
   discrepancy,
   groupCounts,
   inRange,
+  Kind,
   mergeBins,
   mergeRemarks,
   summarise,
@@ -59,6 +63,8 @@ export interface CreateStockTakeInput {
   branchId: string;
   type: StockTakeType;
   remarks?: string;
+  auditLevel?: StockAuditLevel;
+  auditors?: string;
   selection: PartSelection;
   /** Parts unticked after loading the selection. */
   excludePartIds?: string[];
@@ -107,9 +113,12 @@ export class StockTakeService {
     });
   }
 
-  /** Legacy "Load Parts": the parts a batch would take, flagged when already in another open count. */
-  async previewParts(branchId: string, selection: PartSelection) {
-    const [candidates, busy] = await Promise.all([this.selectParts(prisma, branchId, selection), this.partsInOpenCounts(prisma, branchId)]);
+  /** Legacy "Load Parts": the parts a batch would take, flagged when already in another open count (audits are never held back). */
+  async previewParts(branchId: string, selection: PartSelection, kind: Kind = "COUNT") {
+    const [candidates, busy] = await Promise.all([
+      this.selectParts(prisma, branchId, selection),
+      kind === "AUDIT" ? new Map<string, string>() : this.partsInOpenCounts(prisma, branchId),
+    ]);
     return candidates.map((c) => ({ ...c, openBatch: busy.get(c.partId) ?? null }));
   }
 
@@ -176,10 +185,10 @@ export class StockTakeService {
     return rows;
   }
 
-  /** Part ids already in an ACTIVE or COMPLETED count at the branch, with that count's batch number. */
+  /** Part ids already in an ACTIVE or COMPLETED physical count at the branch, with its batch number. Audits never hold parts. */
   private async partsInOpenCounts(db: Db, branchId: string) {
     const lines = await db.stockTakeLine.findMany({
-      where: { partId: { not: null }, stockTake: { branchId, status: { in: OPEN } } },
+      where: { partId: { not: null }, stockTake: { branchId, status: { in: OPEN }, type: { not: StockTakeType.AUDIT } } },
       select: { partId: true, stockTake: { select: { batchNumber: true } } },
     });
     return new Map(lines.map((l) => [l.partId!, l.stockTake.batchNumber]));
@@ -211,7 +220,11 @@ export class StockTakeService {
         const open = await tx.stockTake.findFirst({ where: { branchId: branch.id, type: StockTakeType.ANNUAL, status: { in: OPEN } } });
         if (open) throw new ConflictError(`Annual stock taking ${open.batchNumber} is still open at this branch`);
       }
-      const [candidates, busy] = await Promise.all([this.selectParts(tx, branch.id, input.selection), this.partsInOpenCounts(tx, branch.id)]);
+      const audit = input.type === StockTakeType.AUDIT;
+      const [candidates, busy] = await Promise.all([
+        this.selectParts(tx, branch.id, input.selection),
+        audit ? new Map<string, string>() : this.partsInOpenCounts(tx, branch.id),
+      ]);
       const wanted = candidates.filter((c) => !excluded.has(c.partId));
       const chosen = wanted.filter((c) => !busy.has(c.partId));
       if (!chosen.length) {
@@ -223,6 +236,7 @@ export class StockTakeService {
           branchId: branch.id,
           type: input.type,
           remarks: input.remarks,
+          ...(audit && { auditLevel: input.auditLevel, auditors: input.auditors }),
           createdById: actorId,
         },
       });
@@ -242,9 +256,13 @@ export class StockTakeService {
     return { stockTake: await this.getStockTake(id), skipped };
   }
 
-  async listStockTakes(filters: { branchId?: string; status?: StockTakeStatus; type?: StockTakeType; search?: string }) {
+  async listStockTakes(filters: { kind?: Kind; branchId?: string; status?: StockTakeStatus; type?: StockTakeType; search?: string }) {
     const takes = await prisma.stockTake.findMany({
       where: {
+        AND: [
+          { type: filters.kind === "AUDIT" ? StockTakeType.AUDIT : { not: StockTakeType.AUDIT } },
+          ...(filters.type ? [{ type: filters.type }] : []),
+        ],
         ...(filters.branchId && { branchId: filters.branchId }),
         ...(filters.status && { status: filters.status }),
         ...(filters.type && { type: filters.type }),
@@ -270,10 +288,11 @@ export class StockTakeService {
     return takes.map((t) => ({ ...t, countedLines: counted.find((c) => c.stockTakeId === t.id)?._count._all ?? 0 }));
   }
 
-  async branchOf(id: string) {
-    const take = await prisma.stockTake.findUnique({ where: { id }, select: { branchId: true } });
+  /** Branch and type of a count, to check the user may act on it. */
+  async accessOf(id: string) {
+    const take = await prisma.stockTake.findUnique({ where: { id }, select: { branchId: true, type: true } });
     if (!take) throw new NotFoundError("Stock taking not found");
-    return take.branchId;
+    return take;
   }
 
   async getStockTake(id: string) {
@@ -391,10 +410,13 @@ export class StockTakeService {
     return tx.stockTake.findUniqueOrThrow({ where: { id } });
   }
 
-  /** Cancel a count that has not adjusted stock. Nothing it counted is kept. */
+  /** Cancel a count that has not adjusted stock. Nothing it counted is kept. A completed audit is final. */
   async cancelStockTake(id: string, remark: string, actorId: string) {
     await prisma.$transaction(async (tx) => {
-      await this.lockTake(tx, id, OPEN);
+      const take = await this.lockTake(tx, id, OPEN);
+      if (take.type === StockTakeType.AUDIT && take.status === StockTakeStatus.COMPLETED) {
+        throw new ConflictError(`Stock audit ${take.batchNumber} is completed and can no longer be cancelled`);
+      }
       const now = new Date();
       await tx.stockTakeSheet.updateMany({
         where: { stockTakeId: id, uploadedAt: null, cancelledAt: null },
@@ -435,7 +457,8 @@ export class StockTakeService {
           stockTakeId: take.id,
           checkerId: input.checkerId,
           criteria: describeCriteria({ ...input, picked: input.lineIds?.length }),
-          showSystemStock: input.showSystemStock ?? false,
+          // An auditor counts blind.
+          showSystemStock: take.type !== StockTakeType.AUDIT && (input.showSystemStock ?? false),
           lineCount: chosen.length,
           issuedById: actorId,
         },
@@ -515,7 +538,7 @@ export class StockTakeService {
    * merges uploads. A part found that is not in the count joins it (legacy NewPart); a part number
    * not in Part Master is kept for the store to resolve (legacy wrong part).
    */
-  private async applyCounts(tx: Tx, take: { id: string; branchId: string }, entries: CountEntry[], actorId: string, sheetId?: string) {
+  private async applyCounts(tx: Tx, take: { id: string; branchId: string; type: StockTakeType }, entries: CountEntry[], actorId: string, sheetId?: string) {
     // Resolve part numbers first, so a part sent by number and by id is one group.
     const byId = [...new Set(entries.filter((e) => e.partId).map((e) => e.partId!))];
     const byNumber = [...new Set(entries.filter((e) => !e.partId && e.partNumber?.trim()).map((e) => e.partNumber!.trim().toUpperCase()))];
@@ -544,7 +567,7 @@ export class StockTakeService {
     const stock = await this.stockOf(tx, take.branchId, partIds);
 
     const newParts = partIds.filter((pid) => !existing.some((l) => l.partId === pid));
-    if (newParts.length) {
+    if (newParts.length && take.type !== StockTakeType.AUDIT) {
       const busy = await this.partsInOpenCounts(tx, take.branchId);
       const clash = newParts.filter((pid) => busy.has(pid));
       if (clash.length) {
@@ -692,7 +715,7 @@ export class StockTakeService {
   }
 
   /** Part numbers created in Part Master since they were counted join their part (legacy re-join on part number). */
-  private async relinkUnknownParts(tx: Tx, take: { id: string; branchId: string }) {
+  private async relinkUnknownParts(tx: Tx, take: { id: string; branchId: string; type: StockTakeType }) {
     const unknown = await tx.stockTakeLine.findMany({ where: { stockTakeId: take.id, partId: null } });
     if (!unknown.length) return;
     const parts = await tx.$queryRaw<{ id: string; partNumber: string; binLocation: string | null }[]>`
@@ -718,7 +741,7 @@ export class StockTakeService {
           },
         });
         await tx.stockTakeLine.delete({ where: { id: line.id } });
-      } else if (!busy.has(part.id)) {
+      } else if (take.type === StockTakeType.AUDIT || !busy.has(part.id)) {
         const st = stock.get(part.id);
         await tx.stockTakeLine.update({
           where: { id: line.id },
@@ -743,6 +766,7 @@ export class StockTakeService {
   async confirmStockTake(id: string, actorId: string) {
     await prisma.$transaction(async (tx) => {
       const take = await this.lockTake(tx, id, [StockTakeStatus.COMPLETED]);
+      if (take.type === StockTakeType.AUDIT) throw new BadRequestError("A stock audit only reports shortage and excess; it does not adjust stock");
       const counted = await tx.stockTakeLine.findMany({
         where: { stockTakeId: id, partId: { not: null }, countedQuantity: { not: null } },
         select: { id: true, partId: true, partNumber: true, countedQuantity: true, damagedQuantity: true, stockAtCount: true, systemStock: true },
@@ -829,6 +853,7 @@ export class StockTakeService {
     let updated = 0;
     await prisma.$transaction(async (tx) => {
       const take = await this.lockTake(tx, id, [StockTakeStatus.COMPLETED, StockTakeStatus.CONFIRMED]);
+      if (take.type === StockTakeType.AUDIT) throw new BadRequestError("A stock audit does not change bin locations");
       if (take.binsUpdatedAt) throw new ConflictError("Bin locations from this count have already been updated");
       const found = await tx.stockTakeLine.findMany({
         where: { stockTakeId: id, id: { in: lines.map((l) => l.lineId) }, partId: { not: null } },

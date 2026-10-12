@@ -21,15 +21,20 @@ import { usePriceCategories } from "@/features/inventory/hooks/use-parts";
 import { apiErrorMessage } from "@/features/stock-transfers/hooks/use-indent-mutations";
 import { previewPartsRequest } from "../api/stock-taking.api";
 import { useCreateStockTake } from "../hooks/use-stock-taking";
-import { PART_FLAG_LABELS, fmtCurrency } from "../lib/stock-taking-format";
-import type { Basis, CandidatePart, PartSelection, StockTakeType } from "../types/stock-taking.types";
+import { AUDIT_LEVEL_LABELS, KINDS, PART_FLAG_LABELS, fmtCurrency } from "../lib/stock-taking-format";
+import type { Basis, CandidatePart, Kind, PartSelection, StockAuditLevel, StockTakeType } from "../types/stock-taking.types";
 
 const PAGE_SIZE = 50;
 
 const num = (v: string) => (v.trim() === "" || Number.isNaN(Number(v)) ? undefined : Number(v));
 
-/** Legacy Batch Creation for Physical Stock Taking: choose the parts, load them, untick any, create. */
-export function StockTakeCreateForm() {
+/**
+ * Legacy Batch Creation, for Physical Stock Taking or Stock Audit: choose the parts, load them,
+ * untick any, create. An audit names its audit type and auditors instead of annual or perpetual.
+ */
+export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
+  const k = KINDS[kind];
+  const audit = kind === "AUDIT";
   const router = useRouter();
   const create = useCreateStockTake();
   const branches = useBranchStore((s) => s.branches);
@@ -37,7 +42,9 @@ export function StockTakeCreateForm() {
   const crossBranch = isSuperAdmin || hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const { data: priceCategories = [] } = usePriceCategories();
 
-  const [type, setType] = useState<StockTakeType>("PERPETUAL");
+  const [type, setType] = useState<StockTakeType>(audit ? "AUDIT" : "PERPETUAL");
+  const [auditLevel, setAuditLevel] = useState<StockAuditLevel>("INTERNAL");
+  const [auditors, setAuditors] = useState("");
   const [branchId, setBranchId] = useState("");
   const [remarks, setRemarks] = useState("");
   const [basis, setBasis] = useState<Basis>("PART");
@@ -82,7 +89,7 @@ export function StockTakeCreateForm() {
   const stale = !!loaded && loaded.key !== key;
 
   const load = useMutation({
-    mutationFn: () => previewPartsRequest(branchId, selection),
+    mutationFn: () => previewPartsRequest(branchId, selection, kind),
     onSuccess: (parts) => {
       setLoaded({ key, selection, parts });
       // Parts already in another open count cannot join this one.
@@ -95,6 +102,7 @@ export function StockTakeCreateForm() {
 
   function validate() {
     if (!branchId) return "Select the branch";
+    if (audit && !auditors.trim()) return "Enter the auditor(s)";
     if (selection.topConsumed && !(selection.topConsumed.months >= 1 && selection.topConsumed.months <= 12)) return "Months must be from 1 to 12";
     if (selection.dealerRateFrom != null && selection.dealerRateTo != null && selection.dealerRateTo < selection.dealerRateFrom)
       return "The dealer rate 'to' cannot be less than 'from'";
@@ -153,8 +161,15 @@ export function StockTakeCreateForm() {
   function submit() {
     if (!loaded) return;
     create.mutate(
-      { branchId, type, remarks: remarks.trim() || undefined, selection: loaded.selection, excludePartIds: excluded.size ? [...excluded] : undefined },
-      { onSuccess: ({ stockTake }) => router.push(`/inventory/stock-taking/${stockTake.id}`) },
+      {
+        branchId,
+        type,
+        remarks: remarks.trim() || undefined,
+        ...(audit && { auditLevel, auditors: auditors.trim() }),
+        selection: loaded.selection,
+        excludePartIds: excluded.size ? [...excluded] : undefined,
+      },
+      { onSuccess: ({ stockTake }) => router.push(`${k.base}/${stockTake.id}`) },
     );
   }
 
@@ -175,26 +190,39 @@ export function StockTakeCreateForm() {
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
-      <Link href="/inventory/stock-taking" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-        <ArrowLeft className="size-4" /> Back to Stock Taking
+      <Link href={k.base} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <ArrowLeft className="size-4" /> Back to {k.title}
       </Link>
       <PageHeader
-        title="New stock taking batch"
-        description="Choose the parts to count, load them, untick any you want to leave out, then create the batch."
+        title={audit ? "New stock audit" : "New stock taking batch"}
+        description={`Choose the parts to ${audit ? "audit" : "count"}, load them, untick any you want to leave out, then create the ${audit ? "audit" : "batch"}.`}
       />
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="grid gap-4 lg:grid-cols-3">
-          <Field label="Stock taking">
-            <div className="flex flex-wrap gap-4 pt-2 text-sm text-slate-700">
-              {(["PERPETUAL", "ANNUAL"] as const).map((t) => (
-                <label key={t} className="flex items-center gap-2">
-                  <input type="radio" className="size-4" checked={type === t} onChange={() => setType(t)} />
-                  {t === "PERPETUAL" ? "Perpetual" : "Annual"}
-                </label>
-              ))}
-            </div>
-          </Field>
+          {audit ? (
+            <Field label="Stock audit">
+              <div className="flex flex-col gap-2 pt-2 text-sm text-slate-700">
+                {(Object.keys(AUDIT_LEVEL_LABELS) as StockAuditLevel[]).map((level) => (
+                  <label key={level} className="flex items-center gap-2">
+                    <input type="radio" className="size-4" checked={auditLevel === level} onChange={() => setAuditLevel(level)} />
+                    {AUDIT_LEVEL_LABELS[level]}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          ) : (
+            <Field label="Stock taking">
+              <div className="flex flex-wrap gap-4 pt-2 text-sm text-slate-700">
+                {(["PERPETUAL", "ANNUAL"] as const).map((t) => (
+                  <label key={t} className="flex items-center gap-2">
+                    <input type="radio" className="size-4" checked={type === t} onChange={() => setType(t)} />
+                    {t === "PERPETUAL" ? "Perpetual" : "Annual"}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
           <Field label="Branch">
             {crossBranch ? (
               <select className={inputCls} value={branchId} disabled={!!loaded} onChange={(e) => setBranchId(e.target.value)}>
@@ -214,7 +242,24 @@ export function StockTakeCreateForm() {
           <Field label="Remarks (optional)">
             <input className={inputCls} maxLength={500} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
           </Field>
+          {audit && (
+            <Field label="Auditor(s)">
+              <input
+                className={inputCls}
+                maxLength={200}
+                value={auditors}
+                onChange={(e) => setAuditors(e.target.value)}
+                placeholder="e.g. Victoria, Fatimah"
+              />
+            </Field>
+          )}
         </div>
+        {audit && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Stock keeps moving during an audit, and parts in a physical count can be audited too. Auditors count blind. The audit reports
+            shortage and excess; it does not adjust stock.
+          </p>
+        )}
         {type === "ANNUAL" && (
           <p className="mt-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
@@ -306,7 +351,7 @@ export function StockTakeCreateForm() {
             <RotateCcw className="size-4" /> Refresh selection
           </Button>
           {error && branchId && <p className="text-sm text-red-500">{error}</p>}
-          {stale && <p className="text-sm text-amber-700">The selection has changed. Load the parts again before creating the batch.</p>}
+          {stale && <p className="text-sm text-amber-700">The selection has changed. Load the parts again before creating the {audit ? "audit" : "batch"}.</p>}
         </div>
       </div>
 
@@ -348,14 +393,14 @@ export function StockTakeCreateForm() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <p className="text-sm text-slate-600">
-          {loaded ? `${chosen} part(s) will be counted` : "Load the parts to see what will be counted."}
+          {loaded ? `${chosen} part(s) will be ${audit ? "audited" : "counted"}` : `Load the parts to see what will be ${audit ? "audited" : "counted"}.`}
         </p>
         <Button
           type="button"
           disabled={!loaded || stale || chosen === 0 || create.isPending}
           onClick={() => (type === "ANNUAL" ? setAttention(true) : submit())}
         >
-          {create.isPending ? "Creating…" : "Create batch"}
+          {create.isPending ? "Creating…" : audit ? "Create audit" : "Create batch"}
         </Button>
       </div>
 

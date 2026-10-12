@@ -8,6 +8,7 @@ import type {
   CountSheet,
   CreateSheetPayload,
   CreateStockTakePayload,
+  Kind,
   LineFilter,
   LinePage,
   Movement,
@@ -50,11 +51,11 @@ export async function getCheckersRequest(branchId: string) {
   return (await apiGet<{ checkers: Checker[] }>(`${BASE}/checkers${qs({ branchId })}`)).checkers;
 }
 
-export async function previewPartsRequest(branchId: string, selection: PartSelection) {
-  return (await apiPost<{ parts: CandidatePart[] }>(`${BASE}/preview`, { branchId, selection })).parts;
+export async function previewPartsRequest(branchId: string, selection: PartSelection, kind: Kind) {
+  return (await apiPost<{ parts: CandidatePart[] }>(`${BASE}/preview`, { branchId, selection, kind })).parts;
 }
 
-export type StockTakeFilters = { status?: StockTakeStatus; type?: StockTakeType; search?: string };
+export type StockTakeFilters = { kind?: Kind; status?: StockTakeStatus; type?: StockTakeType; search?: string };
 
 export async function getStockTakesRequest(params: StockTakeFilters = {}) {
   return (await apiGet<{ stockTakes: StockTakeListItem[] }>(`${BASE}${qs(params)}`)).stockTakes;

@@ -126,6 +126,8 @@ export class PartsReportService {
         return this.adjustments(f);
       case "physical-stock":
         return physicalStockRows(f);
+      case "stock-audit":
+        return physicalStockRows(f, "AUDIT");
       default:
         throw new NotFoundError("Report not found");
     }

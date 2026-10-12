@@ -19,7 +19,7 @@ import {
   useRecordCounts,
   useUpdateBins,
 } from "../hooks/use-stock-taking";
-import { fmtCurrency, toCount } from "../lib/stock-taking-format";
+import { KINDS, fmtCurrency, kindOf, toCount } from "../lib/stock-taking-format";
 import type { Basis, StockTake, StockTakeLine } from "../types/stock-taking.types";
 
 type Close = { onClose: () => void };
@@ -72,11 +72,13 @@ export function NewSheetDialog({ take, onClose, onIssued }: Close & { take: Stoc
   const [to, setTo] = useState("");
   const [uncountedOnly, setUncountedOnly] = useState(true);
   const [showSystemStock, setShowSystemStock] = useState(false);
+  const audit = take.type === "AUDIT";
   return (
     <ModalFame isOpen onClose={onClose} title="Issue a count sheet">
       <div className="grid gap-4">
         <p className="text-sm text-slate-600">
           The sheet lists the parts for one checker to count. Parts already on another open sheet are left out.
+          {audit && " Audit sheets never show system stock."}
         </p>
         <Field label="Checker">
           <select className={inputCls} value={checkerId} onChange={(e) => setCheckerId(e.target.value)}>
@@ -108,10 +110,12 @@ export function NewSheetDialog({ take, onClose, onIssued }: Close & { take: Stoc
           <input type="checkbox" className="size-4" checked={uncountedOnly} onChange={(e) => setUncountedOnly(e.target.checked)} />
           Only parts not counted yet
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" className="size-4" checked={showSystemStock} onChange={(e) => setShowSystemStock(e.target.checked)} />
-          Show system stock to the checker
-        </label>
+        {!audit && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="size-4" checked={showSystemStock} onChange={(e) => setShowSystemStock(e.target.checked)} />
+            Show system stock to the checker
+          </label>
+        )}
         <Actions onClose={onClose}>
           <Button
             disabled={!checkerId || create.isPending}
@@ -262,9 +266,12 @@ export function CompleteDialog({ take, onClose }: Close & { take: StockTake }) {
   const { uncounted, unknown } = take.summary;
   const [rule, setRule] = useState<"ZERO" | "REMOVE">("ZERO");
   return (
-    <ModalFame isOpen onClose={onClose} title={`Complete stock taking ${take.batchNumber}`}>
+    <ModalFame isOpen onClose={onClose} title={`Complete ${KINDS[kindOf(take.type)].noun} ${take.batchNumber}`}>
       <div className="grid gap-4 text-sm text-slate-700">
-        <p>No more counts can be uploaded or corrected once the count is completed.{take.type === "ANNUAL" && " The stock of its parts is free to move again."}</p>
+        <p>
+          No more counts can be uploaded or corrected once the count is completed.{take.type === "ANNUAL" && " The stock of its parts is free to move again."}
+          {take.type === "AUDIT" && " The audit is then final: its shortage and excess are reported, and stock is not adjusted."}
+        </p>
         {unknown > 0 && (
           <p className="rounded-lg bg-red-50 p-3 text-red-700">
             {unknown} counted part number(s) are not in Part Master. Create them in Part Master, or mark them not required, first.

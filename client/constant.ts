@@ -1,5 +1,5 @@
 import { NavGroup, NavItem } from "./type";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
 //icons
 import {
@@ -32,6 +32,7 @@ import {
   FileBarChart,
   Undo2,
   ClipboardCheck,
+  FileSearch,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ export const NAV_GROUPS: NavGroup[] = [
       INVENTORY_PERMISSIONS.TRANSFER_READ,
       PART_SALE_PERMISSIONS.READ,
       STOCK_TAKE_PERMISSIONS.READ,
+      STOCK_AUDIT_PERMISSIONS.READ,
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
     ],
@@ -170,6 +172,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [STOCK_TAKE_PERMISSIONS.READ],
       },
       {
+        label: "Stock Audit",
+        href: "/inventory/stock-audit",
+        icon: FileSearch,
+        permissions: [STOCK_AUDIT_PERMISSIONS.READ],
+      },
+      {
         label: "Part Sale",
         href: "/part-sale/orders",
         icon: ShoppingCart,
@@ -185,7 +193,13 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/parts-reports",
         icon: FileBarChart,
         // Counter-sale, transfer and stock registers; each report checks its own permission.
-        permissions: [PART_SALE_PERMISSIONS.READ, INVENTORY_PERMISSIONS.TRANSFER_READ, INVENTORY_PERMISSIONS.STOCK_READ, STOCK_TAKE_PERMISSIONS.READ],
+        permissions: [
+          PART_SALE_PERMISSIONS.READ,
+          INVENTORY_PERMISSIONS.TRANSFER_READ,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+          STOCK_TAKE_PERMISSIONS.READ,
+          STOCK_AUDIT_PERMISSIONS.READ,
+        ],
       },
       {
         label: "Transfers",

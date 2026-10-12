@@ -25,7 +25,14 @@ import {
   type LineQuery,
   type StockTakeFilters,
 } from "../api/stock-taking.api";
-import type { CountEntry, CreateSheetPayload, CreateStockTakePayload } from "../types/stock-taking.types";
+import { KINDS, kindOf } from "../lib/stock-taking-format";
+import type { CountEntry, CreateSheetPayload, CreateStockTakePayload, StockTake } from "../types/stock-taking.types";
+
+/** "Stock taking 2026000001" or "Stock audit 2026000002". */
+const named = (take: Pick<StockTake, "type" | "batchNumber">) => {
+  const noun = KINDS[kindOf(take.type)].noun;
+  return `${noun[0].toUpperCase()}${noun.slice(1)} ${take.batchNumber}`;
+};
 
 export function useStockTakes(params: StockTakeFilters = {}) {
   return useQuery({ queryKey: stockTakeKeys.list(params), queryFn: () => getStockTakesRequest(params), placeholderData: keepPreviousData });
@@ -85,13 +92,13 @@ export function useCreateStockTake() {
   return useStockTakeMutation(
     (payload: CreateStockTakePayload) => createStockTakeRequest(payload),
     ({ stockTake, skipped }) =>
-      `Stock taking ${stockTake.batchNumber} created with ${stockTake.summary.lines} part(s)${skipped ? `; ${skipped} already in another open count were left out` : ""}`,
+      `${named(stockTake)} created with ${stockTake.summary.lines} part(s)${skipped ? `; ${skipped} already in another open count were left out` : ""}`,
     "Failed to create the stock taking",
   );
 }
 
 export function useCancelStockTake(id: string) {
-  return useStockTakeMutation((remark: string) => cancelStockTakeRequest(id, remark), "Stock taking cancelled", "Failed to cancel the stock taking");
+  return useStockTakeMutation((remark: string) => cancelStockTakeRequest(id, remark), (take) => `${named(take)} cancelled`, "Failed to cancel");
 }
 
 export function useCreateSheet(id: string) {
@@ -142,8 +149,8 @@ export function useSetNotRequired(id: string) {
 export function useCompleteStockTake(id: string) {
   return useStockTakeMutation(
     (uncounted?: "ZERO" | "REMOVE") => completeStockTakeRequest(id, uncounted),
-    "Stock taking completed",
-    "Failed to complete the stock taking",
+    (take) => `${named(take)} completed`,
+    "Failed to complete",
   );
 }
 

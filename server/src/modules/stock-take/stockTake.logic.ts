@@ -8,6 +8,14 @@ import { money } from "../finance/money";
 /** How batch parts and sheet parts are chosen: by part number or by bin location (legacy radio buttons). */
 export type Basis = "PART" | "BIN";
 
+/**
+ * Physical counts (annual, perpetual) or stock audits (legacy TranType P and S). An audit is counted
+ * the same way but only reports: it never adjusts stock or bins and never holds parts against a
+ * physical count.
+ */
+export type Kind = "COUNT" | "AUDIT";
+export const kindOf = (type: string): Kind => (type === "AUDIT" ? "AUDIT" : "COUNT");
+
 /** What happens to parts left blank on an uploaded sheet: counted as none, or back to the pool. */
 export type UncountedOnSheet = "ZERO" | "RELEASE";
 

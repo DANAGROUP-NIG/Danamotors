@@ -3160,6 +3160,16 @@ model CounterSaleReturnLine {
 enum StockTakeType {
   ANNUAL
   PERPETUAL
+  // Legacy Stock Audit (PSTBatchHead TranType S): counted like a perpetual count, but it only
+  // reports shortage and excess; it never adjusts stock or bins.
+  AUDIT
+}
+
+// Legacy Stock Audit menu (PSTType 1, 2, 3).
+enum StockAuditLevel {
+  INTERNAL
+  AUDIT_HEAD
+  VISITING_MANAGEMENT
 }
 
 // Legacy PSTBatchHead / PhysicalStockHead status: A active, M completed, L closed, C cancelled.
@@ -3181,6 +3191,10 @@ model StockTake {
   type        StockTakeType
   status      StockTakeStatus @default(ACTIVE)
   remarks     String?
+  // Stock audits only: who audited (legacy Auditormast). Free text, as visiting management
+  // may have no login here.
+  auditLevel  StockAuditLevel?
+  auditors    String?
 
   createdById   String?
   createdBy     User?     @relation("StockTakeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)

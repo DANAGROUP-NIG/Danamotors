@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { StockTakeStatus, StockTakeType } from "@prisma/client";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
+import { ForbiddenError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
+import { Kind, kindOf } from "./stockTake.logic";
 import { LineFilters, StockTakeService } from "./stockTake.service";
 
 const handle =
@@ -26,6 +28,20 @@ function scope(req: Request): string | undefined {
   return req.user!.branchId ?? undefined;
 }
 
+const KIND_PERMISSIONS = {
+  COUNT: { read: PERMISSIONS.STOCK_TAKE_READ, manage: PERMISSIONS.STOCK_TAKE_MANAGE, name: "physical stock taking" },
+  AUDIT: { read: PERMISSIONS.STOCK_AUDIT_READ, manage: PERMISSIONS.STOCK_AUDIT_MANAGE, name: "stock audits" },
+} as const;
+
+/** Physical counts need stocktake:*, stock audits stockaudit:*. */
+function allow(req: Request, kind: Kind, level: "read" | "manage") {
+  if (req.user?.role === ROLES.SUPER_ADMIN) return;
+  const p = KIND_PERMISSIONS[kind];
+  if (!req.user?.permissions.includes(p[level])) {
+    throw new ForbiddenError(`You do not have permission to ${level === "read" ? "view" : "manage"} ${p.name}`);
+  }
+}
+
 export class StockTakeController {
   private service = new StockTakeService();
 
@@ -42,37 +58,42 @@ export class StockTakeController {
   });
 
   previewParts = handle(async (req, res) => {
+    const kind: Kind = req.body.kind ?? "COUNT";
+    allow(req, kind, "manage");
     assertInventoryBranchAccess(req, [req.body.branchId]);
-    ok(res, { parts: await this.service.previewParts(req.body.branchId, req.body.selection) });
+    ok(res, { parts: await this.service.previewParts(req.body.branchId, req.body.selection, kind) });
   });
 
   // ── Batches ──
 
   createStockTake = handle(async (req, res) => {
+    const kind = kindOf(req.body.type);
+    allow(req, kind, "manage");
     assertInventoryBranchAccess(req, [req.body.branchId]);
     const { stockTake, skipped } = await this.service.createStockTake(req.body, req.user!.userId);
     const note = skipped ? ` (${skipped} part(s) already in another open count were left out)` : "";
-    ok(res, { stockTake, skipped }, `Stock taking ${stockTake.batchNumber} created with ${stockTake.summary.lines} part(s)${note}`, 201);
+    const what = kind === "AUDIT" ? "Stock audit" : "Stock taking";
+    ok(res, { stockTake, skipped }, `${what} ${stockTake.batchNumber} created with ${stockTake.summary.lines} part(s)${note}`, 201);
   });
 
   listStockTakes = handle(async (req, res) => {
-    const q = req.query as { status?: StockTakeStatus; type?: StockTakeType; search?: string };
+    const q = req.query as { kind?: Kind; status?: StockTakeStatus; type?: StockTakeType; search?: string };
+    allow(req, q.kind ?? "COUNT", "read");
     ok(res, { stockTakes: await this.service.listStockTakes({ branchId: scope(req), ...q }) });
   });
 
   getStockTake = handle(async (req, res) => {
-    const stockTake = await this.service.getStockTake(req.params.id);
-    assertInventoryBranchAccess(req, [stockTake.branchId]);
-    ok(res, { stockTake });
+    await this.access(req, "read");
+    ok(res, { stockTake: await this.service.getStockTake(req.params.id) });
   });
 
   listLines = handle(async (req, res) => {
-    await this.access(req);
+    await this.access(req, "read");
     ok(res, await this.service.listLines(req.params.id, req.query as LineFilters));
   });
 
   listMovements = handle(async (req, res) => {
-    await this.access(req);
+    await this.access(req, "read");
     ok(res, { movements: await this.service.listMovements(req.params.id) });
   });
 
@@ -90,7 +111,7 @@ export class StockTakeController {
   });
 
   getSheet = handle(async (req, res) => {
-    await this.access(req);
+    await this.access(req, "read");
     ok(res, { sheet: await this.service.getSheet(req.params.id, req.params.sheetId) });
   });
 
@@ -134,7 +155,7 @@ export class StockTakeController {
   });
 
   binProposals = handle(async (req, res) => {
-    await this.access(req);
+    await this.access(req, "read");
     ok(res, { bins: await this.service.binProposals(req.params.id) });
   });
 
@@ -144,7 +165,10 @@ export class StockTakeController {
     ok(res, result, `${result.updated} bin location(s) updated`);
   });
 
-  private async access(req: Request) {
-    assertInventoryBranchAccess(req, [await this.service.branchOf(req.params.id)]);
+  /** The user's branch and permission for this count's kind (manage unless said otherwise). */
+  private async access(req: Request, level: "read" | "manage" = "manage") {
+    const take = await this.service.accessOf(req.params.id);
+    allow(req, kindOf(take.type), level);
+    assertInventoryBranchAccess(req, [take.branchId]);
   }
 }

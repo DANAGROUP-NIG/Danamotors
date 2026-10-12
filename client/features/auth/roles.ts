@@ -74,6 +74,12 @@ export const STOCK_TAKE_PERMISSIONS = {
   CONFIRM: "stocktake:confirm",
 } as const;
 
+// Stock audit: report only, kept apart so a branch store cannot audit itself.
+export const STOCK_AUDIT_PERMISSIONS = {
+  READ: "stockaudit:read",
+  MANAGE: "stockaudit:manage",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

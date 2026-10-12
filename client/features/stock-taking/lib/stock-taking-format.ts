@@ -1,5 +1,6 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import type { CountSheet, StockTakeStatus, StockTakeType } from "../types/stock-taking.types";
+import { STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS } from "@/features/auth/roles";
+import type { CountSheet, Kind, StockAuditLevel, StockTakeStatus, StockTakeType } from "../types/stock-taking.types";
 
 export { fmtCurrency, fmtDate, fmtDateTime } from "@/features/stock-transfers/lib/indent-status";
 
@@ -21,7 +22,39 @@ export const STATUS_TONES: Record<StockTakeStatus, StatusTone> = {
 export const TYPE_LABELS: Record<StockTakeType, string> = {
   ANNUAL: "Annual",
   PERPETUAL: "Perpetual",
+  AUDIT: "Audit",
 };
+
+// Legacy Stock Audit menu (PSTType 1, 2, 3).
+export const AUDIT_LEVEL_LABELS: Record<StockAuditLevel, string> = {
+  INTERNAL: "Internal audit",
+  AUDIT_HEAD: "Audit by audit head",
+  VISITING_MANAGEMENT: "Audit by visiting management",
+};
+
+/**
+ * Physical stock taking and stock audit share every screen (legacy Batch Creation serves both);
+ * this is what differs. An audit is counted the same way but completing it is final: no S/E
+ * confirmation, no bin update, and its sheets never show system stock.
+ */
+export const KINDS = {
+  COUNT: {
+    title: "Stock Taking",
+    noun: "stock taking",
+    base: "/inventory/stock-taking",
+    report: "physical-stock",
+    permissions: STOCK_TAKE_PERMISSIONS,
+  },
+  AUDIT: {
+    title: "Stock Audit",
+    noun: "stock audit",
+    base: "/inventory/stock-audit",
+    report: "stock-audit",
+    permissions: STOCK_AUDIT_PERMISSIONS,
+  },
+} as const;
+
+export const kindOf = (type: StockTakeType): Kind => (type === "AUDIT" ? "AUDIT" : "COUNT");
 
 // Legacy "Source of Purchase" (part flag).
 export const PART_FLAG_LABELS: Record<string, string> = {

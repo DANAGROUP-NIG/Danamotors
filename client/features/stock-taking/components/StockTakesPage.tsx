@@ -13,10 +13,9 @@ import { DataTableFilterChips } from "@/components/ui/table-components/DataTable
 import { DataTableRowActions } from "@/components/ui/table-components/DataTableRowActions";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { STOCK_TAKE_PERMISSIONS } from "@/features/auth/roles";
 import { useStockTakes } from "../hooks/use-stock-taking";
-import { STATUS_LABELS, STATUS_TONES, TYPE_LABELS, fmtDate, userName } from "../lib/stock-taking-format";
-import type { StockTakeListItem, StockTakeStatus } from "../types/stock-taking.types";
+import { AUDIT_LEVEL_LABELS, KINDS, STATUS_LABELS, STATUS_TONES, TYPE_LABELS, fmtDate, userName } from "../lib/stock-taking-format";
+import type { Kind, StockTakeListItem, StockTakeStatus } from "../types/stock-taking.types";
 
 const PAGE_SIZE = 10;
 const FILTERS = [
@@ -26,17 +25,22 @@ const FILTERS = [
   { label: "S/E confirmed", value: "CONFIRMED" },
   { label: "Cancelled", value: "CANCELLED" },
 ];
+// A completed audit is final; it is never S/E confirmed.
+const AUDIT_FILTERS = FILTERS.filter((f) => f.value !== "CONFIRMED");
 
-/** Physical stock taking batches (legacy Batch Creation for Physical Stock Taking and its documents). */
-export function StockTakesPage() {
+/** Stock taking batches or stock audits (legacy Batch Creation for Physical Stock Taking / Stock Audit and their documents). */
+export function StockTakesPage({ kind = "COUNT" }: { kind?: Kind }) {
   const router = useRouter();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission(STOCK_TAKE_PERMISSIONS.MANAGE);
+  const k = KINDS[kind];
+  const audit = kind === "AUDIT";
+  const canManage = hasPermission(k.permissions.MANAGE);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [committed, setCommitted] = useState("");
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError } = useStockTakes({
+    kind,
     status: (status || undefined) as StockTakeStatus | undefined,
     search: committed || undefined,
   });
@@ -48,12 +52,14 @@ export function StockTakesPage() {
     {
       header: "Batch #",
       render: (t) => (
-        <Link href={`/inventory/stock-taking/${t.id}`} className="font-mono text-sm font-medium hover:underline">
+        <Link href={`${k.base}/${t.id}`} className="font-mono text-sm font-medium hover:underline">
           {t.batchNumber}
         </Link>
       ),
     },
-    { header: "Type", render: (t) => TYPE_LABELS[t.type] },
+    audit
+      ? { header: "Audit", render: (t) => (t.auditLevel ? AUDIT_LEVEL_LABELS[t.auditLevel] : "—") }
+      : { header: "Type", render: (t) => TYPE_LABELS[t.type] },
     { header: "Branch", render: (t) => <span className="text-muted-foreground">{t.branch.name}</span> },
     { header: "Date", className: "whitespace-nowrap", render: (t) => <span className="text-muted-foreground">{fmtDate(t.createdAt)}</span> },
     {
@@ -64,7 +70,9 @@ export function StockTakesPage() {
         </span>
       ),
     },
-    { header: "Created by", render: (t) => <span className="text-muted-foreground">{userName(t.createdBy) || "—"}</span> },
+    audit
+      ? { header: "Auditors", render: (t) => <span className="text-muted-foreground">{t.auditors || "—"}</span> }
+      : { header: "Created by", render: (t) => <span className="text-muted-foreground">{userName(t.createdBy) || "—"}</span> },
     { header: "Status", render: (t) => <StatusBadge status={STATUS_LABELS[t.status]} tone={STATUS_TONES[t.status]} /> },
     {
       header: "Actions",
@@ -73,7 +81,7 @@ export function StockTakesPage() {
       render: (t) => (
         <DataTableRowActions
           item={t}
-          actions={[{ id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/stock-taking/${t.id}`) }]}
+          actions={[{ id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`${k.base}/${t.id}`) }]}
         />
       ),
     },
@@ -82,14 +90,18 @@ export function StockTakesPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
-        title="Stock Taking"
-        description="Physical stock taking, annual or perpetual. Issue count sheets to checkers, compare the count with system stock, then confirm the shortage and excess."
+        title={k.title}
+        description={
+          audit
+            ? "Internal audit, audit by audit head or by visiting management. Auditors count blind; the audit reports shortage and excess against system stock and never adjusts it."
+            : "Physical stock taking, annual or perpetual. Issue count sheets to checkers, compare the count with system stock, then confirm the shortage and excess."
+        }
         actions={
           canManage && (
             <Button asChild size="sm" className="gap-1.5">
-              <Link href="/inventory/stock-taking/new">
+              <Link href={`${k.base}/new`}>
                 <Plus className="size-4" />
-                New batch
+                {audit ? "New audit" : "New batch"}
               </Link>
             </Button>
           )
@@ -98,7 +110,7 @@ export function StockTakesPage() {
 
       {isError ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load stock takings.</CardContent>
+          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load {audit ? "stock audits" : "stock takings"}.</CardContent>
         </Card>
       ) : (
         <DataTable
@@ -106,7 +118,13 @@ export function StockTakesPage() {
           data={paged}
           isLoading={isLoading}
           isFetching={isFetching}
-          emptyMessage={committed || status ? "No stock takings match." : "No stock takings yet. Use New batch to start one."}
+          emptyMessage={
+            committed || status
+              ? `No ${audit ? "stock audits" : "stock takings"} match.`
+              : audit
+                ? "No stock audits yet. Use New audit to start one."
+                : "No stock takings yet. Use New batch to start one."
+          }
           rowKey={(t) => t.id}
           page={page}
           pageSize={PAGE_SIZE}
@@ -129,7 +147,7 @@ export function StockTakesPage() {
             placeholder="Search by batch #, sheet # or part number…"
             filters={
               <DataTableFilterChips
-                options={FILTERS}
+                options={audit ? AUDIT_FILTERS : FILTERS}
                 selected={status}
                 onChange={(v) => {
                   setStatus(v);

@@ -15,6 +15,8 @@ import { STOCK_TAKE_PERMISSIONS } from "@/features/auth/roles";
 import { DetailField } from "@/features/part-sale/components/OrderDetail";
 import { useCancelSheet, useCancelStockTake, useSetNotRequired, useStockTake, useStockTakeLines, useStockTakeMovements } from "../hooks/use-stock-taking";
 import {
+  AUDIT_LEVEL_LABELS,
+  KINDS,
   MOVEMENT_LABELS,
   STATUS_LABELS,
   STATUS_TONES,
@@ -23,12 +25,13 @@ import {
   fmtDate,
   fmtDateTime,
   fmtDiff,
+  kindOf,
   sheetIsOpen,
   sheetStatus,
   userName,
 } from "../lib/stock-taking-format";
 import { AddCountDialog, BinUpdateDialog, CompleteDialog, ConfirmDialog, CorrectLineDialog, NewSheetDialog, RemarkDialog } from "./StockTakeDialogs";
-import type { CountSheet, LineFilter, StockTakeLine } from "../types/stock-taking.types";
+import type { CountSheet, Kind, LineFilter, StockTakeLine } from "../types/stock-taking.types";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -62,8 +65,11 @@ function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNo
   );
 }
 
-/** One stock taking (legacy Upload Physical Stock Data, Upload/Download Status, S/E Confirmation). */
-export function StockTakeDetail({ id }: { id: string }) {
+/**
+ * One stock taking (legacy Upload Physical Stock Data, Upload/Download Status, S/E Confirmation), or
+ * one stock audit, which stops at Complete.
+ */
+export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kind }) {
   const router = useRouter();
   const { data: take, isLoading, error } = useStockTake(id);
   const { hasPermission } = useAuth();
@@ -91,20 +97,24 @@ export function StockTakeDetail({ id }: { id: string }) {
   if (error || !take) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href="/inventory/stock-taking" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft className="size-4" /> Back to Stock Taking
+        <Link href={KINDS[kind].base} className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to {KINDS[kind].title}
         </Link>
-        <p className="text-sm text-red-500">Stock taking not found, or you do not have access to it.</p>
+        <p className="text-sm text-red-500">{KINDS[kind].title} not found, or you do not have access to it.</p>
       </div>
     );
   }
 
+  const k = KINDS[kindOf(take.type)];
+  const audit = take.type === "AUDIT";
   const s = take.summary;
   const active = take.status === "ACTIVE";
-  const canManage = hasPermission(STOCK_TAKE_PERMISSIONS.MANAGE);
-  const canConfirm = take.status === "COMPLETED" && hasPermission(STOCK_TAKE_PERMISSIONS.CONFIRM);
-  const canBins = canManage && (take.status === "COMPLETED" || take.status === "CONFIRMED") && !take.binsUpdatedAt;
-  const reportHref = `/parts-reports/physical-stock?search=${take.batchNumber}&branchId=${take.branchId}`;
+  const canManage = hasPermission(k.permissions.MANAGE);
+  // An audit only reports: no S/E confirmation or bin update, and once completed it is final.
+  const canConfirm = !audit && take.status === "COMPLETED" && hasPermission(STOCK_TAKE_PERMISSIONS.CONFIRM);
+  const canBins = !audit && canManage && (take.status === "COMPLETED" || take.status === "CONFIRMED") && !take.binsUpdatedAt;
+  const canCancel = canManage && (active || (!audit && take.status === "COMPLETED"));
+  const reportHref = `/parts-reports/${k.report}?search=${take.batchNumber}&branchId=${take.branchId}`;
 
   const columns: Column<StockTakeLine>[] = [
     {
@@ -190,8 +200,8 @@ export function StockTakeDetail({ id }: { id: string }) {
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href="/inventory/stock-taking" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft className="size-4" /> Back to Stock Taking
+        <Link href={k.base} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to {k.title}
         </Link>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.print()}>
@@ -202,7 +212,7 @@ export function StockTakeDetail({ id }: { id: string }) {
               <FileBarChart className="size-4" /> Report
             </Link>
           </Button>
-          {canManage && (take.status === "ACTIVE" || take.status === "COMPLETED") && (
+          {canCancel && (
             <Button size="sm" variant="outline" className="gap-1.5 text-red-600" onClick={() => setDialog("cancel")}>
               <Ban className="size-4" /> Cancel
             </Button>
@@ -238,7 +248,7 @@ export function StockTakeDetail({ id }: { id: string }) {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
-                {TYPE_LABELS[take.type]} stock taking · {take.branch.name}
+                {audit && take.auditLevel ? AUDIT_LEVEL_LABELS[take.auditLevel] : `${TYPE_LABELS[take.type]} stock taking`} · {take.branch.name}
               </p>
               <h1 className="font-mono text-xl font-semibold text-slate-800">{take.batchNumber}</h1>
             </div>
@@ -247,8 +257,11 @@ export function StockTakeDetail({ id }: { id: string }) {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Batch date" value={fmtDateTime(take.createdAt)} />
             <DetailField label="Created by" value={userName(take.createdBy) || null} />
+            {audit && <DetailField label="Auditors" value={take.auditors} />}
             <DetailField label="Completed" value={take.completedAt && `${fmtDateTime(take.completedAt)} · ${userName(take.completedBy)}`} />
-            <DetailField label="S/E confirmed" value={take.confirmedAt && `${fmtDateTime(take.confirmedAt)} · ${userName(take.confirmedBy)}`} />
+            {!audit && (
+              <DetailField label="S/E confirmed" value={take.confirmedAt && `${fmtDateTime(take.confirmedAt)} · ${userName(take.confirmedBy)}`} />
+            )}
             {take.binsUpdatedAt && <DetailField label="Bins updated" value={fmtDateTime(take.binsUpdatedAt)} />}
             {take.remarks && <DetailField wide label="Remarks" value={take.remarks} />}
             {take.cancelRemark && (
@@ -258,6 +271,11 @@ export function StockTakeDetail({ id }: { id: string }) {
           {active && take.type === "ANNUAL" && (
             <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 print:hidden">
               Stock of the parts in this count cannot move at {take.branch.name} until the count is completed.
+            </p>
+          )}
+          {audit && (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 print:hidden">
+              This audit reports shortage and excess against system stock when each part was counted. It does not adjust stock or bins.
             </p>
           )}
         </div>
@@ -299,7 +317,7 @@ export function StockTakeDetail({ id }: { id: string }) {
                     return (
                       <tr key={sheet.id} className="border-t border-slate-100">
                         <td className={cn(tdCls, "font-mono font-medium")}>
-                          <Link href={`/inventory/stock-taking/${take.id}/sheets/${sheet.id}`} className="hover:underline">
+                          <Link href={`${k.base}/${take.id}/sheets/${sheet.id}`} className="hover:underline">
                             {sheet.sheetNumber}
                           </Link>
                         </td>
@@ -316,7 +334,7 @@ export function StockTakeDetail({ id }: { id: string }) {
                           {active && canManage && sheetIsOpen(sheet) && (
                             <div className="flex justify-end gap-1">
                               <Button asChild size="sm" variant="outline">
-                                <Link href={`/inventory/stock-taking/${take.id}/sheets/${sheet.id}`}>Enter counts</Link>
+                                <Link href={`${k.base}/${take.id}/sheets/${sheet.id}`}>Enter counts</Link>
                               </Button>
                               <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setCancellingSheet(sheet)}>
                                 Cancel
@@ -417,7 +435,7 @@ export function StockTakeDetail({ id }: { id: string }) {
       </div>
 
       {dialog === "sheet" && (
-        <NewSheetDialog take={take} onClose={() => setDialog(null)} onIssued={(sheetId) => router.push(`/inventory/stock-taking/${take.id}/sheets/${sheetId}`)} />
+        <NewSheetDialog take={take} onClose={() => setDialog(null)} onIssued={(sheetId) => router.push(`${k.base}/${take.id}/sheets/${sheetId}`)} />
       )}
       {dialog === "count" && <AddCountDialog take={take} onClose={() => setDialog(null)} />}
       {dialog === "complete" && <CompleteDialog take={take} onClose={() => setDialog(null)} />}
@@ -425,9 +443,9 @@ export function StockTakeDetail({ id }: { id: string }) {
       {dialog === "bins" && <BinUpdateDialog take={take} onClose={() => setDialog(null)} />}
       {dialog === "cancel" && (
         <RemarkDialog
-          title={`Cancel stock taking ${take.batchNumber}`}
-          description={`Counts recorded so far are discarded and stock is not adjusted.${take.type === "ANNUAL" && active ? " The stock of its parts is free to move again." : ""}`}
-          action="Cancel stock taking"
+          title={`Cancel ${k.noun} ${take.batchNumber}`}
+          description={`Counts recorded so far are discarded${audit ? "" : " and stock is not adjusted"}.${take.type === "ANNUAL" && active ? " The stock of its parts is free to move again." : ""}`}
+          action={`Cancel ${k.noun}`}
           pending={cancel.isPending}
           onSubmit={(remark) => cancel.mutate(remark, { onSuccess: () => setDialog(null) })}
           onClose={() => setDialog(null)}

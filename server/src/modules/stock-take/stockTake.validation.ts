@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { StockTakeStatus, StockTakeType } from "@prisma/client";
+import { StockAuditLevel, StockTakeStatus, StockTakeType } from "@prisma/client";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
@@ -40,22 +40,35 @@ const selection = z
     path: ["dealerRateTo"],
   });
 
+/** Physical counts (annual, perpetual) or stock audits; each has its own permissions. */
+const kind = z.enum(["COUNT", "AUDIT"]);
+
 export const previewSchema = z.object({
-  body: z.object({ branchId: uuid("branch ID"), selection }),
+  body: z.object({ branchId: uuid("branch ID"), selection, kind: kind.optional() }),
 });
 
 export const createStockTakeSchema = z.object({
-  body: z.object({
-    branchId: uuid("branch ID"),
-    type: z.nativeEnum(StockTakeType),
-    remarks: optionalText(500),
-    selection,
-    excludePartIds: z.array(uuid("part ID")).max(100_000).optional(),
-  }),
+  body: z
+    .object({
+      branchId: uuid("branch ID"),
+      type: z.nativeEnum(StockTakeType),
+      remarks: optionalText(500),
+      auditLevel: z.nativeEnum(StockAuditLevel).optional(),
+      auditors: optionalText(200),
+      selection,
+      excludePartIds: z.array(uuid("part ID")).max(100_000).optional(),
+    })
+    .refine((b) => b.type !== StockTakeType.AUDIT || b.auditLevel, { message: "Select the audit type", path: ["auditLevel"] })
+    .refine((b) => b.type !== StockTakeType.AUDIT || b.auditors, { message: "Enter the auditor(s)", path: ["auditors"] })
+    .refine((b) => b.type === StockTakeType.AUDIT || (!b.auditLevel && !b.auditors), {
+      message: "Audit type and auditors apply to stock audits only",
+      path: ["auditLevel"],
+    }),
 });
 
 export const listStockTakesSchema = z.object({
   query: z.object({
+    kind: kind.optional(),
     status: z.nativeEnum(StockTakeStatus).optional(),
     type: z.nativeEnum(StockTakeType).optional(),
     search: z.string().trim().max(50).optional(),

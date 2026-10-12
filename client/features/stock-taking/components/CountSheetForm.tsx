@@ -10,13 +10,12 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { STOCK_TAKE_PERMISSIONS } from "@/features/auth/roles";
 import { DetailField } from "@/features/part-sale/components/OrderDetail";
 import { PartPicker, type PartSearchQuery } from "@/features/stock-transfers/components/PartPicker";
 import { searchStockTakePartsRequest, stockTakeKeys } from "../api/stock-taking.api";
 import { useCountSheet, useUploadSheet } from "../hooks/use-stock-taking";
-import { fmtDateTime, sheetIsOpen, sheetStatus, toCount, userName } from "../lib/stock-taking-format";
-import type { CountEntry } from "../types/stock-taking.types";
+import { KINDS, fmtDateTime, kindOf, sheetIsOpen, sheetStatus, toCount, userName } from "../lib/stock-taking-format";
+import type { CountEntry, Kind } from "../types/stock-taking.types";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -31,7 +30,7 @@ const blank = (e?: Partial<Entry>) => !e || (!e.qty?.trim() && !e.damaged?.trim(
  * Count entry for one sheet: the stand-in for the handheld (HHDC) until it is integrated. The device
  * will upload the same entries: one per part per bin.
  */
-export function CountSheetForm({ id, sheetId }: { id: string; sheetId: string }) {
+export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sheetId: string; kind?: Kind }) {
   const router = useRouter();
   const { data: sheet, isLoading, error } = useCountSheet(id, sheetId);
   const upload = useUploadSheet(id, sheetId);
@@ -60,15 +59,16 @@ export function CountSheetForm({ id, sheetId }: { id: string; sheetId: string })
   if (error || !sheet) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href={`/inventory/stock-taking/${id}`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft className="size-4" /> Back to the stock taking
+        <Link href={`${KINDS[kind].base}/${id}`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to the {KINDS[kind].noun}
         </Link>
         <p className="text-sm text-red-500">Count sheet not found, or you do not have access to it.</p>
       </div>
     );
   }
 
-  const editable = sheetIsOpen(sheet) && sheet.stockTake.status === "ACTIVE" && hasPermission(STOCK_TAKE_PERMISSIONS.MANAGE);
+  const k = KINDS[kindOf(sheet.stockTake.type)];
+  const editable = sheetIsOpen(sheet) && sheet.stockTake.status === "ACTIVE" && hasPermission(k.permissions.MANAGE);
   const status = sheetStatus(sheet);
   const entryFor = (lineId: string, bin: string | null): Entry => entries[lineId] ?? { qty: "", damaged: "", bin: bin ?? "", remarks: "" };
   const setEntry = (lineId: string, bin: string | null, patch: Partial<Entry>) =>
@@ -102,7 +102,7 @@ export function CountSheetForm({ id, sheetId }: { id: string; sheetId: string })
       ...lines.filter((l) => !blank(entries[l.id])).map((l) => toEntry(entries[l.id], l)),
       ...extras.map((x) => toEntry(x, x)),
     ];
-    upload.mutate({ entries: payload, uncounted }, { onSuccess: () => router.push(`/inventory/stock-taking/${id}`) });
+    upload.mutate({ entries: payload, uncounted }, { onSuccess: () => router.push(`${k.base}/${id}`) });
   }
 
   // Legacy "Replicate Computer Stock in Physical Qty": start from system stock and change what differs.
@@ -122,7 +122,7 @@ export function CountSheetForm({ id, sheetId }: { id: string; sheetId: string })
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href={`/inventory/stock-taking/${id}`} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href={`${k.base}/${id}`} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to {sheet.stockTake.batchNumber}
         </Link>
         <div className="flex flex-wrap gap-2">

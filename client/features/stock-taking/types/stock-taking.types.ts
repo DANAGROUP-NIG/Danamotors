@@ -1,6 +1,9 @@
-// Mirrors server/src/modules/stock-take (physical stock taking).
+// Mirrors server/src/modules/stock-take (physical stock taking and stock audit).
 
-export type StockTakeType = "ANNUAL" | "PERPETUAL";
+export type StockTakeType = "ANNUAL" | "PERPETUAL" | "AUDIT";
+/** Physical counts (annual, perpetual) or stock audits. */
+export type Kind = "COUNT" | "AUDIT";
+export type StockAuditLevel = "INTERNAL" | "AUDIT_HEAD" | "VISITING_MANAGEMENT";
 export type StockTakeStatus = "ACTIVE" | "COMPLETED" | "CONFIRMED" | "CANCELLED";
 export type Basis = "PART" | "BIN";
 export type LineFilter = "ALL" | "UNCOUNTED" | "DISCREPANCY" | "DAMAGED" | "UNKNOWN";
@@ -71,6 +74,8 @@ export type StockTakeListItem = {
   type: StockTakeType;
   status: StockTakeStatus;
   remarks: string | null;
+  auditLevel: StockAuditLevel | null;
+  auditors: string | null;
   createdAt: string;
   branch: BranchRef;
   createdBy: UserRef;
@@ -86,6 +91,8 @@ export type StockTake = {
   type: StockTakeType;
   status: StockTakeStatus;
   remarks: string | null;
+  auditLevel: StockAuditLevel | null;
+  auditors: string | null;
   createdAt: string;
   createdBy: UserRef;
   completedAt: string | null;
@@ -160,6 +167,8 @@ export type CreateStockTakePayload = {
   branchId: string;
   type: StockTakeType;
   remarks?: string;
+  auditLevel?: StockAuditLevel;
+  auditors?: string;
   selection: PartSelection;
   excludePartIds?: string[];
 };

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../../middleware/authMiddleware";
-import { requirePermission } from "../../middleware/authorize";
+import { requireAnyPermission, requirePermission } from "../../middleware/authorize";
 import { validateRequest } from "../../middleware/requestValidator";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { StockTakeController } from "./stockTake.controller";
@@ -29,8 +29,10 @@ const controller = new StockTakeController();
 
 router.use(authMiddleware);
 
-const read = requirePermission(PERMISSIONS.STOCK_TAKE_READ);
-const manage = requirePermission(PERMISSIONS.STOCK_TAKE_MANAGE);
+// Physical counts and stock audits share these routes; the controller checks the permission of the
+// count's own kind (stocktake:* or stockaudit:*).
+const read = requireAnyPermission(PERMISSIONS.STOCK_TAKE_READ, PERMISSIONS.STOCK_AUDIT_READ);
+const manage = requireAnyPermission(PERMISSIONS.STOCK_TAKE_MANAGE, PERMISSIONS.STOCK_AUDIT_MANAGE);
 const confirm = requirePermission(PERMISSIONS.STOCK_TAKE_CONFIRM);
 
 /**
@@ -45,6 +47,9 @@ const confirm = requirePermission(PERMISSIONS.STOCK_TAKE_CONFIRM);
  *       3. Correct counts, set aside unknown part numbers, then complete the count.
  *       4. Confirm shortage and excess: each part's discrepancy is posted as a stock ADJUSTMENT.
  *       5. Update the branch bin locations from where parts were found.
+ *
+ *       A stock audit (type AUDIT; legacy Internal Audit, Audit by Audit Head, Audit by Visiting Management) follows
+ *       steps 1 to 3 under the stockaudit permissions. Completing it is final: it reports shortage and excess only.
  *
  * /stock-takes/parts:
  *   get:
@@ -70,19 +75,22 @@ const confirm = requirePermission(PERMISSIONS.STOCK_TAKE_CONFIRM);
  *           example:
  *             branchId: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d
  *             selection: { basis: BIN, from: N-3A1, to: N-3Z9, onlyWithStock: true }
- *     responses: { 200: { description: Parts, flagged when already in another open count } }
+ *             kind: COUNT
+ *     responses: { 200: { description: Parts, flagged when already in another open count (never for an audit) } }
  * /stock-takes:
  *   get:
  *     tags: [Stock Taking]
- *     summary: List stock takings
+ *     summary: List stock takings, or stock audits with kind AUDIT
  *     parameters:
+ *       - { in: query, name: kind, schema: { type: string, enum: [COUNT, AUDIT], default: COUNT } }
  *       - { in: query, name: status, schema: { type: string, enum: [ACTIVE, COMPLETED, CONFIRMED, CANCELLED] } }
- *       - { in: query, name: type, schema: { type: string, enum: [ANNUAL, PERPETUAL] } }
+ *       - { in: query, name: type, schema: { type: string, enum: [ANNUAL, PERPETUAL, AUDIT] } }
  *       - { in: query, name: search, schema: { type: string } }
  *     responses: { 200: { description: Stock takings } }
  *   post:
  *     tags: [Stock Taking]
  *     summary: Create a stock taking batch
+ *     description: A stock audit is type AUDIT with auditLevel (INTERNAL, AUDIT_HEAD, VISITING_MANAGEMENT) and auditors.
  *     requestBody:
  *       content:
  *         application/json:
@@ -182,7 +190,7 @@ const confirm = requirePermission(PERMISSIONS.STOCK_TAKE_CONFIRM);
  * /stock-takes/{id}/confirm:
  *   patch:
  *     tags: [Stock Taking]
- *     summary: Confirm shortage and excess (legacy S/E Confirmation); posts the stock adjustments
+ *     summary: Confirm shortage and excess (legacy S/E Confirmation); posts the stock adjustments. Not for stock audits.
  *     responses:
  *       200: { description: Stock taking }
  *       409: { description: Stock moved since counting and would go below zero or below reserved stock }
