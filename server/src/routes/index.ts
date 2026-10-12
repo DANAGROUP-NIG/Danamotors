@@ -12,6 +12,7 @@ import stockTransferRoutes from '../modules/stock-transfer/stockTransfer.routes'
 import mobisPurchaseRoutes from '../modules/mobis-purchase/mobisPurchase.routes';
 import partSaleRoutes from '../modules/part-sale/partSale.routes';
 import partsReportRoutes from '../modules/parts-report/partsReport.routes';
+import stockTakeRoutes from '../modules/stock-take/stockTake.routes';
 import financeRoutes from '../modules/finance/finance.routes';
 import branchRoutes from '../modules/branch/branch.routes';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes';
@@ -84,6 +85,7 @@ router.use('/services', servicesRoutes);
 router.use('/workshop', workshopRoutes);
 router.use('/part-sale', partSaleRoutes);
 router.use('/parts-reports', partsReportRoutes);
+router.use('/stock-takes', stockTakeRoutes);
 router.use('/inventory', mobisPurchaseRoutes);
 router.use('/inventory', stockTransferRoutes);
 router.use('/inventory', inventoryRoutes);

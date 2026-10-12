@@ -82,6 +82,14 @@ const FIFO_FIRST = [
 const DEALER_FIRST = [FIFO_FIRST[1], FIFO_FIRST[0]];
 const BASED_ON = { option: "Based on" };
 const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part No"), text("description", "Description"), text("category", "Category")];
+/** Physical stock taking: the part as counted, valued at dealer rate. */
+const COUNT_PART_COLUMNS: ReportColumn[] = [
+  text("partNumber", "Part No"),
+  text("flag", "Flag"),
+  text("description", "Description"),
+  text("bin", "Bin"),
+  money("rate", "Dealer rate", false),
+];
 const CATEGORY_COLUMNS: ReportColumn[] = [text("category", "Category"), text("categoryName", "Description")];
 const PROFIT_COLUMNS: ReportColumn[] = [
   qty("quantity", "Qty"),
@@ -861,6 +869,66 @@ export const REPORTS: ReportDefinition[] = [
     labels: { search: "Bin location (optional)" },
     grouped: true,
     columns: [text("bin", "Bin"), ...PART_COLUMNS, text("binCard", "Bin card"), qty("quantity", "Stock")],
+  },
+  {
+    kind: "physical-stock",
+    title: "Physical Stock Taking",
+    group: "Stock",
+    description: "Counted against system stock, with shortage and excess at dealer rate. Give a batch number for one count, else counts created in the period.",
+    permission: PERMISSIONS.STOCK_TAKE_READ,
+    filters: [...PART_FILTERS, "search", "option"],
+    labels: { search: "Batch no. (optional)" },
+    options: [
+      { value: "DISCREPANCY", label: "Shortage / excess" },
+      { value: "PART", label: "Part wise" },
+      { value: "BIN", label: "Bin location wise" },
+      { value: "DAMAGE", label: "Damaged parts" },
+    ],
+    grouped: true,
+    columns: {
+      DISCREPANCY: [
+        text("batch", "Batch No"),
+        ...COUNT_PART_COLUMNS,
+        qty("systemQuantity", "System qty"),
+        qty("physicalQuantity", "Physical qty"),
+        qty("excessQuantity", "Excess qty"),
+        money("excessValue", "Excess value"),
+        qty("shortageQuantity", "Shortage qty"),
+        money("shortageValue", "Shortage value"),
+        text("checker", "Checker"),
+        text("remarks", "Remarks"),
+      ],
+      PART: [
+        text("batch", "Batch No"),
+        ...COUNT_PART_COLUMNS,
+        qty("systemQuantity", "System qty"),
+        money("systemValue", "System value"),
+        qty("physicalQuantity", "Physical qty"),
+        money("physicalValue", "Physical value"),
+        qty("damagedQuantity", "Damaged qty"),
+        qty("excessQuantity", "Excess qty"),
+        qty("shortageQuantity", "Shortage qty"),
+        text("checker", "Checker"),
+      ],
+      BIN: [
+        datetime("date", "Counted"),
+        text("partNumber", "Part No"),
+        text("flag", "Flag"),
+        text("description", "Description"),
+        qty("physicalQuantity", "Physical qty"),
+        qty("damagedQuantity", "Damaged qty"),
+        text("checker", "Checker"),
+      ],
+      DAMAGE: [
+        text("batch", "Batch No"),
+        ...COUNT_PART_COLUMNS,
+        qty("physicalQuantity", "Physical qty"),
+        qty("damagedQuantity", "Damaged qty"),
+        money("damagedValue", "Damaged value"),
+        text("checker", "Checker"),
+        text("remarks", "Remarks"),
+      ],
+    },
   },
   {
     kind: "parts-blocked",

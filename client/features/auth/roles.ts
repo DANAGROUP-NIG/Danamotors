@@ -67,6 +67,13 @@ export const PART_SALE_PERMISSIONS = {
   RETURN: "partsale:return",
 } as const;
 
+// Physical stock taking: batches, count sheets, S/E confirmation.
+export const STOCK_TAKE_PERMISSIONS = {
+  READ: "stocktake:read",
+  MANAGE: "stocktake:manage",
+  CONFIRM: "stocktake:confirm",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

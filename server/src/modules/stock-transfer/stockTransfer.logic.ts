@@ -22,6 +22,8 @@ export const DOC_TYPES = {
   CPO: "CPO",
   COUNTER_SALE: "COUNTER_SALE",
   SALE_RETURN: "SALE_RETURN",
+  STOCK_TAKE: "STOCK_TAKE",
+  STOCK_TAKE_SHEET: "STOCK_TAKE_SHEET",
 } as const;
 
 export type DocType = (typeof DOC_TYPES)[keyof typeof DOC_TYPES];

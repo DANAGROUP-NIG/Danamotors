@@ -42,6 +42,8 @@ app.use(
     credentials: true,
   }),
 );
+// Count sheet uploads and annual batches carry thousands of parts.
+app.use("/api/stock-takes", express.json({ limit: "10mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -62,6 +62,8 @@ model Branch {
   warrantyCases WarrantyCase[]
 
   partBinChanges PartBinHistory[]
+
+  stockTakes StockTake[]
 }
 
 // ============================================================
@@ -164,6 +166,15 @@ model User {
   customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
   counterSalesExecuted  CounterSale[]       @relation("CounterSaleExecutive")
   saleReturnsCreated    CounterSaleReturn[] @relation("SaleReturnCreatedBy")
+
+  stockTakesCreated       StockTake[]      @relation("StockTakeCreatedBy")
+  stockTakesCompleted     StockTake[]      @relation("StockTakeCompletedBy")
+  stockTakesConfirmed     StockTake[]      @relation("StockTakeConfirmedBy")
+  stockTakesCancelled     StockTake[]      @relation("StockTakeCancelledBy")
+  stockTakeSheets         StockTakeSheet[] @relation("StockTakeSheetChecker")
+  stockTakeSheetsIssued   StockTakeSheet[] @relation("StockTakeSheetIssuedBy")
+  stockTakeSheetsUploaded StockTakeSheet[] @relation("StockTakeSheetUploadedBy")
+  stockTakeCounts         StockTakeCount[] @relation("StockTakeCountRecordedBy")
 }
 
 model Role {
@@ -767,6 +778,8 @@ model SparePart {
 
   rateHistory PartRateHistory[]
   binHistory  PartBinHistory[]
+
+  stockTakeLines StockTakeLine[]
 
   @@index([mainPartId])
 }
@@ -3139,4 +3152,150 @@ model CounterSaleReturnLine {
 
   @@index([returnId])
   @@index([invoiceLineId])
+}
+// ============================================================
+// PHYSICAL STOCK TAKING
+// ============================================================
+
+enum StockTakeType {
+  ANNUAL
+  PERPETUAL
+}
+
+// Legacy PSTBatchHead / PhysicalStockHead status: A active, M completed, L closed, C cancelled.
+enum StockTakeStatus {
+  ACTIVE
+  COMPLETED
+  CONFIRMED
+  CANCELLED
+}
+
+// One physical count of a set of parts at a branch (legacy PSTBatchHead + PhysicalStockHead; the
+// batch number is also the PST document number). While an annual count is ACTIVE, stock of its
+// parts cannot move at the branch (enforced by a trigger on InventoryStock).
+model StockTake {
+  id          String          @id @default(uuid())
+  batchNumber String          @unique
+  branchId    String
+  branch      Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  type        StockTakeType
+  status      StockTakeStatus @default(ACTIVE)
+  remarks     String?
+
+  createdById   String?
+  createdBy     User?     @relation("StockTakeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  completedById String?
+  completedBy   User?     @relation("StockTakeCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  // Legacy S/E (shortage / excess) confirmation: posts the stock adjustments.
+  confirmedAt   DateTime?
+  confirmedById String?
+  confirmedBy   User?     @relation("StockTakeConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  // Legacy "Update Bin Location in Part Master", allowed once per count.
+  binsUpdatedAt DateTime?
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("StockTakeCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines  StockTakeLine[]
+  sheets StockTakeSheet[]
+
+  @@index([branchId, status])
+}
+
+// A part in the count (legacy PSTBatchDetail + PhysicalStockDetail). Counted totals are the sum of
+// its StockTakeCount rows.
+model StockTakeLine {
+  id               String          @id @default(uuid())
+  stockTakeId      String
+  stockTake        StockTake       @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  // Null for a part number counted that is not in Part Master (legacy "wrong part").
+  partId           String?
+  part             SparePart?      @relation(fields: [partId], references: [id], onDelete: Restrict)
+  partNumber       String
+  // Bin and system stock when the part joined the count.
+  binLocation      String?
+  systemStock      Int
+  // Counted after the batch was created (legacy NewPart): found in a bin, not selected.
+  addedDuringCount Boolean         @default(false)
+  // The sheet the part is on now, or was last counted on.
+  sheetId          String?
+  sheet            StockTakeSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+
+  // Null until counted.
+  countedQuantity Int?
+  damagedQuantity Int       @default(0)
+  // Every bin the part was found in, joined with "/" (legacy FinalBin).
+  countedBins     String?
+  remarks         String?
+  countedAt       DateTime?
+  // System stock when first counted; the discrepancy is measured against it.
+  stockAtCount    Int?
+  // Unknown part numbers the store has set aside (legacy "Not Required Part").
+  notRequired     Boolean   @default(false)
+
+  // Set by the S/E confirmation.
+  dealerRate       Float?
+  adjustedQuantity Int?
+
+  counts StockTakeCount[]
+
+  @@unique([stockTakeId, partId])
+  @@index([partId])
+  @@index([sheetId])
+}
+
+// Parts given to one checker to count (legacy PSTDownloadHEAD, an HHDC download). Counts come back
+// through the sheet upload, from the handheld or the web count sheet.
+model StockTakeSheet {
+  id              String    @id @default(uuid())
+  sheetNumber     String    @unique
+  stockTakeId     String
+  stockTake       StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  checkerId       String?
+  checker         User?     @relation("StockTakeSheetChecker", fields: [checkerId], references: [id], onDelete: SetNull)
+  // What was selected, e.g. "Bins N-3A1 to N-3Z9".
+  criteria        String?
+  // Legacy "Download Current Stock into HHDC": the checker sees system stock.
+  showSystemStock Boolean   @default(false)
+  lineCount       Int
+  countedCount    Int?
+
+  issuedById   String?
+  issuedBy     User?     @relation("StockTakeSheetIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  issuedAt     DateTime  @default(now())
+  uploadedAt   DateTime?
+  uploadedById String?
+  uploadedBy   User?     @relation("StockTakeSheetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  cancelledAt  DateTime?
+  cancelRemark String?
+
+  lines  StockTakeLine[]
+  counts StockTakeCount[]
+
+  @@index([stockTakeId])
+}
+
+// Each count of a part in one bin from a sheet (legacy PhyStkUploadLog), and each correction made
+// on the count (legacy PhyStkTranLog), stored as the change.
+model StockTakeCount {
+  id              String          @id @default(uuid())
+  lineId          String
+  line            StockTakeLine   @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sheetId         String?
+  sheet           StockTakeSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+  binLocation     String?
+  quantity        Int
+  damagedQuantity Int             @default(0)
+  remarks         String?
+  correction      Boolean         @default(false)
+  countedAt       DateTime        @default(now())
+  recordedById    String?
+  recordedBy      User?           @relation("StockTakeCountRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([lineId])
 }

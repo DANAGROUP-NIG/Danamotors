@@ -57,7 +57,8 @@ const DEFAULT_AGE_LIMITS = "365,730,1095,1460,1825";
 const DEFAULT_MILEAGE_LIMITS = "10000,20000,40000,60000,100000";
 const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
 
-export function PartsReportView({ kind }: { kind: string }) {
+/** `initial` prefills filters from a link, e.g. a stock taking's batch number. */
+export function PartsReportView({ kind, initial }: { kind: string; initial?: { search?: string; branchId?: string } }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
   const crossBranch = isSuperAdmin || hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const branches = useBranchStore((s) => s.branches);
@@ -70,8 +71,9 @@ export function PartsReportView({ kind }: { kind: string }) {
   const [params, setParams] = useState<ReportParams>(() => ({
     from: `${lagosToday().slice(0, 4)}-01-01`,
     to: lagosToday(),
-    branchId: crossBranch ? (activeBranch ?? "") : undefined,
+    branchId: crossBranch ? (initial?.branchId ?? activeBranch ?? "") : undefined,
     includeReturns: true,
+    search: initial?.search,
   }));
   const [customer, setCustomer] = useState<SaleCustomer | null>(null);
   const [applied, setApplied] = useState<ReportParams | null>(null);

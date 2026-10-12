@@ -53,6 +53,7 @@ The legacy **Stock Reports** menu. Reports marked *as on* take one date; *now* r
 | Inventory to Sales Ratio | `inventory-sales-ratio` | Per part: opening and closing stock value against sales at cost, and closing value ÷ sales. FIFO or dealer rate |
 | Branch Wise Stock Report, Store Location Wise Current Stock | `branch-stock` | *Now*, every branch and store location: **Branch wise part value** (a line per branch, grouped by part) or **Total part value** (a line per part), with blocked and available stock, at dealer rate |
 | BIN Location Wise Stock Report | `bin-location-stock` | *Now.* Stock in bin order; filter by bin |
+| Physical Stock Taking | `physical-stock` | Counted against system stock at dealer rate: **Shortage / excess**, **Part wise**, **Bin location wise** or **Damaged parts**; a batch number picks one count. See [stock-taking.md](./stock-taking.md) |
 | List of Parts Blocked | `parts-blocked` | Stock picked for CPOs (until billed) or branch indents (until the STN is made): **Document wise** with picker, or **Part wise** with stock, blocked and available |
 | Item Unavailability Report | `item-unavailability` | Demand the branch could not supply: CPO quantities still unpicked and indent back orders, against free stock now |
 
