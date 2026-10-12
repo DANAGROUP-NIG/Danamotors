@@ -59,8 +59,6 @@ export const CAMPAIGN_PERMISSIONS = {
 
 export const BRANCH_ALL = "branch:all";
 
-export const PARTS_REPORT_READ = "partsreport:read";
-
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
