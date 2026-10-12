@@ -1,17 +1,21 @@
 import { PrismaClient } from "@prisma/client";
 import { ROLES } from "../../src/shared/constants/roles";
 import { hash } from "./helpers";
+import seedPermissionsAndRoles from "./roles";
 
 export default async function seedStaffUsers(
   prisma: PrismaClient,
   branches: { id: string; name: string }[],
 ) {
+  if (branches.length < 3) {
+    throw new Error("Staff seeding requires three branches. Run the branch seed first.");
+  }
   const mainBranch = branches[0];
   const abujaBranch = branches[1];
   const phBranch = branches[2];
 
   const roles = await prisma.role.findMany();
-  const roleMap = Object.fromEntries(roles.map((r) => [r.name, r.id]));
+  const roleMap = new Map(roles.map((r) => [r.name, r.id]));
 
   const staff = [
     {
@@ -192,8 +196,17 @@ export default async function seedStaffUsers(
     },
   ];
 
+  const missingRoles = [...new Set(staff.map((s) => s.role))].filter(
+    (role) => !roleMap.has(role),
+  );
+  if (missingRoles.length > 0) {
+    throw new Error(`Staff seeding requires these roles: ${missingRoles.join(", ")}. Run the role seed first.`);
+  }
+
   const result = [];
   for (const s of staff) {
+    const roleId = roleMap.get(s.role);
+    if (!roleId) throw new Error(`Missing staff role: ${s.role}`);
     const passwordHash = await hash(s.password);
     const user = await prisma.user.upsert({
       where: { email: s.email },
@@ -204,7 +217,7 @@ export default async function seedStaffUsers(
         firstName: s.firstName,
         lastName: s.lastName,
         isActive: true,
-        roleId: roleMap[s.role],
+        roleId,
         branchId: s.branchId,
       },
     });
@@ -219,6 +232,8 @@ if (require.main === module) {
   (async () => {
     const prisma = new PrismaClient();
     try {
+      console.log("Synchronizing built-in roles and permissions before seeding staff...");
+      await seedPermissionsAndRoles(prisma);
       const branches = await prisma.branch.findMany({
         orderBy: { createdAt: "asc" },
         select: { id: true, name: true },
