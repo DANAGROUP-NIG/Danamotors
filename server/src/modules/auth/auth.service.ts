@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs'
+import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { config } from "../../config";
@@ -16,7 +16,7 @@ import { ROLES } from "../../shared/constants/roles";
 // Privileged roles (admins, managers, accountants) must be assigned by an
 // administrator through the admin module.
 const SELF_SERVICE_ROLES: string[] = [
-  ROLES.RECEPTIONIST,
+  ROLES.CCU_OFFICER,
   ROLES.TECHNICIAN,
   ROLES.SERVICE_ADVISOR,
 ];
@@ -95,7 +95,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(data.passwordHash, 10);
     const userCount = await this.authRepository.countUsers();
 
-    let roleToAssign = ROLES.RECEPTIONIST as string;
+    let roleToAssign = ROLES.CCU_OFFICER as string;
 
     // Auto-promote first user to SuperAdmin
     if (userCount === 0) {

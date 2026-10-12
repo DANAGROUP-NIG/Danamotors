@@ -36,6 +36,9 @@ import {
 // from the user's role in the DB, the nav item disappears on next page load
 // (AuthProvider re-fetches /auth/me → updated permissions[]).
 
+// TODO(issue #96): Parts Reports is absent from this checkout. When its menu,
+// page and parts-report API routes are available, gate all three on
+// partsreport:read plus each report permission; exclude both store roles.
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",

@@ -69,7 +69,14 @@ export default function SideNav({
   exactRoot,
 }: SideNavProps) {
   const logout = useLogout();
-  const { user, isHydrated, isSuperAdmin, hasAccess, hasAnyPermission } = useAuth();
+  const {
+    user,
+    isHydrated,
+    isSuperAdmin,
+    isGeneralStoreManager,
+    hasAccess,
+    hasAnyPermission,
+  } = useAuth();
   const pathname = usePathname();
 
   // Desktop collapsed state — persisted
@@ -105,7 +112,7 @@ export default function SideNav({
   // For non-SuperAdmin: lock activeBranch to the user's assigned branch
   useEffect(() => {
     if (branchSource !== "store") return;
-    if (isSuperAdmin || !branchesFetched || branches.length === 0) return;
+    if (isSuperAdmin || isGeneralStoreManager || !branchesFetched || branches.length === 0) return;
 
     const userBranchId = user?.branchId;
     if (!userBranchId) return;
@@ -124,6 +131,8 @@ export default function SideNav({
     user?.branchId,
     activeBranch?.id,
     setActiveBranch,
+    isSuperAdmin,
+    isGeneralStoreManager,
   ]);
 
   // Resolve the branch config passed to the dropdown
@@ -133,12 +142,12 @@ export default function SideNav({
           branches,
           activeBranch,
           isLoading: branchLoading,
-          canSwitch: isSuperAdmin,
-          canSeeAll: isSuperAdmin,
+          canSwitch: isSuperAdmin || isGeneralStoreManager,
+          canSeeAll: isSuperAdmin || isGeneralStoreManager,
           onSelect: (b) => setActiveBranch(b),
           onAllSelect: () => setActiveBranch(null as any),
         }
-      : branch ?? { branches: [], activeBranch: null };
+      : (branch ?? { branches: [], activeBranch: null });
 
   function isItemActive(href: string, pathname: string) {
     if (href === "/logout") return false;
@@ -224,7 +233,9 @@ export default function SideNav({
           {/* Branch icon-only when collapsed */}
           {collapsed && (
             <div className="shrink-0 flex justify-center pt-3">
-              <NavTootip label={branchConfig.activeBranch?.name ?? "All Branches"}>
+              <NavTootip
+                label={branchConfig.activeBranch?.name ?? "All Branches"}
+              >
                 <span className="inline-grid size-9 place-items-center rounded-lg bg-white/10 text-white/50">
                   <Building2 className="size-4" />
                 </span>
@@ -287,17 +298,24 @@ export default function SideNav({
                             : hasAccess(child.roles ?? []),
                         );
                         const isLogout = href === "/logout";
-                        const active = href ? isItemActive(href, pathname) : false;
-                        const hasChildren = Array.isArray(children) && children.length > 0;
+                        const active = href
+                          ? isItemActive(href, pathname)
+                          : false;
+                        const hasChildren =
+                          Array.isArray(children) && children.length > 0;
 
                         // helper: check if any child is active
                         const isAnyChildActive = hasChildren
-                          ? children.some((c: any) => isItemActive(c.href, pathname))
+                          ? children.some((c: any) =>
+                              isItemActive(c.href, pathname),
+                            )
                           : false;
 
                         if (collapsed) {
                           const key = label;
-                          const targetHref = href ?? (hasChildren ? children?.[0]?.href : undefined);
+                          const targetHref =
+                            href ??
+                            (hasChildren ? children?.[0]?.href : undefined);
                           // A collapsed parent icon represents its children, so highlight it
                           // when any child route is active.
                           const collapsedActive = active || isAnyChildActive;
@@ -314,9 +332,11 @@ export default function SideNav({
                                 </button>
                               ) : (
                                 <Link
-                                  href={targetHref ?? '#'}
+                                  href={targetHref ?? "#"}
                                   onClick={() => setSidebarOpen(false)}
-                                  aria-current={collapsedActive ? "page" : undefined}
+                                  aria-current={
+                                    collapsedActive ? "page" : undefined
+                                  }
                                   aria-label={label}
                                   className={cn(
                                     "relative flex size-9 items-center justify-center rounded-lg transition-colors",
@@ -359,7 +379,10 @@ export default function SideNav({
                         if (hasChildren) {
                           // If the user has explicitly toggled this group, respect that value.
                           // Otherwise, default to expanded when any child is active.
-                          const expanded = Object.prototype.hasOwnProperty.call(openGroups, label)
+                          const expanded = Object.prototype.hasOwnProperty.call(
+                            openGroups,
+                            label,
+                          )
                             ? !!openGroups[label]
                             : isAnyChildActive;
                           return (
@@ -368,9 +391,13 @@ export default function SideNav({
                                 aria-expanded={expanded}
                                 onClick={() =>
                                   setOpenGroups((s) => {
-                                    const current = Object.prototype.hasOwnProperty.call(s, label)
-                                      ? !!s[label]
-                                      : isAnyChildActive;
+                                    const current =
+                                      Object.prototype.hasOwnProperty.call(
+                                        s,
+                                        label,
+                                      )
+                                        ? !!s[label]
+                                        : isAnyChildActive;
                                     return { ...s, [label]: !current };
                                   })
                                 }
@@ -382,8 +409,15 @@ export default function SideNav({
                                 )}
                               >
                                 <Icon className="size-[17px] shrink-0" />
-                                <span className="flex-1 truncate text-left">{label}</span>
-                                <ChevronRight className={cn("size-4 transition-transform", expanded && "rotate-90")} />
+                                <span className="flex-1 truncate text-left">
+                                  {label}
+                                </span>
+                                <ChevronRight
+                                  className={cn(
+                                    "size-4 transition-transform",
+                                    expanded && "rotate-90",
+                                  )}
+                                />
                               </button>
 
                               {expanded && (
@@ -394,9 +428,13 @@ export default function SideNav({
                                     return (
                                       <Link
                                         key={childKey}
-                                        href={c.href ?? '#'}
+                                        href={c.href ?? "#"}
                                         onClick={() => setSidebarOpen(false)}
-                                        aria-current={isItemActive(c.href, pathname) ? "page" : undefined}
+                                        aria-current={
+                                          isItemActive(c.href, pathname)
+                                            ? "page"
+                                            : undefined
+                                        }
                                         className={cn(
                                           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                                           isItemActive(c.href, pathname)
@@ -405,7 +443,9 @@ export default function SideNav({
                                         )}
                                       >
                                         <ChildIcon className="size-[14px] shrink-0" />
-                                        <span className="flex-1 truncate">{c.label}</span>
+                                        <span className="flex-1 truncate">
+                                          {c.label}
+                                        </span>
                                       </Link>
                                     );
                                   })}
@@ -417,7 +457,7 @@ export default function SideNav({
 
                         // Non-parent item: ensure stable key and defined href
                         const itemKey = href ?? `${group.label}-${label}`;
-                        const hrefProp = href ?? '#';
+                        const hrefProp = href ?? "#";
 
                         return (
                           <Link
