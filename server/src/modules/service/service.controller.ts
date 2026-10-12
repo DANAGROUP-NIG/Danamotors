@@ -1,10 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { ServiceService } from './service.service';
-import { assertBranchOwnership } from '../../middleware/authorize';
-import { ROLES } from '../../shared/constants/roles';
-import prisma from '../../prisma/client';
-import { ForbiddenError } from '../../shared/errors/appError';
-import { LabourService } from './labour.service';
+import { Request, Response, NextFunction } from "express";
+import { ServiceService } from "./service.service";
+import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
+import { ROLES } from "../../shared/constants/roles";
+import prisma from "../../prisma/client";
+import { ForbiddenError } from "../../shared/errors/appError";
+import { LabourService } from "./labour.service";
 
 export class ServiceController {
   private serviceService: ServiceService;
@@ -15,98 +15,203 @@ export class ServiceController {
     this.labourService = new LabourService();
   }
 
-  listLabourItems = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listLabourItems = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const labourItems = await this.labourService.listItems(req.query.search as string | undefined, req.query.includeInactive === 'true');
-      res.status(200).json({ status: 'success', statusCode: 200, data: { labourItems } });
+      const labourItems = await this.labourService.listItems(
+        req.query.search as string | undefined,
+        req.query.includeInactive === "true",
+      );
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: { labourItems } });
     } catch (error) {
       next(error);
     }
   };
 
-  createLabourItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createLabourItem = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const labourItem = await this.labourService.createItem(req.body);
-      res.status(201).json({ status: 'success', statusCode: 201, data: { labourItem } });
+      res
+        .status(201)
+        .json({ status: "success", statusCode: 201, data: { labourItem } });
     } catch (error) {
       next(error);
     }
   };
 
-  updateLabourItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateLabourItem = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const labourItem = await this.labourService.updateItem(req.params.id, req.body);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { labourItem } });
+      const labourItem = await this.labourService.updateItem(
+        req.params.id,
+        req.body,
+      );
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: { labourItem } });
     } catch (error) {
       next(error);
     }
   };
 
-  listJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listJobCardLabour = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const jobCard = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      const jobCard = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, jobCard?.branchId);
-      const labourLines = await this.labourService.listJobCardLines(req.params.id);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { labourLines } });
+      const labourLines = await this.labourService.listJobCardLines(
+        req.params.id,
+      );
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: { labourLines } });
     } catch (error) {
       next(error);
     }
   };
 
-  addJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addJobCardLabour = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const jobCard = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      const jobCard = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, jobCard?.branchId);
-      if (req.body.rate !== undefined && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may override labour rates');
-      const labourLine = await this.labourService.addJobCardLine(req.params.id, req.body);
-      res.status(201).json({ status: 'success', statusCode: 201, data: { labourLine } });
+      if (
+        req.body.rate !== undefined &&
+        ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(
+          req.user?.role as typeof ROLES.ADMIN,
+        )
+      )
+        throw new ForbiddenError("Only admins may override labour rates");
+      const labourLine = await this.labourService.addJobCardLine(
+        req.params.id,
+        req.body,
+      );
+      res
+        .status(201)
+        .json({ status: "success", statusCode: 201, data: { labourLine } });
     } catch (error) {
       next(error);
     }
   };
 
-  updateJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateJobCardLabour = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const existing = await prisma.jobCardLabour.findUnique({ where: { id: req.params.lineId }, select: { jobCard: { select: { branchId: true } } } });
+      const existing = await prisma.jobCardLabour.findUnique({
+        where: { id: req.params.lineId },
+        select: { jobCard: { select: { branchId: true } } },
+      });
       assertBranchOwnership(req, existing?.jobCard.branchId);
-      if (req.body.rate !== undefined && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may override labour rates');
-      const labourLine = await this.labourService.updateJobCardLine(req.params.lineId, req.body);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { labourLine } });
+      if (
+        req.body.rate !== undefined &&
+        ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(
+          req.user?.role as typeof ROLES.ADMIN,
+        )
+      )
+        throw new ForbiddenError("Only admins may override labour rates");
+      const labourLine = await this.labourService.updateJobCardLine(
+        req.params.lineId,
+        req.body,
+      );
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: { labourLine } });
     } catch (error) {
       next(error);
     }
   };
 
-  removeJobCardLabour = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  removeJobCardLabour = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const existing = await prisma.jobCardLabour.findUnique({ where: { id: req.params.lineId }, select: { jobCard: { select: { branchId: true } } } });
+      const existing = await prisma.jobCardLabour.findUnique({
+        where: { id: req.params.lineId },
+        select: { jobCard: { select: { branchId: true } } },
+      });
       assertBranchOwnership(req, existing?.jobCard.branchId);
       await this.labourService.removeJobCardLine(req.params.lineId);
-      res.status(200).json({ status: 'success', statusCode: 200, message: 'Labour line removed' });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Labour line removed",
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  createAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createAppointment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       // Admin can only create appointments in their own branch
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER && req.user.branchId && req.body.branchName) {
-        const userBranch = await prisma.branch.findUnique({ where: { id: req.user.branchId } });
+      if (
+        req.user &&
+        !canAccessAllBranches(req.user) &&
+        req.user.branchId &&
+        req.body.branchName
+      ) {
+        const userBranch = await prisma.branch.findUnique({
+          where: { id: req.user.branchId },
+        });
         if (userBranch) {
           req.body.branchName = userBranch.name;
         }
       }
 
       const createdById = req.user?.userId;
-      const result = await this.serviceService.createAppointment({ ...req.body, createdById });
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Appointment booked successfully', data: { appointment: result } });
+      const result = await this.serviceService.createAppointment({
+        ...req.body,
+        createdById,
+      });
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Appointment booked successfully",
+        data: { appointment: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  listAppointments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listAppointments = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const page = zCoerceNumber(req.query.page, 1);
       const limit = zCoerceNumber(req.query.limit, 10);
@@ -119,13 +224,17 @@ export class ServiceController {
       const source = req.query.source as string | undefined;
       let createdById: string | undefined;
 
-      // Only SuperAdmin and ReceptionManager can see all branches; others are locked to their branch
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
+      // All-branch access is explicit; other users are locked to their home branch.
+      if (
+        req.user &&
+        !canAccessAllBranches(req.user)
+      ) {
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
       // Receptionists can only see their own bookings
-      if (req.user && req.user.role === ROLES.RECEPTIONIST) {
+      if (req.user && req.user.role === ROLES.CCU_OFFICER) {
         createdById = req.user.userId;
       }
 
@@ -142,67 +251,117 @@ export class ServiceController {
         source,
       });
 
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
   };
 
-  getAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getAppointment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (result as any).branchId);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { appointment: result } });
+      assertBranchOwnership(req, result.branchId);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { appointment: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  updateAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateAppointment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const appointment = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (appointment as any).branchId);
+      assertBranchOwnership(req, appointment.branchId);
       const result = await this.serviceService.updateAppointment(id, {
         ...req.body,
         requestingUserRole: req.user?.role,
       });
-      res.status(200).json({ status: 'success', statusCode: 200, message: 'Appointment updated successfully', data: { appointment: result } });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Appointment updated successfully",
+        data: { appointment: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  deleteAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  deleteAppointment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const appointment = await this.serviceService.getAppointment(id);
-      assertBranchOwnership(req, (appointment as any).branchId);
+      assertBranchOwnership(req, appointment.branchId);
       await this.serviceService.deleteAppointment(id);
-      res.status(200).json({ status: 'success', statusCode: 200, message: 'Appointment deleted successfully' });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Appointment deleted successfully",
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  createJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createJobCard = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
-        throw new ForbiddenError('Only workshop roles can create job cards');
+      if (
+        req.user?.role === ROLES.CCU_OFFICER ||
+        req.user?.role === ROLES.CCU_MANAGER
+      ) {
+        throw new ForbiddenError("Only workshop roles can create job cards");
       }
       const createdById = req.user?.userId;
-      const branch = await prisma.branch.findUnique({ where: { name: req.body.branchName }, select: { id: true } });
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId) throw new ForbiddenError('Your account is not assigned to a branch');
+      const branch = await prisma.branch.findUnique({
+        where: { name: req.body.branchName },
+        select: { id: true },
+      });
+      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId)
+        throw new ForbiddenError("Your account is not assigned to a branch");
       assertBranchOwnership(req, branch?.id);
-      const result = await this.serviceService.createJobCard({ ...req.body, createdById });
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Job card created successfully', data: { jobCard: result } });
+      const result = await this.serviceService.createJobCard({
+        ...req.body,
+        createdById,
+      });
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Job card created successfully",
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  listJobCards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listJobCards = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 50;
@@ -213,77 +372,160 @@ export class ServiceController {
       const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
+      if (
+        req.user &&
+        !canAccessAllBranches(req.user)
+      ) {
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
-      const result = await this.serviceService.listJobCards({ page, limit, branchId, customerId, search, status, dateFrom, dateTo });
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      const result = await this.serviceService.listJobCards({
+        page,
+        limit,
+        branchId,
+        customerId,
+        search,
+        status,
+        dateFrom,
+        dateTo,
+      });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
   };
 
-  getJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getJobCard = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const result = await this.serviceService.getJobCard(id);
-      assertBranchOwnership(req, (result as any).branchId);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { jobCard: result } });
+      assertBranchOwnership(req, result.branchId);
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  updateJobCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateJobCard = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
-        throw new ForbiddenError('Only workshop roles can update job cards');
+      if (
+        req.user?.role === ROLES.CCU_OFFICER ||
+        req.user?.role === ROLES.CCU_MANAGER
+      ) {
+        throw new ForbiddenError("Only workshop roles can update job cards");
       }
       const { id } = req.params;
-      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      const card = await prisma.jobCard.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, card?.branchId);
-      const result = await this.serviceService.updateJobCard(id, req.body, req.user?.userId);
-      res.status(200).json({ status: 'success', statusCode: 200, message: 'Job card updated successfully', data: { jobCard: result } });
+      const result = await this.serviceService.updateJobCard(
+        id,
+        req.body,
+        req.user?.userId,
+      );
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Job card updated successfully",
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  addInspection = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addInspection = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
-        throw new ForbiddenError('Only workshop roles can add inspections');
+      if (
+        req.user?.role === ROLES.CCU_OFFICER ||
+        req.user?.role === ROLES.CCU_MANAGER
+      ) {
+        throw new ForbiddenError("Only workshop roles can add inspections");
       }
       const { id } = req.params;
-      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      const card = await prisma.jobCard.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, card?.branchId);
       const result = await this.serviceService.addInspection(id, req.body);
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Inspection added successfully', data: { inspection: result } });
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Inspection added successfully",
+        data: { inspection: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  addEstimate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addEstimate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
-        throw new ForbiddenError('Only workshop roles can add estimates');
+      if (
+        req.user?.role === ROLES.CCU_OFFICER ||
+        req.user?.role === ROLES.CCU_MANAGER
+      ) {
+        throw new ForbiddenError("Only workshop roles can add estimates");
       }
       const { id } = req.params;
-      const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+      const card = await prisma.jobCard.findUnique({
+        where: { id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, card?.branchId);
-      const result = await this.serviceService.addEstimate(id, req.body, req.user?.userId);
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Estimate created successfully', data: { estimate: result } });
+      const result = await this.serviceService.addEstimate(
+        id,
+        req.body,
+        req.user?.userId,
+      );
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Estimate created successfully",
+        data: { estimate: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  addApproval = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addApproval = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      if (req.user?.role === ROLES.RECEPTIONIST || req.user?.role === ROLES.RECEPTION_MANAGER) {
-        throw new ForbiddenError('Only workshop roles can record approvals');
+      if (
+        req.user?.role === ROLES.CCU_OFFICER ||
+        req.user?.role === ROLES.CCU_MANAGER
+      ) {
+        throw new ForbiddenError("Only workshop roles can record approvals");
       }
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
@@ -291,14 +533,27 @@ export class ServiceController {
         select: { jobCard: { select: { branchId: true } } },
       });
       assertBranchOwnership(req, estimate?.jobCard?.branchId);
-      const result = await this.serviceService.addApproval(id, req.body, req.user?.userId);
-      res.status(201).json({ status: 'success', statusCode: 201, message: 'Customer approval recorded successfully', data: { approval: result } });
+      const result = await this.serviceService.addApproval(
+        id,
+        req.body,
+        req.user?.userId,
+      );
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Customer approval recorded successfully",
+        data: { approval: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  getApprovals = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getApprovals = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
@@ -307,13 +562,21 @@ export class ServiceController {
       });
       assertBranchOwnership(req, estimate?.jobCard?.branchId);
       const result = await this.serviceService.getApprovals(id);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { approvals: result } });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { approvals: result },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  listInspections = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listInspections = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const page = zCoerceNumber(req.query.page, 1);
       const limit = zCoerceNumber(req.query.limit, 10);
@@ -321,18 +584,34 @@ export class ServiceController {
       const status = req.query.status as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
+      if (
+        req.user &&
+        !canAccessAllBranches(req.user)
+      ) {
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
-      const result = await this.serviceService.listInspections({ page, limit, branchId, search, status });
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      const result = await this.serviceService.listInspections({
+        page,
+        limit,
+        branchId,
+        search,
+        status,
+      });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
   };
 
-  listEstimates = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listEstimates = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const page = zCoerceNumber(req.query.page, 1);
       const limit = zCoerceNumber(req.query.limit, 10);
@@ -340,19 +619,31 @@ export class ServiceController {
       const status = req.query.status as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.RECEPTION_MANAGER) {
-        branchId = req.user.branchId ?? undefined;
+      if (
+        req.user &&
+        !canAccessAllBranches(req.user)
+      ) {
+        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        branchId = req.user.branchId;
       }
 
-      const result = await this.serviceService.listEstimates({ page, limit, branchId, search, status });
-      res.status(200).json({ status: 'success', statusCode: 200, data: result });
+      const result = await this.serviceService.listEstimates({
+        page,
+        limit,
+        branchId,
+        search,
+        status,
+      });
+      res
+        .status(200)
+        .json({ status: "success", statusCode: 200, data: result });
     } catch (error) {
       next(error);
     }
   };
 }
 
-function zCoerceNumber(val: any, fallback: number): number {
+function zCoerceNumber(val: unknown, fallback: number): number {
   if (val === undefined || val === null) return fallback;
   const num = Number(val);
   return isNaN(num) ? fallback : num;

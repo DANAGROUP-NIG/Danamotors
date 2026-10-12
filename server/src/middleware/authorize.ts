@@ -43,11 +43,13 @@ export const requirePermission = (...requiredPermissions: string[]) => {
   };
 };
 
-/**
- * Ensures the requesting user's branch matches the resource's branch.
- * SuperAdmin bypasses this check.
- * Admin must belong to the same branch as the resource.
- */
+/** SuperAdmin retains its bypass; other roles need an explicit permission. */
+export function canAccessAllBranches(user: Request["user"]): boolean {
+  return user?.role === ROLES.SUPER_ADMIN ||
+    user?.permissions.includes(PERMISSIONS.BRANCH_ALL) === true;
+}
+
+/** Ensures branch-scoped users can only access their own branch's resources. */
 export function assertBranchOwnership(
   req: Request,
   resourceBranchId?: string | null,
@@ -56,14 +58,13 @@ export function assertBranchOwnership(
     throw new UnauthorizedError();
   }
 
-  if (req.user.role === ROLES.SUPER_ADMIN || req.user.role === ROLES.RECEPTION_MANAGER || req.user.role === ROLES.GENERAL_STORE_MANAGER) {
-    return;
+  if (canAccessAllBranches(req.user)) return;
+
+  if (!req.user.branchId) {
+    throw new ForbiddenError("Your account is not assigned to a branch");
   }
 
-  if (
-    resourceBranchId &&
-    resourceBranchId !== req.user.branchId
-  ) {
+  if (resourceBranchId && resourceBranchId !== req.user.branchId) {
     throw new ForbiddenError(
       "You can only manage resources within your own branch",
     );
@@ -90,10 +91,14 @@ export function assertInventoryBranchAccess(
   }
 
   if (!req.user.branchId || resourceBranchIds.some((branchId) => !branchId)) {
-    throw new ForbiddenError('Your account is not assigned to an authorized branch');
+    throw new ForbiddenError(
+      "Your account is not assigned to an authorized branch",
+    );
   }
 
   if (resourceBranchIds.some((branchId) => branchId !== req.user!.branchId)) {
-    throw new ForbiddenError('You can only access inventory within your own branch');
+    throw new ForbiddenError(
+      "You can only access inventory within your own branch",
+    );
   }
 }
