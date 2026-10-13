@@ -25,6 +25,7 @@ export const runReportSchema = z.object({
       executiveId: uuid("sales executive ID"),
       otherBranchId: uuid("branch ID"),
       partId: uuid("part ID"),
+      partType: z.enum(["S", "O", "A"]).optional(),
       partFlag: z.string().trim().max(2).optional(),
       priceCategory: z.string().trim().max(5).optional(),
       search: z.string().trim().max(40).optional(),

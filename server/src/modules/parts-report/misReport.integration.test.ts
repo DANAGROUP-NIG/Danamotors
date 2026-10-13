@@ -221,6 +221,10 @@ describeDb("MIS reports (database)", () => {
 
   it("summarises consumption by part category", async () => {
     const r = await report("consumption", { summary: true });
-    expect(r.rows).toEqual([expect.objectContaining({ category: "A", issued: 4, transferred: 3, returned: 1, net: 6, value: 200500 })]);
+    // Job: ball joints 2 less 1 returned; PDI: the bolt. Every ball joint at the ₦82,800 retail rate.
+    // SAN: the two bolts written off, shown but not in the total issues.
+    expect(r.rows).toEqual([
+      expect.objectContaining({ category: "A", pdi: 1, job: 1, jobAmount: 82800, counterSale: 1, counterSaleAmount: 82800, stn: 3, san: 2, quantity: 6, value: 415035 }),
+    ]);
   });
 });

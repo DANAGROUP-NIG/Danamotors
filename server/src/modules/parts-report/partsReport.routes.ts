@@ -45,7 +45,8 @@ router.use(authMiddleware);
  *       - { in: query, name: vendor, schema: { type: string }, description: Vendor on MITs and vendor MRNs, e.g. MOBIS }
  *       - { in: query, name: partId, schema: { type: string, format: uuid } }
  *       - { in: query, name: includeAlternates, schema: { type: boolean }, description: With partId, also its main part and alternates }
- *       - { in: query, name: partFlag, schema: { type: string }, description: Purchase source (legacy part flag) }
+ *       - { in: query, name: partType, schema: { type: string, enum: [S, O, A] }, description: Part type - S spare part, O oil, A accessory }
+ *       - { in: query, name: partFlag, schema: { type: string }, description: Purchase source (legacy part flag) - O original part, A authorised source, F FOC item, L local }
  *       - { in: query, name: priceCategory, schema: { type: string }, description: Part category (price category code) }
  *       - { in: query, name: status, schema: { type: string, enum: [PENDING, CANCELLED, EXECUTED] } }
  *       - { in: query, name: option, schema: { type: string }, description: "The report's own choice, e.g. STN or SRN, VENDOR or SUMMARY, ALL or PENDING, FIFO or DEALER" }

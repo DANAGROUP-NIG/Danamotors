@@ -28,12 +28,12 @@ title, filters, options and columns are defined once, in
 | Checklist for Receipts | `receipt-checklist` | Every part received (vendor and branch-transfer MRNs) in bin order, for the store to check against the shelves |
 | MRN / SRN Shortage Report, MIT and MRN Mismatch Report, BIT and SRN Mismatch Report | `receipt-shortage` | Receipt lines with damaged or short quantities: **MRN** (vendor receipts, with invoice, MIT and case) or **SRN** (branch transfers, with STN, packing list and case), valued at the receipt rate. Filter by vendor, and find a receipt by its MRN/SRN, MIT or STN number |
 | Picking List Register | `picking-register` | Parts picked for indents, with bin, picker and any alternate supplied |
-| STN/SRN Register | `stn-register` | STNs sent from the branch, or stock receipts (transfer MRNs) into it |
-| Store Wise STN Register | `store-wise-stn` | STNs grouped by receiving branch, with subtotals |
+| STN/SRN Register | `stn-register` | Legacy layout: Bill Number, Date, Store, Part No, Flag, Description, Qty, Rate, Amount. **STN Register**: STNs sent from the branch, the store is the receiving branch, at the dealer rate on dispatch. **Stock Receipt Note**: transfer MRNs into the branch, the store is the sending branch, the quantity received at the STN rate. Each document is headed "number · date · store" with a total under it, lines in part number order, carried forward page by page. Cancelled STNs are left out. Damaged and short quantities are on the MRN / SRN Shortage Report, and indents on the indent registers |
+| Store Wise STN Register | `store-wise-stn` | Legacy layout: Bill Number, Date, Part No, Flag, Description, Qty, Amount. The same STNs and totals as the STN Register, sorted by the sending store (legacy "Storelocation"), each STN headed "number · date · sending store" with a total under it, lines in part number order, carried forward page by page. The receiving store and rate are left off, as on legacy. Legacy's Tax, Discount and Others are always zero on an STN, so its Net Amount is the Amount and these columns are dropped. Legacy's Location Total is the Grand Total for a single branch. Optional **To branch** filter |
 | Branch Stock Indent Inward Register | `indent-inward-register` | Indents raised on the branch, line by line, with the quantity cancelled; Pending, Cancelled (cancelled or rejected indents, and lines with a quantity cancelled) or Executed |
 | Branch Stock Indent Outward Register | `indent-outward-register` | Indents the branch raised on other branches, with the same columns and order filter as the inward register |
 | Branch In Transit Report | `branch-in-transit` | STN lines dispatched to the branch: sent, received, damaged, short and still on the way; **All** or **Pending** |
-| Consumption Report (Consolidated), Consumption Summary (Consolidated) | `consumption` | Part-wise issued and transferred quantities, less returns (optional), at dealer rate. **Only summary** totals them by part category |
+| Consumption Report (Consolidated), Consumption Summary (Consolidated) | `consumption` | Legacy layout: part, flag, dealer and retail rate; PDI req, job order issues (qty, amount), FOC, goodwill, PDI warr and warr req (job type and who pays the job card line); counter sale (qty, amount); consumable issue (no job card); samples (flag F parts, at no value); STN; SAN (stock taken out by SAN subtractions; additions are ignored; for reference: not in the total); total issues (qty, amount); closing balance at the *to* date. Returns (optional) come off the issue they undo. Valued at the retail rate on each line; STNs and consumable issues use the part's retail rate. Cancelled bills are left out. Carried forward page by page. **Only summary** totals by part category |
 | Checklist for Issues | `issue-checklist` | Every issue voucher wise, with subtotals per section: **STN** at the STN rate, **Counter sales** at the billed value, **Workshop issues** (to job cards) at the job card rate, and **Other issues** (no job card) at retail rate. Cancelled bills and STNs are left out. Cust code is the receiving store's code on an STN and the customer's code otherwise. The part flag is shown, as legacy printed it before the description. Qty reqd is what was asked for: the indent line on an STN, the CPO line on a bill, and otherwise the issued quantity. The legacy service columns (registration, model, VIN, job, mileage) are dropped. As on legacy, every 30 lines (one A4 landscape page) end with a **Carried forward** line showing the running grand total, on screen, in print and in the Excel file. Dispatch challans, the legacy CHALLAN section, will join when they are built |
 | SAN Register | `stock-adjustments` | Stock adjustments: Addition, Subtraction or All |
 
@@ -146,11 +146,12 @@ MIS reports merged or left out, so that no report repeats another:
   else always gets their own branch. CPD is a branch like any other.
 - **Part filters**, matching the legacy filters:
   - **Part:** a single part
-  - **Purchase source:** the legacy part flag (O, A, L, F)
+  - **Part type:** Spare part (S), Oil (O) or Accessory (A): Part Master's part type (legacy
+    `partmast.parttype`). New and existing parts default to Spare part. At CPD nearly every part is a
+    spare, but the branch (AutoEnhancer) has 889 accessories and 122 oils
+  - **Purchase source:** Original part (O), Authorised source (A), FOC item (F) or Local (L): the
+    legacy part flag
   - **Part category:** the price category
-  
-  Legacy "part type" (spare, accessory, oil) is not a filter: 35,212 of the 35,233 CPD parts are
-  spares, and oil is price category O.
 - **Counter-sale values** are priced exactly as the bill was: cash discount first, then VAT on
   taxable parts. Line totals therefore equal the bill before its round-off to ₦10 below, and
   the round-off is shown on the summary and datewise reports.

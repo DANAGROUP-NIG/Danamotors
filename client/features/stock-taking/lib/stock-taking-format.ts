@@ -59,13 +59,7 @@ export const kindOf = (type: StockTakeType): Kind => (type === "AUDIT" ? "AUDIT"
 // Longest bin a branch holds (legacy PARTBAL.bincard); mirrors BIN_LIMIT in stockTake.logic.ts.
 export const BIN_LIMIT = 40;
 
-// Legacy "Source of Purchase" (part flag).
-export const PART_FLAG_LABELS: Record<string, string> = {
-  O: "Original",
-  A: "Authorised source",
-  L: "Local",
-  F: "FOC item",
-};
+export { PART_FLAG_LABELS } from "@/features/inventory/lib/part-codes";
 
 // Stock movement types as the stock reports name them.
 export const MOVEMENT_LABELS: Record<string, string> = {

@@ -152,8 +152,12 @@ describeDb("Parts reports (database)", () => {
   it("reports picking, STNs by store and inward indents", async () => {
     const picking = await report("picking-register");
     expect(picking.rows).toEqual([expect.objectContaining({ picked: 5, picker: "YAHAYA" })]);
+    // Store wise: headed by the sending store, without the receiving store or rate.
     const stores = await report("store-wise-stn");
-    expect(stores.rows).toEqual([expect.objectContaining({ group: `Kia Plaza Reports ${run}`, quantity: 5, amount: 23500 })]);
+    expect(stores.columns.map((c) => c.label)).toEqual(["Bill Number", "Date", "Part No", "Flag", "Description", "Qty", "Amount"]);
+    const [storeLine] = stores.rows;
+    const day = today.split("-").reverse().join("/");
+    expect(stores.rows).toEqual([expect.objectContaining({ group: `${storeLine.stnNumber} · ${day} · CPD Reports ${run}`, quantity: 5, amount: 23500 })]);
     const inward = await report("indent-inward-register", { status: "EXECUTED", fullyExecuted: true });
     expect(inward.rows).toEqual([expect.objectContaining({ requested: 5, dispatched: 5, backOrder: 0 })]);
   });
@@ -201,12 +205,20 @@ describeDb("Parts reports (database)", () => {
   });
 
   it("lists transfer receipts (SRN) at the receiving branch and stock adjustments", async () => {
-    const [stn] = (await report("stn-register")).rows;
+    // Documents are headed "number · dd/mm/yyyy · store", as legacy prints them.
+    const day = today.split("-").reverse().join("/");
+    const stnRegister = await report("stn-register");
+    expect(stnRegister.grouped).toBe(true);
+    const [stn] = stnRegister.rows;
+    expect(stnRegister.columns.map((c) => c.label)).toEqual(["Bill Number", "Date", "Store", "Part No", "Flag", "Description", "Qty", "Rate", "Amount"]);
+    expect(stn.group).toBe(`${stn.stnNumber} · ${day} · Kia Plaza Reports ${run}`);
     const stnRecord = await prisma.stockTransferNote.findUniqueOrThrow({ where: { stnNumber: String(stn.stnNumber) } });
     await transfers.receiveStn(stnRecord.id, user.id, { lines: [{ stnLineId: (await prisma.stockTransferNoteLine.findFirstOrThrow({ where: { stnId: stnRecord.id } })).id, receivedQuantity: 4, damagedQuantity: 1 }] });
     const srn = await reports.run("stn-register", { from: today, to: today, branchId: branch.id, option: "SRN" });
-    expect(srn.columns[0].key).toBe("mrnNumber");
-    expect(srn.rows).toEqual([expect.objectContaining({ stnNumber: stn.stnNumber, received: 4, damaged: 1, value: 18800 })]);
+    expect(srn.columns.map((c) => c.key)).toEqual(["mrnNumber", "date", "fromBranch", "partNumber", "partFlag", "description", "quantity", "rate", "amount"]);
+    // The SRN is valued on what was received (4 of 5; 1 damaged) at the STN rate.
+    expect(srn.rows).toEqual([expect.objectContaining({ fromBranch: `CPD Reports ${run}`, quantity: 4, rate: 4700, amount: 18800 })]);
+    expect(srn.rows[0].group).toBe(`${srn.rows[0].mrnNumber} · ${day} · CPD Reports ${run}`);
     const srnShortage = await reports.run("receipt-shortage", { from: today, to: today, branchId: branch.id, option: "SRN", otherBranchId: cpd.id });
     expect(srnShortage.rows).toEqual([expect.objectContaining({ stnNumber: stn.stnNumber, expected: 5, damaged: 1, short: 0, value: 4700 })]);
     expect((await reports.run("branch-in-transit", { from: today, to: today, branchId: branch.id, option: "PENDING" })).rows).toHaveLength(0);
@@ -224,11 +236,28 @@ describeDb("Parts reports (database)", () => {
 
   it("consolidates consumption and lists issues voucher wise", async () => {
     const consumption = await report("consumption");
-    const oilRow = consumption.rows.find((row) => row.partNumber === `RPT-O-${run}`)!;
-    // 4 sold + 5 on the STN, less 2 returned.
-    expect(oilRow).toMatchObject({ issued: 4, transferred: 5, returned: 2, net: 7, value: 32900 });
+    const stockOf = async (partId: string) => (await prisma.inventoryStock.findUniqueOrThrow({ where: { branchId_partId: { branchId: cpd.id, partId } } })).quantity;
+    // Oil: 4 sold less 2 returned, and 5 on the STN, all at the ₦7,050 retail rate.
+    expect(consumption.rows.find((row) => row.partNumber === `RPT-O-${run}`)).toMatchObject({
+      dealerRate: 4700,
+      retailRate: 7050,
+      flag: "O",
+      job: 0,
+      jobAmount: 0,
+      counterSale: 2,
+      counterSaleAmount: 14100,
+      stn: 5,
+      quantity: 7,
+      value: 49350,
+      // Of the SANs above (3 found, 1 written off) only the write-off shows, outside the total issues.
+      san: 1,
+      closing: await stockOf(oil.id),
+    });
+    // Mirror: one billed at the bill line rate; the cancelled FOC bill is left out, not issued and returned.
+    expect(consumption.rows.find((row) => row.partNumber === `RPT-M-${run}`)).toMatchObject({ counterSale: 1, quantity: 1, value: 273313.81 });
     const noReturns = await report("consumption", { includeReturns: false });
-    expect(noReturns.rows.find((row) => row.partNumber === `RPT-O-${run}`)).toMatchObject({ net: 9 });
+    expect(noReturns.rows.find((row) => row.partNumber === `RPT-O-${run}`)).toMatchObject({ counterSale: 4, stn: 5, quantity: 9, value: 63450 });
+    expect(noReturns.rows.find((row) => row.partNumber === `RPT-M-${run}`)).toMatchObject({ counterSale: 1, quantity: 1 });
 
     // Voucher wise in sections; the cancelled FOC bill is left out (its stock went back).
     const checklist = await report("issue-checklist");
@@ -259,5 +288,51 @@ describeDb("Parts reports (database)", () => {
       ["Workshop issues", `JC-${run}`, `CAVEM ${run}`, 2, 14000],
       ["Other issues", "", "Showroom top-up", 1, 7050],
     ]);
+  });
+
+  it("splits workshop issues in the consumption report by who pays the job card line", async () => {
+    const job = await prisma.jobCard.create({ data: { branchId: cpd.id, jobNumber: `JC-W-${run}`, description: "Warranty repair", customerId: customer.id } });
+    const issue = async (quantity: number, jobCardId?: string) => {
+      const issuance = await prisma.partIssuance.create({ data: { branchId: cpd.id, sparePartId: oil.id, jobCardId, issuedById: user.id, quantity } });
+      await prisma.stockTransaction.create({ data: { branchId: cpd.id, partId: oil.id, type: "ISSUED", quantity: -quantity, referenceId: issuance.id, recordedById: user.id } });
+      return issuance;
+    };
+    // Two to a warranty line at ₦7,000, one of them returned; one consumable issue at the part's retail rate.
+    const warranty = await issue(2, job.id);
+    await prisma.jobCardLine.create({
+      data: { jobCardId: job.id, kind: "PART", sparePartId: oil.id, partIssuanceId: warranty.id, description: "ENGINE OIL 4L", quantity: 2, rate: 7000, amount: 14000, chargeType: "WARRANTY" },
+    });
+    await prisma.stockTransaction.create({ data: { branchId: cpd.id, partId: oil.id, type: "RETURNED", quantity: 1, referenceId: warranty.id, recordedById: user.id } });
+    await issue(1);
+    // A PDI job: one tin to the customer's account, one under warranty.
+    const pdiType = await prisma.workshopMaster.create({ data: { kind: "SERVICE_TYPE", code: `P${run}`, description: "PDI SERVICE", preDelivery: true } });
+    const pdi = await prisma.jobCard.create({ data: { branchId: cpd.id, jobNumber: `JC-P-${run}`, description: "PDI", serviceTypeId: pdiType.id } });
+    for (const chargeType of ["CUSTOMER", "WARRANTY"] as const) {
+      const issuance = await issue(1, pdi.id);
+      await prisma.jobCardLine.create({
+        data: { jobCardId: pdi.id, kind: "PART", sparePartId: oil.id, partIssuanceId: issuance.id, description: "ENGINE OIL 4L", quantity: 1, rate: 7050, amount: 7050, chargeType },
+      });
+    }
+
+    const r = await report("consumption", { partId: oil.id });
+    expect(r.rows).toEqual([
+      expect.objectContaining({ pdi: 1, pdiWarranty: 1, job: 0, warranty: 1, consumable: 1, counterSale: 2, stn: 5, quantity: 11, value: 77500, san: 1 }),
+    ]);
+    expect(r.totals).toMatchObject({ pdi: 1, pdiWarranty: 1, warranty: 1, consumable: 1, quantity: 11, value: 77500, san: 1 });
+  });
+
+  it("lists sample parts (flag F) in their own column at no value", async () => {
+    const sample = await prisma.sparePart.create({
+      data: { partCode: `RPT-F-${run}`, partNumber: `RPT-F-${run}`, name: "FILTER ASSY-AIR", unitPrice: 31605.12, retailRate: 65422.6, partFlag: "F", priceCategoryCode: "A" },
+    });
+    const issuance = await prisma.partIssuance.create({ data: { branchId: cpd.id, sparePartId: sample.id, issuedById: user.id, quantity: 2 } });
+    await prisma.stockTransaction.create({ data: { branchId: cpd.id, partId: sample.id, type: "ISSUED", quantity: -2, referenceId: issuance.id, recordedById: user.id } });
+
+    const r = await report("consumption", { partId: sample.id });
+    expect(r.rows).toEqual([expect.objectContaining({ flag: "F", samples: 2, consumable: 0, quantity: 2, value: 0 })]);
+    // Purchase source (part flag) and part type filters: a spare part (the default), bought as an FOC item.
+    expect((await report("consumption", { partId: sample.id, partFlag: "F", partType: "S" })).rows).toHaveLength(1);
+    expect((await report("consumption", { partId: sample.id, partFlag: "O" })).rows).toHaveLength(0);
+    expect((await report("consumption", { partId: sample.id, partType: "O" })).rows).toHaveLength(0);
   });
 });

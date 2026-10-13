@@ -48,7 +48,7 @@ function takeWhere(f: ReportFilters, kind: Kind, { dated = true, cancelled = fal
  * as not required" the part numbers not in Part Master that the store set aside.
  */
 function partLineWhere(f: ReportFilters): Prisma.StockTakeLineWhereInput {
-  const partFiltered = !!(f.partId || f.partFlag || f.priceCategory);
+  const partFiltered = !!(f.partId || f.partType || f.partFlag || f.priceCategory);
   return {
     ...(partFiltered
       ? { part: partWhere(f) }

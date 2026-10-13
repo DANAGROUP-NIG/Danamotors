@@ -19,6 +19,9 @@ export interface ReportFilters {
   partId?: string;
   /** With `partId`: the part's main part and all its alternates. */
   includeAlternates?: boolean;
+  /** Legacy part type: S spare part, O oil, A accessory. */
+  partType?: string;
+  /** Legacy purchase source (part flag): O original part, A authorised source, F FOC item, L local. */
   partFlag?: string;
   priceCategory?: string;
   search?: string;
@@ -60,6 +63,7 @@ export function dateRange(f: Pick<ReportFilters, "from" | "to">) {
 export function partWhere(f: ReportFilters): Prisma.SparePartWhereInput {
   return {
     ...(f.partId && { id: f.partId }),
+    ...(f.partType && { partType: f.partType }),
     ...(f.partFlag && { partFlag: f.partFlag }),
     ...(f.priceCategory && { priceCategoryCode: f.priceCategory }),
   };

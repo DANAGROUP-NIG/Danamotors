@@ -24,6 +24,7 @@ const INHERITABLE_FIELDS = [
   "retailRate",
   "taxable",
   "partFlag",
+  "partType",
   "priceCategoryCode",
   "storeLocation",
 ] as const;
@@ -455,6 +456,7 @@ export class InventoryService {
     retailRate?: number;
     taxable?: boolean;
     partFlag?: string;
+    partType?: string;
     priceCategoryCode?: string;
     binLocation?: string;
     storeLocation?: string;
@@ -552,6 +554,7 @@ export class InventoryService {
       retailRate?: number;
       taxable?: boolean;
       partFlag?: string;
+      partType?: string;
       priceCategoryCode?: string | null;
       binLocation?: string;
       storeLocation?: string;

@@ -359,6 +359,8 @@ export class MisReportService {
         ...(f.partId && { partId: f.partId }),
         ...(f.partFlag && { partFlag: f.partFlag }),
         ...(f.priceCategory && { priceCategoryCode: f.priceCategory }),
+        // Part type is not kept in the history: the part's current type.
+        ...(f.partType && { part: { partType: f.partType } }),
       },
       include: { changedBy: userSelect },
       orderBy: [{ changedAt: "asc" }, { partNumber: "asc" }],

@@ -20,6 +20,7 @@ export type ReportFilterKey =
   | "executive"
   | "branch"
   | "part"
+  | "partType"
   | "partFlag"
   | "priceCategory"
   | "search"
@@ -90,6 +91,7 @@ export type ReportParams = {
   executiveId?: string;
   otherBranchId?: string;
   partId?: string;
+  partType?: string;
   partFlag?: string;
   priceCategory?: string;
   search?: string;

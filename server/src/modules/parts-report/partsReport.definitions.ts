@@ -26,6 +26,7 @@ export type ReportFilterKey =
   | "executive"
   | "branch"
   | "part"
+  | "partType"
   | "partFlag"
   | "priceCategory"
   | "search"
@@ -81,8 +82,8 @@ const datetime = (key: string, label: string): ReportColumn => ({ key, label, ty
 const percent = (key: string, label: string, of: string, ...over: string[]): ReportColumn => ({ key, label, type: "percent", ratio: { of, over } });
 const balance = (key: string, label: string, type: "qty" | "money"): ReportColumn => ({ key, label, type, total: "last" });
 
-const PART_FILTERS: ReportFilterKey[] = ["part", "partFlag", "priceCategory"];
-const STOCK_PART_FILTERS: ReportFilterKey[] = ["part", "includeAlternates", "partFlag", "priceCategory"];
+const PART_FILTERS: ReportFilterKey[] = ["part", "partType", "partFlag", "priceCategory"];
+const STOCK_PART_FILTERS: ReportFilterKey[] = ["part", "includeAlternates", "partType", "partFlag", "priceCategory"];
 const FIFO_FIRST = [
   { value: "FIFO", label: "FIFO" },
   { value: "DEALER", label: "Dealer rate" },
@@ -99,6 +100,24 @@ const COUNT_PART_COLUMNS: ReportColumn[] = [
   money("rate", "Dealer rate", false),
 ];
 const CATEGORY_COLUMNS: ReportColumn[] = [text("category", "Category"), text("categoryName", "Description")];
+/** Consumption Report (legacy Consumption Report (Consolidated)): issues by kind, net of returns, at retail rate, in the legacy order. */
+const CONSUMPTION_COLUMNS: ReportColumn[] = [
+  qty("pdi", "PDI req qty"),
+  qty("job", "Job order issues qty"),
+  money("jobAmount", "Job order issues amount"),
+  qty("foc", "FOC issues"),
+  qty("goodwill", "Goodwill issues"),
+  qty("pdiWarranty", "PDI warr qty"),
+  qty("warranty", "Warr req qty"),
+  qty("counterSale", "Counter sale qty"),
+  money("counterSaleAmount", "Counter sale amount"),
+  qty("consumable", "Consumable issue qty"),
+  qty("samples", "Samples qty"),
+  qty("stn", "STN qty"),
+  qty("san", "SAN qty (not in total)"),
+  qty("quantity", "Total issues qty"),
+  money("value", "Total issues amount"),
+];
 const PROFIT_COLUMNS: ReportColumn[] = [
   qty("quantity", "Qty"),
   money("sales", "Sale value"),
@@ -117,18 +136,17 @@ const PENDING_OPTIONS = [
   { value: "PENDING", label: "Pending" },
 ];
 const RECEIPT_QTY: ReportColumn[] = [qty("received", "Received"), qty("damaged", "Damaged"), qty("short", "Short")];
+/** Legacy STN/SRN Register columns; the flag prints between the part number and description. */
 const STN_COLUMNS: ReportColumn[] = [
-  text("stnNumber", "STN No"),
+  text("stnNumber", "Bill Number"),
   date(),
-  text("toBranch", "To branch"),
-  text("indents", "Indent(s)"),
-  text("partNumber", "Part Number"),
+  text("toBranch", "Store"),
+  text("partNumber", "Part No"),
+  text("partFlag", "Flag"),
   text("description", "Description"),
   qty("quantity", "Qty"),
   money("rate", "Rate", false),
   money("amount", "Amount"),
-  qty("accounted", "Received"),
-  text("status", "Status"),
 ];
 
 /**
@@ -694,27 +712,23 @@ export const REPORTS: ReportDefinition[] = [
     kind: "stn-register",
     title: "STN / SRN Register",
     group: "Transfers",
-    description: "Stock transfer notes sent from the branch, or stock receipts (transfer MRNs) received into it.",
+    description: "Stock transfer notes sent from the branch, or stock receipts (transfer MRNs) received into it, document by document with a total under each.",
     permission: PERMISSIONS.TRANSFER_READ,
     filters: [...PART_FILTERS, "option"],
     options: [
-      { value: "STN", label: "STN register" },
-      { value: "SRN", label: "Stock receipt note" },
+      { value: "STN", label: "STN Register" },
+      { value: "SRN", label: "Stock Receipt Note" },
     ],
+    grouped: true,
+    carriedForward: true,
     columns: {
       STN: STN_COLUMNS,
+      // On an SRN the store is the sending branch and the quantity is what was received.
       SRN: [
-        text("mrnNumber", "MRN No"),
+        text("mrnNumber", "Bill Number"),
         date(),
-        text("fromBranch", "From branch"),
-        text("stnNumber", "STN No"),
-        text("partNumber", "Part Number"),
-        text("description", "Description"),
-        qty("received", "Received"),
-        qty("damaged", "Damaged"),
-        qty("short", "Short"),
-        money("rate", "Rate", false),
-        money("value", "Value"),
+        text("fromBranch", "Store"),
+        ...STN_COLUMNS.slice(3),
       ],
     },
   },
@@ -722,12 +736,15 @@ export const REPORTS: ReportDefinition[] = [
     kind: "store-wise-stn",
     title: "Store Wise STN Register",
     group: "Transfers",
-    description: "STNs sent from the branch, grouped by receiving branch, with subtotals.",
+    description: "STNs sent from each store, document by document with a total under each.",
     permission: PERMISSIONS.TRANSFER_READ,
     filters: ["branch", ...PART_FILTERS],
     labels: { branch: "To branch" },
     grouped: true,
-    columns: STN_COLUMNS,
+    carriedForward: true,
+    // Legacy leaves off the receiving store and the rate. Its Tax, Discount and Others are always
+    // zero on an STN, so Net Amount is the Amount.
+    columns: STN_COLUMNS.filter((c) => c.key !== "toBranch" && c.key !== "rate"),
   },
   {
     kind: "indent-inward-register",
@@ -810,28 +827,21 @@ export const REPORTS: ReportDefinition[] = [
     kind: "consumption",
     title: "Consumption Report (Consolidated)",
     group: "Stock movement",
-    description: "Part-wise quantities issued (counter sales, workshop issues) and transferred out, less returns, or the summary by part category.",
+    description: "Part-wise quantities issued in the period by kind (PDI, job order, FOC, goodwill, warranty, counter sale, consumable issue, samples, STN), less returns, at retail rate, with SAN for reference and the closing balance; or the summary by part category.",
     permission: PERMISSIONS.STOCK_READ,
     filters: [...PART_FILTERS, "includeReturns", "summary"],
+    carriedForward: true,
     columns: [
       text("partNumber", "Part Number"),
+      text("flag", "Flag"),
       text("description", "Description"),
       text("category", "Category"),
-      qty("issued", "Issued"),
-      qty("transferred", "Transferred out"),
-      qty("returned", "Returned"),
-      qty("net", "Net consumption"),
-      money("rate", "Dealer rate", false),
-      money("value", "Value"),
+      money("dealerRate", "Dealer rate", false),
+      money("retailRate", "Retail rate", false),
+      ...CONSUMPTION_COLUMNS,
+      qty("closing", "Closing balance"),
     ],
-    summaryColumns: [
-      ...CATEGORY_COLUMNS,
-      qty("issued", "Issued"),
-      qty("transferred", "Transferred out"),
-      qty("returned", "Returned"),
-      qty("net", "Net consumption"),
-      money("value", "Value"),
-    ],
+    summaryColumns: [...CATEGORY_COLUMNS, ...CONSUMPTION_COLUMNS],
   },
   {
     kind: "issue-checklist",
@@ -1085,7 +1095,7 @@ export const REPORTS: ReportDefinition[] = [
     description: "Current stock in bin order, for checking the shelves.",
     permission: PERMISSIONS.STOCK_READ,
     period: "none",
-    filters: ["search", "partFlag", "priceCategory"],
+    filters: ["search", "partType", "partFlag", "priceCategory"],
     labels: { search: "Bin location (optional)" },
     grouped: true,
     columns: [text("bin", "Bin"), ...PART_COLUMNS, text("binCard", "Bin card"), qty("quantity", "Stock")],

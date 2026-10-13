@@ -7,7 +7,7 @@
  * (ledger, summary, balances, ageing…) are built in stockReport.service.ts, and the MIS
  * reports in misReport.service.ts.
  */
-import { IndentStatus, MitStatus, MrnSource, Prisma, StnStatus } from "@prisma/client";
+import { ChargeType, IndentStatus, MitStatus, MrnSource, Prisma, StnStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, NotFoundError } from "../../shared/errors/appError";
 import { money, sumMoney } from "../finance/money";
@@ -15,6 +15,7 @@ import { columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./part
 import { dateRange, lineValues, partWhere, partyName, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
 import { MisReportService } from "./misReport.service";
 import { StockReportService } from "./stockReport.service";
+import { STOCK_MOVEMENTS } from "./stockReport.logic";
 import { physicalStockRows, stockTakeLogRows } from "../stock-take/stockTake.report";
 
 export type { ReportFilters };
@@ -36,8 +37,20 @@ const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, binLocation: true, unitPrice: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, binLocation: true, unitPrice: true, retailRate: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
 } as const;
+
+/** Consumption Report issue columns (legacy order): workshop issues by job type and who pays the line, then the other issues. */
+const CONSUMPTION_COLUMNS = ["pdi", "job", "foc", "goodwill", "pdiWarranty", "warranty", "counterSale", "consumable", "samples", "stn"];
+const CHARGE_COLUMN: Record<ChargeType, string> = { CUSTOMER: "job", WARRANTY: "warranty", GOODWILL: "goodwill", FREE: "foc" };
+/** Legacy prints an amount beside these issue columns; the others count only in the total amount. */
+const CONSUMPTION_AMOUNTS: Record<string, string> = { job: "jobAmount", counterSale: "counterSaleAmount" };
+/** Legacy part flag F: samples, issued at no value. */
+const SAMPLE_FLAG = "F";
+
+/** A document's heading line, as legacy prints it: "number · dd/mm/yyyy · store". */
+const documentHeading = (number: string, date: Date, store: string) =>
+  `${number} · ${LAGOS_DAY.format(date).split("-").reverse().join("/")} · ${store}`;
 
 /** The last line of each group: a running balance's closing value. */
 const closingLines = (rows: Row[]) => rows.filter((r, i) => i === rows.length - 1 || rows[i + 1].group !== r.group);
@@ -677,38 +690,54 @@ export class PartsReportService {
     }));
   }
 
+  /**
+   * Legacy STN/SRN Register: one block per document headed "number · date · store", lines in part
+   * number order, a total under each. STNs are valued at the dealer rate on dispatch; SRNs at the
+   * STN rate on the quantity received. Cancelled STNs are left out: their stock went back.
+   *
+   * The Store Wise STN Register is legacy's "Storelocation" layout: the same STNs and totals,
+   * sorted by the sending store, with the receiving store and rate left off. Its heading names the
+   * sending branch in place of the receiver.
+   */
   private async stnRegister(f: ReportFilters, byStore: boolean): Promise<Row[]> {
     const lines = await prisma.stockTransferNoteLine.findMany({
       where: {
         part: partWhere(f),
         stn: {
           documentDate: dateRange(f),
+          status: { not: StnStatus.CANCELLED },
           ...(f.branchId && { sourceBranchId: f.branchId }),
           ...(f.otherBranchId && { destinationBranchId: f.otherBranchId }),
         },
       },
       include: {
         part: partSelect,
-        indentLine: { select: { indent: { select: { indentNumber: true } } } },
-        stn: { select: { stnNumber: true, documentDate: true, status: true, destinationBranch: { select: { name: true } } } },
+        stn: {
+          select: {
+            stnNumber: true,
+            documentDate: true,
+            sourceBranch: { select: { name: true } },
+            destinationBranch: { select: { name: true } },
+          },
+        },
       },
-      orderBy: [{ stn: { documentDate: "asc" } }, { stn: { stnNumber: "asc" } }],
+      orderBy: [{ stn: { documentDate: "asc" } }, { stn: { stnNumber: "asc" } }, { part: { partNumber: "asc" } }],
     });
     const rows = lines.map((l) => ({
-      ...(byStore && { group: l.stn.destinationBranch.name }),
+      group: documentHeading(l.stn.stnNumber, l.stn.documentDate, (byStore ? l.stn.sourceBranch : l.stn.destinationBranch).name),
+      fromBranch: l.stn.sourceBranch.name,
       stnNumber: l.stn.stnNumber,
       date: l.stn.documentDate.toISOString(),
       toBranch: l.stn.destinationBranch.name,
-      indents: l.indentLine?.indent.indentNumber ?? "Direct",
       partNumber: l.part.partNumber,
+      partFlag: l.part.partFlag,
       description: l.part.name,
       quantity: l.quantity,
       rate: l.unitRate,
       amount: l.amount,
-      accounted: l.receivedQuantity + l.damagedQuantity + l.shortQuantity,
-      status: statusLabel(l.stn.status),
     }));
-    return byStore ? rows.sort((a, b) => String(a.group).localeCompare(String(b.group))) : rows;
+    // A stable sort keeps each store's STNs in date order.
+    return byStore ? rows.sort((a, b) => a.fromBranch.localeCompare(b.fromBranch)) : rows;
   }
 
   private async srnRegister(f: ReportFilters): Promise<Row[]> {
@@ -719,23 +748,25 @@ export class PartsReportService {
       },
       include: {
         part: partSelect,
-        mrn: { select: { mrnNumber: true, receiptDate: true, sourceBranch: { select: { name: true } }, stn: { select: { stnNumber: true } } } },
+        mrn: { select: { mrnNumber: true, receiptDate: true, sourceBranch: { select: { name: true } } } },
       },
-      orderBy: [{ mrn: { receiptDate: "asc" } }, { mrn: { mrnNumber: "asc" } }],
+      orderBy: [{ mrn: { receiptDate: "asc" } }, { mrn: { mrnNumber: "asc" } }, { part: { partNumber: "asc" } }],
     });
-    return lines.map((l) => ({
-      mrnNumber: l.mrn.mrnNumber,
-      date: l.mrn.receiptDate.toISOString(),
-      fromBranch: l.mrn.sourceBranch?.name ?? "",
-      stnNumber: l.mrn.stn?.stnNumber ?? "",
-      partNumber: l.part.partNumber,
-      description: l.part.name,
-      received: l.receivedQuantity,
-      damaged: l.damagedQuantity,
-      short: l.shortQuantity,
-      rate: l.unitCost,
-      value: l.amount,
-    }));
+    return lines.map((l) => {
+      const store = l.mrn.sourceBranch?.name ?? "";
+      return {
+        group: documentHeading(l.mrn.mrnNumber, l.mrn.receiptDate, store),
+        mrnNumber: l.mrn.mrnNumber,
+        date: l.mrn.receiptDate.toISOString(),
+        fromBranch: store,
+        partNumber: l.part.partNumber,
+        partFlag: l.part.partFlag,
+        description: l.part.name,
+        quantity: l.receivedQuantity,
+        rate: l.unitCost,
+        amount: l.amount,
+      };
+    });
   }
 
   /** STN lines dispatched to the branch: what has arrived and what is still on the way. */
@@ -842,38 +873,102 @@ export class PartsReportService {
     });
   }
 
+  /**
+   * Legacy Consumption Report (Consolidated): what each part was issued for in the period. Workshop
+   * issues are split by job type (PDI or not) and who pays the job card line; an issue with no job
+   * card is a consumable issue; sample parts (flag F) have their own column at no value. Returns
+   * (optional) come off the column of the issue they undo. Valued at the retail rate on each line
+   * (job card line, bill line, return line); STNs and consumable issues carry no retail rate, so the
+   * part's. Cancelled bills are left out altogether, as on legacy. SAN is the stock taken out by SAN
+   * subtractions (additions are ignored), shown for reference only: it is not in the total issues. Closing is the stock at `to`.
+   */
   private async consumption(f: ReportFilters): Promise<Row[]> {
     const includeReturns = f.includeReturns !== false;
-    const txns = await this.stockTransactions(f, ["ISSUED", "TRANSFER_OUT", "RETURNED"]);
+    const txns = (await this.stockTransactions(f, ["ISSUED", "TRANSFER_OUT", "RETURNED", "ADJUSTMENT"])).filter((t) => includeReturns || t.type !== "RETURNED");
+    const refs = [...new Set(txns.filter((t) => t.type !== "TRANSFER_OUT" && t.referenceId).map((t) => t.referenceId!))];
+    const [issuances, billLines, returnLines] = await Promise.all([
+      prisma.partIssuance.findMany({
+        where: { id: { in: refs } },
+        select: { id: true, jobCard: { select: { serviceType: { select: { preDelivery: true } } } }, jobCardLine: { select: { chargeType: true, rate: true } } },
+      }),
+      prisma.invoiceLine.findMany({
+        where: { invoiceId: { in: refs }, partId: { not: null } },
+        select: { invoiceId: true, partId: true, quantity: true, rate: true, invoice: { select: { cancelledAt: true } } },
+      }),
+      prisma.counterSaleReturnLine.findMany({ where: { returnId: { in: refs } }, select: { returnId: true, partId: true, quantity: true, rate: true } }),
+    ]);
+    const jobs = new Map(issuances.map((i) => [i.id, i]));
+    const cancelledBills = new Set(billLines.filter((l) => l.invoice.cancelledAt).map((l) => l.invoiceId));
+    // A bill (or return) can carry a part on more than one line: its average rate.
+    const lineRates = new Map<string, { quantity: number; value: number }>();
+    for (const l of [...billLines.map((b) => ({ doc: b.invoiceId, ...b })), ...returnLines.map((r) => ({ doc: r.returnId, ...r }))]) {
+      const key = `${l.doc}:${l.partId}`;
+      const sofar = lineRates.get(key) ?? { quantity: 0, value: 0 };
+      lineRates.set(key, { quantity: sofar.quantity + l.quantity, value: sofar.value + l.quantity * l.rate });
+    }
+
     const byPart = new Map<string, Row>();
     for (const t of txns) {
+      const ref = t.referenceId ?? "";
+      if (cancelledBills.has(ref)) continue;
+      // SAN counts only subtractions (legacy SAN type S); a SAN addition is stock found, not an issue.
+      if (t.type === "ADJUSTMENT" && t.quantity >= 0) continue;
+      const retailRate = t.part.retailRate ?? 0;
       const key = f.summary ? (t.part.priceCategoryCode ?? "") : t.partId;
       const row = byPart.get(key) ?? {
         ...(f.summary
           ? { categoryName: t.part.priceCategory?.description ?? "No price category" }
-          : { partNumber: t.part.partNumber, description: t.part.name }),
+          : { partNumber: t.part.partNumber, flag: t.part.partFlag, description: t.part.name }),
         category: t.part.priceCategoryCode,
-        issued: 0,
-        transferred: 0,
-        returned: 0,
-        net: 0,
-        rate: t.part.unitPrice,
+        ...(!f.summary && { dealerRate: t.part.unitPrice, retailRate }),
+        ...Object.fromEntries([...CONSUMPTION_COLUMNS, ...Object.values(CONSUMPTION_AMOUNTS)].map((c) => [c, 0])),
+        quantity: 0,
         value: 0,
+        san: 0,
       };
-      if (t.type === "ISSUED") row.issued = Number(row.issued) + Math.abs(t.quantity);
-      else if (t.type === "TRANSFER_OUT") row.transferred = Number(row.transferred) + Math.abs(t.quantity);
-      else row.returned = Number(row.returned) + Math.abs(t.quantity);
-      // Valued at each part's dealer rate, so a category adds up its parts.
-      const sign = t.type === "RETURNED" ? (includeReturns ? -1 : 0) : 1;
-      row.value = money(Number(row.value) + sign * Math.abs(t.quantity) * t.part.unitPrice);
       byPart.set(key, row);
+      // Issues and SAN subtractions are negative movements, returns positive.
+      const consumed = -t.quantity;
+      if (t.type === "ADJUSTMENT") {
+        row.san = Number(row.san) + consumed;
+        continue;
+      }
+      const job = jobs.get(ref);
+      const line = lineRates.get(`${ref}:${t.partId}`);
+      const chargeType = job?.jobCardLine?.chargeType ?? "CUSTOMER";
+      const pdi = !!job?.jobCard?.serviceType?.preDelivery && (chargeType === "CUSTOMER" || chargeType === "WARRANTY");
+      const [column, rate] =
+        t.type === "TRANSFER_OUT" ? ["stn", retailRate]
+        : t.part.partFlag === SAMPLE_FLAG ? ["samples", 0]
+        : job?.jobCard ? [pdi ? (chargeType === "WARRANTY" ? "pdiWarranty" : "pdi") : CHARGE_COLUMN[chargeType], job.jobCardLine?.rate ?? retailRate]
+        : line ? ["counterSale", line.quantity ? line.value / line.quantity : retailRate]
+        : ["consumable", retailRate];
+      row[column] = Number(row[column]) + consumed;
+      row.quantity = Number(row.quantity) + consumed;
+      row.value = money(Number(row.value) + consumed * rate);
+      const amount = CONSUMPTION_AMOUNTS[column];
+      if (amount) row[amount] = money(Number(row[amount]) + consumed * rate);
     }
-    return [...byPart.values()]
-      .map((row): Row => {
-        const net = Number(row.issued) + Number(row.transferred) - (includeReturns ? Number(row.returned) : 0);
-        return { ...row, ...(includeReturns ? {} : { returned: 0 }), net };
-      })
+    const rows = [...byPart.entries()].filter(([, row]) => [...CONSUMPTION_COLUMNS, "san"].some((c) => row[c] !== 0));
+    if (!f.summary) {
+      const closing = await this.stockAt(f, rows.map(([partId]) => partId));
+      for (const [partId, row] of rows) row.closing = closing.get(partId) ?? 0;
+    }
+    return rows
+      .map(([, row]) => row)
       .sort((a, b) => String(a.partNumber ?? a.category ?? "").localeCompare(String(b.partNumber ?? b.category ?? "")));
+  }
+
+  /** Each part's stock at the end of `to` (all branches when none is chosen): today's stock less later movements. */
+  private async stockAt(f: ReportFilters, partIds: string[]) {
+    const where = { ...(f.branchId && { branchId: f.branchId }), partId: { in: partIds } };
+    const [stocks, later] = await Promise.all([
+      prisma.inventoryStock.groupBy({ by: ["partId"], where, _sum: { quantity: true } }),
+      prisma.stockTransaction.groupBy({ by: ["partId"], where: { ...where, type: { in: STOCK_MOVEMENTS }, createdAt: { gte: dateRange(f).lt } }, _sum: { quantity: true } }),
+    ]);
+    const balance = new Map(stocks.map((s) => [s.partId, s._sum.quantity ?? 0]));
+    for (const m of later) balance.set(m.partId, (balance.get(m.partId) ?? 0) - (m._sum.quantity ?? 0));
+    return balance;
   }
 
   /**

@@ -21,6 +21,7 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   retailRate: null,
   taxable: true,
   partFlag: "O",
+  partType: "S",
   priceCategoryCode: null,
   binLocation: null,
   storeLocation: null,

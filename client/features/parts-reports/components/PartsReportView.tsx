@@ -26,6 +26,7 @@ import {
   type ReportRow,
 } from "../api/parts-reports.api";
 import { carriedForward, exportReportXlsx, subtotal } from "../lib/export-report";
+import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "@/features/inventory/lib/part-codes";
 
 const lagosToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" }).format(new Date());
 const amount = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -297,13 +298,26 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
             Include alternate parts
           </label>
         )}
+        {has("partType") && (
+          <Field label="Part type">
+            <select className={inputCls} value={params.partType ?? ""} onChange={(e) => set({ partType: e.target.value || undefined })}>
+              <option value="">All</option>
+              {Object.keys(PART_TYPE_LABELS).map((code) => (
+                <option key={code} value={code}>
+                  {codeLabel(PART_TYPE_LABELS, code)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         {has("partFlag") && (
-          <Field label="Purchase source (part flag)">
+          <Field label="Purchase source">
             <select className={inputCls} value={params.partFlag ?? ""} onChange={(e) => set({ partFlag: e.target.value || undefined })}>
               <option value="">All</option>
-              {(lookups.data?.partFlags ?? []).map((flag) => (
-                <option key={flag} value={flag}>
-                  {flag}
+              {/* The four legacy sources, then any other flag found in Part Master. */}
+              {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(lookups.data?.partFlags ?? [])])].map((code) => (
+                <option key={code} value={code}>
+                  {codeLabel(PART_FLAG_LABELS, code)}
                 </option>
               ))}
             </select>
