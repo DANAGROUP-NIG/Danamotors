@@ -66,6 +66,8 @@ export interface ReportDefinition {
   countTypes?: { value: string; label: string }[];
   /** Rows carry a `group` value; the screen shows a heading and subtotal per group. */
   grouped?: boolean;
+  /** Printed and exported in pages that end with the running grand total (legacy "Carried Forward"). */
+  carriedForward?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
   /** With the `summary` filter ticked: these columns instead. */
   summaryColumns?: ReportColumn[];
@@ -87,10 +89,10 @@ const FIFO_FIRST = [
 ];
 const DEALER_FIRST = [FIFO_FIRST[1], FIFO_FIRST[0]];
 const BASED_ON = { option: "Based on" };
-const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part No"), text("description", "Description"), text("category", "Category")];
+const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part Number"), text("description", "Description"), text("category", "Category")];
 /** Physical stock taking: the part as counted, valued at dealer rate. */
 const COUNT_PART_COLUMNS: ReportColumn[] = [
-  text("partNumber", "Part No"),
+  text("partNumber", "Part Number"),
   text("flag", "Flag"),
   text("description", "Description"),
   text("bin", "Bin"),
@@ -120,7 +122,7 @@ const STN_COLUMNS: ReportColumn[] = [
   date(),
   text("toBranch", "To branch"),
   text("indents", "Indent(s)"),
-  text("partNumber", "Part No"),
+  text("partNumber", "Part Number"),
   text("description", "Description"),
   qty("quantity", "Qty"),
   money("rate", "Rate", false),
@@ -177,7 +179,7 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
     ],
     BIN: [
       datetime("date", "Counted"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("flag", "Flag"),
       text("description", "Description"),
       qty("physicalQuantity", "Physical qty"),
@@ -206,7 +208,7 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
     NOT_DEFINED: [
       batch,
       datetime("date", "Counted"),
-      text("partNumber", "Part No (as counted)"),
+      text("partNumber", "Part Number (as counted)"),
       text("bin", "Found in"),
       qty("physicalQuantity", "Physical qty"),
       qty("damagedQuantity", "Damaged qty"),
@@ -219,7 +221,7 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
     // Legacy Parts Having Bin Location Exceeds Defined Limit: the bins found will not fit one bin.
     BIN_LIMIT: [
       batch,
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("flag", "Flag"),
       text("description", "Description"),
       text("recordedBin", "Bin on record"),
@@ -313,7 +315,7 @@ const STOCK_TAKE_LOG: ReportDefinition = {
     CORRECTIONS: [
       text("batch", "Batch No"),
       datetime("date", "Corrected"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("entry", "Entry"),
       qty("quantity", "Qty change"),
@@ -349,7 +351,7 @@ export const REPORTS: ReportDefinition[] = [
       text("customerCode", "Code"),
       text("customer", "Customer"),
       text("cpoNumber", "CPO"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty"),
       money("rate", "Rate", false),
@@ -432,7 +434,7 @@ export const REPORTS: ReportDefinition[] = [
       date(),
       text("billNumber", "Bill No"),
       text("customer", "Customer"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty"),
       money("rate", "Rate", false),
@@ -525,7 +527,7 @@ export const REPORTS: ReportDefinition[] = [
       date(),
       text("customer", "Customer"),
       text("reference", "Customer ref."),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("ordered", "Ordered"),
       qty("picked", "Picked"),
@@ -558,7 +560,7 @@ export const REPORTS: ReportDefinition[] = [
         date(),
         text("invoiceNumber", "Invoice No"),
         text("mitNumber", "MIT No"),
-        text("partNumber", "Part No"),
+        text("partNumber", "Part Number"),
         text("description", "Description"),
         ...RECEIPT_QTY,
         money("unitPrice", "Invoice price", false),
@@ -593,7 +595,7 @@ export const REPORTS: ReportDefinition[] = [
       text("invoiceNumber", "Invoice No"),
       text("caseNumber", "Case No"),
       text("orderNumber", "Order No"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Invoiced"),
       ...RECEIPT_QTY,
@@ -612,7 +614,7 @@ export const REPORTS: ReportDefinition[] = [
     filters: PART_FILTERS,
     columns: [
       text("bin", "Bin"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       date(),
       text("mrnNumber", "MRN No"),
@@ -642,7 +644,7 @@ export const REPORTS: ReportDefinition[] = [
         text("invoiceNumber", "Invoice No"),
         text("mitNumber", "MIT No"),
         text("caseNumber", "Case No"),
-        text("partNumber", "Part No"),
+        text("partNumber", "Part Number"),
         text("description", "Description"),
         qty("expected", "Invoiced"),
         ...RECEIPT_QTY,
@@ -656,7 +658,7 @@ export const REPORTS: ReportDefinition[] = [
         text("stnNumber", "STN No"),
         text("packingNumber", "Packing No"),
         text("caseNumber", "Case No"),
-        text("partNumber", "Part No"),
+        text("partNumber", "Part Number"),
         text("description", "Description"),
         qty("expected", "Sent"),
         ...RECEIPT_QTY,
@@ -679,7 +681,7 @@ export const REPORTS: ReportDefinition[] = [
       date(),
       text("indentNumber", "Indent"),
       text("toBranch", "For branch"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("requestedPart", "Alternate for"),
       text("bin", "Bin"),
@@ -706,7 +708,7 @@ export const REPORTS: ReportDefinition[] = [
         date(),
         text("fromBranch", "From branch"),
         text("stnNumber", "STN No"),
-        text("partNumber", "Part No"),
+        text("partNumber", "Part Number"),
         text("description", "Description"),
         qty("received", "Received"),
         qty("damaged", "Damaged"),
@@ -740,7 +742,7 @@ export const REPORTS: ReportDefinition[] = [
       text("indentNumber", "Indent No"),
       date(),
       text("fromBranch", "From branch"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("requested", "Requested"),
       qty("approved", "Approved"),
@@ -766,7 +768,7 @@ export const REPORTS: ReportDefinition[] = [
       text("indentNumber", "Indent No"),
       date(),
       text("toBranch", "Supplying branch"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("requested", "Requested"),
       qty("approved", "Approved"),
@@ -792,7 +794,7 @@ export const REPORTS: ReportDefinition[] = [
       date(),
       text("fromBranch", "From branch"),
       text("packingNumber", "Packing No"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Sent"),
       ...RECEIPT_QTY,
@@ -812,7 +814,7 @@ export const REPORTS: ReportDefinition[] = [
     permission: PERMISSIONS.STOCK_READ,
     filters: [...PART_FILTERS, "includeReturns", "summary"],
     columns: [
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("category", "Category"),
       qty("issued", "Issued"),
@@ -835,18 +837,23 @@ export const REPORTS: ReportDefinition[] = [
     kind: "issue-checklist",
     title: "Checklist for Issues",
     group: "Stock movement",
-    description: "Every issue in the period in bin order, for the store to check against the shelves.",
+    description: "Every issue in the period, voucher wise: STNs, counter sales, workshop and other issues, with subtotals.",
     permission: PERMISSIONS.STOCK_READ,
     filters: PART_FILTERS,
+    grouped: true,
+    carriedForward: true,
     columns: [
-      text("bin", "Bin"),
-      text("partNumber", "Part No"),
-      text("description", "Description"),
+      text("voucher", "Voucher No"),
       date(),
-      text("type", "Issue type"),
-      text("reference", "Reference"),
-      qty("quantity", "Qty"),
-      text("by", "Issued by"),
+      text("code", "Cust code"),
+      text("issuedTo", "Customer name"),
+      text("partNumber", "Part Number"),
+      text("partFlag", "Flag"),
+      text("description", "Description"),
+      text("unit", "Unit"),
+      qty("required", "Qty reqd", false),
+      qty("quantity", "Qty issued"),
+      money("amount", "Amount"),
     ],
   },
   {
@@ -863,7 +870,7 @@ export const REPORTS: ReportDefinition[] = [
     ],
     columns: [
       date(),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty (+/−)"),
       money("rate", "Dealer rate", false),
@@ -911,7 +918,7 @@ export const REPORTS: ReportDefinition[] = [
     labels: BASED_ON,
     grouped: true,
     columns: [
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("flag", "Flag"),
       text("category", "Category"),
@@ -939,7 +946,7 @@ export const REPORTS: ReportDefinition[] = [
     labels: BASED_ON,
     grouped: true,
     columns: [
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("flag", "Flag"),
       text("category", "Category"),
@@ -1003,7 +1010,7 @@ export const REPORTS: ReportDefinition[] = [
     grouped: true,
     columns: [
       date(),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("type", "Type"),
       text("number", "Doc No"),
@@ -1025,7 +1032,7 @@ export const REPORTS: ReportDefinition[] = [
     labels: BASED_ON,
     grouped: true,
     columns: [
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("openingQty", "Opening stock"),
       money("openingValue", "Opening value"),
@@ -1101,7 +1108,7 @@ export const REPORTS: ReportDefinition[] = [
     grouped: true,
     columns: {
       DETAIL: [
-        text("partNumber", "Part No"),
+        text("partNumber", "Part Number"),
         text("description", "Description"),
         text("type", "Blocked for"),
         text("document", "Document"),
@@ -1272,7 +1279,7 @@ export const REPORTS: ReportDefinition[] = [
     ],
     columns: [
       datetime("changedAt", "Changed on"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       text("flag", "Flag"),
       text("category", "Category"),
@@ -1329,7 +1336,7 @@ export const REPORTS: ReportDefinition[] = [
       text("stnNumber", "STN No"),
       text("toBranch", "To branch"),
       text("caseNumber", "Case No"),
-      text("partNumber", "Part No"),
+      text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty"),
       money("rate", "Rate", false),

@@ -34,7 +34,7 @@ title, filters, options and columns are defined once, in
 | Branch Stock Indent Outward Register | `indent-outward-register` | Indents the branch raised on other branches, with the same columns and order filter as the inward register |
 | Branch In Transit Report | `branch-in-transit` | STN lines dispatched to the branch: sent, received, damaged, short and still on the way; **All** or **Pending** |
 | Consumption Report (Consolidated), Consumption Summary (Consolidated) | `consumption` | Part-wise issued and transferred quantities, less returns (optional), at dealer rate. **Only summary** totals them by part category |
-| Checklist for Issues | `issue-checklist` | Every issue in bin order, for the store to check against the shelves |
+| Checklist for Issues | `issue-checklist` | Every issue voucher wise, with subtotals per section: **STN** at the STN rate, **Counter sales** at the billed value, **Workshop issues** (to job cards) at the job card rate, and **Other issues** (no job card) at retail rate. Cancelled bills and STNs are left out. Cust code is the receiving store's code on an STN and the customer's code otherwise. The part flag is shown, as legacy printed it before the description. Qty reqd is what was asked for: the indent line on an STN, the CPO line on a bill, and otherwise the issued quantity. The legacy service columns (registration, model, VIN, job, mileage) are dropped. As on legacy, every 30 lines (one A4 landscape page) end with a **Carried forward** line showing the running grand total, on screen, in print and in the Excel file. Dispatch challans, the legacy CHALLAN section, will join when they are built |
 | SAN Register | `stock-adjustments` | Stock adjustments: Addition, Subtraction or All |
 
 ### Stock reports

@@ -38,13 +38,27 @@ export function subtotal(rows: ReportRow[], columns: ReportColumn[]): Record<str
   return sums;
 }
 
+/** Lines per page on registers that carry their running total forward; fits A4 landscape. */
+export const LINES_PER_PAGE = 30;
+
+/**
+ * Legacy "Carried Forward": the running grand total at the end of each full page, keyed by the
+ * index of the page's last line. The last page carries nothing; the grand total follows it.
+ */
+export function carriedForward(rows: ReportRow[], columns: ReportColumn[]): Map<number, Record<string, number>> {
+  const pages = new Map<number, Record<string, number>>();
+  for (let end = LINES_PER_PAGE; end < rows.length; end += LINES_PER_PAGE) pages.set(end - 1, subtotal(rows.slice(0, end), columns));
+  return pages;
+}
+
 /**
  * Writes the report as a real .xlsx, laid out like the legacy registers: company and report
- * heading, period and branch, S.No. column, group headings with subtotals, and a total line.
+ * heading, period and branch, S.No. column, group headings with subtotals, carried-forward lines
+ * where the report has them, and a grand total line.
  */
 export async function exportReportXlsx(
   result: ReportResult,
-  meta: { subtitle?: string; scope: string; period: string; filename: string },
+  meta: { subtitle?: string; scope: string; period: string; filename: string; carriedForward?: boolean },
 ) {
   const XLSX = await import("xlsx");
   const columns = result.columns;
@@ -58,6 +72,7 @@ export async function exportReportXlsx(
   ];
   const headerRow = aoa.length - 1;
 
+  const pages = meta.carriedForward ? carriedForward(result.rows, columns) : new Map<number, Record<string, number>>();
   let serial = 0;
   let current: string | null | undefined;
   let groupRows: ReportRow[] = [];
@@ -76,9 +91,11 @@ export async function exportReportXlsx(
     }
     groupRows.push(row);
     aoa.push([++serial, ...columns.map((c) => cellValue(c, row[c.key]))]);
+    const forward = pages.get(serial - 1);
+    if (forward) aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Carried forward" : c.key in forward ? forward[c.key] : null))]);
   }
   if (result.grouped) closeGroup();
-  aoa.push(["", ...columns.map((c, i) => (i === 0 ? "TOTAL" : c.key in result.totals ? result.totals[c.key] : null))]);
+  aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Grand Total" : c.key in result.totals ? result.totals[c.key] : null))]);
   if (result.truncated) aoa.push([], ["Only the first 5,000 lines are listed; the total covers every line."]);
 
   const sheet = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true, dateNF: "dd/mm/yyyy" });

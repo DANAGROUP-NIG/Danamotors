@@ -56,6 +56,8 @@ export type ReportDefinition = {
   /** Stock taking type, or audit type. */
   countTypes?: { value: string; label: string }[];
   grouped?: boolean;
+  /** Printed and exported in pages that end with the running grand total (legacy "Carried Forward"). */
+  carriedForward?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
   summaryColumns?: ReportColumn[];
 };

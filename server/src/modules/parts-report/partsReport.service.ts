@@ -36,7 +36,7 @@ const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, binLocation: true, unitPrice: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, binLocation: true, unitPrice: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
 } as const;
 
 /** The last line of each group: a running balance's closing value. */
@@ -876,21 +876,96 @@ export class PartsReportService {
       .sort((a, b) => String(a.partNumber ?? a.category ?? "").localeCompare(String(b.partNumber ?? b.category ?? "")));
   }
 
+  /**
+   * Every issue in the period, voucher wise, in sections: STNs at the STN rate, counter sales at
+   * the billed value, workshop issues at the job card rate and other issues at retail rate.
+   * Required is what was asked for: the indent line (approved, else requested) or the CPO line;
+   * a direct STN, a bill without a CPO and a part issue were asked for as issued.
+   * Cancelled bills and STNs are left out: their stock went back.
+   */
   private async issueChecklist(f: ReportFilters): Promise<Row[]> {
-    const txns = await this.stockTransactions(f, ["ISSUED", "TRANSFER_OUT"]);
-    const rack = await this.racks(f, txns.map((t) => t.partId));
-    return txns
-      .map((t) => ({
-        bin: rack.get(t.partId) ?? t.part.binLocation ?? "",
-        partNumber: t.part.partNumber,
-        description: t.part.name,
-        date: t.createdAt.toISOString(),
-        type: t.type === "TRANSFER_OUT" ? "STN" : t.notes?.startsWith("Counter sale") ? "Counter sale" : "Issue",
-        reference: t.notes,
-        quantity: Math.abs(t.quantity),
-        by: userName(t.recordedBy),
-      }))
-      .sort((a, b) => a.bin.localeCompare(b.bin) || a.partNumber.localeCompare(b.partNumber) || a.date.localeCompare(b.date));
+    const [stnLines, saleLines, issuances] = await Promise.all([
+      prisma.stockTransferNoteLine.findMany({
+        where: {
+          part: partWhere(f),
+          stn: { documentDate: dateRange(f), stockDeducted: true, status: { not: StnStatus.CANCELLED }, ...(f.branchId && { sourceBranchId: f.branchId }) },
+        },
+        include: {
+          part: partSelect,
+          indentLine: { select: { requestedQuantity: true, approvedQuantity: true } },
+          stn: { select: { stnNumber: true, documentDate: true, destinationBranch: { select: { code: true, name: true } } } },
+        },
+      }),
+      prisma.invoiceLine.findMany({
+        where: { invoice: this.saleInvoiceWhere(f), part: partWhere(f) },
+        include: {
+          part: partSelect,
+          customerOrderLine: { select: { orderedQuantity: true } },
+          invoice: { select: { invoiceNumber: true, issuedDate: true, partsDiscountPercent: true, customer: customerSelect } },
+        },
+      }),
+      prisma.partIssuance.findMany({
+        where: { issuedAt: dateRange(f), sparePart: partWhere(f), ...(f.branchId && { branchId: f.branchId }) },
+        include: {
+          sparePart: { select: { partNumber: true, name: true, uom: true, partFlag: true, retailRate: true } },
+          jobCard: { select: { jobNumber: true, customer: customerSelect } },
+          jobCardLine: { select: { amount: true } },
+        },
+      }),
+    ]);
+    const sections: Row[][] = [
+      stnLines.map((l) => ({
+        group: "STN",
+        voucher: l.stn.stnNumber,
+        date: l.stn.documentDate.toISOString(),
+        code: l.stn.destinationBranch.code,
+        issuedTo: l.stn.destinationBranch.name,
+        partNumber: l.part.partNumber,
+        partFlag: l.part.partFlag,
+        description: l.part.name,
+        unit: l.part.uom,
+        required: l.indentLine ? (l.indentLine.approvedQuantity ?? l.indentLine.requestedQuantity) : l.quantity,
+        quantity: l.quantity,
+        amount: l.amount,
+      })),
+      saleLines.map((l) => ({
+        group: "Counter sales",
+        voucher: l.invoice.invoiceNumber,
+        date: l.invoice.issuedDate.toISOString(),
+        code: l.invoice.customer.code,
+        issuedTo: partyName(l.invoice.customer),
+        partNumber: l.part?.partNumber ?? "",
+        partFlag: l.part?.partFlag ?? "",
+        description: l.description,
+        unit: l.part?.uom ?? "",
+        required: l.customerOrderLine?.orderedQuantity ?? l.quantity,
+        quantity: l.quantity,
+        amount: lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent).net,
+      })),
+      ...[true, false].map((toJob) =>
+        issuances
+          .filter((i) => !!i.jobCard === toJob)
+          .map((i) => ({
+            group: toJob ? "Workshop issues" : "Other issues",
+            voucher: i.jobCard?.jobNumber ?? "",
+            date: i.issuedAt.toISOString(),
+            code: i.jobCard?.customer?.code ?? "",
+            issuedTo: i.jobCard?.customer ? partyName(i.jobCard.customer) : (i.notes ?? ""),
+            partNumber: i.sparePart.partNumber,
+            partFlag: i.sparePart.partFlag,
+            description: i.sparePart.name,
+            unit: i.sparePart.uom,
+            required: i.quantity,
+            quantity: i.quantity,
+            amount: i.jobCardLine?.amount ?? money(i.quantity * (i.sparePart.retailRate ?? 0)),
+          })),
+      ),
+    ];
+    const byVoucher = (a: Row, b: Row) =>
+      String(a.date).localeCompare(String(b.date)) ||
+      String(a.voucher).localeCompare(String(b.voucher)) ||
+      String(a.partNumber).localeCompare(String(b.partNumber));
+    return sections.flatMap((rows) => rows.sort(byVoucher));
   }
 
   /** The branch's rack location per part, for the checklists (none for all branches). */

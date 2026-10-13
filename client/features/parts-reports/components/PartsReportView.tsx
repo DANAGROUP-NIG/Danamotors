@@ -25,7 +25,7 @@ import {
   type ReportResult,
   type ReportRow,
 } from "../api/parts-reports.api";
-import { exportReportXlsx, subtotal } from "../lib/export-report";
+import { carriedForward, exportReportXlsx, subtotal } from "../lib/export-report";
 
 const lagosToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" }).format(new Date());
 const amount = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -117,6 +117,7 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
         scope: scopeLabel,
         period: applied ? periodLabel(applied) : "",
         filename: period === "range" ? `${kind}-${applied?.from}-to-${applied?.to}` : `${kind}-${applied?.to}`,
+        carriedForward: definition?.carriedForward,
       });
     } catch {
       toast.error("The Excel file could not be created");
@@ -134,6 +135,12 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
     });
     return out;
   }, [result]);
+
+  // Running grand totals at each page end, on registers that carry them forward.
+  const pages = useMemo(
+    () => (result && definition?.carriedForward ? carriedForward(result.rows, result.columns) : new Map<number, Record<string, number>>()),
+    [result, definition?.carriedForward],
+  );
 
   if (catalog.isLoading) {
     return (
@@ -504,16 +511,31 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
                         </th>
                       </tr>
                     )}
-                    {g.rows.map((row, i) => (
-                      <tr key={i} className={cn("border-b last:border-0 hover:bg-muted/20", row.status === "Cancelled" && "text-muted-foreground line-through")}>
-                        <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{g.start + i + 1}</td>
-                        {result.columns.map((c) => (
-                          <td key={c.key} className={cn("px-3 py-1.5", numeric(c) ? "whitespace-nowrap text-right tabular-nums" : "", (c.type === "date" || c.type === "datetime") && "whitespace-nowrap")}>
-                            {formatCell(c, row[c.key])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {g.rows.map((row, i) => {
+                      const forward = pages.get(g.start + i);
+                      return (
+                        <Fragment key={i}>
+                          <tr className={cn("border-b last:border-0 hover:bg-muted/20", row.status === "Cancelled" && "text-muted-foreground line-through")}>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground print:py-0.5">{g.start + i + 1}</td>
+                            {result.columns.map((c) => (
+                              <td key={c.key} className={cn("px-3 py-1.5 print:py-0.5", numeric(c) ? "whitespace-nowrap text-right tabular-nums" : "", (c.type === "date" || c.type === "datetime") && "whitespace-nowrap")}>
+                                {formatCell(c, row[c.key])}
+                              </td>
+                            ))}
+                          </tr>
+                          {forward && (
+                            <tr className="border-b bg-muted/10 font-medium italic print:break-after-page">
+                              <td />
+                              {result.columns.map((c, ci) => (
+                                <td key={c.key} className={cn("px-3 py-1.5 print:py-0.5", numeric(c) && "whitespace-nowrap text-right tabular-nums")}>
+                                  {ci === 0 ? "Carried forward" : c.key in forward ? formatCell(c, forward[c.key]) : ""}
+                                </td>
+                              ))}
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                     {g.name !== null && (
                       <tr className="border-b bg-muted/10 font-medium">
                         <td />
@@ -535,7 +557,7 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
                   <td />
                   {result.columns.map((c, i) => (
                     <td key={c.key} className={cn("px-3 py-2", numeric(c) && "whitespace-nowrap text-right tabular-nums")}>
-                      {i === 0 ? "TOTAL" : c.key in result.totals ? formatCell(c, result.totals[c.key]) : ""}
+                      {i === 0 ? "Grand Total" : c.key in result.totals ? formatCell(c, result.totals[c.key]) : ""}
                     </td>
                   ))}
                 </tr>

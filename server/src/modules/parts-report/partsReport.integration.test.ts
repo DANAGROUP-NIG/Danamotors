@@ -222,7 +222,7 @@ describeDb("Parts reports (database)", () => {
     expect((await report("stock-adjustments")).totals.quantity).toBe(2);
   });
 
-  it("consolidates consumption and lists issues in bin order", async () => {
+  it("consolidates consumption and lists issues voucher wise", async () => {
     const consumption = await report("consumption");
     const oilRow = consumption.rows.find((row) => row.partNumber === `RPT-O-${run}`)!;
     // 4 sold + 5 on the STN, less 2 returned.
@@ -230,11 +230,34 @@ describeDb("Parts reports (database)", () => {
     const noReturns = await report("consumption", { includeReturns: false });
     expect(noReturns.rows.find((row) => row.partNumber === `RPT-O-${run}`)).toMatchObject({ net: 9 });
 
-    const checklist = await report("issue-checklist", { partId: mirror.id });
-    // The cancelled FOC bill's issue still shows: it left the shelf before it was cancelled.
-    expect(checklist.rows.map((row) => [row.bin, row.type, row.quantity])).toEqual([
-      ["53B3", "Counter sale", 1],
-      ["53B3", "Counter sale", 1],
+    // Voucher wise in sections; the cancelled FOC bill is left out (its stock went back).
+    const checklist = await report("issue-checklist");
+    expect(checklist.grouped).toBe(true);
+    expect(checklist.rows.map((row) => [row.group, row.partNumber, row.issuedTo, row.quantity, row.amount])).toEqual([
+      ["STN", `RPT-O-${run}`, `Kia Plaza Reports ${run}`, 5, 23500],
+      ["Counter sales", `RPT-M-${run}`, `CAVEM ${run}`, 1, 227704.57],
+      ["Counter sales", `RPT-O-${run}`, `CAVEM ${run}`, 4, 21855],
+    ]);
+    expect(checklist.totals).toEqual({ quantity: 10, amount: 273059.57 });
+    // Required: the indent line for the STN, the CPO line (3 ordered, 1 billed) for the bill.
+    expect(checklist.rows.map((row) => [row.code, row.partFlag, row.required])).toEqual([
+      [null, "O", 5],
+      [`R${run}`, "O", 3],
+      [`R${run}`, "O", 4],
+    ]);
+    expect((await report("issue-checklist", { partId: mirror.id })).rows).toHaveLength(1);
+  });
+
+  it("lists workshop issues at the job card rate and other issues at retail rate", async () => {
+    const job = await prisma.jobCard.create({ data: { branchId: cpd.id, jobNumber: `JC-${run}`, description: "Service", customerId: customer.id } });
+    const toJob = await prisma.partIssuance.create({ data: { branchId: cpd.id, sparePartId: oil.id, jobCardId: job.id, issuedById: user.id, quantity: 2 } });
+    await prisma.jobCardLine.create({ data: { jobCardId: job.id, kind: "PART", sparePartId: oil.id, partIssuanceId: toJob.id, description: "ENGINE OIL 4L", quantity: 2, rate: 7000, amount: 14000 } });
+    await prisma.partIssuance.create({ data: { branchId: cpd.id, sparePartId: oil.id, issuedById: user.id, quantity: 1, notes: "Showroom top-up" } });
+
+    const rows = (await report("issue-checklist", { partId: oil.id })).rows.filter((row) => String(row.group).endsWith("issues"));
+    expect(rows.map((row) => [row.group, row.voucher, row.issuedTo, row.quantity, row.amount])).toEqual([
+      ["Workshop issues", `JC-${run}`, `CAVEM ${run}`, 2, 14000],
+      ["Other issues", "", "Showroom top-up", 1, 7050],
     ]);
   });
 });
