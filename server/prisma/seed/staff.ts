@@ -1,17 +1,21 @@
 import { PrismaClient } from "@prisma/client";
 import { ROLES } from "../../src/shared/constants/roles";
 import { hash } from "./helpers";
+import seedPermissionsAndRoles from "./roles";
 
 export default async function seedStaffUsers(
   prisma: PrismaClient,
   branches: { id: string; name: string }[],
 ) {
+  if (branches.length < 3) {
+    throw new Error("Staff seeding requires three branches. Run the branch seed first.");
+  }
   const mainBranch = branches[0];
   const abujaBranch = branches[1];
   const phBranch = branches[2];
 
   const roles = await prisma.role.findMany();
-  const roleMap = Object.fromEntries(roles.map((r) => [r.name, r.id]));
+  const roleMap = new Map(roles.map((r) => [r.name, r.id]));
 
   const staff = [
     {
@@ -31,7 +35,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "admin.abuja@danamotors.com",
+      email: "admin.abuja@kiamotors.com",
       password: "Admin@123",
       firstName: "Emeka",
       lastName: "Nwosu",
@@ -39,7 +43,7 @@ export default async function seedStaffUsers(
       branchId: abujaBranch.id,
     },
     {
-      email: "wm.lagos@danamotors.com",
+      email: "wm.lagos@kiaamotors.com",
       password: "WManager@123",
       firstName: "Rotimi",
       lastName: "Ajayi",
@@ -47,7 +51,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "wm.abuja@danamotors.com",
+      email: "wm.abuja@kiamotors.com",
       password: "WManager@123",
       firstName: "Musa",
       lastName: "Ibrahim",
@@ -55,7 +59,7 @@ export default async function seedStaffUsers(
       branchId: abujaBranch.id,
     },
     {
-      email: "wm.ph@danamotors.com",
+      email: "wm.ph@kiamotors.com",
       password: "WManager@123",
       firstName: "Godwin",
       lastName: "Peters",
@@ -63,7 +67,7 @@ export default async function seedStaffUsers(
       branchId: phBranch.id,
     },
     {
-      email: "store.lagos@danamotors.com",
+      email: "store.lagos@kiamotors.com",
       password: "Store@123",
       firstName: "Amina",
       lastName: "Bello",
@@ -71,7 +75,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "store.abuja@danamotors.com",
+      email: "store.abuja@kiamotors.com",
       password: "Store@123",
       firstName: "Chukwuemeka",
       lastName: "Odu",
@@ -79,7 +83,7 @@ export default async function seedStaffUsers(
       branchId: abujaBranch.id,
     },
     {
-      email: "advisor1@danamotors.com",
+      email: "advisor1@kiamotors.com",
       password: "Advisor@123",
       firstName: "Chidi",
       lastName: "Eze",
@@ -87,7 +91,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "advisor2@danamotors.com",
+      email: "advisor2@kiamotors.com",
       password: "Advisor@123",
       firstName: "Fatima",
       lastName: "Bello",
@@ -95,7 +99,7 @@ export default async function seedStaffUsers(
       branchId: abujaBranch.id,
     },
     {
-      email: "advisor3@danamotors.com",
+      email: "advisor3@kiamotors.com",
       password: "Advisor@123",
       firstName: "Blessing",
       lastName: "Obi",
@@ -103,7 +107,7 @@ export default async function seedStaffUsers(
       branchId: phBranch.id,
     },
     {
-      email: "tech1@danamotors.com",
+      email: "tech1@kiamotors.com",
       password: "Tech@123",
       firstName: "Tunde",
       lastName: "Akinyemi",
@@ -111,7 +115,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "tech2@danamotors.com",
+      email: "tech2@kiamotors.com",
       password: "Tech@123",
       firstName: "Kingsley",
       lastName: "Okoro",
@@ -119,7 +123,7 @@ export default async function seedStaffUsers(
       branchId: mainBranch.id,
     },
     {
-      email: "tech3@danamotors.com",
+      email: "tech3@kiamotors.com",
       password: "Tech@123",
       firstName: "Usman",
       lastName: "Garba",
@@ -127,7 +131,7 @@ export default async function seedStaffUsers(
       branchId: abujaBranch.id,
     },
     {
-      email: "tech4@danamotors.com",
+      email: "tech4@kiamotors.com",
       password: "Tech@123",
       firstName: "Ifeanyi",
       lastName: "Chukwu",
@@ -135,49 +139,74 @@ export default async function seedStaffUsers(
       branchId: phBranch.id,
     },
     {
-      email: "reception1@danamotors.com",
-      password: "Recept@123",
+      email: "ccuofficer1@kiamotors.com",
+      password: "CcuOfficer@123",
       firstName: "Chidinma",
       lastName: "Okafor",
-      role: ROLES.RECEPTIONIST,
+      role: ROLES.CCU_OFFICER,
       branchId: mainBranch.id,
     },
     {
-      email: "reception2@danamotors.com",
-      password: "Recept@123",
+      email: "ccuofficer2@kiamotors.com",
+      password: "CcuOfficer@123",
       firstName: "Hauwa",
       lastName: "Musa",
-      role: ROLES.RECEPTIONIST,
+      role: ROLES.CCU_OFFICER,
       branchId: abujaBranch.id,
     },
     {
-      email: "reception3@danamotors.com",
-      password: "Recept@123",
+      email: "ccuofficer3@kiamotors.com",
+      password: "CcuOfficer@123",
       firstName: "Priscilla",
       lastName: "Hart",
-      role: ROLES.RECEPTIONIST,
+      role: ROLES.CCU_OFFICER,
       branchId: phBranch.id,
     },
     {
-      email: "recptionmanager@danamotors.com",
-      password: "RecpManager@123",
-      firstName: "Blessing",
-      lastName: "Effiong",
-      role: ROLES.RECEPTION_MANAGER,
+      email: "ccumanager@kiamotors.com",
+      password: "CcuManager@123",
+      firstName: "Madam",
+      lastName: "Ihuoma",
+      role: ROLES.CCU_MANAGER,
       branchId: mainBranch.id,
     },
     {
-      email: "warranty@danamotors.com",
+      email: "warranty@kiamotors.com",
       password: "Warranty@123",
       firstName: "Folake",
       lastName: "Adebayo",
       role: ROLES.WARRANTY_OFFICER,
       branchId: mainBranch.id,
     },
+    {
+      email: "servicemanager@kiamotors.com",
+      password: "ServiceManager@123",
+      firstName: "Mr",
+      lastName: "Mark",
+      role: ROLES.SERVICE_MANAGER,
+      branchId: mainBranch.id,
+    },
+    {
+      email: "serviceadvisor@kiamotors.com",
+      password: "ServiceAdvisor@123",
+      firstName: "Service",
+      lastName: "Advisor",
+      role: ROLES.SERVICE_ADVISOR,
+      branchId: mainBranch.id,
+    },
   ];
+
+  const missingRoles = [...new Set(staff.map((s) => s.role))].filter(
+    (role) => !roleMap.has(role),
+  );
+  if (missingRoles.length > 0) {
+    throw new Error(`Staff seeding requires these roles: ${missingRoles.join(", ")}. Run the role seed first.`);
+  }
 
   const result = [];
   for (const s of staff) {
+    const roleId = roleMap.get(s.role);
+    if (!roleId) throw new Error(`Missing staff role: ${s.role}`);
     const passwordHash = await hash(s.password);
     const user = await prisma.user.upsert({
       where: { email: s.email },
@@ -188,7 +217,7 @@ export default async function seedStaffUsers(
         firstName: s.firstName,
         lastName: s.lastName,
         isActive: true,
-        roleId: roleMap[s.role],
+        roleId,
         branchId: s.branchId,
       },
     });
@@ -203,6 +232,8 @@ if (require.main === module) {
   (async () => {
     const prisma = new PrismaClient();
     try {
+      console.log("Synchronizing built-in roles and permissions before seeding staff...");
+      await seedPermissionsAndRoles(prisma);
       const branches = await prisma.branch.findMany({
         orderBy: { createdAt: "asc" },
         select: { id: true, name: true },

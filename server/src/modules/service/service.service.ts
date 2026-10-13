@@ -1,18 +1,36 @@
-import { latestEstimateQuery } from './estimate-approval';
-import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
-import { lineAmount, sumMoney } from '../finance/money';
-import { Prisma, WarrantyCoverageStatus } from '@prisma/client';
-import { canonicalJobStatus, jobStatusFilter } from './job-card-workflow.service';
-import { z } from 'zod';
-import { estimateBody, jobOpeningBody, jobUpdateBody } from './service.validation';
-import { JobCardWorkflowService } from './job-card-workflow.service';
-import prisma from '../../prisma/client';
-import { ServiceRepository } from './service.repository';
-import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
-import { ROLES } from '../../shared/constants/roles';
-import { NotificationService } from '../notification/notification.service';
-import { assertMileage } from '../warranty/warranty.logic';
-import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warranty/warranty.coverage';
+import { latestEstimateQuery } from "./estimate-approval";
+import {
+  serviceChargeDescription,
+  serviceChargeReference,
+} from "./job-service-charge";
+import { lineAmount, sumMoney } from "../finance/money";
+import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import {
+  canonicalJobStatus,
+  jobStatusFilter,
+} from "./job-card-workflow.service";
+import { z } from "zod";
+import {
+  estimateBody,
+  jobOpeningBody,
+  jobUpdateBody,
+} from "./service.validation";
+import { JobCardWorkflowService } from "./job-card-workflow.service";
+import prisma from "../../prisma/client";
+import { ServiceRepository } from "./service.repository";
+import {
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+} from "../../shared/errors/appError";
+import { ROLES } from "../../shared/constants/roles";
+import { NotificationService } from "../notification/notification.service";
+import { assertMileage } from "../warranty/warranty.logic";
+import {
+  buildCheck,
+  findOpenCampaigns,
+  loadVehicleForWarranty,
+} from "../warranty/warranty.coverage";
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -21,15 +39,15 @@ import { buildCheck, findOpenCampaigns, loadVehicleForWarranty } from '../warran
  * - SuperAdmin users can bypass this map (see updateAppointment).
  */
 export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
-  'Pending':           ['Checked In', 'Cancelled'],
-  'Checked In':        ['Inspection', 'Cancelled'],
-  'Inspection':        ['Awaiting Approval', 'Cancelled'],
-  'Awaiting Approval': ['In Repair', 'Cancelled'],
-  'In Repair':         ['Quality Check', 'Cancelled'],
-  'Quality Check':     ['Ready', 'In Repair'],
-  'Ready':             ['Completed'],
-  'Completed':         [],
-  'Cancelled':         [],
+  Pending: ["Checked In", "Cancelled"],
+  "Checked In": ["Inspection", "Cancelled"],
+  Inspection: ["Awaiting Approval", "Cancelled"],
+  "Awaiting Approval": ["In Repair", "Cancelled"],
+  "In Repair": ["Quality Check", "Cancelled"],
+  "Quality Check": ["Ready", "In Repair"],
+  Ready: ["Completed"],
+  Completed: [],
+  Cancelled: [],
 };
 
 export class ServiceService {
@@ -50,25 +68,34 @@ export class ServiceService {
     status?: string;
     createdById?: string;
   }) {
-    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-    if (!customer) throw new NotFoundError('Customer not found');
+    const customer = await prisma.customer.findUnique({
+      where: { id: data.customerId },
+    });
+    if (!customer) throw new NotFoundError("Customer not found");
 
-    const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-    if (!vehicle) throw new NotFoundError('Vehicle not found');
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: data.vehicleId },
+    });
+    if (!vehicle) throw new NotFoundError("Vehicle not found");
 
-    const branch = await prisma.branch.findUnique({ where: { name: data.branchName } });
-    if (!branch) throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
+    const branch = await prisma.branch.findUnique({
+      where: { name: data.branchName },
+    });
+    if (!branch)
+      throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
     if (data.serviceId) {
-      const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
-      if (!service) throw new NotFoundError('Service not found');
+      const service = await prisma.service.findUnique({
+        where: { id: data.serviceId },
+      });
+      if (!service) throw new NotFoundError("Service not found");
     }
 
     const activeAppointment = await prisma.serviceAppointment.findFirst({
       where: {
         customerId: data.customerId,
         vehicleId: data.vehicleId,
-        status: { notIn: ['Closed', 'Cancelled', 'Completed'] },
+        status: { notIn: ["Closed", "Cancelled", "Completed"] },
       },
     });
     if (activeAppointment) {
@@ -86,27 +113,51 @@ export class ServiceService {
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
       notes: data.notes,
-      status: data.status ?? 'Pending',
-      source: 'WalkIn',
+      status: data.status ?? "Pending",
+      source: "WalkIn",
     });
 
     const notificationService = new NotificationService();
     const appointmentMessage = `Walk-in: ${customer.firstName} ${customer.lastName} booked at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
     const appointmentPayload = {
-      type: 'APPOINTMENT_CREATE',
-      title: 'New walk-in appointment',
+      type: "APPOINTMENT_CREATE",
+      title: "New walk-in appointment",
       message: appointmentMessage,
       link: `/appointments/${appointment.id}`,
       branchId: branch.id,
     };
 
     await Promise.all([
-      notificationService.notifyRole(ROLES.RECEPTIONIST,       branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.RECEPTION_MANAGER,  branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.WORKSHOP_MANAGER,   branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.SERVICE_ADVISOR,    branch.id, appointmentPayload),
-      notificationService.notifyRole(ROLES.ADMIN,              undefined,  appointmentPayload),
-      notificationService.notifyRole(ROLES.SUPER_ADMIN,        undefined,  appointmentPayload),
+      notificationService.notifyRole(
+        ROLES.CCU_OFFICER,
+        branch.id,
+        appointmentPayload,
+      ),
+      notificationService.notifyRole(
+        ROLES.CCU_MANAGER,
+        branch.id,
+        appointmentPayload,
+      ),
+      notificationService.notifyRole(
+        ROLES.WORKSHOP_MANAGER,
+        branch.id,
+        appointmentPayload,
+      ),
+      notificationService.notifyRole(
+        ROLES.SERVICE_ADVISOR,
+        branch.id,
+        appointmentPayload,
+      ),
+      notificationService.notifyRole(
+        ROLES.ADMIN,
+        undefined,
+        appointmentPayload,
+      ),
+      notificationService.notifyRole(
+        ROLES.SUPER_ADMIN,
+        undefined,
+        appointmentPayload,
+      ),
     ]);
 
     return appointment;
@@ -125,18 +176,19 @@ export class ServiceService {
     source?: string;
   }) {
     const skip = (params.page - 1) * params.limit;
-    const { appointments, total } = await this.serviceRepository.listAppointments({
-      skip,
-      take: params.limit,
-      search: params.search,
-      branchId: params.branchId,
-      status: params.status,
-      createdById: params.createdById,
-      customerId: params.customerId,
-      dateFrom: params.dateFrom,
-      dateTo: params.dateTo,
-      source: params.source,
-    });
+    const { appointments, total } =
+      await this.serviceRepository.listAppointments({
+        skip,
+        take: params.limit,
+        search: params.search,
+        branchId: params.branchId,
+        status: params.status,
+        createdById: params.createdById,
+        customerId: params.customerId,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+        source: params.source,
+      });
 
     return {
       appointments,
@@ -152,28 +204,33 @@ export class ServiceService {
   async getAppointment(id: string) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
-      throw new NotFoundError('Appointment not found');
+      throw new NotFoundError("Appointment not found");
     }
 
     return appointment;
   }
 
-  async updateAppointment(id: string, data: {
-    scheduledAt?: string;
-    durationMins?: number;
-    notes?: string;
-    status?: string;
-    requestingUserRole?: string;
-    mileage?: number;
-    warrantyAcknowledged?: boolean;
-    acknowledgedCampaignIds?: string[];
-  }) {
+  async updateAppointment(
+    id: string,
+    data: {
+      scheduledAt?: string;
+      durationMins?: number;
+      notes?: string;
+      status?: string;
+      requestingUserRole?: string;
+      mileage?: number;
+      warrantyAcknowledged?: boolean;
+      acknowledgedCampaignIds?: string[];
+    },
+  ) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
-      throw new NotFoundError('Appointment not found');
+      throw new NotFoundError("Appointment not found");
     }
-    if (data.mileage !== undefined && data.status !== 'Checked In') {
-      throw new BadRequestError('Mileage is recorded when the vehicle is checked in');
+    if (data.mileage !== undefined && data.status !== "Checked In") {
+      throw new BadRequestError(
+        "Mileage is recorded when the vehicle is checked in",
+      );
     }
 
     const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
@@ -192,7 +249,7 @@ export class ServiceService {
           );
         } else if (!allowedTransitions.includes(data.status)) {
           throw new BadRequestError(
-            `Invalid status transition from '${currentStatus}' to '${data.status}'. Allowed transitions: ${allowedTransitions.join(', ')}.`,
+            `Invalid status transition from '${currentStatus}' to '${data.status}'. Allowed transitions: ${allowedTransitions.join(", ")}.`,
           );
         }
       }
@@ -201,7 +258,8 @@ export class ServiceService {
     // ── Reschedule detection ──────────────────────────────────────────────────
     const isRescheduled =
       data.scheduledAt !== undefined &&
-      new Date(data.scheduledAt).toISOString() !== new Date(appointment.scheduledAt).toISOString();
+      new Date(data.scheduledAt).toISOString() !==
+        new Date(appointment.scheduledAt).toISOString();
 
     const oldScheduledAt = appointment.scheduledAt;
 
@@ -210,7 +268,7 @@ export class ServiceService {
     // a covered vehicle or open campaign must be acknowledged, like on the job card form.
     let checkInCampaigns: { code: string; title: string }[] = [];
     const updated = await prisma.$transaction(async (tx) => {
-      if (data.status === 'Checked In' && data.mileage !== undefined) {
+      if (data.status === "Checked In" && data.mileage !== undefined) {
         await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${appointment.vehicleId} FOR UPDATE`;
         const vehicle = await loadVehicleForWarranty(tx, appointment.vehicleId);
         assertMileage(data.mileage, vehicle.lastRecordedMileage);
@@ -218,24 +276,35 @@ export class ServiceService {
         const check = buildCheck(vehicle, data.mileage, openCampaigns);
         const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
         const missing =
-          (check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged) ||
+          (check.coverage.status === WarrantyCoverageStatus.ACTIVE &&
+            !data.warrantyAcknowledged) ||
           openCampaigns.some((c) => !acknowledged.has(c.campaignId));
         if (missing) {
-          throw new ConflictError('Inform the customer and acknowledge the warranty status and open campaigns before check-in.').withCode(
-            'WARRANTY_ACK_REQUIRED',
-            check,
-          );
+          throw new ConflictError(
+            "Inform the customer and acknowledge the warranty status and open campaigns before check-in.",
+          ).withCode("WARRANTY_ACK_REQUIRED", check);
         }
         await tx.vehicle.update({
           where: { id: vehicle.id },
-          data: { lastRecordedMileage: Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage), lastMileageAt: new Date() },
+          data: {
+            lastRecordedMileage: Math.max(
+              vehicle.lastRecordedMileage ?? 0,
+              data.mileage,
+            ),
+            lastMileageAt: new Date(),
+          },
         });
-        checkInCampaigns = openCampaigns.map((c) => ({ code: c.code, title: c.title }));
+        checkInCampaigns = openCampaigns.map((c) => ({
+          code: c.code,
+          title: c.title,
+        }));
       }
       return tx.serviceAppointment.update({
         where: { id },
         data: {
-          scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+          scheduledAt: data.scheduledAt
+            ? new Date(data.scheduledAt)
+            : undefined,
           durationMins: data.durationMins,
           notes: data.notes,
           status: data.status,
@@ -250,22 +319,30 @@ export class ServiceService {
     const apptAny = appointment as any;
     const customerName = apptAny.customer
       ? `${apptAny.customer.firstName} ${apptAny.customer.lastName}`
-      : 'Customer';
-    const branchName = apptAny.branch?.name ?? 'branch';
+      : "Customer";
+    const branchName = apptAny.branch?.name ?? "branch";
     const branchId: string = appointment.branchId;
 
     // 1. Reschedule notification
     if (isRescheduled) {
       const rescheduledPayload = {
-        type: 'APPOINTMENT_RESCHEDULED',
-        title: 'Appointment rescheduled',
+        type: "APPOINTMENT_RESCHEDULED",
+        title: "Appointment rescheduled",
         message: `Appointment for ${customerName} at ${branchName} rescheduled from ${new Date(oldScheduledAt).toLocaleString()} to ${new Date(data.scheduledAt!).toLocaleString()}.`,
         link: `/appointments/${id}`,
         branchId,
       };
       await Promise.all([
-        notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId, rescheduledPayload),
-        notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId, rescheduledPayload),
+        notificationService.notifyRole(
+          ROLES.CCU_OFFICER,
+          branchId,
+          rescheduledPayload,
+        ),
+        notificationService.notifyRole(
+          ROLES.CCU_MANAGER,
+          branchId,
+          rescheduledPayload,
+        ),
       ]);
     }
 
@@ -273,50 +350,65 @@ export class ServiceService {
     if (data.status && data.status !== appointment.status) {
       const newStatus = data.status;
 
-      if (newStatus === 'Checked In') {
+      if (newStatus === "Checked In") {
         const payload = {
-          type: 'APPOINTMENT_CHECKED_IN',
-          title: checkInCampaigns.length > 0 ? 'Checked in — open campaign' : 'Appointment checked in',
+          type: "APPOINTMENT_CHECKED_IN",
+          title:
+            checkInCampaigns.length > 0
+              ? "Checked in — open campaign"
+              : "Appointment checked in",
           message:
             `${customerName} has checked in at ${branchName}.` +
             (checkInCampaigns.length > 0
-              ? ` Open campaign work: ${checkInCampaigns.map((c) => `${c.code} ${c.title}`).join('; ')}.`
-              : ''),
+              ? ` Open campaign work: ${checkInCampaigns.map((c) => `${c.code} ${c.title}`).join("; ")}.`
+              : ""),
           link: `/appointments/${id}`,
           branchId,
         };
         await Promise.all([
-          notificationService.notifyRole(ROLES.WORKSHOP_MANAGER, branchId, payload),
-          notificationService.notifyRole(ROLES.SERVICE_ADVISOR,  branchId, payload),
+          notificationService.notifyRole(
+            ROLES.WORKSHOP_MANAGER,
+            branchId,
+            payload,
+          ),
+          notificationService.notifyRole(
+            ROLES.SERVICE_ADVISOR,
+            branchId,
+            payload,
+          ),
         ]);
-      } else if (newStatus === 'Cancelled') {
+      } else if (newStatus === "Cancelled") {
         const payload = {
-          type: 'APPOINTMENT_CANCELLED',
-          title: 'Appointment cancelled',
+          type: "APPOINTMENT_CANCELLED",
+          title: "Appointment cancelled",
           message: `Appointment for ${customerName} at ${branchName} has been cancelled.`,
           link: `/appointments/${id}`,
           branchId,
         };
         await Promise.all([
-          notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId,  payload),
-          notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId,  payload),
-          notificationService.notifyRole(ROLES.WORKSHOP_MANAGER,  branchId,  payload),
-          notificationService.notifyRole(ROLES.ADMIN,             undefined, payload),
-          notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined, payload),
+          notificationService.notifyRole(ROLES.CCU_OFFICER, branchId, payload),
+          notificationService.notifyRole(ROLES.CCU_MANAGER, branchId, payload),
+          notificationService.notifyRole(
+            ROLES.WORKSHOP_MANAGER,
+            branchId,
+            payload,
+          ),
+          notificationService.notifyRole(ROLES.ADMIN, undefined, payload),
+          notificationService.notifyRole(ROLES.SUPER_ADMIN, undefined, payload),
         ]);
-      } else if (newStatus === 'Completed') {
+      } else if (newStatus === "Completed") {
         const payload = {
-          type: 'APPOINTMENT_COMPLETED',
-          title: 'Appointment completed',
+          type: "APPOINTMENT_COMPLETED",
+          title: "Appointment completed",
           message: `Appointment for ${customerName} at ${branchName} has been completed.`,
           link: `/appointments/${id}`,
           branchId,
         };
         await Promise.all([
-          notificationService.notifyRole(ROLES.RECEPTIONIST,      branchId,  payload),
-          notificationService.notifyRole(ROLES.RECEPTION_MANAGER, branchId,  payload),
-          notificationService.notifyRole(ROLES.ADMIN,             undefined, payload),
-          notificationService.notifyRole(ROLES.SUPER_ADMIN,       undefined, payload),
+          notificationService.notifyRole(ROLES.CCU_OFFICER, branchId, payload),
+          notificationService.notifyRole(ROLES.CCU_MANAGER, branchId, payload),
+          notificationService.notifyRole(ROLES.ADMIN, undefined, payload),
+          notificationService.notifyRole(ROLES.SUPER_ADMIN, undefined, payload),
         ]);
       }
     }
@@ -327,12 +419,14 @@ export class ServiceService {
   async deleteAppointment(id: string) {
     const appointment = await this.serviceRepository.findAppointmentById(id);
     if (!appointment) {
-      throw new NotFoundError('Appointment not found');
+      throw new NotFoundError("Appointment not found");
     }
     await this.serviceRepository.deleteAppointment(id);
   }
 
-  async createJobCard(data: z.infer<typeof jobOpeningBody> & { createdById?: string }) {
+  async createJobCard(
+    data: z.infer<typeof jobOpeningBody> & { createdById?: string },
+  ) {
     return new JobCardWorkflowService().open(data);
   }
 
@@ -356,26 +450,66 @@ export class ServiceService {
 
     if (params?.search) {
       where.OR = [
-        { jobNumber: { contains: params.search, mode: 'insensitive' } },
-        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobNumber: { contains: params.search, mode: "insensitive" } },
+        {
+          customer: {
+            phoneNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            companyName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        { description: { contains: params.search, mode: "insensitive" } },
+        {
+          customer: {
+            firstName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            lastName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        { vehicle: { make: { contains: params.search, mode: "insensitive" } } },
+        {
+          vehicle: { model: { contains: params.search, mode: "insensitive" } },
+        },
+        { vehicle: { vin: { contains: params.search, mode: "insensitive" } } },
+        {
+          vehicle: {
+            registrationNumber: {
+              contains: params.search,
+              mode: "insensitive",
+            },
+          },
+        },
       ];
     }
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
-    if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
+    if (params?.dateTo)
+      createdAtFilter.lte = new Date(
+        params.dateTo.length === 10
+          ? `${params.dateTo}T23:59:59.999Z`
+          : params.dateTo,
+      );
+    if (Object.keys(createdAtFilter).length > 0)
+      where.createdAt = createdAtFilter;
 
     const [jobCards, total] = await Promise.all([
-      this.serviceRepository.listJobCards({ skip, take: limit, branchId: params?.branchId, customerId: params?.customerId, search: params?.search, status: params?.status, dateFrom: params?.dateFrom, dateTo: params?.dateTo }),
+      this.serviceRepository.listJobCards({
+        skip,
+        take: limit,
+        branchId: params?.branchId,
+        customerId: params?.customerId,
+        search: params?.search,
+        status: params?.status,
+        dateFrom: params?.dateFrom,
+        dateTo: params?.dateTo,
+      }),
       prisma.jobCard.count({ where }),
     ]);
 
@@ -393,7 +527,7 @@ export class ServiceService {
   async getJobCard(id: string) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
-      throw new NotFoundError('Job card not found');
+      throw new NotFoundError("Job card not found");
     }
 
     // This vehicle's progress in each campaign the job card was opened for.
@@ -402,34 +536,50 @@ export class ServiceService {
         ? await prisma.campaignVehicle.findMany({
             where: {
               campaignId: { in: card.campaigns.map((c) => c.campaignId) },
-              OR: [{ vehicleId: card.vehicle.id }, { vin: card.vehicle.vin.toUpperCase() }],
+              OR: [
+                { vehicleId: card.vehicle.id },
+                { vin: card.vehicle.vin.toUpperCase() },
+              ],
             },
-            select: { campaignId: true, status: true, completedJobCardId: true },
+            select: {
+              campaignId: true,
+              status: true,
+              completedJobCardId: true,
+            },
           })
         : [];
     return {
       ...card,
       campaigns: card.campaigns.map((c) => ({
         ...c,
-        vehicleStatus: campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ?? null,
+        vehicleStatus:
+          campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
+          null,
       })),
     };
   }
 
-  async updateJobCard(id: string, data: z.infer<typeof jobUpdateBody>, actorId?: string) {
+  async updateJobCard(
+    id: string,
+    data: z.infer<typeof jobUpdateBody>,
+    actorId?: string,
+  ) {
     return new JobCardWorkflowService().update(id, data, actorId);
   }
 
-  async addInspection(jobCardId: string, data: {
-    inspectorId?: string;
-    findings: string;
-    passed?: boolean;
-    status?: string;
-    notes?: string;
-  }) {
+  async addInspection(
+    jobCardId: string,
+    data: {
+      inspectorId?: string;
+      findings: string;
+      passed?: boolean;
+      status?: string;
+      notes?: string;
+    },
+  ) {
     const card = await this.serviceRepository.findJobCardById(jobCardId);
     if (!card) {
-      throw new NotFoundError('Job card not found');
+      throw new NotFoundError("Job card not found");
     }
 
     return this.serviceRepository.addInspection({
@@ -442,100 +592,302 @@ export class ServiceService {
     });
   }
 
-  async addEstimate(jobCardId: string, input: z.infer<typeof estimateBody>, actorId?: string) {
+  async addEstimate(
+    jobCardId: string,
+    input: z.infer<typeof estimateBody>,
+    actorId?: string,
+  ) {
     const data = estimateBody.parse(input);
-    return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`);
-      const card = await tx.jobCard.findUnique({ where: { id: jobCardId }, include: { serviceType: { select: { description: true } }, vehicle: { include: { catalogue: true } } } });
-      if (!card) throw new NotFoundError('Job card not found');
-      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('Estimates can only be added to unbilled jobs');
-      const billable = data.lines.filter(line => line.type !== 'COMPLAINT');
-      if (new Set(billable.map(line => `${line.type}:${line.referenceId}`)).size !== billable.length) throw new BadRequestError('Each service, part or labour operation can appear only once per estimate');
-      const services = billable.filter(line => line.type === 'SERVICE');
-      const chargeReference = serviceChargeReference(card);
-      if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Include the selected job-card service exactly once with quantity 1');
-      if (data.lines.some(line => line.includedInService && !['PART', 'LABOUR'].includes(line.type))) throw new BadRequestError('Only parts and labour can be included in the service charge');
-      if (data.lines.some(line => line.includedInService) && services.length !== 1) throw new BadRequestError('Package inclusions require the selected service line');
-      const lines = [];
-      for (const line of data.lines) {
-        let description = line.description ?? '';
-        let rate = 0;
-        let quantity = line.quantity;
-        if (line.type === 'PART') {
-          const part = line.referenceId ? await tx.sparePart.findUnique({ where: { id: line.referenceId } }) : null;
-          if (!part) throw new BadRequestError('Select a part');
-          if (part.retailRate == null) throw new BadRequestError(`Retail rate is not set for ${part.partNumber}`);
-          description = part.name; rate = part.retailRate;
-        } else if (line.type === 'LABOUR') {
-          const item = line.referenceId ? await tx.labourItem.findFirst({ where: { id: line.referenceId, active: true } }) : null;
-          if (!item) throw new BadRequestError('Select an active labour operation');
-          const modelId = card.vehicle?.catalogue?.parentId;
-          const modelRate = modelId ? await tx.labourRate.findFirst({ where: { labourItemId: item.id, modelId, active: true } }) : null;
-          description = item.description; rate = modelRate?.rate ?? item.rate;
-          quantity = modelRate?.pricing === 'FIXED' ? 1 : line.quantity;
-        } else if (line.type === 'SERVICE') {
-          if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
-            description = serviceChargeDescription(card);
-            rate = card.serviceCharge ?? 0;
-          } else {
-            const service = line.referenceId ? await tx.service.findFirst({ where: { id: line.referenceId, isActive: true } }) : null;
-            if (!service) throw new BadRequestError('Select an active service');
-            description = service.name; rate = card.serviceCharge ?? service.price;
+    return prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`,
+        );
+        const card = await tx.jobCard.findUnique({
+          where: { id: jobCardId },
+          include: {
+            serviceType: { select: { description: true } },
+            vehicle: { include: { catalogue: true } },
+          },
+        });
+        if (!card) throw new NotFoundError("Job card not found");
+        if (
+          card.billedAt ||
+          ["BILLED", "DELIVERED", "CANCELLED"].includes(
+            canonicalJobStatus(card.status),
+          )
+        )
+          throw new BadRequestError(
+            "Estimates can only be added to unbilled jobs",
+          );
+        const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
+        if (
+          new Set(billable.map((line) => `${line.type}:${line.referenceId}`))
+            .size !== billable.length
+        )
+          throw new BadRequestError(
+            "Each service, part or labour operation can appear only once per estimate",
+          );
+        const services = billable.filter((line) => line.type === "SERVICE");
+        const chargeReference = serviceChargeReference(card);
+        if (
+          chargeReference &&
+          (services.length !== 1 ||
+            services[0].referenceId !== chargeReference ||
+            services[0].quantity !== 1)
+        )
+          throw new BadRequestError(
+            "Include the selected job-card service exactly once with quantity 1",
+          );
+        if (
+          data.lines.some(
+            (line) =>
+              line.includedInService && !["PART", "LABOUR"].includes(line.type),
+          )
+        )
+          throw new BadRequestError(
+            "Only parts and labour can be included in the service charge",
+          );
+        if (
+          data.lines.some((line) => line.includedInService) &&
+          services.length !== 1
+        )
+          throw new BadRequestError(
+            "Package inclusions require the selected service line",
+          );
+        const lines = [];
+        for (const line of data.lines) {
+          let description = line.description ?? "";
+          let rate = 0;
+          let quantity = line.quantity;
+          if (line.type === "PART") {
+            const part = line.referenceId
+              ? await tx.sparePart.findUnique({
+                  where: { id: line.referenceId },
+                })
+              : null;
+            if (!part) throw new BadRequestError("Select a part");
+            if (part.retailRate == null)
+              throw new BadRequestError(
+                `Retail rate is not set for ${part.partNumber}`,
+              );
+            description = part.name;
+            rate = part.retailRate;
+          } else if (line.type === "LABOUR") {
+            const item = line.referenceId
+              ? await tx.labourItem.findFirst({
+                  where: { id: line.referenceId, active: true },
+                })
+              : null;
+            if (!item)
+              throw new BadRequestError("Select an active labour operation");
+            const modelId = card.vehicle?.catalogue?.parentId;
+            const modelRate = modelId
+              ? await tx.labourRate.findFirst({
+                  where: { labourItemId: item.id, modelId, active: true },
+                })
+              : null;
+            description = item.description;
+            rate = modelRate?.rate ?? item.rate;
+            quantity = modelRate?.pricing === "FIXED" ? 1 : line.quantity;
+          } else if (line.type === "SERVICE") {
+            if (card.serviceTypeId && line.referenceId === card.serviceTypeId) {
+              description = serviceChargeDescription(card);
+              rate = card.serviceCharge ?? 0;
+            } else {
+              const service = line.referenceId
+                ? await tx.service.findFirst({
+                    where: { id: line.referenceId, isActive: true },
+                  })
+                : null;
+              if (!service)
+                throw new BadRequestError("Select an active service");
+              description = service.name;
+              rate = card.serviceCharge ?? service.price;
+            }
+          } else if (line.referenceId) {
+            const complaint = await tx.jobComplaint.findFirst({
+              where: { id: line.referenceId, jobCardId },
+            });
+            if (!complaint)
+              throw new BadRequestError("Complaint must belong to this job");
+            description = complaint.description;
           }
-        } else if (line.referenceId) {
-          const complaint = await tx.jobComplaint.findFirst({ where: { id: line.referenceId, jobCardId } });
-          if (!complaint) throw new BadRequestError('Complaint must belong to this job');
-          description = complaint.description;
+          if (!description)
+            throw new BadRequestError("Complaint description is required");
+          const { includedInService, ...fields } = line;
+          lines.push({
+            ...fields,
+            type: includedInService ? `INCLUDED_${line.type}` : line.type,
+            description,
+            rate: includedInService ? 0 : rate,
+            quantity,
+            amount: includedInService ? 0 : lineAmount(quantity, rate),
+          });
         }
-        if (!description) throw new BadRequestError('Complaint description is required');
-        const { includedInService, ...fields } = line;
-        lines.push({ ...fields, type: includedInService ? `INCLUDED_${line.type}` : line.type, description, rate: includedInService ? 0 : rate, quantity, amount: includedInService ? 0 : lineAmount(quantity, rate) });
-      }
-      // A new scope needs a fresh QC result and fresh credit authorization.
-      const reopening = canonicalJobStatus(card.status) === 'READY';
-      await tx.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING', creditApprovedById: null, ...(reopening ? { status: 'QC', readyAt: null, statusHistory: { create: { fromStatus: card.status, toStatus: 'QC', actorId: actorId ?? card.createdById!, remarks: 'Estimate revised; approval and quality check required' } } } : {}) } });
-      const previous = (await tx.estimate.findMany({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { createdAt: true } }))?.[0];
-      // Strict ordering under the shared row lock, including transactions started earlier.
-      const createdAt = new Date(Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1));
-      return tx.estimate.create({ data: { createdAt, jobCardId, description: data.description, currency: 'NGN', status: 'Pending', amount: sumMoney(lines.map(line => line.amount)), lines: { createMany: { data: lines } } }, include: { lines: true } });
-    }, { maxWait: 5000, timeout: 15000 });
+        // A new scope needs a fresh QC result and fresh credit authorization.
+        const reopening = canonicalJobStatus(card.status) === "READY";
+        await tx.jobCard.update({
+          where: { id: jobCardId },
+          data: {
+            qcStatus: "PENDING",
+            creditApprovedById: null,
+            ...(reopening
+              ? {
+                  status: "QC",
+                  readyAt: null,
+                  statusHistory: {
+                    create: {
+                      fromStatus: card.status,
+                      toStatus: "QC",
+                      actorId: actorId ?? card.createdById!,
+                      remarks:
+                        "Estimate revised; approval and quality check required",
+                    },
+                  },
+                }
+              : {}),
+          },
+        });
+        const previous = (
+          await tx.estimate.findMany({
+            where: { jobCardId },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 1,
+            select: { createdAt: true },
+          })
+        )?.[0];
+        // Strict ordering under the shared row lock, including transactions started earlier.
+        const createdAt = new Date(
+          Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1),
+        );
+        return tx.estimate.create({
+          data: {
+            createdAt,
+            jobCardId,
+            description: data.description,
+            currency: "NGN",
+            status: "Pending",
+            amount: sumMoney(lines.map((line) => line.amount)),
+            lines: { createMany: { data: lines } },
+          },
+          include: { lines: true },
+        });
+      },
+      { maxWait: 5000, timeout: 15000 },
+    );
   }
 
-  async addApproval(estimateId: string, data: {
-    customerId: string;
-    approved?: boolean;
-    decisionDate?: string;
-    comments?: string;
-    status?: string;
-  }, actorId?: string) {
-    const identity = await prisma.estimate.findUnique({ where: { id: estimateId }, select: { jobCardId: true } });
-    if (!identity) throw new NotFoundError('Estimate not found');
-    return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`);
-      const estimates = await tx.estimate.findMany({ where: { jobCardId: identity.jobCardId }, ...latestEstimateQuery });
-      const estimate = estimates[0];
-      if (!estimate || estimate.id !== estimateId) throw new ConflictError('Only the latest estimate revision can receive a decision');
-      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: identity.jobCardId } });
-      if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(card.status))) throw new BadRequestError('This job is closed for estimate decisions');
-      if (card.customerId !== data.customerId) throw new BadRequestError('Approval must be from the bill-to customer');
-      if (estimate.approvals.length) throw new ConflictError('This revision already has a decision. Create a new revision to change scope.');
-      const status = data.approved ? 'Approved' : 'Declined';
-      if (data.approved) {
-        const services = estimate.lines.filter(line => line.type === 'SERVICE');
-        const chargeReference = serviceChargeReference(card);
-        if (chargeReference && (services.length !== 1 || services[0].referenceId !== chargeReference || services[0].quantity !== 1)) throw new BadRequestError('Revise the estimate to include the selected service exactly once');
-        if (services.length) await tx.jobCard.update({ where: { id: card.id }, data: { serviceCharge: services[0].amount } });
-      }
-      await tx.estimate.update({ where: { id: estimateId }, data: { status } });
-      if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: 'ESTIMATE_DECISION_RECORDED', details: JSON.stringify({ jobCardId: card.id, estimateId, customerId: data.customerId, status, comments: data.comments }) } });
-      return tx.customerApproval.create({ data: { estimateId, customerId: data.customerId, approved: data.approved, decisionDate: new Date(), comments: data.comments, status } });
-    }, { maxWait: 5000, timeout: 15000 });
+  async addApproval(
+    estimateId: string,
+    data: {
+      customerId: string;
+      approved?: boolean;
+      decisionDate?: string;
+      comments?: string;
+      status?: string;
+    },
+    actorId?: string,
+  ) {
+    const identity = await prisma.estimate.findUnique({
+      where: { id: estimateId },
+      select: { jobCardId: true },
+    });
+    if (!identity) throw new NotFoundError("Estimate not found");
+    return prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${identity.jobCardId} FOR UPDATE`,
+        );
+        const estimates = await tx.estimate.findMany({
+          where: { jobCardId: identity.jobCardId },
+          ...latestEstimateQuery,
+        });
+        const estimate = estimates[0];
+        if (!estimate || estimate.id !== estimateId)
+          throw new ConflictError(
+            "Only the latest estimate revision can receive a decision",
+          );
+        const card = await tx.jobCard.findUniqueOrThrow({
+          where: { id: identity.jobCardId },
+        });
+        if (
+          card.billedAt ||
+          ["BILLED", "DELIVERED", "CANCELLED"].includes(
+            canonicalJobStatus(card.status),
+          )
+        )
+          throw new BadRequestError(
+            "This job is closed for estimate decisions",
+          );
+        if (card.customerId !== data.customerId)
+          throw new BadRequestError(
+            "Approval must be from the bill-to customer",
+          );
+        if (estimate.approvals.length)
+          throw new ConflictError(
+            "This revision already has a decision. Create a new revision to change scope.",
+          );
+        const status = data.approved ? "Approved" : "Declined";
+        if (data.approved) {
+          const services = estimate.lines.filter(
+            (line) => line.type === "SERVICE",
+          );
+          const chargeReference = serviceChargeReference(card);
+          if (
+            chargeReference &&
+            (services.length !== 1 ||
+              services[0].referenceId !== chargeReference ||
+              services[0].quantity !== 1)
+          )
+            throw new BadRequestError(
+              "Revise the estimate to include the selected service exactly once",
+            );
+          if (services.length)
+            await tx.jobCard.update({
+              where: { id: card.id },
+              data: { serviceCharge: services[0].amount },
+            });
+        }
+        await tx.estimate.update({
+          where: { id: estimateId },
+          data: { status },
+        });
+        if (actorId)
+          await tx.auditLog.create({
+            data: {
+              userId: actorId,
+              action: "ESTIMATE_DECISION_RECORDED",
+              details: JSON.stringify({
+                jobCardId: card.id,
+                estimateId,
+                customerId: data.customerId,
+                status,
+                comments: data.comments,
+              }),
+            },
+          });
+        return tx.customerApproval.create({
+          data: {
+            estimateId,
+            customerId: data.customerId,
+            approved: data.approved,
+            decisionDate: new Date(),
+            comments: data.comments,
+            status,
+          },
+        });
+      },
+      { maxWait: 5000, timeout: 15000 },
+    );
   }
 
   async getApprovals(estimateId: string) {
-    const estimate = await prisma.estimate.findUnique({ where: { id: estimateId } });
+    const estimate = await prisma.estimate.findUnique({
+      where: { id: estimateId },
+    });
     if (!estimate) {
-      throw new NotFoundError('Estimate not found');
+      throw new NotFoundError("Estimate not found");
     }
 
     return this.serviceRepository.getApprovals(estimateId);
@@ -558,11 +910,27 @@ export class ServiceService {
 
     if (params?.search) {
       where.OR = [
-        { findings: { contains: params.search, mode: 'insensitive' } },
-        { notes: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+        { findings: { contains: params.search, mode: "insensitive" } },
+        { notes: { contains: params.search, mode: "insensitive" } },
+        {
+          jobCard: {
+            jobNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              firstName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              lastName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
       ];
     }
 
@@ -605,10 +973,26 @@ export class ServiceService {
 
     if (params?.search) {
       where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+        { description: { contains: params.search, mode: "insensitive" } },
+        {
+          jobCard: {
+            jobNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              firstName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              lastName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
       ];
     }
 

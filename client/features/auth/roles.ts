@@ -57,6 +57,8 @@ export const CAMPAIGN_PERMISSIONS = {
   VEHICLE_UPDATE: "campaign:vehicle:update",
 } as const;
 
+export const BRANCH_ALL = "branch:all";
+
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
 // CPD part sale: customer purchase orders, counter sales and sale returns.

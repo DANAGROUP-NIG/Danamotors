@@ -263,7 +263,7 @@ export function ServicesTable() {
             },
           ]}
           actions={[
-            {
+            canEdit &&{
               id: "view",
               label: "View details",
               icon: <Eye className="size-4" />,
