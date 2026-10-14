@@ -16,8 +16,26 @@ four actions and the system creates every document in between.
 | --- | --- | --- | --- |
 | 1. Request | Requesting branch | `POST /api/inventory/indents` | Creates the indent with a number, prefills rate, amount and current stock from Part Master, fills vehicle details from a job card, and notifies the supplying branch and general store manager. |
 | 2. Approve | Supplying branch | `PATCH /api/inventory/indents/:id/approve` | Records the approval, creates the picking list, reserves available stock, and puts the rest on back order. The general store manager is told about missing parts. |
-| 3. Dispatch | Supplying branch | `PATCH /api/inventory/indents/:id/dispatch` | Creates the STN, cases and packing list in one transaction. It deducts source stock once and records `TRANSFER_OUT`. The goods are now in transit on the STN. |
-| 4. Generate MRN | Requesting branch | `PATCH /api/inventory/indents/:id/receive` | Generates an MRN against the STN, posts good quantities to the requesting branch as `TRANSFER_IN`, and records damaged and short quantities. |
+| 3. Dispatch | Supplying branch | `PATCH /api/inventory/indents/:id/dispatch`, or `POST /api/inventory/stn/dispatch` for several indents | Creates the STN, cases and packing list cum gate pass in one transaction. It deducts source stock once and records `TRANSFER_OUT`. The goods are now in transit on the STN. |
+| 4. Generate MRN | Requesting branch | `POST /api/inventory/stn/:id/receive` (or `PATCH /api/inventory/indents/:id/receive` with `stnId`) | Generates an MRN against the STN, posts good quantities to the requesting branch as `TRANSFER_IN`, and records damaged and short quantities. Every indent on the STN is updated. |
+
+CPD works this way in the legacy data (CPDAutoEnhancer, 2024 to 2026), and the workflow follows it:
+
+- **Split deliveries.** 38% of indents ship over two or more STNs as stock arrives, on average 70 days
+  apart. Whatever is not picked or not shipped stays on the indent's back order. **Pick back order**
+  (`PATCH /indents/:id/pick`) reserves it again, and the next dispatch creates another STN. When stock
+  arrives at the supplier (Mobis MRN or transfer receipt), the supplier is told which back orders it can now pick.
+- **Cancel lines.** Data Management → **Indent From / To Branch Cancellation** cancels what is still to
+  supply on chosen lines, across several indents, with one reason (legacy `cancelledQty`). The line
+  records the cancelled quantity, who and why; see [data-management.md](./data-management.md).
+- **Close back order.** `PATCH /indents/:id/close` with a reason stops supplying the rest of a partly
+  shipped indent. Any open pick is released, and the indent completes once its STNs are received.
+- **Several indents on one STN.** 30% of CPD STNs carry two or more indents of the same branch (legacy
+  Pick List "Fill Orders"). **Dispatch to branch** ships every picked indent you tick on one STN, in one
+  case, with one gate pass.
+- **Direct STN.** 10% of CPD STNs have no indent, such as the monthly Microcat Live recharge.
+  `POST /api/inventory/stn/direct` sends free stock to a branch with a stated purpose. The branch is
+  notified and receives it with an MRN like any other STN.
 
 Every request body is optional except the indent itself and a rejection reason. An empty
 approve, dispatch or receive call handles the common case: approve everything, ship
@@ -26,18 +44,22 @@ everything in one case, and receive everything in good condition.
 ## Statuses
 
 ```
-DRAFT → SUBMITTED → APPROVED → PICKED → IN_TRANSIT → COMPLETED
-                                              └──→ PARTIALLY_RECEIVED → COMPLETED
+DRAFT → SUBMITTED → APPROVED → PICKED → IN_TRANSIT → PARTIALLY_RECEIVED → COMPLETED
+                                    │   ▲
+                                    ▼   │ pick back order
+                             PARTLY_DISPATCHED ──(close back order)──► IN_TRANSIT / COMPLETED
 SUBMITTED → REJECTED
-DRAFT | SUBMITTED | APPROVED | PICKED → CANCELLED   (reserved stock is released)
+DRAFT | SUBMITTED | APPROVED | PICKED → CANCELLED   (only before anything ships; reserved stock is released)
 ```
 
 The status history also records the stages that happen inside dispatch and receipt:
 `STN_CREATED`, `PACKED`, `DISPATCHED`, `MRN_CREATED` and `RECEIVED`. `GET /indents/:id`
 returns a `progress` array built from that history, ready for a stepper.
 
-An indent stays `APPROVED` when nothing was available to pick. `PATCH /indents/:id/pick`
-retries picking once stock arrives.
+After approval the status follows the quantities: `PICKED` while a picking list is open,
+`PARTLY_DISPATCHED` while part of the approved quantity is still to ship, then `IN_TRANSIT`,
+`PARTIALLY_RECEIVED` and `COMPLETED` as the STNs are received. An indent stays `APPROVED` when
+nothing was available to pick. `PATCH /indents/:id/pick` retries once stock arrives.
 
 ## Stock rules
 
@@ -51,7 +73,9 @@ retries picking once stock arrives.
 - **Partial receipts.** Each receipt generates its own MRN. The indent stays
   `PARTIALLY_RECEIVED` until everything is accounted for.
 - **Shipping less than picked.** The unshipped difference is released and added to the
-  line's back order.
+  line's back order, to go on a later STN.
+- **One open pick per indent.** A partial unique index allows only one `OPEN` picking list per
+  indent. Each indent line tracks `dispatchedQuantity`, and a check keeps it within the approved quantity.
 - **Damaged items** are recorded on the MRN but not added to stock. `closeShort: true`
   records anything still outstanding as missing and closes the transfer.
 
@@ -64,8 +88,10 @@ main-and-alternate family. The picking list and STN lines both keep
 
 ## Documents
 
-Documents are created only by the four actions. These endpoints are read-only:
-`/picking-lists`, `/stn`, `/cases/:id`, `/packing-lists/:id` and `/transfer-mrns`.
+Documents are created only by the actions above. These endpoints are read-only:
+`/picking-lists`, `/stn`, `/stn/:id`, `/cases/:id`, `/packing-lists/:id` and `/transfer-mrns`.
+Each packing list carries a gate pass number from the shared gate pass series (legacy "Packing
+List cum Gate Pass"). The picking list records the picker's name.
 A transfer MRN has `source = BRANCH_TRANSFER` and points to the STN and the supplying branch;
 a Mobis MRN has `source = MOBIS` and points to its MIT. A database check keeps the two apart.
 
@@ -85,7 +111,10 @@ one notification per event, even if they qualify through more than one role.
 | Indent approved or rejected | Requester, requesting branch store managers |
 | Missing parts (back order) | General store managers |
 | Picking list ready | Supplying branch store managers |
-| Dispatched (STN, cases, packing list and MIT in one message) | Requester, requesting branch store managers |
+| Dispatched (STN, cases, packing list and gate pass in one message, naming every indent on the STN and any back order still to come) | Requesters, receiving branch store managers |
+| Direct STN dispatched | Receiving branch store managers |
+| Stock arrived for a back order | Supplying branch store managers, general store managers |
+| Back order closed | Requester, requesting branch store managers |
 | MRN generated or transfer received | Supplying branch store managers, general store managers |
 | Damaged or short quantities | General store managers |
 | Indent cancelled | Requester, and supplying branch store managers if it was already submitted |
@@ -104,7 +133,8 @@ with `inventory:cross-branch` and super admins can act on any branch.
 | --- | --- |
 | `BranchIndentDetail` (orderid, UrgentQty, Qty, BackOrdQty, Rate, VIN, Registrationno, Model, Jobno, JobDate, AuthorisedBy, ApprovalDate, partflag) | `BranchIndent` and `BranchIndentLine` |
 | `PickingHead`, `PickingDetail` | `PickingList`, `PickingListLine` |
-| `countersale` with trantype `M`, and `csissue` (parts STN) | `StockTransferNote`, `StockTransferNoteLine` |
+| `countersale` with trantype `M`, and `csissue` (parts STN; `OrderNo` = indent, empty on a direct STN) | `StockTransferNote` (linked to its indents), `StockTransferNoteLine` |
+| HHDC `BI` picking downloads (one indent each; picker recorded) | `PickingList` with `pickerName`; HHDC itself is not integrated yet |
 | `CaseHeader` and `CaseDetail` with trantype `CB` | `TransferCase`, `TransferCaseLine` |
 | `CaseHeader` with trantype `PB` (PackId, WayBillNo, CourierName, ConsignmentWeight) | `PackingList` |
 | `branchInTransithead`, `branchInTransitDetail` (PartOrdered vs PARTNO, QTYRECIEVED, QtyRejected) | The STN and its lines: the received, damaged and short totals on `StockTransferNoteLine` |

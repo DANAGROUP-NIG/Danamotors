@@ -11,7 +11,7 @@ branch shares one database, so internal transfers need no files. See
 
 | Step | Screen | What happens |
 | --- | --- | --- |
-| 1. Upload MIT | Inventory → Mobis Receipts → **Upload MIT** | Choose the invoice file. It is read in the browser and previewed: invoice number (prefilled), lines, totals, and which parts already exist in Part Master. Vendor is Mobis, conversion rate defaults to 2700, physical receipt date defaults to today, received mode is Air, Ship or Road, and the receiving branch defaults to CPD. Save creates the MIT. |
+| 1. Upload MIT | Operations → MIT → **Upload MIT** | Choose the invoice file. It is read in the browser and previewed: invoice number (prefilled), lines, totals, and which parts already exist in Part Master. Vendor is Mobis, conversion rate defaults to 2700, physical receipt date defaults to today, received mode is Air, Ship or Road, and the receiving branch defaults to CPD. Save creates the MIT. |
 | 2. Generate MRN | MIT detail → **Generate MRN** | Confirm what physically arrived. By default everything is received in good condition; enter damaged or missing quantities only when needed. Tax form defaults to P. Good units are added to the receiving branch stock as `RECEIVED` transactions. |
 
 Both steps send a dashboard notification to the general store managers and the receiving

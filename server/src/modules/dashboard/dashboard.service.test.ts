@@ -31,10 +31,15 @@ it('reports remaining outstanding, including overdue invoices, instead of full b
   });
 });
 
-it('scopes both job bills and standalone customer invoices to the selected branch', async () => {
+it('scopes job bills, counter sales and standalone customer invoices to the selected branch', async () => {
   await new DashboardService().getStats('branch');
   expect(prisma.invoice.aggregate).toHaveBeenCalledWith({
-    where: { status: { notIn: ['Cancelled', 'CANCELLED', 'CANCELED', 'VOID'] }, OR: [{ jobCard: { branchId: 'branch' } }, { jobCardId: null, customer: { branchId: 'branch' } }] },
+    where: { status: { notIn: ['Cancelled', 'CANCELLED', 'CANCELED', 'VOID'] }, OR: [
+      { jobCard: { is: { branchId: 'branch' } } },
+      // Bills without a job card (e.g. CPD counter sales) use the branch recorded on the bill.
+      { jobCardId: null, reportBranchId: 'branch' },
+      { jobCardId: null, reportBranchId: null, customer: { is: { branchId: 'branch' } } },
+    ] },
     _sum: { outstandingAmount: true },
   });
 });

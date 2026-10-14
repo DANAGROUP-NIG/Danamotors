@@ -69,7 +69,8 @@ async function action<B>(id: string, verb: string, body?: B) {
 
 export const submitIndentRequest = (id: string) => action(id, "submit");
 export const approveIndentRequest = (id: string, body: ApproveIndentPayload) => action(id, "approve", body);
-export const pickIndentRequest = (id: string) => action(id, "pick");
+export const pickIndentRequest = (id: string, pickerName?: string) => action(id, "pick", { pickerName });
+export const closeIndentRequest = (id: string, reason: string) => action(id, "close", { reason });
 export const rejectIndentRequest = (id: string, reason: string) => action(id, "reject", { reason });
 export const cancelIndentRequest = (id: string, reason?: string) => action(id, "cancel", { reason });
 export const dispatchIndentRequest = (id: string, body: DispatchIndentPayload) => action(id, "dispatch", body);

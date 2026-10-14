@@ -114,7 +114,7 @@ describeDb("Stock transfer workflow (database)", () => {
 
     const approved = await service.approveIndent(created.id, cpdManager.id, { remarks: "ok" });
     expect(approved.status).toBe("PICKED");
-    expect(approved.pickingList?.lines[0].pickedQuantity).toBe(5);
+    expect(approved.openPickingList?.lines[0].pickedQuantity).toBe(5);
     let source = await stockOf(cpd.id, filter.id);
     expect(source).toMatchObject({ quantity: 52, reservedQuantity: 5 });
 
@@ -124,23 +124,23 @@ describeDb("Stock transfer workflow (database)", () => {
       waybillNumber: "WB-1",
     });
     expect(dispatched.status).toBe("IN_TRANSIT");
-    expect(dispatched.stn?.stockDeducted).toBe(true);
-    expect(dispatched.stn?.cases).toHaveLength(1);
-    expect(dispatched.stn?.packingList?.waybillNumber).toBe("WB-1");
+    expect(dispatched.stns[0]?.stockDeducted).toBe(true);
+    expect(dispatched.stns[0]?.cases).toHaveLength(1);
+    expect(dispatched.stns[0]?.packingList?.waybillNumber).toBe("WB-1");
     // Transfers travel on the STN; MIT is for Mobis invoices only.
     expect(await prisma.materialInTransit.count({ where: { destinationBranchId: branch.id } })).toBe(mitsBefore);
     source = await stockOf(cpd.id, filter.id);
     expect(source).toMatchObject({ quantity: 47, reservedQuantity: 0 });
 
-    const out = await prisma.stockTransaction.findMany({ where: { referenceId: dispatched.stn!.id } });
+    const out = await prisma.stockTransaction.findMany({ where: { referenceId: dispatched.stns[0].id } });
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ type: "TRANSFER_OUT", quantity: -5 });
 
     const received = await service.receiveIndent(created.id, requester.id, {});
     expect(received.status).toBe("COMPLETED");
     // The receiving branch generated one MRN against the STN.
-    expect(received.stn?.mrns).toHaveLength(1);
-    expect(received.stn?.mrns[0]).toMatchObject({
+    expect(received.stns[0]?.mrns).toHaveLength(1);
+    expect(received.stns[0]?.mrns[0]).toMatchObject({
       source: "BRANCH_TRANSFER",
       receivingBranchId: branch.id,
       sourceBranchId: cpd.id,
@@ -148,14 +148,15 @@ describeDb("Stock transfer workflow (database)", () => {
       totalReceived: 5,
       totalValue: 45281.7,
     });
-    const transferIn = await prisma.stockTransaction.findMany({ where: { referenceId: received.stn!.mrns[0].id } });
+    const transferIn = await prisma.stockTransaction.findMany({ where: { referenceId: received.stns[0].mrns[0].id } });
     expect(transferIn).toEqual([expect.objectContaining({ type: "TRANSFER_IN", quantity: 5 })]);
-    expect(received.stn?.status).toBe("RECEIVED");
+    expect(received.stns[0]?.status).toBe("RECEIVED");
     expect(await stockOf(branch.id, filter.id)).toMatchObject({ quantity: 5 });
     expect(received.lines[0].summary).toMatchObject({ dispatched: 5, received: 5, inTransit: 0 });
     expect(received.progress.every((step) => step.completed)).toBe(true);
 
-    await expect(service.receiveIndent(created.id, requester.id, {})).rejects.toThrow(/Cannot receive/);
+    await expect(service.receiveIndent(created.id, requester.id, {})).rejects.toThrow(/nothing in transit/);
+    expect(received.stns[0].packingList?.gatePassNumber).toMatch(/^\d{10}$/);
     expect(await stockOf(branch.id, filter.id)).toMatchObject({ quantity: 5 });
 
     // The requester is also the branch store manager but gets each alert once.
@@ -262,11 +263,11 @@ describeDb("Stock transfer workflow (database)", () => {
     const approved = await service.approveIndent(indent.id, cpdManager.id, {
       lines: [{ lineId, supplyPartId: hornAlt.id }],
     });
-    const pick = approved.pickingList!.lines[0];
+    const pick = approved.openPickingList!.lines[0];
     expect(pick).toMatchObject({ requestedPartId: horn.id, partId: hornAlt.id, isAlternate: true, pickedQuantity: 2 });
 
     const dispatched = await service.dispatchIndent(indent.id, cpdManager.id);
-    expect(dispatched.stn!.lines[0]).toMatchObject({ requestedPartId: horn.id, partId: hornAlt.id, unitRate: 11500 });
+    expect(dispatched.stns[0].lines[0]).toMatchObject({ requestedPartId: horn.id, partId: hornAlt.id, unitRate: 11500 });
     await service.receiveIndent(indent.id, requester.id);
     expect(await stockOf(branch.id, hornAlt.id)).toMatchObject({ quantity: 2 });
     expect(await stockOf(branch.id, horn.id)).toBeNull();
@@ -283,7 +284,7 @@ describeDb("Stock transfer workflow (database)", () => {
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(await stockOf(cpd.id, filter.id)).toMatchObject({ quantity: 42, reservedQuantity: 0 });
-    expect(await prisma.stockTransferNote.count({ where: { indentId: indent.id } })).toBe(1);
+    expect(await prisma.stockTransferNote.count({ where: { indents: { some: { id: indent.id } } } })).toBe(1);
     await service.receiveIndent(indent.id, requester.id);
   });
 
@@ -294,39 +295,215 @@ describeDb("Stock transfer workflow (database)", () => {
     ]);
     const approved = await service.approveIndent(indent.id, cpdManager.id);
     // Look lines up by part: the picking list does not guarantee line order.
-    const p1 = approved.pickingList!.lines.find((l) => l.partId === filter.id)!;
-    const p2 = approved.pickingList!.lines.find((l) => l.partId === unrelated.id)!;
+    const p1 = approved.openPickingList!.lines.find((l) => l.partId === filter.id)!;
+    const p2 = approved.openPickingList!.lines.find((l) => l.partId === unrelated.id)!;
     const dispatched = await service.dispatchIndent(indent.id, cpdManager.id, {
       cases: [
         { weight: 3, lines: [{ pickingLineId: p1.id, quantity: 3 }, { pickingLineId: p2.id, quantity: 4 }] },
         { weight: 1.5, lines: [{ pickingLineId: p1.id, quantity: 2 }] },
       ],
     });
-    expect(dispatched.stn!.cases).toHaveLength(2);
-    expect(dispatched.stn!.packingList!.consignmentWeight).toBe(4.5);
-    const filterLine = dispatched.stn!.lines.find((l) => l.partId === filter.id)!;
-    const casesWithFilter = dispatched.stn!.cases.filter((c) => c.lines.some((l) => l.stnLineId === filterLine.id));
+    expect(dispatched.stns[0].cases).toHaveLength(2);
+    expect(dispatched.stns[0].packingList!.consignmentWeight).toBe(4.5);
+    const filterLine = dispatched.stns[0].lines.find((l) => l.partId === filter.id)!;
+    const casesWithFilter = dispatched.stns[0].cases.filter((c) => c.lines.some((l) => l.stnLineId === filterLine.id));
     expect(casesWithFilter).toHaveLength(2);
     await service.receiveIndent(indent.id, requester.id);
   });
 
-  it("ships less than picked and returns the difference to back order", async () => {
+  it("ships less than picked, then ships the back order on a second STN", async () => {
     const indent = await newIndent([{ partId: filter.id, stockQuantity: 5 }]);
-    const approved = await service.approveIndent(indent.id, cpdManager.id);
-    const pickLine = approved.pickingList!.lines[0];
-    const dispatched = await service.dispatchIndent(indent.id, cpdManager.id, {
+    const approved = await service.approveIndent(indent.id, cpdManager.id, { pickerName: "YAHAYA JAMIU" });
+    expect(approved.openPickingList?.pickerName).toBe("YAHAYA JAMIU");
+    const pickLine = approved.openPickingList!.lines[0];
+    const first = await service.dispatchIndent(indent.id, cpdManager.id, {
       lines: [{ pickingLineId: pickLine.id, quantity: 3 }],
     });
-    expect(dispatched.lines[0].summary).toMatchObject({ dispatched: 3, backOrder: 2 });
+    expect(first.status).toBe("PARTLY_DISPATCHED");
+    expect(first.lines[0].summary).toMatchObject({ dispatched: 3, backOrder: 2 });
     expect(await stockOf(cpd.id, filter.id)).toMatchObject({ quantity: 49, reservedQuantity: 0 });
-    await service.receiveIndent(indent.id, requester.id);
+
+    // The branch receives the first STN while the back order is still open.
+    const afterFirst = await service.receiveIndent(indent.id, requester.id);
+    expect(afterFirst.status).toBe("PARTLY_DISPATCHED");
+
+    const repicked = await service.pickIndent(indent.id, cpdManager.id);
+    expect(repicked.status).toBe("PICKED");
+    expect(repicked.openPickingList!.lines[0].pickedQuantity).toBe(2);
+    const second = await service.dispatchIndent(indent.id, cpdManager.id);
+    // All shipped; the first STN is already received.
+    expect(second.status).toBe("PARTIALLY_RECEIVED");
+    expect(second.stns).toHaveLength(2);
+    expect(second.lines[0].summary).toMatchObject({ dispatched: 5, backOrder: 0, received: 3, inTransit: 2 });
+
+    const done = await service.receiveIndent(indent.id, requester.id);
+    expect(done.status).toBe("COMPLETED");
+    expect(await stockOf(branch.id, filter.id)).toMatchObject({ quantity: 5 });
+    // An indent with shipments can no longer be cancelled outright.
+    await expect(service.cancelIndent(indent.id, cpdManager.id)).rejects.toThrow(/Cannot cancel/);
+  });
+
+  it("ships several indents of one branch on a single STN", async () => {
+    const a = await newIndent([{ partId: filter.id, stockQuantity: 2 }]);
+    const b = await newIndent([{ partId: filter.id, stockQuantity: 3 }, { partId: unrelated.id, stockQuantity: 1 }]);
+    await service.approveIndent(a.id, cpdManager.id);
+    await service.approveIndent(b.id, cpdManager.id);
+
+    const stn = await service.dispatchIndents({ indentIds: [a.id, b.id], transportMode: "ROAD" }, cpdManager.id);
+    expect(stn.indents.map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
+    expect(stn.lines).toHaveLength(3);
+    expect(stn.totalQuantity).toBe(6);
+    expect(stn.cases).toHaveLength(1);
+    expect(await stockOf(cpd.id, filter.id)).toMatchObject({ quantity: 47, reservedQuantity: 0 });
+
+    // One message names both indents.
+    const alert = await prisma.notification.findFirst({
+      where: { userId: requester.id, type: "STN_DISPATCHED", message: { contains: stn.stnNumber } },
+    });
+    expect(alert?.message).toContain(a.indentNumber);
+    expect(alert?.message).toContain(b.indentNumber);
+
+    await service.receiveStn(stn.id, requester.id);
+    expect((await service.getIndent(a.id)).status).toBe("COMPLETED");
+    expect((await service.getIndent(b.id)).status).toBe("COMPLETED");
+  });
+
+  it("refuses to put indents for different branches on one STN", async () => {
+    const other = await prisma.branch.create({ data: { name: `Utako ${run}` } });
+    const a = await newIndent([{ partId: filter.id, stockQuantity: 1 }]);
+    const b = await service.createIndent(
+      { requestingBranchId: other.id, sourceBranchId: cpd.id, lines: [{ partId: filter.id, stockQuantity: 1 }] },
+      requester.id,
+    );
+    await expect(service.dispatchIndents({ indentIds: [a.id, b.id] }, cpdManager.id)).rejects.toThrow(/same branch/);
+    await service.cancelIndent(a.id, cpdManager.id);
+    await service.cancelIndent(b.id, cpdManager.id);
+  });
+
+  it("sends a direct STN without an indent and receives it at the branch", async () => {
+    await expect(
+      service.createDirectStn(
+        { sourceBranchId: cpd.id, destinationBranchId: branch.id, remarks: "too many", lines: [{ partId: unrelated.id, quantity: 11 }] },
+        cpdManager.id,
+      ),
+    ).rejects.toThrow(/Only 10 unit/);
+
+    const stn = await service.createDirectStn(
+      {
+        sourceBranchId: cpd.id,
+        destinationBranchId: branch.id,
+        remarks: "Microcat Live for the month of May",
+        packerName: "YAHAYA JAMIU",
+        lines: [{ partId: unrelated.id, quantity: 2 }],
+      },
+      cpdManager.id,
+    );
+    expect(stn.indents).toEqual([]);
+    expect(stn.lines[0]).toMatchObject({ indentLineId: null, pickingLineId: null, quantity: 2, unitRate: 1021.14 });
+    expect(stn.packingList?.gatePassNumber).toMatch(/^\d{10}$/);
+    expect(await stockOf(cpd.id, unrelated.id)).toMatchObject({ quantity: 8 });
+    const alert = await prisma.notification.findFirst({
+      where: { userId: requester.id, type: "DIRECT_STN_DISPATCHED", message: { contains: stn.stnNumber } },
+    });
+    expect(alert?.message).toContain("direct STN");
+
+    const received = await service.receiveStn(stn.id, requester.id);
+    expect(received.status).toBe("RECEIVED");
+    expect(await stockOf(branch.id, unrelated.id)).toMatchObject({ quantity: 2 });
+  });
+
+  it("closes a back order and completes once the shipped STN is received", async () => {
+    await setStock(cpd.id, filter.id, 4);
+    const indent = await newIndent([{ partId: filter.id, stockQuantity: 6 }]);
+    await service.approveIndent(indent.id, cpdManager.id);
+    const partly = await service.dispatchIndent(indent.id, cpdManager.id);
+    expect(partly.status).toBe("PARTLY_DISPATCHED");
+
+    // Stock for the back order arrives at CPD: the supplier is told it can now pick.
+    await setStock(cpd.id, filter.id, 10);
+    await service.notifyBackOrdersPickable(cpd.id, [filter.id]);
+    const pickable = await prisma.notification.findFirst({
+      where: { userId: cpdManager.id, type: "INDENT_BACK_ORDER_PICKABLE", message: { contains: indent.indentNumber } },
+    });
+    expect(pickable).not.toBeNull();
+
+    const closed = await service.closeBackOrder(indent.id, cpdManager.id, "Superseded part");
+    expect(closed.status).toBe("IN_TRANSIT");
+    expect(closed.lines[0]).toMatchObject({ approvedQuantity: 4, backOrderQuantity: 0, dispatchedQuantity: 4 });
+    const done = await service.receiveIndent(indent.id, requester.id);
+    expect(done.status).toBe("COMPLETED");
+  });
+
+  it("cancels ticked lines across indents, releasing only their pick", async () => {
+    const picked = await newIndent([
+      { partId: filter.id, stockQuantity: 5 },
+      { partId: unrelated.id, stockQuantity: 3 },
+    ]);
+    await service.approveIndent(picked.id, cpdManager.id);
+    const submitted = await newIndent([
+      { partId: filter.id, stockQuantity: 2 },
+      { partId: unrelated.id, stockQuantity: 1 },
+    ]);
+    const lineOf = (indent: { lines: { id: string; partId: string }[] }, partId: string) =>
+      indent.lines.find((l) => l.partId === partId)!.id;
+
+    // CPD sees both indents from the branch, line by line, with what is picked.
+    const pending = await service.listPendingLines({ direction: "INWARD", branchId: cpd.id, otherBranchId: branch.id });
+    const listed = pending.find((o) => o.id === picked.id)!;
+    expect(listed.lines.map((l) => [l.pending, l.picked])).toEqual([
+      [5, 5],
+      [3, 3],
+    ]);
+    expect(pending.some((o) => o.id === submitted.id)).toBe(true);
+
+    const result = await service.cancelPendingLines(
+      [lineOf(picked, filter.id), lineOf(submitted, filter.id)],
+      cpdManager.id,
+      "Purchased under PL-1",
+    );
+    expect(result.units).toBe(7);
+
+    const after = await service.getIndent(picked.id);
+    expect(after.status).toBe("PICKED");
+    expect(after.lines.find((l) => l.partId === filter.id)).toMatchObject({
+      approvedQuantity: 0,
+      cancelledQuantity: 5,
+      backOrderQuantity: 0,
+      cancelRemark: "Purchased under PL-1",
+    });
+    expect(after.openPickingList?.lines.map((l) => l.partId)).toEqual([unrelated.id]);
+    expect(await stockOf(cpd.id, filter.id)).toMatchObject({ quantity: 52, reservedQuantity: 0 });
+    expect(await stockOf(cpd.id, unrelated.id)).toMatchObject({ reservedQuantity: 3 });
+
+    // The branch's own view (indents to other branches) shows only what is still to come.
+    const outward = await service.listPendingLines({ direction: "OUTWARD", branchId: branch.id, search: picked.indentNumber });
+    expect(outward[0].lines.map((l) => l.partNumber)).toEqual([after.lines.find((l) => l.partId === unrelated.id)!.part.partNumber]);
+
+    // A line cancelled before approval cannot be approved; the rest is approved and picked.
+    await expect(
+      service.approveIndent(submitted.id, cpdManager.id, { lines: [{ lineId: lineOf(submitted, filter.id), approvedQuantity: 1 }] }),
+    ).rejects.toThrow(/between 0 and 0/);
+    const approved = await service.approveIndent(submitted.id, cpdManager.id);
+    expect(approved.lines.find((l) => l.partId === filter.id)).toMatchObject({ approvedQuantity: 0, cancelledQuantity: 2 });
+    expect(approved.lines.find((l) => l.partId === unrelated.id)).toMatchObject({ approvedQuantity: 1 });
+
+    // Cancelling everything left on an indent with nothing shipped cancels the indent.
+    await service.cancelPendingLines([lineOf(submitted, unrelated.id)], cpdManager.id, "Duplicate indent");
+    const cancelled = await service.getIndent(submitted.id);
+    expect(cancelled).toMatchObject({ status: "CANCELLED", cancellationReason: "Duplicate indent" });
+    await expect(service.cancelPendingLines([lineOf(submitted, unrelated.id)], cpdManager.id, "Again")).rejects.toThrow(
+      /nothing is left/,
+    );
+
+    await service.cancelIndent(picked.id, cpdManager.id, "test cleanup");
+    expect(await stockOf(cpd.id, unrelated.id)).toMatchObject({ reservedQuantity: 0 });
   });
 
   it("supports partial, damaged and short receipts without double posting", async () => {
     const indent = await newIndent([{ partId: filter.id, stockQuantity: 6 }]);
     await service.approveIndent(indent.id, cpdManager.id);
     const dispatched = await service.dispatchIndent(indent.id, cpdManager.id);
-    const stnLineId = dispatched.stn!.lines[0].id;
+    const stnLineId = dispatched.stns[0].lines[0].id;
 
     const first = await service.receiveIndent(indent.id, requester.id, {
       lines: [{ stnLineId, receivedQuantity: 2, damagedQuantity: 1 }],
@@ -345,14 +522,14 @@ describeDb("Stock transfer workflow (database)", () => {
     expect(second.status).toBe("COMPLETED");
     expect(second.lines[0].summary).toMatchObject({ received: 4, damaged: 1, short: 1, inTransit: 0 });
     // One MRN per receipt.
-    expect(second.stn!.mrns.map((m) => [m.totalReceived, m.totalDamaged, m.totalShort])).toEqual([
+    expect(second.stns[0].mrns.map((m) => [m.totalReceived, m.totalDamaged, m.totalShort])).toEqual([
       [2, 1, 0],
       [2, 0, 1],
     ]);
     expect(await stockOf(branch.id, filter.id)).toMatchObject({ quantity: 4 });
 
     const discrepancy = await prisma.notification.findFirst({
-      where: { userId: gsm.id, type: "TRANSFER_DISCREPANCY", message: { contains: second.stn!.stnNumber } },
+      where: { userId: gsm.id, type: "TRANSFER_DISCREPANCY", message: { contains: second.stns[0].stnNumber } },
     });
     expect(discrepancy).not.toBeNull();
   });
