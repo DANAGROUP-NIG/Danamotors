@@ -696,8 +696,9 @@ export class PartsReportService {
    * STN rate on the quantity received. Cancelled STNs are left out: their stock went back.
    *
    * The Store Wise STN Register is legacy's "Storelocation" layout: the same STNs and totals,
-   * sorted by the sending store, with the receiving store and rate left off. Its heading names the
-   * sending branch in place of the receiver.
+   * sorted by the sending store, with the receiving store and rate left off and legacy's Tax,
+   * Discount, Others and Net Amount added. Its heading names the sending branch in place of the
+   * receiver.
    */
   private async stnRegister(f: ReportFilters, byStore: boolean): Promise<Row[]> {
     const lines = await prisma.stockTransferNoteLine.findMany({
@@ -735,6 +736,8 @@ export class PartsReportService {
       quantity: l.quantity,
       rate: l.unitRate,
       amount: l.amount,
+      // STNs carry no tax, discount or other charges yet (see the Store Wise STN Register).
+      ...(byStore && { tax: 0, discount: 0, others: 0, net: l.amount }),
     }));
     // A stable sort keeps each store's STNs in date order.
     return byStore ? rows.sort((a, b) => a.fromBranch.localeCompare(b.fromBranch)) : rows;

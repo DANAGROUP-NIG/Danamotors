@@ -154,10 +154,22 @@ describeDb("Parts reports (database)", () => {
     expect(picking.rows).toEqual([expect.objectContaining({ picked: 5, picker: "YAHAYA" })]);
     // Store wise: headed by the sending store, without the receiving store or rate.
     const stores = await report("store-wise-stn");
-    expect(stores.columns.map((c) => c.label)).toEqual(["Bill Number", "Date", "Part No", "Flag", "Description", "Qty", "Amount"]);
+    expect(stores.columns.map((c) => c.label)).toEqual([
+      "Bill Number", "Date", "Part No", "Flag", "Description", "Qty", "Amount", "Tax", "Discount", "Others", "Net Amount",
+    ]);
     const [storeLine] = stores.rows;
     const day = today.split("-").reverse().join("/");
-    expect(stores.rows).toEqual([expect.objectContaining({ group: `${storeLine.stnNumber} · ${day} · CPD Reports ${run}`, quantity: 5, amount: 23500 })]);
+    expect(stores.rows).toEqual([
+      expect.objectContaining({
+        group: `${storeLine.stnNumber} · ${day} · CPD Reports ${run}`,
+        quantity: 5,
+        amount: 23500,
+        tax: 0,
+        discount: 0,
+        others: 0,
+        net: 23500,
+      }),
+    ]);
     const inward = await report("indent-inward-register", { status: "EXECUTED", fullyExecuted: true });
     expect(inward.rows).toEqual([expect.objectContaining({ requested: 5, dispatched: 5, backOrder: 0 })]);
   });

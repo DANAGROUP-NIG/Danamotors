@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Download, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Maximize2, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { PageHeader } from "@/components/headers/page-header";
@@ -78,6 +78,8 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
   }));
   const [customer, setCustomer] = useState<SaleCustomer | null>(null);
   const [applied, setApplied] = useState<ReportParams | null>(null);
+  // Legacy "Output To: Screen": the report alone, filling the window.
+  const [fullScreen, setFullScreen] = useState(false);
   const set = (patch: Partial<ReportParams>) => setParams((p) => ({ ...p, ...patch }));
   const option = params.option ?? definition?.options?.[0]?.value;
 
@@ -143,6 +145,14 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
     [result, definition?.carriedForward],
   );
 
+  // Esc closes the full-screen view.
+  useEffect(() => {
+    if (!fullScreen) return;
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setFullScreen(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [fullScreen]);
+
   if (catalog.isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -161,6 +171,17 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
     );
   }
 
+  const output = result && (
+    <>
+      <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => window.print()}>
+        <Printer className="size-4" /> Print
+      </Button>
+      <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => exportExcel(result)}>
+        <Download className="size-4" /> Export Excel
+      </Button>
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6 print:gap-2 print:p-0">
       <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
@@ -174,12 +195,10 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
           actions={
             result && (
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => window.print()}>
-                  <Printer className="size-4" /> Print
+                <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => setFullScreen(true)}>
+                  <Maximize2 className="size-4" /> Full screen
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => exportExcel(result)}>
-                  <Download className="size-4" /> Export Excel
-                </Button>
+                {output}
               </div>
             )
           }
@@ -485,7 +504,23 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
       ) : result && !result.rows.length ? (
         <p className="border-y py-12 text-center text-sm text-muted-foreground">No records match these filters.</p>
       ) : result ? (
-        <div className="rounded-xl border bg-background print:border-0">
+        <div
+          role={fullScreen ? "dialog" : undefined}
+          aria-modal={fullScreen || undefined}
+          aria-label={fullScreen ? result.title : undefined}
+          className={cn(
+            "rounded-xl border bg-background print:border-0",
+            fullScreen && "fixed inset-0 z-50 flex flex-col rounded-none border-0 print:static print:block",
+          )}
+        >
+          {fullScreen && (
+            <div className="flex items-center justify-end gap-2 border-b px-4 py-2 print:hidden">
+              {output}
+              <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setFullScreen(false)}>
+                <X className="size-4" /> Close
+              </Button>
+            </div>
+          )}
           {/* Print header, as on the legacy registers. */}
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
             <p className="font-semibold">
@@ -501,9 +536,9 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
               Only the first 5,000 lines are shown. Narrow the dates or filters to see the rest; totals cover every line.
             </p>
           )}
-          <div className="overflow-x-auto">
+          <div className={cn("overflow-x-auto", fullScreen && "min-h-0 flex-1 overflow-y-auto print:overflow-visible")}>
             <table className="w-full text-sm print:text-[10px]">
-              <thead className="border-b bg-muted/40">
+              <thead className={cn("border-b bg-muted/40", fullScreen && "sticky top-0 z-10 bg-muted print:static")}>
                 <tr>
                   <th scope="col" className="w-12 whitespace-nowrap px-3 py-2 text-right font-medium">
                     S.No.

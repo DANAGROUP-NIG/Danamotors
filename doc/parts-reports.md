@@ -1,8 +1,10 @@
 # Parts Reports
 
 The legacy Parts module report menus (part sale, part purchase, stock and MIS reports), rebuilt as one screen: **Operations → Parts Reports**.
-Pick a report, set its filters, then **Run report**. Each run shows on screen, with **Print**
-(A4 landscape) and **Export Excel**. Both follow the legacy register layout: report title, branch
+Pick a report, set its filters, then **Run report**. Each run shows on screen, with the legacy
+"Output To" choices: **Full screen** (Screen: the report alone, filling the window, with the column
+headings kept in view; Esc or **Close** returns to the filters), **Print** (Printer, A4 landscape)
+and **Export Excel** (File). Print and Excel follow the legacy register layout: report title, branch
 and period, an S.No. column, group headings with subtotals, and a total line. The Excel file is a
 real `.xlsx` with numbers, dates and number formats intact.
 
@@ -29,7 +31,7 @@ title, filters, options and columns are defined once, in
 | MRN / SRN Shortage Report, MIT and MRN Mismatch Report, BIT and SRN Mismatch Report | `receipt-shortage` | Receipt lines with damaged or short quantities: **MRN** (vendor receipts, with invoice, MIT and case) or **SRN** (branch transfers, with STN, packing list and case), valued at the receipt rate. Filter by vendor, and find a receipt by its MRN/SRN, MIT or STN number |
 | Picking List Register | `picking-register` | Parts picked for indents, with bin, picker and any alternate supplied |
 | STN/SRN Register | `stn-register` | Legacy layout: Bill Number, Date, Store, Part No, Flag, Description, Qty, Rate, Amount. **STN Register**: STNs sent from the branch, the store is the receiving branch, at the dealer rate on dispatch. **Stock Receipt Note**: transfer MRNs into the branch, the store is the sending branch, the quantity received at the STN rate. Each document is headed "number · date · store" with a total under it, lines in part number order, carried forward page by page. Cancelled STNs are left out. Damaged and short quantities are on the MRN / SRN Shortage Report, and indents on the indent registers |
-| Store Wise STN Register | `store-wise-stn` | Legacy layout: Bill Number, Date, Part No, Flag, Description, Qty, Amount. The same STNs and totals as the STN Register, sorted by the sending store (legacy "Storelocation"), each STN headed "number · date · sending store" with a total under it, lines in part number order, carried forward page by page. The receiving store and rate are left off, as on legacy. Legacy's Tax, Discount and Others are always zero on an STN, so its Net Amount is the Amount and these columns are dropped. Legacy's Location Total is the Grand Total for a single branch. Optional **To branch** filter |
+| Store Wise STN Register | `store-wise-stn` | Legacy layout: Bill Number, Date, Part No, Flag, Description, Qty, Amount, Tax, Discount, Others, Net Amount. The same STNs and totals as the STN Register, sorted by the sending store (legacy "Storelocation"), each STN headed "number · date · sending store" with a total under it, lines in part number order, carried forward page by page. The receiving store and rate are left off, as on legacy. Legacy STNs could carry VAT and a discount (rare; none in 2026). Ours cannot yet, so Tax, Discount and Others show zero and Net Amount equals Amount. Legacy's Location Total is the Grand Total for a single branch. Optional **To branch** filter |
 | Branch Stock Indent Inward Register | `indent-inward-register` | Indents raised on the branch, line by line, with the quantity cancelled; Pending, Cancelled (cancelled or rejected indents, and lines with a quantity cancelled) or Executed |
 | Branch Stock Indent Outward Register | `indent-outward-register` | Indents the branch raised on other branches, with the same columns and order filter as the inward register |
 | Branch In Transit Report | `branch-in-transit` | STN lines dispatched to the branch: sent, received, damaged, short and still on the way; **All** or **Pending** |

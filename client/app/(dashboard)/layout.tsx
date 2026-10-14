@@ -84,7 +84,8 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f4f8]">
+    // Printing: the page content alone, on white, flowing over as many pages as it needs.
+    <div className="flex h-screen overflow-hidden bg-[#f0f4f8] print:block print:h-auto print:overflow-visible print:bg-white">
       {/* ── Mobile backdrop ─────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
@@ -95,24 +96,30 @@ export default function DashboardLayout({
       )}
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <SideNav
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        navGroups={NAV_GROUPS}
-      />
+      <div className="contents print:hidden">
+        <SideNav
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          navGroups={NAV_GROUPS}
+        />
+      </div>
 
       {/* ── Right column ────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a] print:block print:overflow-visible print:bg-white">
         {/* ── Top header ──────────────────────────────────────────── */}
-        <MainHeader setSidebarOpen={setSidebarOpen} />
+        <div className="contents print:hidden">
+          <MainHeader setSidebarOpen={setSidebarOpen} />
+        </div>
 
         {/* ── Page content ────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto" id="main-content">
+        <main className="flex-1 overflow-y-auto print:overflow-visible" id="main-content">
           <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
         </main>
 
         {/* ── Mobile bottom nav ───────────────────────────────────── */}
-        <MobileNav />
+        <div className="contents print:hidden">
+          <MobileNav />
+        </div>
       </div>
     </div>
   );

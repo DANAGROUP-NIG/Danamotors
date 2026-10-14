@@ -742,9 +742,15 @@ export const REPORTS: ReportDefinition[] = [
     labels: { branch: "To branch" },
     grouped: true,
     carriedForward: true,
-    // Legacy leaves off the receiving store and the rate. Its Tax, Discount and Others are always
-    // zero on an STN, so Net Amount is the Amount.
-    columns: STN_COLUMNS.filter((c) => c.key !== "toBranch" && c.key !== "rate"),
+    // Legacy leaves off the receiving store and the rate, and adds the STN's charges. Legacy STNs
+    // could carry VAT and a discount (rarely); ours cannot yet, so these are zero and Net is Amount.
+    columns: [
+      ...STN_COLUMNS.filter((c) => c.key !== "toBranch" && c.key !== "rate"),
+      money("tax", "Tax"),
+      money("discount", "Discount"),
+      money("others", "Others"),
+      money("net", "Net Amount"),
+    ],
   },
   {
     kind: "indent-inward-register",
