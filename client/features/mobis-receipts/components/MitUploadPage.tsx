@@ -158,7 +158,7 @@ export function MitUploadPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <Link href="/inventory/mobis-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-        <ArrowLeft className="size-4" /> Back to Mobis Receipts
+        <ArrowLeft className="size-4" /> Back to MIT
       </Link>
       <PageHeader title="Upload MIT" description="Import a Mobis invoice file in MIT format. Nothing is saved until you click Save." />
 

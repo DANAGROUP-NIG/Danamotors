@@ -135,21 +135,21 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     permissions: [
-      "invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create","financereport:read","report:receipt-register","report:party-ledger","report:party-outstanding","report:party-outstanding-age","report:party-outstanding-bill","report:debit-note-register","report:credit-note-register",
-      "outstanding:recalculate", "letter:outstanding",
-      "debitnote:read", "creditnote:read", "debitnote:create", "creditnote:create", "report:debit-note-register", "report:credit-note-register",
-      "invoice:read",
       INVENTORY_PERMISSIONS.SPAREPART_READ,
       INVENTORY_PERMISSIONS.STOCK_READ,
       INVENTORY_PERMISSIONS.TRANSFER_READ,
+      INVENTORY_PERMISSIONS.TRANSFER_CANCEL,
       PART_SALE_PERMISSIONS.READ,
+      PART_SALE_PERMISSIONS.ORDER,
       STOCK_TAKE_PERMISSIONS.READ,
       STOCK_AUDIT_PERMISSIONS.READ,
-      INVENTORY_PERMISSIONS.TRANSFER_CANCEL,
-      PART_SALE_PERMISSIONS.ORDER,
+      "labour-item:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
+      "financereport:read","report:receipt-register","report:party-ledger","report:party-outstanding","report:party-outstanding-age","report:party-outstanding-bill","report:debit-note-register","report:credit-note-register",
     ],
+    // Parts first, in the order a part moves: master, query, receive (MIT), count, sell, correct,
+    // transfer, report. Then the workshop-wide items.
     items: [
       {
         label: "Inventory",
@@ -167,7 +167,7 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ, INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
-        label: "Mobis Receipts",
+        label: "MIT",
         href: "/inventory/mobis-receipts",
         icon: Ship,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
@@ -193,19 +193,6 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "Customer Orders", href: "/part-sale/orders", icon: ClipboardList, permissions: [PART_SALE_PERMISSIONS.READ] },
           { label: "Counter Sales", href: "/part-sale/counter-sales", icon: ReceiptText, permissions: [PART_SALE_PERMISSIONS.READ] },
           { label: "Sale Returns", href: "/part-sale/returns", icon: Undo2, permissions: [PART_SALE_PERMISSIONS.READ] },
-        ],
-      },
-      {
-        label: "Parts Reports",
-        href: "/parts-reports",
-        icon: FileBarChart,
-        // Counter-sale, transfer and stock registers; each report checks its own permission.
-        permissions: [
-          PART_SALE_PERMISSIONS.READ,
-          INVENTORY_PERMISSIONS.TRANSFER_READ,
-          INVENTORY_PERMISSIONS.STOCK_READ,
-          STOCK_TAKE_PERMISSIONS.READ,
-          STOCK_AUDIT_PERMISSIONS.READ,
         ],
       },
       {
@@ -237,17 +224,47 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [INVENTORY_PERMISSIONS.TRANSFER_READ],
       },
       {
-        label: "Purchase Requests",
-        href: "/purchase-requests",
-        icon: ClipboardList,
-        permissions: [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
+        label: "Parts Reports",
+        href: "/parts-reports",
+        icon: FileBarChart,
+        // Counter-sale, transfer and stock registers; each report checks its own permission.
+        permissions: [
+          PART_SALE_PERMISSIONS.READ,
+          INVENTORY_PERMISSIONS.TRANSFER_READ,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+          STOCK_TAKE_PERMISSIONS.READ,
+          STOCK_AUDIT_PERMISSIONS.READ,
+        ],
       },
       {
-        label: "Purchasing",
-        href: "/purchasing",
-        icon: ReceiptText,
-        permissions: ["invoice:read", "payment:read"],
+        label: "Labour Catalogue",
+        href: "/labour-catalogue",
+        icon: ListChecks,
+        permissions: ["labour-item:read"],
       },
+      {
+        label: "Warranty",
+        href: "/warranty",
+        icon: BadgeCheck,
+        permissions: [WARRANTY_PERMISSIONS.READ],
+      },
+      {
+        label: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
+      },
+      {
+        label: "Reports",
+        href: "/reports",
+        icon: FileText,
+        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+      },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
       {
         label: "Finance",
         href: "/finance",
@@ -299,40 +316,11 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: ["tally:post", "tally:import"],
       },
       {
-        label: "Labour Catalogue",
-        href: "/labour-catalogue",
-        icon: ListChecks,
-        permissions: ["labour-item:read"],
-      },
-      {
         label: "Credit Applications",
         href: "/credit-applications",
         icon: Wallet,
         permissions: ["credit:application:create"],
       },
-      {
-        label: "Warranty",
-        href: "/warranty",
-        icon: BadgeCheck,
-        permissions: [WARRANTY_PERMISSIONS.READ],
-      },
-      {
-        label: "Campaigns",
-        href: "/campaigns",
-        icon: Megaphone,
-        permissions: [CAMPAIGN_PERMISSIONS.READ],
-      },
-      {
-        label: "Reports",
-        href: "/reports",
-        icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
-      },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
       {
         label: "Settings",
         href: "/settings",
