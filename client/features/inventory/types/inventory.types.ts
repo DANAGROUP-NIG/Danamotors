@@ -44,8 +44,10 @@ export type PartMaster = {
   retailRate: number | null;
   /** Legacy tax status. */
   taxable: boolean;
-  /** Legacy part flag, for example O for original. */
+  /** Legacy part flag = purchase source: O original part, A authorised source, F FOC item, L local. */
   partFlag: string;
+  /** Legacy part type: S spare part, O oil, A accessory. */
+  partType: string;
   /** Legacy pricing category (A, C, E…); its multiplier derives the retail rate. */
   priceCategoryCode: string | null;
   binLocation: string | null;
@@ -75,6 +77,7 @@ export type PartMasterPayload = {
   retailRate?: number;
   taxable?: boolean;
   partFlag?: string;
+  partType?: string;
   priceCategoryCode?: string | null;
   binLocation?: string;
   storeLocation?: string;

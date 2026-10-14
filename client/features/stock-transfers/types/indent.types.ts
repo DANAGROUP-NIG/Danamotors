@@ -4,6 +4,7 @@ export type IndentStatus =
   | "APPROVED"
   | "PICKING"
   | "PICKED"
+  | "PARTLY_DISPATCHED"
   | "STN_CREATED"
   | "PACKED"
   | "DISPATCHED"
@@ -36,12 +37,15 @@ export type PartRef = {
   partFlag?: string;
   priceCategoryCode?: string | null;
   retailRate?: number | null;
+  taxable?: boolean;
 };
 
 export type LineSummary = {
   requested: number;
   approved: number | null;
   rejected: number;
+  /** No longer to be supplied (legacy cancelled qty). */
+  cancelled: number;
   picked: number;
   backOrder: number;
   dispatched: number;
@@ -70,6 +74,11 @@ export type IndentLine = {
   supplyCode: "EP" | "APN";
   approvedQuantity: number | null;
   backOrderQuantity: number;
+  /** Shipped so far, across every STN for this indent. */
+  dispatchedQuantity: number;
+  cancelledQuantity: number;
+  cancelledAt?: string | null;
+  cancelRemark?: string | null;
   unitRate: number;
   amount: number;
   currentStock: number | null;
@@ -119,6 +128,10 @@ export type PickingList = {
   id: string;
   pickingNumber: string;
   status: "OPEN" | "COMPLETED" | "CANCELLED";
+  /** Who physically picked (legacy HHDC picker). */
+  pickerName?: string | null;
+  /** The STN this pick shipped on. */
+  stnId?: string | null;
   createdAt: string;
   completedAt?: string | null;
   completedBy?: PersonRef | null;
@@ -127,8 +140,9 @@ export type PickingList = {
 
 export type StnLine = {
   id: string;
-  indentLineId: string;
-  pickingLineId: string;
+  /** Empty on a direct STN (stock sent without an indent). */
+  indentLineId: string | null;
+  pickingLineId: string | null;
   requestedPartId: string;
   requestedPart: PartRef;
   partId: string;
@@ -156,6 +170,8 @@ export type TransferCase = {
 export type PackingList = {
   id: string;
   packingNumber: string;
+  /** Legacy "Packing List cum Gate Pass". */
+  gatePassNumber?: string | null;
   status: "PACKED" | "DISPATCHED";
   dispatchMode?: TransportMode | null;
   waybillNumber?: string | null;
@@ -207,11 +223,37 @@ export type Stn = {
   totalValue: number;
   dispatchedAt?: string | null;
   dispatchedBy?: PersonRef | null;
+  /** Indents shipped on this STN; empty for a direct STN. */
+  indents: { id: string; indentNumber: string }[];
   lines: StnLine[];
   cases: TransferCase[];
   packingList: PackingList | null;
   mrns: Mrn[];
-  srns: Srn[]; 
+};
+
+/** STN register row. */
+export type StnListItem = Pick<
+  Stn,
+  "id" | "stnNumber" | "status" | "documentDate" | "transportMode" | "remarks" | "totalQuantity" | "totalValue" | "indents"
+> & {
+  sourceBranchId: string;
+  destinationBranchId: string;
+  sourceBranch: BranchRef;
+  destinationBranch: BranchRef;
+  packingList: { id: string; packingNumber: string; gatePassNumber: string | null } | null;
+  _count: { lines: number; cases: number; mrns: number };
+};
+
+/** STN detail: lines also say which indent they belong to. */
+export type StnDetail = Omit<Stn, "lines"> & {
+  sourceBranchId: string;
+  destinationBranchId: string;
+  sourceBranch: BranchRef;
+  destinationBranch: BranchRef;
+  createdBy?: PersonRef | null;
+  lines: (StnLine & {
+    indentLine: { id: string; lineNumber: number; indent: { id: string; indentNumber: string } } | null;
+  })[];
 };
 
 export type Indent = {
@@ -242,8 +284,13 @@ export type Indent = {
   lines: IndentLine[];
   statusHistory: StatusHistoryEntry[];
   progress: ProgressStep[];
-  pickingList: PickingList | null;
-  stn: Stn | null;
+  /** One picking list per pick round; the back order can be picked again after a dispatch. */
+  pickingLists: PickingList[];
+  openPickingList: PickingList | null;
+  /** An indent can ship over several STNs, and one STN can carry several indents. */
+  stns: Stn[];
+  /** STNs still waiting for the requesting branch's MRN. */
+  stnsInTransit: Stn[];
 };
 
 export type IndentListItem = {
@@ -257,7 +304,7 @@ export type IndentListItem = {
   requestingBranch: BranchRef;
   sourceBranch: BranchRef;
   requestedBy: PersonRef;
-  stn: { id: string; stnNumber: string; status: Stn["status"] } | null;
+  stns: { id: string; stnNumber: string; status: Stn["status"] }[];
   _count: { lines: number };
 };
 
@@ -272,32 +319,6 @@ export type PartSearchResult = PartRef & {
   unitRate: number;
   sourceAvailable: number;
   requestingStock: number;
-};
-export type SrnLine = {
-  id: string;
-  stnLineId: string | null;
-  partId: string;
-  part: PartRef;
-  receivedQuantity: number;
-  damagedQuantity: number;
-  shortQuantity: number;
-  unitCost: number;
-  amount: number;
-  remarks?: string | null;
-};
-
-export type Srn = {
-  id: string;
-  srnNumber: string;
-  receiptDate: string;
-  taxForm?: string | null;
-  remarks?: string | null;
-  totalReceived: number;
-  totalDamaged: number;
-  totalShort: number;
-  totalValue: number;
-  receivedBy?: PersonRef | null;
-  lines: SrnLine[];
 };
 export type PartLookup = {
   part: PartRef & { unitRate: number };
@@ -335,6 +356,7 @@ export type CreateIndentPayload = {
 
 export type ApproveIndentPayload = {
   remarks?: string;
+  pickerName?: string;
   lines?: { lineId: string; approvedQuantity?: number; supplyPartId?: string }[];
 };
 
@@ -352,6 +374,17 @@ export type DispatchIndentPayload = {
     weight?: number;
     lines: { pickingLineId: string; quantity: number }[];
   }[];
+};
+
+/** Several picked indents of one branch on one STN. */
+export type DispatchStnPayload = Omit<DispatchIndentPayload, "lines" | "cases"> & { indentIds: string[] };
+
+/** Free stock sent without an indent. */
+export type DirectStnPayload = Omit<DispatchIndentPayload, "lines" | "cases"> & {
+  sourceBranchId: string;
+  destinationBranchId: string;
+  remarks: string;
+  lines: { partId: string; quantity: number }[];
 };
 
 export type ReceiveIndentPayload = {

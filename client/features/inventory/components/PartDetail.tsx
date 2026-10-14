@@ -37,6 +37,7 @@ import { useBranchStore } from "@/store/branch.store";
 import type { PartStockItem } from "../types/inventory.types";
 import { PartRoleBadge, PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster } from "../types/inventory.types";
+import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -269,7 +270,8 @@ export function PartDetail({ id }: { id: string }) {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
-            <DetailField label="Part flag" value={part.partFlag} />
+            <DetailField label="Part type" value={codeLabel(PART_TYPE_LABELS, part.partType ?? "S")} />
+            <DetailField label="Purchase source" value={codeLabel(PART_FLAG_LABELS, part.partFlag)} />
             <DetailField
               label="Price category"
               value={

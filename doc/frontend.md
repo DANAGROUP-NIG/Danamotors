@@ -37,8 +37,8 @@ authenticated workspace is in the `(dashboard)` group.
 | `/vehicles/[id]` | Vehicle detail |
 | `/inventory` | Parts + branch stock |
 | `/inventory/[id]` | Part detail |
-| `/purchase-requests` | Purchase requests |
-| `/purchasing` | Purchasing list (backed by purchase requests) |
+| `/purchase-requests` | Purchase requests (not in the side menu) |
+| `/purchasing` | Purchasing list (backed by purchase requests; not in the side menu) |
 | `/transfers` | Inter-branch transfers |
 | `/invoices` | Invoices list (edit / record payment via row actions) |
 | `/invoices/new` | Create invoice |

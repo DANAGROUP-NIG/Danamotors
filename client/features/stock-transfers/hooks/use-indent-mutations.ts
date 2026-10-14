@@ -5,6 +5,7 @@ import { notificationKeys } from "@/features/notification/api/notification.keys"
 import {
   approveIndentRequest,
   cancelIndentRequest,
+  closeIndentRequest,
   createIndentRequest,
   dispatchIndentRequest,
   pickIndentRequest,
@@ -59,14 +60,25 @@ export const useApproveIndent = () =>
   useIndentMutation(
     ({ id, body }: { id: string; body: ApproveIndentPayload }) => approveIndentRequest(id, body),
     (i) =>
-      i.pickingList
-        ? `Approved. Picking list ${i.pickingList.pickingNumber} created`
+      i.openPickingList
+        ? `Approved. Picking list ${i.openPickingList.pickingNumber} created`
         : "Approved. No stock available yet, all lines are on back order",
     "Failed to approve indent",
   );
 
 export const usePickIndent = () =>
-  useIndentMutation((id: string) => pickIndentRequest(id), "Picking list created", "Failed to pick indent");
+  useIndentMutation(
+    ({ id, pickerName }: { id: string; pickerName?: string }) => pickIndentRequest(id, pickerName),
+    (i) => `Picking list ${i.openPickingList?.pickingNumber ?? ""} created`.trim(),
+    "Failed to pick indent",
+  );
+
+export const useCloseIndent = () =>
+  useIndentMutation(
+    ({ id, reason }: { id: string; reason: string }) => closeIndentRequest(id, reason),
+    "Back order closed",
+    "Failed to close the back order",
+  );
 
 export const useRejectIndent = () =>
   useIndentMutation(
@@ -85,7 +97,12 @@ export const useCancelIndent = () =>
 export const useDispatchIndent = () =>
   useIndentMutation(
     ({ id, body }: { id: string; body: DispatchIndentPayload }) => dispatchIndentRequest(id, body),
-    (i) => `Dispatched on STN ${i.stn?.stnNumber}. The goods are now in transit`,
+    (i) => {
+      const stn = i.stns[i.stns.length - 1];
+      return i.status === "PARTLY_DISPATCHED"
+        ? `Dispatched on STN ${stn?.stnNumber}. The rest stays on back order`
+        : `Dispatched on STN ${stn?.stnNumber}. The goods are now in transit`;
+    },
     "Failed to dispatch",
   );
 
@@ -93,7 +110,7 @@ export const useReceiveIndent = () =>
   useIndentMutation(
     ({ id, body }: { id: string; body: ReceiveIndentPayload }) => receiveIndentRequest(id, body),
     (i) => {
-      const mrn = i.stn?.mrns[i.stn.mrns.length - 1];
+      const mrn = i.stns.flatMap((s) => s.mrns).sort((a, b) => a.receiptDate.localeCompare(b.receiptDate)).pop();
       return i.status === "COMPLETED"
         ? `MRN ${mrn?.mrnNumber} generated. Transfer complete`
         : `MRN ${mrn?.mrnNumber} generated. Some items are still outstanding`;
