@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Download,
   Eye,
+  FileText,
   FileSpreadsheet,
   History,
   Link2,
@@ -34,6 +35,8 @@ import { copyToClipboard, downloadCsv, downloadExcel } from "@/lib/table-actions
 import { useIndents } from "../hooks/use-indents";
 import { useSubmitIndent } from "../hooks/use-indent-mutations";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import {
   INDENT_FILTER_STATUSES,
   INDENT_STATUS_LABELS,
@@ -68,7 +71,7 @@ function exportRows(items: IndentListItem[]) {
     requestingBranch: i.requestingBranch.name,
     sourceBranch: i.sourceBranch.name,
     lines: i._count.lines,
-    stnNumber: i.stn?.stnNumber ?? "",
+    stnNumber: i.stns.map((s) => s.stnNumber).join(", "),
     requestedBy: personName(i.requestedBy),
     status: INDENT_STATUS_LABELS[i.status],
   }));
@@ -82,6 +85,8 @@ export function IndentsPage() {
   const [committedSearch, setCommittedSearch] = useState("");
   const { canCreate, abilities, myBranchId, crossBranch } = useIndentAbilities();
   const submit = useSubmitIndent();
+  const { hasPermission } = useAuth();
+  const canDispatch = hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH);
 
   const { data, isLoading, isFetching, isError } = useIndents({
     status: (statusFilter || undefined) as IndentStatus | undefined,
@@ -163,7 +168,7 @@ export function IndentsPage() {
     },
     {
       header: "STN #",
-      render: (i) => <span className="font-mono text-sm text-muted-foreground">{i.stn?.stnNumber ?? "—"}</span>,
+      render: (i) => <span className="font-mono text-sm text-muted-foreground">{i.stns.map((s) => s.stnNumber).join(", ") || "—"}</span>,
     },
     {
       header: "Requested By",
@@ -267,6 +272,28 @@ export function IndentsPage() {
         }
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link href="/transfers/stn">
+                <FileText className="size-4" />
+                STNs
+              </Link>
+            </Button>
+            {canDispatch && (
+              <>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href="/transfers/stn/dispatch">
+                    <Truck className="size-4" />
+                    Dispatch to branch
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href="/transfers/stn/direct">
+                    <Send className="size-4" />
+                    Direct STN
+                  </Link>
+                </Button>
+              </>
+            )}
             <Button asChild variant="ghost" size="sm" className="gap-1.5">
               <Link href="/transfers/legacy">
                 <History className="size-4" />

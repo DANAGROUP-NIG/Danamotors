@@ -7,6 +7,7 @@ export const INDENT_STATUS_LABELS: Record<IndentStatus, string> = {
   APPROVED: "Approved",
   PICKING: "Picking",
   PICKED: "Ready to dispatch",
+  PARTLY_DISPATCHED: "Partly dispatched",
   STN_CREATED: "STN created",
   PACKED: "Packed",
   DISPATCHED: "Dispatched",
@@ -25,6 +26,7 @@ export const INDENT_STATUS_TONES: Record<IndentStatus, StatusTone> = {
   APPROVED: "blue",
   PICKING: "blue",
   PICKED: "blue",
+  PARTLY_DISPATCHED: "orange",
   STN_CREATED: "purple",
   PACKED: "purple",
   DISPATCHED: "purple",
@@ -43,6 +45,7 @@ export const INDENT_FILTER_STATUSES: IndentStatus[] = [
   "SUBMITTED",
   "APPROVED",
   "PICKED",
+  "PARTLY_DISPATCHED",
   "IN_TRANSIT",
   "PARTIALLY_RECEIVED",
   "COMPLETED",
@@ -64,6 +67,22 @@ export const MOBIS_ORDER_MODE_LABELS: Record<MobisOrderMode, string> = {
   AIR: "Air",
   COURIER: "Courier",
 };
+
+export const STN_STATUS_LABELS = {
+  CREATED: "Created",
+  DISPATCHED: "In transit",
+  PARTIALLY_RECEIVED: "Partly received",
+  RECEIVED: "Received",
+  CANCELLED: "Cancelled",
+} as const;
+
+export const STN_STATUS_TONES = {
+  CREATED: "gray",
+  DISPATCHED: "purple",
+  PARTIALLY_RECEIVED: "orange",
+  RECEIVED: "emerald",
+  CANCELLED: "gray",
+} as const;
 
 export function fmtDate(iso?: string | null) {
   return iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";

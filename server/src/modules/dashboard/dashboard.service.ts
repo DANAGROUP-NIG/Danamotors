@@ -1,4 +1,5 @@
 import prisma from '../../prisma/client';
+import { branchScope } from '../finance/finance.repository';
 
 export class DashboardService {
   async getStats(branchId?: string, userId?: string) {
@@ -253,7 +254,7 @@ export class DashboardService {
       prisma.invoice.aggregate({
         where: {
           status: { notIn: ['Cancelled', 'CANCELLED', 'CANCELED', 'VOID'] },
-          ...(branchId ? { OR: [{ jobCard: { branchId } }, { jobCardId: null, customer: { branchId } }] } : {}),
+          ...(branchId ? { OR: branchScope(branchId) } : {}),
         },
         _sum: { outstandingAmount: true },
       }),

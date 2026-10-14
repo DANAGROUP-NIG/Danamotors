@@ -20,6 +20,18 @@ function paymentFromAllocation(allocation: AllocatedPayment) {
   };
 }
 
+/**
+ * A bill belongs to its job card's branch; a bill without a job card (such as a CPD
+ * counter sale) belongs to the branch recorded on it, else to the customer's branch.
+ */
+export function branchScope(branchId: string) {
+  return [
+    { jobCard: { is: { branchId } } },
+    { jobCardId: null, reportBranchId: branchId },
+    { jobCardId: null, reportBranchId: null, customer: { is: { branchId } } },
+  ];
+}
+
 export class FinanceRepository {
   async listInvoices(params?: { branchId?: string; customerId?: string }): Promise<Invoice[]> {
     const where: Record<string, any> = {};
@@ -29,10 +41,7 @@ export class FinanceRepository {
     }
 
     if (params?.branchId) {
-      where.OR = [
-        { jobCard: { is: { branchId: params.branchId } } },
-        { jobCardId: null, customer: { is: { branchId: params.branchId } } },
-      ];
+      where.OR = branchScope(params.branchId);
     }
 
     return prisma.invoice.findMany({
@@ -50,6 +59,7 @@ export class FinanceRepository {
           },
         },
         jobCard: { include: { branch: true, vehicle: true } },
+        counterSale: { select: { id: true, branchId: true } },
         payments: true,
         receipts: true,
         lines: true,
@@ -76,6 +86,7 @@ export class FinanceRepository {
           },
         },
         jobCard: { include: { branch: true, vehicle: true } },
+        counterSale: { select: { id: true, branchId: true } },
         payments: true,
         receipts: true,
         lines: true,
@@ -90,10 +101,7 @@ export class FinanceRepository {
   }
 
   async listPayments(params?: { branchId?: string }) {
-    const invoiceScope = params?.branchId ? { OR: [
-      { jobCard: { is: { branchId: params.branchId } } },
-      { jobCardId: null, customer: { is: { branchId: params.branchId } } },
-    ] } : {};
+    const invoiceScope = params?.branchId ? { OR: branchScope(params.branchId) } : {};
     const [legacyPayments, allocations] = await Promise.all([
       prisma.payment.findMany({
         // Linked receipts are represented by their current allocations below.

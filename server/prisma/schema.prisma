@@ -53,9 +53,17 @@ model Branch {
   mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
   mrnsSourced    MaterialReceiptNote[] @relation("MrnSourceBranch")
 
+  customerOrders CustomerOrder[]
+  counterSales   CounterSale[]
+  saleReturns    CounterSaleReturn[]
+
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
+
+  partBinChanges PartBinHistory[]
+
+  stockTakes StockTake[]
 }
 
 // ============================================================
@@ -125,6 +133,7 @@ model User {
   indentsApproved      BranchIndent[]          @relation("IndentApprovedBy")
   indentsRejected      BranchIndent[]          @relation("IndentRejectedBy")
   indentsCancelled     BranchIndent[]          @relation("IndentCancelledBy")
+  indentLinesCancelled BranchIndentLine[]      @relation("IndentLineCancelledBy")
   transferStatusEvents TransferStatusHistory[] @relation("TransferStatusActor")
   pickingListsCreated  PickingList[]           @relation("PickingListCreatedBy")
   pickingListsDone     PickingList[]           @relation("PickingListCompletedBy")
@@ -136,6 +145,8 @@ model User {
   mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
+  partRateChanges           PartRateHistory[]  @relation("PartRateChangedBy")
+  partBinChanges            PartBinHistory[]   @relation("PartBinChangedBy")
 
   notifications Notification[]
 
@@ -152,6 +163,20 @@ model User {
   warrantyCaseStatusEvents     WarrantyCaseStatusHistory[] @relation("WarrantyCaseStatusActor")
   campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
+
+  customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
+  customerOrderLinesCancelled CustomerOrderLine[] @relation("CustomerOrderLineCancelledBy")
+  counterSalesExecuted  CounterSale[]       @relation("CounterSaleExecutive")
+  saleReturnsCreated    CounterSaleReturn[] @relation("SaleReturnCreatedBy")
+
+  stockTakesCreated       StockTake[]      @relation("StockTakeCreatedBy")
+  stockTakesCompleted     StockTake[]      @relation("StockTakeCompletedBy")
+  stockTakesConfirmed     StockTake[]      @relation("StockTakeConfirmedBy")
+  stockTakesCancelled     StockTake[]      @relation("StockTakeCancelledBy")
+  stockTakeSheets         StockTakeSheet[] @relation("StockTakeSheetChecker")
+  stockTakeSheetsIssued   StockTakeSheet[] @relation("StockTakeSheetIssuedBy")
+  stockTakeSheetsUploaded StockTakeSheet[] @relation("StockTakeSheetUploadedBy")
+  stockTakeCounts         StockTakeCount[] @relation("StockTakeCountRecordedBy")
 }
 
 model Role {
@@ -283,6 +308,9 @@ model Customer {
   creditApplications CustomerCreditApplication[]
 
   warrantyCases WarrantyCase[]
+
+  customerOrders CustomerOrder[]
+  saleReturns    CounterSaleReturn[]
 
   @@index([branchId])
   @@index([branchId, partyStatus, code])
@@ -706,8 +734,10 @@ model SparePart {
   retailRate        Float?
   // Legacy tax status (partmast.taxable).
   taxable           Boolean       @default(true)
-  // Legacy part flag, for example O for original.
+  // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local.
   partFlag          String        @default("O")
+  // Legacy partmast.parttype: S spare part, O oil, A accessory.
+  partType          String        @default("S")
   // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
   priceCategoryCode String?
   priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
@@ -747,7 +777,69 @@ model SparePart {
   jobCardLines      JobCardLine[]
   warrantyCaseLines WarrantyCaseLine[]
 
+  customerOrderLines CustomerOrderLine[]
+  saleReturnLines    CounterSaleReturnLine[]
+
+  rateHistory PartRateHistory[]
+  binHistory  PartBinHistory[]
+
+  stockTakeLines StockTakeLine[]
+
   @@index([mainPartId])
+}
+
+enum PartChangeAction {
+  ADDED
+  EDITED
+  DELETED
+}
+
+// Legacy PartRateHistory: each dealer and retail rate a part has had, and parts deleted from
+// Part Master. The part number, description, flag and category are kept for deleted parts.
+model PartRateHistory {
+  id String @id @default(uuid())
+
+  partId            String?
+  part              SparePart?       @relation(fields: [partId], references: [id], onDelete: SetNull)
+  partNumber        String
+  description       String
+  partFlag          String
+  priceCategoryCode String?
+  action            PartChangeAction
+
+  oldDealerRate Float?
+  newDealerRate Float?
+  oldRetailRate Float?
+  newRetailRate Float?
+
+  changedById String?
+  changedBy   User?    @relation("PartRateChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now())
+
+  @@index([changedAt])
+  @@index([partId])
+}
+
+// Legacy PartBinHistory: each change of a part's bin, at a branch (its rack location) or the
+// Part Master default bin (no branch).
+model PartBinHistory {
+  id String @id @default(uuid())
+
+  partId String
+  part   SparePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  oldBin String?
+  newBin String?
+
+  changedById String?
+  changedBy   User?    @relation("PartBinChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now())
+
+  @@index([changedAt])
+  @@index([partId])
 }
 
 // ============================================================
@@ -1130,6 +1222,8 @@ model Invoice {
 
   creditApplications CustomerCreditApplication[]
 
+  // Set when the invoice is a CPD counter-sale bill (parts sold against customer purchase orders).
+  counterSale CounterSale?
 
   @@index([dueDate, status])
   @@index([customerId])
@@ -1194,7 +1288,17 @@ model InvoiceLine {
   customerPaid    Boolean        @default(true)
   createdAt       DateTime       @default(now())
 
+  // Counter-sale lines: the CPO line billed, the VAT applied, and units returned so far.
+  customerOrderLineId String?
+  customerOrderLine   CustomerOrderLine?      @relation(fields: [customerOrderLineId], references: [id], onDelete: Restrict)
+  vatPercent          Float?
+  // Dealer rate when billed, so revenue and margin reports do not move with later price changes.
+  unitCost            Float?
+  returnedQuantity    Int                     @default(0)
+  returnLines         CounterSaleReturnLine[]
+
   @@index([invoiceId])
+  @@index([customerOrderLineId])
 }
 
 model DocumentSequence {
@@ -1364,6 +1468,7 @@ model PartyNote {
   accountLines PartyNoteAccountLine[]
   debitAdjustments  ReceiptAllocation[] @relation("DebitNoteAdjustments")
   creditAdjustments ReceiptAllocation[] @relation("CreditNoteAdjustments")
+  saleReturn        CounterSaleReturn?
 
   @@index([branchId, direction, date])
   @@unique([direction, number])
@@ -1784,6 +1889,8 @@ enum IndentStatus {
   APPROVED
   PICKING
   PICKED
+  // Part of the approved quantity is shipped; the back order is still to be picked or closed.
+  PARTLY_DISPATCHED
   STN_CREATED
   PACKED
   DISPATCHED
@@ -1906,8 +2013,9 @@ model BranchIndent {
 
   lines         BranchIndentLine[]
   statusHistory TransferStatusHistory[]
-  pickingList   PickingList?
-  stn           StockTransferNote?
+  // One picking list per pick round; the back order can be picked and dispatched later.
+  pickingLists  PickingList[]
+  stns          StockTransferNote[]     @relation("StnIndents")
 
   @@index([requestingBranchId])
   @@index([sourceBranchId])
@@ -1936,7 +2044,10 @@ model BranchIndentLine {
   requestedQuantity  Int
 
   approvedQuantity  Int?
+  // Approved but neither shipped nor reserved on an open picking list.
   backOrderQuantity Int  @default(0)
+  // Shipped so far, across every STN for this indent.
+  dispatchedQuantity Int @default(0)
 
   // Snapshots taken from Part Master and branch stock when the line is created.
   unitRate     Float
@@ -1956,6 +2067,14 @@ model BranchIndentLine {
   mobisOrderMode MobisOrderMode?
 
   remarks String?
+
+  // What will no longer be supplied (legacy cancelledQty, CancelBy, CancelDate, CancelRemark).
+  // The latest cancellation is recorded; approvedQuantity drops to what has shipped.
+  cancelledQuantity Int       @default(0)
+  cancelledAt       DateTime?
+  cancelledById     String?
+  cancelledBy       User?     @relation("IndentLineCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark      String?
 
   createdAt DateTime @default(now())
 
@@ -1988,13 +2107,21 @@ model PickingList {
   id            String @id @default(uuid())
   pickingNumber String @unique
 
-  indentId String       @unique
+  // An indent can be picked again for its back order after each dispatch; at most one
+  // picking list per indent is OPEN at a time (partial unique index in the migration).
+  indentId String
   indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Cascade)
 
   branchId String
   branch   Branch @relation("PickingListBranch", fields: [branchId], references: [id], onDelete: Restrict)
 
   status PickingListStatus @default(OPEN)
+  // Who physically picked the parts (legacy HHDC picker), if different from the user.
+  pickerName String?
+
+  // The STN this picking list shipped on. One STN can ship several indents' picking lists.
+  stnId String?
+  stn   StockTransferNote? @relation(fields: [stnId], references: [id], onDelete: SetNull)
 
   createdById   String?
   createdBy     User?     @relation("PickingListCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -2006,8 +2133,9 @@ model PickingList {
   updatedAt DateTime @updatedAt
 
   lines PickingListLine[]
-  stn   StockTransferNote?
 
+  @@index([indentId])
+  @@index([stnId])
   @@index([branchId])
   @@index([status])
 }
@@ -2044,11 +2172,10 @@ model StockTransferNote {
   id        String @id @default(uuid())
   stnNumber String @unique
 
-  indentId String       @unique
-  indent   BranchIndent @relation(fields: [indentId], references: [id], onDelete: Restrict)
-
-  pickingListId String      @unique
-  pickingList   PickingList @relation(fields: [pickingListId], references: [id], onDelete: Restrict)
+  // Indents shipped on this STN: one or several of the same branch. None for a direct STN
+  // (CPD sends stock without an indent, e.g. the monthly Microcat recharge).
+  indents      BranchIndent[] @relation("StnIndents")
+  pickingLists PickingList[]
 
   sourceBranchId String
   sourceBranch   Branch @relation("StnSourceBranch", fields: [sourceBranchId], references: [id], onDelete: Restrict)
@@ -2092,10 +2219,11 @@ model StockTransferNoteLine {
   stnId String
   stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
 
-  indentLineId  String
-  indentLine    BranchIndentLine @relation(fields: [indentLineId], references: [id], onDelete: Restrict)
-  pickingLineId String           @unique
-  pickingLine   PickingListLine  @relation(fields: [pickingLineId], references: [id], onDelete: Restrict)
+  // Empty on a direct STN, which ships free stock without an indent or picking list.
+  indentLineId  String?
+  indentLine    BranchIndentLine? @relation(fields: [indentLineId], references: [id], onDelete: Restrict)
+  pickingLineId String?           @unique
+  pickingLine   PickingListLine?  @relation(fields: [pickingLineId], references: [id], onDelete: Restrict)
 
   requestedPartId String
   requestedPart   SparePart @relation("StnRequestedPart", fields: [requestedPartId], references: [id], onDelete: Restrict)
@@ -2177,6 +2305,8 @@ model PackingList {
 
   status            PackingListStatus @default(PACKED)
   dispatchMode      TransportMode?
+  // Legacy "Packing List cum Gate Pass": the number security checks at the gate.
+  gatePassNumber    String?           @unique
   waybillNumber     String?
   courierName       String?
   consignmentWeight Float?
@@ -2891,4 +3021,313 @@ model OutstandingLetter {
   printedById String?
   @@index([branchId, reference])
   @@index([customerId, printedAt])
+}
+
+// ============================================================
+// PART SALE (CPD): customer purchase order -> counter sale -> return.
+// Legacy CPDAutoEnhancer CUSTOMERORDERHEAD/DETAIL (OrderType C),
+// countersale + csissue (trantype C), csrethead/csretdetail.
+// ============================================================
+
+// Legacy CPO status: A = active, E = executed, C = cancelled.
+enum CustomerOrderStatus {
+  OPEN
+  PARTLY_BILLED
+  BILLED
+  CANCELLED
+}
+
+model CustomerOrder {
+  id        String @id @default(uuid())
+  cpoNumber String @unique
+
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  customerRefNo   String?
+  customerRefDate DateTime?
+  orderDate       DateTime            @default(now())
+  validTill       DateTime?
+  status          CustomerOrderStatus @default(OPEN)
+  remarks         String?
+
+  totalQuantity Int   @default(0)
+  totalAmount   Float @default(0)
+
+  createdById  String?
+  createdBy    User?     @relation("CustomerOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  closedAt     DateTime?
+  cancelledAt  DateTime?
+  cancelRemark String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines CustomerOrderLine[]
+
+  @@index([branchId, status])
+  @@index([customerId])
+}
+
+model CustomerOrderLine {
+  id      String        @id @default(uuid())
+  orderId String
+  order   CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partId  String
+  part    SparePart     @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  orderedQuantity   Int
+  // Picked = reserved in CPD stock and waiting to be billed.
+  pickedQuantity    Int   @default(0)
+  billedQuantity    Int   @default(0)
+  cancelledQuantity Int   @default(0)
+  retailRate        Float
+  amount            Float
+
+  // Latest cancellation of the line (legacy CancelBy, CancelDate, CancelRemark).
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("CustomerOrderLineCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
+
+  createdAt DateTime @default(now())
+
+  invoiceLines InvoiceLine[]
+
+  @@unique([orderId, partId])
+  @@index([partId])
+}
+
+// Counter-sale details that a job bill does not have. The bill itself is the Invoice.
+model CounterSale {
+  id        String  @id @default(uuid())
+  invoiceId String  @unique
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  branchId  String
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  salesExecutiveId String?
+  salesExecutive   User?          @relation("CounterSaleExecutive", fields: [salesExecutiveId], references: [id], onDelete: SetNull)
+  transportMode    TransportMode?
+  transporter      String?
+  grNumber         String?
+  grDate           DateTime?
+  numberOfCases    Int?
+
+  createdAt DateTime @default(now())
+
+  returns CounterSaleReturn[]
+
+  @@index([branchId])
+}
+
+model CounterSaleReturn {
+  id            String      @id @default(uuid())
+  returnNumber  String      @unique
+  counterSaleId String
+  counterSale   CounterSale @relation(fields: [counterSaleId], references: [id], onDelete: Restrict)
+  branchId      String
+  branch        Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  returnDate DateTime @default(now())
+  reason     String?
+
+  grossAmount    Float
+  discountAmount Float
+  vatAmount      Float
+  roundOff       Float
+  total          Float
+
+  // The credit note raised for the return; it is set off against the bill first.
+  creditNoteId String?    @unique
+  creditNote   PartyNote? @relation(fields: [creditNoteId], references: [id], onDelete: Restrict)
+
+  createdById String?
+  createdBy   User?    @relation("SaleReturnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  lines CounterSaleReturnLine[]
+
+  @@index([counterSaleId])
+  @@index([customerId])
+}
+
+model CounterSaleReturnLine {
+  id            String            @id @default(uuid())
+  returnId      String
+  saleReturn    CounterSaleReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  invoiceLineId String
+  invoiceLine   InvoiceLine       @relation(fields: [invoiceLineId], references: [id], onDelete: Restrict)
+  partId        String
+  part          SparePart         @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity      Int
+  rate          Float
+  amount        Float
+
+  @@index([returnId])
+  @@index([invoiceLineId])
+}
+// ============================================================
+// PHYSICAL STOCK TAKING
+// ============================================================
+
+enum StockTakeType {
+  ANNUAL
+  PERPETUAL
+  // Legacy Stock Audit (PSTBatchHead TranType S): counted like a perpetual count, but it only
+  // reports shortage and excess; it never adjusts stock or bins.
+  AUDIT
+}
+
+// Legacy Stock Audit menu (PSTType 1, 2, 3).
+enum StockAuditLevel {
+  INTERNAL
+  AUDIT_HEAD
+  VISITING_MANAGEMENT
+}
+
+// Legacy PSTBatchHead / PhysicalStockHead status: A active, M completed, L closed, C cancelled.
+enum StockTakeStatus {
+  ACTIVE
+  COMPLETED
+  CONFIRMED
+  CANCELLED
+}
+
+// One physical count of a set of parts at a branch (legacy PSTBatchHead + PhysicalStockHead; the
+// batch number is also the PST document number). While an annual count is ACTIVE, stock of its
+// parts cannot move at the branch (enforced by a trigger on InventoryStock).
+model StockTake {
+  id          String          @id @default(uuid())
+  batchNumber String          @unique
+  branchId    String
+  branch      Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  type        StockTakeType
+  status      StockTakeStatus @default(ACTIVE)
+  remarks     String?
+  // Stock audits only: who audited (legacy Auditormast). Free text, as visiting management
+  // may have no login here.
+  auditLevel  StockAuditLevel?
+  auditors    String?
+
+  createdById   String?
+  createdBy     User?     @relation("StockTakeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  completedById String?
+  completedBy   User?     @relation("StockTakeCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  // Legacy S/E (shortage / excess) confirmation: posts the stock adjustments.
+  confirmedAt   DateTime?
+  confirmedById String?
+  confirmedBy   User?     @relation("StockTakeConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  // Legacy "Update Bin Location in Part Master", allowed once per count.
+  binsUpdatedAt DateTime?
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("StockTakeCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelRemark  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines  StockTakeLine[]
+  sheets StockTakeSheet[]
+
+  @@index([branchId, status])
+}
+
+// A part in the count (legacy PSTBatchDetail + PhysicalStockDetail). Counted totals are the sum of
+// its StockTakeCount rows.
+model StockTakeLine {
+  id               String          @id @default(uuid())
+  stockTakeId      String
+  stockTake        StockTake       @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  // Null for a part number counted that is not in Part Master (legacy "wrong part").
+  partId           String?
+  part             SparePart?      @relation(fields: [partId], references: [id], onDelete: Restrict)
+  partNumber       String
+  // Bin and system stock when the part joined the count.
+  binLocation      String?
+  systemStock      Int
+  // Counted after the batch was created (legacy NewPart): found in a bin, not selected.
+  addedDuringCount Boolean         @default(false)
+  // The sheet the part is on now, or was last counted on.
+  sheetId          String?
+  sheet            StockTakeSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+
+  // Null until counted.
+  countedQuantity Int?
+  damagedQuantity Int       @default(0)
+  // Every bin the part was found in, joined with "/" (legacy FinalBin).
+  countedBins     String?
+  remarks         String?
+  countedAt       DateTime?
+  // System stock when first counted; the discrepancy is measured against it.
+  stockAtCount    Int?
+  // Unknown part numbers the store has set aside (legacy "Not Required Part").
+  notRequired     Boolean   @default(false)
+
+  // Set by the S/E confirmation.
+  dealerRate       Float?
+  adjustedQuantity Int?
+
+  counts StockTakeCount[]
+
+  @@unique([stockTakeId, partId])
+  @@index([partId])
+  @@index([sheetId])
+}
+
+// Parts given to one checker to count (legacy PSTDownloadHEAD, an HHDC download). Counts come back
+// through the sheet upload, from the handheld or the web count sheet.
+model StockTakeSheet {
+  id              String    @id @default(uuid())
+  sheetNumber     String    @unique
+  stockTakeId     String
+  stockTake       StockTake @relation(fields: [stockTakeId], references: [id], onDelete: Cascade)
+  checkerId       String?
+  checker         User?     @relation("StockTakeSheetChecker", fields: [checkerId], references: [id], onDelete: SetNull)
+  // What was selected, e.g. "Bins N-3A1 to N-3Z9".
+  criteria        String?
+  // Legacy "Download Current Stock into HHDC": the checker sees system stock.
+  showSystemStock Boolean   @default(false)
+  lineCount       Int
+  countedCount    Int?
+
+  issuedById   String?
+  issuedBy     User?     @relation("StockTakeSheetIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  issuedAt     DateTime  @default(now())
+  uploadedAt   DateTime?
+  uploadedById String?
+  uploadedBy   User?     @relation("StockTakeSheetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  cancelledAt  DateTime?
+  cancelRemark String?
+
+  lines  StockTakeLine[]
+  counts StockTakeCount[]
+
+  @@index([stockTakeId])
+}
+
+// Each count of a part in one bin from a sheet (legacy PhyStkUploadLog), and each correction made
+// on the count (legacy PhyStkTranLog), stored as the change.
+model StockTakeCount {
+  id              String          @id @default(uuid())
+  lineId          String
+  line            StockTakeLine   @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sheetId         String?
+  sheet           StockTakeSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+  binLocation     String?
+  quantity        Int
+  damagedQuantity Int             @default(0)
+  remarks         String?
+  correction      Boolean         @default(false)
+  countedAt       DateTime        @default(now())
+  recordedById    String?
+  recordedBy      User?           @relation("StockTakeCountRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([lineId])
 }

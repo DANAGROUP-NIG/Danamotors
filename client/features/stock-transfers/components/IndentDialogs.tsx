@@ -10,12 +10,13 @@ import { useIndentPartLookup } from "../hooks/use-indents";
 import {
   useApproveIndent,
   useCancelIndent,
+  useCloseIndent,
   useDispatchIndent,
-  useReceiveIndent,
   useRejectIndent,
 } from "../hooks/use-indent-mutations";
+import { useReceiveStn } from "../hooks/use-stns";
 import { TRANSPORT_MODE_LABELS } from "../lib/indent-status";
-import type { DispatchIndentPayload, Indent, IndentLine, TransportMode } from "../types/indent.types";
+import type { DispatchIndentPayload, Indent, IndentLine, Stn, TransportMode } from "../types/indent.types";
 
 const textareaCls =
   "min-h-20 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -110,6 +111,7 @@ function ApproveRow({
 export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
   const approve = useApproveIndent();
   const [remarks, setRemarks] = useState("");
+  const [pickerName, setPickerName] = useState("");
   const [rows, setRows] = useState<Record<string, ApproveRowState>>(() =>
     Object.fromEntries(indent.lines.map((l) => [l.id, { approved: String(l.requestedQuantity), supplyPartId: "" }])),
   );
@@ -136,7 +138,14 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
     approve.mutate(
-      { id: indent.id, body: { remarks: remarks.trim() || undefined, lines: lines.length ? lines : undefined } },
+      {
+        id: indent.id,
+        body: {
+          remarks: remarks.trim() || undefined,
+          pickerName: pickerName.trim() || undefined,
+          lines: lines.length ? lines : undefined,
+        },
+      },
       { onSuccess: onClose },
     );
   }
@@ -173,6 +182,15 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
             </tbody>
           </table>
         </div>
+        <Field label="Picker (optional)">
+          <input
+            className={inputCls}
+            value={pickerName}
+            maxLength={60}
+            placeholder="Who picks the parts"
+            onChange={(e) => setPickerName(e.target.value)}
+          />
+        </Field>
         <Field label="Approval remarks (optional)">
           <textarea className={textareaCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
         </Field>
@@ -194,7 +212,7 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
 
 export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
   const dispatch = useDispatchIndent();
-  const pickLines = indent.pickingList?.lines ?? [];
+  const pickLines = indent.openPickingList?.lines ?? [];
   const [ship, setShip] = useState<Record<string, string>>(() =>
     Object.fromEntries(pickLines.map((l) => [l.id, String(l.pickedQuantity)])),
   );
@@ -266,8 +284,9 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
     <ModalFame isOpen={open} onClose={onClose} title={`Dispatch indent ${indent.indentNumber}`}>
       <div className="grid gap-4">
         <p className="text-sm text-slate-600">
-          Dispatching creates the STN, cases, packing list and in-transit record in one step, and deducts the stock
-          from {indent.sourceBranch.name}.
+          Dispatching creates the STN, cases and packing list cum gate pass in one step, and deducts the stock from{" "}
+          {indent.sourceBranch.name}. To ship several indents for {indent.requestingBranch.name} on one STN, use
+          Dispatch to branch on the Stock Transfers page.
         </p>
 
         <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -308,7 +327,9 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
           </table>
         </div>
         {pickLines.some((l) => shipQty(l.id) < l.pickedQuantity) && !shipInvalid && (
-          <p className="text-sm text-amber-700">Units not shipped are released back to stock and put on back order.</p>
+          <p className="text-sm text-amber-700">
+            Units not shipped are released back to stock and stay on back order, to go on a later STN.
+          </p>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -451,17 +472,28 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
 
 // ── Receive ──────────────────────────────────────────────────────────────────
 
-export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
-  const receive = useReceiveIndent();
-  const stnLines = useMemo(() => indent.stn?.lines ?? [], [indent.stn?.lines]);
+/** Generates an MRN against one STN (also used on the STN page for direct and multi-indent STNs). */
+export function ReceiveStnForm({
+  stn,
+  receivingBranchName,
+  onDone,
+  onCancel,
+}: {
+  stn: Stn;
+  receivingBranchName: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const receive = useReceiveStn();
+  const stnLines = stn.lines;
   // Case numbers per STN line, for finding the goods in the delivery.
   const caseNumbers = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const c of indent.stn?.cases ?? []) {
+    for (const c of stn.cases) {
       for (const l of c.lines) map.set(l.stnLineId, [...(map.get(l.stnLineId) ?? []), c.caseNumber]);
     }
     return map;
-  }, [indent.stn?.cases]);
+  }, [stn.cases]);
   const outstanding = (l: (typeof stnLines)[number]) =>
     l.quantity - l.receivedQuantity - l.damagedQuantity - l.shortQuantity;
   const open_ = stnLines.filter((l) => outstanding(l) > 0);
@@ -486,7 +518,7 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
   function confirm() {
     receive.mutate(
       {
-        id: indent.id,
+        id: stn.id,
         body: {
           remarks: remarks.trim() || undefined,
           closeShort: closeShort || undefined,
@@ -498,84 +530,118 @@ export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
           })),
         },
       },
-      { onSuccess: onClose },
+      { onSuccess: onDone },
     );
   }
 
   return (
-    <ModalFame isOpen={open} onClose={onClose} title={`Receive STN ${indent.stn?.stnNumber ?? ""}`}>
-      <div className="grid gap-4">
-        <p className="text-sm text-slate-600">
-          This generates an MRN for what arrived. Good units are added to {indent.requestingBranch.name} stock.
-          Damaged units are recorded on the MRN but not added to stock.
-        </p>
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="stack-table w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className={thCls}>Part</th>
-                <th className={thCls}>Case</th>
-                <th className={cn(thCls, "text-right")}>Outstanding</th>
-                <th className={cn(thCls, "text-right")}>Received good</th>
-                <th className={cn(thCls, "text-right")}>Damaged</th>
-                <th className={cn(thCls, "text-right")}>Still missing</th>
+    <div className="grid gap-4">
+      <p className="text-sm text-slate-600">
+        This generates an MRN for what arrived on STN {stn.stnNumber}. Good units are added to {receivingBranchName}{" "}
+        stock. Damaged units are recorded on the MRN but not added to stock.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="stack-table w-full text-sm">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className={thCls}>Part</th>
+              <th className={thCls}>Case</th>
+              <th className={cn(thCls, "text-right")}>Outstanding</th>
+              <th className={cn(thCls, "text-right")}>Received good</th>
+              <th className={cn(thCls, "text-right")}>Damaged</th>
+              <th className={cn(thCls, "text-right")}>Still missing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {values.map(({ line, ok, left }) => (
+              <tr key={line.id} className="border-t border-slate-100">
+                <td className={tdCls}>
+                  <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
+                  <p className="text-sm text-slate-500">{line.part.name}</p>
+                </td>
+                <td data-label="Case" className={cn(tdCls, "text-xs text-slate-500")}>
+                  {caseNumbers.get(line.id)?.join(", ") || "—"}
+                </td>
+                <td data-label="Outstanding" className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
+                {(["received", "damaged"] as const).map((field) => (
+                  <td key={field} data-label={field === "received" ? "Received good" : "Damaged"} className={cn(tdCls, "text-right")}>
+                    <input
+                      type="number"
+                      min={0}
+                      className={cn(numCls, "ml-auto", !ok && "border-red-400")}
+                      value={rows[line.id]?.[field] ?? ""}
+                      onChange={(e) =>
+                        setRows((prev) => ({ ...prev, [line.id]: { ...prev[line.id], [field]: e.target.value } }))
+                      }
+                    />
+                  </td>
+                ))}
+                <td data-label="Still missing" className={cn(tdCls, "text-right", left > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
+                  {left}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {values.map(({ line, ok, left }) => (
-                <tr key={line.id} className="border-t border-slate-100">
-                  <td className={tdCls}>
-                    <p className="font-mono text-sm font-medium">{line.part.partNumber}</p>
-                    <p className="text-sm text-slate-500">{line.part.name}</p>
-                  </td>
-                  <td data-label="Case" className={cn(tdCls, "text-xs text-slate-500")}>
-                    {caseNumbers.get(line.id)?.join(", ") || "—"}
-                  </td>
-                  <td data-label="Outstanding" className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
-                  {(["received", "damaged"] as const).map((field) => (
-                    <td key={field} data-label={field === "received" ? "Received good" : "Damaged"} className={cn(tdCls, "text-right")}>
-                      <input
-                        type="number"
-                        min={0}
-                        className={cn(numCls, "ml-auto", !ok && "border-red-400")}
-                        value={rows[line.id]?.[field] ?? ""}
-                        onChange={(e) =>
-                          setRows((prev) => ({ ...prev, [line.id]: { ...prev[line.id], [field]: e.target.value } }))
-                        }
-                      />
-                    </td>
-                  ))}
-                  <td data-label="Still missing" className={cn(tdCls, "text-right", left > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
-                    {left}
-                  </td>
-                </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {invalid && <p className="text-sm text-red-500">Received plus damaged cannot exceed what is outstanding.</p>}
+
+      {leftTotal > 0 && (
+        <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <input type="checkbox" className="mt-0.5" checked={closeShort} onChange={(e) => setCloseShort(e.target.checked)} />
+          <span>
+            Record the {leftTotal} missing {leftTotal === 1 ? "unit" : "units"} as short and close this STN. Leave
+            unticked to receive the rest later.
+          </span>
+        </label>
+      )}
+
+      <Field label="Remarks (optional)">
+        <textarea className={textareaCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onCancel}>
+          Close
+        </Button>
+        <Button disabled={receive.isPending || invalid || !anything} onClick={confirm}>
+          {receive.isPending ? "Generating MRN…" : "Generate MRN"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Receives one of the indent's STNs in transit; asks which when there are several. */
+export function ReceiveIndentDialog({ indent, open, onClose }: DialogProps) {
+  const [stnId, setStnId] = useState(indent.stnsInTransit[0]?.id ?? "");
+  const stn = indent.stnsInTransit.find((s) => s.id === stnId);
+
+  return (
+    <ModalFame isOpen={open} onClose={onClose} title={`Receive ${stn ? `STN ${stn.stnNumber}` : "STN"}`}>
+      <div className="grid gap-4">
+        {indent.stnsInTransit.length > 1 && (
+          <Field label="STN to receive">
+            <select className={inputCls} value={stnId} onChange={(e) => setStnId(e.target.value)}>
+              {indent.stnsInTransit.map((s) => (
+                <option key={s.id} value={s.id}>
+                  STN {s.stnNumber} · {s.totalQuantity} unit(s)
+                  {s.indents.length > 1 ? ` · also for ${s.indents.length - 1} other indent(s)` : ""}
+                </option>
               ))}
-            </tbody>
-          </table>
-        </div>
-        {invalid && <p className="text-sm text-red-500">Received plus damaged cannot exceed what is outstanding.</p>}
-
-        {leftTotal > 0 && (
-          <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <input type="checkbox" className="mt-0.5" checked={closeShort} onChange={(e) => setCloseShort(e.target.checked)} />
-            <span>
-              Record the {leftTotal} missing {leftTotal === 1 ? "unit" : "units"} as short and close the transfer.
-              Leave unticked to receive the rest later.
-            </span>
-          </label>
+            </select>
+          </Field>
         )}
-
-        <Field label="Remarks (optional)">
-          <textarea className={textareaCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-          <Button disabled={receive.isPending || invalid || !anything} onClick={confirm}>
-            {receive.isPending ? "Generating MRN…" : "Generate MRN"}
-          </Button>
-        </div>
+        {stn ? (
+          <ReceiveStnForm
+            key={stn.id}
+            stn={stn}
+            receivingBranchName={indent.requestingBranch.name}
+            onDone={onClose}
+            onCancel={onClose}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Nothing is in transit for this indent.</p>
+        )}
       </div>
     </ModalFame>
   );
@@ -588,32 +654,42 @@ export function ReasonDialog({
   open,
   onClose,
   mode,
-}: DialogProps & { mode: "reject" | "cancel" }) {
+}: DialogProps & { mode: "reject" | "cancel" | "close" }) {
   const reject = useRejectIndent();
   const cancel = useCancelIndent();
+  const closeBackOrder = useCloseIndent();
   const [reason, setReason] = useState("");
-  const pending = reject.isPending || cancel.isPending;
-  const required = mode === "reject";
+  const pending = reject.isPending || cancel.isPending || closeBackOrder.isPending;
+  const required = mode !== "cancel";
   const tooShort = required && reason.trim().length < 3;
+  const backOrder = indent.lines.reduce((s, l) => s + (l.approvedQuantity ?? 0) - l.dispatchedQuantity, 0);
 
   function confirm() {
     if (mode === "reject") reject.mutate({ id: indent.id, reason: reason.trim() }, { onSuccess: onClose });
+    else if (mode === "close") closeBackOrder.mutate({ id: indent.id, reason: reason.trim() }, { onSuccess: onClose });
     else cancel.mutate({ id: indent.id, reason: reason.trim() || undefined }, { onSuccess: onClose });
   }
+  const titles = {
+    reject: `Reject indent ${indent.indentNumber}`,
+    cancel: `Cancel indent ${indent.indentNumber}`,
+    close: `Close back order on ${indent.indentNumber}`,
+  };
 
   return (
     <ModalFame
       isOpen={open}
       onClose={onClose}
-      title={mode === "reject" ? `Reject indent ${indent.indentNumber}` : `Cancel indent ${indent.indentNumber}`}
+      title={titles[mode]}
     >
       <div className="grid gap-4">
         <p className="text-sm text-slate-600">
           {mode === "reject"
             ? "The requesting branch will be notified with your reason."
-            : indent.pickingList
-              ? "Reserved stock will be released back to the supplying branch."
-              : "The indent will be closed and no stock will move."}
+            : mode === "close"
+              ? `The remaining ${backOrder} unit(s) will not be supplied${indent.openPickingList ? " and the open pick is released" : ""}. The indent completes once its STNs are received, and ${indent.requestingBranch.name} is told why.`
+              : indent.openPickingList
+                ? "Reserved stock will be released back to the supplying branch."
+                : "The indent will be closed and no stock will move."}
         </p>
         <Field label={required ? "Reason" : "Reason (optional)"}>
           <textarea className={textareaCls} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
@@ -623,7 +699,7 @@ export function ReasonDialog({
             Close
           </Button>
           <Button variant="destructive" disabled={pending || tooShort} onClick={confirm}>
-            {pending ? "Saving…" : mode === "reject" ? "Reject indent" : "Cancel indent"}
+            {pending ? "Saving…" : mode === "reject" ? "Reject indent" : mode === "close" ? "Close back order" : "Cancel indent"}
           </Button>
         </div>
       </div>

@@ -17,6 +17,8 @@ export const errorHandler = (
   let message = 'Internal Server Error';
   let code: string | undefined;
   let details: unknown;
+  // Raised by the InventoryStock trigger while an annual stock taking is active.
+  const freeze = /STOCK_TAKE_FREEZE: (.+? until the count is completed\.)/.exec(err.message ?? '');
 
   // Handle Custom AppError
   if (err instanceof AppError) {
@@ -24,6 +26,10 @@ export const errorHandler = (
     message = err.message;
     code = err.code;
     details = err.details;
+  } else if (freeze) {
+    statusCode = 409;
+    message = freeze[1];
+    code = 'STOCK_TAKE_FREEZE';
   }
   // Handle Prisma Database Errors (codes are always P2xxx/P1xxx style)
   else if ('code' in err && typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) {
