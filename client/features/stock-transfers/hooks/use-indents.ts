@@ -8,10 +8,11 @@ import {
   type IndentListParams,
 } from "../api/indent.api";
 
-export function useIndents(params: IndentListParams = {}) {
+export function useIndents(params: IndentListParams = {}, enabled = true) {
   return useQuery({
     queryKey: indentKeys.list(params),
     queryFn: () => getIndentsRequest(params),
+    enabled,
     placeholderData: keepPreviousData,
   });
 }

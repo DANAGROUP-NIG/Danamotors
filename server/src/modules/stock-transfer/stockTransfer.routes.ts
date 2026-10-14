@@ -6,6 +6,7 @@ import { PERMISSIONS } from "../../shared/constants/roles";
 import { StockTransferController } from "./stockTransfer.controller";
 import {
   approveIndentSchema,
+  cancelIndentLinesSchema,
   cancelIndentSchema,
   createIndentSchema,
   dispatchIndentSchema,
@@ -16,9 +17,14 @@ import {
   listStnsSchema,
   partLookupSchema,
   partSearchSchema,
+  pendingIndentLinesSchema,
   pickIndentSchema,
   receiveIndentSchema,
   rejectIndentSchema,
+  closeIndentSchema,
+  directStnSchema,
+  dispatchStnSchema,
+  receiveStnSchema,
 } from "./stockTransfer.validation";
 
 const router = Router();
@@ -209,6 +215,45 @@ router.get("/indents/part-search", read, validateRequest(partSearchSchema), cont
  */
 router.post("/indents", requirePermission(PERMISSIONS.TRANSFER_CREATE), validateRequest(createIndentSchema), controller.createIndent);
 router.get("/indents", read, validateRequest(listIndentsSchema), controller.listIndents);
+
+/**
+ * @openapi
+ * /inventory/indents/pending-lines:
+ *   get:
+ *     tags: [Stock Transfers]
+ *     summary: Indent lines still to supply, for cancellation
+ *     description: |
+ *       Legacy Branch Indent From / To Other Branch Cancellation "Fill Orders". INWARD lists the indents other
+ *       branches raised on `branchId` (it supplies); OUTWARD lists the indents `branchId` raised on others.
+ *       Each indent comes with its lines that still have a pending quantity.
+ *     parameters:
+ *       - { in: query, name: direction, required: true, schema: { type: string, enum: [INWARD, OUTWARD] } }
+ *       - { in: query, name: branchId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: otherBranchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: from, schema: { type: string, format: date } }
+ *       - { in: query, name: to, schema: { type: string, format: date } }
+ *       - { in: query, name: search, description: Indent number, schema: { type: string } }
+ *     responses: { 200: { description: "{ orders: [{ id, number, date, status, party, lines: [{ id, partNumber, description, ordered, pending, picked }] }] }" } }
+ * /inventory/indents/pending-lines/cancel:
+ *   patch:
+ *     tags: [Stock Transfers]
+ *     summary: Cancel the pending quantity of ticked indent lines
+ *     description: |
+ *       Works across several indents with one reason. Picked stock on the lines is released and approved drops to what
+ *       has shipped. An indent with nothing shipped and nothing left is cancelled; otherwise it follows its quantities.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { lineIds: [3f2a9a1e-1d2b-4c5d-8e9f-0a1b2c3d4e5f], reason: Purchased under PL-1 }
+ *     responses: { 200: { description: "{ indents: [{ id, indentNumber, status }], units }" } }
+ */
+router.get("/indents/pending-lines", read, validateRequest(pendingIndentLinesSchema), controller.listPendingLines);
+router.patch(
+  "/indents/pending-lines/cancel",
+  requirePermission(PERMISSIONS.TRANSFER_CANCEL),
+  validateRequest(cancelIndentLinesSchema),
+  controller.cancelPendingLines,
+);
 
 /**
  * @openapi
@@ -448,6 +493,54 @@ router.patch("/indents/:id/receive", requirePermission(PERMISSIONS.TRANSFER_RECE
  */
 router.get("/picking-lists", read, validateRequest(listPickingListsSchema), controller.listPickingLists);
 router.get("/picking-lists/:id", read, validateRequest(idParamSchema), controller.getPickingList);
+/**
+ * @openapi
+ * /inventory/indents/{id}/close:
+ *   patch:
+ *     tags: [Stock Transfer]
+ *     summary: Close the back order of a partly dispatched indent
+ *     description: Releases any open pick and writes off what was not shipped. The indent completes once its STNs are received.
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+ *     requestBody: { content: { application/json: { example: { reason: Superseded by part 76003Q6100 } } } }
+ *     responses: { 200: { description: Indent } }
+ * /inventory/stn/dispatch:
+ *   post:
+ *     tags: [Stock Transfer]
+ *     summary: Dispatch the picked indents of one branch on one STN
+ *     description: |
+ *       Ships the open picking lists of every listed indent (same supplier, same receiving branch) on a single STN
+ *       with its cases and packing list cum gate pass. Anything picked but not shipped returns to the indent's back
+ *       order, which can be picked again when stock arrives.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { indentIds: [3f2a9a1e-1d2b-4c5d-8e9f-0a1b2c3d4e5f, 4a3b2c1d-0e9f-4a8b-9c7d-6e5f4a3b2c1d], transportMode: ROAD }
+ *     responses: { 201: { description: STN with its indents, cases and packing list } }
+ * /inventory/stn/direct:
+ *   post:
+ *     tags: [Stock Transfer]
+ *     summary: Send free stock to a branch without an indent (direct STN)
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example:
+ *             sourceBranchId: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d
+ *             destinationBranchId: 1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e
+ *             remarks: Microcat Live for the month of May 2026
+ *             lines: [{ partId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f, quantity: 1 }]
+ *     responses: { 201: { description: STN } }
+ * /inventory/stn/{id}/receive:
+ *   post:
+ *     tags: [Stock Transfer]
+ *     summary: Generate an MRN against an STN at the receiving branch
+ *     description: Empty body receives everything outstanding in good condition. Every indent on the STN is updated.
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+ *     responses: { 201: { description: STN with its MRNs } }
+ */
+router.patch("/indents/:id/close", requirePermission(PERMISSIONS.TRANSFER_CANCEL), validateRequest(closeIndentSchema), controller.closeIndent);
+router.post("/stn/dispatch", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(dispatchStnSchema), controller.dispatchStn);
+router.post("/stn/direct", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(directStnSchema), controller.createDirectStn);
+router.post("/stn/:id/receive", requirePermission(PERMISSIONS.TRANSFER_RECEIVE), validateRequest(receiveStnSchema), controller.receiveStn);
 router.get("/stn", read, validateRequest(listStnsSchema), controller.listStns);
 router.get("/stn/:id", read, validateRequest(idParamSchema), controller.getStn);
 router.get("/cases/:id", read, validateRequest(idParamSchema), controller.getCase);

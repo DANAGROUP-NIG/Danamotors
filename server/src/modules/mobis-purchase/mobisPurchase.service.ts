@@ -13,7 +13,8 @@ import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
-import { nextDocumentNumber } from "../stock-transfer/stockTransfer.service";
+import { recordPartChange } from "../inventory/partHistory";
+import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
 import {
   DEFAULT_CONVERSION_RATE,
@@ -124,6 +125,7 @@ export class MobisPurchaseService {
             partStatus: PartStatus.ACTIVE,
           },
         });
+        await recordPartChange(tx, null, part, actorId);
         partIdByNumber.set(partNumber, part.id);
         created.add(partNumber);
       }
@@ -353,6 +355,11 @@ export class MobisPurchaseService {
         ".",
       link: `/inventory/mobis-receipts/${mit.id}`,
     });
+    // Mobis stock is what usually fills the branch back orders CPD is holding.
+    await new StockTransferService().notifyBackOrdersPickable(
+      mit.destinationBranchId,
+      mit.lines.map((l) => l.partId),
+    );
     return this.getMobisMit(mitId);
   }
 

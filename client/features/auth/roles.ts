@@ -61,6 +61,27 @@ export const BRANCH_ALL = "branch:all";
 
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
+// CPD part sale: customer purchase orders, counter sales and sale returns.
+export const PART_SALE_PERMISSIONS = {
+  READ: "partsale:read",
+  ORDER: "partsale:order",
+  BILL: "partsale:bill",
+  RETURN: "partsale:return",
+} as const;
+
+// Physical stock taking: batches, count sheets, S/E confirmation.
+export const STOCK_TAKE_PERMISSIONS = {
+  READ: "stocktake:read",
+  MANAGE: "stocktake:manage",
+  CONFIRM: "stocktake:confirm",
+} as const;
+
+// Stock audit: report only, kept apart so a branch store cannot audit itself.
+export const STOCK_AUDIT_PERMISSIONS = {
+  READ: "stockaudit:read",
+  MANAGE: "stockaudit:manage",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

@@ -43,6 +43,23 @@ export const requirePermission = (...requiredPermissions: string[]) => {
   };
 };
 
+/** Passes when the user has at least one of the permissions; the handler narrows it further. */
+export const requireAnyPermission = (...permissions: string[]) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new UnauthorizedError();
+    }
+
+    if (req.user.role === ROLES.SUPER_ADMIN || permissions.some((p) => req.user?.permissions.includes(p))) {
+      return next();
+    }
+
+    throw new ForbiddenError(
+      "You do not have the required permissions to access this resource",
+    );
+  };
+};
+
 /** SuperAdmin retains its bypass; other roles need an explicit permission. */
 export function canAccessAllBranches(user: Request["user"]): boolean {
   return user?.role === ROLES.SUPER_ADMIN ||

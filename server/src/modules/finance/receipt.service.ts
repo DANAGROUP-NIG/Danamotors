@@ -20,7 +20,7 @@ async function lockInvoices(transaction: Prisma.TransactionClient, invoiceIds: s
   await transaction.$queryRaw<Array<{ id: string }>>(
     Prisma.sql`SELECT id FROM "Invoice" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`,
   );
-  return transaction.invoice.findMany({ where: { id: { in: ids } }, include: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } });
+  return transaction.invoice.findMany({ where: { id: { in: ids } }, include: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } }, counterSale: { select: { id: true } } } });
 }
 
 async function updateInvoiceBalance(
@@ -93,7 +93,8 @@ export class ReceiptService {
         let allocatedAmount = 0;
         for (const allocation of input.allocations) {
           const invoice = invoiceById.get(allocation.invoiceId!)!;
-          if ((invoice.jobCard?.branchId ?? invoice.customer.branchId) !== branchId) throw new BadRequestError('Allocated bills must belong to the receiving branch');
+          // reportBranchId is the bill's own branch (e.g. CPD for a counter sale), set when it was created.
+          if ((invoice.reportBranchId ?? invoice.jobCard?.branchId ?? invoice.customer.branchId) !== branchId) throw new BadRequestError('Allocated bills must belong to the receiving branch');
           if (invoice.customerId !== customer.id) throw new BadRequestError('All allocated invoices must belong to the selected customer');
           if (['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase())) {
             throw new BadRequestError(`Invoice ${invoice.invoiceNumber} is cancelled`);
@@ -103,8 +104,10 @@ export class ReceiptService {
           }
           allocatedAmount = sumMoney([allocatedAmount, allocation.amount]);
         }
-        if (input.allocations.some((allocation) => invoiceById.get(allocation.invoiceId!)!.jobCardId) && input.category !== 'SERVICE_PARTS') {
-          throw new BadRequestError('Receipts allocated to job bills belong to the Service and parts register');
+        // Job bills and CPD counter-sale (parts) bills are both legacy "Service and Parts" receipts.
+        const servicePartsBill = (id: string) => { const invoice = invoiceById.get(id)!; return Boolean(invoice.jobCardId || invoice.counterSale); };
+        if (input.allocations.some((allocation) => servicePartsBill(allocation.invoiceId!)) && input.category !== 'SERVICE_PARTS') {
+          throw new BadRequestError('Receipts allocated to job bills or counter-sale bills belong to the Service and parts register');
         }
         if (allocatedAmount > input.amount + 0.000001) {
           throw new BadRequestError('Receipt allocations cannot exceed the receipt amount');

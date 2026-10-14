@@ -2,7 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
-import { StockTransferService } from "./stockTransfer.service";
+import { PendingLineFilters, StockTransferService } from "./stockTransfer.service";
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 
@@ -125,11 +125,53 @@ export class StockTransferController {
     ok(res, { indent }, "Indent cancelled");
   });
 
+  /** Legacy Branch Indent From / To Other Branch Cancellation: what is still to supply. */
+  listPendingLines = handle(async (req, res) => {
+    const q = req.query as unknown as PendingLineFilters;
+    assertInventoryBranchAccess(req, [q.branchId]);
+    ok(res, { orders: await this.service.listPendingLines(q) });
+  });
+
+  cancelPendingLines = handle(async (req, res) => {
+    for (const indent of await this.service.getLineIndents(req.body.lineIds)) {
+      assertEitherBranch(req, indent.requestingBranchId, indent.sourceBranchId);
+    }
+    const result = await this.service.cancelPendingLines(req.body.lineIds, req.user!.userId, req.body.reason);
+    ok(res, result, `${result.units} unit(s) cancelled on ${result.indents.length} indent(s)`);
+  });
+
   dispatchIndent = handle(async (req, res) => {
     const branches = await this.service.getIndentBranches(req.params.id);
     assertInventoryBranchAccess(req, [branches.sourceBranchId]);
     const indent = await this.service.dispatchIndent(req.params.id, req.user!.userId, req.body);
-    ok(res, { indent }, "Dispatched: STN, cases, packing list and MIT created");
+    ok(res, { indent }, "Dispatched: STN, cases and packing list cum gate pass created");
+  });
+
+  closeIndent = handle(async (req, res) => {
+    const branches = await this.service.getIndentBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const indent = await this.service.closeBackOrder(req.params.id, req.user!.userId, req.body.reason);
+    ok(res, { indent }, "Back order closed");
+  });
+
+  dispatchStn = handle(async (req, res) => {
+    const branches = await this.service.getDispatchBranches(req.body.indentIds);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const stn = await this.service.dispatchIndents(req.body, req.user!.userId);
+    ok(res, { stn }, `STN ${stn.stnNumber} dispatched`, 201);
+  });
+
+  createDirectStn = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [req.body.sourceBranchId]);
+    const stn = await this.service.createDirectStn(req.body, req.user!.userId);
+    ok(res, { stn }, `Direct STN ${stn.stnNumber} dispatched`, 201);
+  });
+
+  receiveStn = handle(async (req, res) => {
+    const branches = await this.service.getStnBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.destinationBranchId]);
+    const stn = await this.service.receiveStn(req.params.id, req.user!.userId, req.body);
+    ok(res, { stn }, "Receipt posted: MRN generated and stock updated", 201);
   });
 
   receiveIndent = handle(async (req, res) => {
