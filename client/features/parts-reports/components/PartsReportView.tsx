@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Download, Loader2, Maximize2, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,11 @@ import {
   partsReportKeys,
   runReportRequest,
   type ReportColumn,
+  type ReportFilterKey,
   type ReportParams,
   type ReportResult,
   type ReportRow,
+  REPORT_GROUPS,
 } from "../api/parts-reports.api";
 import { carriedForward, exportReportXlsx, subtotal } from "../lib/export-report";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "@/features/inventory/lib/part-codes";
@@ -58,9 +61,28 @@ const DEFAULT_AGE_LIMITS = "365,730,1095,1460,1825";
 const DEFAULT_MILEAGE_LIMITS = "10000,20000,40000,60000,100000";
 const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
 
+/** On/off choices, shown together in one row under the other filters. */
+const CHECKBOXES: ReportFilterKey[] = ["includeReturns", "onlyTransacted", "summary", "onlyRemarks", "includeNotRequired", "includeCancelled"];
+/** Filters beyond the option, period and branch, counted in the folded summary. */
+const EXTRA_FILTERS: (keyof ReportParams)[] = [
+  "otherBranchId",
+  "customerId",
+  "vendor",
+  "executiveId",
+  "countType",
+  "search",
+  "partId",
+  "partType",
+  "partFlag",
+  "priceCategory",
+  "status",
+];
+const extraFilters = (p: ReportParams) => EXTRA_FILTERS.filter((k) => p[k]).length;
+
 /** `initial` prefills filters from a link, e.g. a stock taking's batch number. */
 export function PartsReportView({ kind, initial }: { kind: string; initial?: { search?: string; branchId?: string } }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
+  const router = useRouter();
   const crossBranch = isSuperAdmin || hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const branches = useBranchStore((s) => s.branches);
   const activeBranch = useBranchStore((s) => s.activeBranch?.id);
@@ -80,8 +102,13 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
   const [applied, setApplied] = useState<ReportParams | null>(null);
   // Legacy "Output To: Screen": the report alone, filling the window.
   const [fullScreen, setFullScreen] = useState(false);
+  // The filters fold to a one-line summary once a report is run.
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const set = (patch: Partial<ReportParams>) => setParams((p) => ({ ...p, ...patch }));
   const option = params.option ?? definition?.options?.[0]?.value;
+  // Headings name the option the report was run with, not one picked since.
+  const appliedOption = definition?.options?.find((o) => o.value === applied?.option)?.label;
 
   const report = useQuery({
     queryKey: partsReportKeys.run(kind, applied ?? params),
@@ -111,19 +138,27 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
       branchId: crossBranch && !definition?.allBranches ? params.branchId || undefined : undefined,
       includeAlternates: params.partId ? params.includeAlternates : undefined,
     });
+    setFiltersOpen(false);
   }
 
+  // The screen shows the first 5,000 lines; the Excel file always has every line, as legacy's File output did.
   async function exportExcel(r: ReportResult) {
+    if (!applied) return;
+    setExporting(true);
     try {
-      await exportReportXlsx(r, {
-        subtitle: definition?.options?.find((o) => o.value === option)?.label,
+      const all = r.truncated ? await runReportRequest(kind, { ...applied, full: true }) : r;
+      if (all.truncated) toast.warning(`The Excel file holds the first ${all.rows.length.toLocaleString()} lines. Narrow the dates for the rest.`);
+      await exportReportXlsx(all, {
+        subtitle: appliedOption,
         scope: scopeLabel,
-        period: applied ? periodLabel(applied) : "",
-        filename: period === "range" ? `${kind}-${applied?.from}-to-${applied?.to}` : `${kind}-${applied?.to}`,
+        period: periodLabel(applied),
+        filename: period === "range" ? `${kind}-${applied.from}-to-${applied.to}` : `${kind}-${applied.to}`,
         carriedForward: definition?.carriedForward,
       });
     } catch {
       toast.error("The Excel file could not be created");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -176,8 +211,8 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
       <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => window.print()}>
         <Printer className="size-4" /> Print
       </Button>
-      <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length} onClick={() => exportExcel(result)}>
-        <Download className="size-4" /> Export Excel
+      <Button size="sm" variant="outline" className="gap-1.5" disabled={!result.rows.length || exporting} onClick={() => exportExcel(result)}>
+        {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />} {exporting ? "Exporting…" : "Export Excel"}
       </Button>
     </>
   );
@@ -185,9 +220,30 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6 print:gap-2 print:p-0">
       <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
-      <Link href="/parts-reports" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 print:hidden">
-        <ArrowLeft className="size-4" /> Back to Parts Reports
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href="/parts-reports" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to Parts Reports
+        </Link>
+        {/* Go straight to another report, by legacy menu. */}
+        <select
+          aria-label="Switch report"
+          className={cn(inputCls, "w-auto max-w-full")}
+          value={kind}
+          onChange={(e) => router.push(`/parts-reports/${e.target.value}`)}
+        >
+          {REPORT_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {(catalog.data ?? [])
+                .filter((r) => r.group === group)
+                .map((r) => (
+                  <option key={r.kind} value={r.kind}>
+                    {r.title}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
       <div className="print:hidden">
         <PageHeader
           title={definition.title}
@@ -205,7 +261,39 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
         />
       </div>
 
-      <form onSubmit={run} className="grid gap-4 rounded-xl border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden" aria-label="Report filters">
+      {applied && !filtersOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3 print:hidden">
+          <p className="text-sm">
+            <span className="font-medium">{[appliedOption, periodLabel(applied), scopeLabel].filter(Boolean).join(" · ")}</span>
+            {extraFilters(applied) > 0 && (
+              <span className="text-muted-foreground">
+                {" "}
+                · {extraFilters(applied)} more filter{extraFilters(applied) > 1 ? "s" : ""}
+              </span>
+            )}
+          </p>
+          <Button size="sm" variant="outline" onClick={() => setFiltersOpen(true)}>
+            Change filters
+          </Button>
+        </div>
+      )}
+
+      <form
+        onSubmit={run}
+        className={cn("grid gap-4 rounded-xl border bg-background p-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden", !filtersOpen && "hidden")}
+        aria-label="Report filters"
+      >
+        {has("option") && (
+          <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b pb-4 sm:col-span-2 lg:col-span-4" aria-label={definition.labels?.option}>
+            {definition.labels?.option && <span className="text-sm font-medium">{definition.labels.option}:</span>}
+            {(definition.options ?? []).map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm">
+                <input type="radio" name="report-option" checked={option === o.value} onChange={() => set({ option: o.value })} />
+                {o.label}
+              </label>
+            ))}
+          </fieldset>
+        )}
         {period === "range" && (
           <>
             <Field label="From date">
@@ -430,56 +518,49 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
             />
           </Field>
         )}
-        {has("option") && (
-          <fieldset className="flex flex-wrap items-end gap-4 sm:col-span-2" aria-label={definition.labels?.option}>
-            {definition.labels?.option && <span className="pb-2 text-sm font-medium">{definition.labels.option}:</span>}
-            {(definition.options ?? []).map((o) => (
-              <label key={o.value} className="flex items-center gap-2 pb-2 text-sm">
-                <input type="radio" name="report-option" checked={option === o.value} onChange={() => set({ option: o.value })} />
-                {o.label}
+        {CHECKBOXES.some(has) && (
+          <div className="flex flex-wrap gap-x-6 gap-y-2 sm:col-span-2 lg:col-span-4">
+            {has("includeReturns") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={params.includeReturns !== false} onChange={(e) => set({ includeReturns: e.target.checked })} />
+                Include returns
               </label>
-            ))}
-          </fieldset>
-        )}
-        {has("includeReturns") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={params.includeReturns !== false} onChange={(e) => set({ includeReturns: e.target.checked })} />
-            Include returns
-          </label>
-        )}
-        {has("onlyTransacted") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={!!params.onlyTransacted} onChange={(e) => set({ onlyTransacted: e.target.checked || undefined })} />
-            Only transacted parts
-          </label>
-        )}
-        {has("summary") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={!!params.summary} onChange={(e) => set({ summary: e.target.checked || undefined })} />
-            Only summary
-          </label>
-        )}
-        {has("onlyRemarks") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={!!params.onlyRemarks} onChange={(e) => set({ onlyRemarks: e.target.checked || undefined })} />
-            Only parts having remarks
-          </label>
-        )}
-        {has("includeNotRequired") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={!!params.includeNotRequired}
-              onChange={(e) => set({ includeNotRequired: e.target.checked || undefined })}
-            />
-            Include parts identified as not required
-          </label>
-        )}
-        {has("includeCancelled") && (
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input type="checkbox" checked={!!params.includeCancelled} onChange={(e) => set({ includeCancelled: e.target.checked || undefined })} />
-            Show cancelled records
-          </label>
+            )}
+            {has("onlyTransacted") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!params.onlyTransacted} onChange={(e) => set({ onlyTransacted: e.target.checked || undefined })} />
+                Only transacted parts
+              </label>
+            )}
+            {has("summary") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!params.summary} onChange={(e) => set({ summary: e.target.checked || undefined })} />
+                Only summary
+              </label>
+            )}
+            {has("onlyRemarks") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!params.onlyRemarks} onChange={(e) => set({ onlyRemarks: e.target.checked || undefined })} />
+                Only parts having remarks
+              </label>
+            )}
+            {has("includeNotRequired") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!!params.includeNotRequired}
+                  onChange={(e) => set({ includeNotRequired: e.target.checked || undefined })}
+                />
+                Include parts identified as not required
+              </label>
+            )}
+            {has("includeCancelled") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!params.includeCancelled} onChange={(e) => set({ includeCancelled: e.target.checked || undefined })} />
+                Show cancelled records
+              </label>
+            )}
+          </div>
         )}
         <div className="flex items-end sm:col-span-2 lg:col-span-4">
           <Button type="submit" disabled={report.isFetching}>
@@ -525,7 +606,7 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
             <p className="font-semibold">
               Dana Motors Limited · {result.title}
-              {option && definition.options && <span className="font-normal text-muted-foreground"> · {definition.options.find((o) => o.value === option)?.label}</span>}
+              {appliedOption && <span className="font-normal text-muted-foreground"> · {appliedOption}</span>}
             </p>
             <p className="text-sm text-muted-foreground">
               {scopeLabel} · {periodLabel(applied)} · {result.rows.length} line(s)

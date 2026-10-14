@@ -56,7 +56,8 @@ router.use(authMiddleware);
  *       - { in: query, name: mileageLimits, schema: { type: string }, example: "10000,20000,40000,60000,100000", description: Mileage wise reports - five increasing limits in km }
  *       - { in: query, name: topN, schema: { type: integer, minimum: 1, maximum: 1000 }, description: Maximum consumed parts - how many parts per branch (default 10) }
  *       - { in: query, name: summary, schema: { type: boolean }, description: Only summary - by part category (consumption, profitability) or one line per packing list }
- *     responses: { 200: { description: Columns, rows (up to 5000) and totals } }
+ *       - { in: query, name: full, schema: { type: boolean }, description: Every line (up to 200000) for the Excel file, instead of the first 5000 }
+ *     responses: { 200: { description: Columns, rows (up to 5000, or 200000 with full) and totals } }
  */
 router.get("/", controller.catalog);
 router.get("/lookups", controller.lookups);

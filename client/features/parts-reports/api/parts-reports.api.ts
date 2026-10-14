@@ -40,10 +40,13 @@ export type ReportFilterKey =
   | "onlyRemarks"
   | "includeNotRequired";
 
+/** The legacy Parts report menus, in menu order. */
+export const REPORT_GROUPS = ["Part sales", "Part purchase", "Transfers", "Stock", "Stock taking & audit", "MIS"] as const;
+
 export type ReportDefinition = {
   kind: string;
   title: string;
-  group: string;
+  group: (typeof REPORT_GROUPS)[number];
   description: string;
   permission: string;
   filters: ReportFilterKey[];
@@ -112,6 +115,8 @@ export type ReportParams = {
   countType?: string;
   onlyRemarks?: boolean;
   includeNotRequired?: boolean;
+  /** Every line (for the Excel file), not just the first 5,000. */
+  full?: boolean;
 };
 
 const BASE = "/parts-reports";

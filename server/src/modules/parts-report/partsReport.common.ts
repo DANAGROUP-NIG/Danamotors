@@ -48,6 +48,8 @@ export interface ReportFilters {
   onlyRemarks?: boolean;
   /** Stock taking reports: also part numbers not in Part Master that the store set aside. */
   includeNotRequired?: boolean;
+  /** Every line, for the Excel file, instead of the first 5,000 shown on screen. */
+  full?: boolean;
 }
 
 /** Mileage bands asked for on the legacy screens are in km; these follow the 10,000 km service interval. */

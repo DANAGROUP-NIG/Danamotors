@@ -1,12 +1,26 @@
 # Parts Reports
 
-The legacy Parts module report menus (part sale, part purchase, stock and MIS reports), rebuilt as one screen: **Operations → Parts Reports**.
-Pick a report, set its filters, then **Run report**. Each run shows on screen, with the legacy
-"Output To" choices: **Full screen** (Screen: the report alone, filling the window, with the column
-headings kept in view; Esc or **Close** returns to the filters), **Print** (Printer, A4 landscape)
-and **Export Excel** (File). Print and Excel follow the legacy register layout: report title, branch
-and period, an S.No. column, group headings with subtotals, and a total line. The Excel file is a
-real `.xlsx` with numbers, dates and number formats intact.
+The legacy Parts module report menus, rebuilt as one screen: **Operations → Parts Reports**. Reports
+are listed under the legacy menus: **Part sales** (counter sales, CPO, consumption, checklist for
+issues, SAN), **Part purchase** (MRN, MIT, receipts, shortages, branch in transit, indent outward),
+**Transfers** (picking, STN/SRN, indent inward; on legacy these sit under Part sales), **Stock**,
+**Stock taking & audit** (legacy "Physical Stock and Stock Audit MIS") and **MIS**. A search box
+finds a report by any word of its name or description (e.g. "STN", "SAN", "ledger").
+
+Pick a report, set its filters, then **Run report**. The report's own choice (e.g. STN Register or
+Stock Receipt Note) comes first, then the period and branch, the other filters, and the on/off
+choices in one row. Once run, the filters fold to a one-line summary ("STN Register · 01/01/2026 to
+14/10/2026 · Kia Plaza · 2 more filters"); **Change filters** opens them again. A picker at the top
+goes straight to another report.
+
+Each run shows on screen, with the legacy "Output To" choices: **Full screen** (Screen: the report
+alone, filling the window, with the column headings kept in view; Esc or **Close** returns to the
+filters), **Print** (Printer, A4 landscape; the app's menus and header are left off) and **Export
+Excel** (File). Print and Excel follow the legacy register layout: report title, branch and period,
+an S.No. column, group headings with subtotals, and a total line. The screen shows the first 5,000
+lines (totals always cover every line); the Excel file fetches **every line** (up to 200,000), as
+legacy's File output did. The Excel file is a real `.xlsx` with numbers, dates and number formats
+intact.
 
 All reports share one API, `GET /api/parts-reports/:kind`, and one generic screen. Each report's
 title, filters, options and columns are defined once, in

@@ -40,6 +40,7 @@ export const runReportSchema = z.object({
       countType: z.enum(["ANNUAL", "PERPETUAL", "INTERNAL", "AUDIT_HEAD", "VISITING_MANAGEMENT"]).optional(),
       onlyRemarks: flag,
       includeNotRequired: flag,
+      full: flag,
       topN: z.coerce.number().int().min(1, "List at least 1 part").max(1000).optional(),
       days: z.coerce.number().int().min(1, "Enter at least 1 day").max(3650).optional(),
       ageLimits: z

@@ -31,6 +31,8 @@ export interface ReportResult {
 }
 
 const MAX_ROWS = 5000;
+/** The Excel file asks for every line; this only guards against a runaway query. */
+const MAX_EXPORT_ROWS = 200_000;
 const LAGOS_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" });
 
 const customerSelect = {
@@ -78,14 +80,15 @@ export class PartsReportService {
     if (kind === "inventory-sales-ratio") {
       totals.ratio = totals.sales > 0 ? money(totals.closingValue / totals.sales) : 0;
     }
+    const limit = filters.full ? MAX_EXPORT_ROWS : MAX_ROWS;
     return {
       kind,
       title: definition.title,
       columns,
-      rows: rows.slice(0, MAX_ROWS),
+      rows: rows.slice(0, limit),
       totals,
       grouped: !!definition.grouped && rows.some((r) => r.group != null),
-      truncated: rows.length > MAX_ROWS,
+      truncated: rows.length > limit,
     };
   }
 

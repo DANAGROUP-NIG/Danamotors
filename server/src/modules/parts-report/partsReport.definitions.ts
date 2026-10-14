@@ -46,10 +46,17 @@ export type ReportFilterKey =
   | "onlyRemarks"
   | "includeNotRequired";
 
+/**
+ * The legacy Parts report menus, in menu order. Transfers (on legacy, part of Part sales) and stock
+ * taking and audit (legacy "Physical Stock and Stock Audit MIS") are their own groups.
+ */
+export const REPORT_GROUPS = ["Part sales", "Part purchase", "Transfers", "Stock", "Stock taking & audit", "MIS"] as const;
+
 export interface ReportDefinition {
   kind: string;
   title: string;
-  group: "Counter sales" | "Customer orders" | "Purchase" | "Transfers" | "Stock movement" | "Stock" | "MIS";
+  /** The legacy Parts report menus. */
+  group: (typeof REPORT_GROUPS)[number];
   description: string;
   permission: string;
   filters: ReportFilterKey[];
@@ -270,7 +277,7 @@ const ALL = { value: "", label: "All" };
 const PHYSICAL_STOCK: ReportDefinition = {
   kind: "physical-stock",
   title: "Physical Stock Taking",
-  group: "Stock",
+  group: "Stock taking & audit",
   description: "Counted against system stock, with shortage and excess at dealer rate. Give a batch number for one count, else counts created in the period.",
   permission: PERMISSIONS.STOCK_TAKE_READ,
   filters: COUNT_FILTERS,
@@ -305,7 +312,7 @@ const STOCK_AUDIT: ReportDefinition = {
 const STOCK_TAKE_LOG: ReportDefinition = {
   kind: "stock-take-log",
   title: "Stock Taking Log",
-  group: "Stock",
+  group: "Stock taking & audit",
   description: "Count sheets issued, uploaded and cancelled, and every count corrected or added on screen, with who did it and when.",
   permission: PERMISSIONS.STOCK_TAKE_READ,
   filters: ["countType", "search", "option"],
@@ -355,11 +362,11 @@ const STOCK_AUDIT_LOG: ReportDefinition = {
 };
 
 export const REPORTS: ReportDefinition[] = [
-  // ── Counter sales ──
+  // ── Part sales: counter sales ──
   {
     kind: "counter-sales",
     title: "Counter Sales Register",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Every counter-sale bill line: part, quantity, rate, cash discount, VAT and net value.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["customer", ...PART_FILTERS],
@@ -382,7 +389,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-summary",
     title: "Counter Sales Register Summary",
-    group: "Counter sales",
+    group: "Part sales",
     description: "One line per bill with its totals, round-off and what is still outstanding.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["customer"],
@@ -404,7 +411,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-tax-datewise",
     title: "Counter Sales Tax Register (Datewise)",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Day totals of taxable and exempt sales and VAT.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: [],
@@ -423,7 +430,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-tax-annexure",
     title: "Counter Sales Tax Register (Annexure)",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Bill-wise VAT annexure with customer address. Cancelled bills can be listed but are not totalled.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["includeCancelled"],
@@ -443,7 +450,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-returns",
     title: "Counter Sales Return Register",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Parts returned against counter-sale bills, at the bill's discount and VAT.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["customer", ...PART_FILTERS],
@@ -466,7 +473,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-cancellations",
     title: "Counter Sales Cancellation Register",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Cancelled counter-sale bills. FOC bills are those with a 100% cash discount.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option"],
@@ -490,7 +497,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "counter-sales-revenue",
     title: "Counter Sale Revenue",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Sales less returns by price category, against dealer cost, with the margin.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option"],
@@ -514,7 +521,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "sales-executive-register",
     title: "Sales Executive Wise Counter Sales Register",
-    group: "Counter sales",
+    group: "Part sales",
     description: "Counter-sale bills grouped by sales executive, with subtotals.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["executive"],
@@ -530,11 +537,11 @@ export const REPORTS: ReportDefinition[] = [
     ],
   },
 
-  // ── Customer orders ──
+  // ── Part sales: customer orders ──
   {
     kind: "cpo-register",
     title: "CPO Register",
-    group: "Customer orders",
+    group: "Part sales",
     description: "Customer purchase order lines with what was picked, billed, cancelled and is still pending.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["customer", "search", ...PART_FILTERS, "status", "fullyExecuted"],
@@ -558,11 +565,11 @@ export const REPORTS: ReportDefinition[] = [
     ],
   },
 
-  // ── Purchase ──
+  // ── Part purchase ──
   {
     kind: "mrn-register",
     title: "MRN Register",
-    group: "Purchase",
+    group: "Part purchase",
     description: "Stock received from vendors (Mobis MRNs), line by line by vendor, or one line per supplier invoice.",
     permission: PERMISSIONS.STOCK_READ,
     filters: ["vendor", "search", ...PART_FILTERS, "option"],
@@ -601,7 +608,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "mit-register",
     title: "Material In Transit Report",
-    group: "Purchase",
+    group: "Part purchase",
     description: "Mobis invoice lines imported as MITs, with what was received, damaged or short, and what is still in transit.",
     permission: PERMISSIONS.STOCK_READ,
     filters: ["vendor", "search", ...PART_FILTERS, "option"],
@@ -626,7 +633,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "receipt-checklist",
     title: "Checklist for Receipts",
-    group: "Purchase",
+    group: "Part purchase",
     description: "Every part received in the period (vendor and branch-transfer MRNs) in bin order, for the store to check against the shelves.",
     permission: PERMISSIONS.STOCK_READ,
     filters: PART_FILTERS,
@@ -644,7 +651,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "receipt-shortage",
     title: "MRN / SRN Shortage Report",
-    group: "Purchase",
+    group: "Part purchase",
     description:
       "Receipt lines that do not match what was sent (damaged or short): vendor MRNs against their MIT, by invoice and case, or branch-transfer SRNs against their STN, by packing list and case.",
     permission: PERMISSIONS.STOCK_READ,
@@ -686,7 +693,7 @@ export const REPORTS: ReportDefinition[] = [
     },
   },
 
-  // ── Transfers ──
+  // ── Transfers (the indent outward register and branch in transit are on the Part purchase menu) ──
   {
     kind: "picking-register",
     title: "Picking List Register",
@@ -781,7 +788,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "indent-outward-register",
     title: "Branch Stock Indent Outward Register",
-    group: "Transfers",
+    group: "Part purchase",
     description: "Indents this branch raised on other branches, line by line, with what has been shipped to it.",
     permission: PERMISSIONS.TRANSFER_READ,
     filters: ["branch", "search", ...PART_FILTERS, "status", "fullyExecuted"],
@@ -806,7 +813,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "branch-in-transit",
     title: "Branch In Transit Report",
-    group: "Transfers",
+    group: "Part purchase",
     description: "STNs dispatched to this branch, with what has arrived and what is still on the way.",
     permission: PERMISSIONS.TRANSFER_READ,
     filters: ["search", "branch", ...PART_FILTERS, "option"],
@@ -828,11 +835,11 @@ export const REPORTS: ReportDefinition[] = [
     ],
   },
 
-  // ── Stock movement ──
+  // ── Part sales: stock movement ──
   {
     kind: "consumption",
     title: "Consumption Report (Consolidated)",
-    group: "Stock movement",
+    group: "Part sales",
     description: "Part-wise quantities issued in the period by kind (PDI, job order, FOC, goodwill, warranty, counter sale, consumable issue, samples, STN), less returns, at retail rate, with SAN for reference and the closing balance; or the summary by part category.",
     permission: PERMISSIONS.STOCK_READ,
     filters: [...PART_FILTERS, "includeReturns", "summary"],
@@ -852,7 +859,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "issue-checklist",
     title: "Checklist for Issues",
-    group: "Stock movement",
+    group: "Part sales",
     description: "Every issue in the period, voucher wise: STNs, counter sales, workshop and other issues, with subtotals.",
     permission: PERMISSIONS.STOCK_READ,
     filters: PART_FILTERS,
@@ -875,7 +882,7 @@ export const REPORTS: ReportDefinition[] = [
   {
     kind: "stock-adjustments",
     title: "SAN Register",
-    group: "Stock movement",
+    group: "Part sales",
     description: "Stock adjustments (additions and subtractions) at dealer rate.",
     permission: PERMISSIONS.STOCK_READ,
     filters: [...PART_FILTERS, "option"],
