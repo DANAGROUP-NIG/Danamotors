@@ -281,6 +281,21 @@ model Customer {
   tallyPartyCode String?
   mergedIntoId   String?
 
+  // Legacy Customer/Vendor profile fields.
+  segment           String?
+  district          String?
+  // Legacy comptype (L, P) and, for vendors, purchase source (LOCAL, IMP) and MRN rate (D dealer, R retail).
+  companyType       String?
+  vendorType        String?
+  mrnRateType       String?
+  governmentVehicle Boolean   @default(false)
+  ownCompanyVehicle Boolean   @default(false)
+  creditLimit       Float?
+  // Legacy Organization: the corporate group this customer belongs to.
+  organizationId    String?
+  organization      Customer?  @relation("CustomerOrganization", fields: [organizationId], references: [id], onDelete: SetNull)
+  members           Customer[] @relation("CustomerOrganization")
+
   // Read-only compatibility cache, derived by financial-document triggers.
   creditBalance     Float                  @default(0)
   creditDays        Int?
@@ -322,6 +337,7 @@ model Customer {
   @@index([branchId, partyStatus, code])
   @@index([phoneNumber])
   @@index([mergedIntoId])
+  @@index([organizationId])
 }
 
 model CustomerAccount {

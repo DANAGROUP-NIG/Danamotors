@@ -12,7 +12,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { useCreatePart, useOpeningStock, useUpdatePart } from "../hooks/use-part-mutations";
 import { usePriceCategories } from "../hooks/use-parts";
-import { useMasterCodes } from "../hooks/use-master-codes";
+import { MasterOptions } from "@/components/forms/MasterOptions";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
@@ -39,20 +39,6 @@ const LEGACY_FLAGS = [
   ["includeInTopN", "Include in top-N parts"],
   ["underAmc", "Under AMC"],
 ] as const;
-
-/** Suggestions for a free-text code field from a workshop master list. */
-function MasterOptions({ id, kind, extra = [] }: { id: string; kind: string; extra?: string[] }) {
-  const { data } = useMasterCodes(kind);
-  const codes = new Map<string, string>(extra.map((code) => [code, ""]));
-  for (const master of data ?? []) codes.set(master.code, master.description);
-  return (
-    <datalist id={id}>
-      {[...codes.entries()].map(([code, description]) => (
-        <option key={code} value={code}>{description}</option>
-      ))}
-    </datalist>
-  );
-}
 
 const day = (value?: string | null) => (value ? value.slice(0, 10) : "");
 

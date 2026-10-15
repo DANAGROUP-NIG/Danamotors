@@ -164,6 +164,25 @@ three tabs that the vehicle lacked:
 FOC amounts) belong to the vehicle sales module, which this system does not replace. The Sale Details discount
 percentages and "Company Vehicle" are empty in all three databases.
 
+## Customer / vendor master
+
+The customer type (individual, corporate, government, vendor) already covers legacy `custtype` and
+`CustomerCategory`. The profile form adds the remaining legacy `Customer` fields:
+
+| Legacy field | New field |
+| --- | --- |
+| salutation | `salutation`, any code from the SALUTATION master (was a fixed list of six, which legacy PROF., MAJ., REV. would not fit) |
+| Segment | `segment` (SEGMENT code) |
+| district | `district` |
+| comptype | `companyType` (legacy code) |
+| VendorType, MRNRatetype | `vendorType` (LOCAL / IMP), `mrnRateType` (D dealer / R retail), shown for vendors |
+| govt_vehicle, own_comp_vehicle | `governmentVehicle`, `ownCompanyVehicle` |
+| CreditLimit | `creditLimit` |
+| Organization | `organizationId` (the corporate group customer); moves to the survivor on a customer merge |
+
+Zone, state and city inputs suggest values from the geography masters. The consignee address (`reg*` columns) is
+filled on a handful of rows and maps to the registered name and address already on the customer.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle
