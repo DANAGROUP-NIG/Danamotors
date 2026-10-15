@@ -93,6 +93,10 @@ export const PERMISSIONS = {
   LABOUR_ITEM_CREATE: "labour-item:create",
   LABOUR_ITEM_UPDATE: "labour-item:update",
 
+  // ── Employee Master ───────────────────────────────────────────────────────
+  EMPLOYEE_READ: "employee:read",
+  EMPLOYEE_MANAGE: "employee:manage",
+
   // ── Service — Inspections ─────────────────────────────────────────────────
   INSPECTION_READ: "inspection:read",
   INSPECTION_CREATE: "inspection:create",
@@ -240,6 +244,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.OUTSTANDING_RECALCULATE,
     PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
@@ -428,6 +434,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   [ROLES.WORKSHOP_MANAGER]: [
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
@@ -542,6 +550,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -577,6 +586,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,

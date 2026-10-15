@@ -3,7 +3,9 @@
 export type AttributeField =
   | { key: string; label: string; type: "text" | "textarea" | "number" }
   | { key: string; label: string; type: "checkbox" }
-  | { key: string; label: string; type: "select"; options: { value: string; label: string }[] };
+  | { key: string; label: string; type: "select"; options: { value: string; label: string }[] }
+  // Stores the code of another master, as legacy did.
+  | { key: string; label: string; type: "master"; kind: string };
 
 export type MasterKindConfig = {
   label: string;
@@ -41,7 +43,7 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
     label: "Colour",
     group: "Vehicle catalogue",
     parent: { kind: "MODEL", label: "Model", required: true, fixed: true },
-    attributes: [{ key: "colourType", label: "Colour type code", type: "text" }],
+    attributes: [{ key: "colourType", label: "Colour type", type: "master", kind: "COLOUR_TYPE" }],
   },
   TYRE_MAKE: { label: "Tyre make", group: "Vehicle catalogue" },
   BATTERY_MAKE: { label: "Battery make", group: "Vehicle catalogue" },
@@ -86,22 +88,13 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
   },
   TEAM: { label: "Employee group / team", group: "Workshop" },
   LATE_REASON: { label: "Late delivery reason", group: "Workshop" },
+  DEPARTMENT: { label: "Department", group: "People" },
   DESIGNATION: {
     label: "Designation",
     group: "People",
     attributes: [
       { key: "hierarchy", label: "Hierarchy (1 = top)", type: "number" },
-      {
-        key: "department",
-        label: "Department",
-        type: "select",
-        options: [
-          { value: "EXECUTIVE", label: "Executive" },
-          { value: "PRODUCTION", label: "Production" },
-          { value: "COMMERCIAL", label: "Commercial" },
-          { value: "MANAGEMENT", label: "Management" },
-        ],
-      },
+      { key: "department", label: "Department", type: "master", kind: "DEPARTMENT" },
       { key: "containsGroup", label: "Belongs to an employee group", type: "checkbox" },
       { key: "canReceiveVehicle", label: "Can receive vehicles", type: "checkbox" },
       { key: "canDeliverVehicle", label: "Can deliver vehicles", type: "checkbox" },

@@ -46,6 +46,15 @@ function AttributeInput({ field, value, onChange }: {
         checked={value === true}
         onChange={e => onChange(e.target.checked)} />{field.label}</label>;
 
+  if (field.type === "master")
+    return <WorkshopPicker
+      label={field.label}
+      endpoint={`/workshop-masters?kind=${field.kind}`}
+      collection="items"
+      value={typeof value === "string" ? value : ""}
+      getOptionId={row => row.code ?? row.id}
+      onChange={code => onChange(code || null)} />;
+
   if (field.type === "select")
     return <Field label={field.label}><select
         className={inputCls}

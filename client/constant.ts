@@ -98,7 +98,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Workshop",
-    permissions: ["jobcard:read", "inspection:read", "services:read"],
+    permissions: ["jobcard:read", "inspection:read", "services:read", "employee:read"],
     items: [
       {
         label: "Job Cards",
@@ -129,6 +129,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/technicians",
         icon: UserCog,
         permissions: ["workshop:read"],
+      },
+      {
+        label: "Employees",
+        href: "/employees",
+        icon: Users,
+        permissions: ["employee:read"],
       },
     ],
   },

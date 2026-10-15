@@ -20,6 +20,7 @@ export const MASTER_KINDS = [
   'BATTERY_MAKE',
   'VEHICLE_SYSTEM',
   'VEHICLE_GROUP',
+  'DEPARTMENT',
   'DESIGNATION',
   'SALUTATION',
   'ZONE',
@@ -76,7 +77,8 @@ export const MASTER_ATTRIBUTES: Partial<Record<MasterKind, z.ZodTypeAny>> = {
   }).strict(),
   DESIGNATION: z.object({
     hierarchy: z.number().int().min(1).max(99).nullable().optional(),
-    department: z.enum(['EXECUTIVE', 'PRODUCTION', 'COMMERCIAL', 'MANAGEMENT']).nullable().optional(),
+    // Legacy department letter (E, P, C, M); names live in the DEPARTMENT list.
+    department: text(10),
     containsGroup: z.boolean().optional(),
     canReceiveVehicle: z.boolean().optional(),
     canDeliverVehicle: z.boolean().optional(),
@@ -106,7 +108,7 @@ export function parseAttributes(kind: MasterKind, attributes: unknown) {
 
   const result = schema.safeParse(attributes);
   if (!result.success)
-    throw new BadRequestError(`Invalid ${kind.toLowerCase().replace(/_/g, ' ')} fields: ${result.error.issues.map(issue => `${issue.path.join('.')} ${issue.message}`).join('; ')}`);
+    throw new BadRequestError(`Invalid ${kind.toLowerCase().replace(/_/g, ' ')} fields: ${result.error.issues.map(issue => [issue.path.join('.'), issue.message].filter(Boolean).join(' ')).join('; ')}`);
 
   return result.data as Record<string, unknown>;
 }

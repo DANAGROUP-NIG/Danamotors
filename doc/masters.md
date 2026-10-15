@@ -27,7 +27,8 @@ Each record also has a **short description** (legacy `shortdesc`). Extra legacy 
 | Bay Master | BAY | — | bay category: PDI, Service & Repair, Accidental |
 | Defect | COMPLAINT | Vehicle group (optional) | major defect, used in (warranty / beyond / both) |
 | Miscellaneous → Employee group | TEAM | — | — |
-| Designation | DESIGNATION | — | hierarchy, department, belongs to a group, can receive / deliver vehicles |
+| (employee department) | DEPARTMENT | — | — (legacy only stores the letter E, P, C or M; name them here) |
+| Designation | DESIGNATION | — | hierarchy, department code, belongs to a group, can receive / deliver vehicles |
 | Salutation | SALUTATION | — | reference in letters |
 | (customer segment) | SEGMENT | — | segment type |
 | Zone / State / City | ZONE, STATE, CITY | zone → state → city (optional, as in legacy) | — |
@@ -41,6 +42,27 @@ Other parents (for example a state's zone) can be changed.
 Legacy fields that are empty in all three databases (AutoEnhancer, CPDAutoEnhancer, ABJAutoEnhancer) are not
 carried over: variant specifications (class, cc, weights, seats, body type), state permit, city STD code, vehicle
 group mileage limit / % variation, tax form start / end numbers.
+
+## Employee master
+
+**Workshop → Employees** (`/employees`, API `/api/employees`, permissions `employee:read` / `employee:manage`).
+Legacy jobs name mechanics (up to three per labour line), the main mechanic and the employee group by employee
+code, but most of those people never log in. So employees are their own master, and a login user can be linked
+to an employee when the person also uses the system.
+
+| Legacy field | New field |
+| --- | --- |
+| employee | `code` (unique per branch, upper case, fixed once saved) |
+| name | `name` |
+| designation, department, empgroup | `designationId`, `departmentId`, `teamId` (DESIGNATION, DEPARTMENT, TEAM masters) |
+| emptype O / C | `employeeType` OWN / CONTRACT |
+| majororminor S / J | `grade` SENIOR / JUNIOR |
+| dateofbirth, qualification, Blood_Group, experience | same names |
+| block, street, district, city, state, pin, phone | same names |
+| empjoindate, empleftdate | `joinDate`, `leftDate` |
+
+An employee with a left date on or before today drops out of the current list (and pickers) but stays on old
+documents. Salary (filled for a handful of rows) is not kept: payroll is not part of this system.
 
 ## Not carried over
 

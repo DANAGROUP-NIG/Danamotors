@@ -64,6 +64,8 @@ model Branch {
   partBinChanges PartBinHistory[]
 
   stockTakes StockTake[]
+
+  employees Employee[]
 }
 
 // ============================================================
@@ -177,6 +179,8 @@ model User {
   stockTakeSheetsIssued   StockTakeSheet[] @relation("StockTakeSheetIssuedBy")
   stockTakeSheetsUploaded StockTakeSheet[] @relation("StockTakeSheetUploadedBy")
   stockTakeCounts         StockTakeCount[] @relation("StockTakeCountRecordedBy")
+
+  employee Employee?
 }
 
 model Role {
@@ -1729,6 +1733,9 @@ model WorkshopMaster {
   colouredVehicles Vehicle[]        @relation("VehicleColour")
   labourRates      LabourRate[]
   serviceTypeSettings ServiceTypeModelSetting[] @relation("ServiceTypeSettings")
+  designationEmployees Employee[] @relation("EmployeeDesignation")
+  departmentEmployees  Employee[] @relation("EmployeeDepartment")
+  teamEmployees        Employee[] @relation("EmployeeTeam")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
   @@unique([kind, code])
@@ -3333,4 +3340,68 @@ model StockTakeCount {
   recordedBy      User?           @relation("StockTakeCountRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
 
   @@index([lineId])
+}
+
+// ============================================================
+// EMPLOYEE MASTER (legacy Employee)
+// ============================================================
+
+enum EmployeeType {
+  OWN
+  CONTRACT
+}
+
+enum EmployeeGrade {
+  SENIOR
+  JUNIOR
+}
+
+// Every workshop employee, with or without a login. Legacy jobs name mechanics,
+// the main mechanic and the employee group by these codes.
+model Employee {
+  id   String @id @default(uuid())
+  code String
+  name String
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  designationId String?
+  designation   WorkshopMaster? @relation("EmployeeDesignation", fields: [designationId], references: [id], onDelete: Restrict)
+  departmentId  String?
+  department    WorkshopMaster? @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  // Legacy empgroup: the workshop group / team the employee works in.
+  teamId        String?
+  team          WorkshopMaster? @relation("EmployeeTeam", fields: [teamId], references: [id], onDelete: Restrict)
+
+  employeeType EmployeeType   @default(OWN)
+  grade        EmployeeGrade?
+
+  dateOfBirth     DateTime?
+  qualification   String?
+  bloodGroup      String?
+  experienceYears Float?
+
+  block    String?
+  street   String?
+  district String?
+  city     String?
+  state    String?
+  pin      String?
+  phone    String?
+
+  joinDate DateTime?
+  // Set when the employee leaves; they then drop out of pickers but stay on old jobs.
+  leftDate DateTime?
+
+  // Optional login account for employees who use the system.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, code])
+  @@index([branchId, leftDate])
+  @@index([teamId])
 }
