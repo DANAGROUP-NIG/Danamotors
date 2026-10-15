@@ -12,6 +12,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { recordPartChange } from "./partHistory";
+import type { LegacyPartFields } from "./inventory.validation";
 
 export class InventoryRepository {
   async listSpareParts(branchId?: string): Promise<SparePart[]> {
@@ -75,7 +76,7 @@ export class InventoryRepository {
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;
-  }, changedById?: string): Promise<SparePart> {
+  } & LegacyPartFields, changedById?: string): Promise<SparePart> {
     return this.createTracked(data, changedById);
   }
 

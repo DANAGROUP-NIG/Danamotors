@@ -91,6 +91,23 @@ export const listPartsFilterQuerySchema = z.object({
 
 const partStatusEnum = z.enum(["ACTIVE", "BLOCKED"]);
 
+// Legacy partmast fields from the Part screen (classification and ordering).
+export const legacyPartFields = {
+  vehicleSystem: z.string().trim().max(20).nullable().optional(),
+  vehicleGroup: z.string().trim().max(20).nullable().optional(),
+  applicableModels: z.array(z.string().trim().min(1).max(20)).max(200).optional(),
+  moq: z.number().positive('MOQ must be greater than zero').nullable().optional(),
+  conversionFactor: z.number().positive('Conversion factor must be greater than zero').optional(),
+  basicRate: z.number().nonnegative('Base rate must be 0 or more').nullable().optional(),
+  nspDate: z.coerce.date().nullable().optional(),
+  nlaDate: z.coerce.date().nullable().optional(),
+  blockReserve: z.boolean().optional(),
+  includeInTopN: z.boolean().optional(),
+  topMover: z.boolean().optional(),
+  underAmc: z.boolean().optional(),
+};
+export type LegacyPartFields = z.infer<z.ZodObject<typeof legacyPartFields>>;
+
 const basePartMasterFields = {
   partCode: z
     .string()
@@ -139,6 +156,7 @@ const basePartMasterFields = {
   // Legacy partmast.WTYAPPLICABLE / warrrate.
   warrantyApplicable: z.boolean().optional(),
   warrantyRate: z.number().nonnegative('Warranty rate must be 0 or more').nullable().optional(),
+  ...legacyPartFields,
 };
 
 export const createPartMasterSchema = z.object({
@@ -185,6 +203,7 @@ export const updatePartMasterSchema = z.object({
       warrantyApplicable: basePartMasterFields.warrantyApplicable,
       warrantyRate: basePartMasterFields.warrantyRate,
       partStatus: partStatusEnum.optional(),
+      ...legacyPartFields,
     })
     .refine(
       (data) => {

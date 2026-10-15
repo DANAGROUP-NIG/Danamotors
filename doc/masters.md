@@ -107,6 +107,25 @@ Per-model time / amount (legacy `labour`: model, time required, amount or time) 
 (**Settings → Model labour rates**). The labour Part and Defect tabs are not carried over: `partlabour` and
 `troublelabour` are empty in all three databases.
 
+## Part master
+
+**Inventory → Parts**. On top of the fields the part already had (number, name, UOM, purchase source / part flag,
+part type, dealer and retail rate, price category, tax category / form, min / max / reorder, warranty), the form's
+**Classification and ordering** section keeps the remaining legacy `partmast` fields:
+
+| Legacy field | New field |
+| --- | --- |
+| vehiclesystem, vehiclegroup | `vehicleSystem`, `vehicleGroup` (codes; suggested from the masters) |
+| partmodel, allmodelpart | `applicableModels` (model codes; empty = all models) |
+| MOQ, ConversionFactor | `moq`, `conversionFactor` |
+| basicrate | `basicRate` (supplier base price in foreign currency) |
+| NSPDATE, NCADATE | `nspDate`, `nlaDate` |
+| blockreserve, TOP350, topnparts, UnderAMC | `blockReserve`, `topMover`, `includeInTopN`, `underAmc` |
+
+UOM, tax category and tax form inputs suggest the codes from their master lists. `salerate` (set on under 1% of
+parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
+over: `partlabour` and `troublepart` are empty in all three databases.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle

@@ -12,6 +12,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { useCreatePart, useOpeningStock, useUpdatePart } from "../hooks/use-part-mutations";
 import { usePriceCategories } from "../hooks/use-parts";
+import { useMasterCodes } from "../hooks/use-master-codes";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
@@ -32,6 +33,29 @@ export const PART_CATEGORIES = [
 ];
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
+const LEGACY_FLAGS = [
+  ["blockReserve", "Block reserve"],
+  ["topMover", "Top mover"],
+  ["includeInTopN", "Include in top-N parts"],
+  ["underAmc", "Under AMC"],
+] as const;
+
+/** Suggestions for a free-text code field from a workshop master list. */
+function MasterOptions({ id, kind, extra = [] }: { id: string; kind: string; extra?: string[] }) {
+  const { data } = useMasterCodes(kind);
+  const codes = new Map<string, string>(extra.map((code) => [code, ""]));
+  for (const master of data ?? []) codes.set(master.code, master.description);
+  return (
+    <datalist id={id}>
+      {[...codes.entries()].map(([code, description]) => (
+        <option key={code} value={code}>{description}</option>
+      ))}
+    </datalist>
+  );
+}
+
+const day = (value?: string | null) => (value ? value.slice(0, 10) : "");
+
 const sectionCls = "rounded-lg border border-[#e8edf3] bg-slate-50 p-4";
 const sectionTitle = "mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -41,7 +65,11 @@ interface PartFormProps {
 }
 
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
-  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", partType: "S", warrantyApplicable: false };
+  if (!part)
+    return {
+      uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", partType: "S", warrantyApplicable: false,
+      conversionFactor: 1, blockReserve: false, includeInTopN: false, topMover: false, underAmc: false,
+    };
   return {
     partNumber: part.partNumber,
     name: part.name,
@@ -63,6 +91,18 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     partStatus: part.partStatus,
     warrantyApplicable: part.warrantyApplicable ?? false,
     warrantyRate: part.warrantyRate ?? undefined,
+    vehicleSystem: part.vehicleSystem ?? "",
+    vehicleGroup: part.vehicleGroup ?? "",
+    applicableModels: (part.applicableModels ?? []).join(", "),
+    moq: part.moq ?? undefined,
+    conversionFactor: part.conversionFactor ?? 1,
+    basicRate: part.basicRate ?? undefined,
+    nspDate: day(part.nspDate),
+    nlaDate: day(part.nlaDate),
+    blockReserve: part.blockReserve ?? false,
+    includeInTopN: part.includeInTopN ?? false,
+    topMover: part.topMover ?? false,
+    underAmc: part.underAmc ?? false,
   };
 }
 
@@ -120,6 +160,14 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       taxForm: text(values.taxForm),
       binLocation: text(values.binLocation),
       storeLocation: text(values.storeLocation),
+      vehicleSystem: values.vehicleSystem?.trim() || null,
+      vehicleGroup: values.vehicleGroup?.trim() || null,
+      applicableModels: (values.applicableModels ?? "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean),
+      moq: values.moq ?? null,
+      conversionFactor: values.conversionFactor ?? 1,
+      basicRate: values.basicRate ?? null,
+      nspDate: values.nspDate || null,
+      nlaDate: values.nlaDate || null,
     };
 
     if (!isEdit && (payload.retailRate === undefined || Number.isNaN(payload.retailRate))) delete payload.retailRate;
@@ -214,11 +262,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Unit of measure" error={errors.uom?.message}>
             <input className={inputCls} list="part-uoms" {...register("uom")} />
-            <datalist id="part-uoms">
-              {UOM_OPTIONS.map((u) => (
-                <option key={u} value={u} />
-              ))}
-            </datalist>
+            <MasterOptions id="part-uoms" kind="UOM" extra={UOM_OPTIONS} />
           </Field>
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
@@ -252,10 +296,12 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             )}
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
-            <input className={inputCls} {...register("taxCategory")} />
+            <input className={inputCls} list="part-tax-categories" {...register("taxCategory")} />
+            <MasterOptions id="part-tax-categories" kind="TAX_CATEGORY" />
           </Field>
           <Field label="Tax form (optional)" error={errors.taxForm?.message}>
-            <input className={inputCls} placeholder="e.g. X" {...register("taxForm")} />
+            <input className={inputCls} placeholder="e.g. X" list="part-tax-forms" {...register("taxForm")} />
+            <MasterOptions id="part-tax-forms" kind="TAX_FORM" />
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold">
             <input type="checkbox" className="size-4" {...register("taxable")} />
@@ -287,6 +333,44 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("warrantyRate")}
             />
           </Field>
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <p className={sectionTitle}>Classification and ordering</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Vehicle system (optional)" error={errors.vehicleSystem?.message}>
+            <input className={inputCls} list="part-vehicle-systems" {...register("vehicleSystem")} />
+            <MasterOptions id="part-vehicle-systems" kind="VEHICLE_SYSTEM" />
+          </Field>
+          <Field label="Vehicle group (optional)" error={errors.vehicleGroup?.message}>
+            <input className={inputCls} list="part-vehicle-groups" {...register("vehicleGroup")} />
+            <MasterOptions id="part-vehicle-groups" kind="VEHICLE_GROUP" />
+          </Field>
+          <Field label="Models (blank = all models)" error={errors.applicableModels?.message}>
+            <input className={inputCls} placeholder="e.g. CRT, RIO" {...register("applicableModels")} />
+          </Field>
+          <Field label="MOQ (optional)" error={errors.moq?.message}>
+            <input type="number" min={0} step="any" className={inputCls} {...register("moq")} />
+          </Field>
+          <Field label="Conversion factor" error={errors.conversionFactor?.message}>
+            <input type="number" min={0} step="any" className={inputCls} {...register("conversionFactor")} />
+          </Field>
+          <Field label="Base rate, foreign currency (optional)" error={errors.basicRate?.message}>
+            <input type="number" min={0} step="0.01" className={inputCls} {...register("basicRate")} />
+          </Field>
+          <Field label="NSP date (optional)" error={errors.nspDate?.message}>
+            <input type="date" className={inputCls} {...register("nspDate")} />
+          </Field>
+          <Field label="NLA date (optional)" error={errors.nlaDate?.message}>
+            <input type="date" className={inputCls} {...register("nlaDate")} />
+          </Field>
+          {LEGACY_FLAGS.map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" className="size-4" {...register(key)} />
+              {label}
+            </label>
+          ))}
         </div>
       </div>
 

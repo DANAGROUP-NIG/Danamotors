@@ -25,7 +25,27 @@ export type PartRole = "MAIN" | "ALTERNATE";
  * A Part Master record. The list endpoint returns the price as `unitPrice`
  * and the detail endpoint as `unitRate`; the API layer normalises both to `unitRate`.
  */
-export type PartMaster = {
+
+/** Legacy partmast fields from the Part screen (classification and ordering). */
+export type LegacyPartFields = {
+  vehicleSystem: string | null;
+  vehicleGroup: string | null;
+  /** Model codes the part fits; empty = all models. */
+  applicableModels: string[];
+  /** Minimum order quantity. */
+  moq: number | null;
+  conversionFactor: number;
+  /** Supplier base price in foreign currency (legacy basicrate). */
+  basicRate: number | null;
+  nspDate: string | null;
+  nlaDate: string | null;
+  blockReserve: boolean;
+  includeInTopN: boolean;
+  topMover: boolean;
+  underAmc: boolean;
+};
+
+export type PartMaster = LegacyPartFields & {
   id: string;
   partCode: string;
   partNumber: string;
@@ -84,7 +104,7 @@ export type PartMasterPayload = {
   partStatus?: PartStatus;
   warrantyApplicable?: boolean;
   warrantyRate?: number | null;
-};
+} & Partial<LegacyPartFields>;
 
 export type PriceCategory = {
   code: string;

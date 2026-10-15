@@ -754,6 +754,22 @@ model SparePart {
   warrantyApplicable Boolean @default(false)
   warrantyRate       Float?
 
+  // Legacy partmast classification and ordering fields from the Part screen.
+  vehicleSystem    String?
+  vehicleGroup     String?
+  // Model codes the part fits; empty = all models (legacy partmodel / allmodelpart).
+  applicableModels String[]  @default([])
+  moq              Float?
+  conversionFactor Float     @default(1)
+  // Supplier base price in foreign currency (legacy basicrate).
+  basicRate        Float?
+  nspDate          DateTime?
+  nlaDate          DateTime?
+  blockReserve     Boolean   @default(false)
+  includeInTopN    Boolean   @default(false)
+  topMover         Boolean   @default(false)
+  underAmc         Boolean   @default(false)
+
   // --- new: main/alternate relationship ---
   role           PartRole    @default(MAIN)
   mainPartId     String?

@@ -294,6 +294,16 @@ export function PartDetail({ id }: { id: string }) {
                   : "Not applicable"
               }
             />
+            <DetailField label="Vehicle system / group" value={[part.vehicleSystem, part.vehicleGroup].filter(Boolean).join(" / ") || null} />
+            <DetailField label="Models" value={part.applicableModels?.length ? part.applicableModels.join(", ") : "All models"} />
+            <DetailField label="MOQ" value={part.moq != null ? String(part.moq) : null} />
+            <DetailField label="NSP / NLA date" value={[part.nspDate, part.nlaDate].map((d) => d?.slice(0, 10) ?? "—").join(" / ")} />
+            <DetailField
+              label="Flags"
+              value={[part.blockReserve && "Block reserve", part.topMover && "Top mover", part.includeInTopN && "Top-N", part.underAmc && "Under AMC"]
+                .filter(Boolean)
+                .join(", ") || null}
+            />
             <DetailField label="Description" value={part.description} wide />
           </div>
         </div>

@@ -11,6 +11,7 @@ import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
 import { recordBinChange, recordPartChange } from "./partHistory";
+import type { LegacyPartFields } from "./inventory.validation";
 
 const INHERITABLE_FIELDS = [
   "category",
@@ -463,7 +464,7 @@ export class InventoryService {
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     warrantyRate?: number | null;
-  }, changedById?: string) {
+  } & LegacyPartFields, changedById?: string) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
       data = {
         ...data,
@@ -561,7 +562,7 @@ export class InventoryService {
       partStatus?: PartStatus;
       warrantyApplicable?: boolean;
       warrantyRate?: number | null;
-    },
+    } & LegacyPartFields,
     changedById?: string,
   ) {
     const part = await this.inventoryRepository.findPartById(id);
