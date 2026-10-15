@@ -789,6 +789,8 @@ model SparePart {
 
   stockTakeLines StockTakeLine[]
 
+  checklistLines ServiceChecklistLine[]
+
   @@index([mainPartId])
 }
 
@@ -1250,6 +1252,7 @@ model LabourItem {
   group         String?
   modelRates    LabourRate[]
   jobCardLines  JobCardLabour[]
+  checklistLines ServiceChecklistLine[]
 }
 
 model JobCardLabour {
@@ -1738,6 +1741,12 @@ model WorkshopMaster {
   teamEmployees        Employee[] @relation("EmployeeTeam")
   defectEstimates      DefectModelEstimate[] @relation("DefectEstimates")
   modelDefectEstimates DefectModelEstimate[] @relation("ModelDefectEstimates")
+  checklistLines         ServiceChecklistLine[]    @relation("ChecklistLines")
+  modelChecklistLines    ServiceChecklistLine[]    @relation("ChecklistLineModel")
+  variantChecklistLines  ServiceChecklistLine[]    @relation("ChecklistLineVariant")
+  checklistMileages      ServiceChecklistMileage[] @relation("ChecklistMileageChecklist")
+  modelChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageModel")
+  variantChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageVariant")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
   @@unique([kind, code])
@@ -3430,4 +3439,55 @@ model Employee {
   @@unique([branchId, code])
   @@index([branchId, leftDate])
   @@index([teamId])
+}
+
+// ============================================================
+// SERVICE CHECKLISTS (legacy ChecklistMaster, ChecklistDefinitionMaster,
+// MileageChecklistDefinition). The checklist itself is a CHECKLIST master.
+// ============================================================
+
+enum ChecklistLineKind {
+  PART
+  LABOUR
+}
+
+// A part (with quantity) or a labour (with amount) to do under a checklist on a model,
+// for one variant or, when variantId is null, all variants of the model.
+model ServiceChecklistLine {
+  id           String            @id @default(uuid())
+  checklistId  String
+  checklist    WorkshopMaster    @relation("ChecklistLines", fields: [checklistId], references: [id], onDelete: Cascade)
+  modelId      String
+  model        WorkshopMaster    @relation("ChecklistLineModel", fields: [modelId], references: [id], onDelete: Restrict)
+  variantId    String?
+  variant      WorkshopMaster?   @relation("ChecklistLineVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  kind         ChecklistLineKind
+  sparePartId  String?
+  sparePart    SparePart?        @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+  labourItemId String?
+  labourItem   LabourItem?       @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  quantity     Float             @default(1)
+  // Labour amount; part lines are priced from the part's current rate.
+  amount       Float             @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([checklistId, modelId, variantId])
+  @@index([sparePartId])
+  @@index([labourItemId])
+}
+
+// Which checklist to follow at a mileage, for a model (and variant, or all variants).
+model ServiceChecklistMileage {
+  id          String          @id @default(uuid())
+  modelId     String
+  model       WorkshopMaster  @relation("ChecklistMileageModel", fields: [modelId], references: [id], onDelete: Restrict)
+  variantId   String?
+  variant     WorkshopMaster? @relation("ChecklistMileageVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  mileage     Int
+  checklistId String
+  checklist   WorkshopMaster  @relation("ChecklistMileageChecklist", fields: [checklistId], references: [id], onDelete: Restrict)
+  createdAt   DateTime        @default(now())
+
+  @@index([modelId, variantId, mileage])
 }

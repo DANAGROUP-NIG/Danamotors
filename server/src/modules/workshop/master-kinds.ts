@@ -6,6 +6,7 @@ import { BadRequestError } from '../../shared/errors/appError';
 // `attributes`, so one table and one screen serve all of them.
 export const MASTER_KINDS = [
   'SERVICE_TYPE',
+  'CHECKLIST',
   'BAY',
   'COMPLAINT',
   'TEAM',

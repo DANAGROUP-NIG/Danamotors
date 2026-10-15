@@ -24,6 +24,7 @@ Each record also has a **short description** (legacy `shortdesc`). Extra legacy 
 | Vehicle System | VEHICLE_SYSTEM | — | — |
 | Vehicle Group | VEHICLE_GROUP | Vehicle system (required) | — |
 | Service | SERVICE_TYPE | — | multi-service; see [Service master](#service-master) |
+| Service Checklist Master | CHECKLIST | — | see [Service checklists](#service-checklists) |
 | Bay Master | BAY | — | bay category: PDI, Service & Repair, Accidental |
 | Defect | COMPLAINT | Vehicle group (optional) | major defect, used in (warranty / beyond / both) |
 | Miscellaneous → Employee group | TEAM | — | — |
@@ -79,6 +80,20 @@ to maintain its per-model settings (legacy `servicedetail`):
 | ChecklistFollowed | `checklistFollowed` |
 
 A service is due at the mileage or days limit, plus or minus the variation.
+
+## Service checklists
+
+**Settings → Service Checklists** (`/settings/service-checklists`, API `/api/service-checklists`). The checklist
+code is a CHECKLIST master (legacy `ChecklistMaster`).
+
+- **Checklist definition** (legacy `ChecklistDefinitionMaster`): part lines (part + quantity, priced at the
+  part's retail rate) and labour lines (labour + amount) per checklist and model, for one variant or all variants
+  (legacy "All Variant"). A variant follows its own lines plus the all-variant lines. Estimated part, oil (parts
+  of type O) and labour amounts are calculated, as in legacy.
+- **Mileage-wise checklists** (legacy `MileageChecklistDefinition`): the checklist to follow at a mileage for a
+  model and variant, with the same estimates.
+
+Each item appears once per checklist, model and variant; each mileage once per model and variant.
 
 ## Defect master
 

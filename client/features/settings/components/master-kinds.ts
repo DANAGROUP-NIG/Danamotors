@@ -58,6 +58,7 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
     group: "Workshop",
     attributes: [{ key: "multiService", label: "Multi-service (can be opened with another service)", type: "checkbox" }],
   },
+  CHECKLIST: { label: "Service checklist", group: "Workshop" },
   BAY: {
     label: "Bay",
     group: "Workshop",

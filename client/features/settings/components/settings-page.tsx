@@ -26,6 +26,11 @@ const SETTINGS_CARDS = [
     href: "/settings/workshop-masters",
   },
   {
+    title: "Service Checklists",
+    description: "Parts and labour per checklist and model, and the checklist due at each mileage.",
+    href: "/settings/service-checklists",
+  },
+  {
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",
