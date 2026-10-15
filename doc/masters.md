@@ -142,6 +142,28 @@ The percentages differ between the three legacy databases (for example discount 
 conversion factor hold the same default (1 or 0) for every category in all three databases and are not carried
 over.
 
+## Vehicle master
+
+**Vehicles → edit → Sale, stock and fitment** keeps the legacy `vehiclemaster` fields from the Vehicle screen's
+three tabs that the vehicle lacked:
+
+| Legacy field | New field |
+| --- | --- |
+| CTYPE | `colourType` (COLOUR_TYPE code) |
+| parkedat R / Y / S | `parkedAt` SHOWROOM / STOCKYARD / SOLD |
+| PurchaseAmount | `purchaseAmount` |
+| invno, invdate, SaleAmount | `saleInvoiceNumber`, `saleInvoiceDate`, `saleAmount` |
+| WcoNo, WCOdate | `wcoNumber`, `wcoDate` |
+| PPLInvoice, PPLInvdate | `principalInvoiceNumber`, `principalInvoiceDate` |
+| theft | `theft` |
+| Manufacturingmonth, manufacturingyear | `manufactureMonth`, `manufactureYear` |
+| tyremake1–5, tyreno1–5, BatteryMake, batteryno | `tyres` [{ makeId, make, number }], `batteryMake`, `batteryNumber` (same shape as the job card snapshot) |
+
+`InstallationDate` equals `SaleDate` on most rows and stands in for it when `SaleDate` is blank, so it maps to
+`saleDate`. The vehicle-sales stock columns (VRN / SRN / STN numbers and dates, reservation, booking, FSC code,
+FOC amounts) belong to the vehicle sales module, which this system does not replace. The Sale Details discount
+percentages and "Company Vehicle" are empty in all three databases.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle

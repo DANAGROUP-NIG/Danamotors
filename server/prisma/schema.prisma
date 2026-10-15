@@ -668,6 +668,25 @@ model Vehicle {
 
   ownershipStatus String?
 
+  // Legacy vehiclemaster sale, stock and fitment details (Vehicle screen tabs).
+  colourType             String?
+  parkedAt               VehicleParkedAt?
+  purchaseAmount         Float?
+  saleInvoiceNumber      String?
+  saleInvoiceDate        DateTime?
+  saleAmount             Float?
+  wcoNumber              String?
+  wcoDate                DateTime?
+  principalInvoiceNumber String?
+  principalInvoiceDate   DateTime?
+  theft                  Boolean          @default(false)
+  manufactureMonth       Int?
+  manufactureYear        Int?
+  // Current tyres and battery, same shape as the job card snapshot: [{ makeId, make, number }].
+  tyres                  Json?
+  batteryMake            String?
+  batteryNumber          String?
+
   createdById String?
   createdBy   User?   @relation("CreatedVehicles", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -705,6 +724,13 @@ model VehicleImage {
 }
 
 // ============================================================
+// Legacy vehiclemaster.parkedat: R showroom, Y stockyard, S sold.
+enum VehicleParkedAt {
+  SHOWROOM
+  STOCKYARD
+  SOLD
+}
+
 enum PartStatus {
   ACTIVE
   BLOCKED
