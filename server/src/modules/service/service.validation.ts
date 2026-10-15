@@ -304,6 +304,14 @@ export const createLabourItemSchema = z.object({
       group: z.string().trim().max(100).optional(),
       defaultHours: z.number().positive(),
       rate: z.number().nonnegative(),
+      majorLabour: z.boolean().optional(),
+      insured: z.boolean().optional(),
+      approvalRequired: z.boolean().optional(),
+      externalLabour: z.boolean().optional(),
+      underAmc: z.boolean().optional(),
+      followUpAnalysis: z.boolean().optional(),
+      amountEditable: z.boolean().optional(),
+      includeInTopN: z.boolean().optional(),
     })
     .strict(),
 });
@@ -318,6 +326,14 @@ export const updateLabourItemSchema = z.object({
       defaultHours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       active: z.boolean().optional(),
+      majorLabour: z.boolean().optional(),
+      insured: z.boolean().optional(),
+      approvalRequired: z.boolean().optional(),
+      externalLabour: z.boolean().optional(),
+      underAmc: z.boolean().optional(),
+      followUpAnalysis: z.boolean().optional(),
+      amountEditable: z.boolean().optional(),
+      includeInTopN: z.boolean().optional(),
     })
     .strict()
     .refine(

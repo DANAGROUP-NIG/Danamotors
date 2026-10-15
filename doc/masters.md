@@ -95,6 +95,18 @@ code is a CHECKLIST master (legacy `ChecklistMaster`).
 
 Each item appears once per checklist, model and variant; each mileage once per model and variant.
 
+## Labour master
+
+**Operations → Labour Catalogue**. A labour (legacy `labourhead`) has code, description, vehicle system and group
+(picked from the VEHICLE_SYSTEM / VEHICLE_GROUP lists, stored as codes) and the legacy flags in the row's
+**Options** dialog: major labour, insured, approval required, external labour, under AMC, include in follow-up
+analysis, labour amount can be edited and include in top-N reports. Defaults follow most legacy codes (the last
+three on, the rest off). Deactivating a labour records the date (legacy `inactivedate`).
+
+Per-model time / amount (legacy `labour`: model, time required, amount or time) is the model labour rate
+(**Settings → Model labour rates**). The labour Part and Defect tabs are not carried over: `partlabour` and
+`troublelabour` are empty in all three databases.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle

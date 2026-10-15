@@ -1250,6 +1250,16 @@ model LabourItem {
 
   vehicleSystem String?
   group         String?
+  // Legacy labour master flags. Per-model time or amount pricing is LabourRate.pricing.
+  majorLabour      Boolean   @default(false)
+  insured          Boolean   @default(false)
+  approvalRequired Boolean   @default(false)
+  externalLabour   Boolean   @default(false)
+  underAmc         Boolean   @default(false)
+  followUpAnalysis Boolean   @default(true)
+  amountEditable   Boolean   @default(true)
+  includeInTopN    Boolean   @default(true)
+  inactiveDate     DateTime?
   modelRates    LabourRate[]
   jobCardLines  JobCardLabour[]
   checklistLines ServiceChecklistLine[]

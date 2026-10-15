@@ -5,6 +5,9 @@ import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
 import { canonicalJobStatus } from './job-card-workflow.service';
 import { ROLES } from '../../shared/constants/roles';
 
+export const LABOUR_FLAGS = ['majorLabour', 'insured', 'approvalRequired', 'externalLabour', 'underAmc', 'followUpAnalysis', 'amountEditable', 'includeInTopN'] as const;
+type LabourFlags = Partial<Record<typeof LABOUR_FLAGS[number], boolean>>;
+
 const roundMoney = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
 
 export class LabourService {
@@ -12,19 +15,22 @@ export class LabourService {
     return prisma.labourItem.findMany({ where: { ...(includeInactive ? {} : { active: true }), ...(search ? { OR: [{ code: { contains: search, mode: 'insensitive' as const } }, { description: { contains: search, mode: 'insensitive' as const } }] } : {}) }, orderBy: [{ code: 'asc' }], take: 100 });
   }
 
-  async createItem(input: { code: string; description: string; vehicleSystem?: string; group?: string; defaultHours: number; rate: number }) {
+  async createItem(input: { code: string; description: string; vehicleSystem?: string; group?: string; defaultHours: number; rate: number } & LabourFlags) {
     return prisma.labourItem.create({
       data: { ...input, code: input.code.trim(), description: input.description.trim() },
     });
   }
 
-  async updateItem(id: string, input: { code?: string; description?: string; vehicleSystem?: string; group?: string; defaultHours?: number; rate?: number; active?: boolean }) {
+  async updateItem(id: string, input: { code?: string; description?: string; vehicleSystem?: string; group?: string; defaultHours?: number; rate?: number; active?: boolean } & LabourFlags) {
     const existing = await prisma.labourItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundError('Labour item not found');
+    // Legacy inactivedate: when the labour was switched off.
+    const inactiveDate = input.active === undefined || input.active === existing.active ? undefined : input.active ? null : new Date();
     return prisma.labourItem.update({
       where: { id },
       data: {
         ...input,
+        inactiveDate,
         code: input.code?.trim(),
         description: input.description?.trim(),
         vehicleSystem: input.vehicleSystem,
