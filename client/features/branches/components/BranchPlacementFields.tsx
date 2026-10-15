@@ -5,12 +5,12 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "../hooks/useFetchBranches";
 
-type PlacementValues = { code?: string; parentBranchId?: string };
+type PlacementValues = { code?: string; shortName?: string; parentBranchId?: string };
 
 interface BranchPlacementFieldsProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: UseFormRegister<any>;
-  errors: { code?: { message?: string }; parentBranchId?: { message?: string } };
+  errors: { code?: { message?: string }; shortName?: { message?: string }; parentBranchId?: { message?: string } };
   /** The branch being edited, so it is not offered as its own parent. */
   selfId?: string;
   /** A branch that already has sub-locations cannot become one. */
@@ -31,6 +31,9 @@ export function BranchPlacementFields({ register, errors, selfId, hasSubLocation
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Store code (optional)" error={errors.code?.message}>
         <input className={inputCls} placeholder="e.g. A, QS, DH" maxLength={10} {...register("code" satisfies keyof PlacementValues)} />
+      </Field>
+      <Field label="Short name (optional)" error={errors.shortName?.message}>
+        <input className={inputCls} placeholder="e.g. VI-2" maxLength={20} {...register("shortName" satisfies keyof PlacementValues)} />
       </Field>
       <Field label="Sub-location of (optional)" error={errors.parentBranchId?.message}>
         <select className={inputCls} disabled={hasSubLocations} {...register("parentBranchId" satisfies keyof PlacementValues)}>

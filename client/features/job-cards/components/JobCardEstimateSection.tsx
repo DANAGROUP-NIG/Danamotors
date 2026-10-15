@@ -12,6 +12,7 @@ import { WorkshopPicker } from "./WorkshopPicker";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { jobCardKeys } from "../api/job-card.keys";
 import type { JobCard } from "../types/job-card.types";
+import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 
 type Line = {
   type: "COMPLAINT" | "PART" | "LABOUR" | "SERVICE";
@@ -353,6 +354,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
             : "Could not save estimate or decision"}
         </p>
       )}
+      <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={jobCard.branchId} />
     </section>
   );
 }

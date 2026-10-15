@@ -16,6 +16,8 @@ model Branch {
   name        String   @unique
   // Legacy store-location code (e.g. A, QS, DH, VI).
   code           String?  @unique
+  // Legacy storelocation.ShortName, e.g. VI-2.
+  shortName      String?
   // Set when this is a sub-location (store, godown) at another branch's premises.
   parentBranchId String?
   parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
@@ -68,6 +70,7 @@ model Branch {
   employees Employee[]
 
   partCategorySettings PartCategoryBranchSetting[]
+  documentTerms        DocumentTerms[]
 }
 
 // ============================================================
@@ -3578,4 +3581,32 @@ model ServiceChecklistMileage {
   createdAt   DateTime        @default(now())
 
   @@index([modelId, variantId, mileage])
+}
+
+// ============================================================
+// DOCUMENT TERMS (legacy Quotation Terms and Conditions Master and the
+// Control screen's terms and footer messages)
+// ============================================================
+
+enum DocumentTermType {
+  JOB_ESTIMATE
+  JOB_CARD
+  JOB_BILL
+  PARTS_QUOTATION
+  COUNTER_SALE
+  RECEIPT
+}
+
+// Numbered terms and the footer message printed on a document, company-wide
+// (branchId null) or for one branch, which then overrides the company text.
+model DocumentTerms {
+  id           String           @id @default(uuid())
+  documentType DocumentTermType
+  branchId     String?
+  branch       Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  terms        String[]         @default([])
+  footer       String?
+  updatedAt    DateTime         @updatedAt
+
+  @@index([documentType, branchId])
 }

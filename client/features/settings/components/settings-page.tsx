@@ -36,6 +36,11 @@ const SETTINGS_CARDS = [
     href: "/settings/part-categories",
   },
   {
+    title: "Terms & Conditions",
+    description: "Terms and footer messages printed on estimates, job cards, bills, quotations and receipts.",
+    href: "/settings/document-terms",
+  },
+  {
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",

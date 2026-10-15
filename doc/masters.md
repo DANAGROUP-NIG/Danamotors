@@ -195,6 +195,28 @@ defect and model. Edit a defect on **Settings → Workshop Masters** to maintain
 defect Part / Labour tabs are not carried over: their link tables (`troublepart`, `troublelabour`) are empty in
 all three databases.
 
+## Store location
+
+A legacy store location (`storelocation`) is a branch: `code` (store code), `shortName` (legacy `ShortName`,
+e.g. VI-2), name, address, and `parentBranchId` for a store within another branch's premises (legacy
+`withinsamepremises`). VAT / RC numbers and stock-transfer-to/from are empty or unused.
+
+## Terms and conditions
+
+**Settings → Terms & Conditions** (`/settings/document-terms`, API `/api/document-terms`). One record per document
+(job estimate, job card, job bill, parts quotation / order, counter sale, payment receipt) for the whole company,
+and optionally one per branch that overrides it. Each holds numbered terms (up to 20) and a footer message.
+
+| Legacy source | Document |
+| --- | --- |
+| Quotation Terms and Conditions Master (document "Job Estimate", per location) | JOB_ESTIMATE (per branch) |
+| Control → Terms & Conditions: parts quotation 1–5, counter sale 1–4 | PARTS_QUOTATION, COUNTER_SALE |
+| Control Freeze 3: job card 1–9, job bill 1–4 | JOB_CARD, JOB_BILL |
+| Control Information: footer messages JC, JB, CS, Rcpt | footer of JOB_CARD, JOB_BILL, COUNTER_SALE, RECEIPT |
+
+The effective terms and footer show at the end of the job estimate, job bill, counter sale and part-sale order
+views and print with them.
+
 ## Not carried over
 
 | Legacy screen | Reason |
@@ -203,6 +225,7 @@ all three databases.
 | Control: Freeze 1/2, Modification of Data | Desktop record locks. Document statuses and role permissions do this |
 | Control: Control Status | "Last number" seeds. `DocumentSequence` does this |
 | Control: Calculations Formula, Other charges 1–5 | Only the default formula chain and unnamed placeholder charges were ever set |
+| Control: organisation / workshop information, service identification, margins, print settings | Company details live on branches; service roles are flags on the service master (free service, pre-delivery); print layout settings belong to the desktop reports |
 | Colour Cost Master | Holds only 0 / 1 values; vehicle sales pricing, not workshop |
 | Model Assembly Names | A handful of test values |
 | Service Booking | One model only, every number 1 |

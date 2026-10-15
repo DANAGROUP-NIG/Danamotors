@@ -27,6 +27,7 @@ export class BranchService {
         phoneNumber: branch.phoneNumber,
         email: branch.email,
         code: branch.code,
+        shortName: branch.shortName,
         parentBranchId: branch.parentBranchId,
         parentBranch: branch.parentBranch,
         isActive: branch.isActive,
@@ -59,6 +60,7 @@ export class BranchService {
       phoneNumber: branch.phoneNumber,
       email: branch.email,
       code: branch.code,
+      shortName: branch.shortName,
       parentBranchId: branch.parentBranchId,
       parentBranch: branch.parentBranch,
       subLocations: branch.subLocations,
@@ -80,6 +82,7 @@ export class BranchService {
     phoneNumber?: string;
     email?: string;
     code?: string;
+    shortName?: string;
     parentBranchId?: string;
   }) {
     const existingBranch = await this.branchRepository.findBranchByName(data.name);
@@ -101,6 +104,7 @@ export class BranchService {
       phoneNumber: branch.phoneNumber,
       email: branch.email,
       code: branch.code,
+      shortName: branch.shortName,
       parentBranchId: branch.parentBranchId,
       isActive: branch.isActive,
       createdAt: branch.createdAt,
@@ -117,6 +121,7 @@ export class BranchService {
     phoneNumber?: string;
     email?: string;
     code?: string | null;
+    shortName?: string | null;
     parentBranchId?: string | null;
   }) {
     const branch = await this.branchRepository.findBranchById(id);
@@ -145,6 +150,7 @@ export class BranchService {
       phoneNumber: updatedBranch.phoneNumber,
       email: updatedBranch.email,
       code: updatedBranch.code,
+      shortName: updatedBranch.shortName,
       parentBranchId: updatedBranch.parentBranchId,
       isActive: updatedBranch.isActive,
       createdAt: updatedBranch.createdAt,
