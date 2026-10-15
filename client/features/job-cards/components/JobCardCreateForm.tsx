@@ -197,8 +197,11 @@ export function JobCardCreateForm({
   const needsAck = canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
   const lastJob = vehicle?.jobCards?.[0];
   const recentJobs = useQuery({
-    queryKey: ["job-opening-recent-jobs", vehicleId],
-    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(`/service/vehicles/${vehicleId}/recent-jobs`),
+    // Previous jobs within the branch's repeat window: its days, or its km of this reading.
+    queryKey: ["job-opening-recent-jobs", vehicleId, branchId, debouncedMileage],
+    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(
+      `/service/vehicles/${vehicleId}/recent-jobs?${new URLSearchParams({ ...(branchId ? { branchId } : {}), ...(Number.isFinite(debouncedMileage) ? { mileage: String(debouncedMileage) } : {}) })}`,
+    ),
     enabled: !!vehicleId && hasPermission("jobcard:read"),
   });
 

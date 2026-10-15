@@ -10,13 +10,12 @@ import {
   NotFoundError,
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
-import { config } from "../../config";
+import { getBranchSettings } from '../company-settings/company-settings.service';
 import { calculateJobBillTotals } from "./job-bill-calculator";
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
 const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
-const VAT_RATE = config.JOB_BILL_VAT_RATE;
 
 function isActiveBillStatus(status: string) {
   return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
@@ -184,13 +183,15 @@ export class JobBillingService {
     const labourTotal = lines
       .filter((line) => line.type === "LABOUR")
       .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
+    const settings = await getBranchSettings(jobCard.branchId);
     const totals = calculateJobBillTotals({
       partsTotal,
       labourTotal,
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
       serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-      vatRate: VAT_RATE,
+      vatRate: settings.labourVatPercent,
+      roundOffValue: settings.roundOffValue,
     });
     return {
       jobCard,
@@ -246,13 +247,15 @@ export class JobBillingService {
             const labourTotal = lines
               .filter((line) => line.type === "LABOUR")
               .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
+            const settings = await getBranchSettings(jobCard.branchId, transaction);
             const totals = calculateJobBillTotals({
               partsTotal,
               labourTotal,
               partsDiscountPercent: input.partsDiscountPercent,
               labourDiscountPercent: input.labourDiscountPercent,
               serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-              vatRate: VAT_RATE,
+              vatRate: settings.labourVatPercent,
+              roundOffValue: settings.roundOffValue,
             });
             const invoiceNumber = await nextDocumentNumber(
               transaction,

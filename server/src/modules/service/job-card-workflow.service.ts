@@ -1,4 +1,5 @@
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
+import { getBranchSettings } from '../company-settings/company-settings.service';
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import { z } from "zod";
 import prisma from "../../prisma/client";
@@ -58,9 +59,26 @@ export function repeatWindowStart(
   days = Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 30),
 ) {
   if (!Number.isInteger(days) || days < 1 || days > 3650)
-    throw new BadRequestError("Invalid JOB_REPEAT_WINDOW_DAYS configuration");
+    throw new BadRequestError("Invalid repeat window days");
 
   return new Date(now.getTime() - days * 86400000);
+}
+
+// A previous job qualifies for a repeat when it is within the branch's repeat days, or within
+// its repeat km of the current reading (legacy: either limit is enough).
+export function repeatCandidateWhere(
+  window: { repeatWindowDays: number; repeatWindowKm: number | null },
+  mileage?: number,
+  now = new Date(),
+): Prisma.JobCardWhereInput {
+  return {
+    OR: [
+      { createdAt: { gte: repeatWindowStart(now, window.repeatWindowDays) } },
+      ...(window.repeatWindowKm && mileage !== undefined
+        ? [{ mileage: { gte: mileage - window.repeatWindowKm, lte: mileage } }]
+        : []),
+    ],
+  };
 }
 
 export function assertTransition(
@@ -240,10 +258,7 @@ export class JobCardWorkflowService {
           where: {
             id: data.previousJobId,
             vehicleId: vehicle.id,
-
-            createdAt: {
-              gte: repeatWindowStart(),
-            },
+            ...repeatCandidateWhere(await getBranchSettings(branch.id, tx), data.mileage),
 
             status: {
               notIn: ["CANCELLED", "Cancelled"],

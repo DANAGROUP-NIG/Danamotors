@@ -11,9 +11,9 @@ const SETTINGS_CARDS = [
     href: "/settings/roles",
   },
   {
-    title: "Workshop Profile",
-    description: "Update workshop name, address, and contact details.",
-    href: "/settings",
+    title: "Company & Branch Settings",
+    description: "Company details on documents; each branch's VAT, round-off, repeat-job, booking and workshop rules.",
+    href: "/settings/company",
   },
   {
     title: "Notifications",

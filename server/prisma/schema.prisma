@@ -71,6 +71,7 @@ model Branch {
 
   partCategorySettings PartCategoryBranchSetting[]
   documentTerms        DocumentTerms[]
+  settings             BranchSettings?
 }
 
 // ============================================================
@@ -3616,4 +3617,40 @@ model DocumentTerms {
   updatedAt    DateTime         @updatedAt
 
   @@index([documentType, branchId])
+}
+
+// ============================================================
+// BRANCH SETTINGS (legacy Control screen: Control Information,
+// Control Calculation and Workshop Information, which each legacy
+// database set for its own location)
+// ============================================================
+
+model BranchSettings {
+  branchId String @id
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  // Billing
+  labourVatPercent Float @default(7.5)
+  // Job bills are rounded down to a multiple of this (legacy RoundOffValue).
+  roundOffValue    Int   @default(10)
+
+  // Workshop rules
+  repeatWindowDays Int  @default(30)
+  repeatWindowKm   Int? @default(1500)
+  bookingMaxDays   Int  @default(30)
+
+  // Workshop information
+  contactPerson   String?
+  shifts          Int     @default(1)
+  workStartTime   String  @default("07:30")
+  workingHours    Float   @default(10)
+  weeklyHoliday   String?
+  vorOrderDays    Int     @default(7)
+  reorderMonths   Int     @default(3)
+  courtLocation   String?
+  // Printed on reminder letters (legacy reminderletterdesig, Sign1-5).
+  reminderLetterDesignation String?
+  signatories               String[] @default([])
+
+  updatedAt DateTime @updatedAt
 }
