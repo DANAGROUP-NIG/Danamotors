@@ -63,7 +63,14 @@ to an employee when the person also uses the system.
 | empjoindate, empleftdate | `joinDate`, `leftDate` |
 
 An employee with a left date on or before today drops out of the current list (and pickers) but stays on old
-documents. Salary (filled for a handful of rows) is not kept: payroll is not part of this system.
+documents.
+
+Each job-card labour line records its **mechanic** (`JobCardLabour.mechanicId`, legacy `joblabordetail.mechanic`):
+a current employee of the job card's branch. In 2025 legacy filled it on 99 % of labour lines, across 32 (Lagos)
+and 14 (Abuja) people. When the employee has a login, it is also stored as the line's technician. Lines entered
+before this keep their technician; the migration fills their mechanic when that login is linked to an employee.
+`mechanic2` / `mechanic3` were never used, so one mechanic per line. The job-level main mechanic was a single
+default person per branch on almost every legacy job; it stays the optional job technician. Salary (filled for a handful of rows) is not kept: payroll is not part of this system.
 
 ## Service master
 

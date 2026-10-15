@@ -1340,6 +1340,10 @@ model JobCardLabour {
   amount       Float
   technicianId String?
   technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  // Legacy joblabordetail.mechanic: the employee who did the work. technicianId is that
+  // employee's login, when they have one.
+  mechanicId   String?
+  mechanic     Employee?  @relation(fields: [mechanicId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -1350,6 +1354,7 @@ model JobCardLabour {
 
   @@index([jobCardId])
   @@index([labourItemId])
+  @@index([mechanicId])
 }
 
 model InvoiceLine {
@@ -3523,6 +3528,8 @@ model Employee {
   // Optional login account for employees who use the system.
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  labourLines JobCardLabour[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

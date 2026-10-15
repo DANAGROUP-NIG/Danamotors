@@ -353,6 +353,7 @@ export const createJobCardLabourSchema = z.object({
       hours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       technicianId: z.string().uuid("Invalid technician ID").optional(),
+      mechanicId: z.string().uuid("Invalid mechanic ID").optional(),
     })
     .strict(),
 
@@ -372,6 +373,7 @@ export const updateJobCardLabourSchema = z.object({
         .uuid("Invalid technician ID")
         .nullable()
         .optional(),
+      mechanicId: z.string().uuid("Invalid mechanic ID").nullable().optional(),
     })
     .strict()
     .refine(
