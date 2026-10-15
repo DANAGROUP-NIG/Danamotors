@@ -1,5 +1,6 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   workshopMaster: { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+  defectModelEstimate: { findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn() },
 } }));
 import prisma from '../../prisma/client';
 import { WorkshopMasterService } from './workshop-master.service';
@@ -45,4 +46,21 @@ it('lets geography move to another parent but keeps catalogue parents fixed', as
   expect(prisma.workshopMaster.update).toHaveBeenCalled();
   (prisma.workshopMaster.findUnique as jest.Mock).mockResolvedValue({ id, kind: 'MODEL', parentId: id, attributes: null });
   await expect(service.update(id, { parentId })).rejects.toMatchObject({ statusCode: 400 });
+});
+
+it('upserts a defect estimate only for a defect and an active model', async () => {
+  const amounts = { partAmount: 42000, oilAmount: 5200, labourAmount: 50000 };
+  await service.saveEstimate(id, parentId, amounts);
+  expect(prisma.workshopMaster.findFirst).toHaveBeenNthCalledWith(1, { where: { id, kind: 'COMPLAINT' } });
+  expect(prisma.workshopMaster.findFirst).toHaveBeenNthCalledWith(2, { where: { id: parentId, kind: 'MODEL', active: true } });
+  expect(prisma.defectModelEstimate.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    where: { defectId_modelId: { defectId: id, modelId: parentId } }, update: amounts,
+  }));
+  (prisma.workshopMaster.findFirst as jest.Mock).mockResolvedValueOnce(null);
+  await expect(service.saveEstimate(id, parentId, amounts)).rejects.toMatchObject({ statusCode: 404 });
+});
+
+it('reports a missing estimate on removal', async () => {
+  (prisma.defectModelEstimate.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+  await expect(service.removeEstimate(id, parentId)).rejects.toMatchObject({ statusCode: 404 });
 });

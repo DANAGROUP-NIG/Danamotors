@@ -47,3 +47,25 @@ export const listMasterSchema = z.object({
     parentId: z.string().uuid().optional(),
   }),
 });
+
+const amount = z.number().min(0).max(1e12).multipleOf(0.01);
+
+export const defectEstimateSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+    modelId: z.string().uuid(),
+  }),
+
+  body: z.object({
+    partAmount: amount,
+    oilAmount: amount,
+    labourAmount: amount,
+  }).strict(),
+});
+
+export const defectEstimateParamsSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+    modelId: z.string().uuid().optional(),
+  }),
+});

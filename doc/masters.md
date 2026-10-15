@@ -64,6 +64,18 @@ to an employee when the person also uses the system.
 An employee with a left date on or before today drops out of the current list (and pickers) but stays on old
 documents. Salary (filled for a handful of rows) is not kept: payroll is not part of this system.
 
+## Defect master
+
+Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle
+system), major defect and used in warranty / beyond warranty / both. Legacy jobs (`jobtrouble`) reference these
+codes. The Kia warranty defect codes (`WarrantyDefectCode`) are a separate list for warranty claims.
+
+The legacy "Estimate (user entered)" grid (`trouble`) is `DefectModelEstimate`: part, oil and labour amounts per
+defect and model. Edit a defect on **Settings → Workshop Masters** to maintain it
+(API `/api/workshop-masters/{defectId}/model-estimates/{modelId}`). The "Estimate (calculated)" grid and the
+defect Part / Labour tabs are not carried over: their link tables (`troublepart`, `troublelabour`) are empty in
+all three databases.
+
 ## Not carried over
 
 | Legacy screen | Reason |

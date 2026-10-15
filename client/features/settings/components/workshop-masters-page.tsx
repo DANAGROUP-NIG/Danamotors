@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ServiceTypeModelSettings } from "./service-type-model-settings";
+import { DefectModelEstimates } from "./defect-model-estimates";
 import { MASTER_KIND_GROUPS, MASTER_KINDS, type AttributeField } from "./master-kinds";
 
 type Master = {
@@ -200,7 +201,7 @@ export function WorkshopMastersPage() {
           header: "Actions",
           render: row => isAdminOrAbove && <Button variant="outline" size="sm" onClick={() => setForm(row)}>Edit</Button>,
         }]} />
-      <ModalFame isOpen={!!form} size={kind === "SERVICE_TYPE" ? "wide" : "default"} title={`${form?.id ? "Edit" : "Create"} ${config.label.toLowerCase()}`} onClose={() => setForm(null)}>{form && <form
+      <ModalFame isOpen={!!form} size={kind === "SERVICE_TYPE" || kind === "COMPLAINT" ? "wide" : "default"} title={`${form?.id ? "Edit" : "Create"} ${config.label.toLowerCase()}`} onClose={() => setForm(null)}>{form && <form
           className="grid gap-3 p-5"
           onSubmit={e => {
             e.preventDefault();
@@ -312,6 +313,8 @@ export function WorkshopMastersPage() {
         </form>}
         {form?.id && kind === "SERVICE_TYPE" && <ServiceTypeModelSettings key={form.id} serviceTypeId={form.id} />}
         {form && !form.id && kind === "SERVICE_TYPE" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the service type first, then edit it to configure model charges.</p>}
+        {form?.id && kind === "COMPLAINT" && <DefectModelEstimates key={form.id} defectId={form.id} />}
+        {form && !form.id && kind === "COMPLAINT" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the defect first, then edit it to enter model-wise estimates.</p>}
       </ModalFame>
     </div>
   );

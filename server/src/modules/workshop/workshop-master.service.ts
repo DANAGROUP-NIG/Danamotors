@@ -155,4 +155,74 @@ export class WorkshopMasterService {
       },
     });
   }
+
+  private async requireDefect(id: string) {
+    const defect = await prisma.workshopMaster.findFirst({
+      where: {
+        id,
+        kind: 'COMPLAINT',
+      },
+    });
+
+    if (!defect)
+      throw new NotFoundError('Defect not found');
+  }
+
+  async listEstimates(defectId: string) {
+    await this.requireDefect(defectId);
+
+    return prisma.defectModelEstimate.findMany({
+      where: {
+        defectId,
+      },
+
+      include: {
+        model: parentSelect,
+      },
+
+      orderBy: {
+        model: {
+          code: 'asc',
+        },
+      },
+    });
+  }
+
+  async saveEstimate(defectId: string, modelId: string, amounts: { partAmount: number; oilAmount: number; labourAmount: number }) {
+    await this.requireDefect(defectId);
+    await requireMaster(prisma, modelId, 'MODEL');
+
+    return prisma.defectModelEstimate.upsert({
+      where: {
+        defectId_modelId: {
+          defectId,
+          modelId,
+        },
+      },
+
+      create: {
+        defectId,
+        modelId,
+        ...amounts,
+      },
+
+      update: amounts,
+
+      include: {
+        model: parentSelect,
+      },
+    });
+  }
+
+  async removeEstimate(defectId: string, modelId: string) {
+    const { count } = await prisma.defectModelEstimate.deleteMany({
+      where: {
+        defectId,
+        modelId,
+      },
+    });
+
+    if (!count)
+      throw new NotFoundError('Estimate not found');
+  }
 }

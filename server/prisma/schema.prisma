@@ -1736,6 +1736,8 @@ model WorkshopMaster {
   designationEmployees Employee[] @relation("EmployeeDesignation")
   departmentEmployees  Employee[] @relation("EmployeeDepartment")
   teamEmployees        Employee[] @relation("EmployeeTeam")
+  defectEstimates      DefectModelEstimate[] @relation("DefectEstimates")
+  modelDefectEstimates DefectModelEstimate[] @relation("ModelDefectEstimates")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
   @@unique([kind, code])
@@ -1756,6 +1758,23 @@ model ServiceTypeModelSetting {
 
   @@unique([serviceTypeId, modelId])
   @@index([modelId, active, serviceTypeId])
+}
+
+// Legacy trouble: the expected part, oil and labour amounts for a defect on one model,
+// used to estimate a repair before parts and labour are picked.
+model DefectModelEstimate {
+  id           String         @id @default(uuid())
+  defectId     String
+  defect       WorkshopMaster @relation("DefectEstimates", fields: [defectId], references: [id], onDelete: Cascade)
+  modelId      String
+  model        WorkshopMaster @relation("ModelDefectEstimates", fields: [modelId], references: [id], onDelete: Restrict)
+  partAmount   Float          @default(0)
+  oilAmount    Float          @default(0)
+  labourAmount Float          @default(0)
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([defectId, modelId])
+  @@index([modelId])
 }
 
 model JobComplaint {
