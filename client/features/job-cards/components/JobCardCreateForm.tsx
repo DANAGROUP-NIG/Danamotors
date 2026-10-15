@@ -311,7 +311,6 @@ export function JobCardCreateForm({
       "complaints",
       estimate.lines.map((line) => ({
         ...emptyRequest(),
-        defectCode: "9999999",
         description: line.description,
         spare: line.type === "PART" ? line.amount : 0,
         labour: line.type === "LABOUR" ? line.amount : 0,

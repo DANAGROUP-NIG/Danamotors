@@ -17,10 +17,9 @@ export type EligibleServiceRow = {
   effectiveFrom: Date | null;
 };
 
-// One database round trip for vehicle/model resolution and the eligible options.
-// Keep the base vehicle row when no model or setting exists, so the service can
-// distinguish missing vehicles from unconfigured models without another query.
-export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: string) {
+// Resolves a vehicle to its workshop MODEL master: through its catalogue variant, or
+// by matching make and model names when exactly one workshop model fits.
+function vehicleContextCte(vehicleId: string) {
   return Prisma.sql`
     WITH RECURSIVE model_path AS (
       SELECT m.id, m.kind, m."parentId", ARRAY[m.id] AS visited
@@ -63,7 +62,25 @@ export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: str
           ELSE (SELECT min(id) FROM matching_models HAVING count(*) = 1)
         END AS "modelId"
       FROM vehicle_identity v
-    )
+    )`;
+}
+
+// The vehicle's workshop MODEL master id, or null when it cannot be resolved.
+export async function resolveVehicleWorkshopModel(vehicleId: string, db: ServiceTypeDb = prisma) {
+  const rows = await db.$queryRaw<{ modelId: string | null }[]>(Prisma.sql`
+    ${vehicleContextCte(vehicleId)}
+    SELECT "modelId" FROM vehicle_context
+  `);
+
+  return rows[0]?.modelId ?? null;
+}
+
+// One database round trip for vehicle/model resolution and the eligible options.
+// Keep the base vehicle row when no model or setting exists, so the service can
+// distinguish missing vehicles from unconfigured models without another query.
+export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: string) {
+  return Prisma.sql`
+    ${vehicleContextCte(vehicleId)}
     SELECT v.id AS "vehicleId", v."modelId", v."vehicleMake", v."vehicleModel", options.*
     FROM vehicle_context v
     LEFT JOIN LATERAL (

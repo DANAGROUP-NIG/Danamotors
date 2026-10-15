@@ -186,8 +186,13 @@ filled on a handful of rows and maps to the registered name and address already 
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle
-system), major defect and used in warranty / beyond warranty / both. Legacy jobs (`jobtrouble`) reference these
-codes. The Kia warranty defect codes (`WarrantyDefectCode`) are a separate list for warranty claims.
+system), major defect and used in warranty / beyond warranty / both. The Kia warranty defect codes
+(`WarrantyDefectCode`) are a separate list, entered on warranty claim lines.
+
+On a job card the customer request text is what is recorded; the defect code is optional. Legacy staff typed the
+request under the catch-all code `9999999` on about 97 % of 2025 requests, so those migrate as requests with no
+code. Picking a defect (`/api/job-cards/defect-codes?vehicleId=`) fills an empty description and, when the
+request has no amounts yet, the defect's estimate for the vehicle's workshop model.
 
 The legacy "Estimate (user entered)" grid (`trouble`) is `DefectModelEstimate`: part, oil and labour amounts per
 defect and model. Edit a defect on **Settings → Workshop Masters** to maintain it

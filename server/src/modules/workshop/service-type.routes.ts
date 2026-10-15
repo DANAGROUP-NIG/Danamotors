@@ -4,6 +4,7 @@ import { requirePermission, requireRole } from '../../middleware/authorize';
 import { validateRequest } from '../../middleware/requestValidator';
 import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
 import { ServiceTypeService } from './service-type.service';
+import { resolveVehicleWorkshopModel } from './service-type.repository';
 import prisma from '../../prisma/client';
 import { z } from 'zod';
 import { createSettingSchema, deleteSettingSchema, listSettingsSchema, serviceTypeOptionsSchema, updateSettingSchema } from './service-type.validation';
@@ -14,32 +15,46 @@ serviceTypeOptionsRouter.use(authMiddleware);
 const defectSearchSchema = z.object({ query: z.object({
   search: z.string().trim().max(100).default(''),
   limit: z.coerce.number().int().positive().max(50).default(20),
+  vehicleId: z.string().uuid().optional(),
 }) });
 /**
  * @openapi
  * /job-cards/defect-codes:
  *   get:
  *     tags: [Service]
- *     summary: Compact active database defect codes for customer requests
+ *     summary: Active workshop defects (COMPLAINT master) for customer requests, with the vehicle model's estimate
+ *     description: |
+ *       A request's defect code is optional; the request text is what is recorded. With vehicleId, each
+ *       defect carries its part, oil and labour estimate for the vehicle's workshop model (null when none is set).
+ *       Kia warranty defect codes are entered on warranty claim lines, not here.
  *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: query, name: search, schema: { type: string, maxLength: 100 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+ *       - { in: query, name: vehicleId, schema: { type: string, format: uuid } }
  *     responses:
- *       200: { description: data.items contains id, code and description }
+ *       200: { description: data.items contains id, code, description and estimate }
  *       403: { description: Job-card create permission required }
  */
 serviceTypeOptionsRouter.get('/defect-codes', requirePermission(PERMISSIONS.JOBCARD_CREATE), validateRequest(defectSearchSchema), async (req, res, next) => {
   try {
     const query = defectSearchSchema.parse({ query: req.query }).query;
-    const items = await prisma.warrantyDefectCode.findMany({
-      where: { isActive: true, ...(query.search ? { OR: [
-        { code: { contains: query.search, mode: 'insensitive' as const } },
-        { description: { contains: query.search, mode: 'insensitive' as const } },
-      ] } : {}) },
-      select: { id: true, code: true, description: true }, orderBy: { code: 'asc' }, take: query.limit,
-    });
-    res.json({ status: 'success', data: { items } });
+    const [defects, modelId] = await Promise.all([
+      prisma.workshopMaster.findMany({
+        where: { kind: 'COMPLAINT', active: true, ...(query.search ? { OR: [
+          { code: { contains: query.search, mode: 'insensitive' as const } },
+          { description: { contains: query.search, mode: 'insensitive' as const } },
+        ] } : {}) },
+        select: { id: true, code: true, description: true }, orderBy: { code: 'asc' }, take: query.limit,
+      }),
+      query.vehicleId ? resolveVehicleWorkshopModel(query.vehicleId) : null,
+    ]);
+    const estimates = modelId && defects.length ? await prisma.defectModelEstimate.findMany({
+      where: { modelId, defectId: { in: defects.map(defect => defect.id) } },
+      select: { defectId: true, partAmount: true, oilAmount: true, labourAmount: true },
+    }) : [];
+    const byDefect = new Map(estimates.map(({ defectId, ...amounts }) => [defectId, amounts]));
+    res.json({ status: 'success', data: { items: defects.map(defect => ({ ...defect, estimate: byDefect.get(defect.id) ?? null })) } });
   } catch (error) { next(error); }
 });
 /**
