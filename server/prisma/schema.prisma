@@ -1702,6 +1702,9 @@ model WorkshopMaster {
   kind             String
   code             String
   description      String
+  shortDescription String?
+  // Extra legacy fields per kind, validated by workshop/master-kinds.ts.
+  attributes       Json?
   active           Boolean          @default(true)
   category         String?
   chargedTo        String           @default("CUSTOMER")

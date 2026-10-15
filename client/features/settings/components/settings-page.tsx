@@ -22,7 +22,7 @@ const SETTINGS_CARDS = [
   },
   {
     title: "Workshop Masters",
-    description: "Service types, bays, complaints, teams and the vehicle catalogue.",
+    description: "Vehicle catalogue, services, bays, defects, designations, geography, UOM and tax codes.",
     href: "/settings/workshop-masters",
   },
   {

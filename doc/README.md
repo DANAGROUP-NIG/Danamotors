@@ -27,6 +27,7 @@ danamotors/
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving Mobis purchases: MIT file upload, MRN, CPD stock |
 | [part-sale.md](./part-sale.md) | CPD part sale: customer purchase order, picking, counter-sale bill, sale return |
+| [masters.md](./masters.md) | Legacy Masters menu mapped to the new system: shared code lists, employees, defects, checklists, terms |
 | [stock-taking.md](./stock-taking.md) | Physical stock taking: annual/perpetual batches, count sheets (handheld stand-in), S/E confirmation adjusting stock, bin update; stock audit (report only) |
 | [data-management.md](./data-management.md) | Data Management: cancelling pending CPO and indent lines (legacy CPO and Branch Indent From / To Other Branch Cancellation), Part List, and why Parts Posting is not needed |
 | [utilities.md](./utilities.md) | Utilities: why the legacy SRN, STN, counter sale, SAN and part deletion uploads need no new screens, and where each is handled now |
