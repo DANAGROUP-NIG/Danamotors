@@ -89,5 +89,6 @@ export function loadEligibleServiceTypes(vehicleId: string, db: ServiceTypeDb = 
 export const adminSettingSelect = {
   id: true, serviceTypeId: true, modelId: true, serviceCharge: true,
   previousCharge: true, effectiveFrom: true, active: true,
+  hoursRequired: true, mileageLimit: true, daysLimit: true, mileageVariation: true, daysVariation: true, checklistFollowed: true,
   model: { select: { id: true, code: true, description: true } },
 } satisfies Prisma.ServiceTypeModelSettingSelect;

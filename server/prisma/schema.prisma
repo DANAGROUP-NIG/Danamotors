@@ -1755,6 +1755,13 @@ model ServiceTypeModelSetting {
   previousCharge Float?
   effectiveFrom  DateTime?
   active         Boolean        @default(true)
+  // Legacy servicedetail: when the service falls due and how long it takes on this model.
+  hoursRequired     Float?
+  mileageLimit      Int?
+  daysLimit         Int?
+  mileageVariation  Int?
+  daysVariation     Int?
+  checklistFollowed Boolean @default(false)
 
   @@unique([serviceTypeId, modelId])
   @@index([modelId, active, serviceTypeId])

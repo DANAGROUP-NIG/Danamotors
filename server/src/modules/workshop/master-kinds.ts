@@ -54,6 +54,10 @@ export const FIXED_PARENT_KINDS: MasterKind[] = ['PRODUCT', 'MODEL', 'VARIANT', 
 const text = (max: number) => z.string().trim().max(max).nullable().optional();
 
 export const MASTER_ATTRIBUTES: Partial<Record<MasterKind, z.ZodTypeAny>> = {
+  SERVICE_TYPE: z.object({
+    // Legacy multiserv: can be opened together with another service on one job.
+    multiService: z.boolean().optional(),
+  }).strict(),
   PRODUCT: z.object({
     includeInReports: z.boolean().optional(),
   }).strict(),

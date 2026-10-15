@@ -23,7 +23,7 @@ Each record also has a **short description** (legacy `shortdesc`). Extra legacy 
 | Miscellaneous → Tyre / Battery make | TYRE_MAKE, BATTERY_MAKE | — | — |
 | Vehicle System | VEHICLE_SYSTEM | — | — |
 | Vehicle Group | VEHICLE_GROUP | Vehicle system (required) | — |
-| Service | SERVICE_TYPE | — | see the service screen |
+| Service | SERVICE_TYPE | — | multi-service; see [Service master](#service-master) |
 | Bay Master | BAY | — | bay category: PDI, Service & Repair, Accidental |
 | Defect | COMPLAINT | Vehicle group (optional) | major defect, used in (warranty / beyond / both) |
 | Miscellaneous → Employee group | TEAM | — | — |
@@ -63,6 +63,22 @@ to an employee when the person also uses the system.
 
 An employee with a left date on or before today drops out of the current list (and pickers) but stays on old
 documents. Salary (filled for a handful of rows) is not kept: payroll is not part of this system.
+
+## Service master
+
+A service is a SERVICE_TYPE record: code, description, short description, charged to customer or company
+(legacy `chargefrom` C / E), display sequence, multi-service and active (legacy `InActiveService`). Edit a service
+to maintain its per-model settings (legacy `servicedetail`):
+
+| Legacy field | New field |
+| --- | --- |
+| intnewamt, intoldamt, inteffdate | `serviceCharge`, `previousCharge`, `effectiveFrom` |
+| hours_reqd | `hoursRequired` |
+| MileageLimit, MileageVariation | `mileageLimit`, `mileageVariation` (km) |
+| dayslimit, daysvariation | `daysLimit`, `daysVariation` |
+| ChecklistFollowed | `checklistFollowed` |
+
+A service is due at the mileage or days limit, plus or minus the variation.
 
 ## Defect master
 

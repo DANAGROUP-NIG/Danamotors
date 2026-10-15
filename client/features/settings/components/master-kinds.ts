@@ -53,7 +53,11 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
     group: "Workshop",
     parent: { kind: "VEHICLE_SYSTEM", label: "Vehicle system", required: true },
   },
-  SERVICE_TYPE: { label: "Service", group: "Workshop" },
+  SERVICE_TYPE: {
+    label: "Service",
+    group: "Workshop",
+    attributes: [{ key: "multiService", label: "Multi-service (can be opened with another service)", type: "checkbox" }],
+  },
   BAY: {
     label: "Bay",
     group: "Workshop",

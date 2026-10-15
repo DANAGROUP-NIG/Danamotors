@@ -8,6 +8,12 @@ export const serviceTypeSettingBody = z.object({
   previousCharge: charge.nullable().optional(),
   effectiveFrom: z.string().datetime().nullable().optional(),
   active: z.boolean().optional(),
+  hoursRequired: z.number().min(0).max(1000).nullable().optional(),
+  mileageLimit: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  daysLimit: z.number().int().min(0).max(36_500).nullable().optional(),
+  mileageVariation: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  daysVariation: z.number().int().min(0).max(36_500).nullable().optional(),
+  checklistFollowed: z.boolean().optional(),
 }).strict();
 export const settingIdParams = z.object({ id: z.string().uuid() });
 export const createSettingSchema = z.object({ body: serviceTypeSettingBody });
