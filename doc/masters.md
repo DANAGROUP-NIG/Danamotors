@@ -133,6 +133,27 @@ UOM, tax category and tax form inputs suggest the codes from their master lists.
 parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
 over: `partlabour` and `troublepart` are empty in all three databases.
 
+### Part sources and source prices
+
+The part flag codes double as **part sources**: O Mobis (original part), A authorised source, F FOC item,
+L local purchase, plus two new ones, **U second-hand / used** and **R repaired**. No legacy code was removed.
+
+A part's own flag is priced by its retail rate. The same part supplied from any other source has its own price
+(and optional cost), set on the part's **Prices by part source** card (API
+`GET`/`PUT /api/inventory/parts/:id/source-prices`, permission `sparepart:update` to save). A source with no price
+cannot be quoted.
+
+On an estimate, each part line picks its source and is priced from it. For example, a workshop manager quotes all
+Mobis parts; the customer finds it too expensive; the service advisor creates a revised estimate, switches some
+lines to local, used or repaired, and sends it for approval again. The same part may be quoted from two sources
+on one estimate, but only once per source. The source is internal: it is not on the printed estimate, the
+customer portal or the bill.
+
+The source follows the part through the job. A part issue takes the source approved on the estimate (choose one
+on the issue form when the estimate has the part from two sources), and the job card line, the approval check and
+the bill all use that source's price. Issuing the part from a source the customer did not approve needs a revised
+estimate. Stock is still held per part, not per source.
+
 ## Part category master
 
 **Settings → Part Categories** (`/settings/part-categories`; API `/api/inventory/part-categories`, permissions

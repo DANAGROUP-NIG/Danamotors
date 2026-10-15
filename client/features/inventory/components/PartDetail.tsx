@@ -32,6 +32,7 @@ import { usePart, usePartAlternates, usePartStock, usePriceCategories } from "..
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
 import { PartForm } from "./PartForm";
+import { PartSourcePrices } from "./PartSourcePrices";
 import { StockLocationForm } from "./StockLocationForm";
 import { useBranchStore } from "@/store/branch.store";
 import type { PartStockItem } from "../types/inventory.types";
@@ -307,6 +308,10 @@ export function PartDetail({ id }: { id: string }) {
             <DetailField label="Description" value={part.description} wide />
           </div>
         </div>
+
+        <SectionCard icon={<Tag className="size-4" />} title="Prices by part source">
+          <PartSourcePrices partId={part.id} canEdit={canEdit} />
+        </SectionCard>
 
         <div className="grid gap-5 md:grid-cols-2">
           <SectionCard icon={<Receipt className="size-4" />} title="Tax">

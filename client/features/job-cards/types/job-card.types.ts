@@ -28,6 +28,8 @@ export type Estimate = {
     id: string;
     type: string;
     referenceId?: string | null;
+    /** Part lines: part source code (internal; never shown to customers). */
+    partSource?: string | null;
     description: string;
     quantity: number;
     rate: number;
@@ -80,6 +82,8 @@ export type JobCardVehicle = {
 export type PartIssuance = {
   id: string;
   quantity: number;
+  /** Part source code (internal; not shown to customers). */
+  partSource?: string | null;
   notes?: string;
   issuedAt: string;
   sparePart: {

@@ -786,7 +786,9 @@ model SparePart {
   retailRate        Float?
   // Legacy tax status (partmast.taxable).
   taxable           Boolean       @default(true)
-  // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local.
+  // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local,
+  // plus U second-hand/used and R repaired. retailRate prices the part from this source;
+  // prices from other sources live in SparePartSourcePrice.
   partFlag          String        @default("O")
   // Legacy partmast.parttype: S spare part, O oil, A accessory.
   partType          String        @default("S")
@@ -850,6 +852,9 @@ model SparePart {
 
   rateHistory PartRateHistory[]
   binHistory  PartBinHistory[]
+
+  // Prices for supplying this part from a source other than its own part flag.
+  sourcePrices SparePartSourcePrice[]
 
   stockTakeLines StockTakeLine[]
 
@@ -1111,6 +1116,9 @@ model PartIssuance {
 
   quantity Int
 
+  // Part source code (part flag list) the part is supplied and charged from.
+  partSource String?
+
   issuedAt DateTime @default(now())
 
   notes String?
@@ -1365,6 +1373,8 @@ model InvoiceLine {
   type            String
   partId          String?
   part            SparePart?     @relation(fields: [partId], references: [id], onDelete: Restrict)
+  // Job bill part lines: the part source the rate came from (internal only, not printed).
+  partSource      String?
   jobCardLabourId String?
   jobCardLabour   JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: Restrict)
   description     String
@@ -1921,6 +1931,8 @@ model EstimateLine {
   estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
   type        String
   referenceId String?
+  // Part lines: the part source code the rate was priced from. Internal only; never shown to the customer.
+  partSource  String?
   description String
   quantity    Float    @default(1)
   rate        Float    @default(0)
@@ -2105,6 +2117,24 @@ enum MitStatus {
 }
 
 // Where the stock on an MRN came from: a Mobis invoice (MIT) or a branch transfer (STN).
+// Customer price (and cost) of a part supplied from another source: e.g. a Mobis part fitted
+// as a local purchase, second-hand/used or repaired part. The part's own source (its part flag)
+// is priced by SparePart.retailRate.
+model SparePartSourcePrice {
+  id          String    @id @default(uuid())
+  sparePartId String
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  // Part source code: O, A, F, L, U or R.
+  source      String
+  retailRate  Float
+  dealerRate  Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sparePartId, source])
+}
+
 enum MrnSource {
   MOBIS
   BRANCH_TRANSFER
@@ -2757,6 +2787,8 @@ model JobCardLine {
 
   operationCode String?
   description   String
+  // Part lines: the part source code the rate comes from (internal only).
+  partSource    String?
   // Quantity for parts, hours for labour.
   quantity      Float
   rate          Float

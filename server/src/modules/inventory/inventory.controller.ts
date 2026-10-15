@@ -311,6 +311,24 @@ export class InventoryController {
     }
   };
 
+  getSourcePrices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.getSourcePrices(req.params.id);
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  setSourcePrices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.setSourcePrices(req.params.id, req.body.prices);
+      res.status(200).json({ status: "success", statusCode: 200, message: "Source prices saved", data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   createPart = async (
     req: Request,
     res: Response,

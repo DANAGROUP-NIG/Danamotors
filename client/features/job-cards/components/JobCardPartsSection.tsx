@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { jobCardKeys } from "../api/job-card.keys";
 import type { JobCard } from "../types/job-card.types";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
+import { PART_SOURCE_CODES, partSourceLabel } from "@/features/inventory/lib/part-codes";
 
 type IssuableStock = {
   partId: string;
@@ -43,6 +44,8 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
   const [selectedPart, setSelectedPart] = useState<IssuableStock | null>(null);
   const [issuanceId, setIssuanceId] = useState("");
   const [quantity, setQuantity] = useState(1);
+  // Empty = the source approved on the estimate (or the part's own source).
+  const [partSource, setPartSource] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const [returnQuantity, setReturnQuantity] = useState(1);
 
@@ -111,6 +114,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         branchId: jobCard.branchId,
         issuedById: user?.id,
         quantity,
+        ...(partSource && { partSource }),
       }),
     onSuccess: () => {
       toast.success("Part issued to job card");
@@ -118,6 +122,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
       setDebouncedSearch("");
       setSelectedPart(null);
       setQuantity(1);
+      setPartSource("");
       refresh();
     },
     onError: (error) =>
@@ -166,7 +171,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
       </div>
 
       {canIssue && (
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-end">
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_minmax(0,180px)_auto] sm:items-end">
           <Field label="Find part by number or name">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -209,6 +214,20 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
               onChange={(event) => setQuantity(Number(event.target.value))}
             />
           </Field>
+          <Field label="Part source">
+            <select
+              className={`${inputCls} h-9`}
+              value={partSource}
+              onChange={(event) => setPartSource(event.target.value)}
+            >
+              <option value="">As approved on estimate</option>
+              {PART_SOURCE_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {partSourceLabel(code)}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Button
             type="button"
             size="sm"
@@ -226,7 +245,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
           </Button>
 
           {debouncedSearch.length >= 2 && !selectedPart && (
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-4">
               {stockQuery.isFetching ? (
                 <p role="status" className="py-2 text-xs text-muted-foreground">
                   Searching branch stock...
@@ -298,7 +317,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
           )}
 
           {selectedPart && (
-            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 sm:col-span-3">
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 sm:col-span-4">
               <span className="min-w-0 truncate text-sm">
                 <strong>{selectedPart.part.partNumber}</strong> ·{" "}
                 {selectedPart.part.name}
@@ -339,7 +358,8 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
                     value={row.id}
                     disabled={remaining === 0}
                   >
-                    {row.sparePart.partNumber} · {row.sparePart.name} (
+                    {row.sparePart.partNumber} · {row.sparePart.name}
+                    {row.partSource ? ` · ${partSourceLabel(row.partSource)}` : ""} (
                     {remaining} remaining)
                   </option>
                 );

@@ -264,7 +264,7 @@ export class InventoryRepository {
             }
           : {}),
       },
-      include: { part: true, branch: true },
+      include: { part: { include: { sourcePrices: { select: { source: true, retailRate: true } } } }, branch: true },
       orderBy: { updatedAt: "desc" },
       take: filters?.limit,
     });

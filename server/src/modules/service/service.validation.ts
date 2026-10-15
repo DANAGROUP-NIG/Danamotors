@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_MILEAGE } from "../warranty/warranty.logic";
+import { PART_SOURCE_CODES } from "../inventory/partSource";
 
 const mileageField = z.number().int("Mileage must be a whole number").min(0, "Mileage cannot be negative").max(MAX_MILEAGE);
 const acknowledgementFields = {
@@ -259,8 +260,14 @@ export const estimateBody = z
             description: z.string().trim().max(2000).optional(),
             quantity: z.number().finite().positive().max(1e6).default(1),
             includedInService: z.boolean().optional(),
+            // Part lines: where the part comes from; defaults to the part's own flag.
+            partSource: z.enum(PART_SOURCE_CODES).optional(),
           })
-          .strict(),
+          .strict()
+          .refine((line) => !line.partSource || line.type === "PART", {
+            message: "Only part lines take a part source",
+            path: ["partSource"],
+          }),
       )
       .min(1)
       .max(200),

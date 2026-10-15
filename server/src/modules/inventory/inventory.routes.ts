@@ -10,6 +10,7 @@ import {
   createPartMasterSchema,
   updatePartMasterSchema,
   partMasterIdParamSchema,
+  setPartSourcePricesSchema,
   listPartsQueryWithFiltersSchema,
   // listPartsQuerySchema,
   createPurchaseRequestSchema,
@@ -909,6 +910,48 @@ router.get('/part-categories', requirePermission(PERMISSIONS.SPAREPART_READ), co
 router.use('/part-categories', partCategoryRoutes);
 router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
+
+/**
+ * @swagger
+ * /inventory/parts/{id}/source-prices:
+ *   get:
+ *     tags: [Inventory]
+ *     summary: Part prices by part source
+ *     description: >
+ *       Part sources share the part flag codes - O Mobis (original part), A authorised source, F FOC item,
+ *       L local purchase, U second-hand/used, R repaired. The part's own flag is priced by its retail rate;
+ *       each other source the part can be supplied from has its own price. Internal only, never shown to customers.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Source prices
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data: { partId: "uuid", partNumber: "58101A6A00", partFlag: "O", dealerRate: 20000, retailRate: 41400, prices: [{ source: "L", retailRate: 18000, dealerRate: 12000 }, { source: "U", retailRate: 9000, dealerRate: null }] }
+ *   put:
+ *     tags: [Inventory]
+ *     summary: Replace a part's other-source prices
+ *     description: Sources left out are removed. The part's own source is priced in Part Master and cannot be listed.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { prices: [{ source: "L", retailRate: 18000, dealerRate: 12000 }, { source: "R", retailRate: 7000 }] }
+ *     responses:
+ *       200: { description: Saved source prices }
+ *       400: { description: Own source listed, duplicate or unknown source }
+ */
+router.get('/parts/:id/source-prices', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getSourcePrices);
+router.put('/parts/:id/source-prices', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(setPartSourcePricesSchema), controller.setSourcePrices);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
 router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updatePartMasterSchema), controller.updatePart);
 router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partMasterIdParamSchema), controller.deletePart);

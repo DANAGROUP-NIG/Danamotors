@@ -1,5 +1,6 @@
 import { PartRole } from "@prisma/client/wasm";
 import { z } from "zod";
+import { PART_SOURCE_CODES } from "./partSource";
 
 enum PartStatus {
   ACTIVE,
@@ -226,6 +227,27 @@ export const partMasterIdParamSchema = z.object({
   }),
 });
 
+export const setPartSourcePricesSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid part ID"),
+  }),
+  body: z
+    .object({
+      prices: z
+        .array(
+          z
+            .object({
+              source: z.enum(PART_SOURCE_CODES, { message: "Unknown part source" }),
+              retailRate: z.number().finite().nonnegative("Price must be 0 or more"),
+              dealerRate: z.number().finite().nonnegative("Cost must be 0 or more").nullable().optional(),
+            })
+            .strict(),
+        )
+        .max(PART_SOURCE_CODES.length),
+    })
+    .strict(),
+});
+
 export const listPartsQuerySchema = z.object({
   query: z.object({
     partCode: z.string().optional(),
@@ -281,6 +303,7 @@ export const createPartIssuanceSchema = z.object({
     issuedById: z.string().uuid("Invalid issuer ID"),
     quantity: z.number().int().positive("Quantity must be positive"),
     notes: z.string().optional(),
+    partSource: z.enum(PART_SOURCE_CODES).optional(),
   }),
 });
 

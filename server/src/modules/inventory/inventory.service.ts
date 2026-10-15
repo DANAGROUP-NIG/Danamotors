@@ -1,4 +1,5 @@
-import { assertApprovedOperation } from '../service/estimate-approval';
+import { assertApprovedOperation, latestEstimateQuery } from '../service/estimate-approval';
+import { requireSourceRate, resolveSource, sourceLabel } from './partSource';
 import prisma from "../../prisma/client";
 import { InventoryRepository } from "./inventory.repository";
 import {
@@ -570,6 +571,17 @@ export class InventoryService {
       throw new NotFoundError("Part not found");
     }
 
+    if (data.partFlag && data.partFlag !== part.partFlag) {
+      // The part's own source is priced by its retail rate; it cannot also have a source price.
+      const clash = await prisma.sparePartSourcePrice.findUnique({
+        where: { sparePartId_source: { sparePartId: id, source: data.partFlag } },
+      });
+      if (clash)
+        throw new ConflictError(
+          `This part already has a ${sourceLabel(data.partFlag)} source price. Remove it before making ${data.partFlag} the part's own source.`,
+        );
+    }
+
     if (data.partCode && data.partCode !== part.partCode) {
       const existing = await this.inventoryRepository.findPartByCode(
         data.partCode,
@@ -603,6 +615,52 @@ export class InventoryService {
 
     const updated = await this.inventoryRepository.updatePart(id, updateData, changedById);
     return this.mapToPartMasterDto(updated);
+  }
+
+  // ── Part source prices ─────────────────────────────────────────────────
+  // The part's own source (part flag) is priced by its retail rate; these rows price the
+  // same part when supplied from another source (local purchase, used, repaired…).
+
+  async getSourcePrices(id: string) {
+    const part = await prisma.sparePart.findUnique({
+      where: { id },
+      select: { id: true, partNumber: true, partFlag: true, unitPrice: true, retailRate: true, sourcePrices: { orderBy: { source: "asc" } } },
+    });
+    if (!part) throw new NotFoundError("Part not found");
+    return {
+      partId: part.id,
+      partNumber: part.partNumber,
+      partFlag: part.partFlag,
+      dealerRate: part.unitPrice,
+      retailRate: part.retailRate,
+      prices: part.sourcePrices.map(({ source, retailRate, dealerRate, updatedAt }) => ({ source, retailRate, dealerRate, updatedAt })),
+    };
+  }
+
+  /** Replaces the part's other-source prices; sources left out are removed. */
+  async setSourcePrices(id: string, prices: { source: string; retailRate: number; dealerRate?: number | null }[]) {
+    const part = await prisma.sparePart.findUnique({ where: { id }, select: { partFlag: true } });
+    if (!part) throw new NotFoundError("Part not found");
+    if (prices.some((price) => price.source === part.partFlag))
+      throw new BadRequestError(
+        `${sourceLabel(part.partFlag)} is this part's own source; set its price as the retail rate in Part Master`,
+      );
+    if (new Set(prices.map((price) => price.source)).size !== prices.length)
+      throw new BadRequestError("Each source can have only one price");
+    await prisma.$transaction(async (tx) => {
+      await tx.sparePartSourcePrice.deleteMany({
+        where: { sparePartId: id, source: { notIn: prices.map((price) => price.source) } },
+      });
+      for (const price of prices) {
+        const values = { retailRate: price.retailRate, dealerRate: price.dealerRate ?? null };
+        await tx.sparePartSourcePrice.upsert({
+          where: { sparePartId_source: { sparePartId: id, source: price.source } },
+          create: { sparePartId: id, source: price.source, ...values },
+          update: values,
+        });
+      }
+    });
+    return this.getSourcePrices(id);
   }
 
   async deletePart(id: string, changedById?: string) {
@@ -884,6 +942,8 @@ export class InventoryService {
     issuedById: string;
     quantity: number;
     notes?: string;
+    // Part source the part is supplied from; defaults to the approved estimate, then the part flag.
+    partSource?: string;
   }) {
     const sparePart = await this.inventoryRepository.findSparePartById(
       data.sparePartId,
@@ -928,14 +988,23 @@ export class InventoryService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      let partSource = resolveSource(sparePart, data.partSource);
       if (data.jobCardId) {
         await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
         const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });
         if (card.branchId !== data.branchId || card.billedAt || ['READY', 'COMPLETED', 'BILLED', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(card.status.toUpperCase())) throw new BadRequestError('Parts can only be issued to an open job in this branch');
+        if (!data.partSource) {
+          // Issue from the source the customer approved on the estimate.
+          const [estimate] = await tx.estimate.findMany({ where: { jobCardId: card.id }, ...latestEstimateQuery });
+          const planned = [...new Set((estimate?.lines ?? []).filter(l => l.type.replace('INCLUDED_', '') === 'PART' && l.referenceId === sparePart.id).map(l => resolveSource(sparePart, l.partSource)))];
+          if (planned.length > 1) throw new BadRequestError(`${sparePart.partNumber} is on the estimate from more than one source (${planned.map(sourceLabel).join(', ')}); choose the part source to issue`);
+          if (planned.length === 1) partSource = planned[0];
+        }
+        const sourcePrices = await tx.sparePartSourcePrice.findMany({ where: { sparePartId: sparePart.id } });
+        const rate = requireSourceRate({ ...sparePart, sourcePrices }, partSource);
         const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId }, include: { returns: true } });
-        const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((n, r) => n + r.quantity, 0), 0);
-        if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
-        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+        const quantity = data.quantity + previous.filter(row => resolveSource(sparePart, row.partSource) === partSource).reduce((sum, row) => sum + row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((n, r) => n + r.quantity, 0), 0);
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource, description: sparePart.name, quantity, rate, amount: Math.round(quantity * rate * 100) / 100 }]);
       }
       const updated = await tx.inventoryStock.updateMany({
         where: {
@@ -950,7 +1019,7 @@ export class InventoryService {
       }
 
       if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
-      const issuance = await tx.partIssuance.create({ data });
+      const issuance = await tx.partIssuance.create({ data: { ...data, partSource } });
       await tx.stockTransaction.create({
         data: {
           branchId: data.branchId,

@@ -1,5 +1,6 @@
 import { creditDueDate, defaultCreditDays } from './credit-terms';
 import { latestEstimateQuery, reviewApprovedScope } from '../service/estimate-approval';
+import { requireSourceRate, resolveSource } from '../inventory/partSource';
 import { serviceChargeDescription, serviceChargeReference } from '../service/job-service-charge';
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
@@ -36,7 +37,7 @@ export class JobBillingService {
         appointment: { select: { customerId: true } },
         vehicle: true,
         branch: true,
-        partIssuances: { include: { sparePart: true, returns: true, jobCardLine: { select: { chargeType: true } } } },
+        partIssuances: { include: { sparePart: { include: { sourcePrices: true } }, returns: true, jobCardLine: { select: { chargeType: true } } } },
         labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
@@ -89,20 +90,18 @@ export class JobBillingService {
           0,
         );
       if (quantity <= 0) return [];
-      if (issuance.sparePart.retailRate == null) {
-        throw new BadRequestError(
-          `Retail rate is not set for ${issuance.sparePart.partNumber}`,
-        );
-      }
+      // Charged at the price of the source the part was issued from.
+      const rate = requireSourceRate(issuance.sparePart, issuance.partSource);
       return [
         {
           type: "PART",
           partId: issuance.sparePartId,
           referenceId: issuance.sparePartId,
+          partSource: resolveSource(issuance.sparePart, issuance.partSource),
           description: issuance.sparePart.name,
           quantity,
-          rate: issuance.sparePart.retailRate,
-          amount: lineAmount(quantity, issuance.sparePart.retailRate),
+          rate,
+          amount: lineAmount(quantity, rate),
           customerPaid: customerPays(issuance.jobCardLine),
         },
       ];
@@ -131,7 +130,7 @@ export class JobBillingService {
     const rawLines = this.getBillLines(jobCard).filter(line => line.customerPaid);
     const review = reviewApprovedScope(jobCard.estimates?.[0], rawLines, jobCard.customerId ?? jobCard.appointment?.customerId);
     const lines = rawLines.map(line => {
-      const row = review.rows.find(row => row.type === line.type && row.referenceId === line.referenceId);
+      const row = review.rows.find(row => row.type === line.type && row.referenceId === line.referenceId && (row.partSource ?? null) === ('partSource' in line ? line.partSource : null));
       return row?.included ? { ...line, rate: 0, amount: 0, description: `${line.description} (included in service charge)` } : line;
     });
     return { lines, review };

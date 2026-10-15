@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EstimatePartPicker } from "./EstimatePartPicker";
+import { PartSourceSelect } from "./PartSourceSelect";
+import { partSourceLabel } from "@/features/inventory/lib/part-codes";
 import { WorkshopPicker } from "./WorkshopPicker";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { jobCardKeys } from "../api/job-card.keys";
@@ -20,6 +22,8 @@ type Line = {
   description?: string;
   quantity: number;
   includedInService?: boolean;
+  // Part lines: where the part comes from (Mobis, local, used, repaired…). Staff-only.
+  partSource?: string;
 };
 const money = (value: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
@@ -92,16 +96,20 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       : latest.status === "Declined"
         ? "Revision Required"
         : "Awaiting Approval";
+  const partKeys = lines.filter((line) => line.type === "PART").map((line) => `${line.referenceId}:${line.partSource ?? ""}`);
+  const duplicateSource = new Set(partKeys).size !== partKeys.length;
+  const sourcesPending = lines.some((line) => line.type === "PART" && !line.partSource);
   const error = create.error ?? approval.error;
   const busy = create.isPending || approval.isPending;
   function revise() {
-    const draft =
+    const draft: Line[] =
       latest?.lines?.map((line) => ({
         type: line.type.replace("INCLUDED_", "") as Line["type"],
         referenceId: line.referenceId ?? undefined,
         description: line.description,
         quantity: line.quantity,
         includedInService: line.type.startsWith("INCLUDED_"),
+        partSource: line.partSource ?? undefined,
       })) ?? [];
     if (serviceReference && !draft.some((line) => line.type === "SERVICE"))
       draft.unshift({
@@ -143,14 +151,16 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       {open && editing && hasPermission("estimate:create") && (
         <div className="grid gap-3 print:hidden" inert={busy}>
           <p className="text-sm text-muted-foreground">
-            The service uses the saved job-card charge. Parts use retail rates;
-            labour uses model rates. Mark package inclusions explicitly to avoid
-            an additional charge.
+            The service uses the saved job-card charge. Each part is priced by
+            its source (Mobis, local purchase, used, repaired); switch a
+            part&apos;s source to change its price. Sources are internal and are
+            not printed for the customer. Labour uses model rates. Mark package
+            inclusions explicitly to avoid an additional charge.
           </p>
           {lines.map((line, index) => (
             <div
               key={index}
-              className="flex justify-between gap-3 border-b py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
             >
               <span>
                 {line.description || line.type} ? {line.quantity}
@@ -159,6 +169,19 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                   ? ` ? ${money(jobCard.serviceCharge ?? 0)}`
                   : ""}
               </span>
+              {line.type === "PART" && line.referenceId && (
+                <PartSourceSelect
+                  partId={line.referenceId}
+                  value={line.partSource}
+                  onChange={(partSource) =>
+                    setLines((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, partSource } : row,
+                      ),
+                    )
+                  }
+                />
+              )}
               {line.type !== "SERVICE" && (
                 <button
                   type="button"
@@ -229,10 +252,12 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               !Number.isFinite(quantity) ||
               quantity <= 0 ||
               lines.length >= 200 ||
-              lines.some(
-                (line) =>
-                  line.type === type && line.referenceId === referenceId,
-              )
+              // A part may be added again to quote it from a second source.
+              (type === "LABOUR" &&
+                lines.some(
+                  (line) =>
+                    line.type === type && line.referenceId === referenceId,
+                ))
             }
             onClick={() => {
               setLines((current) => [
@@ -244,10 +269,16 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           >
             Add to estimate
           </Button>
+          {duplicateSource && (
+            <p role="alert" className="text-sm text-destructive">
+              The same part is listed twice from one source. Change a source or
+              remove the extra line.
+            </p>
+          )}
           <div className="flex gap-2">
             <Button
               type="button"
-              disabled={!lines.length || busy}
+              disabled={!lines.length || busy || duplicateSource || sourcesPending}
               onClick={() => create.mutate()}
             >
               Submit for approval
@@ -279,6 +310,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               <thead>
                 <tr className="border-b text-left">
                   <th>Description</th>
+                  <th className="print:hidden">Source</th>
                   <th>Qty / hours</th>
                   <th>Rate</th>
                   <th>Amount</th>
@@ -292,6 +324,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                       {line.type.startsWith("INCLUDED_")
                         ? " (included in service charge)"
                         : ""}
+                    </td>
+                    <td className="print:hidden">
+                      {partSourceLabel(line.partSource)}
                     </td>
                     <td>{line.quantity}</td>
                     <td>{money(line.rate)}</td>
