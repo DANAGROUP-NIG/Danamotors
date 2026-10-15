@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import partCategoryRoutes from './part-category.routes';
 import { InventoryController } from './inventory.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
@@ -905,6 +906,7 @@ router.use(authMiddleware);
  *               data: { categories: [{ code: "A", description: "Co-op parts", markupMultiplier: 2.07, isActive: true }] }
  */
 router.get('/part-categories', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listPartCategories);
+router.use('/part-categories', partCategoryRoutes);
 router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);

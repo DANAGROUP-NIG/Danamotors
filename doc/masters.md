@@ -126,6 +126,22 @@ UOM, tax category and tax form inputs suggest the codes from their master lists.
 parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
 over: `partlabour` and `troublepart` are empty in all three databases.
 
+## Part category master
+
+**Settings → Part Categories** (`/settings/part-categories`; API `/api/inventory/part-categories`, permissions
+`sparepart:create` / `sparepart:update`). Legacy `Category`:
+
+| Legacy field | New field |
+| --- | --- |
+| category, categorydesc | `code`, `description` |
+| multiply | `markupMultiplier` (retail rate = dealer rate × multiplier) |
+| discountper, handlingper, DirectCostPer, OperationalCostPer | `PartCategoryBranchSetting` per branch |
+
+The percentages differ between the three legacy databases (for example discount 50 % at Lagos, 45 % at Abuja,
+0 % at CPD), so they are kept per branch. Reorder / min / max level factors, reserve, reserve months and the
+conversion factor hold the same default (1 or 0) for every category in all three databases and are not carried
+over.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle

@@ -31,6 +31,11 @@ const SETTINGS_CARDS = [
     href: "/settings/service-checklists",
   },
   {
+    title: "Part Categories",
+    description: "Retail multiplier per price category and each branch's discount, handling and cost %.",
+    href: "/settings/part-categories",
+  },
+  {
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",

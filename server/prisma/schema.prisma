@@ -66,6 +66,8 @@ model Branch {
   stockTakes StockTake[]
 
   employees Employee[]
+
+  partCategorySettings PartCategoryBranchSetting[]
 }
 
 // ============================================================
@@ -2022,7 +2024,25 @@ model PartCategory {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @default(now()) @updatedAt
 
-  parts SparePart[]
+  parts          SparePart[]
+  branchSettings PartCategoryBranchSetting[]
+}
+
+// Legacy Part Category Master percentages. Each legacy database (branch) kept its own
+// discount, handling, direct cost and operational cost % for a category.
+model PartCategoryBranchSetting {
+  categoryCode           String
+  category               PartCategory @relation(fields: [categoryCode], references: [code], onDelete: Cascade)
+  branchId               String
+  branch                 Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  discountPercent        Float        @default(0)
+  handlingPercent        Float        @default(0)
+  directCostPercent      Float        @default(0)
+  operationalCostPercent Float        @default(0)
+  updatedAt              DateTime     @updatedAt
+
+  @@id([categoryCode, branchId])
+  @@index([branchId])
 }
 
 enum MitStatus {
