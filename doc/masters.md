@@ -133,26 +133,48 @@ UOM, tax category and tax form inputs suggest the codes from their master lists.
 parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
 over: `partlabour` and `troublepart` are empty in all three databases.
 
-### Part sources and source prices
+### Part sources and source records
 
 The part flag codes double as **part sources**: O Mobis (original part), A authorised source, F FOC item,
 L local purchase, plus two new ones, **U second-hand / used** and **R repaired**. No legacy code was removed.
 
-A part's own flag is priced by its retail rate. The same part supplied from any other source has its own price
-(and optional cost), set on the part's **Prices by part source** card (API
-`GET`/`PUT /api/inventory/parts/:id/source-prices`, permission `sparepart:update` to save). A source with no price
-cannot be quoted.
+The system matches the physical stock: a used shock absorber and a new Mobis one are different items on the
+shelf. So a local, used or repaired version of a part is its own Part Master record, a **source record**, linked
+to its main part (`sourceOfPartId`). It has its own part number, stock, dealer rate, retail rate, bin and history;
+its source is its part flag. This link is separate from alternates (supersession and replacement options).
 
-On an estimate, each part line picks its source and is priced from it. For example, a workshop manager quotes all
-Mobis parts; the customer finds it too expensive; the service advisor creates a revised estimate, switches some
-lines to local, used or repaired, and sends it for approval again. The same part may be quoted from two sources
-on one estimate, but only once per source. The source is internal: it is not on the printed estimate, the
-customer portal or the bill.
+- **Sources card.** The part page lists the main part and its source records with the stock at the current branch,
+  the dealer rate and the retail rate. **Add source record** (`sparepart:create`) takes the source, the part number
+  (suggested as main part number + `-` + code, e.g. `54651-U`), the dealer rate and a price category, and copies the
+  name, UOM, tax and classification from the main part. A source record's page shows the part it is a source of.
+  API: `GET`/`POST /api/inventory/parts/:id/sources`.
+- **Price.** Retail = dealer rate × price category multiplier, as for Mobis parts. New local, used and repaired
+  records default to category **L** (local consumable, 1.5×), which is how legacy prices local purchases; the
+  Mobis general category C is 3.33×. Other sources default to the main part's category. A vendor receipt sets the
+  dealer rate to the received cost and recalculates retail the same way (see
+  [mobis-receiving.md](./mobis-receiving.md#vendor-receipts-non-mobis-purchases)).
+- **Rules.** One record per source per main part; a source record's flag differs from its main part's; source
+  records have no source records, are not alternates and are never warranty-applicable. A main part with source
+  records, or a source record, cannot change its part flag. The database enforces the structural rules too.
+- **Estimates** offer only records that exist. After a part is picked, the line's source dropdown lists the main
+  part and its source records with price and branch stock; changing the source swaps the line's part. Each record
+  may appear once per estimate. For example: a workshop manager quotes all Mobis parts; the customer finds it too
+  expensive; the advisor creates a revised estimate, switches some lines to the local, used or repaired records
+  and sends it for approval again.
+- **Issue, job card and bill.** The storekeeper issues the exact record from branch stock, and stock comes off that
+  record. It must be the record on the approved estimate. The job card line and the bill charge that record's
+  retail rate. Estimate, issue, job card and bill lines keep the record's flag in `partSource` for reporting.
+- **Internal only.** The source is never on the printed estimate, the customer portal or the printed bill.
+- **Kept out of transfers.** CPD supplies Mobis parts: source records and L, U and R parts cannot be indented,
+  picked as alternates or sent on a direct STN (legacy has no L indent since 2022). Mobis MIT lines match Part
+  Master by part number and are refused if they match a source record.
+- **Stock taking.** Count sheets list each record with its own part number and value it at its own dealer rate.
+  There is no bin rule per source: local parts share racks with Mobis parts, as in legacy.
 
-The source follows the part through the job. A part issue takes the source approved on the estimate (choose one
-on the issue form when the estimate has the part from two sources), and the job card line, the approval check and
-the bill all use that source's price. Issuing the part from a source the customer did not approve needs a revised
-estimate. Stock is still held per part, not per source.
+The first version (per-source prices on one part, `SparePartSourcePrice`) was retired by migration
+`20261016120000_part_source_records`. Existing estimate, issue, job card and bill lines were left as they were:
+lines priced from another source of the same part (demo data only) cannot be mapped to a source record
+automatically, so their `partSource` stays as a snapshot.
 
 ## Part category master
 
