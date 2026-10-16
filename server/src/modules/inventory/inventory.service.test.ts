@@ -27,6 +27,7 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   storeLocation: null,
   role: PartRole.MAIN,
   mainPartId: null,
+  sourceOfPartId: null,
   partStatus: PartStatus.ACTIVE,
   warrantyApplicable: false,
   warrantyRate: null,

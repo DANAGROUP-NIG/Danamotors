@@ -227,23 +227,27 @@ export const partMasterIdParamSchema = z.object({
   }),
 });
 
-export const setPartSourcePricesSchema = z.object({
+export const partSourcesQuerySchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid part ID"),
   }),
+  query: z.object({
+    branchId: z.string().uuid("Invalid branch ID").optional(),
+  }),
+});
+
+export const createSourceRecordSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid main part ID"),
+  }),
   body: z
     .object({
-      prices: z
-        .array(
-          z
-            .object({
-              source: z.enum(PART_SOURCE_CODES, { message: "Unknown part source" }),
-              retailRate: z.number().finite().nonnegative("Price must be 0 or more"),
-              dealerRate: z.number().finite().nonnegative("Cost must be 0 or more").nullable().optional(),
-            })
-            .strict(),
-        )
-        .max(PART_SOURCE_CODES.length),
+      source: z.enum(PART_SOURCE_CODES, { message: "Unknown part source" }),
+      partNumber: z.string().trim().min(1, "Part number is required").max(40, "Part number must be 40 characters or less"),
+      dealerRate: z.number().finite().positive("Dealer rate must be greater than zero"),
+      // Omitted: L (local consumable, 1.5x) for local, used and repaired records, else the main part's category.
+      priceCategoryCode: z.string().trim().toUpperCase().max(2, "Price category must be 1 or 2 characters").nullable().optional(),
+      binLocation: z.string().trim().max(30).optional(),
     })
     .strict(),
 });
@@ -303,7 +307,6 @@ export const createPartIssuanceSchema = z.object({
     issuedById: z.string().uuid("Invalid issuer ID"),
     quantity: z.number().int().positive("Quantity must be positive"),
     notes: z.string().optional(),
-    partSource: z.enum(PART_SOURCE_CODES).optional(),
   }),
 });
 

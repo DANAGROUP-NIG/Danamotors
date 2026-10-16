@@ -337,6 +337,9 @@ model Customer {
   customerOrders CustomerOrder[]
   saleReturns    CounterSaleReturn[]
 
+  // Vendors: material receipt notes for parts bought from them.
+  vendorReceipts MaterialReceiptNote[] @relation("MrnVendor")
+
   @@index([branchId])
   @@index([branchId, partyStatus, code])
   @@index([phoneNumber])
@@ -787,8 +790,8 @@ model SparePart {
   // Legacy tax status (partmast.taxable).
   taxable           Boolean       @default(true)
   // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local,
-  // plus U second-hand/used and R repaired. retailRate prices the part from this source;
-  // prices from other sources live in SparePartSourcePrice.
+  // plus U second-hand/used and R repaired. It is the part's source; other sources of the same part
+  // are their own records (see sourceOfPartId).
   partFlag          String        @default("O")
   // Legacy partmast.parttype: S spare part, O oil, A accessory.
   partType          String        @default("S")
@@ -826,6 +829,13 @@ model SparePart {
   mainPart       SparePart?  @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
   alternateParts SparePart[] @relation("PartAlternates")
 
+  // Part source records: a local, used or repaired version of a part is its own record, with its
+  // own part number, stock, rates and bin, linked to its main part. Its source is its part flag.
+  // Separate from alternates (supersession); one level deep, one record per source.
+  sourceOfPartId String?
+  sourceOfPart   SparePart?  @relation("PartSourceRecords", fields: [sourceOfPartId], references: [id], onDelete: Restrict)
+  sourceRecords  SparePart[] @relation("PartSourceRecords")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -853,13 +863,11 @@ model SparePart {
   rateHistory PartRateHistory[]
   binHistory  PartBinHistory[]
 
-  // Prices for supplying this part from a source other than its own part flag.
-  sourcePrices SparePartSourcePrice[]
-
   stockTakeLines StockTakeLine[]
 
   checklistLines ServiceChecklistLine[]
 
+  @@unique([sourceOfPartId, partFlag])
   @@index([mainPartId])
 }
 
@@ -2116,28 +2124,12 @@ enum MitStatus {
   CANCELLED
 }
 
-// Where the stock on an MRN came from: a Mobis invoice (MIT) or a branch transfer (STN).
-// Customer price (and cost) of a part supplied from another source: e.g. a Mobis part fitted
-// as a local purchase, second-hand/used or repaired part. The part's own source (its part flag)
-// is priced by SparePart.retailRate.
-model SparePartSourcePrice {
-  id          String    @id @default(uuid())
-  sparePartId String
-  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
-  // Part source code: O, A, F, L, U or R.
-  source      String
-  retailRate  Float
-  dealerRate  Float?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([sparePartId, source])
-}
-
+// Where the stock on an MRN came from: a Mobis invoice (MIT), a branch transfer (STN), or a
+// direct purchase from a vendor (local, used or repaired parts; CPD's non-Mobis purchases).
 enum MrnSource {
   MOBIS
   BRANCH_TRANSFER
+  VENDOR
 }
 
 model BranchIndent {
@@ -2602,9 +2594,13 @@ model MaterialReceiptNote {
   receivingBranchId String
   receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
 
-  // Mobis only.
+  // Mobis and vendor receipts. `vendor` is the name as printed; vendor receipts also link the vendor.
   vendor         String?
+  vendorId       String?
+  vendorParty    Customer? @relation("MrnVendor", fields: [vendorId], references: [id], onDelete: Restrict)
   invoiceNumber  String?
+  // Vendor receipts: the vendor's invoice date.
+  invoiceDate    DateTime?
   // Legacy tax form: P for Mobis purchases; a transfer MRN takes the STN's form, if any.
   taxForm        String?
   // Invoice currency to naira; 1 for branch transfers, which are already in naira.
@@ -2628,6 +2624,7 @@ model MaterialReceiptNote {
   @@index([receivingBranchId])
   @@index([stnId])
   @@index([source])
+  @@index([vendorId])
 }
 
 model MaterialReceiptLine {
@@ -2635,7 +2632,7 @@ model MaterialReceiptLine {
   mrnId String
   mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
 
-  // Exactly one of these is set, matching the MRN's source.
+  // Mobis and transfer MRNs: exactly one of these is set, matching the MRN's source. Vendor MRNs: neither.
   mitLineId String?
   mitLine   MaterialInTransitLine? @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
   stnLineId String?

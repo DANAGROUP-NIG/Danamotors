@@ -4,7 +4,6 @@ import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { coveredItemMatches } from "../campaign/campaign.logic";
 import { assertChargeChange, chargeTotals, defaultChargeType, lineAmount } from "./jobCardLine.logic";
-import { resolveSource, sourceRate, type SourcePricedPart } from "../inventory/partSource";
 
 type Tx = Prisma.TransactionClient;
 
@@ -123,7 +122,7 @@ export class JobCardLineService {
     const issuances = await tx.partIssuance.findMany({
       where: { jobCardId },
       include: {
-        sparePart: { include: { sourcePrices: true } },
+        sparePart: true,
         returns: { where: { status: { in: RETURNED_STATUSES } }, select: { quantity: true } },
         jobCardLine: { include: lineInclude },
       },
@@ -141,8 +140,8 @@ export class JobCardLineService {
           partWarrantyApplicable: part.warrantyApplicable,
           campaignMatchId: this.campaignMatch(context, { kind: "PART", partNumber: part.partNumber, description: part.name }),
         });
-        const partSource = resolveSource(part, issuance.partSource);
-        const rate = this.partRate(part, chargeType, partSource);
+        const partSource = issuance.partSource ?? part.partFlag;
+        const rate = this.partRate(part, chargeType);
         await tx.jobCardLine.create({
           data: {
             jobCardId,
@@ -210,10 +209,9 @@ export class JobCardLineService {
     }
   }
 
-  // Customer lines are charged at the price of the part's source; warranty claims use the warranty rate.
-  private partRate(part: SourcePricedPart & { unitPrice: number; warrantyRate: number | null }, chargeType: ChargeType, partSource?: string | null) {
+  private partRate(part: { retailRate: number | null; unitPrice: number; warrantyRate: number | null }, chargeType: ChargeType) {
     if (chargeType === ChargeType.WARRANTY) return part.warrantyRate ?? part.retailRate ?? part.unitPrice;
-    return sourceRate(part, partSource) ?? part.unitPrice;
+    return part.retailRate ?? part.unitPrice;
   }
 
   async list(jobCardId: string) {
@@ -254,7 +252,7 @@ export class JobCardLineService {
   ) {
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "JobCardLine" WHERE "id" = ${lineId} FOR UPDATE`;
-      const line = await tx.jobCardLine.findFirst({ where: { id: lineId, jobCardId }, include: { ...lineInclude, sparePart: { include: { sourcePrices: true } } } });
+      const line = await tx.jobCardLine.findFirst({ where: { id: lineId, jobCardId }, include: { ...lineInclude, sparePart: true } });
       if (!line) throw new NotFoundError("Line not found on this job card");
       const ctx = await this.context(tx, jobCardId);
       if (ctx.bill) throw new ConflictError(`Job card ${ctx.jobCard.jobNumber} is billed on ${ctx.bill.invoiceNumber}; who pays can no longer change`);
@@ -281,7 +279,7 @@ export class JobCardLineService {
           chargeTypeReason: input.reason?.trim() || null,
         });
         if (line.kind === "PART" && line.sparePart) {
-          const rate = this.partRate(line.sparePart, input.chargeType, line.partSource);
+          const rate = this.partRate(line.sparePart, input.chargeType);
           Object.assign(data, { rate, amount: lineAmount(line.quantity, rate) });
         }
       } else if (input.campaignId !== undefined && line.chargeType === ChargeType.FREE) {

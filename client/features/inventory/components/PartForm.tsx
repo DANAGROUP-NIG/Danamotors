@@ -225,14 +225,21 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             </select>
           </Field>
           <Field label="Purchase source" error={errors.partFlag?.message}>
-            <select className={inputCls} {...register("partFlag")}>
-              {/* Keep a non-legacy flag already on the part selectable. */}
-              {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(part?.partFlag ? [part.partFlag] : [])])].map((code) => (
-                <option key={code} value={code}>
-                  {codeLabel(PART_FLAG_LABELS, code)}
-                </option>
-              ))}
-            </select>
+            {/* A source record's flag is its source and cannot change (shown, not registered). */}
+            {part?.sourceOfPartId ? (
+              <select className={inputCls} disabled value={part.partFlag} aria-label="Purchase source">
+                <option value={part.partFlag}>{codeLabel(PART_FLAG_LABELS, part.partFlag)}</option>
+              </select>
+            ) : (
+              <select className={inputCls} {...register("partFlag")}>
+                {/* Keep a non-legacy flag already on the part selectable. */}
+                {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(part?.partFlag ? [part.partFlag] : [])])].map((code) => (
+                  <option key={code} value={code}>
+                    {codeLabel(PART_FLAG_LABELS, code)}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label="Status" error={errors.partStatus?.message}>
             <select className={inputCls} {...register("partStatus")}>
@@ -300,11 +307,17 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
         <p className={sectionTitle}>Warranty</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" className="mt-0.5 size-4" {...register("warrantyApplicable")} />
+            {part?.sourceOfPartId ? (
+              <input type="checkbox" className="mt-0.5 size-4" disabled checked={false} readOnly aria-label="Warranty applicable" />
+            ) : (
+              <input type="checkbox" className="mt-0.5 size-4" {...register("warrantyApplicable")} />
+            )}
             <span>
               <span className="font-semibold">Warranty applicable</span>
               <span className="block text-xs text-muted-foreground">
-                Only warranty-applicable parts can be charged to warranty or claimed from the manufacturer.
+                {part?.sourceOfPartId
+                  ? "Local, used and repaired source records are never claimed under warranty."
+                  : "Only warranty-applicable parts can be charged to warranty or claimed from the manufacturer."}
               </span>
             </span>
           </label>

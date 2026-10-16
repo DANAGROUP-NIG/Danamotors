@@ -1,5 +1,4 @@
 import { latestEstimateQuery } from "./estimate-approval";
-import { requireSourceRate, resolveSource } from "../inventory/partSource";
 import { getBranchSettings } from "../company-settings/company-settings.service";
 import {
   serviceChargeDescription,
@@ -637,17 +636,13 @@ export class ServiceService {
             "Estimates can only be added to unbilled jobs",
           );
         const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
-        // The same part may be quoted from two sources (e.g. one Mobis, one used), but not twice from one.
+        // Each part record once: a used or local version of a part is its own record (source record).
         if (
-          new Set(
-            billable.map(
-              (line) =>
-                `${line.type}:${line.referenceId}:${line.partSource ?? ""}`,
-            ),
-          ).size !== billable.length
+          new Set(billable.map((line) => `${line.type}:${line.referenceId}`))
+            .size !== billable.length
         )
           throw new BadRequestError(
-            "Each service, labour operation, or part from one source can appear only once per estimate",
+            "Each service, part or labour operation can appear only once per estimate",
           );
         const services = billable.filter((line) => line.type === "SERVICE");
         const chargeReference = serviceChargeReference(card);
@@ -686,13 +681,17 @@ export class ServiceService {
             const part = line.referenceId
               ? await tx.sparePart.findUnique({
                   where: { id: line.referenceId },
-                  include: { sourcePrices: true },
                 })
               : null;
             if (!part) throw new BadRequestError("Select a part");
-            partSource = resolveSource(part, line.partSource);
+            if (part.retailRate == null)
+              throw new BadRequestError(
+                `Retail rate is not set for ${part.partNumber}`,
+              );
+            // Snapshot of the chosen record's source (part flag), kept for reporting.
+            partSource = part.partFlag;
             description = part.name;
-            rate = requireSourceRate(part, partSource);
+            rate = part.retailRate;
           } else if (line.type === "LABOUR") {
             const item = line.referenceId
               ? await tx.labourItem.findFirst({
@@ -746,13 +745,6 @@ export class ServiceService {
             amount: includedInService ? 0 : lineAmount(quantity, rate),
           });
         }
-        const partKeys = lines
-          .filter((line) => line.partSource)
-          .map((line) => `${line.referenceId}:${line.partSource}`);
-        if (new Set(partKeys).size !== partKeys.length)
-          throw new BadRequestError(
-            "Each part can appear only once per source in an estimate",
-          );
         // A new scope needs a fresh QC result and fresh credit authorization.
         const reopening = canonicalJobStatus(card.status) === "READY";
         await tx.jobCard.update({

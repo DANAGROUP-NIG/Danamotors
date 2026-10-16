@@ -206,6 +206,32 @@ export class InventoryController {
     }
   };
 
+  listPartSources = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // Stock is shown for the branch asked for, or the user's own branch.
+      const branchId = (req.query.branchId as string | undefined) ?? req.user?.branchId ?? undefined;
+      if (branchId) assertInventoryBranchAccess(req, [branchId]);
+      const result = await this.inventoryService.listPartSources(req.params.id, branchId);
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createSourceRecord = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.inventoryService.createSourceRecord(req.params.id, req.body, req.user?.userId);
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: `Source record ${result.partNumber} created`,
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   listPartsWithFilters = async (
     req: Request,
     res: Response,
@@ -306,24 +332,6 @@ export class InventoryController {
         statusCode: 200,
         data: { part: result },
       });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  getSourcePrices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const result = await this.inventoryService.getSourcePrices(req.params.id);
-      res.status(200).json({ status: "success", statusCode: 200, data: result });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  setSourcePrices = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const result = await this.inventoryService.setSourcePrices(req.params.id, req.body.prices);
-      res.status(200).json({ status: "success", statusCode: 200, message: "Source prices saved", data: result });
     } catch (error) {
       next(error);
     }

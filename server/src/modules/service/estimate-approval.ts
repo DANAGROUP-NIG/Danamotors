@@ -2,14 +2,13 @@ import { Prisma } from '@prisma/client';
 import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { BadRequestError } from '../../shared/errors/appError';
 import { money, sumMoney } from '../finance/money';
-import { requireSourceRate, resolveSource } from '../inventory/partSource';
 
-// Part lines carry the part source: the same part from another source is different scope.
+// Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
 export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
 export type ApprovalEstimate = { id: string; status: string; currency?: string; amount: number; lines: ScopeLine[]; approvals: { approved: boolean | null; customerId: string }[] };
 export const latestEstimateQuery = { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], take: 1, include: { lines: true, approvals: true } };
 const baseType = (type: string) => type.replace('INCLUDED_', '');
-const key = (line: ScopeLine) => `${baseType(line.type)}:${line.referenceId ?? ''}${baseType(line.type) === 'PART' ? `:${line.partSource ?? ''}` : ''}`;
+const key = (line: ScopeLine) => `${baseType(line.type)}:${line.referenceId ?? ''}`;
 
 export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actual: ScopeLine[], customerId?: string | null) {
   const approved = !!estimate && estimate.status.toUpperCase() === 'APPROVED' && estimate.approvals.some(a => a.approved === true && a.customerId === customerId);
@@ -52,15 +51,15 @@ export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobC
 }
 
 export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardId: string) {
-  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: { include: { sourcePrices: true } }, returns: true } }, labourLines: true } });
+  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true } }, labourLines: true } });
   const lines: ScopeLine[] = [];
   const chargeReference = serviceChargeReference(card);
   if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
   for (const row of card.partIssuances) {
     const quantity = row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((sum, r) => sum + r.quantity, 0);
     if (quantity > 0) {
-      const rate = requireSourceRate(row.sparePart, row.partSource);
-      lines.push({ type: 'PART', referenceId: row.sparePartId, partSource: resolveSource(row.sparePart, row.partSource), description: row.sparePart.name, quantity, rate, amount: money(quantity * rate) });
+      if (row.sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before completing this job');
+      lines.push({ type: 'PART', referenceId: row.sparePartId, partSource: row.partSource ?? row.sparePart.partFlag, description: row.sparePart.name, quantity, rate: row.sparePart.retailRate, amount: money(quantity * row.sparePart.retailRate) });
     }
   }
   for (const row of card.labourLines) lines.push({ type: 'LABOUR', referenceId: row.labourItemId, description: row.description, quantity: row.hours, rate: row.rate, amount: row.amount });

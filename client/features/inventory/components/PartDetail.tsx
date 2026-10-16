@@ -32,13 +32,13 @@ import { usePart, usePartAlternates, usePartStock, usePriceCategories } from "..
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
 import { PartForm } from "./PartForm";
-import { PartSourcePrices } from "./PartSourcePrices";
+import { PartSources } from "./PartSources";
 import { StockLocationForm } from "./StockLocationForm";
 import { useBranchStore } from "@/store/branch.store";
 import type { PartStockItem } from "../types/inventory.types";
 import { PartRoleBadge, PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster } from "../types/inventory.types";
-import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
+import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS, partSourceLabel } from "../lib/part-codes";
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -167,6 +167,9 @@ export function PartDetail({ id }: { id: string }) {
   const familyRootId = part ? (part.role === "MAIN" ? part.id : part.mainPartId) : null;
   const { data: family, isLoading: familyLoading } = usePartAlternates(familyRootId);
   const { data: mainPart } = usePart(part?.role === "ALTERNATE" && part.mainPartId ? part.mainPartId : "");
+  // A source record (local, used, repaired…) names the main part it is a source of.
+  const { data: sourceOf } = usePart(part?.sourceOfPartId ?? "");
+  const sourcesBranchId = activeBranch?.id ?? user?.branchId ?? null;
   const { data: stock, isLoading: stockLoading, isError: stockError } = usePartStock(id, canReadStock);
 
   if (isLoading) {
@@ -248,6 +251,14 @@ export function PartDetail({ id }: { id: string }) {
             <div>
               <h1 className="text-xl font-semibold text-slate-800">{part.name}</h1>
               <p className="mt-1 font-mono text-sm text-slate-500">{part.partNumber}</p>
+              {sourceOf && (
+                <p className="mt-1 text-sm text-slate-500">
+                  {partSourceLabel(part.partFlag)} source of{" "}
+                  <Link href={`/inventory/${sourceOf.id}`} className="font-mono font-medium text-primary hover:underline">
+                    {sourceOf.partNumber}
+                  </Link>
+                </p>
+              )}
               {part.role === "ALTERNATE" && mainPart && (
                 <p className="mt-1 text-sm text-slate-500">
                   Alternate for{" "}
@@ -309,8 +320,8 @@ export function PartDetail({ id }: { id: string }) {
           </div>
         </div>
 
-        <SectionCard icon={<Tag className="size-4" />} title="Prices by part source">
-          <PartSourcePrices partId={part.id} canEdit={canEdit} />
+        <SectionCard icon={<Tag className="size-4" />} title="Sources">
+          <PartSources part={part} branchId={sourcesBranchId} branchName={activeBranch?.name} canCreate={canCreate} />
         </SectionCard>
 
         <div className="grid gap-5 md:grid-cols-2">
@@ -426,6 +437,7 @@ export function PartDetail({ id }: { id: string }) {
           title={part.role === "MAIN" ? "Alternate parts" : "Part family"}
           action={
             part.role === "MAIN" &&
+            !part.sourceOfPartId &&
             canCreate && (
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAddingAlt(true)}>
                 <Plus className="size-4" /> Add alternate
@@ -435,6 +447,10 @@ export function PartDetail({ id }: { id: string }) {
         >
           {familyLoading ? (
             <Loader2 className="size-5 animate-spin text-slate-400" />
+          ) : part.sourceOfPartId ? (
+            <p className="text-sm text-muted-foreground">
+              Source records have no alternates and are never offered as replacements; alternates belong to the main part.
+            </p>
           ) : part.role === "MAIN" && siblings.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No alternates yet. Alternates can be supplied in place of this part on branch indents.

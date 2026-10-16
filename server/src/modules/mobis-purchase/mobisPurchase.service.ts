@@ -99,8 +99,16 @@ export class MobisPurchaseService {
     const mit = await prisma.$transaction(async (tx) => {
       const existing = await tx.sparePart.findMany({
         where: { partNumber: { in: [...new Set(lines.map((l) => l.partNumber))], mode: "insensitive" } },
-        select: { id: true, partNumber: true },
+        select: { id: true, partNumber: true, sourceOfPartId: true },
       });
+      // Matching is by part number, so local, used and repaired records (e.g. 54651-U) only match if an
+      // invoice really carries their number; Mobis stock must never land on them.
+      const sourceRecords = existing.filter((p) => p.sourceOfPartId).map((p) => p.partNumber);
+      if (sourceRecords.length) {
+        throw new BadRequestError(
+          `Part number(s) ${sourceRecords.slice(0, 15).join(", ")} belong to local, used or repaired source records, not Mobis parts`,
+        );
+      }
       const partIdByNumber = new Map(existing.map((p) => [p.partNumber.toUpperCase(), p.id]));
       const created = new Set<string>();
 

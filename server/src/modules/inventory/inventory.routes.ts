@@ -10,7 +10,8 @@ import {
   createPartMasterSchema,
   updatePartMasterSchema,
   partMasterIdParamSchema,
-  setPartSourcePricesSchema,
+  partSourcesQuerySchema,
+  createSourceRecordSchema,
   listPartsQueryWithFiltersSchema,
   // listPartsQuerySchema,
   createPurchaseRequestSchema,
@@ -911,47 +912,6 @@ router.use('/part-categories', partCategoryRoutes);
 router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 
-/**
- * @swagger
- * /inventory/parts/{id}/source-prices:
- *   get:
- *     tags: [Inventory]
- *     summary: Part prices by part source
- *     description: >
- *       Part sources share the part flag codes - O Mobis (original part), A authorised source, F FOC item,
- *       L local purchase, U second-hand/used, R repaired. The part's own flag is priced by its retail rate;
- *       each other source the part can be supplied from has its own price. Internal only, never shown to customers.
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
- *     responses:
- *       200:
- *         description: Source prices
- *         content:
- *           application/json:
- *             example:
- *               status: success
- *               data: { partId: "uuid", partNumber: "58101A6A00", partFlag: "O", dealerRate: 20000, retailRate: 41400, prices: [{ source: "L", retailRate: 18000, dealerRate: 12000 }, { source: "U", retailRate: 9000, dealerRate: null }] }
- *   put:
- *     tags: [Inventory]
- *     summary: Replace a part's other-source prices
- *     description: Sources left out are removed. The part's own source is priced in Part Master and cannot be listed.
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           example: { prices: [{ source: "L", retailRate: 18000, dealerRate: 12000 }, { source: "R", retailRate: 7000 }] }
- *     responses:
- *       200: { description: Saved source prices }
- *       400: { description: Own source listed, duplicate or unknown source }
- */
-router.get('/parts/:id/source-prices', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getSourcePrices);
-router.put('/parts/:id/source-prices', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(setPartSourcePricesSchema), controller.setSourcePrices);
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
 router.put('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_UPDATE), validateRequest(updatePartMasterSchema), controller.updatePart);
 router.delete('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_DELETE), validateRequest(partMasterIdParamSchema), controller.deletePart);
@@ -960,6 +920,62 @@ router.get('/parts', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequ
 router.post('/parts/:id/alternates', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createAlternatePartSchema), controller.createAlternatePart);
 router.get('/parts/:id/alternates', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.listAlternates);
 router.get('/parts/:id/replacement-options', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getReplacementOptions);
+
+/**
+ * @swagger
+ * /inventory/parts/{id}/sources:
+ *   get:
+ *     tags: [Inventory]
+ *     summary: A part and its source records
+ *     description: >
+ *       Part sources share the part flag codes - O Mobis (original part), A authorised source, F FOC item,
+ *       L local purchase, U second-hand/used, R repaired. A local, used or repaired version of a part is its own
+ *       Part Master record (a source record) with its own part number, stock, dealer and retail rates, linked to
+ *       its main part. Returns the main part first, then its source records, each with stock at the branch.
+ *       Called with a source record's id, returns its main part and siblings. Internal only, never shown to customers.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: branchId, description: Branch for stock; defaults to the user's branch, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Main part and source records
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 mainPartId: "uuid"
+ *                 branchId: "uuid"
+ *                 records:
+ *                   - { id: "uuid", partNumber: "546512S000", partFlag: "O", sourceLabel: "Mobis (original part)", isMain: true, dealerRate: 20000, retailRate: 66600, stock: { quantity: 4, available: 4 } }
+ *                   - { id: "uuid", partNumber: "546512S000-U", partFlag: "U", sourceLabel: "Second-hand / used", isMain: false, dealerRate: 8000, retailRate: 12000, stock: { quantity: 2, available: 2 } }
+ *   post:
+ *     tags: [Inventory]
+ *     summary: Add a source record (local, used, repaired...) to a main part
+ *     description: >
+ *       Creates a Part Master record for the main part from another source, copying its name, UOM, tax and
+ *       classification. The retail rate is the dealer rate x the price category multiplier; the category defaults
+ *       to L (local consumable) for L, U and R records and to the main part's category otherwise. One record per
+ *       source; source records cannot have source records, alternates or warranty. Suggested part number:
+ *       main part number + "-" + source code.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example: { source: "U", partNumber: "546512S000-U", dealerRate: 8000, priceCategoryCode: "L" }
+ *     responses:
+ *       201: { description: Source record created }
+ *       400: { description: Same source as the main part, main part is itself a source record, or unknown category }
+ *       409: { description: The main part already has a record from this source, or the part number is taken }
+ */
+router.get('/parts/:id/sources', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partSourcesQuerySchema), controller.listPartSources);
+router.post('/parts/:id/sources', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createSourceRecordSchema), controller.createSourceRecord);
 
 // Branch Stock
 router.get('/stock', requirePermission(PERMISSIONS.STOCK_READ), validateRequest(stockQuerySchema), controller.listAllStock);

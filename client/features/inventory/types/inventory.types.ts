@@ -64,7 +64,7 @@ export type PartMaster = LegacyPartFields & {
   retailRate: number | null;
   /** Legacy tax status. */
   taxable: boolean;
-  /** Legacy part flag = purchase source: O original part, A authorised source, F FOC item, L local. */
+  /** Legacy part flag = purchase source: O original part, A authorised source, F FOC item, L local, U used, R repaired. */
   partFlag: string;
   /** Legacy part type: S spare part, O oil, A accessory. */
   partType: string;
@@ -79,8 +79,37 @@ export type PartMaster = LegacyPartFields & {
   warrantyRate: number | null;
   role: PartRole;
   mainPartId: string | null;
+  /** Source records (local, used, repaired…): the main part this record is a source of. */
+  sourceOfPartId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/** One record of a part family by source: the main part or one of its source records. */
+export type PartSourceRecord = {
+  id: string;
+  partNumber: string;
+  name: string;
+  partFlag: string;
+  sourceLabel: string;
+  isMain: boolean;
+  partStatus: PartStatus;
+  priceCategoryCode: string | null;
+  dealerRate: number;
+  retailRate: number | null;
+  binLocation: string | null;
+  /** Stock at the branch asked for; null when no branch was given. */
+  stock: { quantity: number; available: number; rackLocation: string | null } | null;
+};
+
+export type PartSources = { mainPartId: string; branchId: string | null; records: PartSourceRecord[] };
+
+export type SourceRecordPayload = {
+  source: string;
+  partNumber: string;
+  dealerRate: number;
+  priceCategoryCode?: string | null;
+  binLocation?: string;
 };
 
 export type PartMasterPayload = {

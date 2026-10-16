@@ -1,48 +1,56 @@
-import { requireSourceRate, resolveSource, sourceRate } from "./partSource";
+import { defaultSourceCategory, indentProblem, sourceLabel, sourcePartNumber, sourceRecordProblem } from "./partSource";
 import { reviewApprovedScope } from "../service/estimate-approval";
 
-const part = {
-  partNumber: "58101A6A00",
-  partFlag: "O",
-  retailRate: 41400,
-  sourcePrices: [
-    { source: "L", retailRate: 18000 },
-    { source: "U", retailRate: 9000 },
-  ],
-};
+const main = { partNumber: "546512S000", partFlag: "O", sourceOfPartId: null, role: "MAIN" };
 
-describe("part source pricing", () => {
-  it("prices the part's own source from its retail rate and other sources from their own price", () => {
-    expect(sourceRate(part, undefined)).toBe(41400);
-    expect(sourceRate(part, "O")).toBe(41400);
-    expect(sourceRate(part, "L")).toBe(18000);
-    expect(sourceRate(part, "U")).toBe(9000);
-    expect(sourceRate(part, "R")).toBeNull();
+describe("part source records", () => {
+  it("labels every source code and passes unknown codes through", () => {
+    expect(sourceLabel("O")).toBe("Mobis (original part)");
+    expect(sourceLabel("U")).toBe("Second-hand / used");
+    expect(sourceLabel("R")).toBe("Repaired");
+    expect(sourceLabel("Z")).toBe("Z");
   });
 
-  it("defaults a missing source to the part flag", () => {
-    expect(resolveSource(part, null)).toBe("O");
-    expect(resolveSource({ partFlag: "L" }, undefined)).toBe("L");
-    expect(resolveSource(part, "R")).toBe("R");
+  it("suggests the main part number with the source code", () => {
+    expect(sourcePartNumber(" 54651 ", "U")).toBe("54651-U");
   });
 
-  it("names the source and part when no price is set", () => {
-    expect(() => requireSourceRate(part, "R")).toThrow("Repaired price is not set for 58101A6A00");
-    expect(() => requireSourceRate({ ...part, retailRate: null }, "O")).toThrow("Mobis (original part) price is not set");
+  it("prices local, used and repaired records like legacy local parts (category L) and others like the main part", () => {
+    expect(defaultSourceCategory("L", "C")).toBe("L");
+    expect(defaultSourceCategory("U", "C")).toBe("L");
+    expect(defaultSourceCategory("R", null)).toBe("L");
+    expect(defaultSourceCategory("A", "C")).toBe("C");
   });
 
-  it("treats the same part from another source as different approved scope", () => {
+  it("allows one record per source, never the main part's own source, and only one level deep", () => {
+    expect(sourceRecordProblem(main, "U")).toBeNull();
+    expect(sourceRecordProblem(main, "O")).toContain("already a Mobis (original part) part");
+    expect(sourceRecordProblem(main, "U", ["L", "U"])).toContain("already has a Second-hand / used record");
+    expect(sourceRecordProblem({ ...main, partNumber: "546512S000-U", partFlag: "U", sourceOfPartId: "m1" }, "R")).toContain(
+      "itself a source record",
+    );
+    expect(sourceRecordProblem({ ...main, role: "ALTERNATE" }, "U")).toContain("alternate part");
+  });
+
+  it("keeps local, used and repaired records off CPD indents", () => {
+    expect(indentProblem(main)).toBeNull();
+    expect(indentProblem({ ...main, partFlag: "A" })).toBeNull();
+    expect(indentProblem({ ...main, partFlag: "L" })).toContain("bought by the branch");
+    expect(indentProblem({ partNumber: "546512S000-A", partFlag: "A", sourceOfPartId: "m1" })).toContain("cannot be indented");
+  });
+
+  it("treats each source record as its own approved scope", () => {
     const estimate = {
       id: "e1",
       status: "Approved",
       currency: "NGN",
       amount: 9000,
       approvals: [{ approved: true, customerId: "c1" }],
-      lines: [{ type: "PART", referenceId: "p1", partSource: "U", description: "Brake pad", quantity: 1, rate: 9000, amount: 9000 }],
+      lines: [{ type: "PART", referenceId: "used-record", partSource: "U", description: "Shock absorber", quantity: 1, rate: 9000, amount: 9000 }],
     };
-    const used = reviewApprovedScope(estimate, [{ type: "PART", referenceId: "p1", partSource: "U", description: "Brake pad", quantity: 1, rate: 9000, amount: 9000 }], "c1");
+    const used = reviewApprovedScope(estimate, [{ type: "PART", referenceId: "used-record", description: "Shock absorber", quantity: 1, rate: 9000, amount: 9000 }], "c1");
     expect(used.canBill).toBe(true);
-    const mobis = reviewApprovedScope(estimate, [{ type: "PART", referenceId: "p1", partSource: "O", description: "Brake pad", quantity: 1, rate: 41400, amount: 41400 }], "c1");
+    const mobis = reviewApprovedScope(estimate, [{ type: "PART", referenceId: "mobis-record", description: "Shock absorber", quantity: 1, rate: 41400, amount: 41400 }], "c1");
     expect(mobis.canBill).toBe(false);
     expect(mobis.issues.join(" ")).toContain("Not in approved scope");
   });

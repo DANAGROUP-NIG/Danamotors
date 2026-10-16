@@ -22,8 +22,6 @@ type Line = {
   description?: string;
   quantity: number;
   includedInService?: boolean;
-  // Part lines: where the part comes from (Mobis, local, used, repaired…). Staff-only.
-  partSource?: string;
 };
 const money = (value: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
@@ -96,9 +94,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       : latest.status === "Declined"
         ? "Revision Required"
         : "Awaiting Approval";
-  const partKeys = lines.filter((line) => line.type === "PART").map((line) => `${line.referenceId}:${line.partSource ?? ""}`);
-  const duplicateSource = new Set(partKeys).size !== partKeys.length;
-  const sourcesPending = lines.some((line) => line.type === "PART" && !line.partSource);
+  // Each part record once: a used or local version of a part is a different record.
+  const partKeys = lines.filter((line) => line.type === "PART").map((line) => line.referenceId);
+  const duplicatePart = new Set(partKeys).size !== partKeys.length;
   const error = create.error ?? approval.error;
   const busy = create.isPending || approval.isPending;
   function revise() {
@@ -109,7 +107,6 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         description: line.description,
         quantity: line.quantity,
         includedInService: line.type.startsWith("INCLUDED_"),
-        partSource: line.partSource ?? undefined,
       })) ?? [];
     if (serviceReference && !draft.some((line) => line.type === "SERVICE"))
       draft.unshift({
@@ -151,9 +148,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       {open && editing && hasPermission("estimate:create") && (
         <div className="grid gap-3 print:hidden" inert={busy}>
           <p className="text-sm text-muted-foreground">
-            The service uses the saved job-card charge. Each part is priced by
-            its source (Mobis, local purchase, used, repaired); switch a
-            part&apos;s source to change its price. Sources are internal and are
+            The service uses the saved job-card charge. Parts use the retail
+            rate of the record chosen: switch a part&apos;s source to quote its
+            local, used or repaired record instead. Sources are internal and are
             not printed for the customer. Labour uses model rates. Mark package
             inclusions explicitly to avoid an additional charge.
           </p>
@@ -172,11 +169,13 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               {line.type === "PART" && line.referenceId && (
                 <PartSourceSelect
                   partId={line.referenceId}
-                  value={line.partSource}
-                  onChange={(partSource) =>
+                  branchId={jobCard.branchId}
+                  onChange={(record) =>
                     setLines((current) =>
                       current.map((row, i) =>
-                        i === index ? { ...row, partSource } : row,
+                        i === index
+                          ? { ...row, referenceId: record.id, description: record.name }
+                          : row,
                       ),
                     )
                   }
@@ -252,12 +251,10 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               !Number.isFinite(quantity) ||
               quantity <= 0 ||
               lines.length >= 200 ||
-              // A part may be added again to quote it from a second source.
-              (type === "LABOUR" &&
-                lines.some(
-                  (line) =>
-                    line.type === type && line.referenceId === referenceId,
-                ))
+              lines.some(
+                (line) =>
+                  line.type === type && line.referenceId === referenceId,
+              )
             }
             onClick={() => {
               setLines((current) => [
@@ -269,16 +266,16 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           >
             Add to estimate
           </Button>
-          {duplicateSource && (
+          {duplicatePart && (
             <p role="alert" className="text-sm text-destructive">
-              The same part is listed twice from one source. Change a source or
-              remove the extra line.
+              The same part record is listed twice. Change a source or remove
+              the extra line.
             </p>
           )}
           <div className="flex gap-2">
             <Button
               type="button"
-              disabled={!lines.length || busy || duplicateSource || sourcesPending}
+              disabled={!lines.length || busy || duplicatePart}
               onClick={() => create.mutate()}
             >
               Submit for approval

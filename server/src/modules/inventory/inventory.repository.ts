@@ -60,6 +60,7 @@ export class InventoryRepository {
     partCode?: string;
     partNumber: string;
     name: string;
+    description?: string | null;
     category: string;
     uom: string;
     taxCategory?: string | null;
@@ -76,12 +77,15 @@ export class InventoryRepository {
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;
+    warrantyApplicable?: boolean;
+    // Source records: the main part this local, used or repaired record is a source of.
+    sourceOfPartId?: string;
   } & LegacyPartFields, changedById?: string): Promise<SparePart> {
     return this.createTracked(data, changedById);
   }
 
   // Every create, rate or bin change and delete is kept in the part's rate and bin history.
-  private async createTracked(data: Prisma.SparePartCreateInput, changedById?: string): Promise<SparePart> {
+  private async createTracked(data: Prisma.SparePartUncheckedCreateInput, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
       const part = await tx.sparePart.create({ data });
       await recordPartChange(tx, null, part, changedById);
@@ -264,7 +268,7 @@ export class InventoryRepository {
             }
           : {}),
       },
-      include: { part: { include: { sourcePrices: { select: { source: true, retailRate: true } } } }, branch: true },
+      include: { part: true, branch: true },
       orderBy: { updatedAt: "desc" },
       take: filters?.limit,
     });
