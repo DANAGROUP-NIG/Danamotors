@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   PackageSearch,
   Ship,
+  Truck,
   Landmark,
   Megaphone,
   ShoppingCart,
@@ -176,6 +177,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "MIT",
         href: "/inventory/mobis-receipts",
         icon: Ship,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Vendor Receipts",
+        href: "/inventory/vendor-receipts",
+        icon: Truck,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
