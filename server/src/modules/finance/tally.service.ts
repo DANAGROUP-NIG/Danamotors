@@ -8,10 +8,14 @@ import { generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type
 
 export { generateTallyImportXml, generateTallyVoucherXml } from './tally-xml';
 
+// Sales vouchers: job bills and CPD counter-sale bills share the same ledger mappings.
+const salesBill: Prisma.InvoiceWhereInput = { OR: [{ jobCardId: { not: null } }, { counterSale: { isNot: null } }] };
+const salesBillBranch = (branchId: string): Prisma.InvoiceWhereInput => ({ OR: [{ jobCard: { branchId } }, { counterSale: { branchId } }] });
+
 export class TallyService {
   async pendingBatches(branchId?: string, noteDirections: Array<'DEBIT'|'CREDIT'> = ['DEBIT','CREDIT']) {
     const [invoices, receipts] = await Promise.all([
-      prisma.invoice.findMany({ where: { tallyPostedAt: null, ...(branchId ? { jobCard: { branchId } } : {}) }, select: { id: true, invoiceNumber: true } }),
+      prisma.invoice.findMany({ where: { tallyPostedAt: null, ...(branchId ? salesBillBranch(branchId) : {}) }, select: { id: true, invoiceNumber: true } }),
       prisma.receipt.findMany({ where: { tallyPostedAt: null, ...(branchId ? { branchId } : {}) }, select: { id: true, receiptNumber: true } }),
     ]);
     const notes = await prisma.partyNote.findMany({ where: { direction:{in:noteDirections}, type: { not: 'OPENING' }, tallyExcluded: false, tallyPostedAt: null, status: 'ACTIVE', ...(branchId ? { branchId } : {}) }, select: { id: true, number: true, direction: true } });
@@ -119,10 +123,9 @@ export class TallyService {
       const invoices = await prisma.invoice.findMany({
         where: {
           issuedDate: { gte: start, lt: end },
-          jobCardId: { not: null },
+          AND: [salesBill, ...(input.branchId ? [salesBillBranch(input.branchId)] : [])],
           status: { notIn: ['Cancelled', 'CANCELLED', 'VOID'] },
           tallyPostedAt: null,
-          ...(input.branchId ? { jobCard: { branchId: input.branchId } } : {}),
         },
         include: { customer: { include: { tallyLedger: true } }, jobCard: true },
         orderBy: { invoiceNumber: 'asc' },
@@ -206,9 +209,9 @@ export class TallyService {
         if (selected.type === 'JOB_BILL') {
           const invoice = await transaction.invoice.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } } },
+            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } } },
           });
-          if (!invoice || !invoice.jobCardId || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
+          if (!invoice || (!invoice.jobCardId && !invoice.counterSale) || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             skipped.push({ ...selected, reason: 'Job bill is missing or cancelled' });
             continue;
           }

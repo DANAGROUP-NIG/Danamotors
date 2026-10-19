@@ -117,7 +117,7 @@ export class InventoryController {
           ? part.inventoryStocks.map((stock) => stock.branchId)
           : [req.user?.branchId],
       );
-      const result = await this.inventoryService.updateSparePart(id, req.body);
+      const result = await this.inventoryService.updateSparePart(id, req.body, req.user?.userId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -146,7 +146,7 @@ export class InventoryController {
           ? part.inventoryStocks.map((stock) => stock.branchId)
           : [req.user?.branchId],
       );
-      await this.inventoryService.deleteSparePart(id);
+      await this.inventoryService.deleteSparePart(id, req.user?.userId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -168,10 +168,10 @@ export class InventoryController {
         : req.user?.branchId;
       assertInventoryBranchAccess(req, [branchId]);
 
-      const result = await this.inventoryService.createAlternatePart({
-        ...req.body,
-        mainPartId: req.params.id,
-      });
+      const result = await this.inventoryService.createAlternatePart(
+        { ...req.body, mainPartId: req.params.id },
+        req.user?.userId,
+      );
       res.status(201).json({
         status: "success",
         statusCode: 201,
@@ -317,7 +317,7 @@ export class InventoryController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const result = await this.inventoryService.createPart(req.body);
+      const result = await this.inventoryService.createPart(req.body, req.user?.userId);
       res.status(201).json({
         status: "success",
         statusCode: 201,
@@ -336,7 +336,7 @@ export class InventoryController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.inventoryService.updatePart(id, req.body);
+      const result = await this.inventoryService.updatePart(id, req.body, req.user?.userId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -355,7 +355,7 @@ export class InventoryController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      await this.inventoryService.deletePart(id);
+      await this.inventoryService.deletePart(id, req.user?.userId);
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -423,6 +423,7 @@ export class InventoryController {
         branchId,
         partId,
         req.body,
+        req.user?.userId,
       );
       res.status(200).json({
         status: "success",

@@ -1,0 +1,118 @@
+import { toast } from "sonner";
+import type { ReportColumn, ReportResult, ReportRow } from "../api/parts-reports.api";
+
+type Cell = string | number | Date | null;
+
+const numeric = (c: ReportColumn) => c.type === "money" || c.type === "qty" || c.type === "percent";
+const NUMBER_FORMAT: Partial<Record<ReportColumn["type"], string>> = {
+  money: "#,##0.00",
+  qty: "#,##0.##",
+  percent: "0.00\"%\"",
+  date: "dd/mm/yyyy",
+  datetime: "dd/mm/yyyy hh:mm",
+};
+
+function cellValue(column: ReportColumn, value: ReportRow[string] | undefined): Cell {
+  if (value === null || value === undefined || value === "") return null;
+  if (column.type === "date" || column.type === "datetime") return new Date(String(value));
+  if (numeric(column)) return Number(value);
+  return String(value);
+}
+
+/** Group subtotals: sums (cancelled lines left out), a running balance's last value, or a percent of two sums. */
+export function subtotal(rows: ReportRow[], columns: ReportColumn[]): Record<string, number> {
+  const sums: Record<string, number> = Object.fromEntries(
+    columns
+      .filter((c) => c.total)
+      .map((c) => [
+        c.key,
+        c.total === "last"
+          ? Number(rows[rows.length - 1]?.[c.key] ?? 0)
+          : rows.reduce((s, r) => s + (r.status === "Cancelled" ? 0 : Number(r[c.key] ?? 0)), 0),
+      ]),
+  );
+  for (const { key, ratio } of columns.filter((c) => c.ratio)) {
+    const over = ratio!.over.reduce((s, k) => s + (sums[k] ?? 0), 0);
+    sums[key] = over ? ((sums[ratio!.of] ?? 0) / over) * 100 : 0;
+  }
+  return sums;
+}
+
+/** Lines per page on registers that carry their running total forward; fits A4 landscape. */
+export const LINES_PER_PAGE = 30;
+
+/**
+ * Legacy "Carried Forward": the running grand total at the end of each full page, keyed by the
+ * index of the page's last line. The last page carries nothing; the grand total follows it.
+ */
+export function carriedForward(rows: ReportRow[], columns: ReportColumn[]): Map<number, Record<string, number>> {
+  const pages = new Map<number, Record<string, number>>();
+  for (let end = LINES_PER_PAGE; end < rows.length; end += LINES_PER_PAGE) pages.set(end - 1, subtotal(rows.slice(0, end), columns));
+  return pages;
+}
+
+/**
+ * Writes the report as a real .xlsx, laid out like the legacy registers: company and report
+ * heading, period and branch, S.No. column, group headings with subtotals, carried-forward lines
+ * where the report has them, and a grand total line.
+ */
+export async function exportReportXlsx(
+  result: ReportResult,
+  meta: { subtitle?: string; scope: string; period: string; filename: string; carriedForward?: boolean },
+) {
+  const XLSX = await import("xlsx");
+  const columns = result.columns;
+  const width = columns.length + 1;
+  const aoa: Cell[][] = [
+    ["DANA MOTORS LTD."],
+    [result.title.toUpperCase() + (meta.subtitle ? ` (${meta.subtitle})` : "")],
+    [`${meta.scope} · ${meta.period}`],
+    [],
+    ["S.No.", ...columns.map((c) => c.label)],
+  ];
+  const headerRow = aoa.length - 1;
+
+  const pages = meta.carriedForward ? carriedForward(result.rows, columns) : new Map<number, Record<string, number>>();
+  let serial = 0;
+  let current: string | null | undefined;
+  let groupRows: ReportRow[] = [];
+  const closeGroup = () => {
+    if (current == null) return;
+    const sub = subtotal(groupRows, columns);
+    aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Subtotal" : c.key in sub ? sub[c.key] : null))]);
+  };
+  for (const row of result.rows) {
+    const group = result.grouped && row.group != null ? String(row.group) : null;
+    if (result.grouped && group !== current) {
+      closeGroup();
+      current = group;
+      groupRows = [];
+      if (group !== null) aoa.push([group]);
+    }
+    groupRows.push(row);
+    aoa.push([++serial, ...columns.map((c) => cellValue(c, row[c.key]))]);
+    const forward = pages.get(serial - 1);
+    if (forward) aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Carried forward" : c.key in forward ? forward[c.key] : null))]);
+  }
+  if (result.grouped) closeGroup();
+  aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Grand Total" : c.key in result.totals ? result.totals[c.key] : null))]);
+  if (result.truncated) aoa.push([], ["Only the first 5,000 lines are listed; the total covers every line."]);
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true, dateNF: "dd/mm/yyyy" });
+  // Number formats per column, below the column header.
+  columns.forEach((c, i) => {
+    const format = NUMBER_FORMAT[c.type];
+    if (!format) return;
+    for (let r = headerRow + 1; r < aoa.length; r++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c: i + 1 })];
+      if (cell && (cell.t === "n" || cell.t === "d")) cell.z = format;
+    }
+  });
+  sheet["!cols"] = [{ wch: 6 }, ...columns.map((c) => ({ wch: c.type === "text" ? (c.key === "description" || c.key === "address" ? 36 : 18) : 14 }))];
+  sheet["!merges"] = [0, 1, 2].map((r) => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
+
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, result.title.replace(/[\\/?*[\]:]/g, " ").slice(0, 31));
+  XLSX.writeFile(book, `${meta.filename}.xlsx`, { compression: true });
+  toast.success(`Downloaded ${meta.filename}.xlsx`);
+}

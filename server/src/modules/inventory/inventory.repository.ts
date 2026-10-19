@@ -9,7 +9,9 @@ import {
   InterBranchTransfer,
   InterBranchTransferItem,
   PartStatus,
+  Prisma,
 } from "@prisma/client";
+import { recordPartChange } from "./partHistory";
 
 export class InventoryRepository {
   async listSpareParts(branchId?: string): Promise<SparePart[]> {
@@ -35,19 +37,20 @@ export class InventoryRepository {
     description?: string;
     category?: string;
     unitPrice?: number;
-  }): Promise<SparePart> {
-    return prisma.sparePart.create({ data });
+  }, changedById?: string): Promise<SparePart> {
+    return this.createTracked(data, changedById);
   }
 
   async updateSparePart(
     id: string,
     data: Partial<SparePart>,
+    changedById?: string,
   ): Promise<SparePart> {
     return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }
 
-  async deleteSparePart(id: string): Promise<SparePart> {
-    return prisma.sparePart.delete({ where: { id } });
+  async deleteSparePart(id: string, changedById?: string): Promise<SparePart> {
+    return this.deletePart(id, changedById);
   }
 
   // ── Part Master ────────────────────────────────────────────────────────
@@ -67,12 +70,24 @@ export class InventoryRepository {
     retailRate?: number | null;
     taxable?: boolean;
     partFlag?: string;
+    partType?: string;
     priceCategoryCode?: string | null;
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;
   }): Promise<SparePart> {
     return prisma.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });
+  }, changedById?: string): Promise<SparePart> {
+    return this.createTracked(data, changedById);
+  }
+
+  // Every create, rate or bin change and delete is kept in the part's rate and bin history.
+  private async createTracked(data: Prisma.SparePartCreateInput, changedById?: string): Promise<SparePart> {
+    return prisma.$transaction(async (tx) => {
+      const part = await tx.sparePart.create({ data });
+      await recordPartChange(tx, null, part, changedById);
+      return part;
+    });
   }
 
   async findAllParts(filters?: {
@@ -126,9 +141,21 @@ export class InventoryRepository {
   async updatePart(id: string, data: Partial<SparePart>): Promise<SparePart> {
     return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }
+  async updatePart(id: string, data: Partial<SparePart>, changedById?: string): Promise<SparePart> {
+    return prisma.$transaction(async (tx) => {
+      const before = await tx.sparePart.findUniqueOrThrow({ where: { id } });
+      const part = await tx.sparePart.update({ where: { id }, data });
+      await recordPartChange(tx, before, part, changedById);
+      return part;
+    });
+  }
 
-  async deletePart(id: string): Promise<SparePart> {
-    return prisma.sparePart.delete({ where: { id } });
+  async deletePart(id: string, changedById?: string): Promise<SparePart> {
+    return prisma.$transaction(async (tx) => {
+      const part = await tx.sparePart.delete({ where: { id } });
+      await recordPartChange(tx, part, null, changedById);
+      return part;
+    });
   }
 
   // ── Inventory Stock ────────────────────────────────────────────────────

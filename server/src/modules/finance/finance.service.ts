@@ -1,5 +1,5 @@
 import prisma from '../../prisma/client';
-import { FinanceRepository } from './finance.repository';
+import { FinanceRepository, branchScope } from './finance.repository';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
 
 export class FinanceService {
@@ -64,7 +64,7 @@ export class FinanceService {
     if (hasDateFilter) invoiceWhere.issuedDate = dateFilter;
     if (hasDateFilter) receiptWhere.issuedAt = dateFilter;
     if (params.branchId) {
-      invoiceWhere.OR = [{ jobCard: { branchId: params.branchId } }, { jobCardId: null, customer: { branchId: params.branchId } }];
+      invoiceWhere.OR = branchScope(params.branchId);
       receiptWhere.branchId = params.branchId;
     }
 
@@ -86,7 +86,7 @@ export class FinanceService {
 
   async getInvoiceReport(params: { startDate?: string; endDate?: string; branchId?: string }) {
     const where: any = {};
-    if (params.branchId) where.OR = [{ jobCard: { branchId: params.branchId } }, { jobCardId: null, customer: { branchId: params.branchId } }];
+    if (params.branchId) where.OR = branchScope(params.branchId);
     if (params.startDate || params.endDate) {
       where.issuedDate = {};
       if (params.startDate) where.issuedDate.gte = new Date(params.startDate);
@@ -112,7 +112,7 @@ export class FinanceService {
   }
 
   async getDashboardOverview(branchId?: string) {
-    const invoiceScope = branchId ? { OR: [{ jobCard: { branchId } }, { jobCardId: null, customer: { branchId } }] } : {};
+    const invoiceScope = branchId ? { OR: branchScope(branchId) } : {};
     const [openInvoices, overdueInvoices, paidInvoices, totalOutstanding] = await Promise.all([
       prisma.invoice.count({ where: { ...invoiceScope, status: 'Unpaid' } }),
       prisma.invoice.count({ where: { ...invoiceScope, status: 'Overdue' } }),

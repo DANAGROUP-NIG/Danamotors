@@ -126,6 +126,8 @@ const basePartMasterFields = {
     .min(1, "Part flag is required")
     .max(2, "Part flag must be 1 or 2 characters")
     .optional(),
+  // Legacy part type: S spare part, O oil, A accessory.
+  partType: z.enum(["S", "O", "A"], { message: "Part type must be S (spare part), O (oil) or A (accessory)" }).optional(),
   priceCategoryCode: z
     .string()
     .trim()
@@ -176,6 +178,7 @@ export const updatePartMasterSchema = z.object({
       retailRate: basePartMasterFields.retailRate,
       taxable: basePartMasterFields.taxable,
       partFlag: basePartMasterFields.partFlag,
+      partType: basePartMasterFields.partType,
       priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
       binLocation: basePartMasterFields.binLocation,
       storeLocation: basePartMasterFields.storeLocation,
