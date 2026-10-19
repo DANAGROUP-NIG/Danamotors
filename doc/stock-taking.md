@@ -41,14 +41,58 @@ Audit, Audit by Audit Head, Audit by Visiting Management); see [Stock audit](#st
 
 ## Handheld (HHDC)
 
-The web count sheet stands in until the handheld is integrated. The device should use the same
-two calls:
+The handheld is a Motorola MC3190 (Windows CE 6.0, .NET Compact Framework 3.5). Two programs in
+`hhdc/` replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`, with **no server
+changes**. They use the same two calls as the web count sheet:
 
 - `GET /api/stock-takes/:id/sheets/:sheetId`: the sheet's parts (bin, part, description, and
   system stock if `showSystemStock`).
 - `POST /api/stock-takes/:id/sheets/:sheetId/upload`: `{ uncounted: "ZERO" | "RELEASE", entries:
-  [{ partId | partNumber, binLocation, quantity, damagedQuantity, remarks, countedAt }] }`. Send
-  one entry per scan (part and bin). The upload accepts up to 50,000 entries.
+  [{ partNumber, binLocation, quantity, damagedQuantity, remarks, countedAt }] }`, one entry per
+  part per bin (up to 50,000). The server **adds counts up**, so a sheet is uploaded once.
+
+| Program | Where it runs | What it does |
+| --- | --- | --- |
+| **Danamotors Count** (`hhdc/device`) | The handheld, offline | The checker picks a sheet, scans or types bin then part, enters quantity, damaged and remark. Each entry is saved at once to an append-only file. Review (edit, delete) and **Finish sheet** (locks it). |
+| **HHDC Link** (`hhdc/link`) | The store PC with Windows Mobile Device Center | Signs in with a Danamotors account, lists issued sheets not yet uploaded, **Send to device**, **Receive from device** (summary, ZERO or RELEASE, upload once, clear the device), **Install / update app**. `HhdcLinkCli.exe` does the same on a command line. |
+
+How it works:
+
+- **Sending.** The sheet is written to `\Application\Danamotors\sheets\<sheet>.sheet` on the device
+  (plain text ending in a line count, so a copy cut short by a dropped USB link is detected). The PC's
+  time is written in it, because the device clock can read 2009. A sheet that has counts on the device
+  is never overwritten. System stock goes to the device only if the sheet allows it; an audit sheet is
+  always blind.
+- **Counting.** A scan arrives as keystrokes (DataWedge). Enter, Tab, or a burst of fast characters
+  followed by a short pause ends a scan. The same part in two bins is two entries. The same part and
+  bin again asks **add** or **replace**. A part not on the sheet asks first and is marked; a bin that
+  differs from the sheet's bin warns but is allowed (the Update bins step uses it). A battery pull
+  loses at most the entry being typed.
+- **Receiving.** HHDC Link needs the sheet **finished**. It shows entries, quantity, damaged, parts not
+  on the sheet and parts not counted, and requires a choice for the uncounted parts (`ZERO` or
+  `RELEASE`) before it uploads. It checks the server first (sheet still open), writes `Uploading` to its
+  own record (`%APPDATA%\Danamotors\HHDC Link\uploads.log`), posts, writes `Uploaded`, then clears the
+  sheet from the device. If the answer is lost, the next attempt asks the server before sending again.
+  A sheet already uploaded, from this PC or from the web, is refused (the server also answers 409).
+- **Times.** An entry's device time is used only if it falls between when the PC sent the sheet and
+  now; otherwise `countedAt` is the time the PC received the sheet.
+- **Who may upload.** The upload needs `stocktake:manage` (`stockaudit:manage` for an audit), so
+  whoever signs in to HHDC Link needs it. Whether checkers get it or a supervisor runs HHDC Link is not
+  decided; HHDC Link works either way.
+
+Build and test (no Visual Studio; only the free `csc.exe` of .NET Framework 4):
+
+```powershell
+cd hhdc
+.\build.ps1            # builds both programs and runs the unit tests
+.\build.ps1 -UiTest    # also drives the real device exe through a counting session on this PC
+```
+
+The device app is compiled against the device's own .NET CF 3.5 libraries, which are not in the repo
+(`dana_projects/hhdc_integration/tools/probe/refs`; pass `-CfRefs` if they are elsewhere). The same exe
+runs on a PC: `DanamotorsCount.exe --data <folder>` shows the 318x269 screen. HHDC Link can use a folder
+in place of a device (`--folder <dir>`, or the "Test folder" box). See `hhdc/README.md`. What cannot be
+proven without the device is in `dana_projects/hhdc_integration/device_checklist.md`.
 
 ## Legacy findings (AutoEnhancer and CPDAutoEnhancer)
 
