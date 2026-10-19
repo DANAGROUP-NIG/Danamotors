@@ -46,7 +46,7 @@ export class InventoryRepository {
     data: Partial<SparePart>,
     changedById?: string,
   ): Promise<SparePart> {
-    return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
+    return this.updatePart(id, data, changedById);
   }
 
   async deleteSparePart(id: string, changedById?: string): Promise<SparePart> {
@@ -75,16 +75,14 @@ export class InventoryRepository {
     binLocation?: string | null;
     storeLocation?: string | null;
     partStatus?: PartStatus;
-  }): Promise<SparePart> {
-    return prisma.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }, changedById?: string): Promise<SparePart> {
     return this.createTracked(data, changedById);
   }
 
   // Every create, rate or bin change and delete is kept in the part's rate and bin history.
-  private async createTracked(data: Prisma.SparePartCreateInput, changedById?: string): Promise<SparePart> {
+  private async createTracked(data: Prisma.SparePartUncheckedCreateInput, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
-      const part = await tx.sparePart.create({ data });
+      const part = await tx.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });
       await recordPartChange(tx, null, part, changedById);
       return part;
     });
@@ -138,13 +136,10 @@ export class InventoryRepository {
     return prisma.sparePart.findUnique({ where: { partCode } });
   }
 
-  async updatePart(id: string, data: Partial<SparePart>): Promise<SparePart> {
-    return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
-  }
   async updatePart(id: string, data: Partial<SparePart>, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
       const before = await tx.sparePart.findUniqueOrThrow({ where: { id } });
-      const part = await tx.sparePart.update({ where: { id }, data });
+      const part = await tx.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
       await recordPartChange(tx, before, part, changedById);
       return part;
     });
