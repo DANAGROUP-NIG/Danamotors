@@ -20,6 +20,10 @@ integration('Monthly reports database chain', () => {
             expect(tax.totals.vat).toBe(30);
             expect(tax.totals.billAmount).toBe(791);
             expect(tax.groups.find(g => g.title === 'VAT annexure')?.totals?.vat).toBe(tax.totals.vat);
+            const cash = await reports.report('tax-register', reportQueries['tax-register'].parse({ ...base, billType: 'CASH' }));
+            const credit = await reports.report('tax-register', reportQueries['tax-register'].parse({ ...base, billType: 'CREDIT' }));
+            expect(cash.totals).toMatchObject({ bills: 1, billAmount: 683, vat: 22.5 });
+            expect(credit.totals).toMatchObject({ bills: 1, billAmount: 108, vat: 7.5 });
             const booked = await reports.report('booked-vs-availed', reportQueries['booked-vs-availed'].parse({ ...base, graceDays: 2 }));
             expect(booked.totals).toMatchObject({ bookings: 3, availed: 2, notAvailed: 1, walkIns: 2 });
             const estimate = await reports.report('estimate-vs-job', reportQueries['estimate-vs-job'].parse(base));
