@@ -16,12 +16,24 @@ type ModelSetting = {
   previousCharge: number | null;
   effectiveFrom: string | null;
   active: boolean;
-};
+} & Record<LimitKey, number | null> & { checklistFollowed: boolean };
+// Legacy servicedetail: when the service falls due on this model and how long it takes.
+const limits = [
+  ["hoursRequired", "Hours required", "0.01"],
+  ["mileageLimit", "Mileage limit (km)", "1"],
+  ["mileageVariation", "Mileage variation (km)", "1"],
+  ["daysLimit", "Days limit", "1"],
+  ["daysVariation", "Days variation", "1"],
+] as const;
+type LimitKey = typeof limits[number][0];
 type SettingForm = {
-  id?: string; modelId: string; model?: ModelSetting["model"];
-  serviceCharge: string; previousCharge: string; effectiveFrom: string; active: boolean;
-};
-const newSetting = (): SettingForm => ({ modelId: "", serviceCharge: "0", previousCharge: "", effectiveFrom: "", active: true });
+  id?: string; modelId: string; model?: { id: string; code: string; description: string };
+  serviceCharge: string; previousCharge: string; effectiveFrom: string; active: boolean; checklistFollowed: boolean;
+} & Record<LimitKey, string>;
+const newSetting = (): SettingForm => ({
+  modelId: "", serviceCharge: "0", previousCharge: "", effectiveFrom: "", active: true, checklistFollowed: false,
+  hoursRequired: "", mileageLimit: "", mileageVariation: "", daysLimit: "", daysVariation: "",
+});
 const errorMessage = (error: unknown) => isAxiosError(error) ? error.response?.data?.message ?? "Could not save model charges" : "Could not save model charges";
 
 export function ServiceTypeModelSettings({ serviceTypeId }: { serviceTypeId: string }) {
@@ -48,6 +60,8 @@ export function ServiceTypeModelSettings({ serviceTypeId }: { serviceTypeId: str
         previousCharge: values.previousCharge === "" ? null : Number(values.previousCharge),
         effectiveFrom: values.effectiveFrom ? `${values.effectiveFrom}T00:00:00.000Z` : null,
         active: values.active,
+        checklistFollowed: values.checklistFollowed,
+        ...Object.fromEntries(limits.map(([key]) => [key, values[key] === "" ? null : Number(values[key])])),
       };
       return values.id ? apiPut(`/service-type-model-settings/${values.id}`, payload)
         : apiPost('/service-type-model-settings', { ...payload, serviceTypeId, modelId: values.modelId });
@@ -72,12 +86,15 @@ export function ServiceTypeModelSettings({ serviceTypeId }: { serviceTypeId: str
         { header: "Charge", render: row => row.serviceCharge.toLocaleString() },
         { header: "Previous charge", render: row => row.previousCharge?.toLocaleString() ?? "—" },
         { header: "Effective from", render: row => row.effectiveFrom?.slice(0, 10) ?? "—" },
+        { header: "Due at", render: row => [row.mileageLimit != null && `${row.mileageLimit.toLocaleString()} km`, row.daysLimit != null && `${row.daysLimit} days`].filter(Boolean).join(" / ") || "—" },
+        { header: "Hours", render: row => row.hoursRequired ?? "—" },
         { header: "Active", render: row => row.active ? "Yes" : "No" },
         { header: "Actions", render: row => <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => { save.reset(); setForm({
             id: row.id, modelId: row.modelId, model: row.model, serviceCharge: String(row.serviceCharge),
             previousCharge: row.previousCharge === null ? "" : String(row.previousCharge),
-            effectiveFrom: row.effectiveFrom?.slice(0, 10) ?? "", active: row.active,
+            effectiveFrom: row.effectiveFrom?.slice(0, 10) ?? "", active: row.active, checklistFollowed: row.checklistFollowed,
+            ...Object.fromEntries(limits.map(([key]) => [key, row[key] == null ? "" : String(row[key])])) as Record<LimitKey, string>,
           }); }}>Edit</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => { remove.reset(); setRemoveId(row.id); }}>Remove</Button>
         </div> },
@@ -98,6 +115,9 @@ export function ServiceTypeModelSettings({ serviceTypeId }: { serviceTypeId: str
         value={form.previousCharge} onChange={event => setForm({ ...form, previousCharge: event.target.value })} /></Field>
       <Field label="Effective from"><input className={inputCls} type="date" value={form.effectiveFrom}
         onChange={event => setForm({ ...form, effectiveFrom: event.target.value })} /></Field>
+      {limits.map(([key, label, step]) => <Field key={key} label={label}><input className={inputCls} type="number" min="0" step={step}
+        value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} /></Field>)}
+      <label className="flex gap-2"><input type="checkbox" checked={form.checklistFollowed} onChange={event => setForm({ ...form, checklistFollowed: event.target.checked })} />Service checklist to be followed</label>
       <label className="flex gap-2"><input type="checkbox" checked={form.active} onChange={event => setForm({ ...form, active: event.target.checked })} />Active setting</label>
       {save.isError && <p role="alert" className="text-destructive">{errorMessage(save.error)}</p>}
       <div className="flex gap-2"><Button disabled={save.isPending || !form.modelId}>Save charges</Button>

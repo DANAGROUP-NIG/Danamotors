@@ -184,6 +184,7 @@ export class CustomerService {
     })))
       throw new ConflictError('A customer with this email address already exists');
 
+    await this.assertOrganization(data.organizationId);
     const duplicates = await this.findDuplicates(data);
 
     const customer = await prisma.$transaction(async tx => {
@@ -293,6 +294,15 @@ export class CustomerService {
     }) : [];
   }
 
+  private async assertOrganization(organizationId?: string | null, customerId?: string) {
+    if (!organizationId)
+      return;
+    if (organizationId === customerId)
+      throw new BadRequestError('A customer cannot be its own organization');
+    if (!(await prisma.customer.findFirst({ where: { id: organizationId, mergedIntoId: null }, select: { id: true } })))
+      throw new NotFoundError('Organization customer not found');
+  }
+
   async updateCustomer(id: string, input: z.infer<ReturnType<typeof customerBody.partial>>) {
     const existing = await prisma.customer.findUnique({
       where: {
@@ -311,6 +321,9 @@ export class CustomerService {
       ...input,
       dateOfBirth: input.dateOfBirth ?? existing.dateOfBirth?.toISOString(),
     });
+
+    if (data.organizationId !== existing.organizationId)
+      await this.assertOrganization(data.organizationId, id);
 
     return prisma.customer.update({
       where: {
@@ -383,6 +396,31 @@ export class CustomerService {
 
         data: {
           customerId: targetId,
+        },
+      });
+
+      await tx.customer.updateMany({
+        where: {
+          organizationId: sourceId,
+          id: {
+            not: targetId,
+          },
+        },
+
+        data: {
+          organizationId: targetId,
+        },
+      });
+
+      // The surviving customer cannot belong to itself.
+      await tx.customer.updateMany({
+        where: {
+          id: targetId,
+          organizationId: sourceId,
+        },
+
+        data: {
+          organizationId: null,
         },
       });
 

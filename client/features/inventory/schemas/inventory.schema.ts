@@ -40,6 +40,19 @@ export const partMasterSchema = z
     partStatus: z.enum(["ACTIVE", "BLOCKED"]),
     warrantyApplicable: z.boolean(),
     warrantyRate: optionalNumber("Warranty rate"),
+    vehicleSystem: optionalText(20),
+    vehicleGroup: optionalText(20),
+    /** Comma-separated model codes; blank = all models. */
+    applicableModels: optionalText(2000),
+    moq: optionalNumber("MOQ"),
+    conversionFactor: optionalNumber("Conversion factor"),
+    basicRate: optionalNumber("Base rate"),
+    nspDate: z.string().optional(),
+    nlaDate: z.string().optional(),
+    blockReserve: z.boolean(),
+    includeInTopN: z.boolean(),
+    topMover: z.boolean(),
+    underAmc: z.boolean(),
   })
   .refine((d) => d.minLevel == null || d.maxLevel == null || d.maxLevel >= d.minLevel, {
     message: "Maximum level must be greater than or equal to minimum level",

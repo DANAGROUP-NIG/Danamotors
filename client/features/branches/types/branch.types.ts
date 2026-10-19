@@ -11,6 +11,8 @@ export type Branch = {
   usersCount: number;
   /** Legacy store-location code, e.g. A, QS, DH. */
   code?: string | null;
+  /** Legacy store-location short name, e.g. VI-2. */
+  shortName?: string | null;
   /** Set when this is a sub-location (store, godown) at another branch's premises. */
   parentBranchId?: string | null;
   parentBranch?: { id: string; name: string; code: string | null } | null;
@@ -33,11 +35,14 @@ export type CreateBranchPayload = {
   phoneNumber?: string;
   email?: string;
   code?: string;
+  shortName?: string;
   parentBranchId?: string;
 };
 
 export type UpdateBranchPayload = Partial<
-  Omit<CreateBranchPayload, "code" | "parentBranchId"> & {
+  Omit<CreateBranchPayload, "code" | "shortName" | "parentBranchId"> & {
+    /** null clears the short name. */
+    shortName: string | null;
     isActive?: boolean;
     /** null clears the code. */
     code: string | null;

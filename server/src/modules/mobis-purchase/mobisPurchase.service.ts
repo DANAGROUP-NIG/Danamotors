@@ -8,12 +8,11 @@
  * (and, if asked, any parts missing from Part Master). Generating the MRN
  * records what physically arrived and posts accepted stock exactly once.
  */
-import { MitStatus, MrnSource, PartStatus, TransportMode } from "@prisma/client";
+import { MitStatus, MrnSource, TransportMode } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
-import { recordPartChange } from "../inventory/partHistory";
 import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
 import {
@@ -43,7 +42,8 @@ export interface ImportMitInput {
   receivedMode: TransportMode;
   remarks?: string;
   sourceFileName?: string;
-  createMissingParts?: boolean;
+  /** Leave invoice lines for parts not in Part Master off the MIT instead of rejecting the file. */
+  ignoreMissingParts?: boolean;
   lines: ImportLineInput[];
 }
 
@@ -93,45 +93,38 @@ export class MobisPurchaseService {
       throw new ConflictError(`Mobis invoice ${invoiceNumber} was already imported as MIT ${duplicate.mitNumber}`);
     }
 
-    const lines = cleanImportLines(input.lines);
-    const totals = importTotals(lines);
+    const allLines = cleanImportLines(input.lines);
 
-    const mit = await prisma.$transaction(async (tx) => {
+    const { mit, totals, ignored } = await prisma.$transaction(async (tx) => {
       const existing = await tx.sparePart.findMany({
-        where: { partNumber: { in: [...new Set(lines.map((l) => l.partNumber))], mode: "insensitive" } },
-        select: { id: true, partNumber: true },
+        where: { partNumber: { in: [...new Set(allLines.map((l) => l.partNumber))], mode: "insensitive" } },
+        select: { id: true, partNumber: true, sourceOfPartId: true },
       });
-      const partIdByNumber = new Map(existing.map((p) => [p.partNumber.toUpperCase(), p.id]));
-      const created = new Set<string>();
-
-      const missing = [...new Set(lines.map((l) => l.partNumber).filter((n) => !partIdByNumber.has(n)))];
-      if (missing.length && !input.createMissingParts) {
+      // Matching is by part number, so local, used and repaired records (e.g. 54651-U) only match if an
+      // invoice really carries their number; Mobis stock must never land on them.
+      const sourceRecords = existing.filter((p) => p.sourceOfPartId).map((p) => p.partNumber);
+      if (sourceRecords.length) {
         throw new BadRequestError(
-          `${missing.length} part(s) are not in Part Master: ${missing.slice(0, 15).join(", ")}. ` +
-            "Create them from the invoice or add them to Part Master first.",
+          `Part number(s) ${sourceRecords.slice(0, 15).join(", ")} belong to local, used or repaired source records, not Mobis parts`,
         );
       }
-      for (const partNumber of missing) {
-        const line = lines.find((l) => l.partNumber === partNumber)!;
-        const part = await tx.sparePart.create({
-          data: {
-            partNumber,
-            name: line.partName ?? partNumber,
-            description: `Created from Mobis invoice ${invoiceNumber}`,
-            category: "Mobis import",
-            uom: "UNIT",
-            // Initial dealer rate: the invoice price in naira. Review it in Part Master.
-            unitPrice: unitCost(line.unitPrice, conversionRate),
-            partStatus: PartStatus.ACTIVE,
-          },
-        });
-        await recordPartChange(tx, null, part, actorId);
-        partIdByNumber.set(partNumber, part.id);
-        created.add(partNumber);
+      const partByNumber = new Map(existing.map((p) => [p.partNumber.toUpperCase(), p]));
+
+      // Parts are never created from an invoice: the user either adds them to Part Master first or
+      // knowingly leaves them off this MIT.
+      const ignored = [...new Set(allLines.map((l) => l.partNumber).filter((n) => !partByNumber.has(n)))];
+      if (ignored.length && !input.ignoreMissingParts) {
+        throw new BadRequestError(
+          `${ignored.length} part(s) are not in Part Master: ${ignored.slice(0, 15).join(", ")}. ` +
+            "Create them in Part Master first, or continue without them.",
+        );
       }
+      const lines = allLines.filter((l) => partByNumber.has(l.partNumber));
+      if (!lines.length) throw new BadRequestError("None of the invoice parts are in Part Master, so there is nothing to import");
+      const totals = importTotals(lines);
 
       const mitNumber = await nextDocumentNumber(tx, DOC_TYPES.MIT);
-      return tx.materialInTransit.create({
+      const created = await tx.materialInTransit.create({
         data: {
           mitNumber,
           status: MitStatus.IN_TRANSIT,
@@ -150,7 +143,7 @@ export class MobisPurchaseService {
           createdById: actorId,
           lines: {
             create: lines.map((l) => ({
-              partId: partIdByNumber.get(l.partNumber)!,
+              partId: partByNumber.get(l.partNumber)!.id,
               filePartNumber: l.partNumber,
               filePartName: l.partName,
               orderNumber: l.orderNumber,
@@ -163,22 +156,21 @@ export class MobisPurchaseService {
               orderedQuantity: l.quantity,
               unitPrice: l.unitPrice,
               amount: l.amount,
-              newPart: created.has(l.partNumber),
             })),
           },
         },
         include: { lines: true },
       });
+      return { mit: created, totals, ignored };
     }, TX_OPTIONS);
 
-    const newParts = mit.lines.filter((l) => l.newPart).length;
     await this.notifyStore(branch.id, {
       type: MOBIS_NOTIFICATION_TYPES.MIT_UPLOADED,
       title: "Mobis invoice uploaded",
       message:
         `MIT ${mit.mitNumber} for Mobis invoice ${invoiceNumber}: ${totals.totalQuantity} unit(s) on ${mit.lines.length} line(s)` +
         (totals.totalCases ? ` in ${totals.totalCases} case(s)` : "") +
-        (newParts ? `, ${newParts} new part(s) added to Part Master` : "") +
+        (ignored.length ? `, ${ignored.length} part(s) not in Part Master left off` : "") +
         ". Check the shipment and generate the MRN.",
       link: `/inventory/mobis-receipts/${mit.id}`,
     });

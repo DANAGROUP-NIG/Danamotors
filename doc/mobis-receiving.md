@@ -61,7 +61,34 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
 branch transfers are under `/api/inventory/transfer-mrns`. Request and response examples are in
 Swagger under "Mobis Purchase".
 
+## Vendor receipts (non-Mobis purchases)
+
+**Inventory → Vendor Receipts** (`/inventory/vendor-receipts`) receives parts bought from any vendor other than
+Mobis: the local, second-hand and repaired parts the branches buy (legacy: about 600–850 local-vendor MRNs a year
+per branch), and CPD's direct non-Mobis purchases. Each receipt is an MRN with source `VENDOR` for one vendor
+invoice, numbered like every MRN.
+
+- Pick the branch, the vendor (a party of type VENDOR), the vendor's invoice number and date, then the lines: part
+  record, quantity and unit cost. Lines are usually source records such as `54651-U` (see
+  [masters.md](./masters.md#part-sources-and-source-records)), but any active part can be received; legacy branches
+  also buy some O-flag parts from local vendors.
+- Posting adds the stock to the branch, writes a RECEIVED stock transaction, sets each record's dealer rate to the
+  unit cost, recalculates its retail rate from its price category and records the rate change in the part's history.
+- Discounts, handling, tax and other charges are not recorded: they were zero on every legacy MRN since 2024.
+- The same vendor invoice cannot be received twice. A vendor whose name contains "Mobis" is refused: Mobis
+  invoices come in through the MIT upload above.
+- The receipt page prints the MRN and staff-only shelf labels (part number, name, source, bin), one per unit or
+  one per line.
+- Vendor MRNs are on the MRN register report with the Mobis ones.
+
+API: `GET /api/inventory/vendor-receipts/vendors`, `GET /api/inventory/vendor-receipts/parts`,
+`POST`/`GET /api/inventory/vendor-receipts`, `GET /api/inventory/vendor-receipts/:id` (permissions `stock:read`,
+`stock:update` to post). Swagger: "Vendor Receipts".
+
 ## Not yet built
+
+Returns to vendors (legacy MRN returns) are not built yet; neither is Tally posting of vendor receipts
+(see `tally_requirements_part_purchase.md` outside the repo).
 
 Purchase requests do not yet feed Mobis orders. There is no request stepper and no
 back-order-to-order link. The Mobis order number from the invoice is stored on each MIT line,

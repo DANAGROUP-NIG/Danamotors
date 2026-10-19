@@ -38,6 +38,7 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       phoneNumber: branch.phoneNumber ?? "",
       email: branch.email ?? "",
       code: branch.code ?? "",
+      shortName: branch.shortName ?? "",
       parentBranchId: branch.parentBranchId ?? "",
     },
   });
@@ -54,19 +55,21 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       phoneNumber: branch.phoneNumber ?? "",
       email: branch.email ?? "",
       code: branch.code ?? "",
+      shortName: branch.shortName ?? "",
       parentBranchId: branch.parentBranchId ?? "",
     });
   }, [branch, reset]);
 
   function onSubmit(values: UpdateBranchFormValues) {
-    const { code, parentBranchId, ...rest } = values;
+    const { code, shortName, parentBranchId, ...rest } = values;
     const payload = {
       ...(Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== "" && v !== undefined)) as Omit<
         UpdateBranchFormValues,
-        "code" | "parentBranchId"
+        "code" | "shortName" | "parentBranchId"
       >),
       // Empty clears these, so they are always sent.
       code: code?.trim() ? code.trim().toUpperCase() : null,
+      shortName: shortName?.trim() || null,
       parentBranchId: parentBranchId || null,
     };
     update.mutate(payload, { onSuccess });

@@ -11,9 +11,9 @@ const SETTINGS_CARDS = [
     href: "/settings/roles",
   },
   {
-    title: "Workshop Profile",
-    description: "Update workshop name, address, and contact details.",
-    href: "/settings",
+    title: "Company & Branch Settings",
+    description: "Company details on documents; each branch's VAT, round-off, repeat-job, booking and workshop rules.",
+    href: "/settings/company",
   },
   {
     title: "Notifications",
@@ -22,8 +22,23 @@ const SETTINGS_CARDS = [
   },
   {
     title: "Workshop Masters",
-    description: "Service types, bays, complaints, teams and the vehicle catalogue.",
+    description: "Vehicle catalogue, services, bays, defects, designations, geography, UOM and tax codes.",
     href: "/settings/workshop-masters",
+  },
+  {
+    title: "Service Checklists",
+    description: "Parts and labour per checklist and model, and the checklist due at each mileage.",
+    href: "/settings/service-checklists",
+  },
+  {
+    title: "Part Categories",
+    description: "Retail multiplier per price category and each branch's discount, handling and cost %.",
+    href: "/settings/part-categories",
+  },
+  {
+    title: "Terms & Conditions",
+    description: "Terms and footer messages printed on estimates, job cards, bills, quotations and receipts.",
+    href: "/settings/document-terms",
   },
   {
     title: "Integrations",

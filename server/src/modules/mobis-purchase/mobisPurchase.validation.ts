@@ -19,7 +19,7 @@ export const importMitSchema = z.object({
     receivedMode,
     remarks: optionalText(500),
     sourceFileName: optionalText(200),
-    createMissingParts: z.boolean().optional(),
+    ignoreMissingParts: z.boolean().optional(),
     lines: z
       .array(
         z.object({

@@ -10,6 +10,8 @@ import type {
   PartMasterPayload,
   PartQueryResult,
   PartStockItem,
+  PartSources,
+  SourceRecordPayload,
   PriceCategory,
   StockLocationPayload,
   UpdatePartMasterPayload,
@@ -66,6 +68,16 @@ export async function getAlternatesRequest(mainPartId: string): Promise<PartMast
   // The backend names this list `part`.
   const data = await apiGet<{ part: RawPart[] }>(API_ROUTES.inventory.parts.alternates(mainPartId));
   return data.part.map(normalizePart);
+}
+
+export async function getPartSourcesRequest(partId: string, branchId?: string | null): Promise<PartSources> {
+  const qs = branchId ? `?branchId=${encodeURIComponent(branchId)}` : "";
+  return apiGet<PartSources>(`${API_ROUTES.inventory.parts.sources(partId)}${qs}`);
+}
+
+export async function createSourceRecordRequest(mainPartId: string, payload: SourceRecordPayload): Promise<PartMaster> {
+  const data = await apiPost<{ part: RawPart }, SourceRecordPayload>(API_ROUTES.inventory.parts.sources(mainPartId), payload);
+  return normalizePart(data.part);
 }
 
 export async function createAlternateRequest(mainPartId: string, payload: AlternatePartPayload): Promise<PartMaster> {

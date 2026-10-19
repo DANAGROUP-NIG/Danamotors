@@ -62,6 +62,7 @@ export class BranchRepository {
     phoneNumber?: string;
     email?: string;
     code?: string;
+    shortName?: string;
     parentBranchId?: string;
   }): Promise<Branch> {
     return prisma.branch.create({ data });
@@ -76,6 +77,7 @@ export class BranchRepository {
     phoneNumber: string;
     email: string;
     code: string | null;
+    shortName: string | null;
     parentBranchId: string | null;
   }>): Promise<Branch> {
     return prisma.branch.update({ where: { id }, data });

@@ -10,6 +10,13 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { createCustomerSchema, type CreateCustomerFormValues } from "../schemas/customer.schema";
 import type { Customer } from "../types/customer.types";
+import { MasterOptions } from "@/components/forms/MasterOptions";
+import { useMasterCodes } from "@/hooks/use-master-codes";
+import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+
+const DEFAULT_SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."];
+// Geography inputs suggest names from the ZONE / STATE / CITY masters.
+const GEOGRAPHY: Record<string, string> = { zone: "ZONE", state: "STATE", city: "CITY" };
 
 export function CustomerProfileForm(
   {
@@ -33,10 +40,15 @@ export function CustomerProfileForm(
 
   const defaults = Object.fromEntries(Object.entries(customer ?? {}).map(([key, value]) => [key, key === "dateOfBirth" ? String(value ?? "").slice(0, 10) : value ?? ""]));
 
+  const { data: salutationMasters } = useMasterCodes("SALUTATION");
+  const { data: segments } = useMasterCodes("SEGMENT");
+  const salutations = [...new Set([...DEFAULT_SALUTATIONS, ...(salutationMasters ?? []).map(row => row.code), ...(customer?.salutation ? [customer.salutation] : [])])];
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
 
     formState: {
       errors,
@@ -105,15 +117,33 @@ export function CustomerProfileForm(
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString() : undefined,
         code: isAdminOrAbove ? data.code || undefined : undefined,
         salutation: data.type === "CORPORATE" ? "M/S." : data.salutation || undefined,
+        segment: data.segment || null,
+        companyType: data.companyType || null,
+        vendorType: data.vendorType || null,
+        mrnRateType: data.mrnRateType || null,
+        organizationId: data.organizationId || null,
       }))}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Customer type"><select className={inputCls} {...register("type")}>{["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"].map(value => <option key={value}>{value}</option>)}</select></Field>
         <Field label="Credit days (blank uses company default)" error={errors.creditDays?.message}><input className={inputCls} type="number" min="0" max="3650" {...register("creditDays", { setValueAs: value => value === "" ? null : Number(value) })} /></Field>
         <Field label="Party status" error={errors.partyStatus?.message}><select className={inputCls} {...register("partyStatus")}><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option><option value="FA_PARTY">FA party</option></select></Field>
-        <Field label="Salutation">{type === "CORPORATE" ? <input className={inputCls} value="M/S." readOnly /> : <select className={inputCls} {...register("salutation")}><option value="">Select salutation</option>{["Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."].map(value => <option key={value}>{value}</option>)}</select>}</Field>
+        <Field label="Salutation">{type === "CORPORATE" ? <input className={inputCls} value="M/S." readOnly /> : <select className={inputCls} {...register("salutation")}><option value="">Select salutation</option>{salutations.map(value => <option key={value}>{value}</option>)}</select>}</Field>
         {fields.map(
-          ([key, label]) => <Field key={key} label={label} error={errors[key]?.message}><input className={inputCls} type={key === "email" ? "email" : "text"} {...register(key)} /></Field>,
+          ([key, label]) => <Field key={key} label={label} error={errors[key]?.message}><input className={inputCls} type={key === "email" ? "email" : "text"}
+            list={GEOGRAPHY[key] ? `customer-${key}` : undefined} {...register(key)} />{GEOGRAPHY[key] && <MasterOptions id={`customer-${key}`} kind={GEOGRAPHY[key]} value={key === "zone" ? "code" : "description"} />}</Field>,
         )}
+        <Field label="District"><input className={inputCls} {...register("district")} /></Field>
+        <Field label="Segment"><select className={inputCls} {...register("segment")}><option value="">Not set</option>{[...new Set([...(segments ?? []).map(row => row.code), ...(customer?.segment ? [customer.segment] : [])])].map(code => <option key={code} value={code}>{segments?.find(row => row.code === code)?.description ?? code}</option>)}</select></Field>
+        <Field label="Company type code (optional)"><input className={inputCls} maxLength={10} {...register("companyType")} /></Field>
+        <Field label="Credit limit (optional)" error={errors.creditLimit?.message}><input className={inputCls} type="number" min="0" step="0.01" {...register("creditLimit", { setValueAs: value => value === "" || value === null ? null : Number(value) })} /></Field>
+        {type === "VENDOR" && <>
+          <Field label="Vendor purchase source"><select className={inputCls} {...register("vendorType")}><option value="">Not set</option><option value="LOCAL">Local</option><option value="IMP">Imported</option></select></Field>
+          <Field label="MRN rate"><select className={inputCls} {...register("mrnRateType")}><option value="">Not set</option><option value="D">Dealer rate</option><option value="R">Retail rate</option></select></Field>
+        </>}
+        <WorkshopPicker label="Organization (corporate group)" endpoint="/customers" collection="customers" value={watch("organizationId") ?? ""}
+          onChange={id => setValue("organizationId", id, { shouldDirty: true })} />
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("governmentVehicle")} />Government vehicle</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("ownCompanyVehicle")} />Own company vehicle</label>
         <Field label="Birth date"><input type="date" className={inputCls} {...register("dateOfBirth")} /></Field>
         <Field label="Anniversary date"><input type="date" className={inputCls} {...register("anniversaryDate")} /></Field>
         <Field label="Preferred follow-up day"><select className={inputCls} {...register("preferredFollowupDay")}><option value="">No preference</option>{["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => <option key={day}>{day}</option>)}</select></Field>

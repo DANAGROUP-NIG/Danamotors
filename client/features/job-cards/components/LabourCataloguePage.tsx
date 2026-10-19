@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Save, X } from "lucide-react";
+import { Plus, Save, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/headers/page-header";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -10,6 +10,21 @@ import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import ModalFame from "@/components/modals/ModalFame";
+import { WorkshopPicker } from "./WorkshopPicker";
+
+// Legacy labour master flags.
+const FLAGS = [
+  ["majorLabour", "Major labour"],
+  ["insured", "Insured"],
+  ["approvalRequired", "Approval required"],
+  ["externalLabour", "External labour"],
+  ["underAmc", "Under AMC"],
+  ["followUpAnalysis", "Include in follow-up analysis"],
+  ["amountEditable", "Labour amount can be edited"],
+  ["includeInTopN", "Include in top-N reports"],
+] as const;
+type FlagKey = typeof FLAGS[number][0];
 
 type LabourItem = {
   id: string;
@@ -20,7 +35,8 @@ type LabourItem = {
   active: boolean;
   vehicleSystem?: string;
   group?: string;
-};
+  inactiveDate?: string | null;
+} & Partial<Record<FlagKey, boolean>>;
 type LabourForm = {
   code: string;
   description: string;
@@ -48,6 +64,7 @@ export function LabourCataloguePage() {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<LabourForm>(emptyForm);
   const [editing, setEditing] = useState<Record<string, LabourForm>>({});
+  const [options, setOptions] = useState<LabourItem | null>(null);
   const catalogue = useQuery({
     queryKey: ["labour-items", "all", search],
     queryFn: async () =>
@@ -84,6 +101,7 @@ export function LabourCataloguePage() {
     }) => apiPut(API_ROUTES.service.labourItems + `/${id}`, payload),
     onSuccess: () => {
       toast.success("Labour item updated");
+      setOptions(null);
       refresh();
     },
     onError: () => toast.error("Could not update labour item"),
@@ -141,24 +159,22 @@ export function LabourCataloguePage() {
               required
             />
           </Field>
-          <Field label="Vehicle system">
-            <input
-              className={inputCls}
-              value={form.vehicleSystem ?? ""}
-              onChange={(event) =>
-                setForm({ ...form, vehicleSystem: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="Group">
-            <input
-              className={inputCls}
-              value={form.group ?? ""}
-              onChange={(event) =>
-                setForm({ ...form, group: event.target.value })
-              }
-            />
-          </Field>
+          <WorkshopPicker
+            label="Vehicle system"
+            endpoint="/workshop-masters?kind=VEHICLE_SYSTEM"
+            collection="items"
+            value={form.vehicleSystem ?? ""}
+            getOptionId={(row) => row.code ?? row.id}
+            onChange={(code) => setForm({ ...form, vehicleSystem: code })}
+          />
+          <WorkshopPicker
+            label="Group"
+            endpoint="/workshop-masters?kind=VEHICLE_GROUP"
+            collection="items"
+            value={form.group ?? ""}
+            getOptionId={(row) => row.code ?? row.id}
+            onChange={(code) => setForm({ ...form, group: code })}
+          />
           <Field label="Default hours">
             <input
               type="number"
@@ -360,6 +376,15 @@ export function LabourCataloguePage() {
                           <Button
                             type="button"
                             size="icon"
+                            variant="outline"
+                            aria-label={`Options for ${item.code}`}
+                            onClick={() => setOptions(item)}
+                          >
+                            <SlidersHorizontal className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
                             variant="ghost"
                             aria-label={`Deactivate ${item.code}`}
                             disabled={update.isPending}
@@ -382,6 +407,46 @@ export function LabourCataloguePage() {
           </table>
         </div>
       )}
+      <ModalFame
+        isOpen={!!options}
+        title={`Labour options ${options?.code ?? ""}`}
+        onClose={() => setOptions(null)}
+      >
+        {options && (
+          <form
+            className="grid gap-3 p-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              update.mutate({
+                id: options.id,
+                payload: Object.fromEntries(
+                  FLAGS.map(([key]) => [key, options[key] ?? false]),
+                ),
+              });
+            }}
+          >
+            <p className="text-sm text-muted-foreground">{options.description}</p>
+            {FLAGS.map(([key, label]) => (
+              <label key={key} className="flex gap-2">
+                <input
+                  type="checkbox"
+                  checked={options[key] ?? false}
+                  onChange={(event) =>
+                    setOptions({ ...options, [key]: event.target.checked })
+                  }
+                />
+                {label}
+              </label>
+            ))}
+            {!options.active && options.inactiveDate && (
+              <p className="text-sm text-muted-foreground">
+                Inactive since {options.inactiveDate.slice(0, 10)}
+              </p>
+            )}
+            <Button disabled={update.isPending}>Save options</Button>
+          </form>
+        )}
+      </ModalFame>
     </div>
   );
 }
