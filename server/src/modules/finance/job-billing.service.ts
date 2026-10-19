@@ -13,6 +13,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { config } from "../../config";
 import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
 import { categoryOf } from "../reports/report.logic";
+import { taxRegisterValues } from '../reports/tax-register-layout';
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
@@ -275,6 +276,7 @@ export class JobBillingService {
                 invoiceNumber,
                 billType: jobCard.creditApprovedById ? "CREDIT" : "CASH",
                 vatBreakdown: {create:breakdown},
+                taxRegisterSnapshot: { version: 1, source: 'BILLING', values: taxRegisterValues({ ...totals, vatBreakdown: breakdown }).values },
                 issuedDate,
                 dueDate,
                 subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]),

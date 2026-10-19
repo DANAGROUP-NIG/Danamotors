@@ -7,6 +7,7 @@ import { customerName } from './delivery-warranty.report';
 import { money, sumMoney } from '../finance/money';
 import { BadRequestError } from '../../shared/errors/appError';
 import { Prisma } from '@prisma/client';
+import { taxRegisterValues, taxRegisterTotals, taxRegisterColumns, taxRegisterLabels, taxRegisterGroups } from './tax-register-layout';
 export function taxAnnexure(rows: Array<{
     category: string;
     rate: number;
@@ -34,8 +35,11 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
         vat: number;
     }> = [];
     let historical = 0;
+    let incomplete = 0;
+    let roundingDifferences = 0;
     for (const i of bills) {
-        const type = i.billType ?? (i.jobCard?.creditApprovedById ? 'CREDIT' : 'CASH');
+        const layout = taxRegisterValues(i);
+        const type = i.billType ?? (layout.source === 'LEGACY' || i.notes?.startsWith('Imported stored total;') ? 'UNCLASSIFIED' : i.jobCard?.creditApprovedById ? 'CREDIT' : 'CASH');
         if (input.billType !== 'BOTH' && input.billType !== type)
             continue;
         const breakdown = i.vatBreakdown.map(r => ({ category: r.category, rate: Number(r.rate), saleAmount: Number(r.saleAmount), discount: Number(r.discount), taxableAmount: Number(r.taxableAmount), vat: Number(r.vat) }));
@@ -46,14 +50,16 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
         taxes.push(...breakdown);
         const cat = (key: string) => sumMoney(breakdown.filter(b => b.category === key).map(b => b.saleAmount));
         const partVat = sumMoney(breakdown.filter(b => b.category !== 'LABOUR' && b.category !== 'LEGACY_UNALLOCATED').map(b => b.vat));
-        rows.push({ billType: type, billNumber: i.invoiceNumber, billDate: dateKey(i.issuedDate), customer: customerName(i.customer), ...(input.printAddress === 'true' ? { address: i.customer.address, phone: i.customer.phoneNumber } : {}), taxId: null, spares: breakdown.some(b => b.category === 'SPARES') ? cat('SPARES') : null, oil: breakdown.some(b => b.category === 'OIL') ? cat('OIL') : null, accessories: breakdown.some(b => b.category === 'ACCESSORIES') ? cat('ACCESSORIES') : null, unclassifiedParts: cat('UNCLASSIFIED'), parts: i.partsTotal, discount: sumMoney([i.partsDiscountAmount, i.labourDiscountAmount]), taxableAmount: money(new Prisma.Decimal(i.subtotal).minus(i.partsDiscountAmount).minus(i.labourDiscountAmount).toNumber()), partsVat: partVat, labour: i.labourTotal, serviceCharge: i.serviceTotal, labourVat: sumMoney(breakdown.filter(b => b.category === 'LABOUR').map(b => b.vat)), legacyVat: sumMoney(breakdown.filter(b => b.category === 'LEGACY_UNALLOCATED').map(b => b.vat)), vat: i.vatAmount, roundOff: i.roundOff, billAmount: i.total });
+        if (layout.incomplete) incomplete++;
+        if (layout.sourceRoundingDifference) roundingDifferences++;
+        rows.push({ serialNumber: rows.length + 1, billType: type, billNumber: layout.documentNumber ?? i.invoiceNumber, billDate: dateKey(i.issuedDate), customer: customerName(i.customer), ...(input.printAddress === 'true' ? { address: i.customer.address, phone: i.customer.phoneNumber } : {}), taxId: null, spares: breakdown.some(b => b.category === 'SPARES') ? cat('SPARES') : null, oil: breakdown.some(b => b.category === 'OIL') ? cat('OIL') : null, accessories: breakdown.some(b => b.category === 'ACCESSORIES') ? cat('ACCESSORIES') : null, unclassifiedParts: cat('UNCLASSIFIED'), parts: i.partsTotal, discount: sumMoney([i.partsDiscountAmount, i.labourDiscountAmount]), taxableAmount: money(new Prisma.Decimal(i.subtotal).minus(i.partsDiscountAmount).minus(i.labourDiscountAmount).toNumber()), partsVat: partVat, labour: i.labourTotal, serviceCharge: i.serviceTotal, labourVat: sumMoney(breakdown.filter(b => b.category === 'LABOUR').map(b => b.vat)), legacyVat: sumMoney(breakdown.filter(b => b.category === 'LEGACY_UNALLOCATED').map(b => b.vat)), vat: i.vatAmount, roundOff: i.roundOff, billAmount: i.total, ...layout.values });
     }
     const keys = ['spares', 'oil', 'accessories', 'unclassifiedParts', 'parts', 'discount', 'taxableAmount', 'partsVat', 'labour', 'serviceCharge', 'labourVat', 'legacyVat', 'vat', 'roundOff', 'billAmount'];
     const annexure = taxAnnexure(taxes);
-    const sections = input.view === 'ANNEXURE' ? [] : groups(rows, 'billType', keys).map((g, i) => ({ ...g, pageBreak: input.pageBreak === 'true' && i > 0 }));
+    const sections: ReportResult['groups'] = input.view === 'ANNEXURE' ? [] : groups(rows, 'billType', keys).map((g, i) => ({ ...g, title: g.title === 'UNCLASSIFIED' ? 'Unclassified billing type' : g.title, columns: [...taxRegisterColumns, ...(input.printAddress === 'true' ? ['address', 'phone'] : [])], columnGroups: [...taxRegisterGroups, ...(input.printAddress === 'true' ? [{ title: 'Customer contact', columns: ['address', 'phone'] }] : [])], columnLabels: taxRegisterLabels, totals: { ...g.totals, ...taxRegisterTotals(g.rows) }, pageBreak: input.pageBreak === 'true' && i > 0 }));
     if (input.view !== 'DETAIL')
         sections.push({ title: 'VAT annexure', rows: annexure, totals: totals(annexure, ['saleAmount', 'discount', 'taxableAmount', 'vat']), pageBreak: true });
-    return { rows: [], groups: sections, totals: { ...totals(rows, keys), bills: rows.length }, filters: input, warnings: historical ? [`${historical} historical bills have no category breakdown. Stored VAT appears as legacy unallocated; no amounts were reconstructed.`] : [] };
+    return { rows: [], groups: sections, totals: { ...totals(rows, keys), ...taxRegisterTotals(rows), bills: rows.length }, summaryKeys: ['bills', 'netTotal', 'vat', 'roundOff'], filters: input, warnings: [...(roundingDifferences ? [`${roundingDifferences} legacy bills have a one-kobo component rounding difference. Net total preserves the stored invoice amount.`] : []), ...(historical ? [`${historical} historical bills have no category breakdown. Stored VAT appears as legacy unallocated; no amounts were reconstructed.`] : []), ...(incomplete && !historical ? [`${incomplete} bills have unavailable legacy charge or government-split fields. Dashes and incomplete totals indicate unknown amounts, not zero.`] : []), ...(rows.some(r => r.billType === 'UNCLASSIFIED') ? ['Imported cash/credit flags are unconfirmed. Those bills are shown separately and excluded from Cash-only and Credit-only selections.'] : [])] };
 }
 export async function corporateBills(input: ReportInput): Promise<ReportResult> {
     const corporates = await prisma.corporateGroup.findMany({ orderBy: input.order === 'NAME' ? [{ name: 'asc' }, { code: 'asc' }] : [{ code: 'asc' }] });

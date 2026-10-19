@@ -5,8 +5,12 @@ export interface ReportSection {
     rows: ReportRow[];
     totals?: ReportRow;
     pageBreak?: boolean;
+    columns?: string[];
+    columnGroups?: { title: string; columns: string[] }[];
+    columnLabels?: Record<string, string>;
 }
 export interface ReportResult {
+    summaryKeys?: string[];
     rows: ReportRow[];
     groups: ReportSection[];
     totals: ReportRow;

@@ -3,10 +3,25 @@ import prisma from '../../prisma/client';
 import { ReportsService } from './reports.service';
 import { reportQueries } from './report.validation';
 import { jobScope } from './report.repository';
+import { taxRegisterMoneyKeys } from './tax-register-layout';
 const base = { branchId: '11111111-1111-4111-8111-111111111111', from: '2026-10-01', to: '2026-10-07' };
 const job = { id: 'j', jobNumber: 'J1', createdAt: new Date('2026-10-01T09:00Z'), status: 'DELIVERED', vehicleId: 'v', vehicle: { id: 'v', vin: 'VIN', registrationNumber: 'REG', model: 'Rio', customer: null, catalogModel: null, catalogue: null }, customer: null, serviceType: { description: 'Paid', preDelivery: false }, service: null, lines: [], invoices: [], complaints: [], deliveryAdvisor: null, serviceAdvisor: null };
 describe('Monthly report data behavior', () => {
     beforeEach(() => jest.resetAllMocks());
+    it('returns the photographed register columns and original document number without guessing cash/credit', async () => {
+        const values = Object.fromEntries(taxRegisterMoneyKeys.map(k => [k, 0]));
+        Object.assign(values, { taxableSpares: 100, taxableAmount: 90, taxableDiscount: 10, upstNonGovernment: 6.75, taxableSubtotal: 96.75, labourAmount: 55, labourVat: 4.13, wctAmount: 5, netTotal: 150.88 });
+        const bill = { invoiceNumber: 'IMPORT-KEY', issuedDate: new Date('2026-10-01'), notes: 'Imported stored total; original flags pending', billType: null, customer: null, jobCard: { creditApprovedById: null }, vatBreakdown: [], partsTotal: 0, partsDiscountAmount: 0, labourTotal: 0, labourDiscountAmount: 0, serviceTotal: 0, subtotal: 140, vatAmount: 10.88, vatRate: 0, roundOff: 0, total: 150.88, taxRegisterSnapshot: { version: 1, source: 'LEGACY', documentNumber: '2026000973', values } };
+        (prisma.invoice.findMany as jest.Mock).mockResolvedValue([bill]);
+        const r = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse(base));
+        expect(r.groups[0].title).toBe('Unclassified billing type');
+        expect(r.groups[0].columns).toHaveLength(24);
+        expect(r.groups[0].columnGroups?.map(g => g.title)).toEqual(['Bill details', 'Taxable', 'Tax paid / non-taxable', 'Labour and bill total']);
+        expect(r.groups[0].rows[0]).toMatchObject({ billNumber: '2026000973', taxableSpares: 100, labourAmount: 55, labourVat: 4.13, wctAmount: 5, netTotal: 150.88 });
+        expect(r.totals.netTotal).toBe(150.88);
+        const cash = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse({ ...base, billType: 'CASH' }));
+        expect(cash.totals.bills).toBe(0);
+    });
     it('reports a standalone estimate shortage with catalogue codes rather than UUIDs', async () => {
         (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id: 'e', estimateNumber: 'E1', estimateDate: new Date('2026-10-01'), jobCard: null, vehicle: null, customer: null, lines: [{ type: 'PART', referenceId: 'part', description: 'Filter', quantity: 1, amount: 100 }] }]);
         (prisma.sparePart.findMany as jest.Mock).mockResolvedValue([{ id: 'part', partNumber: 'FILTER-01' }]);

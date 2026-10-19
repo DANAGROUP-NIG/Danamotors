@@ -1186,6 +1186,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  taxRegisterSnapshot Json?
   billType String?
   vatBreakdown InvoiceVatBreakdown[]
   serviceTotal Float @default(0)
