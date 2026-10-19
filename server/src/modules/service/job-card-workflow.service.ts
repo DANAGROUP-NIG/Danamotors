@@ -232,6 +232,8 @@ export class JobCardWorkflowService {
         ROLES.SERVICE_ADVISOR,
       );
 
+      if (data.engineerId) await requireStaff(tx, data.engineerId, branch.id, ROLES.ENGINEER);
+
       if (data.technicianId)
         await requireStaff(tx, data.technicianId, branch.id, ROLES.TECHNICIAN);
 

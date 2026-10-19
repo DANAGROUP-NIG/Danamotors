@@ -43,7 +43,7 @@ export class InventoryRepository {
     id: string,
     data: Partial<SparePart>,
   ): Promise<SparePart> {
-    return prisma.sparePart.update({ where: { id }, data });
+    return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }
 
   async deleteSparePart(id: string): Promise<SparePart> {
@@ -72,7 +72,7 @@ export class InventoryRepository {
     storeLocation?: string | null;
     partStatus?: PartStatus;
   }): Promise<SparePart> {
-    return prisma.sparePart.create({ data });
+    return prisma.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }
 
   async findAllParts(filters?: {
@@ -124,7 +124,7 @@ export class InventoryRepository {
   }
 
   async updatePart(id: string, data: Partial<SparePart>): Promise<SparePart> {
-    return prisma.sparePart.update({ where: { id }, data });
+    return prisma.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
   }
 
   async deletePart(id: string): Promise<SparePart> {
@@ -605,3 +605,9 @@ export class InventoryRepository {
 }
 
 export default InventoryRepository;
+
+function canonicalPartTax(value: string | null | undefined) {
+  if (value === undefined) return {};
+  const mapped: Record<string,string> = {A:'SPARES',B:'OIL',C:'ACCESSORIES',SPARES:'SPARES',OIL:'OIL',ACCESSORIES:'ACCESSORIES'};
+  return { reportTaxCategoryCode: mapped[value?.trim().toUpperCase() ?? ''] ?? null };
+}

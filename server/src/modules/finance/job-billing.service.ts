@@ -11,7 +11,8 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { config } from "../../config";
-import { calculateJobBillTotals } from "./job-bill-calculator";
+import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
+import { categoryOf } from "../reports/report.logic";
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
@@ -37,7 +38,7 @@ export class JobBillingService {
         appointment: { select: { customerId: true } },
         vehicle: true,
         branch: true,
-        partIssuances: { include: { sparePart: true, returns: true, jobCardLine: { select: { chargeType: true } } } },
+        partIssuances: { include: { sparePart: true, returns: true, jobCardLine: { select: { id: true, chargeType: true } } } },
         labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
@@ -98,6 +99,9 @@ export class JobBillingService {
       return [
         {
           type: "PART",
+          jobCardLineId: issuance.jobCardLine?.id,
+          taxCategory: categoryOf(issuance.sparePart),
+          taxable: issuance.sparePart.taxable,
           partId: issuance.sparePartId,
           referenceId: issuance.sparePartId,
           description: issuance.sparePart.name,
@@ -184,18 +188,20 @@ export class JobBillingService {
     const labourTotal = lines
       .filter((line) => line.type === "LABOUR")
       .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-    const totals = calculateJobBillTotals({
+    const taxSettings = await partsVatSettings(prisma);
+    const {totals,breakdown} = calculateBillWithPartsVat({
       partsTotal,
       labourTotal,
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
       serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
       vatRate: VAT_RATE,
-    });
+    }, lines.filter(line => line.type === "PART").map(line => ({amount:line.amount,category:"taxCategory" in line ? String(line.taxCategory) : "UNCLASSIFIED",taxable:"taxable" in line && line.taxable === true,customerPaid:line.customerPaid})), taxSettings.enabled, taxSettings.rates);
     return {
       jobCard,
       review,
       lines,
+      vatBreakdown: breakdown,
       totals: { ...totals, subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]) },
     };
   }
@@ -246,14 +252,15 @@ export class JobBillingService {
             const labourTotal = lines
               .filter((line) => line.type === "LABOUR")
               .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-            const totals = calculateJobBillTotals({
+            const taxSettings = await partsVatSettings(transaction);
+            const {totals,breakdown} = calculateBillWithPartsVat({
               partsTotal,
               labourTotal,
               partsDiscountPercent: input.partsDiscountPercent,
               labourDiscountPercent: input.labourDiscountPercent,
               serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
               vatRate: VAT_RATE,
-            });
+            }, lines.filter(line => line.type === "PART").map(line => ({amount:line.amount,category:"taxCategory" in line ? String(line.taxCategory) : "UNCLASSIFIED",taxable:"taxable" in line && line.taxable === true,customerPaid:line.customerPaid})), taxSettings.enabled, taxSettings.rates);
             const invoiceNumber = await nextDocumentNumber(
               transaction,
               "JOB_BILL",
@@ -266,6 +273,8 @@ export class JobBillingService {
                 customerId,
                 jobCardId: jobCard.id,
                 invoiceNumber,
+                billType: jobCard.creditApprovedById ? "CREDIT" : "CASH",
+                vatBreakdown: {create:breakdown},
                 issuedDate,
                 dueDate,
                 subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]),
@@ -286,7 +295,7 @@ export class JobBillingService {
                 notes: input.notes,
                 status: totals.total === 0 ? "Paid" : "Unpaid",
                 // Batch line snapshots to avoid one insert round trip per line.
-                lines: { createMany: { data: lines.map(({ referenceId: _referenceId, ...line }) => line) } },
+                lines: { createMany: { data: lines.map(line => { const {referenceId: _referenceId, ...snapshot}=line; const {taxCategory: _taxCategory, taxable: _taxable, ...stored}=snapshot as typeof snapshot & {taxCategory?:string;taxable?:boolean};return stored;}) } },
               },
               include: {
                 lines: true,

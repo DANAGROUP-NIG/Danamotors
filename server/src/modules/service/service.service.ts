@@ -1,3 +1,4 @@
+import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
 import {
   serviceChargeDescription,
@@ -63,6 +64,7 @@ export class ServiceService {
     branchName: string;
     scheduledAt: string;
     serviceId?: string;
+    serviceTypeId?: string;
     durationMins?: number;
     notes?: string;
     status?: string;
@@ -84,6 +86,10 @@ export class ServiceService {
     if (!branch)
       throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
+    if (data.serviceTypeId) {
+      const type=await prisma.workshopMaster.findFirst({where:{id:data.serviceTypeId,kind:"SERVICE_TYPE",active:true}});
+      if(!type)throw new BadRequestError("Select an active workshop service type");
+    }
     if (data.serviceId) {
       const service = await prisma.service.findUnique({
         where: { id: data.serviceId },
@@ -109,6 +115,7 @@ export class ServiceService {
       vehicleId: data.vehicleId,
       branchId: branch.id,
       serviceId: data.serviceId,
+      serviceTypeId: data.serviceTypeId,
       createdById: data.createdById,
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
@@ -764,6 +771,8 @@ export class ServiceService {
         return tx.estimate.create({
           data: {
             createdAt,
+            estimateDate: createdAt,
+            estimateNumber: await nextDocumentNumber(tx, "ESTIMATE"),
             jobCardId,
             description: data.description,
             currency: "NGN",
@@ -793,7 +802,8 @@ export class ServiceService {
       where: { id: estimateId },
       select: { jobCardId: true },
     });
-    if (!identity) throw new NotFoundError("Estimate not found");
+    if (!identity?.jobCardId) throw new NotFoundError("Job-linked estimate not found");
+    const approvalJobCardId = identity.jobCardId;
     return prisma.$transaction(
       async (tx) => {
         await tx.$queryRaw(
@@ -809,7 +819,7 @@ export class ServiceService {
             "Only the latest estimate revision can receive a decision",
           );
         const card = await tx.jobCard.findUniqueOrThrow({
-          where: { id: identity.jobCardId },
+          where: { id: approvalJobCardId },
         });
         if (
           card.billedAt ||
@@ -967,7 +977,7 @@ export class ServiceService {
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {jobCardId:{not:null}};
     if (params?.branchId) where.jobCard = { branchId: params.branchId };
     if (params?.status) where.status = params.status;
 

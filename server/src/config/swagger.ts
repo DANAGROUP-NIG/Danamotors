@@ -1,5 +1,6 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
+import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -503,5 +504,7 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
 };
 
 const swaggerSpec = swaggerJsdoc(options);
+const spec = swaggerSpec as {paths?:Record<string,unknown>};
+spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths};
 
 export default swaggerSpec;

@@ -41,7 +41,7 @@ router.get(
     z.object({
       query: z.object({
         branchId: z.string().uuid(),
-        role: z.enum(["ServiceAdviser", "Technician"]),
+        role: z.enum(["ServiceAdviser", "Technician", "Engineer"]),
         search: z.string().optional(),
         limit: z.coerce.number().int().positive().max(100).default(50),
       }),

@@ -1,3 +1,4 @@
+import { jobScope } from "../reports/report.repository";
 import prisma from '../../prisma/client';
 import {
   Vehicle,
@@ -44,7 +45,7 @@ export class PortalRepository {
       orderBy: { createdAt: 'desc' },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { orderBy: { createdAt: 'desc' } },
+        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
       },
     }) as Promise<VehicleWithJobs[]>;
   }
@@ -54,7 +55,7 @@ export class PortalRepository {
       where: { id: vehicleId, customerId },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { orderBy: { createdAt: 'desc' } },
+        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
       },
     }) as Promise<VehicleWithJobs | null>;
   }
@@ -65,6 +66,7 @@ export class PortalRepository {
   ): Promise<JobCardWithRelations[]> {
     return prisma.jobCard.findMany({
       where: {
+        ...jobScope({}),
         customerId,
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
@@ -117,7 +119,7 @@ export class PortalRepository {
     jobCardId: string,
   ): Promise<JobCardWithRelations | null> {
     return prisma.jobCard.findFirst({
-      where: { id: jobCardId, customerId },
+      where: { ...jobScope({}), id: jobCardId, customerId },
       include: {
         vehicle: {
           select: {
@@ -209,10 +211,11 @@ export class PortalRepository {
 
   async listInvoices(customerId: string): Promise<Invoice[]> {
     return prisma.invoice.findMany({
-      where: { customerId },
+      where: { customerId, OR:[{jobCardId:null},{jobCard:{is:jobScope({})}}] },
       include: {
         jobCard: {
-          include: {
+          select: {
+            id:true,jobNumber:true,status:true,
             vehicle: {
               select: {
                 id: true,
@@ -245,10 +248,11 @@ export class PortalRepository {
 
   async findInvoice(customerId: string, invoiceId: string): Promise<Invoice | null> {
     return prisma.invoice.findFirst({
-      where: { id: invoiceId, customerId },
+      where: { id: invoiceId, customerId, OR:[{jobCardId:null},{jobCard:{is:jobScope({})}}] },
       include: {
         jobCard: {
-          include: {
+          select: {
+            id:true,jobNumber:true,status:true,
             vehicle: {
               select: {
                 id: true,

@@ -137,7 +137,7 @@ describe('Job-bill transaction resilience', () => {
     const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
     expect(data.dueDate).toBeInstanceOf(Date);
     expect(new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos'}).format(data.dueDate)).toBe(new Intl.DateTimeFormat('en-CA', {timeZone:'Africa/Lagos'}).format(data.issuedDate));
-    expect(prisma.financeSetting.findUnique).not.toHaveBeenCalled();
+    expect(prisma.financeSetting.findUnique).not.toHaveBeenCalledWith({where:{key:'defaultCreditDays'}});
   });
   it('uses bounded transaction limits and bulk inserts line snapshots', async () => {
     await new JobBillingService().createJobBill(input);

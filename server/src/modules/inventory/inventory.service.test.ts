@@ -13,6 +13,7 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   category: "Lubricants",
   uom: "Litre",
   taxCategory: null,
+  reportTaxCategoryCode: null,
   taxForm: null,
   minLevel: null,
   maxLevel: null,

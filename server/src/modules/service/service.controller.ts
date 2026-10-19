@@ -530,9 +530,9 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { jobCard: { select: { branchId: true } } },
+        select: { branchId:true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
       const result = await this.serviceService.addApproval(
         id,
         req.body,
@@ -558,9 +558,9 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { jobCard: { select: { branchId: true } } },
+        select: { branchId:true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
       const result = await this.serviceService.getApprovals(id);
       res.status(200).json({
         status: "success",
