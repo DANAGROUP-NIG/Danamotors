@@ -50,7 +50,7 @@ For each report: open Reports → Monthly → named card, choose the dates above
 
 ### M1 — Tax register
 
-- Choose Cash and credit, Bill number, Detail and annexure; Run.
+- Choose Categories and VAT layout, Cash and credit, Bill number, Detail and annexure; Run.
 - CASH group: QA79-B1, parts 400, spares 400, discount 40, labour 200, service 100, labour VAT 22.50, total 683. CREDIT group: QA79-B2, labour 100, VAT 7.50, total 108. Grand bill amount 791 and VAT 30.
 - Annexure: SPARES rate 0, sale 400, discount 40, taxable 360, VAT 0; LABOUR rate 7.5, sale/taxable 400, discount 0, VAT 30.
 - Choose Cash: one bill, total 683/VAT 22.50. Credit: one bill, total 108/VAT 7.50. Change order to Bill date: B1 before B2.
@@ -194,4 +194,6 @@ Tester: __________ Date: __________ Environment/commit: __________
 - [ ] Legacy SQL compared when supplied
 - [ ] Business confirms parts VAT, corporate membership interpretation and delivery-target decision
 
-Result: Pass / Fail / Pending. Record defects with report, filter URL, expected number, actual number and screenshot. This walkthrough is prepared; it has not been executed against a live QA database in this session.
+Result: Pass / Fail / Pending. Record defects with report, filter URL, expected number, actual number and screenshot. The 19 October audit exercised all ten real output components with synthetic localhost responses (screen, print, XLSX and true 390px captures). This complete authenticated walkthrough, including role sign-in, admin uploads and live loading/error interactions, has not been executed as an end-to-end browser session. See issue-79-audit.md for the exact automated and component checks.
+
+M9 vehicle picker: search by VIN/registration, select results across searches, load further pages, and verify All clears selection. Local integration explicitly checks a 1,001-vehicle cohort and cross-branch selection denial. M10 default options produce eleven section sheets, including headers for empty sections.

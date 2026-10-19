@@ -1,0 +1,313 @@
+{
+  "date": "2026-10-19",
+  "branch": "issue-79/audit-completion",
+  "baseline": "c882afd",
+  "productionCodeCommit": "bf10421",
+  "database": "Disposable PostgreSQL 18.4 on 127.0.0.1:55479; no non-local writes",
+  "freshMigrations": 57,
+  "reportMigrationsReplayed": 5,
+  "backendTypecheck": "PASS",
+  "backendBuild": "PASS",
+  "frontendLintErrors": 0,
+  "frontendBuild": "PASS (80 pages)",
+  "unit": {
+    "numPassedTestSuites": 58,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 15,
+    "numPassedTests": 720,
+    "numFailedTests": 0,
+    "numPendingTests": 98,
+    "numTotalTests": 818,
+    "failures": []
+  },
+  "databaseSuite": {
+    "numPassedTestSuites": 71,
+    "numFailedTestSuites": 1,
+    "numPendingTestSuites": 1,
+    "numPassedTests": 815,
+    "numFailedTests": 2,
+    "numPendingTests": 1,
+    "numTotalTests": 818,
+    "failures": [
+      {
+        "file": "/src/modules/stock-transfer/stockTransfer.integration.test.ts",
+        "test": "Stock transfer workflow (database) sends a direct STN without an indent and receives it at the branch"
+      },
+      {
+        "file": "/src/modules/stock-transfer/stockTransfer.integration.test.ts",
+        "test": "Stock transfer workflow (database) closes a back order and completes once the shipped STN is received"
+      }
+    ]
+  },
+  "visualScope": "Real output components; synthetic localhost report results; not authenticated end-to-end browser QA",
+  "reports": [
+    {
+      "slug": "delivered-model",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 Delivery details"
+      ],
+      "detailRows": 7,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 2
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "delivered-service",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 Delivery details"
+      ],
+      "detailRows": 7,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 2
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "warranty-attended",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792415411907 Rio",
+        "3 QA79AUDIT1792415411907 Sporta"
+      ],
+      "detailRows": 4,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "warranty-parts",
+      "orientation": "portrait",
+      "sheets": [
+        "1 QA79AUDIT1792415411907VIN01",
+        "2 Grand totals"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 1
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "booked-vs-availed",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Booked and availed",
+        "2 Booked but not availed",
+        "3 Walk-ins",
+        "4 Summary by service type",
+        "5 Grand totals"
+      ],
+      "detailRows": 7,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 4
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 2,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "estimate-vs-job",
+      "orientation": "landscape",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792415411907-J1",
+        "3 Estimate QA79AUDIT17924154119"
+      ],
+      "detailRows": 2,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 841.91998 594.95996"
+      ]
+    },
+    {
+      "slug": "unbilled-parts",
+      "orientation": "landscape",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792415411907-J1",
+        "3 WARRANTY"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 841.91998 594.95996"
+      ]
+    },
+    {
+      "slug": "tax-register",
+      "orientation": "landscape",
+      "sheets": [
+        "1 CASH",
+        "2 CREDIT",
+        "3 VAT annexure",
+        "4 Grand totals"
+      ],
+      "detailRows": 4,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 4
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 1,
+        "overflow": false
+      },
+      "pdfPages": 2,
+      "pdfMediaBoxes": [
+        "0 0 841.91998 594.95996"
+      ]
+    },
+    {
+      "slug": "corporate-bills",
+      "orientation": "portrait",
+      "sheets": [
+        "1 QA79AUDIT1792415411907-FLEET ",
+        "2 Grand totals"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 1
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    },
+    {
+      "slug": "vehicle-history-card",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Vehicle and warranty",
+        "2 Customer and ownership",
+        "3 Selling dealer",
+        "4 Free services",
+        "5 Job visits",
+        "6 Customer requests",
+        "7 Parts and oil",
+        "8 Labour and service charges",
+        "9 Expenses by service type",
+        "10 Warranty, FOC and goodwill",
+        "11 Repair cost and repeat jobs"
+      ],
+      "detailRows": 12,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 10
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 10,
+        "overflow": false
+      },
+      "pdfPages": 11,
+      "pdfMediaBoxes": [
+        "0 0 594.95996 841.91998"
+      ]
+    }
+  ],
+  "additionalReportIntegration": "PASS: cash-only and credit-only totals independently asserted after the full suite"
+}
