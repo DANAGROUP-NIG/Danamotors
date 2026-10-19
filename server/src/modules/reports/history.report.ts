@@ -2,7 +2,7 @@ import { ReportRepository } from './report.repository';
 import { ReportInput } from './report.validation';
 import { ReportResult, ReportRow, ReportSection } from './report.types';
 import { customerName, identity, modelName } from './delivery-warranty.report';
-import { dateKey, groups, netIssued, totals } from './report.logic';
+import { actualLineAmount, dateKey, groups, netIssued, totals } from './report.logic';
 import { coverageFor } from '../warranty/warranty.coverage';
 import { Prisma } from '@prisma/client';
 import { money, sumMoney } from '../finance/money';
@@ -21,8 +21,7 @@ export async function history(input: ReportInput): Promise<ReportResult> {
     const jobs = v.jobCards;
     const sections: ReportSection[] = [];
     sections.push({ title: 'Vehicle and warranty', rows: [{ registration: v.registrationNumber, vin: v.vin, engineNumber: v.engineNumber, model: modelName(v), variant: v.catalogue?.description ?? v.trim, colour: v.colour?.description ?? v.color, saleDate: v.saleDate ? dateKey(v.saleDate) : null, warrantyDays: v.vehicleModel?.warrantyDays ?? null, warrantyKm: v.vehicleModel?.warrantyKm ?? null, coverage: coverage.status, expiryDate: coverage.expiresOn, remainingDays: coverage.remainingDays, remainingKm: coverage.remainingKm }] });
-    sections.push({ title: 'Current owner', rows: [{ customer: customerName(v.customer), address: v.customer?.address ?? '', phone: v.customer?.phoneNumber ?? '' }] });
-    sections.push({ title: 'Ownership history', rows: v.ownerships.map(o => ({ customer: customerName(o.customer), address: o.customer.address, purchaseDate: dateKey(o.purchaseDate), saleDate: o.saleDate ? dateKey(o.saleDate) : null })) });
+    sections.push({ title: 'Customer and ownership', rows: [{ ownership: 'Current', customer: customerName(v.customer), address: v.customer?.address ?? '', phone: v.customer?.phoneNumber ?? '', purchaseDate: null, saleDate: null }, ...v.ownerships.map(o => ({ ownership: 'Recorded ownership', customer: customerName(o.customer), address: o.customer.address, phone: o.customer.phoneNumber, purchaseDate: dateKey(o.purchaseDate), saleDate: o.saleDate ? dateKey(o.saleDate) : null }))] });
     sections.push({ title: 'Selling dealer', rows: [{ dealer: v.sellingDealer }] });
     sections.push({ title: 'Free services', rows: jobs.filter(j => j.serviceType?.freeService).map(j => ({ ...identity(j), mileage: j.mileage, freeServiceNumber: null })) });
     const expenses = jobs.map(j => ({ ...identity(j), amount: sumMoney(j.invoices.map(i => i.total)) }));
@@ -33,7 +32,7 @@ export async function history(input: ReportInput): Promise<ReportResult> {
         const quantity = l.partIssuance ? netIssued(l.partIssuance.quantity, l.partIssuance.returns) : l.quantity;
         if (quantity <= 0)
             return [];
-        return [{ jobNumber: j.jobNumber, date: dateKey(j.createdAt), kind: l.kind, itemCode: l.sparePart?.partNumber ?? l.operationCode ?? l.jobCardLabour?.labourItem.code ?? '', description: l.description, quantity, rate: l.rate, amount: money(new Prisma.Decimal(quantity).times(l.rate).toNumber()), chargeType: l.chargeType, caseNumber: l.warrantyCaseLines.map(c => c.case.caseNumber).join(', ') }];
+        return [{ jobNumber: j.jobNumber, date: dateKey(j.createdAt), kind: l.kind, itemCode: l.sparePart?.partNumber ?? l.operationCode ?? l.jobCardLabour?.labourItem.code ?? '', description: l.description, quantity, rate: l.rate, amount: actualLineAmount(l), chargeType: l.chargeType, caseNumber: l.warrantyCaseLines.map(c => c.case.caseNumber).join(', ') }];
     }));
     if (input.parts === 'true')
         sections.push({ title: 'Parts and oil', rows: lines.filter(l => l.kind === 'PART'), totals: totals(lines.filter(l => l.kind === 'PART'), ['amount']), pageBreak: true });
@@ -48,7 +47,25 @@ export async function history(input: ReportInput): Promise<ReportResult> {
     const readings = jobs.map(j => j.mileage).filter((n): n is number => n != null);
     const distance = readings.length > 1 ? Math.max(...readings) - Math.min(...readings) : 0;
     const total = sumMoney(expenses.map(r => r.amount as number));
-    sections.push({ title: 'Repair cost per km', rows: [{ totalExpenses: total, recordedDistanceKm: distance, averageCostPerKm: distance > 0 ? money(new Prisma.Decimal(total).div(distance).toNumber()) : null }] });
-    sections.push({ title: 'Repeat jobs', rows: jobs.filter(j => j.isRepeat).map(j => ({ ...identity(j), previousJob: j.previousJobId, reason: j.repeatReason })) });
-    return { rows: [], groups: sections, totals: { visits: jobs.length, billAmount: total }, filters: input, warnings: ['Legacy SQL parity pending: vehicle_history_card.sql unavailable. Free-service sequence is not recorded; it is left blank.'] };
+    sections.push({ title: 'Repair cost and repeat jobs', rows: [{ recordType: 'Repair cost', totalExpenses: total, recordedDistanceKm: distance, averageCostPerKm: distance > 0 ? money(new Prisma.Decimal(total).div(distance).toNumber()) : null }, ...jobs.filter(j => j.isRepeat).map(j => ({ recordType: 'Repeat job', ...identity(j), previousJob: j.previousJobId, reason: j.repeatReason }))] });
+    for (const [index, section] of sections.entries()) {
+        section.columns = HISTORY_COLUMNS[section.title];
+        section.pageBreak = index > 0;
+    }
+    return { exportSummary: false, rows: [], groups: sections, totals: { visits: jobs.length, billAmount: total }, filters: input, warnings: ['Free-service numbers were not recorded and are shown blank.'] };
 }
+
+// Explicit schemas keep empty sections readable in print and Excel.
+const HISTORY_COLUMNS: Record<string, string[]> = {
+    'Vehicle and warranty': ['registration', 'vin', 'engineNumber', 'model', 'variant', 'colour', 'saleDate', 'warrantyDays', 'warrantyKm', 'coverage', 'expiryDate', 'remainingDays', 'remainingKm'],
+    'Customer and ownership': ['ownership', 'customer', 'address', 'phone', 'purchaseDate', 'saleDate'],
+    'Selling dealer': ['dealer'],
+    'Free services': ['jobNumber', 'jobDate', 'registration', 'serviceType', 'mileage', 'freeServiceNumber'],
+    'Job visits': ['jobNumber', 'jobDate', 'mileage', 'serviceType', 'status', 'advisor', 'engineer', 'billNumber', 'billAmount'],
+    'Customer requests': ['jobNumber', 'description', 'defectCode'],
+    'Parts and oil': ['jobNumber', 'date', 'itemCode', 'description', 'quantity', 'rate', 'amount', 'chargeType', 'caseNumber'],
+    'Labour and service charges': ['jobNumber', 'date', 'itemCode', 'description', 'quantity', 'rate', 'amount', 'chargeType', 'caseNumber'],
+    'Expenses by service type': ['serviceType', 'amount'],
+    'Warranty, FOC and goodwill': ['jobNumber', 'date', 'kind', 'itemCode', 'description', 'quantity', 'rate', 'amount', 'chargeType', 'caseNumber'],
+    'Repair cost and repeat jobs': ['recordType', 'totalExpenses', 'recordedDistanceKm', 'averageCostPerKm', 'jobNumber', 'jobDate', 'serviceType', 'previousJob', 'reason'],
+};

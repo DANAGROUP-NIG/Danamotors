@@ -461,7 +461,7 @@ export class PortalService {
 
   async getCreditApplications(customerId: string) {
     return prisma.customerCreditApplication.findMany({
-      where: { customerId },
+      where: { customerId, OR: [{ invoice: { jobCardId: null } }, { invoice: { jobCard: { is: jobScope({}) } } }] },
       orderBy: { createdAt: "desc" },
       include: {
         invoice: {
@@ -473,7 +473,7 @@ export class PortalService {
           },
         },
         requestedBy: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { id: true },
         },
       },
     });

@@ -14,12 +14,14 @@ export type ReportSection = {
   columnLabels?: Record<string, string>;
 };
 export type ReportResult = {
+  exportSummary?: boolean;
   summaryKeys?: string[];
   rows: ReportRow[];
   groups: ReportSection[];
   totals: ReportRow;
   filters: Record<string, unknown>;
   columns?: string[];
+  columnLabels?: Record<string, string>;
   warnings?: string[];
 };
 const label = (key: string) =>
@@ -84,6 +86,7 @@ export function ReportTable({
   return (
     <div className="min-w-0 max-w-full overflow-x-auto rounded-xl border">
       <table className="w-full text-sm">
+        <colgroup>{keys.map(k => <col key={k} style={{ width: `${100 / (keys.length + (onPick ? 1 : 0))}%` }} />)}{onPick && <col />}</colgroup>
         <thead className="bg-muted/40 text-left">
           {columnGroups && <tr>{columnGroups.map(g => <th key={g.title} colSpan={g.columns.filter(k => keys.includes(k)).length} scope="colgroup" className="border-b border-r bg-muted/60 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">{g.title}</th>)}</tr>}
           <tr>
@@ -198,10 +201,10 @@ export function ReportOutput({
     const book = XLSX.utils.book_new();
     const sections = [
       ...(result.rows.length
-        ? [{ title: "Report", rows: result.rows, totals: result.totals }]
+        ? [{ title: "Report", rows: result.rows, totals: result.totals, columns: result.columns, columnLabels: result.columnLabels }]
         : []),
       ...result.groups,
-      ...(!result.rows.length && result.groups.length
+      ...(result.exportSummary !== false && !result.rows.length && result.groups.length
         ? [{ title: "Grand totals", rows: [result.totals], columns: totalColumns, columnGroups: totalColumnGroups, columnLabels: details?.columnLabels }]
         : []),
     ];
@@ -224,6 +227,7 @@ export function ReportOutput({
         ...metadata,
         ...('columnGroups' in g && g.columnGroups ? [keys.map(k => g.columnGroups?.find(group => group.columns.includes(k))?.title ?? '')] : []),
         keys.map(k => ('columnLabels' in g && g.columnLabels?.[k]) || label(k)),
+        ...(!g.rows.length ? [["No records in this section."]] : []),
         ...g.rows.map((r) =>
           keys.map((k) =>
             typeof r[k] === "string" &&
@@ -265,7 +269,7 @@ export function ReportOutput({
           {Object.entries(result.totals).filter(([k]) => !result.summaryKeys || result.summaryKeys.includes(k)).sort(([a], [b]) => result.summaryKeys ? result.summaryKeys.indexOf(a) - result.summaryKeys.indexOf(b) : 0).map(([k, v]) => (
             <div key={k}>
               <span className="block text-xs text-muted-foreground">
-                {label(k)}
+                {result.columnLabels?.[k] ?? label(k)}
               </span>
               <strong className="text-lg tabular-nums">
                 {formatted(v, k)}
@@ -284,9 +288,9 @@ export function ReportOutput({
           </Button>
         </div>
       </div>
-      <style>{`@media print { body * { visibility:hidden } body *:has(#workshop-report) { display:block!important; height:auto!important; max-height:none!important; overflow:visible!important } body *:has(#workshop-report)>*:not(:has(#workshop-report)):not(#workshop-report) { display:none!important } #workshop-report, #workshop-report * { visibility:visible } #workshop-report { position:static;width:100%;background:white;color:black } #workshop-report .print\\:hidden { display:none!important } #workshop-report .overflow-x-auto { overflow:visible!important } table { font-size:${wide ? "8" : "10"}px } th,td { padding:5px!important } thead { display:table-header-group } tr { break-inside:avoid } .section-break { break-before:page } .report-page-footer { position:fixed;bottom:0 } } @page { size:A4 ${wide ? "landscape" : "portrait"}; margin:12mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); } }`}</style>
+      <style>{`@media print { body * { visibility:hidden } body *:has(#workshop-report) { display:block!important; height:auto!important; max-height:none!important; overflow:visible!important } body *:has(#workshop-report)>*:not(:has(#workshop-report)):not(#workshop-report) { display:none!important } #workshop-report, #workshop-report * { visibility:visible } #workshop-report { position:static;width:100%;background:white;color:black } #workshop-report .print\\:hidden { display:none!important } #workshop-report .overflow-x-auto { overflow:visible!important } table { table-layout:fixed;width:100%;font-size:${wide ? "8" : "10"}px } th,td { white-space:normal!important;overflow-wrap:anywhere } th,td { padding:5px!important } thead { display:table-header-group } tr { break-inside:avoid } .section-break { break-before:page } .report-page-footer { position:fixed;bottom:0 } } @page { size:A4 ${wide ? "landscape" : "portrait"}; margin:12mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); } }`}</style>
       <article id="workshop-report" className="space-y-6">
-        <style>{`@media print { #workshop-report .tax-register-section table { table-layout:fixed; width:100% } #workshop-report .tax-register-section th, #workshop-report .tax-register-section td { white-space:normal!important; overflow-wrap:anywhere; font-size:7px; padding:3px!important } #workshop-report .tax-register-section button { gap:0 } #workshop-report .tax-register-section th:nth-child(4) { width:12% } }`}</style>
+        <style>{`@media print { #workshop-report .tax-register-section table { table-layout:fixed; width:100% } #workshop-report .tax-register-section th, #workshop-report .tax-register-section td { white-space:normal!important; overflow-wrap:anywhere; font-size:7px; padding:3px!important } #workshop-report .tax-register-section button { gap:0 } }`}</style>
         <header className="rounded-xl border bg-card p-5 print:rounded-none print:border-0 print:p-0">
           {branchDetails?.address && <p className="text-xs text-muted-foreground">{branchDetails.address}</p>}
           {branchDetails?.phoneNumber && <p className="text-xs text-muted-foreground">{branchDetails.phoneNumber}</p>}
@@ -294,12 +298,12 @@ export function ReportOutput({
           <h1 className="text-xl font-bold">{title}</h1>
           <p className="text-xs">
             {Object.entries(result.filters)
-              .filter(([k, v]) => k !== "branchId" && v != null && v !== "")
+              .filter(([k, v]) => k !== "branchId" && !k.endsWith("Id") && v != null && v !== "")
               .map(
                 ([k, v]) =>
                   label(k) +
                   ": " +
-                  (typeof v === "string" ? formatted(v, k) : String(v)),
+                  (k.endsWith("Ids") ? String(v).split(",").length + " selected" : v === "true" || v === true ? "Yes" : v === "false" || v === false ? "No" : typeof v === "string" && /^[A-Z_]+$/.test(v) ? v.toLowerCase().replaceAll("_", " ") : typeof v === "string" ? formatted(v, k) : String(v)),
               )
               .join(" | ")}
           </p>
@@ -317,6 +321,7 @@ export function ReportOutput({
             rows={result.rows}
             totals={result.totals}
             columns={result.columns}
+            columnLabels={result.columnLabels}
             onPick={onPick}
           />
         )}
@@ -352,7 +357,7 @@ export function ReportOutput({
             {details ? <div className="tax-register-section"><ReportTable rows={[]} totals={result.totals} columns={totalColumns} columnGroups={totalColumnGroups} columnLabels={details.columnLabels} /></div> : <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {Object.entries(result.totals).map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-xs text-muted-foreground">{label(k)}</dt>
+                  <dt className="text-xs text-muted-foreground">{result.columnLabels?.[k] ?? label(k)}</dt>
                   <dd className="font-semibold tabular-nums">
                     {formatted(v, k)}
                   </dd>

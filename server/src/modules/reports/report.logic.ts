@@ -20,15 +20,16 @@ export function groups(rows: ReportRow[], key: string, keys: string[]): ReportSe
 }
 export function deliveryGrid(rows: ReportRow[], dimension: string) {
     const labels = [...new Set(rows.map(r => String(r[dimension])))].sort();
+    const keyFor = (label: string) => ['deliveryDate', 'total', '__proto__', 'constructor', 'prototype'].includes(label) || label.startsWith('dimension:') ? 'dimension:' + label : label;
     const dates = [...new Set(rows.map(r => String(r.deliveryDate)))].sort();
     const grid = dates.map(date => {
         const row: ReportRow = { deliveryDate: date };
         for (const label of labels)
-            row[label] = rows.filter(r => r.deliveryDate === date && r[dimension] === label).length;
+            row[keyFor(label)] = rows.filter(r => r.deliveryDate === date && r[dimension] === label).length;
         row.total = rows.filter(r => r.deliveryDate === date).length;
         return row;
     });
-    return { rows: grid, totals: totals(grid, [...labels, 'total']), columns: ['deliveryDate', ...labels, 'total'] };
+    return { rows: grid, totals: totals(grid, [...labels.map(keyFor), 'total']), columns: ['deliveryDate', ...labels.map(keyFor), 'total'], columnLabels: Object.fromEntries(labels.map(label => [keyFor(label), label])) };
 }
 export const submittedStatuses = ['SUBMITTED', 'APPROVED', 'PARTIALLY_APPROVED', 'REJECTED', 'RETURNED', 'SETTLED'];
 export const claimGenerated = (claims: Array<{

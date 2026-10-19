@@ -3,6 +3,14 @@ import { reportQueries } from './report.validation';
 import { warrantyRow } from './delivery-warranty.report';
 import { ReportJob } from './report.repository';
 describe('Monthly report rules', () => {
+    it('keeps dimension names distinct from grid totals and date fields', () => {
+        const grid = deliveryGrid(['total', 'deliveryDate', '__proto__', 'dimension:total'].map(model => ({ model, deliveryDate: '2026-10-01' })), 'model');
+        expect(grid.rows[0].deliveryDate).toBe('2026-10-01');
+        expect(grid.totals.total).toBe(4);
+        expect(grid.columns).toHaveLength(6);
+        expect(grid.columnLabels['dimension:total']).toBe('total');
+        expect(grid.rows[0]['dimension:dimension:total']).toBe(1);
+    });
     it('counts delivered jobs with reconciling row and column totals', () => { const g = deliveryGrid([{ deliveryDate: '2026-10-01', model: 'Rio' }, { deliveryDate: '2026-10-01', model: 'Rio' }, { deliveryDate: '2026-10-02', model: 'Sportage' }], 'model'); expect(g.totals).toEqual({ Rio: 2, Sportage: 1, total: 3 }); expect(g.rows.map(r => r.total)).toEqual([2, 1]); });
     it('uses Lagos inclusive dates with exclusive next midnight', () => { expect(dateBounds('2026-10-01', '2026-10-01')).toEqual({ gte: new Date('2026-09-30T23:00Z'), lt: new Date('2026-10-01T23:00Z') }); });
     it('validates backwards, oversized and malformed dates', () => {

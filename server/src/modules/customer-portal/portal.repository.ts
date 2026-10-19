@@ -15,7 +15,6 @@ export type VehicleWithJobs = Vehicle & {
 export type JobCardWithRelations = JobCard & {
   vehicle: { id: string; make: string | null; model: string | null; year: number | null; registrationNumber: string | null } | null;
   branch: { id: string; name: string };
-  technician: { id: string; firstName: string; lastName: string } | null;
   estimates: {
     id: string;
     description: string;
@@ -66,9 +65,8 @@ export class PortalRepository {
   ): Promise<JobCardWithRelations[]> {
     return prisma.jobCard.findMany({
       where: {
-        ...jobScope({}),
+        AND: [jobScope({}), ...(filters.status ? [{ status: filters.status }] : [])],
         customerId,
-        ...(filters.status ? { status: filters.status } : {}),
         ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
       },
       include: {
@@ -82,7 +80,6 @@ export class PortalRepository {
           },
         },
         branch: { select: { id: true, name: true } },
-        technician: { select: { id: true, firstName: true, lastName: true } },
         estimates: {
           orderBy: { createdAt: 'desc' },
           include: {
@@ -133,7 +130,6 @@ export class PortalRepository {
           },
         },
         branch: { select: { id: true, name: true } },
-        technician: { select: { id: true, firstName: true, lastName: true } },
         estimates: {
           orderBy: { createdAt: 'desc' },
           include: {
