@@ -108,3 +108,22 @@ npm run db:prepare
 ```
 
 Do not resolve it as applied: its schema and role changes still need execution. Do not roll back the already successful framework migration. If deployment fails again, capture the failed row logs from _prisma_migrations to identify the first SQL error. Live migration validation unavailable here: target is LAN-only and local Docker engine is stopped.
+
+## Live seed runner improvements — 19 October 2026
+
+Batched target conflict checks and inserts to reduce network round trips while retaining one serializable transaction and create-only behavior. Populate customMake/customModel from the source identity for vehicles without catalogue links. Skip fully returned/zero-net part charge lines, as JobCardLine requires positive quantity. Offline checks now cover both database constraints.
+
+Read-only post-import verification compares every planned stored field and reconciles active bill totals:
+
+```powershell
+node prisma/legacy/verify-monthly-cohort.cjs "$env:USERPROFILE/Documents/kia-plaza-monthly-cohort.json" 'e0427a77-117d-4719-b952-fb5a89cb7ef1'
+```
+
+The live runner also supplies standalone-estimate customer identity from the exported vehicle owner and uses namespace-based UUIDv5 IDs, so report UUID filters accept seeded service/vehicle IDs. Prior failed/interrupted attempts were atomic and rolled back.
+
+
+## Import completed and verified ? 19 October 2026
+
+Applied to existing KIA PLAZA - KP in danagroup_danamotors_dev. Stored fields match the planned data, allowing only machine-precision double differences; a one-kobo difference is rejected. The database marks the 11 zero-value active bills Paid. All 74 active bills total NGN 7,422,930, matching source. A repeat dry run creates zero records.
+
+Final counts and skipped records are recorded in `issue-79-kia-plaza-import-verification.json`. One incomplete booking and three fully returned/zero-net part lines were skipped. Stock, accounts and settings were not changed by the seed. Use branch KIA PLAZA - KP and July 2026 for sample report testing. Historical limitations in the preceding sections still apply; no complete-month financial/category or warranty parity is claimed.
