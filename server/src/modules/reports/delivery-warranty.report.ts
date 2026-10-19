@@ -21,9 +21,10 @@ export function warrantyRow(j: ReportJob): ReportRow {
     return { ...identity(j), saleDate: j.vehicle?.saleDate ? dateKey(j.vehicle.saleDate) : null, mileage: j.mileage, expiryDate: j.warrantyStatusAtCreation ? (j.warrantyExpiresOnAtCreation ? dateKey(j.warrantyExpiresOnAtCreation) : null) : coverage?.expiresOn ?? null, kmLimit: j.warrantyStatusAtCreation ? j.warrantyKmLimitAtCreation : coverage?.kmLimit ?? null, warranty: status === 'ACTIVE' ? 'UNDER' : status === 'UNKNOWN' ? 'UNKNOWN' : 'BEYOND', reason: status, source: j.warrantyStatusAtCreation ? 'snapshot' : 'calculated' };
 }
 const selected = (input: ReportInput, key: string, value: string | null | undefined) => !input[key] || (input[key] as string[]).includes(value ?? '');
+export const matchesModel = (ids: unknown, vehicle: { modelId?: string | null; catalogue?: { parentId?: string | null } | null } | null) => !ids || (ids as string[]).some(id => id === vehicle?.modelId || id === vehicle?.catalogue?.parentId);
 export async function delivered(input: ReportInput, byModel: boolean): Promise<ReportResult> {
     const jobs = await new ReportRepository().jobs(input, 'deliveredAt');
-    const detail = jobs.filter(j => !byModel || selected(input, 'modelIds', j.vehicle?.catalogue?.parentId)).map(j => ({ ...identity(j), deliveryDate: dateKey(j.deliveredAt!), deliveredBy: [j.deliveryAdvisor?.firstName, j.deliveryAdvisor?.lastName].filter(Boolean).join(' ') }));
+    const detail = jobs.filter(j => !byModel || matchesModel(input.modelIds, j.vehicle)).map(j => ({ ...identity(j), deliveryDate: dateKey(j.deliveredAt!), deliveredBy: [j.deliveryAdvisor?.firstName, j.deliveryAdvisor?.lastName].filter(Boolean).join(' ') }));
     const grid = deliveryGrid(detail, byModel ? 'model' : 'serviceType');
     return { ...grid, groups: input.detail === 'true' ? [{ title: 'Delivery details', rows: detail }] : [], filters: input };
 }
@@ -39,7 +40,7 @@ export async function warrantyParts(input: ReportInput): Promise<ReportResult> {
     const jobs = await new ReportRepository().jobs({ ...input, from: undefined, to: undefined }, 'createdAt', { lines: { some: { kind: 'PART', chargeType: 'WARRANTY', OR: [{ partIssuance: { issuedAt: bounds } }, { partIssuanceId: null, createdAt: bounds }] } } });
     const rows: ReportRow[] = [];
     for (const j of jobs) {
-        if (!selected(input, 'modelIds', j.vehicle?.catalogue?.parentId) || !selected(input, 'variantIds', j.vehicle?.catalogueId) || !selected(input, 'serviceTypeIds', j.serviceTypeId) || !selected(input, 'teamIds', j.teamId) || !selected(input, 'engineerIds', j.engineerId) || !selected(input, 'vehicleIds', j.vehicleId))
+        if (!matchesModel(input.modelIds, j.vehicle) || !selected(input, 'variantIds', j.vehicle?.catalogueId) || !selected(input, 'serviceTypeIds', j.serviceTypeId) || !selected(input, 'teamIds', j.teamId) || !selected(input, 'engineerIds', j.engineerId) || !selected(input, 'vehicleIds', j.vehicleId))
             continue;
         if (input.technicianIds && !j.lines.some(l => selected(input, 'technicianIds', l.jobCardLabour?.technicianId)))
             continue;
@@ -62,5 +63,5 @@ export async function warrantyParts(input: ReportInput): Promise<ReportResult> {
         }
     }
     rows.sort((a, b) => String(a.vin).localeCompare(String(b.vin)));
-    return { rows, groups: groups(rows, 'vin', ['quantity', 'amount']).map(g => ({ ...g, rows: [] })), totals: totals(rows, ['quantity', 'amount']), filters: input };
+    return { rows: [], groups: groups(rows, 'vin', ['quantity', 'amount']), totals: totals(rows, ['quantity', 'amount']), filters: input };
 }

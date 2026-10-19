@@ -43,8 +43,44 @@ export const daysLate = (booked: Date, opened: Date) => (Date.parse(dateKey(open
 export function netIssued(issued: number, returns: Array<{
     quantity: number;
     status: string;
-}>) { return new Prisma.Decimal(issued).minus(returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((s, r) => s.plus(r.quantity), new Prisma.Decimal(0))).toNumber(); }
+}>) { return Prisma.Decimal.max(0, new Prisma.Decimal(issued).minus(returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((s, r) => s.plus(r.quantity), new Prisma.Decimal(0)))).toNumber(); }
 export function unbilledQuantity(issued: number, returned: number, billed: number) { return Prisma.Decimal.max(0, new Prisma.Decimal(issued).minus(returned).minus(billed)).toNumber(); }
+export function actualLineAmount(line: { kind: string; quantity: number; amount: number; partIssuance?: { quantity: number; returns: { quantity: number; status: string }[] } | null }) {
+    if (line.kind !== 'PART' || !line.partIssuance) return money(line.amount);
+    const issued = line.partIssuance.quantity;
+    return issued > 0 ? money(new Prisma.Decimal(line.amount).times(netIssued(issued, line.partIssuance.returns)).div(issued).toNumber()) : 0;
+}
+interface IssuedLine {
+    id: string; sparePartId: string | null; chargeType: string; quantity: number; createdAt: Date;
+    partIssuance: { quantity: number; returns: { quantity: number; status: string }[] } | null;
+}
+interface BilledPart { type: string; quantity: number; partId: string | null; jobCardLineId?: string | null; customerPaid: boolean }
+export function allocateUnbilled(lines: IssuedLine[], bills: { lines: BilledPart[] }[]) {
+    const legacy = new Map<string, Prisma.Decimal>(), direct = new Map<string, Prisma.Decimal>();
+    for (const bill of bills) for (const line of bill.lines) {
+        if (line.type !== 'PART') continue;
+        if (line.jobCardLineId) direct.set(line.jobCardLineId, (direct.get(line.jobCardLineId) ?? new Prisma.Decimal(0)).plus(line.quantity));
+        else if (line.customerPaid && line.partId) legacy.set(line.partId, (legacy.get(line.partId) ?? new Prisma.Decimal(0)).plus(line.quantity));
+    }
+    return [...lines].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map(line => {
+        const issued = line.partIssuance?.quantity ?? line.quantity;
+        const net = line.partIssuance ? netIssued(issued, line.partIssuance.returns) : issued;
+        const returned = new Prisma.Decimal(issued).minus(net).toNumber();
+        const linked = Prisma.Decimal.min(direct.get(line.id) ?? 0, net);
+        const unlinked = line.chargeType === 'CUSTOMER' && line.sparePartId ? Prisma.Decimal.min(legacy.get(line.sparePartId) ?? 0, new Prisma.Decimal(net).minus(linked)) : new Prisma.Decimal(0);
+        if (line.sparePartId) legacy.set(line.sparePartId, (legacy.get(line.sparePartId) ?? new Prisma.Decimal(0)).minus(unlinked));
+        const billed = linked.plus(unlinked).toNumber();
+        return { lineId: line.id, issued, returned, billed, netQty: unbilledQuantity(issued, returned, billed) };
+    });
+}
+export function availedJob<T extends { id: string; appointmentId: string | null; vehicleId: string | null; createdAt: Date }>(booking: { id: string; vehicleId: string; scheduledAt: Date }, jobs: T[], graceDays: number): T | undefined {
+    const candidates = jobs.filter(j => (j.appointmentId === booking.id || j.vehicleId === booking.vehicleId) && daysLate(booking.scheduledAt, j.createdAt) >= 0 && daysLate(booking.scheduledAt, j.createdAt) <= graceDays);
+    return candidates.sort((a, b) => Number(b.appointmentId === booking.id) - Number(a.appointmentId === booking.id) || a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))[0];
+}
+export function bookingSummary(rows: ReportRow[]) {
+    const booked = rows.filter(r => r.section !== 'Walk-ins').length, availed = rows.filter(r => r.section === 'Booked and availed').length;
+    return { bookings: booked, availed, notAvailed: booked - availed, availedPercent: booked ? new Prisma.Decimal(availed).div(booked).times(100).toDecimalPlaces(2).toNumber() : 0, walkIns: rows.filter(r => r.section === 'Walk-ins').length };
+}
 export interface VariationLine {
     key: string;
     type: string;

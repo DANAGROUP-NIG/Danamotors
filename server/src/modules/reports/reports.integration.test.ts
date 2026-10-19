@@ -34,7 +34,7 @@ integration('Monthly reports database chain', () => {
             expect(coverage.rows.find(r => r.jobNumber === f.jobs[2].jobNumber)?.source).toBe('calculated');
             const parts = await reports.report('warranty-parts', reportQueries['warranty-parts'].parse({ ...base, claims: 'GENERATED', billedOnly: 'true' }));
             expect(parts.totals.amount).toBe(50);
-            expect(parts.rows).toHaveLength(1);
+            expect(parts.groups.flatMap(g => g.rows)).toHaveLength(1);
             const card = await reports.report('vehicle-history-card', reportQueries['vehicle-history-card'].parse({ branchId, vehicleId: f.vehicle.id }));
             expect(card.totals.visits).toBe(1);
             expect(card.groups.map(g => g.title)).toContain('Parts and oil');
