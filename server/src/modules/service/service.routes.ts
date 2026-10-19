@@ -1,10 +1,10 @@
-import { ConflictError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import { assertBranchOwnership, requireRole } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { repeatCandidateWhere, jobStatusFilter } from "./job-card-workflow.service";
 import { defaultBranchSettings, getBranchSettings } from "../company-settings/company-settings.service";
+import { JobCardWorkflowService, repeatWindowStart } from "./job-card-workflow.service";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
@@ -198,27 +198,7 @@ router.post(
         where: { id: req.params.id },
       });
       assertBranchOwnership(req, card.branchId);
-      const result = await prisma.$transaction(async (tx) => {
-        const updated = await tx.jobCard.updateMany({
-          where: { id: card.id, OR: [{ status: jobStatusFilter("READY") }, { status: jobStatusFilter("BILLED") }], creditApprovedById: null },
-          data: { creditApprovedById: req.user!.userId },
-        });
-        if (!updated.count)
-          throw new ConflictError(
-            "Credit approval requires a READY or BILLED job without an existing approval",
-          );
-        await tx.auditLog.create({
-          data: {
-            userId: req.user!.userId,
-            action: "JOB_CREDIT_APPROVED",
-            details: JSON.stringify({
-              jobCardId: card.id,
-              remarks: req.body.remarks,
-            }),
-          },
-        });
-        return updated;
-      });
+      const result = await new JobCardWorkflowService().approveCredit(card.id, req.user!.userId, req.body.remarks);
       res.json({ status: "success", data: result });
     } catch (error) {
       next(error);

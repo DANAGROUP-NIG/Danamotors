@@ -580,6 +580,31 @@ export class JobCardWorkflowService {
 
     return card;
   }
+
+  /** Authorizes delivery before full payment. Allowed once, on a READY or BILLED job. */
+  async approveCredit(id: string, actorId: string, remarks: string) {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.jobCard.updateMany({
+        where: { id, OR: [{ status: jobStatusFilter("READY") }, { status: jobStatusFilter("BILLED") }], creditApprovedById: null },
+        data: { creditApprovedById: actorId },
+      });
+      if (!updated.count)
+        throw new ConflictError(
+          "Credit approval requires a READY or BILLED job without an existing approval",
+        );
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          action: "JOB_CREDIT_APPROVED",
+          details: JSON.stringify({
+            jobCardId: id,
+            remarks,
+          }),
+        },
+      });
+      return updated;
+    });
+  }
 }
 
 /** After a job card commits: tell warranty officers about a warranty job, and the adviser about open campaigns. */
