@@ -13,7 +13,7 @@ export interface TaxRow {
 }
 export function reconciledTaxRows(rows: TaxRow[], storedVat: number) {
     const difference = money(new Prisma.Decimal(storedVat).minus(sumMoney(rows.map(r => r.vat))).toNumber());
-    return { difference, rows: difference === 0 ? rows : [...rows, { category: 'UNALLOCATED_DIFFERENCE', rate: null, saleAmount: 0, discount: 0, taxableAmount: 0, vat: difference }] };
+    return { difference, rows: difference === 0 ? rows : [...rows, { category: 'UNALLOCATED_DIFFERENCE', rate: null, saleAmount: null, discount: null, taxableAmount: null, vat: difference }] };
 }
 export function sortTaxBills(rows: ReportRow[], order: unknown): ReportRow[] {
     return [...rows].sort((a, b) => (order === 'DATE' ? String(a.billDate).localeCompare(String(b.billDate)) : 0) || String(a.billNumber).localeCompare(String(b.billNumber), 'en', { numeric: true })).map((row, index) => ({ ...row, serialNumber: index + 1 }));

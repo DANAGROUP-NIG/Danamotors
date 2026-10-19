@@ -8,6 +8,15 @@ const base = { branchId: '11111111-1111-4111-8111-111111111111', from: '2026-10-
 const job = { id: 'j', jobNumber: 'J1', createdAt: new Date('2026-10-01T09:00Z'), status: 'DELIVERED', vehicleId: 'v', vehicle: { id: 'v', vin: 'VIN', registrationNumber: 'REG', model: 'Rio', customer: null, catalogModel: null, catalogue: null }, customer: null, serviceType: { description: 'Paid', preDelivery: false }, service: null, lines: [], invoices: [], complaints: [], deliveryAdvisor: null, serviceAdvisor: null };
 describe('Monthly report data behavior', () => {
     beforeEach(() => jest.resetAllMocks());
+    it('uses known zero categories on labour-only bills so grand category totals remain numeric', async () => {
+        const invoice = { billType: 'CASH', issuedDate: new Date('2026-10-01'), customer: null, jobCard: null, partsDiscountAmount: 0, labourDiscountAmount: 0, serviceTotal: 0, roundOff: 0, vatRate: 7.5 };
+        (prisma.invoice.findMany as jest.Mock).mockResolvedValue([
+            { ...invoice, invoiceNumber: 'B1', partsTotal: 100, labourTotal: 0, subtotal: 100, vatAmount: 0, total: 100, vatBreakdown: [{ category: 'SPARES', saleAmount: 100, discount: 0, taxableAmount: 100, rate: 0, vat: 0 }] },
+            { ...invoice, invoiceNumber: 'B2', partsTotal: 0, labourTotal: 100, subtotal: 100, vatAmount: 7.5, total: 108, vatBreakdown: [{ category: 'LABOUR', saleAmount: 100, discount: 0, taxableAmount: 100, rate: 7.5, vat: 7.5 }] },
+        ]);
+        const result = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse(base));
+        expect(result.totals).toMatchObject({ spares: 100, oil: 0, accessories: 0 });
+    });
     it('matches estimate labour UUIDs to actual operation codes and preserves stored labour amounts', async () => {
         (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id: 'e', estimateNumber: 'E', estimateDate: new Date('2026-10-01'), lines: [{ type: 'LABOUR', referenceId: 'operation-id', description: 'Repair', quantity: 1, amount: 100 }], jobCard: { ...job, lines: [{ kind: 'LABOUR', operationCode: 'OP', description: 'Repair', quantity: 1, rate: 100, amount: 80, partIssuance: null, jobCardLabour: null }] } }]);
         (prisma.sparePart.findMany as jest.Mock).mockResolvedValue([]);

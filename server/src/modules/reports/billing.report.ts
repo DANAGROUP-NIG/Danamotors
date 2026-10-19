@@ -85,7 +85,7 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
       historical++;
       breakdown.push({
         category: "LEGACY_UNALLOCATED",
-        rate: i.vatRate > 0 ? i.vatRate : null,
+        rate: null,
         saleAmount: importedWithoutCategories ? null : i.subtotal,
         discount: importedWithoutCategories ? null : sumMoney([i.partsDiscountAmount, i.labourDiscountAmount]),
         taxableAmount: importedWithoutCategories ? null : money(
@@ -101,6 +101,7 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
     const reconciled = reconciledTaxRows(breakdown, i.vatAmount);
     if (reconciled.difference !== 0) inconsistentBreakdowns++;
     taxes.push(...reconciled.rows);
+    const categoryAmountsKnown = i.vatBreakdown.length > 0 && sumMoney(breakdown.filter(b => b.category !== "LABOUR").map(b => b.saleAmount ?? 0)) === i.partsTotal;
     const cat = (key: string) =>
       sumMoney(
         breakdown.filter((b) => b.category === key).map((b) => b.saleAmount ?? 0),
@@ -125,11 +126,11 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
         ? { address: i.customer.address, phone: i.customer.phoneNumber }
         : {}),
       taxId: null,
-      spares: breakdown.some((b) => b.category === "SPARES")
+      spares: categoryAmountsKnown || breakdown.some((b) => b.category === "SPARES")
         ? cat("SPARES")
         : null,
-      oil: breakdown.some((b) => b.category === "OIL") ? cat("OIL") : null,
-      accessories: breakdown.some((b) => b.category === "ACCESSORIES")
+      oil: categoryAmountsKnown || breakdown.some((b) => b.category === "OIL") ? cat("OIL") : null,
+      accessories: categoryAmountsKnown || breakdown.some((b) => b.category === "ACCESSORIES")
         ? cat("ACCESSORIES")
         : null,
       unclassifiedParts: importedWithoutCategories ? null : cat("UNCLASSIFIED"),
@@ -151,7 +152,7 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
       legacyVat: importedPartVat != null && layout.values.labourVat != null ? money(new Prisma.Decimal(i.vatAmount).minus(importedPartVat).minus(layout.values.labourVat).toNumber()) : sumMoney(
         breakdown
           .filter((b) => b.category === "LEGACY_UNALLOCATED")
-          .map((b) => b.vat),
+          .map((b) => b.vat).concat(reconciled.difference),
       ),
       vat: i.vatAmount,
       roundOff: i.roundOff,
