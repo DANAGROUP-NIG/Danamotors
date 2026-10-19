@@ -5,6 +5,7 @@ import prisma from '../../prisma/client';
 import { createMonthlyReportFixture } from './monthly-reports.fixture';
 import { ReportsService } from './reports.service';
 import { reportQueries } from './report.validation';
+import { vehicleOptions, vehicleOptionsQuery } from './vehicle-options';
 const integration = dbUrl ? describe : describe.skip;
 integration('Monthly reports database chain', () => {
     it('reconciles booking → job → estimate → returned/customer/warranty parts → bill → delivery', async () => {
@@ -37,6 +38,8 @@ integration('Monthly reports database chain', () => {
             expect(parts.groups.flatMap(g => g.rows)).toHaveLength(1);
             const card = await reports.report('vehicle-history-card', reportQueries['vehicle-history-card'].parse({ branchId, vehicleId: f.vehicle.id }));
             expect(card.totals.visits).toBe(1);
+            expect(card.groups).toHaveLength(11);
+            expect((await reports.report('delivered-service', reportQueries['delivered-service'].parse(base))).totals.total).toBe(4);
             expect(card.groups.map(g => g.title)).toContain('Parts and oil');
             expect(card.groups.flatMap(g => g.rows).some(r => r.jobNumber === prefix + '-PDI')).toBe(false);
             const corporate = await reports.report('corporate-bills', reportQueries['corporate-bills'].parse(base));
@@ -45,6 +48,17 @@ integration('Monthly reports database chain', () => {
             const other = await prisma.branch.create({ data: { name: prefix + ' other' } });
             try {
                 expect((await reports.report('delivered-model', reportQueries['delivered-model'].parse({ ...base, branchId: other.id }))).totals.total).toBe(0);
+                await prisma.vehicle.createMany({ data: Array.from({ length: 1001 }, (_, index) => ({ vin: prefix + '-PICKER-' + String(index).padStart(4, '0'), customerId: f.customer.id, customMake: 'QA', customModel: 'Picker' })) });
+                const found = await vehicleOptions(vehicleOptionsQuery.parse({ branchId, q: prefix + '-PICKER-1000' }));
+                expect(found.vehicles).toHaveLength(1);
+                const first = await vehicleOptions(vehicleOptionsQuery.parse({ branchId, q: prefix + '-PICKER-', limit: 100 }));
+                const next = await vehicleOptions(vehicleOptionsQuery.parse({ branchId, q: prefix + '-PICKER-', limit: 100, cursor: first.nextCursor }));
+                expect(first.vehicles).toHaveLength(100);
+                expect(next.vehicles).toHaveLength(100);
+                expect(new Set([...first.vehicles, ...next.vehicles].map(v => v.id)).size).toBe(200);
+                const denied = await vehicleOptions(vehicleOptionsQuery.parse({ branchId: other.id, q: prefix, selectedIds: found.vehicles[0].id }));
+                expect(denied.vehicles).toEqual([]);
+                expect(denied.selected).toEqual([]);
             }
             finally {
                 await prisma.branch.delete({ where: { id: other.id } });

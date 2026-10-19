@@ -23,6 +23,7 @@ export function warrantyRow(j: ReportJob): ReportRow {
 const selected = (input: ReportInput, key: string, value: string | null | undefined) => !input[key] || (input[key] as string[]).includes(value ?? '');
 export const matchesModel = (ids: unknown, vehicle: { modelId?: string | null; catalogue?: { parentId?: string | null } | null } | null) => !ids || (ids as string[]).some(id => id === vehicle?.modelId || id === vehicle?.catalogue?.parentId);
 export async function delivered(input: ReportInput, byModel: boolean): Promise<ReportResult> {
+    // TODO(confirm): model targets need agreed periods and ownership; omit until confirmed.
     const jobs = await new ReportRepository().jobs(input, 'deliveredAt');
     const detail = jobs.filter(j => !byModel || matchesModel(input.modelIds, j.vehicle)).map(j => ({ ...identity(j), deliveryDate: dateKey(j.deliveredAt!), deliveredBy: [j.deliveryAdvisor?.firstName, j.deliveryAdvisor?.lastName].filter(Boolean).join(' ') }));
     const grid = deliveryGrid(detail, byModel ? 'model' : 'serviceType');
@@ -36,6 +37,7 @@ export async function warrantyAttended(input: ReportInput): Promise<ReportResult
     return { rows, groups: groups(rows, 'model', []).map(g => ({ ...g, rows: [], totals: counts(g.rows) })), totals: counts(rows), filters: input };
 }
 export async function warrantyParts(input: ReportInput): Promise<ReportResult> {
+    // TODO(confirm): job type is not recorded; do not alias it to service type.
     const bounds = dateBounds(input.from!, input.to!);
     const jobs = await new ReportRepository().jobs({ ...input, from: undefined, to: undefined }, 'createdAt', { lines: { some: { kind: 'PART', chargeType: 'WARRANTY', OR: [{ partIssuance: { issuedAt: bounds } }, { partIssuanceId: null, createdAt: bounds }] } } });
     const rows: ReportRow[] = [];

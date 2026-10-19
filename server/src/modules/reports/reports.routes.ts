@@ -11,6 +11,7 @@ import { reportQueries, selectionQuery, ReportInput } from './report.validation'
 import { ReportsService } from './reports.service';
 import { CorporateService } from './corporate.service';
 import { partsVatSettings, partsVatRatesSchema } from '../finance/parts-vat';
+import { vehicleOptions, vehicleOptionsQuery } from './vehicle-options';
 export function reportBranch(req: Request, branchId?: string) {
     if (req.user?.role === ROLES.ADMIN || req.user?.role === ROLES.SUPER_ADMIN)
         return branchId;
@@ -84,13 +85,24 @@ router.put('/billing-settings', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), val
         next(e);
     }
 });
+router.get('/vehicle-options', requirePermission('report:warranty-parts'), validateRequest(z.object({ query: vehicleOptionsQuery })), async (req, res, next) => {
+    try {
+        const input = req.query as unknown as z.infer<typeof vehicleOptionsQuery>;
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ status: 'success', statusCode: 200, data: await vehicleOptions({ ...input, branchId: reportBranch(req, input.branchId) }) });
+    } catch (e) { next(e); }
+});
 router.get('/selections', validateRequest(z.object({ query: selectionQuery })), async (req, res, next) => {
     try {
         if (req.user?.role !== ROLES.SUPER_ADMIN && !REPORT_SLUGS.some(s => req.user?.permissions.includes('report:' + s)))
             throw new ForbiddenError('A monthly report permission is required');
         const branchId = reportBranch(req, req.query.branchId as string | undefined);
-        const [masters, staff, vehicles] = await Promise.all([prisma.workshopMaster.findMany({ where: { active: true, kind: { in: ['MODEL', 'VARIANT', 'SERVICE_TYPE', 'TEAM'] } }, select: { id: true, kind: true, code: true, description: true, parentId: true }, orderBy: { code: 'asc' } }), prisma.user.findMany({ where: { branchId, isActive: true }, select: { id: true, firstName: true, lastName: true } }), prisma.vehicle.findMany({ where: { OR: [{ jobCards: { some: { branchId } } }, ...(branchId ? [{ customer: { branchId } }] : [])] }, select: { id: true, vin: true, registrationNumber: true }, orderBy: { vin: 'asc' }, take: 1000 })]);
-        res.json({ status: 'success', statusCode: 200, data: { masters, staff, vehicles } });
+        const [masters, models, staff] = await Promise.all([
+            prisma.workshopMaster.findMany({ where: { active: true, kind: { in: ['MODEL', 'VARIANT', 'SERVICE_TYPE', 'TEAM'] } }, select: { id: true, kind: true, code: true, description: true, parentId: true }, orderBy: { code: 'asc' } }),
+            prisma.vehicleCatalogModel.findMany({ select: { id: true, name: true, make: { select: { name: true } } }, orderBy: { name: 'asc' } }),
+            prisma.user.findMany({ where: { branchId, isActive: true }, select: { id: true, firstName: true, lastName: true } }),
+        ]);
+        res.json({ status: 'success', statusCode: 200, data: { masters: [...masters, ...models.map(m => ({ id: m.id, kind: 'MODEL', code: m.make.name, description: m.name }))], staff } });
     }
     catch (e) {
         next(e);

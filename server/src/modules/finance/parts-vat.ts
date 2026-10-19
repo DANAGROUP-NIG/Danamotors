@@ -81,6 +81,7 @@ export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxP
     return { totals: { ...base, vatAmount, total, roundOff: money(new Prisma.Decimal(total).minus(beforeRound).toNumber()) }, breakdown };
 }
 export async function partsVatSettings(db: Prisma.TransactionClient) {
+    // TODO(confirm): business approval is required before enabling parts VAT; default is OFF.
     const [flag, rates] = await Promise.all([db.financeSetting.findUnique({ where: { key: 'JOB_BILL_PARTS_VAT_ENABLED' } }), db.financeSetting.findUnique({ where: { key: 'partsVatRates' } })]);
     // An explicit true is required; legacy or unrelated values never enable billing changes.
     const enabled = process.env.JOB_BILL_PARTS_VAT_ENABLED === 'true' || flag?.value === true;

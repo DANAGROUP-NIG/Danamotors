@@ -252,6 +252,7 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
 export async function corporateBills(
   input: ReportInput,
 ): Promise<ReportResult> {
+  // TODO(confirm): fleet membership is current only; historical membership is not recorded.
   const corporates = await prisma.corporateGroup.findMany({
     orderBy:
       input.order === "NAME"

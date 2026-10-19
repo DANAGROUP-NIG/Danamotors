@@ -48,6 +48,20 @@ describe('Job billing after delivery on credit', () => {
     expect(data.statusHistory.create).toEqual(expect.objectContaining({ toStatus: 'DELIVERED', actorId: 'actor', remarks: expect.stringContaining('Job bill') }));
   });
 
+  it('persists the enabled customer parts VAT breakdown on a newly created invoice', async () => {
+    (prisma.financeSetting.findUnique as jest.Mock).mockImplementation(({ where }: { where: { key: string } }) => Promise.resolve({ value: where.key === 'JOB_BILL_PARTS_VAT_ENABLED' ? true : where.key === 'partsVatRates' ? { SPARES: 7.5, OIL: 7.5, ACCESSORIES: 7.5 } : 30 }));
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card,
+      partIssuances: [{ id: 'issue', sparePartId: 'part', quantity: 2, returns: [], jobCardLine: { id: 'line', chargeType: 'CUSTOMER' }, sparePart: { partNumber: 'P', name: 'Filter', retailRate: 100, taxCategory: 'A', taxable: true } }],
+      estimates: [{ ...approved, amount: 500, lines: [...approved.lines, { type: 'PART', referenceId: 'part', description: 'Filter', quantity: 2, rate: 100, amount: 200 }] }],
+    });
+    await new JobBillingService().createJobBill(input);
+    const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.vatBreakdown.create).toEqual(expect.arrayContaining([expect.objectContaining({ category: 'SPARES', rate: 7.5, saleAmount: 200, discount: 0, taxableAmount: 200, vat: 15 })]));
+    expect(data.vatAmount).toBe(22.5);
+    expect(data.total).toBe(323);
+    expect(data.taxRegisterSnapshot.source).toBe('BILLING');
+  });
+
   it('snapshots the named service charge exactly once alongside labour', async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, service: { name: 'Full service' }, serviceCharge: 200 });
     const preview = await new JobBillingService().previewJobBill(input);
