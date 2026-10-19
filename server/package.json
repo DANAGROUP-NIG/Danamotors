@@ -33,6 +33,7 @@
     "prisma:seed:vehicles": "ts-node prisma/seed/vehicle-catalog.ts",
     "vehicles:review-custom": "ts-node prisma/seed/review-custom-vehicles.ts",
     "prisma:seed:warranty": "ts-node prisma/seed/warranty.ts",
+    "prisma:seed:demo": "ts-node prisma/seed/demo/index.ts",
     "legacy:warranty": "ts-node prisma/legacy/warranty-migrate.ts"
   },
   "author": "buildwithzeke <ayeoluwaseyi@gmail.com>",
