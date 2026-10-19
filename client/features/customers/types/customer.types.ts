@@ -21,6 +21,15 @@ export type Customer = {
   street?: string | null;
   zone?: string | null;
   tallyPartyCode?: string | null;
+  segment?: string | null;
+  district?: string | null;
+  companyType?: string | null;
+  vendorType?: string | null;
+  mrnRateType?: "D" | "R" | null;
+  governmentVehicle?: boolean;
+  ownCompanyVehicle?: boolean;
+  creditLimit?: number | null;
+  organizationId?: string | null;
   vehicles?: { id: string; vin: string; registrationNumber?: string | null }[];
   id: string;
   firstName: string;

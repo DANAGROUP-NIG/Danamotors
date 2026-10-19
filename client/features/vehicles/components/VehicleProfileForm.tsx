@@ -8,6 +8,12 @@ import { VehicleCustomerField } from "./VehicleCustomerField";
 import { useVehicleModels } from "@/features/warranty/hooks/use-warranty";
 import { createVehicleSchema, vehicleProfileSchema, type CreateVehicleFormValues } from "../schemas/vehicle.schema";
 import type { Vehicle } from "../types/vehicle.types";
+import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+
+const money = [["purchaseAmount", "Purchase amount"], ["saleAmount", "Sale invoice amount"]] as const;
+const numberOrUndefined = (value: string) => value === "" ? undefined : Number(value);
+const day = (value?: string | null) => value?.slice(0, 10) || null;
+const blankToNull = (value: string) => value || null;
 
 export function VehicleProfileForm(
   {
@@ -55,6 +61,21 @@ export function VehicleProfileForm(
       sellingDealer: vehicle.sellingDealer ?? "",
       year: vehicle.year ?? undefined,
       vehicleModelId: vehicle.vehicleModelId ?? "",
+      colourType: vehicle.colourType ?? null,
+      parkedAt: vehicle.parkedAt ?? null,
+      purchaseAmount: vehicle.purchaseAmount ?? undefined,
+      saleInvoiceNumber: vehicle.saleInvoiceNumber ?? "",
+      saleInvoiceDate: day(vehicle.saleInvoiceDate),
+      saleAmount: vehicle.saleAmount ?? undefined,
+      wcoNumber: vehicle.wcoNumber ?? "",
+      wcoDate: day(vehicle.wcoDate),
+      principalInvoiceNumber: vehicle.principalInvoiceNumber ?? "",
+      principalInvoiceDate: day(vehicle.principalInvoiceDate),
+      theft: vehicle.theft ?? false,
+      manufactureMonth: vehicle.manufactureMonth ?? undefined,
+      manufactureYear: vehicle.manufactureYear ?? undefined,
+      tyres: vehicle.tyres ?? [],
+      batteryNumber: vehicle.batteryNumber ?? "",
     } : {},
   });
 
@@ -66,7 +87,14 @@ export function VehicleProfileForm(
   }
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(values => {
-      const payload = { ...values };
+      const { tyres, batteryMakeId, ...rest } = values;
+      const fitted = (tyres ?? []).filter((tyre): tyre is NonNullable<typeof tyre> => !!(tyre?.makeId || tyre?.number?.trim()))
+        .map(tyre => ({ makeId: tyre.makeId || undefined, number: tyre.number?.trim() || undefined }));
+      const payload: CreateVehicleFormValues = {
+        ...rest,
+        ...(fitted.length || vehicle?.tyres?.length ? { tyres: fitted } : {}),
+        ...(batteryMakeId ? { batteryMakeId } : {}),
+      };
       const unchangedCatalogue = vehicle && (values.catalogueId ?? null) === (vehicle.catalogueId ?? null) && (values.colourId ?? null) === (vehicle.colourId ?? null);
       const unchangedModel = vehicle && ['modelId', 'generationId', 'engineId', 'customModel', 'customMake'].every(key => {
         const field = key as keyof VehicleIdentitySelection;
@@ -132,6 +160,40 @@ export function VehicleProfileForm(
         <Field label="PDI date"><input type="date" className={inputCls} {...register("pdiDate")} /></Field>
         <label><input type="checkbox" {...register("pdiDone")} />PDI done</label>
       </div>
+      <details className="rounded-lg border p-4" open={!!vehicle?.saleInvoiceNumber || !!vehicle?.tyres?.length}>
+        <summary className="cursor-pointer text-sm font-semibold">Sale, stock and fitment</summary>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Controller name="colourType" control={control} render={({ field }) => <WorkshopPicker label="Colour type" endpoint="/workshop-masters?kind=COLOUR_TYPE"
+            collection="items" value={field.value ?? ""} getOptionId={row => row.code ?? row.id} onChange={code => field.onChange(code || null)} />} />
+          <Field label="Vehicle parked at"><select className={inputCls} {...register("parkedAt", { setValueAs: blankToNull })}>
+            <option value="">Not set</option><option value="SHOWROOM">Showroom</option><option value="STOCKYARD">Stockyard</option><option value="SOLD">Sold</option>
+          </select></Field>
+          {money.map(([key, label]) => <Field key={key} label={label}><input type="number" min="0" step="0.01" className={inputCls}
+            {...register(key, { setValueAs: numberOrUndefined })} /></Field>)}
+          {(["saleInvoiceNumber", "wcoNumber", "principalInvoiceNumber"] as const).map(key => <Field key={key}
+            label={{ saleInvoiceNumber: "Sale invoice number", wcoNumber: "WCO number", principalInvoiceNumber: "Principal company invoice number" }[key]}>
+            <input className={inputCls} {...register(key)} /></Field>)}
+          {(["saleInvoiceDate", "wcoDate", "principalInvoiceDate"] as const).map(key => <Field key={key}
+            label={{ saleInvoiceDate: "Sale invoice date", wcoDate: "WCO date", principalInvoiceDate: "Principal company invoice date" }[key]}>
+            <input type="date" className={inputCls} {...register(key, { setValueAs: blankToNull })} /></Field>)}
+          <Field label="Manufacture month"><input type="number" min="1" max="12" className={inputCls} {...register("manufactureMonth", { setValueAs: numberOrUndefined })} /></Field>
+          <Field label="Manufacture year"><input type="number" min="1900" max="2200" className={inputCls} {...register("manufactureYear", { setValueAs: numberOrUndefined })} /></Field>
+          <label className="flex gap-2"><input type="checkbox" {...register("theft")} />Theft vehicle</label>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {[0, 1, 2, 3, 4].map(index => <div key={index} className="grid gap-3 sm:grid-cols-2">
+            <Controller name={`tyres.${index}.makeId`} control={control} render={({ field }) => <WorkshopPicker label={`Tyre ${index + 1} make`}
+              endpoint="/workshop-masters?kind=TYRE_MAKE" collection="items" value={field.value ?? ""} onChange={field.onChange}
+              selectedRecord={vehicle?.tyres?.[index]?.makeId ? { id: vehicle.tyres[index].makeId, description: vehicle.tyres[index].make } : undefined} />} />
+            <Field label={`Tyre ${index + 1} number`}><input className={inputCls} {...register(`tyres.${index}.number`)} /></Field>
+          </div>)}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Controller name="batteryMakeId" control={control} render={({ field }) => <WorkshopPicker label={`Battery make${vehicle?.batteryMake ? ` (now ${vehicle.batteryMake})` : ""}`}
+              endpoint="/workshop-masters?kind=BATTERY_MAKE" collection="items" value={field.value ?? ""} onChange={field.onChange} />} />
+            <Field label="Battery number"><input className={inputCls} {...register("batteryNumber")} /></Field>
+          </div>
+        </div>
+      </details>
       {Object.entries(errors).map(([key, error]) => <p key={key} role="alert" className="text-sm text-red-600">{error.message}</p>)}
       {failed && <p role="alert" className="text-sm text-red-600">Could not save vehicle. Check the customer, VIN, registration and catalogue selections.</p>}
       <Button disabled={pending}>{pending ? "Saving..." : "Save vehicle"}</Button>

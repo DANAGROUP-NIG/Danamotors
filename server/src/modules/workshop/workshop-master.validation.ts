@@ -1,24 +1,14 @@
 import { z } from 'zod';
+import { MASTER_KINDS } from './master-kinds';
 
-export const masterKind = z.enum([
-  'SERVICE_TYPE',
-  'BAY',
-  'COMPLAINT',
-  'TEAM',
-  'LATE_REASON',
-  'MAKE',
-  'PRODUCT',
-  'MODEL',
-  'VARIANT',
-  'COLOUR',
-  'TYRE_MAKE',
-  'BATTERY_MAKE',
-]);
+export const masterKind = z.enum(MASTER_KINDS);
 
 export const masterBody = z.object({
   kind: masterKind,
   code: z.string().trim().min(1).max(50),
   description: z.string().trim().min(1).max(300),
+  shortDescription: z.string().trim().max(50).nullable().optional(),
+  attributes: z.record(z.unknown()).nullable().optional(),
   active: z.boolean().optional(),
   category: z.string().trim().max(100).nullable().optional(),
   chargedTo: z.enum(['CUSTOMER', 'COMPANY']).optional(),
@@ -55,5 +45,27 @@ export const listMasterSchema = z.object({
     limit: z.coerce.number().int().positive().max(100).default(50),
     includeInactive: z.enum(['true', 'false']).optional(),
     parentId: z.string().uuid().optional(),
+  }),
+});
+
+const amount = z.number().min(0).max(1e12).multipleOf(0.01);
+
+export const defectEstimateSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+    modelId: z.string().uuid(),
+  }),
+
+  body: z.object({
+    partAmount: amount,
+    oilAmount: amount,
+    labourAmount: amount,
+  }).strict(),
+});
+
+export const defectEstimateParamsSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+    modelId: z.string().uuid().optional(),
   }),
 });

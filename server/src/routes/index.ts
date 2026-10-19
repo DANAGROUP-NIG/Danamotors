@@ -10,6 +10,7 @@ import workshopRoutes from '../modules/workshop/workshop.routes';
 import inventoryRoutes from '../modules/inventory/inventory.routes';
 import stockTransferRoutes from '../modules/stock-transfer/stockTransfer.routes';
 import mobisPurchaseRoutes from '../modules/mobis-purchase/mobisPurchase.routes';
+import vendorReceiptRoutes from '../modules/vendor-receipt/vendorReceipt.routes';
 import partSaleRoutes from '../modules/part-sale/partSale.routes';
 import partsReportRoutes from '../modules/parts-report/partsReport.routes';
 import stockTakeRoutes from '../modules/stock-take/stockTake.routes';
@@ -27,10 +28,18 @@ import campaignRoutes from '../modules/campaign/campaign.routes';
 import { jobCardLineRouter } from '../modules/job-card-line/jobCardLine.routes';
 
 import workshopMasterRoutes from '../modules/workshop/workshop-master.routes';
+import employeeRoutes from '../modules/employee/employee.routes';
+import serviceChecklistRoutes from '../modules/workshop/service-checklist.routes';
+import documentTermsRoutes from '../modules/document-terms/document-terms.routes';
+import companySettingsRoutes from '../modules/company-settings/company-settings.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
 router.use('/workshop-masters', workshopMasterRoutes);
+router.use('/employees', employeeRoutes);
+router.use('/service-checklists', serviceChecklistRoutes);
+router.use('/document-terms', documentTermsRoutes);
+router.use('/company-settings', companySettingsRoutes);
 router.use('/job-cards', serviceTypeOptionsRouter);
 router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 
@@ -87,6 +96,7 @@ router.use('/part-sale', partSaleRoutes);
 router.use('/parts-reports', partsReportRoutes);
 router.use('/stock-takes', stockTakeRoutes);
 router.use('/inventory', mobisPurchaseRoutes);
+router.use('/inventory', vendorReceiptRoutes);
 router.use('/inventory', stockTransferRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);

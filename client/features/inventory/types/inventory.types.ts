@@ -25,7 +25,27 @@ export type PartRole = "MAIN" | "ALTERNATE";
  * A Part Master record. The list endpoint returns the price as `unitPrice`
  * and the detail endpoint as `unitRate`; the API layer normalises both to `unitRate`.
  */
-export type PartMaster = {
+
+/** Legacy partmast fields from the Part screen (classification and ordering). */
+export type LegacyPartFields = {
+  vehicleSystem: string | null;
+  vehicleGroup: string | null;
+  /** Model codes the part fits; empty = all models. */
+  applicableModels: string[];
+  /** Minimum order quantity. */
+  moq: number | null;
+  conversionFactor: number;
+  /** Supplier base price in foreign currency (legacy basicrate). */
+  basicRate: number | null;
+  nspDate: string | null;
+  nlaDate: string | null;
+  blockReserve: boolean;
+  includeInTopN: boolean;
+  topMover: boolean;
+  underAmc: boolean;
+};
+
+export type PartMaster = LegacyPartFields & {
   id: string;
   partCode: string;
   partNumber: string;
@@ -44,7 +64,7 @@ export type PartMaster = {
   retailRate: number | null;
   /** Legacy tax status. */
   taxable: boolean;
-  /** Legacy part flag = purchase source: O original part, A authorised source, F FOC item, L local. */
+  /** Legacy part flag = purchase source: O original part, A authorised source, F FOC item, L local, U used, R repaired. */
   partFlag: string;
   /** Legacy part type: S spare part, O oil, A accessory. */
   partType: string;
@@ -59,8 +79,37 @@ export type PartMaster = {
   warrantyRate: number | null;
   role: PartRole;
   mainPartId: string | null;
+  /** Source records (local, used, repaired…): the main part this record is a source of. */
+  sourceOfPartId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+/** One record of a part family by source: the main part or one of its source records. */
+export type PartSourceRecord = {
+  id: string;
+  partNumber: string;
+  name: string;
+  partFlag: string;
+  sourceLabel: string;
+  isMain: boolean;
+  partStatus: PartStatus;
+  priceCategoryCode: string | null;
+  dealerRate: number;
+  retailRate: number | null;
+  binLocation: string | null;
+  /** Stock at the branch asked for; null when no branch was given. */
+  stock: { quantity: number; available: number; rackLocation: string | null } | null;
+};
+
+export type PartSources = { mainPartId: string; branchId: string | null; records: PartSourceRecord[] };
+
+export type SourceRecordPayload = {
+  source: string;
+  partNumber: string;
+  dealerRate: number;
+  priceCategoryCode?: string | null;
+  binLocation?: string;
 };
 
 export type PartMasterPayload = {
@@ -84,7 +133,7 @@ export type PartMasterPayload = {
   partStatus?: PartStatus;
   warrantyApplicable?: boolean;
   warrantyRate?: number | null;
-};
+} & Partial<LegacyPartFields>;
 
 export type PriceCategory = {
   code: string;

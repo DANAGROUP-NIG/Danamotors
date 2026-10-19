@@ -7,6 +7,7 @@ jest.mock('../../prisma/client', () => ({
     invoice: { create: jest.fn() },
     customer: { findUniqueOrThrow: jest.fn() },
     financeSetting: { findUnique: jest.fn() },
+    branchSettings: { findUnique: jest.fn() },
     documentSequence: { upsert: jest.fn() },
   },
 }));

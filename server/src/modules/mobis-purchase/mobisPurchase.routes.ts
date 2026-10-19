@@ -48,8 +48,9 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  *     tags: [Mobis Purchase]
  *     summary: Import a Mobis invoice (MIT format)
  *     description: |
- *       Creates the MIT. Parts missing from Part Master are rejected unless `createMissingParts` is true, in which
- *       case they are created (part code = part number, dealer rate = unit price x conversion rate). The same
+ *       Creates the MIT; Part Master prices are not changed. Parts missing from Part
+ *       Master are never created: they are rejected unless `ignoreMissingParts` is true, in which case their lines
+ *       are left off the MIT. The same
  *       invoice cannot be imported twice unless the earlier MIT was cancelled. Line amounts must equal qty x unit price.
  *     requestBody:
  *       content:
@@ -60,7 +61,6 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  *             conversionRate: 2700
  *             receivedMode: AIR
  *             sourceFileName: A6EA0567A.xls
- *             createMissingParts: true
  *             lines:
  *               - { orderNumber: AV10K6Q01R, lineNumber: "0001", partNumber: 84710Q6020WK, partName: "CRASH PAD ASSY-MAIN", quantity: 1, unitPrice: 165.08, amount: 165.08, caseNumber: SPD2APE00210 }
  *               - { orderNumber: AV10K6Q01R, lineNumber: "0002", partNumber: 66311Q6000, partName: "PANEL-FENDER,LH", quantity: 1, unitPrice: 94.77, amount: 94.77, caseNumber: SPD2APE00210 }

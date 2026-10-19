@@ -16,6 +16,7 @@ export const createBranchSchema = z.object({
     phoneNumber: z.string().optional(),
     email: z.string().email('Invalid email address').optional(),
     code: z.string().trim().min(1, 'Code cannot be empty').max(10, 'Code must be 10 characters or less').transform((v) => v.toUpperCase()).optional(),
+    shortName: z.string().trim().max(20, 'Short name must be 20 characters or less').optional(),
     parentBranchId: z.string().uuid('Invalid parent branch ID').optional(),
   }),
 });
@@ -30,6 +31,7 @@ export const updateBranchSchema = z.object({
     phoneNumber: z.string().optional(),
     email: z.string().email('Invalid email address').optional(),
     code: z.string().trim().max(10, 'Code must be 10 characters or less').transform((v) => (v ? v.toUpperCase() : null)).nullable().optional(),
+    shortName: z.string().trim().max(20, 'Short name must be 20 characters or less').transform((v) => v || null).nullable().optional(),
     parentBranchId: z.string().uuid('Invalid parent branch ID').nullable().optional(),
   }),
   params: z.object({

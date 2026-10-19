@@ -1,4 +1,5 @@
 import { assertApprovedOperation } from '../service/estimate-approval';
+import { defaultSourceCategory, sourceLabel, sourceRecordProblem } from './partSource';
 import prisma from "../../prisma/client";
 import { InventoryRepository } from "./inventory.repository";
 import {
@@ -11,6 +12,7 @@ import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
 import { recordBinChange, recordPartChange } from "./partHistory";
+import type { LegacyPartFields } from "./inventory.validation";
 
 const INHERITABLE_FIELDS = [
   "category",
@@ -295,6 +297,12 @@ export class InventoryService {
       throw new NotFoundError("Main part not found");
     }
 
+    if (mainPart.sourceOfPartId) {
+      throw new BadRequestError(
+        `Part ${mainPart.partNumber} is a source record and cannot have alternates`,
+      );
+    }
+
     if (mainPart.role !== PartRole.MAIN) {
       // Prevents alternates being chained off other alternates —
       // keeps the hierarchy exactly one level deep, matching one-to-many.
@@ -410,9 +418,11 @@ export class InventoryService {
     });
     if (!mainPart) throw new NotFoundError(`Part ${mainPartId} not found`);
 
+    // Source records (local, used, repaired) are never replacement options; they are quoted by choice.
     const alternates = await prisma.sparePart.findMany({
       where: {
         mainPartId,
+        sourceOfPartId: null,
         partStatus: "ACTIVE" as never,
         ...(branchId && { inventoryStocks: { some: { branchId } } }),
       },
@@ -463,7 +473,7 @@ export class InventoryService {
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     warrantyRate?: number | null;
-  }, changedById?: string) {
+  } & LegacyPartFields, changedById?: string) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
       data = {
         ...data,
@@ -561,13 +571,26 @@ export class InventoryService {
       partStatus?: PartStatus;
       warrantyApplicable?: boolean;
       warrantyRate?: number | null;
-    },
+    } & LegacyPartFields,
     changedById?: string,
   ) {
     const part = await this.inventoryRepository.findPartById(id);
     if (!part) {
       throw new NotFoundError("Part not found");
     }
+
+    if (data.partFlag && data.partFlag !== part.partFlag) {
+      // A part's flag is its source: it is fixed while the part is linked to source records.
+      const linked = part.sourceOfPartId ? 1 : await prisma.sparePart.count({ where: { sourceOfPartId: id } });
+      if (linked)
+        throw new ConflictError(
+          part.sourceOfPartId
+            ? "This part is a source record; its part flag (source) cannot change"
+            : "This part has source records; its part flag cannot change while they are linked",
+        );
+    }
+    if (part.sourceOfPartId && data.warrantyApplicable)
+      throw new BadRequestError("Source records (local, used or repaired parts) cannot be claimed under warranty");
 
     if (data.partCode && data.partCode !== part.partCode) {
       const existing = await this.inventoryRepository.findPartByCode(
@@ -604,6 +627,112 @@ export class InventoryService {
     return this.mapToPartMasterDto(updated);
   }
 
+  // ── Part source records ────────────────────────────────────────────────
+  // A local, used or repaired version of a part is its own record with its own stock, rates and
+  // bin, linked to its main part. Estimates quote and issues take whichever record is chosen.
+
+  /**
+   * The main part and its source records, each with its stock at `branchId`. Called with a source
+   * record's id, it returns that record's main part and siblings.
+   */
+  async listPartSources(id: string, branchId?: string | null) {
+    const part = await prisma.sparePart.findUnique({ where: { id }, select: { id: true, sourceOfPartId: true } });
+    if (!part) throw new NotFoundError("Part not found");
+    const mainId = part.sourceOfPartId ?? part.id;
+    const records = await prisma.sparePart.findMany({
+      where: { OR: [{ id: mainId }, { sourceOfPartId: mainId }] },
+      include: { inventoryStocks: { where: { branchId: branchId ?? "" } } },
+    });
+    const order = "OAFLUR";
+    const rows = records.map((record) => {
+      const stock = record.inventoryStocks[0];
+      return {
+        id: record.id,
+        partNumber: record.partNumber,
+        name: record.name,
+        partFlag: record.partFlag,
+        sourceLabel: sourceLabel(record.partFlag),
+        isMain: record.id === mainId,
+        partStatus: record.partStatus,
+        priceCategoryCode: record.priceCategoryCode,
+        dealerRate: record.unitPrice,
+        retailRate: record.retailRate,
+        binLocation: record.binLocation,
+        stock: branchId
+          ? { quantity: stock?.quantity ?? 0, available: (stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0), rackLocation: stock?.rackLocation ?? null }
+          : null,
+      };
+    });
+    // Main part first, then its sources in code order (O, A, F, L, U, R).
+    rows.sort((a, b) => Number(b.isMain) - Number(a.isMain) || order.indexOf(a.partFlag) - order.indexOf(b.partFlag));
+    return { mainPartId: mainId, branchId: branchId ?? null, records: rows };
+  }
+
+  /**
+   * Adds a source record for a main part. Name, UOM, tax and classification come from the main
+   * part; the retail rate comes from the dealer rate and price category, as for Mobis parts.
+   */
+  async createSourceRecord(
+    mainPartId: string,
+    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null; binLocation?: string | null },
+    changedById?: string,
+  ) {
+    const main = await prisma.sparePart.findUnique({
+      where: { id: mainPartId },
+      include: { sourceRecords: { select: { partFlag: true } } },
+    });
+    if (!main) throw new NotFoundError("Main part not found");
+    const problem = sourceRecordProblem(main, data.source, main.sourceRecords.map((r) => r.partFlag));
+    if (problem) throw new BadRequestError(problem);
+
+    const partNumber = data.partNumber.trim();
+    const taken = await prisma.sparePart.findFirst({
+      where: { OR: [{ partNumber: { equals: partNumber, mode: "insensitive" } }, { partCode: partNumber }] },
+      select: { partNumber: true },
+    });
+    if (taken) throw new ConflictError(`Part number ${taken.partNumber} is already in Part Master`);
+
+    const priceCategoryCode =
+      data.priceCategoryCode !== undefined ? data.priceCategoryCode : defaultSourceCategory(data.source, main.priceCategoryCode);
+    const retailRate = await this.retailFromCategory(data.dealerRate, priceCategoryCode);
+
+    try {
+      const part = await this.inventoryRepository.createPart(
+        {
+          partCode: partNumber,
+          partNumber,
+          name: main.name,
+          description: `${sourceLabel(data.source)} source of ${main.partNumber}`,
+          category: main.category ?? "",
+          uom: main.uom,
+          taxCategory: main.taxCategory,
+          taxForm: main.taxForm,
+          taxable: main.taxable,
+          partType: main.partType,
+          vehicleSystem: main.vehicleSystem,
+          vehicleGroup: main.vehicleGroup,
+          applicableModels: main.applicableModels,
+          conversionFactor: main.conversionFactor,
+          unitPrice: data.dealerRate,
+          retailRate,
+          partFlag: data.source,
+          priceCategoryCode,
+          binLocation: data.binLocation?.trim() || null,
+          partStatus: PartStatus.ACTIVE,
+          warrantyApplicable: false,
+          sourceOfPartId: main.id,
+        },
+        changedById,
+      );
+      return this.mapToPartMasterDto(part);
+    } catch (error) {
+      // Two users adding the same source at once: the unique (sourceOfPartId, partFlag) index decides.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
+        throw new ConflictError(`${main.partNumber} already has a ${sourceLabel(data.source)} record, or the part number is taken`);
+      throw error;
+    }
+  }
+
   async deletePart(id: string, changedById?: string) {
     const part = await this.inventoryRepository.findPartById(id);
     if (!part) {
@@ -616,6 +745,12 @@ export class InventoryService {
     if (alternates > 0) {
       throw new ConflictError(
         `This part has ${alternates} alternate part(s). Delete or reassign them first, or block the part instead.`,
+      );
+    }
+    const sourceRecords = await prisma.sparePart.count({ where: { sourceOfPartId: id } });
+    if (sourceRecords > 0) {
+      throw new ConflictError(
+        `This part has ${sourceRecords} source record(s) (local, used or repaired). Delete them first, or block the part instead.`,
       );
     }
 
@@ -934,7 +1069,8 @@ export class InventoryService {
         const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId }, include: { returns: true } });
         const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((n, r) => n + r.quantity, 0), 0);
         if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
-        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+        // Each source is its own part record: the approved estimate must name this exact record.
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
       }
       const updated = await tx.inventoryStock.updateMany({
         where: {
@@ -949,7 +1085,8 @@ export class InventoryService {
       }
 
       if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
-      const issuance = await tx.partIssuance.create({ data });
+      // partSource is a snapshot of the issued record's source, kept for reporting.
+      const issuance = await tx.partIssuance.create({ data: { ...data, partSource: sparePart.partFlag } });
       await tx.stockTransaction.create({
         data: {
           branchId: data.branchId,

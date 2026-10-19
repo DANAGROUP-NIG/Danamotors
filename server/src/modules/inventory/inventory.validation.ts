@@ -1,5 +1,6 @@
 import { PartRole } from "@prisma/client/wasm";
 import { z } from "zod";
+import { PART_SOURCE_CODES } from "./partSource";
 
 enum PartStatus {
   ACTIVE,
@@ -91,6 +92,23 @@ export const listPartsFilterQuerySchema = z.object({
 
 const partStatusEnum = z.enum(["ACTIVE", "BLOCKED"]);
 
+// Legacy partmast fields from the Part screen (classification and ordering).
+export const legacyPartFields = {
+  vehicleSystem: z.string().trim().max(20).nullable().optional(),
+  vehicleGroup: z.string().trim().max(20).nullable().optional(),
+  applicableModels: z.array(z.string().trim().min(1).max(20)).max(200).optional(),
+  moq: z.number().positive('MOQ must be greater than zero').nullable().optional(),
+  conversionFactor: z.number().positive('Conversion factor must be greater than zero').optional(),
+  basicRate: z.number().nonnegative('Base rate must be 0 or more').nullable().optional(),
+  nspDate: z.coerce.date().nullable().optional(),
+  nlaDate: z.coerce.date().nullable().optional(),
+  blockReserve: z.boolean().optional(),
+  includeInTopN: z.boolean().optional(),
+  topMover: z.boolean().optional(),
+  underAmc: z.boolean().optional(),
+};
+export type LegacyPartFields = z.infer<z.ZodObject<typeof legacyPartFields>>;
+
 const basePartMasterFields = {
   partCode: z
     .string()
@@ -139,6 +157,7 @@ const basePartMasterFields = {
   // Legacy partmast.WTYAPPLICABLE / warrrate.
   warrantyApplicable: z.boolean().optional(),
   warrantyRate: z.number().nonnegative('Warranty rate must be 0 or more').nullable().optional(),
+  ...legacyPartFields,
 };
 
 export const createPartMasterSchema = z.object({
@@ -185,6 +204,7 @@ export const updatePartMasterSchema = z.object({
       warrantyApplicable: basePartMasterFields.warrantyApplicable,
       warrantyRate: basePartMasterFields.warrantyRate,
       partStatus: partStatusEnum.optional(),
+      ...legacyPartFields,
     })
     .refine(
       (data) => {
@@ -205,6 +225,31 @@ export const partMasterIdParamSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid part ID"),
   }),
+});
+
+export const partSourcesQuerySchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid part ID"),
+  }),
+  query: z.object({
+    branchId: z.string().uuid("Invalid branch ID").optional(),
+  }),
+});
+
+export const createSourceRecordSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid main part ID"),
+  }),
+  body: z
+    .object({
+      source: z.enum(PART_SOURCE_CODES, { message: "Unknown part source" }),
+      partNumber: z.string().trim().min(1, "Part number is required").max(40, "Part number must be 40 characters or less"),
+      dealerRate: z.number().finite().positive("Dealer rate must be greater than zero"),
+      // Omitted: L (local consumable, 1.5x) for local, used and repaired records, else the main part's category.
+      priceCategoryCode: z.string().trim().toUpperCase().max(2, "Price category must be 1 or 2 characters").nullable().optional(),
+      binLocation: z.string().trim().max(30).optional(),
+    })
+    .strict(),
 });
 
 export const listPartsQuerySchema = z.object({

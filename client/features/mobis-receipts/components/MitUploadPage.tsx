@@ -46,7 +46,7 @@ export function MitUploadPage() {
   const [receivedMode, setReceivedMode] = useState<ReceivedMode | "">("");
   const [branchId, setBranchId] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [createMissing, setCreateMissing] = useState(true);
+  const [ignoreMissing, setIgnoreMissing] = useState(false);
 
   // Mobis stock is received at CPD; default to it, else to the user's own branch.
   useEffect(() => {
@@ -61,6 +61,7 @@ export function MitUploadPage() {
     setParsed(null);
     setMatches(null);
     setMatchFailed(false);
+    setIgnoreMissing(false);
     setFileName(file.name);
     try {
       const result = await parseMitFile(file);
@@ -99,13 +100,15 @@ export function MitUploadPage() {
   function clearFile() {
     setParsed(null);
     setMatches(null);
+    setIgnoreMissing(false);
     setFileName("");
     setParseError("");
     setInvoiceNumber("");
   }
 
   const matchByNumber = useMemo(() => new Map((matches ?? []).map((m) => [m.partNumber, m.part])), [matches]);
-  const newParts = matchFailed ? 0 : (matches ?? []).filter((m) => !m.part).length;
+  const missingParts = matchFailed ? [] : (matches ?? []).filter((m) => !m.part).map((m) => m.partNumber);
+  const newParts = missingParts.length;
   const rate = Number(conversionRate);
   const totals = useMemo(() => {
     const lines = parsed?.lines ?? [];
@@ -122,7 +125,7 @@ export function MitUploadPage() {
   if (!(rate > 0)) errors.push("Enter a conversion rate above zero");
   if (!receivedMode) errors.push("Choose the received mode");
   if (!branchId) errors.push("Choose the receiving branch");
-  if (newParts > 0 && !createMissing) errors.push(`${newParts} part(s) are not in Part Master`);
+  if (newParts > 0 && !ignoreMissing) errors.push(`${newParts} part(s) are not in Part Master: proceed without them, or abort`);
 
   function save() {
     if (!parsed || errors.length) return;
@@ -136,7 +139,7 @@ export function MitUploadPage() {
         receivedMode: receivedMode as ReceivedMode,
         remarks: remarks.trim() || undefined,
         sourceFileName: fileName,
-        createMissingParts: createMissing,
+        ignoreMissingParts: ignoreMissing,
         lines: parsed.lines.map((l) => ({
           orderNumber: l.orderNumber || undefined,
           lineNumber: l.lineNumber || undefined,
@@ -292,13 +295,24 @@ export function MitUploadPage() {
             </p>
           </div>
           {newParts > 0 && (
-            <label className="mb-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              <input type="checkbox" className="mt-0.5" checked={createMissing} onChange={(e) => setCreateMissing(e.target.checked)} />
-              <span>
-                Create the {newParts} new part(s) in Part Master from this invoice. They get the invoice part name and a dealer
-                rate of unit price × conversion rate; complete their category and other details in Part Master later.
-              </span>
-            </label>
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="flex items-center gap-1.5 font-semibold">
+                <AlertTriangle className="h-4 w-4" /> {newParts} part(s) in this file are not in Part Master
+              </p>
+              <p className="mt-1 break-words">{missingParts.join(", ")}</p>
+              <p className="mt-2">
+                Parts are never created from an invoice. Proceed and these lines are left off the MIT (and their stock is not
+                received), or abort, add the parts to Part Master, then upload the file again.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant={ignoreMissing ? "default" : "outline"} onClick={() => setIgnoreMissing(true)}>
+                  {ignoreMissing ? "Proceeding without them" : "Proceed without them"}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={clearFile}>
+                  Abort upload
+                </Button>
+              </div>
+            </div>
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -342,7 +356,7 @@ export function MitUploadPage() {
                             {known.partStatus === "BLOCKED" ? "Exists (blocked)" : "Exists"}
                           </span>
                         ) : (
-                          <span className="text-sm font-medium text-blue-700">New part</span>
+                          <span className="text-sm font-medium text-blue-700">Not in Part Master</span>
                         )}
                       </td>
                     </tr>
