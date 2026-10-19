@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { money, sumMoney } from '../finance/money';
+import { Prisma } from '@prisma/client';
 
 export const taxRegisterGroups = [
     { title: 'Bill details', columns: ['serialNumber', 'billNumber', 'billDate', 'customer'] },
@@ -50,12 +51,21 @@ export function taxRegisterValues(bill: Bill): { values: Record<string, number |
         taxableSubtotal: sumMoney([sum(taxable, 'taxableAmount'), sum(taxable, 'vat')]),
         nonTaxableTotal: sum(nonTaxable, 'saleAmount'), nonTaxableDiscount: sum(nonTaxable, 'discount'),
         nonTaxableHandlingCharge: 0, nonTaxableOtherCharges: 0, nonTaxableSubtotal: sum(nonTaxable, 'taxableAmount'),
-        labourAmount: money(bill.labourTotal - bill.labourDiscountAmount + bill.serviceTotal),
+        labourAmount: money(new Prisma.Decimal(bill.labourTotal).minus(bill.labourDiscountAmount).plus(bill.serviceTotal).toNumber()),
         labourVat: sum(rows.filter(r => r.category === 'LABOUR'), 'vat'), wctAmount: 0,
     });
     return { values, incomplete: Object.values(values).some(v => v == null) };
 }
 // A missing historical value must not silently turn into a zero subtotal.
 export function taxRegisterTotals(rows: Record<string, unknown>[]) {
-    return Object.fromEntries(taxRegisterMoneyKeys.map(k => [k, rows.some(r => r[k] == null) ? null : sumMoney(rows.map(r => Number(r[k])))]));
+    return nullableMoneyTotals(rows, taxRegisterMoneyKeys);
 }
+export function nullableMoneyTotals(rows: Record<string, unknown>[], keys: string[]) {
+    return Object.fromEntries(keys.map(k => [k, rows.some(r => r[k] == null) ? null : sumMoney(rows.map(r => Number(r[k])))]));
+}
+export const taxCategoryGroups = [
+    { title: 'Bill details', columns: ['serialNumber', 'billNumber', 'billDate', 'customer', 'taxId'] },
+    { title: 'Parts by category', columns: ['spares', 'oil', 'accessories', 'unclassifiedParts'] },
+    { title: 'Discount and parts VAT', columns: ['discount', 'partsTaxableAmount', 'partsVat'] },
+    { title: 'Labour and totals', columns: ['labour', 'serviceCharge', 'labourVat', 'legacyVat', 'vat', 'roundOff', 'netTotal'] },
+];

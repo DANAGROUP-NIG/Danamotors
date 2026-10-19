@@ -18,7 +18,7 @@ const dimension=(key:string,label:string,source:string):FilterConfig=>({key,labe
 const bill=select('billType','Bill type',[['BOTH','Cash and credit'],['CASH','Cash'],['CREDIT','Credit']]);
 const address=check('printAddress','Include customer address');
 export const MONTHLY_FILTERS:Record<MonthlySlug,FilterConfig[]>={
- 'tax-register':[bill,address,check('pageBreak','Start each bill type on a new page'),select('order','Order by',[['NUMBER','Bill number'],['DATE','Bill date']]),select('view','Show',[['DETAIL_ANNEXURE','Detail and annexure'],['DETAIL','Detail only'],['ANNEXURE','Annexure only']])],
+ 'tax-register':[bill,select('layout','Detail layout',[['CATEGORY','Categories and VAT'],['LEGACY','Legacy charge breakdown']]),address,check('pageBreak','Start each bill type on a new page'),select('order','Order by',[['NUMBER','Bill number'],['DATE','Bill date']]),select('view','Show',[['DETAIL_ANNEXURE','Detail and annexure'],['DETAIL','Detail only'],['ANNEXURE','Annexure only']])],
  'booked-vs-availed':[{key:'graceDays',label:'Grace period (days)',kind:'number',default:'0'}],
  'estimate-vs-job':[select('basedOn','Variation based on',[['ESTIMATE','Estimate'],['JOB','Job']]),select('variation','Report type',[['SHORTAGE','Shortage'],['EXCESS','Excess']])],
  'unbilled-parts':[select('chargeType','Who pays',[['ALL','All charge types'],['CUSTOMER','Non-warranty (customer)'],['WARRANTY','Warranty'],['FREE','Free of charge'],['GOODWILL','Goodwill']]),select('category','Part category',[['BOTH','Spares and oil'],['SPARES','Spares and accessories'],['OIL','Oil']]),select('view','Show',[['DETAIL_SUMMARY','Detail and summary'],['SUMMARY','Summary only'],['DETAIL','Detail only']])],

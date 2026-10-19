@@ -22,7 +22,8 @@ export interface VatRow {
 }
 export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxPart[], enabled: boolean, rates = defaultPartsVatRates) {
     const base = calculateJobBillTotals(input);
-    partsVatRatesSchema.parse(rates);
+    if (enabled) partsVatRatesSchema.parse(rates);
+    let incomplete = false;
     const grouped = new Map<string, {
         category: string;
         rate: number;
@@ -31,17 +32,25 @@ export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxP
     for (const p of parts) {
         if (!p.customerPaid)
             continue;
-        if (!Number.isFinite(p.amount) || p.amount < 0)
-            throw new BadRequestError('Invalid part amount');
-        if (enabled && !(p.category in rates))
+        if (!Number.isFinite(p.amount) || p.amount < 0) {
+            if (enabled) throw new BadRequestError('Invalid part amount');
+            incomplete = true;
+            continue;
+        }
+        if (enabled && !Object.prototype.hasOwnProperty.call(rates, p.category))
             throw new BadRequestError('Classify every customer-paid part as spares, oil or accessories before enabling parts VAT');
         const rate = enabled && p.taxable ? rates[p.category as keyof PartsVatRates] : 0;
         const key = p.category + ':' + rate;
         const prior = grouped.get(key);
         grouped.set(key, { category: p.category, rate, sale: (prior?.sale ?? new Prisma.Decimal(0)).plus(p.amount) });
     }
-    if (sumMoney([...grouped.values()].map(g => money(g.sale.toNumber()))) !== base.partsTotal)
-        throw new BadRequestError('Part tax amounts do not reconcile with the bill');
+    if (incomplete || sumMoney([...grouped.values()].map(g => money(g.sale.toNumber()))) !== base.partsTotal) {
+        if (enabled) throw new BadRequestError('Part tax amounts do not reconcile with the bill');
+        // OFF must accept exactly the old calculator's inputs. Missing category
+        // metadata affects only the new breakdown, never the original totals.
+        grouped.clear();
+        grouped.set('UNCLASSIFIED:0', { category: 'UNCLASSIFIED', rate: 0, sale: new Prisma.Decimal(base.partsTotal) });
+    }
     const breakdown: VatRow[] = [];
     const taxGroups=[...grouped.values()];
     const discountKobo=new Prisma.Decimal(base.partsDiscountAmount).times(100);
@@ -75,5 +84,7 @@ export async function partsVatSettings(db: Prisma.TransactionClient) {
     const [flag, rates] = await Promise.all([db.financeSetting.findUnique({ where: { key: 'JOB_BILL_PARTS_VAT_ENABLED' } }), db.financeSetting.findUnique({ where: { key: 'partsVatRates' } })]);
     // An explicit true is required; legacy or unrelated values never enable billing changes.
     const enabled = process.env.JOB_BILL_PARTS_VAT_ENABLED === 'true' || flag?.value === true;
-    return { enabled, rates: enabled && rates?.value ? partsVatRatesSchema.parse(rates.value) : defaultPartsVatRates };
+    const saved = partsVatRatesSchema.safeParse(rates?.value);
+    if (enabled && rates?.value && !saved.success) throw new BadRequestError('Review the stored parts VAT rates before enabling parts VAT');
+    return { enabled, rates: saved.success ? saved.data : defaultPartsVatRates };
 }
