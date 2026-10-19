@@ -8,6 +8,13 @@ const base = { branchId: '11111111-1111-4111-8111-111111111111', from: '2026-10-
 const job = { id: 'j', jobNumber: 'J1', createdAt: new Date('2026-10-01T09:00Z'), status: 'DELIVERED', vehicleId: 'v', vehicle: { id: 'v', vin: 'VIN', registrationNumber: 'REG', model: 'Rio', customer: null, catalogModel: null, catalogue: null }, customer: null, serviceType: { description: 'Paid', preDelivery: false }, service: null, lines: [], invoices: [], complaints: [], deliveryAdvisor: null, serviceAdvisor: null };
 describe('Monthly report data behavior', () => {
     beforeEach(() => jest.resetAllMocks());
+    it('keeps M7 within scope: actual service types, inclusive totals, and no extra breakdown', async () => {
+        (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([{ ...job, deliveredAt: new Date('2026-10-02'), serviceType: { description: 'Accidental repair', code: 'AC' } }]);
+        const result = await new ReportsService().report('delivered-service', reportQueries['delivered-service'].parse(base));
+        expect(result.totals).toEqual({ 'Accidental repair': 1, total: 1 });
+        expect(result.groups).toEqual([]);
+        expect(reportQueries['tax-register'].safeParse({ ...base, layout: 'LEGACY' }).success).toBe(false);
+    });
     it('uses known zero categories on labour-only bills so grand category totals remain numeric', async () => {
         const invoice = { billType: 'CASH', issuedDate: new Date('2026-10-01'), customer: null, jobCard: null, partsDiscountAmount: 0, labourDiscountAmount: 0, serviceTotal: 0, roundOff: 0, vatRate: 7.5 };
         (prisma.invoice.findMany as jest.Mock).mockResolvedValue([
@@ -33,15 +40,15 @@ describe('Monthly report data behavior', () => {
         expect(result.groups.slice(1).every(g => g.pageBreak)).toBe(true);
         expect(result.exportSummary).toBe(false);
     });
-    it('returns the photographed register columns and original document number without guessing cash/credit', async () => {
+    it('preserves verified legacy values and document numbers behind the issue column set', async () => {
         const values = Object.fromEntries(taxRegisterMoneyKeys.map(k => [k, 0]));
         Object.assign(values, { taxableSpares: 100, taxableAmount: 90, taxableDiscount: 10, upstNonGovernment: 6.75, taxableSubtotal: 96.75, labourAmount: 55, labourVat: 4.13, wctAmount: 5, netTotal: 150.88 });
         const bill = { invoiceNumber: 'IMPORT-KEY', issuedDate: new Date('2026-10-01'), notes: 'Imported stored total; original flags pending', billType: null, customer: null, jobCard: { creditApprovedById: null }, vatBreakdown: [], partsTotal: 0, partsDiscountAmount: 0, labourTotal: 0, labourDiscountAmount: 0, serviceTotal: 0, subtotal: 140, vatAmount: 10.88, vatRate: 0, roundOff: 0, total: 150.88, taxRegisterSnapshot: { version: 1, source: 'LEGACY', documentNumber: '2026000973', values } };
         (prisma.invoice.findMany as jest.Mock).mockResolvedValue([bill]);
-        const r = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse({ ...base, layout: 'LEGACY' }));
+        const r = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse(base));
         expect(r.groups[0].title).toBe('Unclassified billing type');
-        expect(r.groups[0].columns).toHaveLength(24);
-        expect(r.groups[0].columnGroups?.map(g => g.title)).toEqual(['Bill details', 'Taxable', 'Tax paid / non-taxable', 'Labour and bill total']);
+        expect(r.groups[0].columns).toEqual(expect.arrayContaining(['spares', 'oil', 'accessories', 'partsVat', 'serviceCharge']));
+        expect(r.groups[0].columnGroups?.map(g => g.title)).toEqual(['Bill details', 'Parts by category', 'Discount and parts VAT', 'Labour and totals']);
         expect(r.groups[0].rows[0]).toMatchObject({ billNumber: '2026000973', taxableSpares: 100, labourAmount: 55, labourVat: 4.13, wctAmount: 5, netTotal: 150.88 });
         expect(r.totals.netTotal).toBe(150.88);
         const cash = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse({ ...base, billType: 'CASH' }));
@@ -55,7 +62,7 @@ describe('Monthly report data behavior', () => {
             { category: 'ACCESSORIES', rate: 7.5, saleAmount: 50, discount: 5, taxableAmount: 45, vat: 3.38 },
             { category: 'LABOUR', rate: 7.5, saleAmount: 110, discount: 0, taxableAmount: 110, vat: 8.25 },
         ] }]);
-        const result = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse({ ...base, view, order: 'DATE', layout: 'CATEGORY' }));
+        const result = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse({ ...base, view, order: 'DATE' }));
         const annexure = result.groups.find(g => g.title === 'VAT annexure');
         if (view !== 'DETAIL') expect(annexure?.totals?.vat).toBe(result.totals.vat);
         else expect(annexure).toBeUndefined();
@@ -82,6 +89,6 @@ describe('Monthly report data behavior', () => {
     it('uses free-text appointment status only for cancellation, with grace and walk-ins', async () => { (prisma.serviceAppointment.findMany as jest.Mock).mockResolvedValue([{ id: 'b', vehicleId: 'v', scheduledAt: new Date('2026-10-01'), vehicle: job.vehicle, customer: null, serviceType: { description: 'Paid', code: 'PAID' }, service: null }]); (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([{ ...job, appointmentId: 'b', createdAt: new Date('2026-10-03') }, { ...job, id: 'walk', vehicleId: 'other', appointmentId: null }]); const r = await new ReportsService().report('booked-vs-availed', reportQueries['booked-vs-availed'].parse({ ...base, graceDays: 2 })); expect(r.totals).toMatchObject({ bookings: 1, availed: 1, notAvailed: 0, walkIns: 1 }); });
     it('filters warranty claims and requires an active invoice for billed-only', async () => { const l = { kind: 'PART', chargeType: 'WARRANTY', createdAt: new Date('2026-10-01'), sparePart: { partNumber: 'P', taxCategory: 'B' }, description: 'Oil', quantity: 1, rate: 50, partIssuance: null, warrantyCaseLines: [{ case: { caseNumber: 'C1', manufacturerClaimNo: 'M1', status: 'SUBMITTED', statusHistory: [] } }] }; (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([{ ...job, lines: [l], invoices: [{ id: 'bill' }] }]); const r = await new ReportsService().report('warranty-parts', reportQueries['warranty-parts'].parse({ ...base, claims: 'GENERATED', billedOnly: 'true' })); expect(r.totals.amount).toBe(50); expect((await new ReportsService().report('warranty-parts', reportQueries['warranty-parts'].parse({ ...base, claims: 'NOT_GENERATED' }))).rows).toHaveLength(0); });
     it('reconciles legacy VAT without inventing category amounts', async () => { (prisma.invoice.findMany as jest.Mock).mockResolvedValue([{ invoiceNumber: 'B1', issuedDate: new Date('2026-10-01'), customer: null, jobCard: { creditApprovedById: null }, vatBreakdown: [], partsTotal: 100, partsDiscountAmount: 0, labourTotal: 100, labourDiscountAmount: 0, serviceTotal: 0, subtotal: 200, vatAmount: 7.5, vatRate: 7.5, roundOff: 0.5, total: 208 }]); const r = await new ReportsService().report('tax-register', reportQueries['tax-register'].parse(base)); expect(r.totals.vat).toBe(7.5); expect(r.groups.find(g => g.title === 'VAT annexure')?.totals?.vat).toBe(7.5); expect(r.groups[0].rows[0].spares).toBeNull(); expect(r.warnings).toEqual(expect.arrayContaining([expect.stringContaining('historical bills')])); });
-    it('groups corporate bills by vehicle membership', async () => { (prisma.corporateGroup.findMany as jest.Mock).mockResolvedValue([{ id: 'g', code: 'G', name: 'Fleet' }]); (prisma.invoice.findMany as jest.Mock).mockResolvedValue([{ invoiceNumber: 'B', issuedDate: new Date('2026-10-01'), total: 100, partsTotal: 100, labourTotal: 0, serviceTotal: 0, vatAmount: 0, outstandingAmount: 100, jobCard: { ...job, vehicle: { ...job.vehicle, corporateGroup: { code: 'G', name: 'Fleet' } } } }]); const r = await new ReportsService().report('corporate-bills', reportQueries['corporate-bills'].parse(base)); expect(r.groups[0].title).toContain('G · Fleet'); expect(r.totals.billAmount).toBe(100); });
+    it('groups corporate bills by vehicle membership', async () => { (prisma.corporateGroup.findMany as jest.Mock).mockResolvedValue([{ id: 'g', code: 'G', name: 'Fleet' }]); (prisma.invoice.findMany as jest.Mock).mockResolvedValue([{ invoiceNumber: 'B', issuedDate: new Date('2026-10-01'), total: 100, partsTotal: 100, labourTotal: 0, serviceTotal: 0, vatAmount: 0, outstandingAmount: 100, jobCard: { ...job, vehicle: { ...job.vehicle, corporateGroup: { code: 'G', name: 'Fleet' } } } }]); const r = await new ReportsService().report('corporate-bills', reportQueries['corporate-bills'].parse(base)); expect(r.groups[0].title).toBe('G · Fleet'); expect(r.totals.billAmount).toBe(100); });
     it('history options omit optional sections and branch scopes every nested visit', async () => { (prisma.vehicle.findMany as jest.Mock).mockResolvedValue([{ ...job.vehicle, ownerships: [], vehicleModel: null, saleDate: null, jobCards: [job], _count: { jobCards: 1 } }]); const r = await new ReportsService().report('vehicle-history-card', reportQueries['vehicle-history-card'].parse({ branchId: base.branchId, vehicleId: '22222222-2222-4222-8222-222222222222', parts: 'false', labour: 'false', demands: 'false' })); expect(r.groups.map(g => g.title)).not.toContain('Parts and oil'); expect(r.groups.map(g => g.title)).not.toContain('Labour and service charges'); expect(r.groups.map(g => g.title)).not.toContain('Customer requests'); expect((prisma.vehicle.findMany as jest.Mock).mock.calls[0][0].include.jobCards.where.branchId).toBe(base.branchId); });
 });

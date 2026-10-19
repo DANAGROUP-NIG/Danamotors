@@ -265,19 +265,7 @@ export function ReportOutput({
   }
   return (
     <div className="min-w-0 space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex flex-wrap gap-4">
-          {Object.entries(result.totals).filter(([k]) => !result.summaryKeys || result.summaryKeys.includes(k)).sort(([a], [b]) => result.summaryKeys ? result.summaryKeys.indexOf(a) - result.summaryKeys.indexOf(b) : 0).map(([k, v]) => (
-            <div key={k}>
-              <span className="block text-xs text-muted-foreground">
-                {result.columnGroups ? label(k) : result.columnLabels?.[k] ?? label(k)}
-              </span>
-              <strong className="text-lg tabular-nums">
-                {formatted(v, k)}
-              </strong>
-            </div>
-          ))}
-        </div>
+      <div className="flex justify-end print:hidden">
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4" />

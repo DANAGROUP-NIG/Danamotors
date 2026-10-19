@@ -1,6 +1,3 @@
-import { bookedColumns, numberedRows, unbilledColumns } from './legacy-columns';
-import { vehicleInclude } from './report.repository';
-import { nullableMoneyTotals } from './tax-register-layout';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { ReportRepository, jobScope, jobInclude, inactiveStatuses } from './report.repository';
@@ -23,23 +20,23 @@ export async function unbilledParts(input: ReportInput): Promise<ReportResult> {
                 continue;
             if (input.category === 'OIL' && category !== 'OIL' || input.category === 'SPARES' && !['SPARES', 'ACCESSORIES'].includes(category))
                 continue;
-            rows.push({ ...identity(j), jobStatus: j.status, issueDate: dateKey(date), partNumber: l.sparePart?.partNumber ?? '', description: l.sparePart?.name ?? l.description, variant: j.vehicle?.catalogue?.description ?? j.vehicle?.trim ?? null, requisitionNumber: null, dealerRate: null, dealerAmount: null, retailAmount: l.chargeType === 'CUSTOMER' ? money(new Prisma.Decimal(quantity).times(l.rate).toNumber()) : 0, category, chargeType: l.chargeType, quantityIssued: issued, quantityReturned: returned, quantityBilled: allocated, netQty: quantity, rate: l.rate, amount: money(new Prisma.Decimal(quantity).times(l.rate).toNumber()), daysSinceIssue: daysLate(date, new Date()) });
+            rows.push({ ...identity(j), jobStatus: j.status, issueDate: dateKey(date), partNumber: l.sparePart?.partNumber ?? '', description: l.description, category, chargeType: l.chargeType, quantityIssued: issued, quantityReturned: returned, quantityBilled: allocated, netQty: quantity, rate: l.rate, amount: money(new Prisma.Decimal(quantity).times(l.rate).toNumber()), daysSinceIssue: daysLate(date, new Date()) });
         }
     }
-    const summary = [...groups(rows, 'jobNumber', ['amount', 'netQty', 'retailAmount']), ...groups(rows, 'chargeType', ['amount', 'netQty', 'retailAmount'])].map(g => ({ ...g, columns: ['netQty', 'retailAmount', 'dealerAmount', 'lineCount'], columnLabels: { netQty: 'Qty', retailAmount: 'Retail amount', dealerAmount: 'Dealer amount', lineCount: 'Lines' }, rows: [], totals: { ...g.totals, ...nullableMoneyTotals(g.rows, ['dealerAmount']), lineCount: g.rows.length } }));
-    return { ...unbilledColumns, summaryKeys: ['netQty', 'retailAmount', 'dealerAmount'], warnings: ['Requisition numbers and historical dealer rates were not recorded; those values are shown blank.'], rows: input.view === 'SUMMARY' ? [] : rows, groups: input.view === 'DETAIL' ? [] : summary, totals: { ...totals(rows, ['amount', 'netQty', 'retailAmount']), ...nullableMoneyTotals(rows, ['dealerAmount']), lineCount: rows.length }, filters: input };
+    const summary = [...groups(rows, 'jobNumber', ['amount']), ...groups(rows, 'chargeType', ['amount'])].map(g => ({ ...g, rows: [], totals: { ...g.totals, lineCount: g.rows.length } }));
+    return { rows: input.view === 'SUMMARY' ? [] : rows, groups: input.view === 'DETAIL' ? [] : summary, totals: { ...totals(rows, ['amount', 'netQty']), lineCount: rows.length }, filters: input };
 }
 export async function bookedVsAvailed(input: ReportInput): Promise<ReportResult> {
     const bounds = dateBounds(input.from!, input.to!);
     const extended = { gte: bounds.gte, lt: new Date(bounds.lt.getTime() + Number(input.graceDays) * 86400000) };
-    const [bookings, jobs] = await Promise.all([prisma.serviceAppointment.findMany({ where: { branchId: input.branchId, scheduledAt: bounds, status: { notIn: inactiveStatuses, mode: 'insensitive' } }, include: { vehicle: { include: vehicleInclude }, customer: true, service: true, serviceType: true }, orderBy: { scheduledAt: 'asc' } }), prisma.jobCard.findMany({ where: { ...jobScope(input), createdAt: extended }, include: jobInclude, orderBy: { createdAt: 'asc' } })]);
+    const [bookings, jobs] = await Promise.all([prisma.serviceAppointment.findMany({ where: { branchId: input.branchId, scheduledAt: bounds, status: { notIn: inactiveStatuses, mode: 'insensitive' } }, include: { vehicle: { include: { catalogModel: true } }, customer: true, service: true, serviceType: true }, orderBy: { scheduledAt: 'asc' } }), prisma.jobCard.findMany({ where: { ...jobScope(input), createdAt: extended }, include: jobInclude, orderBy: { createdAt: 'asc' } })]);
     const rows: ReportRow[] = bookings.filter(b => !b.serviceType?.preDelivery && b.serviceType?.code.toUpperCase() !== 'PDI').map(b => {
         const job = availedJob(b, jobs, Number(input.graceDays));
-        return { section: job ? 'Booked and availed' : 'Booked but not availed', bookingNumber: b.id, model: modelName(b.vehicle), variant: b.vehicle.catalogue?.description ?? b.vehicle.trim, vin: b.vehicle.vin, serviceCode: b.serviceType?.code ?? null, bookedFor: dateKey(b.scheduledAt), registration: b.vehicle.registrationNumber, customer: customerName(b.customer), phone: b.customer?.phoneNumber ?? '', serviceType: b.serviceType?.description ?? b.service?.name ?? 'Not recorded', jobNumber: job?.jobNumber ?? null, jobDate: job ? dateKey(job.createdAt) : null, daysLate: job ? daysLate(b.scheduledAt, job.createdAt) : null };
+        return { section: job ? 'Booked and availed' : 'Booked but not availed', bookingNumber: b.id, bookedFor: dateKey(b.scheduledAt), registration: b.vehicle.registrationNumber, customer: customerName(b.customer), phone: b.customer?.phoneNumber ?? '', serviceType: b.serviceType?.description ?? b.service?.name ?? 'Not recorded', jobNumber: job?.jobNumber ?? null, jobDate: job ? dateKey(job.createdAt) : null, daysLate: job ? daysLate(b.scheduledAt, job.createdAt) : null };
     });
-    const walks = jobs.filter(j => !j.appointmentId && j.createdAt < bounds.lt).map(j => ({ ...identity(j), variant: j.vehicle?.catalogue?.description ?? j.vehicle?.trim ?? null, serviceCode: j.serviceType?.code ?? null, section: 'Walk-ins', bookingNumber: null, bookedFor: null, phone: j.customer?.phoneNumber ?? null, daysLate: null }));
+    const walks = jobs.filter(j => !j.appointmentId && j.createdAt < bounds.lt).map(j => ({ ...identity(j), section: 'Walk-ins', bookingNumber: null, bookedFor: null, phone: j.customer?.phoneNumber ?? null, daysLate: null }));
     const all = [...rows, ...walks];
-    return { rows: [], groups: [...groups(all, 'section', []).map(g => ({ ...g, ...bookedColumns, rows: numberedRows(g.rows) })), { title: 'Summary by service type', rows: groups(all, 'serviceType', []).map(g => ({ serviceType: g.title, ...bookingSummary(g.rows) })) }], totals: bookingSummary(all), filters: input };
+    return { rows: [], groups: [...groups(all, 'section', []), { title: 'Summary by service type', rows: groups(all, 'serviceType', []).map(g => ({ serviceType: g.title, ...bookingSummary(g.rows) })) }], totals: bookingSummary(all), filters: input };
 }
 export async function estimateVsJob(input: ReportInput): Promise<ReportResult> {
     const bounds = dateBounds(input.from!, input.to!);

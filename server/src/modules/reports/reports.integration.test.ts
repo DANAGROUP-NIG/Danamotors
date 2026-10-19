@@ -31,8 +31,6 @@ integration('Monthly reports database chain', () => {
             const unbilled = await reports.report('unbilled-parts', reportQueries['unbilled-parts'].parse(base));
             expect(unbilled.totals.amount).toBe(50);
             expect(unbilled.rows[0].chargeType).toBe('WARRANTY');
-            expect(unbilled.rows[0]).toMatchObject({ retailAmount: 0, dealerRate: null, dealerAmount: null, requisitionNumber: null });
-            expect(unbilled.columns?.slice(-4)).toEqual(['rate', 'retailAmount', 'dealerRate', 'dealerAmount']);
             const deliveries = await reports.report('delivered-model', reportQueries['delivered-model'].parse(base));
             expect(deliveries.totals.total).toBe(4);
             expect(deliveries.rows.reduce((s, r) => s + Number(r.total), 0)).toBe(4);
@@ -42,8 +40,6 @@ integration('Monthly reports database chain', () => {
             const parts = await reports.report('warranty-parts', reportQueries['warranty-parts'].parse({ ...base, claims: 'GENERATED', billedOnly: 'true' }));
             expect(parts.totals.amount).toBe(50);
             expect(parts.groups.flatMap(g => g.rows)).toHaveLength(1);
-            expect(parts.groups[0].rows[0]).toMatchObject({ dealerRate: null, dealerAmount: null });
-            expect(parts.groups[0].columns?.at(-1)).toBe('claimDate');
             const card = await reports.report('vehicle-history-card', reportQueries['vehicle-history-card'].parse({ branchId, vehicleId: f.vehicle.id }));
             expect(card.totals.visits).toBe(1);
             expect(card.groups).toHaveLength(11);

@@ -58,3 +58,7 @@ For local manual testing, use the [walkthrough](../testing/issue-79-frontend-wal
 M1, M2, M4, M5, M7 and M9 now use the supplied legacy output columns across screen/print/XLSX. M7 includes the free-service breakdown and separately counted accidental deliveries. Missing historical dealer rates and requisition numbers remain blank. Only #79 reports are included; the two additional photographed report types were explicitly excluded by the user. See doc/reports.md for the full column contract. This supersedes the initial audit decision to default M1 to CATEGORY.
 
 Follow-up verification: 59 default suites / 724 tests pass (15 DB suites / 98 tests skipped); all 66 report tests passed with the local database enabled, and the chain was rerun after the final assertions. Backend typecheck/build and frontend lint/build pass. Ten real component XLSX exports and true 390px/print captures pass; affected print captures inspected. No non-local database writes. The earlier full DB-suite stock-transfer failures were not rerun for this column-only follow-up.
+
+## Scope correction requested by user
+
+Issue #79 supersedes the output-photo follow-up above. Removed duplicate top metric cards, M7 free-service breakdown/custom buckets, M5 extra customer/type subdivisions, and the extra M1 layout selector. Restored the issue column sets and inclusive service-type grid totals. Required M2/M4 summaries and subtotals/grand totals remain. No database writes.

@@ -1,4 +1,3 @@
-import { corporateColumns, numberedRows } from './legacy-columns';
 import prisma from "../../prisma/client";
 import { ReportInput } from "./report.validation";
 import { ReportResult, ReportRow } from "./report.types";
@@ -10,10 +9,8 @@ import { BadRequestError } from "../../shared/errors/appError";
 import { Prisma } from "@prisma/client";
 import {
   taxRegisterValues,
-  taxRegisterSnapshotSchema,
   taxRegisterTotals,
   taxRegisterLabels,
-  taxRegisterGroups,
   taxCategoryGroups,
   nullableMoneyTotals,
 } from "./tax-register-layout";
@@ -182,7 +179,7 @@ export async function taxRegister(input: ReportInput): Promise<ReportResult> {
     "billAmount",
   ];
   const annexure = taxAnnexure(taxes);
-  const detailGroups = input.layout === "LEGACY" ? taxRegisterGroups : taxCategoryGroups;
+  const detailGroups = taxCategoryGroups;
   const detailColumns = detailGroups.flatMap(g => g.columns);
   const sections: ReportResult["groups"] =
     input.view === "ANNEXURE"
@@ -284,7 +281,6 @@ export async function corporateBills(
       },
     },
     include: {
-      customer: true,
       jobCard: {
         include: {
           vehicle: {
@@ -307,12 +303,10 @@ export async function corporateBills(
       g = v.corporateGroup!,
       billType = reportBillType(i.billType);
     if (input.billType !== "BOTH" && billType !== input.billType) return [];
-    const snapshot = taxRegisterSnapshotSchema.safeParse(i.taxRegisterSnapshot);
     return [
       {
-        customer: customerName(i.customer) || 'Not recorded',
         corporate: g.code + " · " + g.name,
-        billNumber: snapshot.success ? snapshot.data.documentNumber ?? i.invoiceNumber : i.invoiceNumber,
+        billNumber: i.invoiceNumber,
         billDate: dateKey(i.issuedDate),
         billType,
         jobNumber: j.jobNumber,
@@ -345,8 +339,7 @@ export async function corporateBills(
   ];
   return {
     rows: [],
-    summaryKeys: ['billAmount'],
-    groups: groups(rows, "corporate", keys).flatMap(g => [...groups(g.rows.map(r => ({ ...r, customerGroup: String(r.billType) + " / Customer: " + String(r.customer) })), "customerGroup", keys).map(customer => ({ ...customer, title: g.title + " / " + customer.title, ...corporateColumns, rows: numberedRows(customer.rows) })), { title: g.title + " subtotal", rows: [], totals: { billAmount: g.totals?.billAmount ?? 0 }, columns: ["billAmount"], columnLabels: { billAmount: "Amount" } }]).map((g, index) => ({ ...g, pageBreak: index > 0 && g.rows.length > 0 })),
+    groups: groups(rows, "corporate", keys),
     totals: totals(rows, keys),
     filters: input,
     warnings: rows.some(r => r.billType === "UNCLASSIFIED") ? ["Historical bill types are unclassified until their cash/credit mapping is confirmed."] : [],
