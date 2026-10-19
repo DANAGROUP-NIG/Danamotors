@@ -68,7 +68,7 @@ const cellValue = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.te
       const keys = section.columns ?? [...new Set([...section.rows.flatMap(r => Object.keys(r)), ...Object.keys(section.totals ?? {})])].filter(k => k !== 'vehicleId');
       assert.ok(values.some(row => keys.every((key, i) => row[i] === (section.columnLabels?.[key] ?? label(key)))), `${slug}/${section.title}: column order and labels`);
       for (const row of section.rows) assert.ok(values.some(cells => keys.every((key, i) => cells[i] === cellValue(row[key]))), `${slug}/${section.title}: identical exported row`);
-      if (!section.rows.length) assert.ok(values.some(row => row[0] === 'No records in this section.'), `${slug}: empty section marker`);
+      if (!section.rows.length && !section.totals) assert.ok(values.some(row => row[0] === 'No records in this section.'), `${slug}: empty section marker`);
     });
     if (slug === 'vehicle-history-card') assert.equal(workbook.SheetNames.length, 11);
     const readBack = XLSX.readFile(path.join(output, slug + '.xlsx'));

@@ -22,6 +22,7 @@ export type ReportResult = {
   filters: Record<string, unknown>;
   columns?: string[];
   columnLabels?: Record<string, string>;
+  columnGroups?: { title: string; columns: string[] }[];
   warnings?: string[];
 };
 const label = (key: string) =>
@@ -201,11 +202,11 @@ export function ReportOutput({
     const book = XLSX.utils.book_new();
     const sections = [
       ...(result.rows.length
-        ? [{ title: "Report", rows: result.rows, totals: result.totals, columns: result.columns, columnLabels: result.columnLabels }]
+        ? [{ title: "Report", rows: result.rows, totals: result.totals, columns: result.columns, columnLabels: result.columnLabels, columnGroups: result.columnGroups }]
         : []),
       ...result.groups,
       ...(result.exportSummary !== false && !result.rows.length && result.groups.length
-        ? [{ title: "Grand totals", rows: [result.totals], columns: totalColumns, columnGroups: totalColumnGroups, columnLabels: details?.columnLabels }]
+        ? [{ title: "Grand totals", rows: [result.totals], columns: totalColumns ?? result.summaryKeys, columnGroups: totalColumnGroups, columnLabels: details?.columnLabels }]
         : []),
     ];
     sections.forEach((g, i) => {
@@ -227,7 +228,7 @@ export function ReportOutput({
         ...metadata,
         ...('columnGroups' in g && g.columnGroups ? [keys.map(k => g.columnGroups?.find(group => group.columns.includes(k))?.title ?? '')] : []),
         keys.map(k => ('columnLabels' in g && g.columnLabels?.[k]) || label(k)),
-        ...(!g.rows.length ? [["No records in this section."]] : []),
+        ...(!g.rows.length && !g.totals ? [["No records in this section."]] : []),
         ...g.rows.map((r) =>
           keys.map((k) =>
             typeof r[k] === "string" &&
@@ -269,7 +270,7 @@ export function ReportOutput({
           {Object.entries(result.totals).filter(([k]) => !result.summaryKeys || result.summaryKeys.includes(k)).sort(([a], [b]) => result.summaryKeys ? result.summaryKeys.indexOf(a) - result.summaryKeys.indexOf(b) : 0).map(([k, v]) => (
             <div key={k}>
               <span className="block text-xs text-muted-foreground">
-                {result.columnLabels?.[k] ?? label(k)}
+                {result.columnGroups ? label(k) : result.columnLabels?.[k] ?? label(k)}
               </span>
               <strong className="text-lg tabular-nums">
                 {formatted(v, k)}
@@ -322,6 +323,7 @@ export function ReportOutput({
             totals={result.totals}
             columns={result.columns}
             columnLabels={result.columnLabels}
+            columnGroups={result.columnGroups}
             onPick={onPick}
           />
         )}
@@ -335,7 +337,7 @@ export function ReportOutput({
             {g.rows.length ? (
               <ReportTable rows={g.rows} totals={g.totals} columns={g.columns} columnGroups={g.columnGroups} columnLabels={g.columnLabels} />
             ) : g.totals ? (
-              <ReportTable rows={[g.totals]} />
+              <ReportTable rows={[g.totals]} columns={g.columns} columnGroups={g.columnGroups} columnLabels={g.columnLabels} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 No records in this section.
@@ -355,9 +357,9 @@ export function ReportOutput({
           <section className="space-y-3 border-t pt-4">
             <h2 className="font-semibold">Grand totals</h2>
             {details ? <div className="tax-register-section"><ReportTable rows={[]} totals={result.totals} columns={totalColumns} columnGroups={totalColumnGroups} columnLabels={details.columnLabels} /></div> : <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Object.entries(result.totals).map(([k, v]) => (
+              {Object.entries(result.totals).filter(([k]) => !result.summaryKeys || result.summaryKeys.includes(k)).map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-xs text-muted-foreground">{result.columnLabels?.[k] ?? label(k)}</dt>
+                  <dt className="text-xs text-muted-foreground">{result.columnGroups ? label(k) : result.columnLabels?.[k] ?? label(k)}</dt>
                   <dd className="font-semibold tabular-nums">
                     {formatted(v, k)}
                   </dd>

@@ -18,6 +18,7 @@ export interface ReportResult {
     filters: Record<string, unknown>;
     columns?: string[];
     columnLabels?: Record<string, string>;
+    columnGroups?: { title: string; columns: string[] }[];
     warnings?: string[];
 }
 export const REPORT_SLUGS = ['tax-register', 'booked-vs-availed', 'estimate-vs-job', 'unbilled-parts', 'corporate-bills', 'delivered-model', 'delivered-service', 'warranty-attended', 'warranty-parts', 'vehicle-history-card'] as const;

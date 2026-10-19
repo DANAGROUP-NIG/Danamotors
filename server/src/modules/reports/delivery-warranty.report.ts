@@ -1,3 +1,6 @@
+import { serviceDeliveryGrid } from './service-delivery-grid';
+import { warrantyPartsColumns } from './legacy-columns';
+import { nullableMoneyTotals } from './tax-register-layout';
 import { ReportRepository, ReportJob } from './report.repository';
 import { ReportInput } from './report.validation';
 import { ReportResult, ReportRow } from './report.types';
@@ -26,8 +29,8 @@ export async function delivered(input: ReportInput, byModel: boolean): Promise<R
     // TODO(confirm): model targets need agreed periods and ownership; omit until confirmed.
     const jobs = await new ReportRepository().jobs(input, 'deliveredAt');
     const detail = jobs.filter(j => !byModel || matchesModel(input.modelIds, j.vehicle)).map(j => ({ ...identity(j), deliveryDate: dateKey(j.deliveredAt!), deliveredBy: [j.deliveryAdvisor?.firstName, j.deliveryAdvisor?.lastName].filter(Boolean).join(' ') }));
-    const grid = deliveryGrid(detail, byModel ? 'model' : 'serviceType');
-    return { ...grid, groups: input.detail === 'true' ? [{ title: 'Delivery details', rows: detail }] : [], filters: input };
+    const grid = byModel ? { ...deliveryGrid(detail, 'model'), groups: [] } : serviceDeliveryGrid(jobs.map(j => ({ deliveryDate: dateKey(j.deliveredAt!), code: j.serviceType?.code ?? null, description: serviceName(j), free: j.serviceType?.freeService ?? false })));
+    return { ...grid, groups: [...grid.groups, ...(input.detail === 'true' ? [{ title: 'Delivery details', rows: detail }] : [])], filters: input };
 }
 export async function warrantyAttended(input: ReportInput): Promise<ReportResult> {
     const jobs = await new ReportRepository().jobs(input);
@@ -61,9 +64,9 @@ export async function warrantyParts(input: ReportInput): Promise<ReportResult> {
             const quantity = l.partIssuance ? netIssued(l.partIssuance.quantity, l.partIssuance.returns) : l.quantity;
             if (quantity <= 0)
                 continue;
-            rows.push({ ...identity(j), issueDate: dateKey(issuedAt), partNumber: l.sparePart?.partNumber ?? '', description: l.description, category, quantity, rate: l.rate, amount: money(new Prisma.Decimal(quantity).times(l.rate).toNumber()), caseNumber: l.warrantyCaseLines.map(c => c.case.caseNumber).join(', '), manufacturerClaim: l.warrantyCaseLines.map(c => c.case.manufacturerClaimNo ?? '').join(', '), claimStatus: l.warrantyCaseLines.map(c => c.case.status).join(', ') });
+            rows.push({ ...identity(j), issueDate: dateKey(issuedAt), partNumber: l.sparePart?.partNumber ?? '', description: l.sparePart?.name ?? l.description, category, quantity, dealerRate: null, dealerAmount: null, claimDate: l.warrantyCaseLines.map(c => c.case.manufacturerClaimDate ? dateKey(c.case.manufacturerClaimDate) : '').filter(Boolean).join(', ') || null, rate: l.rate, amount: money(new Prisma.Decimal(quantity).times(l.rate).toNumber()), caseNumber: l.warrantyCaseLines.map(c => c.case.caseNumber).join(', '), manufacturerClaim: l.warrantyCaseLines.map(c => c.case.manufacturerClaimNo ?? '').join(', '), claimStatus: l.warrantyCaseLines.map(c => c.case.status).join(', ') });
         }
     }
     rows.sort((a, b) => String(a.vin).localeCompare(String(b.vin)));
-    return { rows: [], groups: groups(rows, 'vin', ['quantity', 'amount']), totals: totals(rows, ['quantity', 'amount']), filters: input };
+    return { rows: [], summaryKeys: ['quantity', 'dealerAmount'], groups: groups(rows, 'vin', ['quantity', 'amount']).map(g => ({ ...g, ...warrantyPartsColumns, totals: { ...g.totals, ...nullableMoneyTotals(g.rows, ['dealerAmount']) } })), totals: { ...totals(rows, ['quantity', 'amount']), ...nullableMoneyTotals(rows, ['dealerAmount']) }, filters: input, warnings: rows.length ? ['Historical dealer-rate snapshots are unavailable; dealer rates and amounts are shown blank rather than substituted with retail prices.'] : [] };
 }
