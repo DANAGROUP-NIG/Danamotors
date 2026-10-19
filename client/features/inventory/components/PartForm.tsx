@@ -234,14 +234,19 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             )}
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
-            <input className={inputCls} {...register("taxCategory")} />
+            <select className={inputCls} {...register("taxCategory")}>
+              <option value="">Unclassified — review before enabling VAT</option>
+              {part?.taxCategory && !["A","B","C","SPARES","OIL","ACCESSORIES"].includes(part.taxCategory) && <option value={part.taxCategory}>{part.taxCategory} (legacy, unclassified)</option>}
+              <option value="SPARES">Spares</option><option value="OIL">Oil and lubricants</option><option value="ACCESSORIES">Accessories</option>
+              {part?.taxCategory && ["A","B","C"].includes(part.taxCategory) && <option value={part.taxCategory}>{part.taxCategory} (legacy category)</option>}
+            </select>
           </Field>
           <Field label="Tax form (optional)" error={errors.taxForm?.message}>
             <input className={inputCls} placeholder="e.g. X" {...register("taxForm")} />
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold">
             <input type="checkbox" className="size-4" {...register("taxable")} />
-            Taxable
+            Taxable (untick for 0% exemption)
           </label>
         </div>
       </div>

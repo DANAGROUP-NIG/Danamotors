@@ -1,3 +1,4 @@
+import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
 import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
@@ -256,7 +257,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Reports",
         href: "/reports",
         icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+        permissions: [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
       },
     ],
   },

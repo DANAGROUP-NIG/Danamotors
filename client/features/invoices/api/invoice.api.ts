@@ -37,6 +37,7 @@ export type BillableJobCard = {
 };
 
 export type JobBillPreview = {
+  vatBreakdown?: {category:string;rate:number;saleAmount:number;discount:number;taxableAmount:number;vat:number}[];
   review: { estimateId: string | null; status: string; canBill: boolean; issues: string[]; approvedSubtotal: number; actualSubtotal: number; rows: { type: string; referenceId?: string | null; description: string; approvedQuantity: number; actualQuantity: number; approvedAmount: number; actualAmount: number; difference: number; included: boolean; reason: string | null }[] };
   jobCard: BillableJobCard;
   lines: Array<{ id?: string; type: "PART" | "LABOUR" | "SERVICE"; description: string; quantity: number; rate: number; amount: number }>;

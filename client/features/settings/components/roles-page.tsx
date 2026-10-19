@@ -48,6 +48,7 @@ const SYSTEM_ROLE_NAMES = new Set([
   "Accountant",
   "ServiceAdviser",
   "Technician",
+  "Engineer",
   "Receptionist",
   "ReceptionManager",
   "WarrantyOfficer",
