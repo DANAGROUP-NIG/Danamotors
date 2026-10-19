@@ -9,7 +9,7 @@ The ten report routes and APIs are implemented. The actionable audit gaps have b
 | Area | Status | Evidence |
 |---|---|---|
 | Framework, ten routes, validation, branch scope | DONE | `reports.routes.ts`, `report.validation.ts`, monthly config and shared components; route tests; frontend/server filter-contract QA |
-| M1 tax register | DONE | Category layout is default; legacy photo layout selectable; stored VAT reconciles to annexure, including explicit unknown residuals; modes/type/order covered |
+| M1 tax register | DONE | Legacy photo layout is default; category/VAT layout selectable; stored VAT reconciles to annexure, including explicit unknown residuals; modes/type/order covered |
 | M2 booked/availed | DONE | Linked bookings take priority within grace; walk-ins separate; pure matching/summary tests |
 | M3 estimate/job | DONE | Part IDs and canonical operation codes; stored actual amounts, net returns, standalone shortage groups |
 | M4 unbilled parts | DONE | Issued minus returned minus active billed quantities; exact links also deduct non-customer lines |
@@ -27,7 +27,7 @@ Detailed before/after classifications, bugs and verification limits: [audit](../
 
 ## Independently executed checks
 
-Final backend results: 58 default suites / 720 tests pass (15 DB suites / 98 tests skipped). With local DB enabled: 71 suites / 815 tests pass, two stock-transfer notification assertions fail, one catalogue suite/test stays skipped. These counts supersede historical notes. Backend typecheck and build pass. Frontend ESLint has zero errors and the production build generates 80 pages. The report integration chain runs against the disposable database on `127.0.0.1:55479`, not the configured LAN development database.
+Initial audit backend results: 58 default suites / 720 tests pass (15 DB suites / 98 tests skipped). With local DB enabled: 71 suites / 815 tests pass, two stock-transfer notification assertions fail, one catalogue suite/test stays skipped. These counts supersede historical notes. Backend typecheck and build pass. Frontend ESLint has zero errors and the production build generates 80 pages. The report integration chain runs against the disposable database on `127.0.0.1:55479`, not the configured LAN development database.
 
 The complete DB-enabled suite has unrelated stock-transfer notification failures; the report chain passes. Do not describe the entire DB suite as green. See audit for exact final suite/test counts and failures.
 
@@ -52,3 +52,9 @@ This audit replayed migrations only on a newly initialized local cluster under i
 Earlier progress notes recorded a 19 October LAN cohort seed and snapshot enrichment (75 invoices, 74 active, active stored total NGN 7,422,930). Those are historical claims supported by existing files in `doc/testing/issue-79-*verification.json`; they were not rerun or independently confirmed against that target during this local-only audit. They replace earlier historical ?seed blocked? statements, which are no longer current status. Source flags and exact legacy report parity remain unresolved despite seed success.
 
 For local manual testing, use the [walkthrough](../testing/issue-79-frontend-walkthrough.md), explicitly setting a disposable local DATABASE_URL first. Do not run any seed against a non-local database under this task.
+
+## Output-photo follow-up (19 October)
+
+M1, M2, M4, M5, M7 and M9 now use the supplied legacy output columns across screen/print/XLSX. M7 includes the free-service breakdown and separately counted accidental deliveries. Missing historical dealer rates and requisition numbers remain blank. Only #79 reports are included; the two additional photographed report types were explicitly excluded by the user. See doc/reports.md for the full column contract. This supersedes the initial audit decision to default M1 to CATEGORY.
+
+Follow-up verification: 59 default suites / 724 tests pass (15 DB suites / 98 tests skipped); all 66 report tests passed with the local database enabled, and the chain was rerun after the final assertions. Backend typecheck/build and frontend lint/build pass. Ten real component XLSX exports and true 390px/print captures pass; affected print captures inspected. No non-local database writes. The earlier full DB-suite stock-transfer failures were not rerun for this column-only follow-up.

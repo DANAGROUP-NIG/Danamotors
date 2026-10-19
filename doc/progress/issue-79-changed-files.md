@@ -158,3 +158,12 @@ Existing implementation inventory, reconciled with the audit commits. Paths are 
 - `server/src/modules/reports/variation-parts.report.ts`
 - `server/src/modules/reports/vehicle-options.test.ts`
 - `server/src/modules/reports/vehicle-options.ts`
+
+## Output-photo follow-up additions
+
+- `server/src/modules/reports/legacy-columns.ts`
+- `server/src/modules/reports/legacy-columns.test.ts`
+- `server/src/modules/reports/service-delivery-grid.ts`
+- `doc/testing/issue-79-legacy-columns-verification.json`
+
+Also updates existing report services/validation/OpenAPI, shared output metadata/rendering, monthly filter defaults, report regression tests and docs.

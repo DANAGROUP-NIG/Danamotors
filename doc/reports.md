@@ -25,7 +25,7 @@ M2 ignores appointment status for conversion. A matching linked job or same-vehi
 
 M4 deducts net accepted returns and active billed quantities. New invoice lines retain the exact job-line link; legacy invoice quantities are allocated once over chronological matching customer-paid part lines. Warranty/FOC/goodwill lines stay unbilled unless an active invoice explicitly links them; exact links are deducted regardless of who pays. Accessories count as spares. Unclassified legacy categories are visible with Both and excluded by specific category filters.
 
-M1 reads authoritative stored invoice VAT and amounts. The default `layout=CATEGORY` exposes the issue's spares, oil, accessories, discount, taxable parts, parts VAT, labour, service charge, labour VAT, round-off and net total. `layout=LEGACY` retains the 24 photographed charge columns. Cash/credit/both, numeric displayed bill-number or date ordering, address, bill-type page breaks and detail/annexure modes apply to both layouts. Counter-sale selection is hidden.
+M1 reads authoritative stored invoice VAT and amounts. The optional `layout=CATEGORY` exposes the issue's spares, oil, accessories, discount, taxable parts, parts VAT, labour, service charge, labour VAT, round-off and net total. `layout=LEGACY` is now the default and retains the 24 photographed charge columns. Cash/credit/both, numeric displayed bill-number or date ordering, address, bill-type page breaks and detail/annexure modes apply to both layouts. Counter-sale selection is hidden.
 
 An annexure row whose category/rate is unknown stays unallocated. Partial or inconsistent snapshots receive an explicit `UNALLOCATED_DIFFERENCE` VAT adjustment, so annexure VAT always equals selected stored bill VAT; no database values change. Unknown money remains blank, while a confirmed absent category is zero. Legacy report snapshots can supply recorded labour VAT without implying a category split for parts. Missing historical bill types are **UNCLASSIFIED**, included with Both and excluded from Cash/Credit; no payment-status or later approval inference. New bills keep the existing explicit approved-credit classification.
 
@@ -54,3 +54,21 @@ Historical seed verification recorded before this local-only audit: 74 active bi
 With all detail options enabled, M10 has eleven sections. Current and earlier owners share the customer section; cost per kilometre and repeat jobs share the last section. Staff names appear only in authorized internal job visits. Each section has an explicit column schema even when empty; print starts each subsequent section on a new page and Excel produces one sheet per included section, without an extra summary sheet. Options remove their sections. Portal job queries retain cancellation/PDI exclusions even when a status is requested; internal staff names and PDI-linked credit applications are not exposed.
 
 The audit uses a disposable localhost PostgreSQL database. See [audited progress](progress/issue-79-progress.md), [before/after gaps and actual results](testing/issue-79-audit.md), and [component/XLSX verifier](testing/verify-monthly-report-output.cjs). Existing preview files are historical; current synthetic captures are under ignored `.audit-local/visual`. Authenticated role-matrix and production-scale performance testing are separate from those component checks.
+
+
+## 19 October output-photo follow-up
+
+Only existing #79 reports are changed. The customer/vehicle sales report and consolidated transaction summary photos are excluded as requested. No output photo was supplied for M3, M6, M8 or M10; those column contracts stay unchanged.
+
+| Report | Photographed main columns, in order |
+|---|---|
+| M1 | S.No., bill number/date, customer; Taxable spares/discount/handling/taxable amount/UPST government and non-government/surcharge government and non-government/other charges/subtotal; Tax paid/non-taxable total/discount/handling/other/subtotal; labour amount, labour VAT, WCT, round-off, net total |
+| M2 | S.No., registration, customer, model, variant, VIN, service, booked date, availed date, variation days |
+| M4 | Job date/number, registration, customer, model, variant, requisition number/date, type, part number/description, quantity, retail rate/amount, dealer rate/amount |
+| M5 | S.No., model, registration, bill number/date, amount; grouped by fleet, bill type and customer with fleet subtotals |
+| M7 | Date/service, free service, paid service, running repair, others, Total, Accidental; separate 1FS/2FS/3FS free-service breakdown |
+| M9 | VIN, part number/description, quantity, dealer rate, amount, job date, warranty claim number/date |
+
+The same explicit column contracts drive screen, print and XLSX, including grouped Retail/Dealer headings. M7 follows the photo's arithmetic: Total excludes the separately displayed Accidental column; the all-delivery count is retained as delivered. Known service-master codes/descriptions define the buckets; unknown/custom types stay Others. Free services with no recorded sequence appear as Unspecified so the breakdown still reconciles. Booking grace semantics remain those in #79; historical negative variations in the photo are not copied into matching logic.
+
+Historical dealer-rate snapshots and requisition document numbers are absent in the current schema. Those columns stay blank, with a clear note; current part-master prices or UUIDs are not substituted. Warranty retail amounts remain available in the API for compatibility but are not labelled as dealer amounts. Unbilled non-customer lines have zero customer retail amount. Corporate bills use verified original document numbers from report snapshots when available.
