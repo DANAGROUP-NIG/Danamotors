@@ -87,9 +87,30 @@ export function ReportTable({
   return (
     <div className="min-w-0 max-w-full overflow-x-auto rounded-xl border">
       <table className="w-full text-sm">
-        <colgroup>{keys.map(k => <col key={k} style={{ width: `${100 / (keys.length + (onPick ? 1 : 0))}%` }} />)}{onPick && <col />}</colgroup>
+        <colgroup>
+          {keys.map((k) => (
+            <col
+              key={k}
+              style={{ width: `${100 / (keys.length + (onPick ? 1 : 0))}%` }}
+            />
+          ))}
+          {onPick && <col />}
+        </colgroup>
         <thead className="bg-muted/40 text-left">
-          {columnGroups && <tr>{columnGroups.map(g => <th key={g.title} colSpan={g.columns.filter(k => keys.includes(k)).length} scope="colgroup" className="border-b border-r bg-muted/60 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">{g.title}</th>)}</tr>}
+          {columnGroups && (
+            <tr>
+              {columnGroups.map((g) => (
+                <th
+                  key={g.title}
+                  colSpan={g.columns.filter((k) => keys.includes(k)).length}
+                  scope="colgroup"
+                  className="border-b border-r bg-muted/60 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide"
+                >
+                  {g.title}
+                </th>
+              ))}
+            </tr>
+          )}
           <tr>
             {keys.map((k) => (
               <th
@@ -129,8 +150,7 @@ export function ReportTable({
                     "px-4 py-3 " +
                     (typeof row[k] === "number"
                       ? "text-right tabular-nums"
-                      : ""
-                    )
+                      : "")
                   }
                 >
                   {formatted(row[k], k)}
@@ -192,43 +212,88 @@ export function ReportOutput({
   branch: string;
   onPick?: (row: ReportRow) => void;
 }) {
-  const activeBranch = useBranchStore(s => s.activeBranch);
+  const activeBranch = useBranchStore((s) => s.activeBranch);
   const branchDetails = activeBranch?.name === branch ? activeBranch : null;
-  const details = result.groups.find(g => g.columnGroups);
-  const totalColumns = details?.columns?.filter(k => result.totals[k] !== undefined);
-  const totalColumnGroups = details?.columnGroups?.map(g => ({ ...g, columns: g.columns.filter(k => totalColumns?.includes(k)) })).filter(g => g.columns.length);
+  const details = result.groups.find((g) => g.columnGroups);
+  const totalColumns = details?.columns?.filter(
+    (k) => result.totals[k] !== undefined,
+  );
+  const totalColumnGroups = details?.columnGroups
+    ?.map((g) => ({
+      ...g,
+      columns: g.columns.filter((k) => totalColumns?.includes(k)),
+    }))
+    .filter((g) => g.columns.length);
   async function excel() {
     const XLSX = await import("xlsx");
     const book = XLSX.utils.book_new();
     const sections = [
       ...(result.rows.length
-        ? [{ title: "Report", rows: result.rows, totals: result.totals, columns: result.columns, columnLabels: result.columnLabels, columnGroups: result.columnGroups }]
+        ? [
+            {
+              title: "Report",
+              rows: result.rows,
+              totals: result.totals,
+              columns: result.columns,
+              columnLabels: result.columnLabels,
+              columnGroups: result.columnGroups,
+            },
+          ]
         : []),
       ...result.groups,
-      ...(result.exportSummary !== false && !result.rows.length && result.groups.length
-        ? [{ title: "Grand totals", rows: [result.totals], columns: totalColumns ?? result.summaryKeys, columnGroups: totalColumnGroups, columnLabels: details?.columnLabels }]
+      ...(result.exportSummary !== false &&
+      !result.rows.length &&
+      result.groups.length
+        ? [
+            {
+              title: "Grand totals",
+              rows: [result.totals],
+              columns: totalColumns ?? result.summaryKeys,
+              columnGroups: totalColumnGroups,
+              columnLabels: details?.columnLabels,
+            },
+          ]
         : []),
     ];
     sections.forEach((g, i) => {
-      const keys = ('columns' in g && g.columns) || [
-        ...new Set([
-          ...g.rows.flatMap((r) => Object.keys(r)),
-          ...Object.keys(g.totals ?? {}),
-        ]),
-      ].filter((k) => k !== "vehicleId");
+      const keys =
+        ("columns" in g && g.columns) ||
+        [
+          ...new Set([
+            ...g.rows.flatMap((r) => Object.keys(r)),
+            ...Object.keys(g.totals ?? {}),
+          ]),
+        ].filter((k) => k !== "vehicleId");
       const metadata = [
         ["Dana Motors", branch],
         [title, g.title],
-        ["Report period", `${result.filters.from ?? ''} to ${result.filters.to ?? ''}`],
-        ...[branchDetails?.address, branchDetails?.phoneNumber].filter(Boolean).map(v => [v]),
-        ...(result.warnings ?? []).map(w => ["Note", w]),
+        [
+          "Report period",
+          `${result.filters.from ?? ""} to ${result.filters.to ?? ""}`,
+        ],
+        ...[branchDetails?.address, branchDetails?.phoneNumber]
+          .filter(Boolean)
+          .map((v) => [v]),
+        ...(result.warnings ?? []).map((w) => ["Note", w]),
         [],
       ];
       const values = [
         ...metadata,
-        ...('columnGroups' in g && g.columnGroups ? [keys.map(k => g.columnGroups?.find(group => group.columns.includes(k))?.title ?? '')] : []),
-        keys.map(k => ('columnLabels' in g && g.columnLabels?.[k]) || label(k)),
-        ...(!g.rows.length && !g.totals ? [["No records in this section."]] : []),
+        ...("columnGroups" in g && g.columnGroups
+          ? [
+              keys.map(
+                (k) =>
+                  g.columnGroups?.find((group) => group.columns.includes(k))
+                    ?.title ?? "",
+              ),
+            ]
+          : []),
+        keys.map(
+          (k) => ("columnLabels" in g && g.columnLabels?.[k]) || label(k),
+        ),
+        ...(!g.rows.length && !g.totals
+          ? [["No records in this section."]]
+          : []),
         ...g.rows.map((r) =>
           keys.map((k) =>
             typeof r[k] === "string" &&
@@ -242,12 +307,21 @@ export function ReportOutput({
           : []),
       ];
       const sheet = XLSX.utils.aoa_to_sheet(values);
-      if ('columnGroups' in g && g.columnGroups) {
-        sheet['!merges'] = g.columnGroups.flatMap(group => {
-          const positions = group.columns.map(k => keys.indexOf(k)).filter(i => i >= 0);
-          return positions.length > 1 ? [{ s: { r: metadata.length, c: positions[0] }, e: { r: metadata.length, c: positions[positions.length - 1] } }] : [];
+      if ("columnGroups" in g && g.columnGroups) {
+        sheet["!merges"] = g.columnGroups.flatMap((group) => {
+          const positions = group.columns
+            .map((k) => keys.indexOf(k))
+            .filter((i) => i >= 0);
+          return positions.length > 1
+            ? [
+                {
+                  s: { r: metadata.length, c: positions[0] },
+                  e: { r: metadata.length, c: positions[positions.length - 1] },
+                },
+              ]
+            : [];
         });
-        sheet['!cols'] = keys.map(k => ({ wch: k === 'customer' ? 30 : 18 }));
+        sheet["!cols"] = keys.map((k) => ({ wch: k === "customer" ? 30 : 18 }));
       }
       XLSX.utils.book_append_sheet(
         book,
@@ -281,18 +355,42 @@ export function ReportOutput({
       <article id="workshop-report" className="space-y-6">
         <style>{`@media print { #workshop-report .tax-register-section table { table-layout:fixed; width:100% } #workshop-report .tax-register-section th, #workshop-report .tax-register-section td { white-space:normal!important; overflow-wrap:anywhere; font-size:7px; padding:3px!important } #workshop-report .tax-register-section button { gap:0 } }`}</style>
         <header className="rounded-xl border bg-card p-5 print:rounded-none print:border-0 print:p-0">
-          {branchDetails?.address && <p className="text-xs text-muted-foreground">{branchDetails.address}</p>}
-          {branchDetails?.phoneNumber && <p className="text-xs text-muted-foreground">{branchDetails.phoneNumber}</p>}
+          {branchDetails?.address && (
+            <p className="text-xs text-muted-foreground">
+              {branchDetails.address}
+            </p>
+          )}
+          {branchDetails?.phoneNumber && (
+            <p className="text-xs text-muted-foreground">
+              {branchDetails.phoneNumber}
+            </p>
+          )}
           <p>Dana Motors | {branch}</p>
           <h1 className="text-xl font-bold">{title}</h1>
           <p className="text-xs">
             {Object.entries(result.filters)
-              .filter(([k, v]) => k !== "branchId" && !k.endsWith("Id") && v != null && v !== "")
+              .filter(
+                ([k, v]) =>
+                  k !== "branchId" &&
+                  !k.endsWith("Id") &&
+                  v != null &&
+                  v !== "",
+              )
               .map(
                 ([k, v]) =>
                   label(k) +
                   ": " +
-                  (k.endsWith("Ids") ? String(v).split(",").length + " selected" : v === "true" || v === true ? "Yes" : v === "false" || v === false ? "No" : typeof v === "string" && /^[A-Z_]+$/.test(v) ? v.toLowerCase().replaceAll("_", " ") : typeof v === "string" ? formatted(v, k) : String(v)),
+                  (k.endsWith("Ids")
+                    ? String(v).split(",").length + " selected"
+                    : v === "true" || v === true
+                      ? "Yes"
+                      : v === "false" || v === false
+                        ? "No"
+                        : typeof v === "string" && /^[A-Z_]+$/.test(v)
+                          ? v.toLowerCase().replaceAll("_", " ")
+                          : typeof v === "string"
+                            ? formatted(v, k)
+                            : String(v)),
               )
               .join(" | ")}
           </p>
@@ -318,14 +416,33 @@ export function ReportOutput({
         {result.groups.map((g, i) => (
           <section
             key={i}
-            className={"space-y-3 " + (g.columnGroups ? "tax-register-section " : "") + (g.pageBreak ? "section-break" : "")}
+            className={
+              "space-y-3 " +
+              (g.columnGroups ? "tax-register-section " : "") +
+              (g.pageBreak ? "section-break" : "")
+            }
           >
             <h2 className="font-semibold">{g.title}</h2>
-            {g.columnGroups && <p className="text-xs text-muted-foreground print:hidden">Scroll horizontally to view all tax columns.</p>}
+            {g.columnGroups && (
+              <p className="text-xs text-muted-foreground print:hidden">
+                Scroll horizontally to view all tax columns.
+              </p>
+            )}
             {g.rows.length ? (
-              <ReportTable rows={g.rows} totals={g.totals} columns={g.columns} columnGroups={g.columnGroups} columnLabels={g.columnLabels} />
+              <ReportTable
+                rows={g.rows}
+                totals={g.totals}
+                columns={g.columns}
+                columnGroups={g.columnGroups}
+                columnLabels={g.columnLabels}
+              />
             ) : g.totals ? (
-              <ReportTable rows={[g.totals]} columns={g.columns} columnGroups={g.columnGroups} columnLabels={g.columnLabels} />
+              <ReportTable
+                rows={[g.totals]}
+                columns={g.columns}
+                columnGroups={g.columnGroups}
+                columnLabels={g.columnLabels}
+              />
             ) : (
               <p className="text-sm text-muted-foreground">
                 No records in this section.
@@ -344,16 +461,37 @@ export function ReportOutput({
         {result.groups.length > 0 && !result.rows.length && (
           <section className="space-y-3 border-t pt-4">
             <h2 className="font-semibold">Grand totals</h2>
-            {details ? <div className="tax-register-section"><ReportTable rows={[]} totals={result.totals} columns={totalColumns} columnGroups={totalColumnGroups} columnLabels={details.columnLabels} /></div> : <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Object.entries(result.totals).filter(([k]) => !result.summaryKeys || result.summaryKeys.includes(k)).map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-xs text-muted-foreground">{result.columnGroups ? label(k) : result.columnLabels?.[k] ?? label(k)}</dt>
-                  <dd className="font-semibold tabular-nums">
-                    {formatted(v, k)}
-                  </dd>
-                </div>
-              ))}
-            </dl>}
+            {details ? (
+              <div className="tax-register-section">
+                <ReportTable
+                  rows={[]}
+                  totals={result.totals}
+                  columns={totalColumns}
+                  columnGroups={totalColumnGroups}
+                  columnLabels={details.columnLabels}
+                />
+              </div>
+            ) : (
+              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {Object.entries(result.totals)
+                  .filter(
+                    ([k]) =>
+                      !result.summaryKeys || result.summaryKeys.includes(k),
+                  )
+                  .map(([k, v]) => (
+                    <div key={k}>
+                      <dt className="text-xs text-muted-foreground">
+                        {result.columnGroups
+                          ? label(k)
+                          : (result.columnLabels?.[k] ?? label(k))}
+                      </dt>
+                      <dd className="font-semibold tabular-nums">
+                        {formatted(v, k)}
+                      </dd>
+                    </div>
+                  ))}
+              </dl>
+            )}
           </section>
         )}
       </article>
