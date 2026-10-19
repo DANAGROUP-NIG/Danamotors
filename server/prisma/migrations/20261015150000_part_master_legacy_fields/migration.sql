@@ -1,0 +1,14 @@
+-- Legacy partmast fields from the Part screen: vehicle system / group, applicable models,
+-- MOQ, conversion factor, base rate (foreign currency), NSP / NLA dates and the flags.
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "vehicleSystem" TEXT;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "vehicleGroup" TEXT;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "applicableModels" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "moq" DOUBLE PRECISION;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "conversionFactor" DOUBLE PRECISION NOT NULL DEFAULT 1;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "basicRate" DOUBLE PRECISION;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "nspDate" TIMESTAMP(3);
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "nlaDate" TIMESTAMP(3);
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "blockReserve" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "includeInTopN" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "topMover" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "SparePart" ADD COLUMN IF NOT EXISTS "underAmc" BOOLEAN NOT NULL DEFAULT false;

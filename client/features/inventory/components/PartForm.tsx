@@ -12,6 +12,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { useCreatePart, useOpeningStock, useUpdatePart } from "../hooks/use-part-mutations";
 import { usePriceCategories } from "../hooks/use-parts";
+import { MasterOptions } from "@/components/forms/MasterOptions";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
@@ -32,6 +33,15 @@ export const PART_CATEGORIES = [
 ];
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
+const LEGACY_FLAGS = [
+  ["blockReserve", "Block reserve"],
+  ["topMover", "Top mover"],
+  ["includeInTopN", "Include in top-N parts"],
+  ["underAmc", "Under AMC"],
+] as const;
+
+const day = (value?: string | null) => (value ? value.slice(0, 10) : "");
+
 const sectionCls = "rounded-lg border border-[#e8edf3] bg-slate-50 p-4";
 const sectionTitle = "mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -41,7 +51,11 @@ interface PartFormProps {
 }
 
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
-  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", partType: "S", warrantyApplicable: false };
+  if (!part)
+    return {
+      uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", partType: "S", warrantyApplicable: false,
+      conversionFactor: 1, blockReserve: false, includeInTopN: false, topMover: false, underAmc: false,
+    };
   return {
     partNumber: part.partNumber,
     name: part.name,
@@ -63,6 +77,18 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     partStatus: part.partStatus,
     warrantyApplicable: part.warrantyApplicable ?? false,
     warrantyRate: part.warrantyRate ?? undefined,
+    vehicleSystem: part.vehicleSystem ?? "",
+    vehicleGroup: part.vehicleGroup ?? "",
+    applicableModels: (part.applicableModels ?? []).join(", "),
+    moq: part.moq ?? undefined,
+    conversionFactor: part.conversionFactor ?? 1,
+    basicRate: part.basicRate ?? undefined,
+    nspDate: day(part.nspDate),
+    nlaDate: day(part.nlaDate),
+    blockReserve: part.blockReserve ?? false,
+    includeInTopN: part.includeInTopN ?? false,
+    topMover: part.topMover ?? false,
+    underAmc: part.underAmc ?? false,
   };
 }
 
@@ -120,6 +146,14 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       taxForm: text(values.taxForm),
       binLocation: text(values.binLocation),
       storeLocation: text(values.storeLocation),
+      vehicleSystem: values.vehicleSystem?.trim() || null,
+      vehicleGroup: values.vehicleGroup?.trim() || null,
+      applicableModels: (values.applicableModels ?? "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean),
+      moq: values.moq ?? null,
+      conversionFactor: values.conversionFactor ?? 1,
+      basicRate: values.basicRate ?? null,
+      nspDate: values.nspDate || null,
+      nlaDate: values.nlaDate || null,
     };
 
     if (!isEdit && (payload.retailRate === undefined || Number.isNaN(payload.retailRate))) delete payload.retailRate;
@@ -191,14 +225,21 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             </select>
           </Field>
           <Field label="Purchase source" error={errors.partFlag?.message}>
-            <select className={inputCls} {...register("partFlag")}>
-              {/* Keep a non-legacy flag already on the part selectable. */}
-              {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(part?.partFlag ? [part.partFlag] : [])])].map((code) => (
-                <option key={code} value={code}>
-                  {codeLabel(PART_FLAG_LABELS, code)}
-                </option>
-              ))}
-            </select>
+            {/* A source record's flag is its source and cannot change (shown, not registered). */}
+            {part?.sourceOfPartId ? (
+              <select className={inputCls} disabled value={part.partFlag} aria-label="Purchase source">
+                <option value={part.partFlag}>{codeLabel(PART_FLAG_LABELS, part.partFlag)}</option>
+              </select>
+            ) : (
+              <select className={inputCls} {...register("partFlag")}>
+                {/* Keep a non-legacy flag already on the part selectable. */}
+                {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(part?.partFlag ? [part.partFlag] : [])])].map((code) => (
+                  <option key={code} value={code}>
+                    {codeLabel(PART_FLAG_LABELS, code)}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label="Status" error={errors.partStatus?.message}>
             <select className={inputCls} {...register("partStatus")}>
@@ -214,11 +255,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Unit of measure" error={errors.uom?.message}>
             <input className={inputCls} list="part-uoms" {...register("uom")} />
-            <datalist id="part-uoms">
-              {UOM_OPTIONS.map((u) => (
-                <option key={u} value={u} />
-              ))}
-            </datalist>
+            <MasterOptions id="part-uoms" kind="UOM" extra={UOM_OPTIONS} />
           </Field>
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
@@ -252,10 +289,12 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             )}
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
-            <input className={inputCls} {...register("taxCategory")} />
+            <input className={inputCls} list="part-tax-categories" {...register("taxCategory")} />
+            <MasterOptions id="part-tax-categories" kind="TAX_CATEGORY" />
           </Field>
           <Field label="Tax form (optional)" error={errors.taxForm?.message}>
-            <input className={inputCls} placeholder="e.g. X" {...register("taxForm")} />
+            <input className={inputCls} placeholder="e.g. X" list="part-tax-forms" {...register("taxForm")} />
+            <MasterOptions id="part-tax-forms" kind="TAX_FORM" />
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold">
             <input type="checkbox" className="size-4" {...register("taxable")} />
@@ -268,11 +307,17 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
         <p className={sectionTitle}>Warranty</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" className="mt-0.5 size-4" {...register("warrantyApplicable")} />
+            {part?.sourceOfPartId ? (
+              <input type="checkbox" className="mt-0.5 size-4" disabled checked={false} readOnly aria-label="Warranty applicable" />
+            ) : (
+              <input type="checkbox" className="mt-0.5 size-4" {...register("warrantyApplicable")} />
+            )}
             <span>
               <span className="font-semibold">Warranty applicable</span>
               <span className="block text-xs text-muted-foreground">
-                Only warranty-applicable parts can be charged to warranty or claimed from the manufacturer.
+                {part?.sourceOfPartId
+                  ? "Local, used and repaired source records are never claimed under warranty."
+                  : "Only warranty-applicable parts can be charged to warranty or claimed from the manufacturer."}
               </span>
             </span>
           </label>
@@ -287,6 +332,44 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("warrantyRate")}
             />
           </Field>
+        </div>
+      </div>
+
+      <div className={sectionCls}>
+        <p className={sectionTitle}>Classification and ordering</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Vehicle system (optional)" error={errors.vehicleSystem?.message}>
+            <input className={inputCls} list="part-vehicle-systems" {...register("vehicleSystem")} />
+            <MasterOptions id="part-vehicle-systems" kind="VEHICLE_SYSTEM" />
+          </Field>
+          <Field label="Vehicle group (optional)" error={errors.vehicleGroup?.message}>
+            <input className={inputCls} list="part-vehicle-groups" {...register("vehicleGroup")} />
+            <MasterOptions id="part-vehicle-groups" kind="VEHICLE_GROUP" />
+          </Field>
+          <Field label="Models (blank = all models)" error={errors.applicableModels?.message}>
+            <input className={inputCls} placeholder="e.g. CRT, RIO" {...register("applicableModels")} />
+          </Field>
+          <Field label="MOQ (optional)" error={errors.moq?.message}>
+            <input type="number" min={0} step="any" className={inputCls} {...register("moq")} />
+          </Field>
+          <Field label="Conversion factor" error={errors.conversionFactor?.message}>
+            <input type="number" min={0} step="any" className={inputCls} {...register("conversionFactor")} />
+          </Field>
+          <Field label="Base rate, foreign currency (optional)" error={errors.basicRate?.message}>
+            <input type="number" min={0} step="0.01" className={inputCls} {...register("basicRate")} />
+          </Field>
+          <Field label="NSP date (optional)" error={errors.nspDate?.message}>
+            <input type="date" className={inputCls} {...register("nspDate")} />
+          </Field>
+          <Field label="NLA date (optional)" error={errors.nlaDate?.message}>
+            <input type="date" className={inputCls} {...register("nlaDate")} />
+          </Field>
+          {LEGACY_FLAGS.map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" className="size-4" {...register(key)} />
+              {label}
+            </label>
+          ))}
         </div>
       </div>
 

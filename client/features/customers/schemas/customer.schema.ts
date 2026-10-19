@@ -9,7 +9,8 @@ export const customerFields = z.object({
   creditDays: z.number().int().min(0).max(3650).nullable().optional(),
   partyStatus: z.enum(["CUSTOMER","DEALER","FA_PARTY"]).optional(),
   type: z.enum(["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"]).optional(),
-  salutation: z.enum(["", "Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."]).optional(),
+  // Codes from the SALUTATION master.
+  salutation: z.string().max(20).optional(),
   code: z.string().optional(),
   companyName: z.string().optional(),
   contactPerson: z.string().optional(),
@@ -33,6 +34,16 @@ export const customerFields = z.object({
   preferredFollowupTime: z.union([z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), z.literal("")]).optional(),
   postalCode: z.string().optional(),
   tallyPartyCode: z.string().optional(),
+  // Legacy Customer/Vendor profile fields.
+  segment: z.string().max(20).nullable().optional(),
+  district: z.string().max(100).optional(),
+  companyType: z.string().max(10).nullable().optional(),
+  vendorType: z.string().max(20).nullable().optional(),
+  mrnRateType: z.enum(["", "D", "R"]).nullable().optional(),
+  governmentVehicle: z.boolean().optional(),
+  ownCompanyVehicle: z.boolean().optional(),
+  creditLimit: z.number().min(0).nullable().optional(),
+  organizationId: z.string().nullable().optional(),
 });
 
 export const createCustomerSchema = customerFields.superRefine((v, ctx) => {

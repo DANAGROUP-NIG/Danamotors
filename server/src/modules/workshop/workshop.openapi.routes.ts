@@ -204,7 +204,7 @@
  *       "tags": [
  *         "Workshop"
  *       ],
- *       "summary": "Recent jobs for repeat assessment (JOB_REPEAT_WINDOW_DAYS)",
+ *       "summary": "Recent jobs for repeat assessment (the branch's repeat window: days, or km of ?mileage)",
  *       "security": [
  *         {
  *           "BearerAuth": []

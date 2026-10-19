@@ -33,11 +33,8 @@ export const createJobCardSchema = z
             .min(1, "Enter the customer request")
             .max(2000),
           complaintCodeId: z.string().optional(),
-          defectCode: z
-            .string()
-            .trim()
-            .min(1, "Select or enter a defect code")
-            .max(50),
+          // Legacy text code; set by the server from the defect code when one is picked.
+          defectCode: z.string().trim().max(50).optional(),
           spare: z.number().min(0).max(1e12).multipleOf(0.01),
           oil: z.number().min(0).max(1e12).multipleOf(0.01),
           labour: z.number().min(0).max(1e12).multipleOf(0.01),

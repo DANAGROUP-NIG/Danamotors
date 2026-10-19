@@ -86,7 +86,7 @@ export function assertChargeChange(change: ChargeChange): { campaignId: string |
 
 // ── Totals ───────────────────────────────────────────────────────────────────
 
-/** Nigerian VAT as a fraction. The service passes config.JOB_BILL_VAT_RATE / 100; this is the default for tests. */
+/** Nigerian VAT as a fraction. The service passes the branch's labour VAT / 100; this is the default for tests. */
 export const VAT_RATE = 0.075;
 
 export interface LineForTotals {

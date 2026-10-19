@@ -39,6 +39,7 @@ import type {
 } from "@/features/job-cards/types/job-card.types";
 import { JobCardLabourSection } from "@/features/job-cards/components/JobCardLabourSection";
 import { JobCardLinesCard } from "@/features/job-cards/components/JobCardLinesCard";
+import { partSourceLabel } from "@/features/inventory/lib/part-codes";
 import { LinkedCampaignsCard, WarrantySnapshotCard } from "@/features/job-cards/components/JobCardWarrantyCards";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
@@ -952,6 +953,12 @@ function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
       </td>
       <td className="px-3 py-2 text-slate-600">
         {issuance.sparePart?.name ?? ""}
+        {/* The source is internal: never printed for the customer. */}
+        {issuance.partSource && (
+          <span className="block text-xs text-muted-foreground print:hidden">
+            {partSourceLabel(issuance.partSource)}
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 text-right text-slate-700">
         {issuance.quantity}

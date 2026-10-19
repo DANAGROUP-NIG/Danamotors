@@ -453,7 +453,7 @@ export class PartsReportService {
 
   // ── Purchase ──────────────────────────────────────────────────────────────
 
-  /** Vendor (Mobis) MRN lines; branch-transfer MRNs are on the SRN register. */
+  /** Vendor MRN lines (Mobis and direct vendor receipts); branch-transfer MRNs are on the SRN register. */
   private async mrnRegister(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.materialReceiptLine.findMany({
       where: {
@@ -468,7 +468,7 @@ export class PartsReportService {
       },
       include: {
         part: partSelect,
-        mrn: { select: { id: true, mrnNumber: true, receiptDate: true, vendor: true, invoiceNumber: true, mit: { select: { mitNumber: true, invoiceDate: true } } } },
+        mrn: { select: { id: true, mrnNumber: true, receiptDate: true, vendor: true, invoiceNumber: true, invoiceDate: true, mit: { select: { mitNumber: true, invoiceDate: true } } } },
       },
       orderBy: [{ mrn: { vendor: "asc" } }, { mrn: { receiptDate: "asc" } }, { mrn: { mrnNumber: "asc" } }, { part: { partNumber: "asc" } }],
     });
@@ -497,7 +497,7 @@ export class PartsReportService {
         date: l.mrn.receiptDate.toISOString(),
         vendor: l.mrn.vendor,
         invoiceNumber: l.mrn.invoiceNumber,
-        invoiceDate: l.mrn.mit?.invoiceDate?.toISOString() ?? null,
+        invoiceDate: (l.mrn.invoiceDate ?? l.mrn.mit?.invoiceDate)?.toISOString() ?? null,
         mitNumber: l.mrn.mit?.mitNumber ?? null,
         lines: 0,
         received: 0,

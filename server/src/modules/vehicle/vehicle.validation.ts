@@ -1,4 +1,7 @@
 import { z } from 'zod';
+const text = (max: number) => z.string().trim().max(max).nullable().optional();
+const date = z.coerce.date().nullable().optional();
+const amount = z.number().min(0).max(1e12).nullable().optional();
 const modelText = z.string().trim().transform(value => value.replace(/\s+/g, ' ')).pipe(z.string().max(80)).nullable().optional();
 
 export const vehicleIdParamSchema = z.object({
@@ -29,6 +32,25 @@ export const vehicleBody = z.object({
   saleDate: z.string().datetime().nullable().optional(),
   sellingDealer: z.string().trim().max(200).optional(),
   ownershipStatus: z.string().optional(),
+  colourType: z.string().trim().max(20).nullable().optional(),
+  parkedAt: z.enum(['SHOWROOM', 'STOCKYARD', 'SOLD']).nullable().optional(),
+  purchaseAmount: amount,
+  saleInvoiceNumber: text(50),
+  saleInvoiceDate: date,
+  saleAmount: amount,
+  wcoNumber: text(50),
+  wcoDate: date,
+  principalInvoiceNumber: text(50),
+  principalInvoiceDate: date,
+  theft: z.boolean().optional(),
+  manufactureMonth: z.number().int().min(1).max(12).nullable().optional(),
+  manufactureYear: z.number().int().min(1900).max(2200).nullable().optional(),
+  tyres: z.array(z.object({
+    makeId: z.string().uuid().optional(),
+    number: z.string().trim().toUpperCase().max(100).optional(),
+  }).strict()).max(5).optional(),
+  batteryMakeId: z.string().uuid().nullable().optional(),
+  batteryNumber: text(100),
 }).strict();
 
 export const createVehicleSchema = z.object({

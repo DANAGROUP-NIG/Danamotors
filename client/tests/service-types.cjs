@@ -40,7 +40,8 @@ global.__apiGet = async url => {
   }
   if (url.startsWith('/service-type-model-settings')) return { items: [...settings], meta: { total: settings.length, totalPages: 1 } };
   if (url.startsWith('/job-cards/defect-codes')) return { items: [
-    { id: 'defect-one', code: 'D07', description: 'Internal short' }, { id: 'defect-two', code: 'D08', description: 'Loose connection' },
+    { id: 'defect-one', code: 'A000100', description: 'Internal short', estimate: { partAmount: 42000, oilAmount: 5200, labourAmount: 50000 } },
+    { id: 'defect-two', code: 'A000200', description: 'Loose connection', estimate: null },
   ] };
   return { items: [{ id: 'rio', code: 'RIO', description: 'Rio' }] };
 };
@@ -160,18 +161,19 @@ global.__apiDelete = async url => { writes.push({ method: 'DELETE', url }); sett
   cleanup(); client.clear(); reads = [];
   render(React.createElement(QueryClientProvider, { client }, React.createElement(RequestHarness)));
   assert.equal(reads.length, 0, 'Defect queries are lazy');
-  await user.click(screen.getByRole('combobox', { name: 'Defect' }));
+  await user.click(screen.getByRole('combobox', { name: 'Defect code (optional)' }));
   await user.click(await screen.findByRole('option', { name: /Internal short/ }));
   assert.equal(screen.getByRole('textbox', { name: 'Request 1 description' }).value, 'Internal short');
   let request = JSON.parse(screen.getByTestId('request-data').textContent)[0];
-  assert.equal(request.defectCode, 'D07');
-  assert.equal(request.complaintCodeId, '', 'Warranty defect UUID must not become a workshop complaint foreign key');
-  await user.click(screen.getByRole('combobox', { name: 'Defect' }));
+  assert.equal(request.complaintCodeId, 'defect-one');
+  assert.deepEqual([request.spare, request.oil, request.labour], [42000, 5200, 50000], 'The defect estimate fills the amounts');
+  await user.click(screen.getByRole('combobox', { name: 'Defect code (optional)' }));
   await user.click(await screen.findByRole('option', { name: /Loose connection/ }));
-  assert.equal(screen.getByRole('textbox', { name: 'Request 1 description' }).value, 'Loose connection');
+  assert.equal(screen.getByRole('textbox', { name: 'Request 1 description' }).value, 'Internal short', 'A typed description is kept');
   request = JSON.parse(screen.getByTestId('request-data').textContent)[0];
-  assert.equal(request.defectCode, 'D08');
+  assert.equal(request.complaintCodeId, 'defect-two');
+  assert.deepEqual([request.spare, request.oil, request.labour], [42000, 5200, 50000], 'Entered amounts are not overwritten');
   assert.equal(reads.length, 1, 'Reopening the defect list reuses the search cache');
-  console.log('PASS: service defaults, overrides, model-charge CRUD and database defect selection, description replacement, request persistence and cached lookup');
+  console.log('PASS: service defaults, overrides, model-charge CRUD and optional workshop defect selection with estimate fill, request persistence and cached lookup');
   cleanup(); client.clear(); dom.window.close();
 })().catch(error => { console.error(error); process.exitCode = 1; cleanup(); client?.clear(); dom.window.close(); });

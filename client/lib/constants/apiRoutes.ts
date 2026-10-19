@@ -95,6 +95,7 @@ export const API_ROUTES = {
       base: "/inventory/parts",
       detail: (id: string) => `/inventory/parts/${id}`,
       alternates: (id: string) => `/inventory/parts/${id}/alternates`,
+      sources: (id: string) => `/inventory/parts/${id}/sources`,
       query: "/inventory/parts/query",
       categories: "/inventory/part-categories",
     },

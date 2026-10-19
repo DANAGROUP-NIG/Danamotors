@@ -49,12 +49,26 @@ describeDb("Mobis purchase receiving (database)", () => {
     await prisma?.$disconnect();
   });
 
-  it("refuses parts missing from Part Master unless asked to create them", async () => {
+  it("refuses parts missing from Part Master unless told to ignore them", async () => {
     await expect(service.importMit(invoice("X"), user.id)).rejects.toThrow(/2 part\(s\) are not in Part Master/);
+    expect(await prisma.sparePart.count({ where: { partNumber: { in: [`66311Q${run}`, `92101Q${run}`] } } })).toBe(0);
   });
 
-  it("imports the invoice, creating missing parts at unit price x conversion rate", async () => {
-    const mit = await service.importMit({ ...invoice(), createMissingParts: true }, user.id);
+  it("ignores missing parts when told to, never creates them, and leaves Part Master prices alone", async () => {
+    const mit = await service.importMit({ ...invoice("I"), ignoreMissingParts: true }, user.id);
+    expect(mit.lines.map((l) => l.filePartNumber)).toEqual([existingPart.partNumber]);
+    expect(mit).toMatchObject({ totalQuantity: 2 });
+    expect(await prisma.sparePart.count({ where: { partNumber: { in: [`66311Q${run}`, `92101Q${run}`] } } })).toBe(0);
+    const part = await prisma.sparePart.findUniqueOrThrow({ where: { id: existingPart.id } });
+    expect(Number(part.unitPrice)).toBe(400000);
+    await service.cancelMit(mit.id, user.id);
+  });
+
+  it("imports the invoice once its parts are in Part Master", async () => {
+    for (const [partNumber, name] of [[`66311Q${run}`, "PANEL-FENDER,LH"], [`92101Q${run}`, "LAMP ASSY-HEAD,LH"]]) {
+      await prisma.sparePart.create({ data: { partCode: partNumber, partNumber, name, unitPrice: 1 } });
+    }
+    const mit = await service.importMit(invoice(), user.id);
     expect(mit).toMatchObject({
       vendor: "MOBIS",
       status: "IN_TRANSIT",
@@ -64,18 +78,13 @@ describeDb("Mobis purchase receiving (database)", () => {
       totalCases: 2,
     });
     expect(mit.totalAmount).toBeCloseTo(1404.7, 2);
-    expect(mit.lines.map((l) => [l.filePartNumber, l.newPart])).toEqual([
-      [existingPart.partNumber, false],
-      [`66311Q${run}`, true],
-      [`92101Q${run}`, true],
-    ]);
-    const created = await prisma.sparePart.findUniqueOrThrow({ where: { partNumber: `92101Q${run}` } });
-    expect(created).toMatchObject({ name: "LAMP ASSY-HEAD,LH", unitPrice: 881793, category: "Mobis import" });
-    expect(created.partCode).not.toBe(created.partNumber);
+    expect(mit.lines.map((l) => l.filePartNumber)).toEqual([existingPart.partNumber, `66311Q${run}`, `92101Q${run}`]);
+    const lamp = await prisma.sparePart.findUniqueOrThrow({ where: { partNumber: `92101Q${run}` } });
+    expect(Number(lamp.unitPrice)).toBe(1);
   });
 
   it("does not import the same invoice twice", async () => {
-    await expect(service.importMit({ ...invoice(), createMissingParts: true }, user.id)).rejects.toThrow(/already imported/);
+    await expect(service.importMit(invoice(), user.id)).rejects.toThrow(/already imported/);
   });
 
   it("generates one MRN, posts accepted stock to CPD and records damaged and short", async () => {
@@ -106,7 +115,7 @@ describeDb("Mobis purchase receiving (database)", () => {
   });
 
   it("posts stock only once when two MRN requests race", async () => {
-    const mit = await service.importMit({ ...invoice("R"), createMissingParts: true }, user.id);
+    const mit = await service.importMit(invoice("R"), user.id);
     const results = await Promise.allSettled([service.createMrn(mit.id, user.id), service.createMrn(mit.id, user.id)]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     const lamp = await prisma.inventoryStock.findFirstOrThrow({ where: { branchId: cpd.id, part: { partNumber: `92101Q${run}` } } });
@@ -114,10 +123,10 @@ describeDb("Mobis purchase receiving (database)", () => {
   });
 
   it("cancels an MIT before its MRN, which allows re-importing the invoice", async () => {
-    const mit = await service.importMit({ ...invoice("C"), createMissingParts: true }, user.id);
+    const mit = await service.importMit(invoice("C"), user.id);
     const cancelled = await service.cancelMit(mit.id, user.id, "Wrong file");
     expect(cancelled.status).toBe("CANCELLED");
-    const again = await service.importMit({ ...invoice("C"), createMissingParts: true }, user.id);
+    const again = await service.importMit(invoice("C"), user.id);
     expect(again.status).toBe("IN_TRANSIT");
   });
 });

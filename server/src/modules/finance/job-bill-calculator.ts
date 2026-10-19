@@ -9,6 +9,8 @@ export interface JobBillTotalsInput {
   partsDiscountPercent: number;
   labourDiscountPercent: number;
   vatRate: number;
+  // Legacy RoundOffValue: the bill rounds down to a multiple of this. Without it, to the nearest naira.
+  roundOffValue?: number;
 }
 
 export interface JobBillTotals {
@@ -46,7 +48,11 @@ export function calculateJobBillTotals(input: JobBillTotalsInput): JobBillTotals
   const discountedLabour = roundMoney(labourTotal - labourDiscountAmount);
   const vatAmount = percentage(roundMoney(discountedLabour + serviceTotal), vatRate);
   const amountBeforeRoundOff = roundMoney(discountedParts + discountedLabour + serviceTotal + vatAmount);
-  const total = Math.round(amountBeforeRoundOff);
+  const step = input.roundOffValue;
+  if (step !== undefined && (!Number.isInteger(step) || step < 1)) {
+    throw new BadRequestError('Round-off value must be a whole number of at least 1');
+  }
+  const total = step ? Math.floor(roundMoney(amountBeforeRoundOff / step) + 1e-9) * step : Math.round(amountBeforeRoundOff);
 
   return {
     serviceTotal,

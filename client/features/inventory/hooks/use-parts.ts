@@ -3,6 +3,7 @@ import { inventoryKeys } from "../api/inventory.keys";
 import {
   getAlternatesRequest,
   getPartRequest,
+  getPartSourcesRequest,
   getPartStockRequest,
   getPartsRequest,
   getPriceCategoriesRequest,
@@ -31,6 +32,16 @@ export function usePartAlternates(mainPartId: string | null | undefined) {
     queryKey: inventoryKeys.alternates(mainPartId ?? ""),
     queryFn: () => getAlternatesRequest(mainPartId!),
     enabled: !!mainPartId,
+  });
+}
+
+/** The part's main part and source records (local, used, repaired…), with stock at `branchId`. */
+export function usePartSources(partId: string | null | undefined, branchId?: string | null) {
+  return useQuery({
+    queryKey: inventoryKeys.sources(partId ?? "", branchId),
+    queryFn: () => getPartSourcesRequest(partId!, branchId),
+    enabled: !!partId,
+    staleTime: 30_000,
   });
 }
 

@@ -178,7 +178,8 @@ describeDb("Stock transfer workflow (database)", () => {
   });
 
   it("records the three legacy quantities, Mobis order mode, part flag and supply code", async () => {
-    await prisma.sparePart.update({ where: { id: filter.id }, data: { partFlag: "L" } });
+    // A (authorised source) parts are still indented from CPD; L, U and R are bought by the branch.
+    await prisma.sparePart.update({ where: { id: filter.id }, data: { partFlag: "A" } });
     const indent = await service.createIndent(
       {
         requestingBranchId: branch.id,
@@ -196,7 +197,7 @@ describeDb("Stock transfer workflow (database)", () => {
       stockOrderQuantity: 3,
       requestedQuantity: 6,
       mobisOrderMode: "AIR",
-      partFlag: "L",
+      partFlag: "A",
       supplyCode: "EP",
     });
     const approved = await service.approveIndent(indent.id, cpdManager.id, {
