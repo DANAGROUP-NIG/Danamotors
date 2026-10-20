@@ -196,7 +196,7 @@ export type PortalCreditApplication = {
     total: number;
     status: string;
   } | null;
-  requestedBy?: { id: string; firstName: string; lastName: string } | null;
+  requestedBy?: { id: string } | null;
 };
 
 export type PortalCreditTransaction = {

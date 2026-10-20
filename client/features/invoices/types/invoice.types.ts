@@ -52,9 +52,14 @@ export type InvoiceReceiptAllocation = {
 };
 
 export type Invoice = {
+  vatBreakdown?: {category:string;rate:string|number;saleAmount:string|number;discount:string|number;taxableAmount:string|number;vat:string|number}[];
   id: string;
   customerId: string;
   jobCardId?: string;
+  /** The bill's own branch; for a CPD counter sale this is CPD. */
+  reportBranchId?: string | null;
+  /** Set when the bill is a CPD counter sale (parts sold against customer orders). */
+  counterSale?: { id: string; branchId: string } | null;
   invoiceNumber: string;
   issuedDate: string;
   dueDate?: string;

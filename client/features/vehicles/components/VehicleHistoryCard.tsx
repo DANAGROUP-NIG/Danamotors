@@ -52,6 +52,7 @@ export function VehicleHistoryCard(
 
   return (
     <section className="mt-5 grid gap-3 rounded-xl border bg-card p-5">
+      {hasPermission("report:vehicle-history-card") && <Link href={`/reports/vehicle-history-card?vehicleId=${vehicle.id}`} className="text-sm font-medium text-primary underline">Full history card</Link>}
       <h2 className="font-semibold">{showServiceHistory ? "Ownership and service history" : "Ownership history"}</h2>
       <p>Current mileage: {vehicle.lastRecordedMileage ?? "Not recorded"}km · Engine: {vehicle.engineNumber || "—"}· Key: {vehicle.keyNumber || "—"}</p>
       <p>PDI: {vehicle.pdiDone ? vehicle.pdiDate?.slice(0, 10) : "Not completed"}· Sold: {vehicle.saleDate?.slice(0, 10) || "Not recorded"}· Dealer: {vehicle.sellingDealer || "—"}</p>

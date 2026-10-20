@@ -37,7 +37,8 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
   const [allocations, setAllocations] = useState<Record<string, string>>({});
   const initialized = useRef(false);
   const linkedInvoice = useQuery({ queryKey: ["receipt-invoice", invoiceId], queryFn: () => getInvoiceRequest(invoiceId!), enabled: !!invoiceId, staleTime: 0, refetchOnMount: "always" });
-  const branchId = linkedInvoice.data?.jobCard?.branchId ?? activeBranch;
+  // Receipts are taken at the bill's own branch: the job card branch, or CPD for a counter sale.
+  const branchId = linkedInvoice.data?.reportBranchId ?? linkedInvoice.data?.jobCard?.branchId ?? activeBranch;
   const invoiceQuery = useQuery({ queryKey: ["invoices", "receipt-customer", branchId, customerId], queryFn: () => getInvoicesRequest({ branchId, customerId }), enabled: !!customerId && !!branchId });
   const banks = useQuery({ queryKey: ["finance", "banks"], queryFn: () => getBanksRequest() });
 
@@ -57,7 +58,8 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
   const needsBank = mode !== "CASH";
   const overAllocated = allocatedCents > Math.round(receivedAmount * 100);
   const invalidAllocation = Object.entries(allocations).some(([id, value]) => Number(value) < 0 || !Number.isFinite(Number(value)) || (Number(value) > 0 && (!customerInvoices.some((invoice) => invoice.id === id) || Number(value) > (customerInvoices.find((invoice) => invoice.id === id)?.outstandingAmount ?? 0))));
-  const hasJobAllocation = customerInvoices.some((invoice) => invoice.jobCardId && Number(allocations[invoice.id]) > 0);
+  // Job bills and counter-sale (parts) bills belong to the Service and parts register.
+  const hasJobAllocation = customerInvoices.some((invoice) => (invoice.jobCardId || invoice.counterSale) && Number(allocations[invoice.id]) > 0);
   const blocked = !customerId || !branchId || !Number.isFinite(receivedAmount) || receivedAmount <= 0 || (needsBank && !bankId) || overAllocated || invalidAllocation || invoiceQuery.isFetching || invoiceQuery.isError || (mode === "CHEQUE" && (!chequeNumber.trim() || !chequeDate)) || (!!invoiceId && (linkedInvoice.isPending || linkedInvoice.isError));
 
   function submit(event: React.FormEvent<HTMLFormElement>) {

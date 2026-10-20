@@ -15,6 +15,7 @@ export class ServiceRepository {
     vehicleId: string;
     branchId: string;
     serviceId?: string;
+    serviceTypeId?: string;
     createdById?: string;
     scheduledAt: Date;
     durationMins?: number;
@@ -485,7 +486,7 @@ export class ServiceRepository {
     status?: string;
     search?: string;
   }) {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {jobCardId:{not:null}};
 
     if (params.branchId) {
       where.jobCard = { branchId: params.branchId };

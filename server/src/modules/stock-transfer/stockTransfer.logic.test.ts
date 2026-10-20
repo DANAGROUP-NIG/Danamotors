@@ -3,8 +3,10 @@ import { BadRequestError, ConflictError } from "../../shared/errors/appError";
 import {
   assertTransition,
   buildProgress,
+  deriveIndentStatus,
   formatDocumentNumber,
   isSameFamily,
+  pendingSupply,
   planCases,
   planPick,
   planReceipt,
@@ -29,13 +31,18 @@ describe("assertTransition", () => {
     expect(() => assertTransition(IndentStatus.DRAFT, "submit")).not.toThrow();
     expect(() => assertTransition(IndentStatus.SUBMITTED, "approve")).not.toThrow();
     expect(() => assertTransition(IndentStatus.PICKED, "dispatch")).not.toThrow();
-    expect(() => assertTransition(IndentStatus.IN_TRANSIT, "receive")).not.toThrow();
-    expect(() => assertTransition(IndentStatus.PARTIALLY_RECEIVED, "receive")).not.toThrow();
+  });
+
+  it("picks the back order again after a partial dispatch", () => {
+    expect(() => assertTransition(IndentStatus.PARTLY_DISPATCHED, "pick")).not.toThrow();
+    expect(() => assertTransition(IndentStatus.PARTLY_DISPATCHED, "close")).not.toThrow();
+    expect(() => assertTransition(IndentStatus.IN_TRANSIT, "pick")).toThrow(ConflictError);
+    expect(() => assertTransition(IndentStatus.COMPLETED, "close")).toThrow(ConflictError);
   });
 
   it("blocks duplicate or out-of-order actions", () => {
     expect(() => assertTransition(IndentStatus.IN_TRANSIT, "dispatch")).toThrow(ConflictError);
-    expect(() => assertTransition(IndentStatus.COMPLETED, "receive")).toThrow(ConflictError);
+    expect(() => assertTransition(IndentStatus.PICKED, "pick")).toThrow(ConflictError);
     expect(() => assertTransition(IndentStatus.SUBMITTED, "dispatch")).toThrow(ConflictError);
     expect(() => assertTransition(IndentStatus.APPROVED, "reject")).toThrow(ConflictError);
   });
@@ -43,6 +50,50 @@ describe("assertTransition", () => {
   it("does not allow cancelling after dispatch", () => {
     expect(() => assertTransition(IndentStatus.PICKED, "cancel")).not.toThrow();
     expect(() => assertTransition(IndentStatus.IN_TRANSIT, "cancel")).toThrow(ConflictError);
+  });
+});
+
+describe("deriveIndentStatus", () => {
+  const line = (approved: number, dispatched: number, accounted = 0) => ({
+    approvedQuantity: approved,
+    dispatchedQuantity: dispatched,
+    accountedQuantity: accounted,
+  });
+
+  it("is PICKED while a picking list is open, whatever has shipped", () => {
+    expect(deriveIndentStatus([line(5, 2)], true)).toBe(IndentStatus.PICKED);
+  });
+
+  it("stays APPROVED until something ships", () => {
+    expect(deriveIndentStatus([line(5, 0)], false)).toBe(IndentStatus.APPROVED);
+  });
+
+  it("is PARTLY_DISPATCHED while part of the approved quantity is still to ship", () => {
+    expect(deriveIndentStatus([line(5, 2, 2), line(3, 3)], false)).toBe(IndentStatus.PARTLY_DISPATCHED);
+  });
+
+  it("moves from IN_TRANSIT to COMPLETED as fully shipped STNs are received", () => {
+    expect(deriveIndentStatus([line(5, 5)], false)).toBe(IndentStatus.IN_TRANSIT);
+    expect(deriveIndentStatus([line(5, 5, 3)], false)).toBe(IndentStatus.PARTIALLY_RECEIVED);
+    expect(deriveIndentStatus([line(5, 5, 5), line(0, 0)], false)).toBe(IndentStatus.COMPLETED);
+  });
+});
+
+describe("pendingSupply", () => {
+  const line = { requestedQuantity: 10, approvedQuantity: null as number | null, dispatchedQuantity: 0, cancelledQuantity: 0 };
+
+  it("is the request less anything cancelled before approval", () => {
+    expect(pendingSupply(line)).toBe(10);
+    expect(pendingSupply({ ...line, cancelledQuantity: 4 })).toBe(6);
+  });
+
+  it("is the approved quantity less what has shipped after approval", () => {
+    expect(pendingSupply({ ...line, approvedQuantity: 8, dispatchedQuantity: 3 })).toBe(5);
+    expect(pendingSupply({ ...line, approvedQuantity: 3, dispatchedQuantity: 3, cancelledQuantity: 7 })).toBe(0);
+  });
+
+  it("never goes below zero", () => {
+    expect(pendingSupply({ ...line, approvedQuantity: 0 })).toBe(0);
   });
 });
 

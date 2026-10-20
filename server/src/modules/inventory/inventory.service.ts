@@ -10,6 +10,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
+import { recordBinChange, recordPartChange } from "./partHistory";
 
 const INHERITABLE_FIELDS = [
   "category",
@@ -23,6 +24,7 @@ const INHERITABLE_FIELDS = [
   "retailRate",
   "taxable",
   "partFlag",
+  "partType",
   "priceCategoryCode",
   "storeLocation",
 ] as const;
@@ -205,7 +207,7 @@ export class InventoryService {
     };
 
     if (!branchStock || branchStock.length === 0) {
-      return this.inventoryRepository.createSparePart(partData);
+      return this.inventoryRepository.createSparePart(partData, recordedById);
     }
 
     const branchIds = branchStock.map((b) => b.branchId);
@@ -224,6 +226,7 @@ export class InventoryService {
 
     return prisma.$transaction(async (tx) => {
       const part = await tx.sparePart.create({ data: partData });
+      await recordPartChange(tx, null, part, recordedById);
       for (const stock of branchStock) {
         await tx.inventoryStock.create({
           data: {
@@ -257,16 +260,17 @@ export class InventoryService {
       category?: string;
       unitPrice?: number;
     },
+    changedById?: string,
   ) {
     const part = await this.inventoryRepository.findSparePartById(id);
     if (!part) {
       throw new NotFoundError("Spare part not found");
     }
 
-    return this.inventoryRepository.updateSparePart(id, data);
+    return this.inventoryRepository.updateSparePart(id, data, changedById);
   }
 
-  async deleteSparePart(id: string) {
+  async deleteSparePart(id: string, changedById?: string) {
     const alternatePartsCount = await prisma.sparePart.count({
       where: { mainPartId: id },
     });
@@ -279,10 +283,10 @@ export class InventoryService {
       throw new NotFoundError("Spare part not found");
     }
 
-    return this.inventoryRepository.deleteSparePart(id);
+    return this.inventoryRepository.deleteSparePart(id, changedById);
   }
 
-  async createAlternatePart(data: CreateAlternatePartInput) {
+  async createAlternatePart(data: CreateAlternatePartInput, changedById?: string) {
     const mainPart = await prisma.sparePart.findUnique({
       where: { id: data.mainPartId },
     });
@@ -316,17 +320,21 @@ export class InventoryService {
       overrides,
     } = data;
 
-    return prisma.sparePart.create({
-      data: {
-        mainPartId,
-        partNumber,
-        name,
-        description,
-        binLocation,
-        role: PartRole.ALTERNATE,
-        ...inherited,
-        ...overrides,
-      },
+    return prisma.$transaction(async (tx) => {
+      const part = await tx.sparePart.create({
+        data: {
+          mainPartId,
+          partNumber,
+          name,
+          description,
+          binLocation,
+          role: PartRole.ALTERNATE,
+          ...inherited,
+          ...overrides,
+        },
+      });
+      await recordPartChange(tx, null, part, changedById);
+      return part;
     });
   }
 
@@ -448,13 +456,14 @@ export class InventoryService {
     retailRate?: number;
     taxable?: boolean;
     partFlag?: string;
+    partType?: string;
     priceCategoryCode?: string;
     binLocation?: string;
     storeLocation?: string;
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     warrantyRate?: number | null;
-  }) {
+  }, changedById?: string) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
       data = {
         ...data,
@@ -480,7 +489,7 @@ export class InventoryService {
     const part = await this.inventoryRepository.createPart({
       ...rest,
       unitPrice: unitRate,
-    });
+    }, changedById);
 
     return this.mapToPartMasterDto(part);
   }
@@ -545,6 +554,7 @@ export class InventoryService {
       retailRate?: number;
       taxable?: boolean;
       partFlag?: string;
+      partType?: string;
       priceCategoryCode?: string | null;
       binLocation?: string;
       storeLocation?: string;
@@ -552,6 +562,7 @@ export class InventoryService {
       warrantyApplicable?: boolean;
       warrantyRate?: number | null;
     },
+    changedById?: string,
   ) {
     const part = await this.inventoryRepository.findPartById(id);
     if (!part) {
@@ -589,11 +600,11 @@ export class InventoryService {
       updateData.retailRate = await this.retailFromCategory(dealer, category);
     }
 
-    const updated = await this.inventoryRepository.updatePart(id, updateData);
+    const updated = await this.inventoryRepository.updatePart(id, updateData, changedById);
     return this.mapToPartMasterDto(updated);
   }
 
-  async deletePart(id: string) {
+  async deletePart(id: string, changedById?: string) {
     const part = await this.inventoryRepository.findPartById(id);
     if (!part) {
       throw new NotFoundError("Part not found");
@@ -609,7 +620,7 @@ export class InventoryService {
     }
 
     try {
-      await this.inventoryRepository.deletePart(id);
+      await this.inventoryRepository.deletePart(id, changedById);
     } catch (error) {
       // Stock transactions, transfers, issuances and similar records keep the part (onDelete: Restrict).
       if (isForeignKeyViolation(error)) {
@@ -701,8 +712,9 @@ export class InventoryService {
       minimumStock?: number;
       maximumStock?: number | null;
     },
+    changedById?: string,
   ) {
-    const [branch, part] = await Promise.all([
+    const [branch, part, current] = await Promise.all([
       prisma.branch.findUnique({
         where: { id: branchId },
         select: { id: true },
@@ -710,6 +722,10 @@ export class InventoryService {
       prisma.sparePart.findUnique({
         where: { id: partId },
         select: { id: true },
+      }),
+      prisma.inventoryStock.findUnique({
+        where: { branchId_partId: { branchId, partId } },
+        select: { rackLocation: true },
       }),
     ]);
     if (!branch) throw new NotFoundError("Branch not found");
@@ -723,17 +739,23 @@ export class InventoryService {
         "Maximum stock must be greater than or equal to minimum stock",
       );
     }
-    const stock = await prisma.inventoryStock.upsert({
-      where: { branchId_partId: { branchId, partId } },
-      create: {
-        branchId,
-        partId,
-        quantity: 0,
-        ...data,
-        minimumStock: data.minimumStock ?? 0,
-      },
-      update: data,
-      include: { branch: true, part: true },
+    const stock = await prisma.$transaction(async (tx) => {
+      const saved = await tx.inventoryStock.upsert({
+        where: { branchId_partId: { branchId, partId } },
+        create: {
+          branchId,
+          partId,
+          quantity: 0,
+          ...data,
+          minimumStock: data.minimumStock ?? 0,
+        },
+        update: data,
+        include: { branch: true, part: true },
+      });
+      if (data.rackLocation !== undefined) {
+        await recordBinChange(tx, partId, branchId, current?.rackLocation, saved.rackLocation, changedById);
+      }
+      return saved;
     });
     return this.withAvailableQuantity(stock);
   }

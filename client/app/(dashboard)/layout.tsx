@@ -9,7 +9,10 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+
+import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import { MONTHLY_REPORTS } from "@/features/reports/monthly-config";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -29,6 +32,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/mobis-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
   "/inventory/mobis-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
+  "/inventory/stock-taking": [STOCK_TAKE_PERMISSIONS.READ],
+  "/inventory/stock-audit": [STOCK_AUDIT_PERMISSIONS.READ],
   "/inventory": [
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,
@@ -40,6 +45,9 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // More specific paths must come first: the guard uses the first prefix that matches.
   "/transfers/new": [INVENTORY_PERMISSIONS.TRANSFER_CREATE],
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
+  "/data-management/cpo-cancellation": [PART_SALE_PERMISSIONS.ORDER],
+  "/data-management/indent-": [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
+  "/data-management": [PART_SALE_PERMISSIONS.ORDER, INVENTORY_PERMISSIONS.TRANSFER_CANCEL, INVENTORY_PERMISSIONS.STOCK_READ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
   "/finance/receipts/update-outstanding": ["outstanding:recalculate"],
@@ -50,13 +58,17 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
   "/credit-applications": ["credit:application:create"],
+  "/reports/billing-settings": ["role:permission:update"],
+  "/reports/corporate-groups": ["corporate:manage"],
+  ...Object.fromEntries(MONTHLY_REPORTS.map(r=>["/reports/"+r.slug,["report:"+r.slug]])),
+  "/reports/finance/receipt-register": ["report:receipt-register"],
   "/reports/finance/debit-note-register": ["report:debit-note-register"],
   "/reports/finance/credit-note-register": ["report:credit-note-register"],
   "/reports/finance/party-ledger": ["report:party-ledger"],
   "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
   "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
   "/reports/finance/party-outstanding": ["report:party-outstanding"],
-  "/reports": ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+  "/reports": [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
@@ -79,7 +91,8 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f4f8]">
+    // Printing: the page content alone, on white, flowing over as many pages as it needs.
+    <div className="flex h-screen overflow-hidden bg-[#f0f4f8] print:block print:h-auto print:overflow-visible print:bg-white">
       {/* ── Mobile backdrop ─────────────────────────────────────────── */}
       {sidebarOpen && (
         <div
@@ -90,24 +103,30 @@ export default function DashboardLayout({
       )}
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <SideNav
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        navGroups={NAV_GROUPS}
-      />
+      <div className="contents print:hidden">
+        <SideNav
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          navGroups={NAV_GROUPS}
+        />
+      </div>
 
       {/* ── Right column ────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f4f8] text-[#0f172a] print:block print:overflow-visible print:bg-white">
         {/* ── Top header ──────────────────────────────────────────── */}
-        <MainHeader setSidebarOpen={setSidebarOpen} />
+        <div className="contents print:hidden">
+          <MainHeader setSidebarOpen={setSidebarOpen} />
+        </div>
 
         {/* ── Page content ────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto" id="main-content">
+        <main className="flex-1 overflow-y-auto print:overflow-visible" id="main-content">
           <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
         </main>
 
         {/* ── Mobile bottom nav ───────────────────────────────────── */}
-        <MobileNav />
+        <div className="contents print:hidden">
+          <MobileNav />
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   category: "Lubricants",
   uom: "Litre",
   taxCategory: null,
+  reportTaxCategoryCode: null,
   taxForm: null,
   minLevel: null,
   maxLevel: null,
@@ -21,6 +22,7 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   retailRate: null,
   taxable: true,
   partFlag: "O",
+  partType: "S",
   priceCategoryCode: null,
   binLocation: null,
   storeLocation: null,
@@ -58,7 +60,7 @@ describe("InventoryService - Part Master", () => {
         category: "Lubricants",
         uom: "Litre",
         unitRate: 4500,
-      });
+      }, "user-1");
 
       expect(createPartSpy).toHaveBeenCalledWith({
         partCode: "TYT-OIL-5W30",
@@ -67,7 +69,7 @@ describe("InventoryService - Part Master", () => {
         category: "Lubricants",
         uom: "Litre",
         unitPrice: 4500,
-      });
+      }, "user-1");
       expect(result.unitRate).toBe(4500);
       expect(result).not.toHaveProperty("unitPrice");
     });

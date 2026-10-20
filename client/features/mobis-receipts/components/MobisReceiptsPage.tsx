@@ -106,7 +106,7 @@ export function MobisReceiptsPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
-        title="Mobis Receipts"
+        title="MIT (Material in Transit)"
         description="Parts bought from Mobis: upload the invoice (MIT format), check the shipment, then post it to CPD stock with an MRN."
         actions={
           canUpload && (
@@ -122,7 +122,7 @@ export function MobisReceiptsPage() {
 
       {isError ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load Mobis receipts.</CardContent>
+          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load MITs.</CardContent>
         </Card>
       ) : (
         <DataTable

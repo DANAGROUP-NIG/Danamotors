@@ -47,6 +47,7 @@ export const approveIndentSchema = z.object({
   body: z
     .object({
       remarks: optionalText(500),
+      pickerName: optionalText(60),
       lines: z
         .array(
           z.object({
@@ -64,11 +65,17 @@ export const pickIndentSchema = z.object({
   params: z.object({ id: uuid("indent ID") }),
   body: z
     .object({
+      pickerName: optionalText(60),
       lines: z
         .array(z.object({ lineId: uuid("line ID"), supplyPartId: uuid("supply part ID").optional() }))
         .optional(),
     })
     .default({}),
+});
+
+export const closeIndentSchema = z.object({
+  params: z.object({ id: uuid("indent ID") }),
+  body: z.object({ reason: z.string().trim().min(3, "Say why the rest will not be supplied").max(500) }),
 });
 
 export const rejectIndentSchema = z.object({
@@ -80,6 +87,16 @@ export const cancelIndentSchema = z.object({
   params: z.object({ id: uuid("indent ID") }),
   body: z.object({ reason: optionalText(500) }).default({}),
 });
+
+const dispatchFields = {
+  taxForm: optionalText(2),
+  transportMode: z.nativeEnum(TransportMode).optional(),
+  remarks: optionalText(500),
+  waybillNumber: optionalText(30),
+  courierName: optionalText(60),
+  consignmentWeight: z.number().nonnegative().optional(),
+  packerName: optionalText(60),
+};
 
 export const dispatchIndentSchema = z.object({
   params: z.object({ id: uuid("indent ID") }),
@@ -111,10 +128,70 @@ export const dispatchIndentSchema = z.object({
     .default({}),
 });
 
+const dispatchLineFields = {
+  lines: z.array(z.object({ pickingLineId: uuid("picking line ID"), quantity: qty.nonnegative() })).optional(),
+  cases: z
+    .array(
+      z.object({
+        packerName: optionalText(60),
+        weight: z.number().nonnegative().optional(),
+        lines: z
+          .array(z.object({ pickingLineId: uuid("picking line ID"), quantity: qty.positive() }))
+          .min(1, "A case must contain at least one part"),
+      }),
+    )
+    .max(500)
+    .optional(),
+};
+
+/** One STN for the open picking lists of several indents to the same branch. */
+export const dispatchStnSchema = z.object({
+  body: z.object({
+    ...dispatchFields,
+    ...dispatchLineFields,
+    indentIds: z.array(uuid("indent ID")).min(1, "Choose at least one indent").max(100),
+  }),
+});
+
+/** CPD sends free stock without an indent. */
+export const directStnSchema = z.object({
+  body: z.object({
+    ...dispatchFields,
+    sourceBranchId: uuid("sending branch ID"),
+    destinationBranchId: uuid("receiving branch ID"),
+    remarks: z.string().trim().min(3, "Say what this STN is for (for example, Microcat Live for May)").max(500),
+    lines: z
+      .array(z.object({ partId: uuid("part ID"), quantity: qty.positive("Quantity must be above zero") }))
+      .min(1, "Add at least one part")
+      .max(500),
+  }),
+});
+
+const receiptBody = z
+  .object({
+    remarks: optionalText(500),
+    taxForm: optionalText(2),
+    closeShort: z.boolean().optional(),
+    lines: z
+      .array(
+        z.object({
+          stnLineId: uuid("STN line ID"),
+          receivedQuantity: qty.nonnegative(),
+          damagedQuantity: qty.nonnegative().optional(),
+          remarks: optionalText(200),
+        }),
+      )
+      .optional(),
+  })
+  .default({});
+
+export const receiveStnSchema = z.object({ params: z.object({ id: uuid("STN ID") }), body: receiptBody });
+
 export const receiveIndentSchema = z.object({
   params: z.object({ id: uuid("indent ID") }),
   body: z
     .object({
+      stnId: uuid("STN ID").optional(),
       remarks: optionalText(500),
       taxForm: optionalText(2),
       closeShort: z.boolean().optional(),
@@ -136,6 +213,27 @@ const pagination = {
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 };
+
+const day = z.string().date("Use a YYYY-MM-DD date");
+
+/** Legacy Branch Indent From (INWARD) / To (OUTWARD) Other Branch Cancellation. */
+export const pendingIndentLinesSchema = z.object({
+  query: z.object({
+    direction: z.enum(["INWARD", "OUTWARD"]),
+    branchId: uuid("branch ID"),
+    otherBranchId: uuid("other branch ID").optional(),
+    from: day.optional(),
+    to: day.optional(),
+    search: z.string().trim().max(40).optional(),
+  }),
+});
+
+export const cancelIndentLinesSchema = z.object({
+  body: z.object({
+    lineIds: z.array(uuid("indent line ID")).min(1, "Select at least one line to cancel").max(2000),
+    reason: z.string().trim().min(3, "Say why the lines are cancelled").max(500),
+  }),
+});
 
 export const listIndentsSchema = z.object({
   query: z.object({

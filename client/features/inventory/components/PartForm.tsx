@@ -14,6 +14,7 @@ import { useCreatePart, useOpeningStock, useUpdatePart } from "../hooks/use-part
 import { usePriceCategories } from "../hooks/use-parts";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
+import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
 
 export const PART_CATEGORIES = [
   "Engine",
@@ -40,7 +41,7 @@ interface PartFormProps {
 }
 
 function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
-  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", warrantyApplicable: false };
+  if (!part) return { uom: "UNIT", partStatus: "ACTIVE", taxable: true, partFlag: "O", partType: "S", warrantyApplicable: false };
   return {
     partNumber: part.partNumber,
     name: part.name,
@@ -55,6 +56,7 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     retailRate: part.retailRate ?? undefined,
     taxable: part.taxable,
     partFlag: part.partFlag,
+    partType: (part.partType ?? "S") as PartMasterFormInput["partType"],
     priceCategoryCode: part.priceCategoryCode ?? "",
     binLocation: part.binLocation ?? "",
     storeLocation: part.storeLocation ?? "",
@@ -179,8 +181,24 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               ))}
             </datalist>
           </Field>
-          <Field label="Part flag" error={errors.partFlag?.message}>
-            <input className={inputCls} maxLength={2} placeholder="O" {...register("partFlag")} />
+          <Field label="Part type" error={errors.partType?.message}>
+            <select className={inputCls} {...register("partType")}>
+              {Object.keys(PART_TYPE_LABELS).map((code) => (
+                <option key={code} value={code}>
+                  {codeLabel(PART_TYPE_LABELS, code)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Purchase source" error={errors.partFlag?.message}>
+            <select className={inputCls} {...register("partFlag")}>
+              {/* Keep a non-legacy flag already on the part selectable. */}
+              {[...new Set([...Object.keys(PART_FLAG_LABELS), ...(part?.partFlag ? [part.partFlag] : [])])].map((code) => (
+                <option key={code} value={code}>
+                  {codeLabel(PART_FLAG_LABELS, code)}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Status" error={errors.partStatus?.message}>
             <select className={inputCls} {...register("partStatus")}>
@@ -234,14 +252,19 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             )}
           </Field>
           <Field label="Tax category (optional)" error={errors.taxCategory?.message}>
-            <input className={inputCls} {...register("taxCategory")} />
+            <select className={inputCls} {...register("taxCategory")}>
+              <option value="">Unclassified — review before enabling VAT</option>
+              {part?.taxCategory && !["A","B","C","SPARES","OIL","ACCESSORIES"].includes(part.taxCategory) && <option value={part.taxCategory}>{part.taxCategory} (legacy, unclassified)</option>}
+              <option value="SPARES">Spares</option><option value="OIL">Oil and lubricants</option><option value="ACCESSORIES">Accessories</option>
+              {part?.taxCategory && ["A","B","C"].includes(part.taxCategory) && <option value={part.taxCategory}>{part.taxCategory} (legacy category)</option>}
+            </select>
           </Field>
           <Field label="Tax form (optional)" error={errors.taxForm?.message}>
             <input className={inputCls} placeholder="e.g. X" {...register("taxForm")} />
           </Field>
           <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold">
             <input type="checkbox" className="size-4" {...register("taxable")} />
-            Taxable
+            Taxable (untick for 0% exemption)
           </label>
         </div>
       </div>

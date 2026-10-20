@@ -4,14 +4,18 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
-import { generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type TallyDocumentType } from './tally-xml';
+import { jobBillMappingAmounts, generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type TallyDocumentType } from './tally-xml';
 
 export { generateTallyImportXml, generateTallyVoucherXml } from './tally-xml';
+
+// Sales vouchers: job bills and CPD counter-sale bills share the same ledger mappings.
+const salesBill: Prisma.InvoiceWhereInput = { OR: [{ jobCardId: { not: null } }, { counterSale: { isNot: null } }] };
+const salesBillBranch = (branchId: string): Prisma.InvoiceWhereInput => ({ OR: [{ jobCard: { branchId } }, { counterSale: { branchId } }] });
 
 export class TallyService {
   async pendingBatches(branchId?: string, noteDirections: Array<'DEBIT'|'CREDIT'> = ['DEBIT','CREDIT']) {
     const [invoices, receipts] = await Promise.all([
-      prisma.invoice.findMany({ where: { tallyPostedAt: null, ...(branchId ? { jobCard: { branchId } } : {}) }, select: { id: true, invoiceNumber: true } }),
+      prisma.invoice.findMany({ where: { tallyPostedAt: null, ...(branchId ? salesBillBranch(branchId) : {}) }, select: { id: true, invoiceNumber: true } }),
       prisma.receipt.findMany({ where: { tallyPostedAt: null, ...(branchId ? { branchId } : {}) }, select: { id: true, receiptNumber: true } }),
     ]);
     const notes = await prisma.partyNote.findMany({ where: { direction:{in:noteDirections}, type: { not: 'OPENING' }, tallyExcluded: false, tallyPostedAt: null, status: 'ACTIVE', ...(branchId ? { branchId } : {}) }, select: { id: true, number: true, direction: true } });
@@ -119,10 +123,9 @@ export class TallyService {
       const invoices = await prisma.invoice.findMany({
         where: {
           issuedDate: { gte: start, lt: end },
-          jobCardId: { not: null },
+          AND: [salesBill, ...(input.branchId ? [salesBillBranch(input.branchId)] : [])],
           status: { notIn: ['Cancelled', 'CANCELLED', 'VOID'] },
           tallyPostedAt: null,
-          ...(input.branchId ? { jobCard: { branchId: input.branchId } } : {}),
         },
         include: { customer: { include: { tallyLedger: true } }, jobCard: true },
         orderBy: { invoiceNumber: 'asc' },
@@ -206,9 +209,9 @@ export class TallyService {
         if (selected.type === 'JOB_BILL') {
           const invoice = await transaction.invoice.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } } },
+            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } } },
           });
-          if (!invoice || !invoice.jobCardId || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
+          if (!invoice || (!invoice.jobCardId && !invoice.counterSale) || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             skipped.push({ ...selected, reason: 'Job bill is missing or cancelled' });
             continue;
           }
@@ -217,15 +220,7 @@ export class TallyService {
             skipped.push({ ...selected, documentNumber, reason: 'Customer has no active Tally ledger mapping' });
             continue;
           }
-          const values = [
-            ['PARTS_SALES', -invoice.partsTotal],
-            ['LABOUR_SALES', -invoice.labourTotal],
-            ['SERVICE_SALES', -(invoice.serviceTotal ?? 0)],
-            ['PARTS_DISCOUNT', invoice.partsDiscountAmount],
-            ['LABOUR_DISCOUNT', invoice.labourDiscountAmount],
-            ['VAT', -invoice.vatAmount],
-            ['ROUND_OFF', -invoice.roundOff],
-          ] as const;
+          const values = jobBillMappingAmounts(invoice);
           const missingMapping = values.find(([key, amount]) => amount !== 0 && !mappings.has(key));
           if (missingMapping) {
             skipped.push({ ...selected, documentNumber, reason: `Missing Tally account mapping: ${missingMapping[0]}` });

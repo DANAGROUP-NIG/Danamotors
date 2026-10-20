@@ -272,6 +272,7 @@ export function JobCardCreateForm({
 
       setValue("serviceAdvisorId", "");
       setValue("technicianId", "");
+    setValue("engineerId", "");
     }
 
     if (record.serviceId) {
@@ -306,6 +307,7 @@ export function JobCardCreateForm({
 
     setValue("serviceAdvisorId", "");
     setValue("technicianId", "");
+    setValue("engineerId", "");
 
     setValue(
       "complaints",
@@ -403,6 +405,7 @@ export function JobCardCreateForm({
             .join("; ")
             .slice(0, 5000),
           promisedAt: new Date(`${promisedDate}T${promisedTime}`).toISOString(),
+          engineerId: values.engineerId || undefined,
           technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
@@ -944,12 +947,14 @@ export function JobCardCreateForm({
                     />
                   </OpeningField>
                   {masterPicker("teamId", "Group", "TEAM")}
+                  <Controller name="engineerId" control={control} render={({field})=><WorkshopPicker label="Engineer (optional)" endpoint={`/service/staff?role=Engineer&branchId=${branchId ?? ""}`} collection="users" disabled={!branchId} value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={errors.engineerId?.message}/>}/>
+
                   <Controller
                     name="technicianId"
                     control={control}
                     render={({ field }) => (
                       <WorkshopPicker
-                        label="Engineer"
+                        label="Technician"
                         endpoint={`/service/staff?role=Technician&branchId=${branchId ?? ""}`}
                         collection="users"
                         disabled={!branchId}

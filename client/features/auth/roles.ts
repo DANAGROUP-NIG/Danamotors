@@ -11,6 +11,7 @@ export type AppRole =
   | "billingofficer"
   | "serviceadviser"
   | "technician"
+  | "engineer"
   | "receptionist"
   | "receptionmanager"
   | "warrantyofficer"
@@ -60,6 +61,27 @@ export const CAMPAIGN_PERMISSIONS = {
 export const BRANCH_ALL = "branch:all";
 
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
+
+// CPD part sale: customer purchase orders, counter sales and sale returns.
+export const PART_SALE_PERMISSIONS = {
+  READ: "partsale:read",
+  ORDER: "partsale:order",
+  BILL: "partsale:bill",
+  RETURN: "partsale:return",
+} as const;
+
+// Physical stock taking: batches, count sheets, S/E confirmation.
+export const STOCK_TAKE_PERMISSIONS = {
+  READ: "stocktake:read",
+  MANAGE: "stocktake:manage",
+  CONFIRM: "stocktake:confirm",
+} as const;
+
+// Stock audit: report only, kept apart so a branch store cannot audit itself.
+export const STOCK_AUDIT_PERMISSIONS = {
+  READ: "stockaudit:read",
+  MANAGE: "stockaudit:manage",
+} as const;
 
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
@@ -241,3 +263,4 @@ export const APPOINTMENT_CREATE_ROLES: AppRole[] = [
   'receptionmanager',
   'serviceadviser',
 ];
+export const MONTHLY_REPORT_PERMISSIONS = ["report:tax-register", "report:booked-vs-availed", "report:estimate-vs-job", "report:unbilled-parts", "report:corporate-bills", "report:delivered-model", "report:delivered-service", "report:warranty-attended", "report:warranty-parts", "report:vehicle-history-card"] as const;
