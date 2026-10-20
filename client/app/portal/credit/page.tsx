@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import Link from "next/link";
 import { Wallet } from "lucide-react";
@@ -54,7 +55,7 @@ export default function PortalCreditPage() {
           </CardHeader>
           <CardContent>
             {loadingCredit ? (
-              <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+              <LoadingSkeleton variant="list" compact />
             ) : !credit || credit.transactions.length === 0 ? (
               <EmptyState message="No credit activity yet" />
             ) : (
@@ -106,7 +107,7 @@ export default function PortalCreditPage() {
           </CardHeader>
           <CardContent>
             {loadingApplications ? (
-              <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+              <LoadingSkeleton variant="list" compact />
             ) : !applications || applications.length === 0 ? (
               <EmptyState message="No credit applications yet" />
             ) : (

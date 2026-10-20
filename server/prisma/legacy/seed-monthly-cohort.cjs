@@ -1,0 +1,96 @@
+/* Run from server on the target LAN. Defaults to read-only dry run.
+ * Create-only, deterministic import IDs. No source writes, stock movements,
+ * receipts, user accounts, warranty snapshots or settings changes.
+ */
+const fs=require('node:fs');
+const path=require('node:path');
+const crypto=require('node:crypto');
+const {inspect}=require('./validate-monthly-report-cohort.cjs');
+const value=(r,f)=>{const k=Object.keys(r||{}).find(k=>k.toLowerCase()===f.toLowerCase());return r?.[k];};
+const str=(r,f)=>String(value(r,f)??'').trim();
+const key=(r,fields)=>JSON.stringify(fields.map(f=>str(r,f)));
+const num=(r,f)=>{const n=Number(value(r,f)??0);if(!Number.isFinite(n))throw Error(`Invalid number: ${f}`);return n;};
+const yes=(r,f)=>[true,1,'1','True','true'].includes(value(r,f));
+// JSON/Postgres double round trips can differ by a few machine ulps.
+const sameValue=(a,b)=>a instanceof Date||b instanceof Date?+a===+b:typeof a==='number'&&typeof b==='number'?Math.abs(a-b)<=Number.EPSILON*16*Math.max(1,Math.abs(a),Math.abs(b)):a===b;
+function date(r,f){const s=str(r,f);if(!s)return null;const d=new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(s)?s:s+'+01:00');if(!Number.isFinite(+d))throw Error(`Invalid date: ${f}`);return d;}
+function build(input,branchId){
+ const audit=inspect(input);if(Object.values(audit.joins).some(j=>j.unmatched)||Object.values(audit.duplicateKeys).some(n=>n))throw Error('Cohort has orphan or duplicate keys; inspect summary first');
+ const t=input.tables, plan=[],skipped={};
+ const skip=(reason)=>{skipped[reason]=(skipped[reason]||0)+1;};
+ // Stable UUIDv5 IDs are required by report selection/filter validation.
+ const id=(type,k)=>{
+  const bytes=crypto.createHash('sha1').update(Buffer.from('d821ec0b43b64c89984db26907105ea1','hex')).update(branchId+'|'+type+'|'+k).digest().subarray(0,16);
+  bytes[6]=(bytes[6]&15)|80;bytes[8]=(bytes[8]&63)|128;
+  const h=bytes.toString('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+ };
+ const add=(model,k,data)=>{const record={id:id(model,k),...data};plan.push({model,data:record});return record.id;};
+ const customers=new Map(),vehicles=new Map(),services=new Map(),jobs=new Map(),bookings=new Map(),parts=new Map(),bills=new Map();
+ for(const r of t.Customer){const k=key(r,['custtype','customer']);const name=str(r,'CustName')||[str(r,'custnamefirst'),str(r,'custnamemiddle'),str(r,'custnamelast')].filter(Boolean).join(' ');if(!name){skip('Customer without name');continue;}customers.set(k,add('customer',k,{branchId,code:'KP79:'+k,firstName:str(r,'custnamefirst')||name,lastName:str(r,'custnamelast'),phoneNumber:str(r,'mobileno')||str(r,'custphone1')||null,address:[str(r,'block'),str(r,'street')].filter(Boolean).join(' ')||null,city:str(r,'city')||null,state:str(r,'state')||null,companyName:str(r,'Organization')||null}));}
+ const customer=(r,c='customer',type='custtype')=>customers.get(JSON.stringify([str(r,type),str(r,c)]))||null;
+ const models=new Map(t.model.map(r=>[key(r,['make','model']),str(r,'modeldesc')]));
+ for(const r of t.vehiclemaster){const vin=str(r,'ChassisNo');if(!vin){skip('Vehicle without VIN');continue;}vehicles.set(vin,add('vehicle',vin,{vin,registrationNumber:str(r,'RegistrationNo')||null,customerId:customer(r,'custcode','CustType'),make:str(r,'make')||null,customMake:str(r,'make')||null,customModel:models.get(key(r,['make','model']))||str(r,'model')||null,model:models.get(key(r,['make','model']))||str(r,'model')||null,trim:str(r,'Variant')||null,saleDate:date(r,'SaleDate'),pdiDone:yes(r,'PDIDone'),pdiDate:date(r,'PDIDate'),sellingDealer:str(r,'SaleDealer')||null}));}
+ for(const r of t.servhead){const code=str(r,'service');services.set(code,add('workshopMaster',code,{kind:'SERVICE_TYPE',code:'KP79:'+code,description:str(r,'servicedesc')||code,active:!yes(r,'InActiveService')}));}
+ for(const r of t.servbook){const c=customer(r,'Customer','CustType'),v=vehicles.get(str(r,'ChassisNo')),scheduledAt=date(r,'bookedfordate');if(!c||!v||!scheduledAt){skip('Booking missing customer, vehicle or date');continue;}const k=str(r,'booking');bookings.set(k,add('serviceAppointment',k,{branchId,customerId:c,vehicleId:v,scheduledAt,serviceTypeId:services.get(str(r,'service'))||null,status:yes(r,'cancelstatus')?'Cancelled':'Pending',source:'Legacy import',notes:'Source booking '+k+'; raw bookingstatus='+str(r,'bookingstatus')}));}
+ for(const r of t.Job){const k=key(r,['trantype','job']),createdAt=date(r,'jobdate');if(!createdAt){skip('Job without date');continue;}const deliveredAt=date(r,'deliverydate');jobs.set(k,add('jobCard',k,{branchId,jobNumber:'KP79:'+k,customerId:customer(r),vehicleId:vehicles.get(str(r,'ChassisNo'))||null,appointmentId:bookings.get(str(r,'booking'))||null,serviceTypeId:services.get(str(r,'service'))||null,description:'Imported Kia Plaza job '+str(r,'job'),createdAt,deliveredAt,billedAt:date(r,'billdt'),promisedAt:date(r,'promisedt'),mileage:value(r,'Mileage')==null?null:Math.trunc(num(r,'Mileage')),status:yes(r,'Cancelled')?'CANCELLED':deliveredAt?'DELIVERED':yes(r,'Jobcomplete')?'COMPLETED':'Open',inHouse:yes(r,'JobInHouse'),serviceCharge:num(r,'servicecharge'),remarks:'Legacy cohort import. Historical warranty and staff assignments not inferred.'}));}
+ // TODO: source taxcategory A/B/C has no verified mapping. Keep raw code in
+ // description rather than taxCategory (report logic has A/B/C fallbacks).
+ for(const r of t.partmast){const k=key(r,['make','part','partflag']);parts.set(k,add('sparePart',k,{partNumber:'KP79:'+k,partCode:'KP79:'+k,name:str(r,'partdesc')||str(r,'part'),description:'Source part '+str(r,'part')+'; raw taxcategory='+str(r,'taxcategory'),unitPrice:num(r,'dlrrate'),retailRate:num(r,'rtlrate'),partFlag:str(r,'partflag'),taxable:yes(r,'taxable'),uom:str(r,'uom')||'UNIT'}));}
+ // Preserve stored bill totals. Do not invent category/VAT snapshots or infer
+ // cash/credit from outstanding balance. Raw cashinv I/Z stays in notes.
+ const billFields=['trantype','cashinv','bill','billtype'];
+ for(const r of t.jobbill){const j=jobs.get(key(r,['trantype','job'])),sourceJob=t.Job.find(x=>key(x,['trantype','job'])===key(r,['trantype','job'])),c=sourceJob&&customer(sourceJob),issuedDate=date(r,'billdate');if(!j||!c||!issuedDate){skip('Bill missing job, customer or date');continue;}const k=key(r,billFields),tax=num(r,'ServTaxAmt')+t.jobfatax.filter(x=>key(x,billFields)===k).reduce((n,x)=>n+num(x,'taxamount'),0),total=num(r,'billamount');const invoiceId=add('invoice',k,{invoiceNumber:'KP79:'+k,customerId:c,jobCardId:j,reportBranchId:branchId,issuedDate,total,subtotal:Math.round((total-tax-num(r,'RoundOff'))*100)/100,tax,vatAmount:tax,vatRate:0,roundOff:num(r,'RoundOff'),outstandingAmount:num(r,'outstandingamt'),billType:null,status:yes(r,'cancelled')?'Cancelled':total===0?'Paid':'Unpaid',cancelledAt:yes(r,'cancelled')?issuedDate:null,notes:'Imported stored total; component breakdown unavailable. TODO cashinv='+str(r,'cashinv')+'; billtype='+str(r,'billtype')+'; tax categories retained in source JSON.'});bills.set(k,invoiceId);}
+ const headers=new Map(t.requisitionpartheader.map(r=>[key(r,['trantype','storelocation','series','requisition']),r]));
+ t.requisitionpartdetail.forEach((r,i)=>{const h=headers.get(key(r,['trantype','storelocation','series','requisition'])),j=h&&jobs.get(key(h,['trantype','job'])),p=parts.get(key(r,['make','part','partflag']));if(!j||!p||yes(r,'Cancelled')||yes(h,'Cancelled')){skip('Part line missing links or cancelled');return;}const flag=str(r,'warranty');if(!['N','W'].includes(flag)){skip('Part line with unmapped charge flag');return;}const qty=num(r,'qtyissued')-num(r,'qtyreturned');if(qty<0)throw Error('Returned quantity exceeds issued quantity');if(qty===0){skip('Fully returned or zero-quantity part line');return;}const rate=num(r,'retailrate'),createdAt=date(r,'requisitiondt');if(!createdAt){skip('Part line without date');return;}const chargeType=flag==='W'?'WARRANTY':'CUSTOMER',description='Source part '+str(r,'part'),amount=Math.round(qty*rate*100)/100;const lineId=add('jobCardLine','part:'+i,{jobCardId:j,kind:'PART',sparePartId:p,description,quantity:qty,rate,amount,chargeType,createdAt,chargeTypeReason:'Legacy net quantity after stored returns; no stock posting'});const inv=bills.get(key(r,billFields));if(inv)add('invoiceLine','part:'+i,{invoiceId:inv,jobCardLineId:lineId,type:'PART',partId:p,description,quantity:qty,rate,amount,customerPaid:chargeType==='CUSTOMER',createdAt});});
+ const labourHeaders=new Map(t.joblaborhead.map(r=>[key(r,['trantype','labourslip']),r]));
+ t.joblabordetail.forEach((r,i)=>{const h=labourHeaders.get(key(r,['trantype','labourslip'])),j=h&&jobs.get(key(h,['trantype','job']));if(!j||yes(h,'Cancelled')||str(r,'warranty')!=='N'){skip('Labour missing job, cancelled or unmapped charge');return;}const quantity=num(r,'hourscharged'),amount=num(r,'labouramount'),description='Source operation '+str(r,'labour'),createdAt=date(h,'labourslipdate');if(!createdAt){skip('Labour without date');return;}const lineId=add('jobCardLine','labour:'+i,{jobCardId:j,kind:'LABOUR',operationCode:str(r,'labour'),description,quantity,rate:quantity?amount/quantity:0,amount,chargeType:'CUSTOMER',createdAt});const inv=bills.get(key(r,billFields));if(inv)add('invoiceLine','labour:'+i,{invoiceId:inv,jobCardLineId:lineId,type:'LABOUR',description,quantity,rate:quantity?amount/quantity:0,amount,customerPaid:true,createdAt});});
+ for(const r of t.estimate){const k=str(r,'estimate'),j=jobs.get(key(r,['trantype','job']))||null,v=vehicles.get(str(r,'chassisno')||str(r,'chassis'))||null,estimateDate=date(r,'estimatedate');if(!estimateDate){skip('Estimate without date');continue;}const c=(j&&plan.find(x=>x.data.id===j)?.data.customerId)||(v&&plan.find(x=>x.data.id===v)?.data.customerId)||null;if(!j&&(!v||!c)){skip('Standalone estimate missing customer or vehicle');continue;}const e=add('estimate',k,{customerId:c,estimateNumber:'KP79:'+k,branchId,jobCardId:j,vehicleId:v,description:'Source estimate '+k,estimateDate,createdAt:estimateDate,amount:num(r,'estnetamt'),status:yes(r,'Cancelled')?'Cancelled':'Pending'});t.estimateparts.filter(x=>str(x,'estimate')===k).forEach((x,i)=>{const quantity=num(x,'quantityreq'),rate=num(x,'retailrate');add('estimateLine',k+':part:'+i,{estimateId:e,type:'PART',referenceId:parts.get(key(x,['make','part','partflag']))||null,description:'Source part '+str(x,'part'),quantity,rate,amount:Math.round(quantity*rate*100)/100});});t.estimatelabour.filter(x=>str(x,'estimate')===k).forEach((x,i)=>add('estimateLine',k+':labour:'+i,{estimateId:e,type:'LABOUR',description:'Source operation '+str(x,'labour'),quantity:num(x,'hoursreq'),rate:num(x,'hoursreq')?num(x,'labouramt')/num(x,'hoursreq'):0,amount:num(x,'labouramt')}));}
+ return {plan,skipped,audit};
+}
+module.exports={build,sameValue};
+async function main(){
+ const args=process.argv.slice(2),apply=args.includes('--apply'),file=args.find(a=>!a.startsWith('--'));
+ if(!file)throw Error('Usage: node prisma/legacy/seed-monthly-cohort.cjs <cohort.json> --branch-id=<id> [--apply]');
+ require('dotenv').config({path:path.resolve(__dirname,'../../.env')});
+ if(process.env.NODE_ENV==='production')throw Error('This test seed is disabled in production');
+ const branchId=args.find(a=>a.startsWith('--branch-id='))?.slice(12);if(!branchId)throw Error('Specify the existing Kia Plaza branch ID with --branch-id=');
+ const bytes=fs.readFileSync(file),hash=crypto.createHash('sha256').update(bytes).digest('hex');
+ const {PrismaClient,Prisma}=require('@prisma/client'),db=new PrismaClient();
+ try{
+  const branch=await db.branch.findUnique({where:{id:branchId}});if(!branch||!branch.isActive)throw Error('Branch does not exist or is inactive');
+  const migrations=await db.$queryRawUnsafe('SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL');
+  for(const name of ['20261014100000_monthly_report_framework','20261014110000_monthly_report_dimensions','20261014120000_parts_vat_snapshots','20261014130000_corporate_groups'])if(!migrations.some(m=>m.migration_name===name))throw Error('Missing migration: '+name+'; run prisma migrate deploy first');
+  const {plan,skipped,audit}=build(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,'')),branchId);
+  const counts={},pending=[];
+  const grouped=new Map();
+  for(const item of plan){if(!grouped.has(item.model))grouped.set(item.model,[]);grouped.get(item.model).push(item);}
+  const batches=items=>Array.from({length:Math.ceil(items.length/100)},(_,i)=>items.slice(i*100,i*100+100));
+  const check=async(tx)=>{
+   for(const [model,items]of grouped){
+    const existingById=new Map();
+    for(const batch of batches(items))for(const row of await tx[model].findMany({where:{id:{in:batch.map(i=>i.data.id)}}}))existingById.set(row.id,row);
+    const schema=Prisma.dmmf.datamodel.models.find(m=>m.name[0].toLowerCase()+m.name.slice(1)===model);
+    const uniqueFields=[...schema.fields.filter(f=>f.isUnique).map(f=>[f.name]),...schema.uniqueFields];
+    const unique=[];
+    const localKeys=new Set();
+    for(const item of items){
+     for(const fields of uniqueFields)if(fields.every(f=>item.data[f]!=null)){
+      const token=JSON.stringify([fields,fields.map(f=>item.data[f])]);
+      if(localKeys.has(token))throw Error('Duplicate planned target key: '+model);
+      localKeys.add(token);
+     }
+     const existing=existingById.get(item.data.id);
+     if(existing){for(const [k,v]of Object.entries(item.data)){const actual=existing[k];if(!sameValue(actual,v))throw Error('Previously imported record differs: '+model+'.'+k);}continue;}
+     for(const fields of uniqueFields)if(fields.every(f=>item.data[f]!=null))unique.push(Object.fromEntries(fields.map(f=>[f,item.data[f]])));
+     pending.push(item);counts[model]=(counts[model]||0)+1;
+    }
+    for(const batch of batches(unique))if(await tx[model].findFirst({where:{OR:batch},select:{id:true}}))throw Error('Existing target key conflict: '+model+'; no records overwritten');
+   }
+  };
+  // Serialize conflict checks and creates in the same transaction. Any unique
+  // VIN/registration/catalogue collision rolls everything back; no overwrites.
+  await db.$transaction(async tx=>{await check(tx);console.log(JSON.stringify({mode:apply?'APPLY':'DRY RUN',branch:branch.name,sourceSha256:hash,createCounts:counts,skipped,sourceTotals:audit.sourceTotals,limitations:audit.limitations,additionalLimitations:['No corporate assignments, staff accounts, warranty policies or stock movements imported.','Bill component totals and category snapshots remain unavailable.','Return quantities are netted; separate return history is not recreated.','Estimate approval/status and booking completion flags are not inferred.']},null,2));if(apply)for(const model of grouped.keys())for(const batch of batches(pending.filter(item=>item.model===model)))await tx[model].createMany({data:batch.map(item=>item.data)});},{timeout:180000,isolationLevel:'Serializable'});
+  console.log(apply?'Seed committed. Select July 2026 and the chosen branch in reports.':'Dry run complete: no writes. Review counts, then rerun with --apply.');
+ }finally{await db.$disconnect();}
+}
+if(require.main===module)main().catch(e=>{console.error(e.message.replace(/postgres(?:ql)?:\/\/[^\s]+/g,'[connection redacted]'));process.exitCode=1;});

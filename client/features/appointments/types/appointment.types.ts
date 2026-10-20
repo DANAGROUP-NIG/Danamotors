@@ -57,6 +57,7 @@ export type CreateAppointmentPayload = {
   vehicleId: string;
   branchName: string;
   serviceId: string;
+  serviceTypeId?: string;
   scheduledAt: string;
   durationMins?: number;
   notes?: string;

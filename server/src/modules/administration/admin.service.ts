@@ -270,6 +270,8 @@ export class AdminService {
       payment: 'Finance — Payments',
       receipt: 'Finance — Receipts',
       financereport: 'Finance — Reports',
+      report: 'Reports',
+      corporate: 'Corporate Groups',
       credit: 'Credit Management',
       audit: 'Audit Management',
       warranty: 'Warranty',

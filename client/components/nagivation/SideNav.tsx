@@ -256,7 +256,7 @@ export default function SideNav({
                   ? hasAnyPermission(group.permissions)
                   : hasAccess(group.roles ?? []),
               )
-              .map((group) => {
+              .map((group, index) => {
                 const visibleItems = group.items.filter((item) =>
                   item.permissions?.length
                     ? hasAnyPermission(item.permissions)
@@ -266,7 +266,7 @@ export default function SideNav({
 
                 return (
                   <div
-                    key={group.label}
+                    key={index}
                     className={cn(
                       "w-full",
                       collapsed && "flex flex-col items-center gap-1",

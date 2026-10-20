@@ -87,7 +87,7 @@ export class InventoryRepository {
   // Every create, rate or bin change and delete is kept in the part's rate and bin history.
   private async createTracked(data: Prisma.SparePartUncheckedCreateInput, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
-      const part = await tx.sparePart.create({ data });
+      const part = await tx.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });
       await recordPartChange(tx, null, part, changedById);
       return part;
     });
@@ -144,7 +144,7 @@ export class InventoryRepository {
   async updatePart(id: string, data: Partial<SparePart>, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
       const before = await tx.sparePart.findUniqueOrThrow({ where: { id } });
-      const part = await tx.sparePart.update({ where: { id }, data });
+      const part = await tx.sparePart.update({ where: { id }, data: { ...data, ...canonicalPartTax(data.taxCategory) } });
       await recordPartChange(tx, before, part, changedById);
       return part;
     });
@@ -632,3 +632,9 @@ export class InventoryRepository {
 }
 
 export default InventoryRepository;
+
+function canonicalPartTax(value: string | null | undefined) {
+  if (value === undefined) return {};
+  const mapped: Record<string,string> = {A:'SPARES',B:'OIL',C:'ACCESSORIES',SPARES:'SPARES',OIL:'OIL',ACCESSORIES:'ACCESSORIES'};
+  return { reportTaxCategoryCode: mapped[value?.trim().toUpperCase() ?? ''] ?? null };
+}

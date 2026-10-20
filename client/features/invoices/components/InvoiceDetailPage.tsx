@@ -1,4 +1,6 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { VatBreakdownTable } from './VatBreakdownTable';
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -20,7 +22,7 @@ export function InvoiceDetailPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  if (isLoading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading bill...</div>;
+  if (isLoading) return <LoadingSkeleton label="Loading bill" />;
   if (isError || !invoice) return <div className="p-8 text-center"><p role="alert" className="text-sm text-destructive">Bill could not be loaded.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button></div>;
 
   const cancelled = invoice.status.toLowerCase() === "cancelled";
@@ -60,11 +62,12 @@ export function InvoiceDetailPage() {
         <span>Labour</span><span className="text-right">{currency.format(invoice.labourTotal)}</span>
         <span>Labour discount ({invoice.labourDiscountPercent}%)</span><span className="text-right">-{currency.format(invoice.labourDiscountAmount)}</span>
         <span>Service charge</span><span className="text-right">{currency.format(invoice.serviceTotal ?? 0)}</span>
-        <span>VAT ({invoice.vatRate}%)</span><span className="text-right">{currency.format(invoice.vatAmount)}</span>
+        <span>Total VAT</span><span className="text-right">{currency.format(invoice.vatAmount)}</span>
         <span>Round-off</span><span className="text-right">{currency.format(invoice.roundOff)}</span>
         <span className="border-t pt-2 font-semibold">Total</span><span className="border-t pt-2 text-right font-semibold">{currency.format(invoice.total)}</span>
       </section>
 
+      <VatBreakdownTable rows={invoice.vatBreakdown}/>
       <section className="grid gap-3 border-t pt-4">
         <h2 className="font-semibold">Receipts allocated</h2>
         {activeAllocations.length === 0 ? <p className="text-sm text-muted-foreground">No credits have been applied.</p> : activeAllocations.map((allocation) => <div key={allocation.id} className="flex flex-wrap justify-between gap-2 text-sm"><span>{allocation.receipt?.receiptNumber ?? allocation.creditNote?.number ?? "Credit"} · {allocation.receipt?.mode ?? allocation.creditNote?.status ?? ""} · {new Date(allocation.receipt?.issuedAt ?? allocation.creditNote?.date ?? invoice.issuedDate).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })}</span><span>{currency.format(allocation.amount)}</span></div>)}

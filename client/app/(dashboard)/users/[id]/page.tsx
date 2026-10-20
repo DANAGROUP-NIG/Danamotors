@@ -1,20 +1,17 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useUser } from "@/features/users";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useUser(id);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   const user = data?.user;

@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -189,11 +190,7 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
   }, [fullScreen]);
 
   if (catalog.isLoading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (!definition) {
     return (
