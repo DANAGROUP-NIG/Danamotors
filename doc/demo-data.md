@@ -109,14 +109,14 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 
 | Key | Vehicle / branch | Status | Estimate(s) | Bill | Warranty case |
 |---|---|---|---|---|---|
-| JC-01 | Sorento / Main | Delivered | Approved | **Paid** (₦95,358) | none (expired) |
-| JC-02 | Sportage / Main | Delivered on credit | Approved | **Unpaid** (₦59,051) | **SUBMITTED** |
+| JC-01 | Sorento / Main | Delivered | Approved | **Paid** (₦95,350) | none (expired) |
+| JC-02 | Sportage / Main | Delivered on credit | Approved | **Unpaid** (₦59,050) | **SUBMITTED** |
 | JC-03 | Rio / Dana Motors Demo | **In progress**, technician, parts issued | **Approved** (customer approval) | none | **OPEN** |
 | JC-04 | Sorento / Main | **Ready for delivery, unbilled**. Repeat of JC-01 | Approved | none: the tester bills it | none |
 | JC-05 | Sportage / Main | **Open, unassigned** (team only). Repeat of JC-02 | Rev 1 **sent back**, rev 2 **pending** | none | **REJECTED** |
 | TEST-01 / TEST-02 | TEST vehicles / Main, Dana Motors Demo | Open | none | none | OPEN, empty |
 
-Every estimate has parts (genuine and local) and labour: coded operations, plus general labour with a free-text description. The bills are created by the billing service. They show VAT on labour and service charge at 7.5% and round-off to the naira. JC-01's bill is paid by a cash receipt, and JC-02 was delivered on approved credit.
+Every estimate has parts (genuine and local) and labour: coded operations, plus general labour with a free-text description. The bills are created by the billing service. They take VAT on labour and service charge and the round-off from the branch settings (defaults: 7.5% VAT, rounded down to the nearest ₦10). The totals quoted in these docs assume the defaults; a branch with other settings shows different totals. JC-01's bill is paid by a cash receipt, and JC-02 was delivered on approved credit.
 
 **Campaigns (3)**
 

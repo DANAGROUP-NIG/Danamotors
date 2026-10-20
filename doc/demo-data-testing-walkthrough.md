@@ -129,8 +129,8 @@ Log in as the billing officer (or a user with job bill rights).
    | Replace ignition coil and spark plugs 0.8 h × 12,500 | 10,000 |
    | Running repair service charge | 2,100 |
    | VAT 7.5% on labour + service (18,350) | 1,376.25 |
-   | Round-off | −0.25 |
-   | **Total** | **₦71,726** |
+   | Round-off | −6.25 |
+   | **Total** | **₦71,720** |
 
 3. Create the bill. **Expect:** a new bill number, and JC-04 moves to **Billed**.
 
@@ -144,10 +144,10 @@ Open the bill for **JC-02** (Lakeside Courier, `KJA-101DM`). **Expect:**
 | Periodic maintenance 1.5 h × 9,500 (labour) | 14,250 |
 | Paid service charge | 15,100 |
 | VAT 7.5% of 29,350 | 2,201.25 |
-| Round-off | −0.25 |
-| **Total** | **₦59,051** |
+| Round-off | −1.25 |
+| **Total** | **₦59,050** |
 
-- Status **Unpaid**, outstanding ₦59,051, with a due date about 30 days after the bill date.
+- Status **Unpaid**, outstanding ₦59,050, with a due date about 30 days after the bill date.
 - The ignition coil, plugs and coil-replacement labour are **not** on the bill. They are charged to warranty.
 - The job card shows **Delivered** on approved credit.
 
@@ -158,8 +158,8 @@ Open the bill for **JC-01** (Tobi Adeyemi, `LSR-303DM`). **Expect:**
 - labour ₦19,000
 - service ₦15,100
 - VAT ₦2,557.50
-- round-off +0.50
-- total **₦95,358**
+- round-off −7.50
+- total **₦95,350**
 - status **Paid**, outstanding 0, with a receipt allocated to it
 - the job card is Delivered, with a gate pass
 
