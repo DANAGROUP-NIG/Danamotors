@@ -6,8 +6,34 @@ import { money, sumMoney } from '../finance/money';
 
 // Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
 export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
-export type ApprovalEstimate = { id: string; status: string; currency?: string; amount: number; lines: ScopeLine[]; approvals: { approved: boolean | null; customerId: string }[] };
-export const latestEstimateQuery = { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], take: 1, include: { lines: true, approvals: true } };
+export type ApprovalEstimate = {
+  id: string;
+  version?: number;
+  status: string;
+  currency?: string;
+  amount: number;
+  lines: ScopeLine[];
+  approvals: {
+    approved: boolean | null;
+    customerId: string;
+    signatureRequired?: boolean;
+    overrideReason?: string | null;
+    signature?: SignatureEvidence | null;
+  }[];
+};
+// Every operation gate must load the evidence used to verify the signed revision.
+export const latestEstimateQuery = {
+  orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+  take: 1,
+  include: {
+    lines: true,
+    approvals: {
+      include: {
+        signature: { select: { estimateVersion: true, totalSigned: true, contentHash: true } },
+      },
+    },
+  },
+} satisfies Prisma.EstimateFindManyArgs;
 const baseType = (type: string) => type.replace('INCLUDED_', '');
 const key = (line: ScopeLine) => `${baseType(line.type)}:${line.referenceId ?? ''}`;
 
