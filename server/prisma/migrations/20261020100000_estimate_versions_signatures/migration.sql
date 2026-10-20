@@ -2,6 +2,51 @@
 -- Keep each retry atomic; never reset signed scope or reclassify new approvals as legacy.
 BEGIN;
 
+-- Existing deployments use documentType (DocumentTermType enum). Keep it intact.
+-- Add the application's text alias and synchronize both names for old/new callers.
+DO $compat$
+BEGIN
+ IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+            AND table_name = 'DocumentTerms' AND column_name = 'documentType') THEN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema()
+                 AND table_name = 'DocumentTerms' AND column_name = 'type') THEN
+   ALTER TABLE "DocumentTerms" ADD COLUMN "type" TEXT;
+   UPDATE "DocumentTerms" SET "type" = "documentType"::text;
+   ALTER TABLE "DocumentTerms" ALTER COLUMN "type" SET NOT NULL;
+  END IF;
+
+  CREATE OR REPLACE FUNCTION issue117_sync_document_term_type() RETURNS trigger
+  LANGUAGE plpgsql AS $sync$
+  BEGIN
+   IF TG_OP = 'INSERT' THEN
+    IF NEW."type" IS NULL THEN
+     NEW."type" := NEW."documentType"::text;
+    ELSIF NEW."documentType" IS NULL THEN
+     NEW := jsonb_populate_record(NEW, jsonb_build_object('documentType', NEW."type"));
+    END IF;
+   ELSE
+    IF NEW."type" IS DISTINCT FROM OLD."type"
+       AND NEW."documentType" IS NOT DISTINCT FROM OLD."documentType" THEN
+     NEW := jsonb_populate_record(NEW, jsonb_build_object('documentType', NEW."type"));
+    ELSIF NEW."documentType" IS DISTINCT FROM OLD."documentType"
+          AND NEW."type" IS NOT DISTINCT FROM OLD."type" THEN
+     NEW."type" := NEW."documentType"::text;
+    END IF;
+   END IF;
+   IF NEW."type" IS DISTINCT FROM NEW."documentType"::text THEN
+    RAISE EXCEPTION 'DocumentTerms type and documentType must match';
+   END IF;
+   RETURN NEW;
+  END;
+  $sync$;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = '"DocumentTerms"'::regclass
+                 AND tgname = 'issue117_sync_document_term_type') THEN
+   CREATE TRIGGER issue117_sync_document_term_type BEFORE INSERT OR UPDATE ON "DocumentTerms"
+    FOR EACH ROW EXECUTE FUNCTION issue117_sync_document_term_type();
+  END IF;
+ END IF;
+END $compat$;
+
 -- Reuse compatible existing terms, but never reinterpret or replace customer-facing data.
 DO $$
 DECLARE incompatible TEXT;

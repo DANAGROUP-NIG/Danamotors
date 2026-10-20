@@ -90,6 +90,29 @@ INSERT INTO "EstimateSignature" (id,"estimateId","approvalId","imageReference","
     assert query(partial + """SELECT "contentHash" FROM "EstimateSignature";""").stdout.strip() == 'test-hash'
     print('PASS repeated deployment preserves newer versions, signatures and approval requirements')
 
+    # Match the deployment diagnostic: enum documentType and the existing scope index.
+    enum_terms = """
+CREATE TYPE "DocumentTermType" AS ENUM ('JOB_ESTIMATE','JOB_BILL','OTHER_EXISTING_TYPE');
+CREATE TABLE "DocumentTerms" (id TEXT PRIMARY KEY,"documentType" "DocumentTermType" NOT NULL,"branchId" TEXT,terms TEXT[] NOT NULL DEFAULT ARRAY[]::text[],footer TEXT,"updatedAt" TIMESTAMP NOT NULL);
+CREATE UNIQUE INDEX "DocumentTerms_scope_key" ON "DocumentTerms" ("documentType", COALESCE("branchId",''));
+INSERT INTO "DocumentTerms" VALUES ('terms','JOB_ESTIMATE',NULL,ARRAY['Keep existing terms'],'Keep footer',now());
+"""
+    deployed = setup('deployed', enum_terms)
+    query(deployed + migration)
+    assert query(deployed + """SELECT "type" FROM "DocumentTerms" WHERE id='terms';""").stdout.strip() == 'JOB_ESTIMATE'
+    assert query(deployed + """SELECT terms[1] FROM "DocumentTerms" WHERE id='terms';""").stdout.strip() == 'Keep existing terms'
+    query(deployed + """UPDATE "DocumentTerms" SET "documentType"='JOB_BILL' WHERE id='terms';""")
+    assert query(deployed + """SELECT "type" FROM "DocumentTerms" WHERE id='terms';""").stdout.strip() == 'JOB_BILL'
+    query(deployed + """UPDATE "DocumentTerms" SET "type"='JOB_ESTIMATE' WHERE id='terms';""")
+    assert query(deployed + """SELECT "documentType"::text FROM "DocumentTerms" WHERE id='terms';""").stdout.strip() == 'JOB_ESTIMATE'
+    query(deployed + """INSERT INTO "DocumentTerms" (id,type,terms,"updatedAt") VALUES ('new-client','OTHER_EXISTING_TYPE',ARRAY['Other terms'],now());""")
+    query(deployed + """INSERT INTO "DocumentTerms" (id,"documentType",terms,"updatedAt") VALUES ('old-client','JOB_BILL',ARRAY['Bill terms'],now());""")
+    assert query(deployed + """SELECT count(*) FROM "DocumentTerms" WHERE type="documentType"::text;""").stdout.strip() == '3'
+    query(deployed + """UPDATE "DocumentTerms" SET type='JOB_BILL',"documentType"='JOB_ESTIMATE' WHERE id='terms';""", ok=False)
+    query(deployed + migration)
+    assert query(deployed + """SELECT count(*) FROM "DocumentTerms" WHERE type="documentType"::text;""").stdout.strip() == '3'
+    print('PASS existing enum documentType migration, old/new caller synchronization and repeat application')
+
     incompatible = setup('incompatible', terms.replace('terms TEXT[] NOT NULL', 'terms JSONB NOT NULL').replace("ARRAY['Keep existing terms']", "'[]'::jsonb"))
     failure = query(incompatible + migration, ok=False)
     assert 'incompatible/missing columns: terms' in failure.stderr
