@@ -56,7 +56,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   };
   const create = useMutation({
     mutationFn: () =>
-      apiPost(`/service/job-cards/${jobCard.id}/estimates`, {
+      apiPost(latest ? `/service/estimates/${latest.id}/revisions` : `/service/job-cards/${jobCard.id}/estimates`, {
         description: `Workshop estimate ? revision ${estimates.length + 1}`,
         lines,
       }),
@@ -116,7 +116,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   return (
     <section
       id="estimate-approval"
-      className="grid gap-4 rounded-xl border bg-white p-5"
+      className="grid gap-4 rounded-xl border bg-white p-5 print:hidden"
     >
       <div className="flex justify-between gap-3">
         <h2 className="font-semibold">Estimate &amp; Approval</h2>
@@ -128,7 +128,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         customer-approved revision. Amounts below exclude VAT and bill
         discounts.
       </p>
-      {open && hasPermission("estimate:create") && !editing && (
+      {open && hasPermission("estimate:revise") && latest && !editing && (
         <Button
           type="button"
           variant="outline"
@@ -136,10 +136,10 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           disabled={busy}
           onClick={revise}
         >
-          Create revised estimate
+          Revise estimate
         </Button>
       )}
-      {open && editing && hasPermission("estimate:create") && (
+      {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
         <div className="grid gap-3 print:hidden" inert={busy}>
           <p className="text-sm text-muted-foreground">
             The service uses the saved job-card charge. Parts use retail rates;

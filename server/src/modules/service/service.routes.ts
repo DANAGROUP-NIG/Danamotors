@@ -1,3 +1,4 @@
+import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
@@ -820,6 +821,30 @@ router.post(
   validateRequest(createEstimateSchema),
   controller.addEstimate,
 );
+/**
+ * @openapi
+ * /service/estimates/{id}/revisions:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Create an unsigned version N+1 (estimate:revise)
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { description: 'Revised scope', lines: [{ type: 'LABOUR', referenceId: '00000000-0000-4000-8000-000000000001', quantity: 2 }] }
+ *     responses:
+ *       201: { description: New immutable revision }
+ *       403: { description: Missing estimate revise permission }
+ *       409: { description: Superseded source }
+ */
+router.post('/estimates/:id/revisions', requirePermission(PERMISSIONS.ESTIMATE_REVISE), validateRequest(createEstimateSchema), async (req, res, next) => {
+ try {
+  const source = await prisma.estimate.findUniqueOrThrow({ where: { id: req.params.id }, include: { jobCard: true } });
+  assertBranchOwnership(req, source.jobCard?.branchId ?? source.branchId);
+  if (!source.jobCardId) throw new ConflictError('Only job-linked estimates can be revised here');
+  const estimate = await new ServiceService().addEstimate(source.jobCardId, req.body, req.user!.userId, source.id);
+  res.status(201).json({ status: 'success', data: { estimate } });
+ } catch(error) { next(error); }
+});
 router.post(
   "/estimates/:id/approvals",
   requirePermission(PERMISSIONS.ESTIMATE_APPROVE),
