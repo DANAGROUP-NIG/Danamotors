@@ -1,3 +1,4 @@
+import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
@@ -559,6 +560,7 @@ export class ServiceService {
         : [];
     return scopeJobCard({
       ...card,
+      estimates: card.estimates.map(estimate => ({ ...estimate, contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({
         ...c,
         vehicleStatus:
@@ -803,8 +805,15 @@ export class ServiceService {
       decisionDate?: string;
       comments?: string;
       status?: string;
+      expectedVersion?: number;
+      expectedHash?: string;
+      signerName?: string;
+      relationship?: string;
+      signatureImage?: string;
+      overrideReason?: string;
     },
     actorId?: string,
+    capture?: { deviceOrIp: string; allowOverride?: boolean },
   ) {
     const identity = await prisma.estimate.findUnique({
       where: { id: estimateId },
@@ -846,6 +855,18 @@ export class ServiceService {
           throw new ConflictError(
             "This revision already has a decision. Create a new revision to change scope.",
           );
+        if (!data.approved && !data.comments?.trim()) throw new BadRequestError("A decline reason is required");
+        const hash = estimateContentHash(estimate);
+        if (data.expectedVersion !== estimate.version || data.expectedHash !== hash) throw new ConflictError("Estimate changed; reload the signature summary");
+        const override = !!data.overrideReason?.trim();
+        if (override && !capture?.allowOverride) throw new BadRequestError("Only Admin may override with a reason");
+        if (!override) {
+          if (!data.signatureImage || !data.signerName?.trim() || !actorId) throw new BadRequestError("A customer signature and signer name are required; portal capture is not yet available");
+          assertSignaturePng(data.signatureImage);
+          const customer = await tx.customer.findUniqueOrThrow({ where: { id: card.customerId! } });
+          const customerName = `${customer.firstName} ${customer.lastName}`.trim();
+          if (data.signerName.trim().toLowerCase() !== customerName.toLowerCase() && !data.relationship?.trim()) throw new BadRequestError("Relationship is required when signing for the customer");
+        }
         const status = data.approved ? "Approved" : "Declined";
         if (data.approved) {
           const services = estimate.lines.filter(
@@ -882,19 +903,29 @@ export class ServiceService {
                 customerId: data.customerId,
                 status,
                 comments: data.comments,
+                overrideReason: data.overrideReason,
+                contentHash: hash,
               }),
             },
           });
-        return tx.customerApproval.create({
+        const approval = await tx.customerApproval.create({
           data: {
             estimateId,
             customerId: data.customerId,
             approved: data.approved,
+            signatureRequired: true,
+            overrideReason: override ? data.overrideReason!.trim() : null,
             decisionDate: new Date(),
             comments: data.comments,
             status,
           },
         });
+        if (!override) await tx.estimateSignature.create({ data: {
+          estimateId, approvalId: approval.id, imageReference: data.signatureImage!, signerName: data.signerName!.trim(),
+          relationship: data.relationship?.trim(), capturedByUserId: actorId, deviceOrIp: capture?.deviceOrIp ?? 'unknown',
+          estimateVersion: estimate.version, totalSigned: estimate.amount, contentHash: hash,
+        } });
+        return approval;
       },
       { maxWait: 5000, timeout: 15000 },
     );

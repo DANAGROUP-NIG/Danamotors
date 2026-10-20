@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Branch {
+  documentTerms DocumentTerms[]
   standaloneEstimates Estimate[]
   outstandingLetters OutstandingLetter[]
   partyNotes             PartyNote[]
@@ -3419,4 +3420,20 @@ model EstimateSignature {
   channel String @default("COUNTER")
   consentStatement String?
   @@index([estimateId])
+}
+
+// Branch terms take precedence over the company-wide (null branch) record.
+model DocumentTerms {
+  id String @id @default(uuid())
+  type String
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  terms String[]
+  footer String?
+  companyName String?
+  companyAddress String?
+  companyPhone String?
+  updatedAt DateTime @updatedAt
+  @@unique([type, branchId])
+  @@index([type])
 }
