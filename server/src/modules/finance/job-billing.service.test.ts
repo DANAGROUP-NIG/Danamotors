@@ -55,8 +55,12 @@ describe('Job billing after delivery on credit', () => {
       partIssuances: [{ id: 'issue', sparePartId: 'part', quantity: 2, returns: [], jobCardLine: { id: 'line', chargeType: 'CUSTOMER' }, sparePart: { partNumber: 'P', name: 'Filter', retailRate: 100, taxCategory: 'A', taxable: true } }],
       estimates: [{ ...approved, amount: 500, lines: [...approved.lines, { type: 'PART', referenceId: 'part', description: 'Filter', quantity: 2, rate: 100, amount: 200 }] }],
     });
-    await new JobBillingService().createJobBill(input);
+    const service = new JobBillingService();
+    const preview = await service.previewJobBill(input);
+    await service.createJobBill(input);
     const data = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(data.vatBreakdown.create).toEqual(preview.vatBreakdown);
+    expect(data.total).toBe(preview.totals.total);
     expect(data.vatBreakdown.create).toEqual(expect.arrayContaining([expect.objectContaining({ category: 'SPARES', rate: 7.5, saleAmount: 200, discount: 0, taxableAmount: 200, vat: 15 })]));
     expect(data.vatAmount).toBe(22.5);
     expect(data.total).toBe(323);

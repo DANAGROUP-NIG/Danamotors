@@ -10,12 +10,10 @@ import {
   NotFoundError,
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
-import { config } from "../../config";
 import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
 import { categoryOf } from "../reports/report.logic";
 import { taxRegisterValues } from '../reports/tax-register-layout';
 import { getBranchSettings } from '../company-settings/company-settings.service';
-import { calculateJobBillTotals } from "./job-bill-calculator";
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
@@ -102,7 +100,7 @@ export class JobBillingService {
       const rate = issuance.sparePart.retailRate;
       return [
         {
-          type: "PART",
+          type: "PART" as const,
           jobCardLineId: issuance.jobCardLine?.id,
           taxCategory: categoryOf(issuance.sparePart),
           taxable: issuance.sparePart.taxable,
@@ -118,7 +116,7 @@ export class JobBillingService {
       ];
     });
     const labourLines = jobCard.labourLines.map((line) => ({
-      type: "LABOUR",
+      type: "LABOUR" as const,
       jobCardLabourId: line.id,
       referenceId: line.labourItemId,
       description: line.description,
@@ -128,7 +126,7 @@ export class JobBillingService {
       customerPaid: customerPays(line.chargeLine),
     }));
     const serviceLines = jobCard.serviceCharge == null ? [] : [{
-      type: "SERVICE", referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
+      type: "SERVICE" as const, referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
       amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,
     }];
     const lines = [...partLines, ...labourLines, ...serviceLines];
@@ -179,6 +177,31 @@ export class JobBillingService {
     });
   }
 
+  private async calculateTotals(
+    jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
+    lines: ReturnType<JobBillingService["pricedScope"]>["lines"],
+    discounts: { partsDiscountPercent: number; labourDiscountPercent: number },
+    transaction: Prisma.TransactionClient = prisma,
+  ) {
+    const [settings, taxSettings] = await Promise.all([
+      getBranchSettings(jobCard.branchId, transaction),
+      partsVatSettings(transaction),
+    ]);
+    return calculateBillWithPartsVat({
+      partsTotal: sumMoney(lines.filter(line => line.type === 'PART').map(line => line.amount)),
+      labourTotal: sumMoney(lines.filter(line => line.type === 'LABOUR').map(line => line.amount)),
+      serviceTotal: sumMoney(lines.filter(line => line.type === 'SERVICE').map(line => line.amount)),
+      ...discounts,
+      vatRate: settings.labourVatPercent,
+      roundOffValue: settings.roundOffValue,
+    }, lines.flatMap(line => line.type === 'PART' ? [{
+      amount: line.amount,
+      category: line.taxCategory,
+      taxable: line.taxable,
+      customerPaid: line.customerPaid,
+    }] : []), taxSettings.enabled, taxSettings.rates);
+  }
+
   async previewJobBill(input: {
     jobCardId: string;
     partsDiscountPercent: number;
@@ -187,23 +210,9 @@ export class JobBillingService {
     const jobCard = await this.loadJobCard(input.jobCardId);
     this.assertBillable(jobCard);
     const { lines, review } = this.pricedScope(jobCard);
-    const partsTotal = lines
-      .filter((line) => line.type === "PART")
-      .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-    const labourTotal = lines
-      .filter((line) => line.type === "LABOUR")
-      .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-    const taxSettings = await partsVatSettings(prisma);
-    const {totals,breakdown} = calculateBillWithPartsVat({
-    const settings = await getBranchSettings(jobCard.branchId);
-    const totals = calculateJobBillTotals({
-      partsTotal,
-      labourTotal,
+    const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
-      serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-      vatRate: settings.labourVatPercent,
-      roundOffValue: settings.roundOffValue,
     });
     return {
       jobCard,
@@ -254,22 +263,10 @@ export class JobBillingService {
 
             const { lines, review } = this.pricedScope(jobCard);
             if (!review.canBill) throw new BadRequestError(review.issues.join(' '));
-            const partsTotal = lines
-              .filter((line) => line.type === "PART")
-              .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-            const labourTotal = lines
-              .filter((line) => line.type === "LABOUR")
-              .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-            const settings = await getBranchSettings(jobCard.branchId, transaction);
-            const totals = calculateJobBillTotals({
-              partsTotal,
-              labourTotal,
+            const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
               partsDiscountPercent: input.partsDiscountPercent,
               labourDiscountPercent: input.labourDiscountPercent,
-              serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-              vatRate: settings.labourVatPercent,
-              roundOffValue: settings.roundOffValue,
-            });
+            }, transaction);
             const invoiceNumber = await nextDocumentNumber(
               transaction,
               "JOB_BILL",
