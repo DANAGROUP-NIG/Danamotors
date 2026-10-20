@@ -17,6 +17,11 @@ export type Inspection = {
 };
 
 export type Estimate = {
+  version: number;
+  estimateNumber?: string | null;
+  estimateDate?: string | null;
+  contentHash: string;
+
   id: string;
   description: string;
   amount: number;
@@ -36,6 +41,9 @@ export type Estimate = {
 };
 
 export type CustomerApproval = {
+  signatureState?: "valid" | "invalid" | "legacy" | "override";
+  signature?: { imageReference: string; signerName: string; signedAt: string; estimateVersion: number; totalSigned: number; relationship?: string | null } | null;
+
   id: string;
   estimateId: string;
   customerId: string;

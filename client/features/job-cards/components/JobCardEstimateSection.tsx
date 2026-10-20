@@ -1,4 +1,5 @@
 "use client";
+import { EstimateSignatureDialog } from "./EstimateSignatureDialog";
 import { useState } from "react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
@@ -49,7 +50,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [includedInService, setIncluded] = useState(false);
-  const [comments, setComments] = useState("");
+  const [signing, setSigning] = useState(false);
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: jobCardKeys.all });
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -66,19 +67,6 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       await refresh();
     },
   });
-  const approval = useMutation({
-    mutationFn: (approved: boolean) =>
-      apiPost(`/service/estimates/${latest!.id}/approvals`, {
-        customerId: jobCard.customerId,
-        approved,
-        comments: comments.trim() || undefined,
-      }),
-    onSuccess: async () => {
-      toast.success("Customer decision recorded");
-      setComments("");
-      await refresh();
-    },
-  });
   const open =
     !hasJobBill(jobCard) &&
     !["BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -91,8 +79,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       : latest.status === "Declined"
         ? "Revision Required"
         : "Awaiting Approval";
-  const error = create.error ?? approval.error;
-  const busy = create.isPending || approval.isPending;
+  const error = create.error;
+  const busy = create.isPending;
   function revise() {
     const draft =
       latest?.lines?.map((line) => ({
@@ -265,6 +253,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       )}
       {estimates.map((estimate, index) => (
         <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
+          {hasPermission("estimate:print") && <a className="underline print:hidden" href={`/job-cards/${jobCard.id}/estimates/${estimate.id}/print`}>Print estimate</a>}
           <p className="font-medium">
             {estimate.description} ? {money(estimate.amount)} ?{" "}
             {index
@@ -273,6 +262,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                 ? "Awaiting Approval"
                 : estimate.status}
           </p>
+          {estimate.approvals?.map(approval => approval.signature && <div key={approval.id}><img src={approval.signature.imageReference} alt="Customer signature" width={300} height={100}/><p>Signed by {approval.signature.signerName}{approval.signature.relationship ? ` for ${jobCard.customer.firstName} ${jobCard.customer.lastName} (${approval.signature.relationship})` : ""}</p></div>)}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -302,49 +292,18 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
           </div>
           {estimate.approvals?.map((decision) => (
             <p key={decision.id}>
-              {decision.approved ? "Approved" : "Declined"}
+              {decision.signatureState === "invalid" ? "Invalid signature" : decision.approved ? "Approved" : "Declined"}
+              {decision.signatureState === "legacy" ? " ? approved before signatures were introduced" : ""}
               {decision.decisionDate
-                ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
+                ? ` on ${new Date(decision.decisionDate).toLocaleString("en-NG", {timeZone:"Africa/Lagos"})}`
                 : ""}
               {decision.comments ? ` ? ${decision.comments}` : ""}
             </p>
           ))}
         </div>
       ))}
-      {open &&
-        !editing &&
-        latest &&
-        !latest.approvals?.length &&
-        hasPermission("estimate:approve") && (
-          <div className="grid gap-3 print:hidden" inert={busy}>
-            <Field label="Customer decision notes">
-              <textarea
-                className={inputCls}
-                maxLength={2000}
-                placeholder="Who confirmed, how, and any agreed conditions"
-                value={comments}
-                onChange={(event) => setComments(event.target.value)}
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => approval.mutate(true)}
-              >
-                Record customer approval
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => approval.mutate(false)}
-              >
-                Record decline
-              </Button>
-            </div>
-          </div>
-        )}
+      {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={()=>setSigning(true)}>Get customer signature</Button>}
+      {signing && latest && <EstimateSignatureDialog estimate={latest} customerId={jobCard.customerId} customerName={`${jobCard.customer.firstName} ${jobCard.customer.lastName}`} onSaved={refresh} onClose={()=>setSigning(false)} />}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {isAxiosError(error)

@@ -281,6 +281,12 @@ export const createApprovalSchema = z.object({
   body: z.object({
     customerId: z.string().uuid("Invalid customer ID"),
     approved: z.boolean(),
+    expectedVersion: z.number().int().positive(),
+    expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
+    signerName: z.string().trim().min(1).max(200).optional(),
+    relationship: z.string().trim().min(1).max(200).optional(),
+    signatureImage: z.string().max(88000).optional(),
+    overrideReason: z.string().trim().min(1).max(2000).optional(),
     decisionDate: z.string().datetime().optional(),
     comments: z.string().optional(),
     status: z.string().optional(),

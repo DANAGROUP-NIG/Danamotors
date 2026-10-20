@@ -6,7 +6,7 @@ Plan: M1 permissions and seed regression; M2 permission-based job detail scope; 
 - [x] M2 Job detail scope: two nested-data visibility tests passed; service defaults to no financial access.
 - [x] M3 Schema: additive migration; historical versions backfilled; legacy approvals explicitly preserved, new approvals require signatures. Prisma schema validation passed using a localhost placeholder (no database contacted). Client types generated, but engine DLL replacement hit Windows EPERM (existing process lock); final generation remains to verify.
 - [x] M4 Revisions: pure revision plan tests passed; existing catalogue validation and shared job lock reused. Create rejects existing scope; revise requires latest source; old values and new scope audited transactionally.
-- [ ] M5 Signatures
+- [x] M5 Signatures: 31 hash/gate/decision tests pass; frontend typecheck passed. Counter pointer canvas adds no dependency, bounded PNG (64 KiB) stored as a private data URL reference because customer documents currently accept URLs but have no upload provider. New unsigned portal decisions are rejected rather than bypassing signatures; portal capture remains deferred. Admin overrides are explicit and audited. Latest-estimate queries select hash evidence without image data to avoid leaking signatures through billing. Prisma generation subsequently succeeded without replacing any user process.
 - [ ] M6 Print
 - [ ] M7 Documentation and verification
 

@@ -847,7 +847,7 @@ router.post('/estimates/:id/revisions', requirePermission(PERMISSIONS.ESTIMATE_R
 });
 router.post(
   "/estimates/:id/approvals",
-  requirePermission(PERMISSIONS.ESTIMATE_APPROVE),
+  requirePermission(PERMISSIONS.ESTIMATE_SIGN),
   validateRequest(createApprovalSchema),
   controller.addApproval,
 );
