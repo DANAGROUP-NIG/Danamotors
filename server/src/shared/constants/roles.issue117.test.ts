@@ -1,6 +1,6 @@
 import { PERMISSIONS as P, ROLE_PERMISSIONS, ROLES as R } from './roles';
 import { requirePermission } from '../../middleware/authorize';
-import seedRoles from '../../../prisma/seed/roles';
+const seedRoles = require('../../../prisma/seed/roles').default;
 const actions = [P.JOBCARD_CREATE, P.JOBCARD_UPDATE, P.ASSIGNMENT_CREATE, P.JOBPROGRESS_UPDATE, P.QCSTATUS_UPDATE, P.JOBLABOUR_UPDATE, P.PARTISSUANCE_CREATE, P.ESTIMATE_CREATE, P.ESTIMATE_REVISE, P.ESTIMATE_PRINT, P.ESTIMATE_SIGN, P.JOB_BILL_CREATE];
 const cases: [string, string[]][] = [
  [R.CCU_OFFICER, []], [R.CCU_MANAGER, []],
