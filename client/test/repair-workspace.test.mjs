@@ -64,6 +64,8 @@ test("view model uses backend total and only customer-facing line fields", () =>
   const estimate = structuredClone(fixture.estimates[0]); estimate.amount = 123.45;
   const view = helpers.toEstimateViewModel(estimate);
   assert.equal(view.total,123.45); assert.equal(view.version,2);
+  assert.equal(helpers.toEstimateViewModel({...estimate,description:"Workshop estimate ? revision 3"}).description,"Workshop estimate \u00b7 revision 3");
+  assert.equal(helpers.toEstimateViewModel({...estimate,description:"Does the engine still knock?"}).description,"Does the engine still knock?");
   assert.deepEqual(plain(view.lines[0]),{id:"s",title:"Running repair",secondary:"Service charge",quantity:1,rate:2100,amount:2100});
   assert.equal(view.lines[3].secondary,"Included in service charge");
   assert.equal(JSON.stringify(view).includes("SECRET-SOURCE"),false);
