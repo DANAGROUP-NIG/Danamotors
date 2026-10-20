@@ -87,7 +87,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
         {jobCards.isLoading && <span className="text-sm text-muted-foreground">Loading billable job cards...</span>}
         {jobCards.isError && <div role="alert" className="flex items-center gap-2"><span className="text-sm text-destructive">Could not load billable job cards.</span><Button type="button" variant="outline" size="sm" onClick={() => jobCards.refetch()}>Retry</Button></div>}
         {!jobCards.isLoading && !jobCards.isError && jobCards.data?.jobCards.length === 0 && (
-          <span className="text-sm text-muted-foreground">No unbilled job cards are ready in this branch. Complete the job card?s quality check and mark it Ready before creating a bill. Credit-approved delivered jobs are also eligible.</span>
+          <span className="text-sm text-muted-foreground">No unbilled job cards are ready in this branch. Complete the job card's quality check and mark it Ready before creating a bill. Credit-approved delivered jobs are also eligible.</span>
         )}
       </Field>
 

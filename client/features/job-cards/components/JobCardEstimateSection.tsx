@@ -57,7 +57,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const create = useMutation({
     mutationFn: () =>
       apiPost(latest ? `/service/estimates/${latest.id}/revisions` : `/service/job-cards/${jobCard.id}/estimates`, {
-        description: `Workshop estimate ? revision ${estimates.length + 1}`,
+        description: `Workshop estimate · revision ${estimates.length + 1}`,
         lines,
       }),
     onSuccess: async () => {
@@ -152,10 +152,10 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               className="flex justify-between gap-3 border-b py-2 text-sm"
             >
               <span>
-                {line.description || line.type} ? {line.quantity}
-                {line.includedInService ? " ? included in service charge" : ""}
+                {line.description || line.type} {"\u00b7"} {line.quantity}
+                {line.includedInService ? " · included in service charge" : ""}
                 {line.type === "SERVICE"
-                  ? ` ? ${money(jobCard.serviceCharge ?? 0)}`
+                  ? ` · ${money(jobCard.serviceCharge ?? 0)}`
                   : ""}
               </span>
               {line.type !== "SERVICE" && (
@@ -266,7 +266,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       {estimates.map((estimate, index) => (
         <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
           <p className="font-medium">
-            {estimate.description} ? {money(estimate.amount)} ?{" "}
+            {estimate.description.replace(/^Workshop estimate \? revision (\d+)$/, "Workshop estimate \u00b7 revision $1")} {"\u00b7"} {money(estimate.amount)} {"\u00b7"}{" "}
             {index
               ? "Previous revision"
               : estimate.status === "Pending"
@@ -306,7 +306,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               {decision.decisionDate
                 ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
                 : ""}
-              {decision.comments ? ` ? ${decision.comments}` : ""}
+              {decision.comments ? ` · ${decision.comments}` : ""}
             </p>
           ))}
         </div>
