@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -169,11 +170,7 @@ export function PartDetail({ id }: { id: string }) {
   const { data: stock, isLoading: stockLoading, isError: stockError } = usePartStock(id, canReadStock);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   if (error || !part) {

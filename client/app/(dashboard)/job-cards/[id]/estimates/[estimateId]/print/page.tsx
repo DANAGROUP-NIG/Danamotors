@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api/apiClient";
@@ -11,7 +12,7 @@ export default function EstimatePrintPage(){
  const {hasPermission}=useAuth();const allowed=hasPermission("estimate:print");
  const {data,isPending,isError}=useQuery({queryKey:["estimate-print",id,estimateId],queryFn:()=>apiGet<PrintData>(`/service/job-cards/${id}/estimates/${estimateId}/print`),enabled:allowed});
  if(!allowed)return <p role="alert">You do not have permission to print estimates.</p>;
- if(isPending)return <p>Loading estimate...</p>;
+ if(isPending)return <LoadingSkeleton label="Loading estimate" />;
  if(isError||!data)return <p role="alert">Estimate could not be loaded.</p>;
  const {estimate,company,branch,customer,vehicle,job}=data;
  const money=(value:number)=>new Intl.NumberFormat("en-NG",{style:"currency",currency:estimate.currency}).format(value);

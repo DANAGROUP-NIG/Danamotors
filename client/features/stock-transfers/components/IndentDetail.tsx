@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -12,7 +13,6 @@ import {
   ClipboardList,
   FileText,
   History,
-  Loader2,
   PackageCheck,
   PackageSearch,
   PackageX,
@@ -109,11 +109,7 @@ export function IndentDetail({ id }: { id: string }) {
   }, [requested, can, router, pathname]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   if (error || !indent || !can) {

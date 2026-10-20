@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { Suspense } from "react";
 import { useForm } from "react-hook-form";
@@ -102,7 +103,7 @@ export default function ForgotPasswordForm() {
     <Suspense
       fallback={
         <Card>
-          <CardContent className="p-6">Loading…</CardContent>
+          <CardContent className="p-6"><LoadingSkeleton variant="form" compact /></CardContent>
         </Card>
       }
     >

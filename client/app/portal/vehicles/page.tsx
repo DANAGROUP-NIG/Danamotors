@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -34,7 +35,7 @@ export default function PortalVehiclesPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground"><LoadingSkeleton variant="list" compact /></CardContent>
         </Card>
       ) : data && data.length > 0 ? (
         <SimpleTable
