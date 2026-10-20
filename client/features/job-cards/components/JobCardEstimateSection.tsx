@@ -15,12 +15,11 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EstimatePartPicker } from "./EstimatePartPicker";
 import { PartSourceSelect } from "./PartSourceSelect";
-import { partSourceLabel } from "@/features/inventory/lib/part-codes";
+import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 import { WorkshopPicker } from "./WorkshopPicker";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { jobCardKeys } from "../api/job-card.keys";
 import type { CustomerApproval, JobCard } from "../types/job-card.types";
-import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 
 type Line = {
   type: "COMPLAINT" | "PART" | "LABOUR" | "SERVICE";
@@ -81,18 +80,11 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     !["BILLED", "DELIVERED", "CANCELLED"].includes(
       canonicalJobStatus(jobCard.status),
     );
-  const state = !latest
-    ? "Draft"
-    : latest.status === "Approved"
-      ? "Approved"
-      : latest.status === "Declined"
-        ? "Revision Required"
-        : "Awaiting Approval";
-  // Each part record once: a used or local version of a part is a different record.
-  const partKeys = lines.filter((line) => line.type === "PART").map((line) => line.referenceId);
+  // Source variants use separate part records; prevent duplicate records in the draft.
+  const partKeys = lines.filter(line => line.type === "PART").map(line => line.referenceId);
   const duplicatePart = new Set(partKeys).size !== partKeys.length;
-  const error = create.error ?? approval.error;
-  const busy = create.isPending || approval.isPending;
+  const error = create.error;
+  const busy = create.isPending;
   function revise() {
     const draft: Line[] =
       latest?.lines?.map((line) => ({
@@ -118,30 +110,29 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const printAction = latest && hasPermission("estimate:print") ? <Button asChild variant="outline" className="print:hidden"><a href={`/job-cards/${jobCard.id}/estimates/${latest.id}/print`}><Printer aria-hidden="true" />{COPY.print}</a></Button> : null;
   return (
     <div id="estimate-approval" className="min-w-0 space-y-5 print:hidden">
-      <EstimateApprovalCard estimate={view} printAction={printAction} actions={
-        <>
-          {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={() => setSigning(true)}><PenLine aria-hidden="true" />{COPY.sign}</Button>}
-          {view?.status === "approved" && signature && <Button variant="outline" aria-expanded={viewingSignature} aria-controls={`signature-${view.id}`} onClick={() => setViewingSignature(value => !value)}><PenLine aria-hidden="true" />{COPY.viewSignature}</Button>}
-          {open && !editing && latest && hasPermission("estimate:revise") && <Button variant="outline" onClick={revise}>{COPY.revise}</Button>}
-          {open && !latest && !editing && hasPermission("estimate:create") && <Button onClick={() => setEditing(true)}>{COPY.create}</Button>}
-        </>}>
-        {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
-          <div className="grid gap-3 print:hidden" inert={busy}>
-            <p className="text-sm text-muted-foreground">
-              {COPY.editor.help}
-            </p>
-            {lines.map((line, index) => (
-              <div
-                key={index}
-                className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
-              >
-                <span>
-                  {line.description || line.type}{COPY.separator}{line.quantity}
-                  {line.includedInService ? `${COPY.separator}${COPY.included}` : ""}
-                  {line.type === "SERVICE"
-                    ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
-                    : ""}
-                </span>
+      <EstimateApprovalCard estimate={view} printAction={printAction} actions={<>
+        {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={() => setSigning(true)}><PenLine aria-hidden="true" />{COPY.sign}</Button>}
+        {view?.status === "approved" && signature && <Button variant="outline" aria-expanded={viewingSignature} aria-controls={`signature-${view.id}`} onClick={() => setViewingSignature(value => !value)}><PenLine aria-hidden="true" />{COPY.viewSignature}</Button>}
+        {open && !editing && latest && hasPermission("estimate:revise") && <Button variant="outline" onClick={revise}>{COPY.revise}</Button>}
+        {open && !latest && !editing && hasPermission("estimate:create") && <Button onClick={() => setEditing(true)}>{COPY.create}</Button>}
+      </>}>
+      {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
+        <div className="grid gap-3 print:hidden" inert={busy}>
+          <p className="text-sm text-muted-foreground">
+            {COPY.editor.help}
+          </p>
+          {lines.map((line, index) => (
+            <div
+              key={index}
+              className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
+            >
+              <span>
+                {line.description || line.type}{COPY.separator}{line.quantity}
+                {line.includedInService ? `${COPY.separator}${COPY.included}` : ""}
+                {line.type === "SERVICE"
+                  ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
+                  : ""}
+              </span>
                 {line.type === "PART" && line.referenceId && (
                   <PartSourceSelect
                     partId={line.referenceId}
@@ -157,212 +148,124 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                     }
                   />
                 )}
-                {line.type !== "SERVICE" && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setLines((current) => current.filter((_, i) => i !== index))
-                    }
-                  >
-                    {COPY.editor.remove}
-                  </button>
-                )}
-              </div>
-            ))}
-            <Field label={COPY.editor.addWork}>
-              <select
-                className={inputCls}
-                value={type}
-                onChange={(event) => {
-                  setType(event.target.value as typeof type);
-                  setReferenceId("");
-                }}
-              >
-                <option value="PART">{COPY.editor.part}</option>
-                <option value="LABOUR">{COPY.editor.operation}</option>
-              </select>
-            </Field>
-            {type === "PART" ? (
-              <EstimatePartPicker
-                key={jobCard.branchId}
-                branchId={jobCard.branchId}
-                value={referenceId}
-                onChange={(id, name) => { setReferenceId(id); setDescription(name); }}
-              />
-            ) : (
-              <WorkshopPicker
-                label={COPY.editor.operation}
-                endpoint="/service/labour-items"
-                collection="labourItems"
-                value={referenceId}
-                onChange={setReferenceId}
-                onSelect={(row) => setDescription(row.name ?? row.description ?? "")}
-              />
-            )}
-            <Field label={COPY.editor.quantity}>
-              <input
-                type="number"
-                min="0.01"
-                max="1000000"
-                step="0.01"
-                className={inputCls}
-                value={quantity}
-                onChange={(event) => setQuantity(Number(event.target.value))}
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={includedInService}
-                disabled={!serviceReference}
-                onChange={(event) => setIncluded(event.target.checked)}
-              />
-              {COPY.editor.included}
-            </label>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={
-                !referenceId ||
-                !Number.isFinite(quantity) ||
-                quantity <= 0 ||
-                lines.length >= 200 ||
-                lines.some(
-                  (line) =>
-                    line.type === type && line.referenceId === referenceId,
-                )
-              }
-              onClick={() => {
-                setLines((current) => [
-                  ...current,
-                  { type, referenceId, description, quantity, includedInService },
-                ]);
+              {line.type !== "SERVICE" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLines((current) => current.filter((_, i) => i !== index))
+                  }
+                >
+                  {COPY.editor.remove}
+                </button>
+              )}
+            </div>
+          ))}
+          <Field label={COPY.editor.addWork}>
+            <select
+              className={inputCls}
+              value={type}
+              onChange={(event) => {
+                setType(event.target.value as typeof type);
                 setReferenceId("");
               }}
             >
-              {COPY.editor.add}
-            </Button>
+              <option value="PART">{COPY.editor.part}</option>
+              <option value="LABOUR">{COPY.editor.operation}</option>
+            </select>
+          </Field>
+          {type === "PART" ? (
+            <EstimatePartPicker
+              key={jobCard.branchId}
+              branchId={jobCard.branchId}
+              value={referenceId}
+              onChange={(id, name) => { setReferenceId(id); setDescription(name); }}
+            />
+          ) : (
+            <WorkshopPicker
+              label={COPY.editor.operation}
+              endpoint="/service/labour-items"
+              collection="labourItems"
+              value={referenceId}
+              onChange={setReferenceId}
+              onSelect={(row) => setDescription(row.name ?? row.description ?? "")}
+            />
+          )}
+          <Field label={COPY.editor.quantity}>
+            <input
+              type="number"
+              min="0.01"
+              max="1000000"
+              step="0.01"
+              className={inputCls}
+              value={quantity}
+              onChange={(event) => setQuantity(Number(event.target.value))}
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={includedInService}
+              disabled={!serviceReference}
+              onChange={(event) => setIncluded(event.target.checked)}
+            />
+            {COPY.editor.included}
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              !referenceId ||
+              !Number.isFinite(quantity) ||
+              quantity <= 0 ||
+              lines.length >= 200 ||
+              lines.some(
+                (line) =>
+                  line.type === type && line.referenceId === referenceId,
+              )
+            }
+            onClick={() => {
+              setLines((current) => [
+                ...current,
+                { type, referenceId, description, quantity, includedInService },
+              ]);
+              setReferenceId("");
+            }}
+          >
+            {COPY.editor.add}
+          </Button>
             {duplicatePart && (
               <p role="alert" className="text-sm text-destructive">
                 The same part record is listed twice. Change a source or remove
                 the extra line.
               </p>
             )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                disabled={!lines.length || busy || duplicatePart}
-                onClick={() => create.mutate()}
-              >
-                {COPY.editor.submit}
-              </Button>
-              {latest && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditing(false)}
-                >
-                  {COPY.editor.discard}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-        {estimates.map((estimate, index) => (
-          <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
-            <p className="font-medium">
-              {estimate.description} ? {money(estimate.amount)} ?{" "}
-              {index
-                ? "Previous revision"
-                : estimate.status === "Pending"
-                  ? "Awaiting Approval"
-                  : estimate.status}
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th>Description</th>
-                    <th className="print:hidden">Source</th>
-                    <th>Qty / hours</th>
-                    <th>Rate</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {estimate.lines?.map((line) => (
-                    <tr key={line.id} className="border-b">
-                      <td className="py-2">
-                        {line.description}
-                        {line.type.startsWith("INCLUDED_")
-                          ? " (included in service charge)"
-                          : ""}
-                      </td>
-                      <td className="print:hidden">
-                        {partSourceLabel(line.partSource)}
-                      </td>
-                      <td>{line.quantity}</td>
-                      <td>{money(line.rate)}</td>
-                      <td>{money(line.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {estimate.approvals?.map((decision) => (
-              <p key={decision.id}>
-                {decision.approved ? "Approved" : "Declined"}
-                {decision.decisionDate
-                  ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
-                  : ""}
-                {decision.comments ? ` ? ${decision.comments}` : ""}
-              </p>
-            ))}
-          </div>
-        ))}
-      {open &&
-        !editing &&
-        latest &&
-        !latest.approvals?.length &&
-        hasPermission("estimate:approve") && (
-          <div className="grid gap-3 print:hidden" inert={busy}>
-            <Field label="Customer decision notes">
-              <textarea
-                className={inputCls}
-                maxLength={2000}
-                placeholder="Who confirmed, how, and any agreed conditions"
-                value={comments}
-                onChange={(event) => setComments(event.target.value)}
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => approval.mutate(true)}
-              >
-                Record customer approval
-              </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              disabled={!lines.length || busy || duplicatePart}
+              onClick={() => create.mutate()}
+            >
+              {COPY.editor.submit}
+            </Button>
+            {latest && (
               <Button
                 type="button"
                 variant="outline"
-                disabled={busy}
-                onClick={() => approval.mutate(false)}
+                onClick={() => setEditing(false)}
               >
-                Record decline
+                {COPY.editor.discard}
               </Button>
-            </div>
+            )}
           </div>
-        )}
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {isAxiosError(error)
-            ? error.response?.data?.message ||
-              "Could not save estimate or decision"
-            : "Could not save estimate or decision"}
-        </p>
+        </div>
       )}
-      <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={jobCard.branchId} />
-    </section>
+
+        {viewingSignature && signature && <div id={`signature-${view!.id}`}><SignatureEvidence signature={signature} /></div>}
+        {error && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{isAxiosError(error) ? error.response?.data?.message || COPY.saveError : COPY.saveError}</p><Button variant="outline" disabled={busy} onClick={() => create.mutate()}>{COPY.retry}</Button></div>}
+        <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={jobCard.branchId} />
+      </EstimateApprovalCard>
+      {estimates.length > 1 && <details className="min-w-0"><summary className="cursor-pointer rounded-lg py-3 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{COPY.history}</summary><div className="space-y-4">{estimates.slice(1).map(estimate => <EstimateApprovalCard key={estimate.id} estimate={toEstimateViewModel(estimate)} latest={false} printAction={hasPermission("estimate:print") ? <Button asChild variant="outline"><a href={`/job-cards/${jobCard.id}/estimates/${estimate.id}/print`}><Printer aria-hidden="true" />{COPY.print}</a></Button> : null}>{estimate.approvals?.map(approval => approval.signature && <details key={approval.id}><summary className="cursor-pointer rounded-lg py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{COPY.viewSignature}</summary><SignatureEvidence signature={approval.signature} /></details>)}</EstimateApprovalCard>)}</div></details>}
+      {signing && latest && <EstimateSignatureDialog estimate={latest} customerId={jobCard.customerId} customerName={`${jobCard.customer.firstName} ${jobCard.customer.lastName}`} onSaved={refresh} onClose={() => setSigning(false)} />}
+    </div>
   );
 }

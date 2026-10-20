@@ -86,6 +86,7 @@ export function renderWorkspaceFixture({ card = fixture, permissions = ["estimat
     "@/features/auth/hooks/use-auth":{useAuth:()=>({hasPermission:permission=>permissions.includes(permission)})},
     "@tanstack/react-query":{useQueryClient:()=>({invalidateQueries:async()=>{}}),useMutation:()=>({isPending:false,error:null,mutate:()=>{}})},
     "@/lib/api/apiClient":{apiPost:async()=>{}},
+    "@/components/DocumentTermsBlock":{DocumentTermsBlock:({documentType})=>React.createElement("div",null,"Document terms: "+documentType)},
     [path.join(root,component+"EstimateSignatureDialog.tsx")]:{EstimateSignatureDialog:()=>null},
     [path.join(root,component+"EstimatePartPicker.tsx")]:{EstimatePartPicker:()=>null},
     [path.join(root,component+"WorkshopPicker.tsx")]:{WorkshopPicker:()=>null},
@@ -100,6 +101,9 @@ test("workspace renders latest backend data, semantic stepper/table and allowed 
   for(const label of ["Repair workspace","85,800","Awaiting approval","Get customer signature","Revise estimate","Print estimate"])assert.ok(html.includes(label));
   assert.ok(html.includes('aria-current="step"'));assert.ok(html.includes("<table"));assert.ok(html.includes("overflow-x-auto"));
   assert.equal(html.includes("SECRET-SOURCE"),false);
+  assert.ok(html.includes("Document terms: JOB_ESTIMATE"));
+  assert.equal((html.match(/<table/g)||[]).length,1);
+  assert.equal(html.includes("Record customer approval"),false);
   const denied=renderWorkspaceFixture({permissions:[]});
   for(const label of ["Get customer signature","Revise estimate","Print estimate"])assert.equal(denied.includes(label),false);
 });
