@@ -26,7 +26,7 @@ export function EstimateSignatureDialog({estimate,customerId,customerName,onSave
  } catch {setError("Could not save signature. Reload if the estimate changed and check required fields.");}finally{setBusy(false);} }
  return <div role="dialog" aria-modal="true" aria-label="Get customer signature" className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4 print:hidden"><div className="mx-auto max-w-2xl space-y-4 rounded-xl bg-white p-6">
  <h2 className="text-lg font-semibold">Get customer signature</h2>
- <p>Revision {estimate.version} ? {estimate.currency} {estimate.amount.toLocaleString("en-NG")}</p>
+ <p>Revision {estimate.version} · {estimate.currency} {estimate.amount.toLocaleString("en-NG")}</p>
  <table className="w-full text-sm"><thead><tr><th>Description</th><th>Quantity / hours</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{estimate.lines?.map(line=><tr key={line.id}><td>{line.description}</td><td>{line.quantity}</td><td>{line.rate}</td><td>{line.amount}</td></tr>)}</tbody></table>
  <label className="block">Signer name<input className="block w-full rounded border p-2" maxLength={200} value={name} onChange={e=>setName(e.target.value)}/></label>
  <label className="block">Relationship (required when signing for {customerName})<input className="block w-full rounded border p-2" maxLength={200} value={relationship} onChange={e=>setRelationship(e.target.value)}/></label>

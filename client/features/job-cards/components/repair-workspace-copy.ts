@@ -23,7 +23,7 @@ export const WORKSPACE_COPY = {
   estimateStates: { awaiting: "Awaiting approval", approved: "Approved", declined: "Declined", superseded: "Superseded", revision: "Revision required", draft: "Draft" },
   signedBy: (name: string, date: string) => `Signed by ${name} on ${date}`,
   editor: {
-    description: (version: number) => `Workshop estimate ? revision ${version}`,
+    description: (version: number) => `Workshop estimate · revision ${version}`,
     submitted: "Estimate submitted for customer approval",
     help: "The service uses the saved job-card charge. Parts use retail rates; labour uses model rates. Mark package inclusions explicitly to avoid an additional charge.",
     remove: "Remove", addWork: "Add work", part: "Part", operation: "Labour operation", quantity: "Quantity / hours",

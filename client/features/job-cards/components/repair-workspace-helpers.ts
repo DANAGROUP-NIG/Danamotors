@@ -20,7 +20,7 @@ export function toEstimateViewModel(estimate: Estimate) {
     : status === "DECLINED" ? "declined" : status === "SUPERSEDED" ? "superseded"
     : status === "CANCELLED" || status === "REVISION_REQUIRED" ? "revision" : status === "DRAFT" ? "draft" : "awaiting";
   const labels: Record<string, string> = { SERVICE: COPY.service, LABOUR: COPY.labour, PART: COPY.parts, COMPLAINT: COPY.complaint };
-  return { id: estimate.id, version: estimate.version, status: displayStatus, description: estimate.description,
+  return { id: estimate.id, version: estimate.version, status: displayStatus, description: estimate.description.replace(/^Workshop estimate \? revision (\d+)$/, "Workshop estimate \u00b7 revision $1"),
     currency: estimate.currency, total: estimate.amount, decision, invalid,
     lines: (estimate.lines ?? []).map(line => ({ id: line.id, title: line.description,
       secondary: line.type.startsWith("INCLUDED_") ? COPY.included : labels[line.type] ?? line.type,
