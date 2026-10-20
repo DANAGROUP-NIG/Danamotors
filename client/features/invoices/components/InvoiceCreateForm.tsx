@@ -1,4 +1,5 @@
 "use client";
+import { VatBreakdownTable } from './VatBreakdownTable';
 
 import Link from "next/link";
 import { isAxiosError } from "axios";
@@ -86,7 +87,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
         {jobCards.isLoading && <span className="text-sm text-muted-foreground">Loading billable job cards...</span>}
         {jobCards.isError && <div role="alert" className="flex items-center gap-2"><span className="text-sm text-destructive">Could not load billable job cards.</span><Button type="button" variant="outline" size="sm" onClick={() => jobCards.refetch()}>Retry</Button></div>}
         {!jobCards.isLoading && !jobCards.isError && jobCards.data?.jobCards.length === 0 && (
-          <span className="text-sm text-muted-foreground">No unbilled job cards are ready in this branch. Complete the job card?s quality check and mark it Ready before creating a bill. Credit-approved delivered jobs are also eligible.</span>
+          <span className="text-sm text-muted-foreground">No unbilled job cards are ready in this branch. Complete the job card's quality check and mark it Ready before creating a bill. Credit-approved delivered jobs are also eligible.</span>
         )}
       </Field>
 
@@ -125,7 +126,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
             <dt>Labour</dt><dd className="text-right">{currency.format(bill.totals.labourTotal)}</dd>
             <dt>Labour discount</dt><dd className="text-right">-{currency.format(bill.totals.labourDiscountAmount)}</dd>
             <dt>Service charge</dt><dd className="text-right">{currency.format(bill.totals.serviceTotal ?? 0)}</dd>
-            <dt>VAT ({bill.totals.vatRate}%)</dt><dd className="text-right">{currency.format(bill.totals.vatAmount)}</dd>
+            <dt>Total VAT</dt><dd className="text-right">{currency.format(bill.totals.vatAmount)}</dd>
             <dt>Round-off</dt><dd className="text-right">{currency.format(bill.totals.roundOff)}</dd>
             <dt className="border-t pt-2 font-semibold">Total</dt><dd className="border-t pt-2 text-right font-semibold">{currency.format(bill.totals.total)}</dd>
           </dl>
@@ -134,6 +135,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
 
       {bill && <section className="grid gap-3 border-y py-4"><h2 className="font-semibold">Approved estimate vs actual charges</h2><p className="text-sm">{bill.review.status}. Comparison is before discounts, VAT and round-off.</p><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left"><th>Work</th><th>Approved qty</th><th>Actual qty</th><th>Approved</th><th>Actual</th><th>Difference</th></tr></thead><tbody>{bill.review.rows.map((row, index) => <tr key={index} className="border-b"><td className="py-2">{row.description}{row.included ? " (included)" : ""}{row.reason && <p className="text-destructive">{row.reason}</p>}</td><td>{row.approvedQuantity}</td><td>{row.actualQuantity}</td><td>{currency.format(row.approvedAmount)}</td><td>{currency.format(row.actualAmount)}</td><td>{currency.format(row.difference)}</td></tr>)}</tbody></table></div>{!bill.review.canBill && <div role="alert" className="text-sm text-destructive">{bill.review.issues.map((issue, index) => <p key={index}>{issue}</p>)}<Link className="underline" href={`/job-cards/${jobCardId}#estimate-approval`}>Review estimate and approval on the job card</Link></div>}</section>}
 
+      {bill && <VatBreakdownTable rows={bill.vatBreakdown}/>}
       {jobCardId && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Parts discount (%)">

@@ -11,6 +11,9 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 import { NAV_GROUPS } from "@/constant";
 import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
+import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import { MONTHLY_REPORTS } from "@/features/reports/monthly-config";
+
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
   "/customers": ["customer:read"],
@@ -57,13 +60,17 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/tally": ["tally:post", "tally:import"],
   "/finance": ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
   "/credit-applications": ["credit:application:create"],
+  "/reports/billing-settings": ["role:permission:update"],
+  "/reports/corporate-groups": ["corporate:manage"],
+  ...Object.fromEntries(MONTHLY_REPORTS.map(r=>["/reports/"+r.slug,["report:"+r.slug]])),
+  "/reports/finance/receipt-register": ["report:receipt-register"],
   "/reports/finance/debit-note-register": ["report:debit-note-register"],
   "/reports/finance/credit-note-register": ["report:credit-note-register"],
   "/reports/finance/party-ledger": ["report:party-ledger"],
   "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
   "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
   "/reports/finance/party-outstanding": ["report:party-outstanding"],
-  "/reports": ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+  "/reports": [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],

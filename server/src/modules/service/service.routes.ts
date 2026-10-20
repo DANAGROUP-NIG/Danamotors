@@ -1,3 +1,5 @@
+import { projectEstimatePrint } from "./estimate-print";
+import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
@@ -42,7 +44,7 @@ router.get(
     z.object({
       query: z.object({
         branchId: z.string().uuid(),
-        role: z.enum(["ServiceAdviser", "Technician"]),
+        role: z.enum(["ServiceAdviser", "Technician", "Engineer"]),
         search: z.string().optional(),
         limit: z.coerce.number().int().positive().max(100).default(50),
       }),
@@ -830,9 +832,33 @@ router.post(
   validateRequest(createEstimateSchema),
   controller.addEstimate,
 );
+/**
+ * @openapi
+ * /service/estimates/{id}/revisions:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Create an unsigned version N+1 (estimate:revise)
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { description: 'Revised scope', lines: [{ type: 'LABOUR', referenceId: '00000000-0000-4000-8000-000000000001', quantity: 2 }] }
+ *     responses:
+ *       201: { description: New immutable revision }
+ *       403: { description: Missing estimate revise permission }
+ *       409: { description: Superseded source }
+ */
+router.post('/estimates/:id/revisions', requirePermission(PERMISSIONS.ESTIMATE_REVISE), validateRequest(createEstimateSchema), async (req, res, next) => {
+ try {
+  const source = await prisma.estimate.findUniqueOrThrow({ where: { id: req.params.id }, include: { jobCard: true } });
+  assertBranchOwnership(req, source.jobCard?.branchId ?? source.branchId);
+  if (!source.jobCardId) throw new ConflictError('Only job-linked estimates can be revised here');
+  const estimate = await new ServiceService().addEstimate(source.jobCardId, req.body, req.user!.userId, source.id);
+  res.status(201).json({ status: 'success', data: { estimate } });
+ } catch(error) { next(error); }
+});
 router.post(
   "/estimates/:id/approvals",
-  requirePermission(PERMISSIONS.ESTIMATE_APPROVE),
+  requirePermission(PERMISSIONS.ESTIMATE_SIGN),
   validateRequest(createApprovalSchema),
   controller.addApproval,
 );
@@ -842,5 +868,54 @@ router.get(
   validateRequest(estimateIdParamSchema),
   controller.getApprovals,
 );
+
+/**
+ * @openapi
+ * /service/job-cards/{id}/estimates/{estimateId}/print:
+ *   get:
+ *     tags: [Service & Job Cards]
+ *     summary: Customer-facing single estimate print data (estimate:print)
+ *     responses:
+ *       200: { description: Header, job, customer, vehicle, scope, terms and signature }
+ *       403: { description: Missing estimate print permission or wrong branch }
+ * /service/estimates/{id}/approvals:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Capture signed customer decision (estimate:sign)
+ *     description: Requires expectedVersion, expectedHash, signerName and a PNG signatureImage (64 KiB max). Decline requires comments. Admin may supply overrideReason instead of a signature. All decisions are audited. Unsigned portal approvals are disabled pending remote capture.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { customerId: '00000000-0000-4000-8000-000000000001', approved: true, expectedVersion: 2, expectedHash: '64-character-sha256-from-estimate', signerName: 'Customer name', signatureImage: 'data:image/png;base64,...' }
+ *     responses:
+ *       201: { description: Signature and decision saved atomically }
+ *       400: { description: Signature, relationship, decline reason or override reason missing }
+ *       403: { description: Missing estimate sign permission }
+ *       409: { description: Estimate changed or already decided }
+ */
+router.get('/job-cards/:id/estimates/:estimateId/print', requirePermission(PERMISSIONS.ESTIMATE_PRINT), validateRequest(z.object({params:z.object({id:z.string().uuid(),estimateId:z.string().uuid()})})), async (req,res,next)=>{
+ try {
+  const estimate=await prisma.estimate.findFirstOrThrow({where:{id:req.params.estimateId,jobCardId:req.params.id},include:{lines:true,approvals:{include:{signature:true}},successor:{select:{version:true}},jobCard:{include:{branch:true,customer:true,vehicle:true,complaints:true,serviceType:true,service:true}}}});
+  const card=estimate.jobCard!;
+  assertBranchOwnership(req,card.branchId);
+  const [branchTerms,companyTerms,parts,labour]=await Promise.all([
+   prisma.documentTerms.findFirst({where:{type:'JOB_ESTIMATE',branchId:card.branchId}}),
+   prisma.documentTerms.findFirst({where:{type:'JOB_ESTIMATE',branchId:null}}),
+   prisma.sparePart.findMany({where:{id:{in:estimate.lines.filter(l=>l.type.endsWith('PART')).map(l=>l.referenceId!).filter(Boolean)}},select:{id:true,partNumber:true}}),
+   prisma.labourItem.findMany({where:{id:{in:estimate.lines.filter(l=>l.type.endsWith('LABOUR')).map(l=>l.referenceId!).filter(Boolean)}},select:{id:true,code:true}})
+  ]);
+  const terms=branchTerms ?? companyTerms;
+  const codes=new Map([...parts.map(p=>[p.id,p.partNumber] as [string,string]),...labour.map(l=>[l.id,l.code] as [string,string])]);
+  res.json({status:'success',data:{
+   estimate:projectEstimatePrint(estimate,codes),
+   company:{name:companyTerms?.companyName ?? 'Dana Motors',address:companyTerms?.companyAddress,phone:companyTerms?.companyPhone},
+   branch:{name:card.branch.name,address:card.branch.address,phone:card.branch.phoneNumber},
+   customer:card.customer ? {name:card.customer.companyName || `${card.customer.firstName} ${card.customer.lastName}`,address:[card.customer.address,card.customer.house,card.customer.street,card.customer.city,card.customer.state].filter(Boolean).join(', '),phone:card.customer.phoneNumber} : null,
+   vehicle:card.vehicle ? {registration:card.vehicle.registrationNumber,vin:card.vehicle.vin,make:card.vehicle.make,model:card.vehicle.model,variant:card.vehicle.trim,mileage:card.mileage} : null,
+   job:{number:card.jobNumber,date:card.createdAt,serviceType:card.serviceType?.description ?? card.service?.name,complaints:card.complaints.map(c=>c.description)},
+   terms:terms?.terms ?? [],footer:terms?.footer ?? null,printedAt:new Date().toISOString()
+  }});
+ }catch(error){next(error);}
+});
 
 export default router;

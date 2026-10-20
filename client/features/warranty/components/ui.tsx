@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import type { ReactNode } from "react";
 import { Check, Minus } from "lucide-react";
@@ -245,11 +246,7 @@ export function Stepper({ steps }: { steps: ProgressStep[] }) {
 /** Loading / error states shared by detail pages. */
 export function PageState({ loading, message }: { loading?: boolean; message?: string }) {
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <span className="size-6 animate-spin rounded-full border-2 border-slate-300 border-t-transparent" aria-label="Loading" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   return <p className="px-4 py-10 text-sm text-red-500 lg:px-6">{message}</p>;
 }

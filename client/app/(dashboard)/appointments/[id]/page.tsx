@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -91,11 +92,7 @@ export default function AppointmentDetailPage() {
   const [showCheckIn, setShowCheckIn] = useState(false);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   const appointment = data?.appointment;

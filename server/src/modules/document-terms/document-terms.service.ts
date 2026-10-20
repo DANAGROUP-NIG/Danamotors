@@ -83,6 +83,7 @@ export class DocumentTermsService {
       }) : tx.documentTerms.create({
         data: {
           documentType: type,
+          type,
           branchId,
           ...data,
         },

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import reportRoutes from '../modules/reports/reports.routes';
 import authRoutes from '../modules/auth/auth.routes';
 import adminRoutes from '../modules/administration/admin.routes';
 import customerRoutes from '../modules/customer/customer.routes';
@@ -35,6 +36,7 @@ import companySettingsRoutes from '../modules/company-settings/company-settings.
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
+router.use('/reports', reportRoutes);
 router.use('/workshop-masters', workshopMasterRoutes);
 router.use('/employees', employeeRoutes);
 router.use('/service-checklists', serviceChecklistRoutes);

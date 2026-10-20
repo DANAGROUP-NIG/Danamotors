@@ -1,3 +1,7 @@
+import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
+import { planEstimateRevision } from "./estimate-revision";
+import { scopeJobCard } from "./job-card-visibility";
+import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
 import { getBranchSettings } from "../company-settings/company-settings.service";
 import {
@@ -74,6 +78,7 @@ export class ServiceService {
     branchName: string;
     scheduledAt: string;
     serviceId?: string;
+    serviceTypeId?: string;
     durationMins?: number;
     notes?: string;
     status?: string;
@@ -95,6 +100,10 @@ export class ServiceService {
     if (!branch)
       throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
+    if (data.serviceTypeId) {
+      const type=await prisma.workshopMaster.findFirst({where:{id:data.serviceTypeId,kind:"SERVICE_TYPE",active:true}});
+      if(!type)throw new BadRequestError("Select an active workshop service type");
+    }
     if (data.serviceId) {
       const service = await prisma.service.findUnique({
         where: { id: data.serviceId },
@@ -122,6 +131,7 @@ export class ServiceService {
       vehicleId: data.vehicleId,
       branchId: branch.id,
       serviceId: data.serviceId,
+      serviceTypeId: data.serviceTypeId,
       createdById: data.createdById,
       scheduledAt: new Date(data.scheduledAt),
       durationMins: data.durationMins,
@@ -539,7 +549,7 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string) {
+  async getJobCard(id: string, permissions: readonly string[] = []) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
@@ -563,15 +573,16 @@ export class ServiceService {
             },
           })
         : [];
-    return {
+    return scopeJobCard({
       ...card,
+      estimates: card.estimates.map(estimate => ({ ...estimate, contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({
         ...c,
         vehicleStatus:
           campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
           null,
       })),
-    };
+    }, permissions);
   }
 
   async updateJobCard(
@@ -611,6 +622,7 @@ export class ServiceService {
     jobCardId: string,
     input: z.infer<typeof estimateBody>,
     actorId?: string,
+    supersedesId?: string,
   ) {
     const data = estimateBody.parse(input);
     return prisma.$transaction(
@@ -774,9 +786,12 @@ export class ServiceService {
             where: { jobCardId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
-            select: { createdAt: true },
+            include: { lines: true },
           })
         )?.[0];
+        const revision = planEstimateRevision(previous, supersedesId, { description: data.description, amount: sumMoney(lines.map(line => line.amount)), lines });
+        if (previous) await tx.estimate.update({ where: { id: previous.id }, data: { status: "SUPERSEDED" } });
+        if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: previous ? "ESTIMATE_REVISED" : "ESTIMATE_CREATED", details: JSON.stringify({ jobCardId, supersedesId: revision.supersedesId, version: revision.version, ...revision.diff }) } });
         // Strict ordering under the shared row lock, including transactions started earlier.
         const createdAt = new Date(
           Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1),
@@ -784,6 +799,10 @@ export class ServiceService {
         return tx.estimate.create({
           data: {
             createdAt,
+            estimateDate: createdAt,
+            estimateNumber: await nextDocumentNumber(tx, "ESTIMATE"),
+            version: revision.version,
+            supersedesId: revision.supersedesId,
             jobCardId,
             description: data.description,
             currency: "NGN",
@@ -806,14 +825,22 @@ export class ServiceService {
       decisionDate?: string;
       comments?: string;
       status?: string;
+      expectedVersion?: number;
+      expectedHash?: string;
+      signerName?: string;
+      relationship?: string;
+      signatureImage?: string;
+      overrideReason?: string;
     },
     actorId?: string,
+    capture?: { deviceOrIp: string; allowOverride?: boolean },
   ) {
     const identity = await prisma.estimate.findUnique({
       where: { id: estimateId },
       select: { jobCardId: true },
     });
-    if (!identity) throw new NotFoundError("Estimate not found");
+    if (!identity?.jobCardId) throw new NotFoundError("Job-linked estimate not found");
+    const approvalJobCardId = identity.jobCardId;
     return prisma.$transaction(
       async (tx) => {
         await tx.$queryRaw(
@@ -829,7 +856,7 @@ export class ServiceService {
             "Only the latest estimate revision can receive a decision",
           );
         const card = await tx.jobCard.findUniqueOrThrow({
-          where: { id: identity.jobCardId },
+          where: { id: approvalJobCardId },
         });
         if (
           card.billedAt ||
@@ -848,6 +875,18 @@ export class ServiceService {
           throw new ConflictError(
             "This revision already has a decision. Create a new revision to change scope.",
           );
+        if (!data.approved && !data.comments?.trim()) throw new BadRequestError("A decline reason is required");
+        const hash = estimateContentHash(estimate);
+        if (data.expectedVersion !== estimate.version || data.expectedHash !== hash) throw new ConflictError("Estimate changed; reload the signature summary");
+        const override = !!data.overrideReason?.trim();
+        if (override && !capture?.allowOverride) throw new BadRequestError("Only Admin may override with a reason");
+        if (!override) {
+          if (!data.signatureImage || !data.signerName?.trim() || !actorId) throw new BadRequestError("A customer signature and signer name are required; portal capture is not yet available");
+          assertSignaturePng(data.signatureImage);
+          const customer = await tx.customer.findUniqueOrThrow({ where: { id: card.customerId! } });
+          const customerName = `${customer.firstName} ${customer.lastName}`.trim();
+          if (data.signerName.trim().toLowerCase() !== customerName.toLowerCase() && !data.relationship?.trim()) throw new BadRequestError("Relationship is required when signing for the customer");
+        }
         const status = data.approved ? "Approved" : "Declined";
         if (data.approved) {
           const services = estimate.lines.filter(
@@ -884,19 +923,29 @@ export class ServiceService {
                 customerId: data.customerId,
                 status,
                 comments: data.comments,
+                overrideReason: data.overrideReason,
+                contentHash: hash,
               }),
             },
           });
-        return tx.customerApproval.create({
+        const approval = await tx.customerApproval.create({
           data: {
             estimateId,
             customerId: data.customerId,
             approved: data.approved,
+            signatureRequired: true,
+            overrideReason: override ? data.overrideReason!.trim() : null,
             decisionDate: new Date(),
             comments: data.comments,
             status,
           },
         });
+        if (!override) await tx.estimateSignature.create({ data: {
+          estimateId, approvalId: approval.id, imageReference: data.signatureImage!, signerName: data.signerName!.trim(),
+          relationship: data.relationship?.trim(), capturedByUserId: actorId, deviceOrIp: capture?.deviceOrIp ?? 'unknown',
+          estimateVersion: estimate.version, totalSigned: estimate.amount, contentHash: hash,
+        } });
+        return approval;
       },
       { maxWait: 5000, timeout: 15000 },
     );
@@ -987,7 +1036,7 @@ export class ServiceService {
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {jobCardId:{not:null}};
     if (params?.branchId) where.jobCard = { branchId: params.branchId };
     if (params?.status) where.status = params.status;
 

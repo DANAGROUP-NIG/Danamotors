@@ -11,10 +11,6 @@ import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { jobCardKeys } from "../api/job-card.keys";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { WorkshopPicker, type PickerRecord } from "./WorkshopPicker";
-
-type Mechanic = { id: string; code: string; name: string };
-const mechanicLabel = (row: PickerRecord) => [row.code, row.name].filter(Boolean).join(" | ");
 
 type LabourItem = {
   id: string;
@@ -32,9 +28,6 @@ type LabourLine = {
   amount: number;
   technicianId?: string | null;
   technician?: { id: string; firstName: string; lastName: string } | null;
-  /** Employee who did the work (legacy joblabordetail.mechanic). */
-  mechanicId?: string | null;
-  mechanic?: Mechanic | null;
 };
 
 const formatMoney = (amount: number) =>
@@ -55,6 +48,7 @@ export function JobCardLabourSection({
 }) {
   const queryClient = useQueryClient();
   const { hasPermission, isAdminOrAbove } = useAuth();
+  const canSeeAmounts = hasPermission("estimate:read") || hasPermission("invoice:read");
   const canEdit =
     !billedAt &&
     hasPermission("jobcard:labour:update") &&
@@ -68,12 +62,10 @@ export function JobCardLabourSection({
     ].includes(status.toLowerCase());
   const [labourItemId, setLabourItemId] = useState("");
   const [hours, setHours] = useState("");
-  const [mechanicId, setMechanicId] = useState("");
+  const [technicianId, setTechnicianId] = useState("");
   const [editing, setEditing] = useState<
-    Record<string, { hours: string; rate: string; mechanicId: string }>
+    Record<string, { hours: string; rate: string; technicianId: string }>
   >({});
-  // Current employees of the job card's branch.
-  const mechanicEndpoint = `/employees?status=CURRENT${branchId ? `&branchId=${branchId}` : ""}`;
   const lines = useQuery({
     queryKey: ["job-card-labour", jobCardId],
     queryFn: async () =>
@@ -87,6 +79,15 @@ export function JobCardLabourSection({
     queryFn: async () =>
       apiGet<{ labourItems: LabourItem[] }>(API_ROUTES.service.labourItems),
   });
+  const users = useQuery({
+    queryKey: ["job-card-technicians", branchId],
+    queryFn: () =>
+      apiGet<{
+        technicians: { id: string; firstName: string; lastName: string }[];
+      }>(`/workshop/technicians?branchId=${branchId}&limit=100`),
+    enabled: canEdit,
+  });
+  const technicians = users.data?.technicians ?? [];
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ["job-card-labour", jobCardId] });
@@ -97,13 +98,13 @@ export function JobCardLabourSection({
       apiPost(API_ROUTES.service.jobCardLabour(jobCardId), {
         labourItemId,
         hours: hours ? Number(hours) : undefined,
-        mechanicId: mechanicId || undefined,
+        technicianId: technicianId || undefined,
       }),
     onSuccess: () => {
       toast.success("Labour line added");
       setLabourItemId("");
       setHours("");
-      setMechanicId("");
+      setTechnicianId("");
       refresh();
     },
     onError: (error) => toast.error(isAxiosError(error) ? error.response?.data?.message || "Could not add labour line" : "Could not add labour line"),
@@ -114,7 +115,7 @@ export function JobCardLabourSection({
       values,
     }: {
       id: string;
-      values: { hours: number; rate: number; mechanicId?: string | null };
+      values: { hours: number; rate: number; technicianId: string | null };
     }) =>
       apiPut(API_ROUTES.service.jobCardLabourLine(id), {
         ...values,
@@ -162,7 +163,7 @@ export function JobCardLabourSection({
         const form = editing[line.id] ?? {
           hours: String(line.hours),
           rate: String(line.rate),
-          mechanicId: line.mechanicId ?? "",
+          technicianId: line.technicianId ?? "",
         };
         return (
           <div
@@ -172,7 +173,7 @@ export function JobCardLabourSection({
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{line.description}</p>
               <p className="text-sm text-slate-500">
-                {formatMoney(line.amount)}
+                {canSeeAmounts && formatMoney(line.amount)}
               </p>
             </div>
             <Field label="Hours">
@@ -191,7 +192,7 @@ export function JobCardLabourSection({
                 }
               />
             </Field>
-            <Field label="Rate">
+            {canSeeAmounts && <Field label="Rate">
               <input
                 type="number"
                 min="0"
@@ -206,26 +207,28 @@ export function JobCardLabourSection({
                   }))
                 }
               />
+            </Field>}
+            <Field label="Technician">
+              <select
+                className={inputCls}
+                value={form.technicianId}
+                disabled={!canEdit}
+                onChange={(event) =>
+                  setEditing((current) => ({
+                    ...current,
+                    [line.id]: { ...form, technicianId: event.target.value },
+                  }))
+                }
+              >
+                <option value="">Unassigned</option>
+                {line.technician && !technicians.some((technician) => technician.id === line.technician?.id) && <option value={line.technician.id}>{line.technician.firstName} {line.technician.lastName}</option>}
+                {technicians.map((technician) => (
+                  <option key={technician.id} value={technician.id}>
+                    {technician.firstName} {technician.lastName}
+                  </option>
+                ))}
+              </select>
             </Field>
-            <div className="min-w-0">
-            <WorkshopPicker
-              label="Mechanic"
-              endpoint={mechanicEndpoint}
-              collection="items"
-              value={form.mechanicId}
-              disabled={!canEdit}
-              formatLabel={mechanicLabel}
-              renderOption={(row) => <span className="font-medium">{mechanicLabel(row)}</span>}
-              selectedRecord={line.mechanic ?? undefined}
-              onChange={(id) =>
-                setEditing((current) => ({
-                  ...current,
-                  [line.id]: { ...form, mechanicId: id },
-                }))
-              }
-            />
-              {!line.mechanic && line.technician && <p className="mt-1 text-sm text-muted-foreground">Technician: {line.technician.firstName} {line.technician.lastName}</p>}
-            </div>
             {canEdit && (
               <div className="flex gap-1 print:hidden">
                 <Button
@@ -239,8 +242,7 @@ export function JobCardLabourSection({
                       values: {
                         hours: Number(form.hours),
                         rate: Number(form.rate),
-                        // Only a changed mechanic is sent, so an earlier technician stays as recorded.
-                        ...((form.mechanicId || null) !== (line.mechanicId ?? null) ? { mechanicId: form.mechanicId || null } : {}),
+                        technicianId: form.technicianId || null,
                       },
                     })
                   }
@@ -301,15 +303,20 @@ export function JobCardLabourSection({
               placeholder="Default"
             />
           </Field>
-          <WorkshopPicker
-            label="Mechanic"
-            endpoint={mechanicEndpoint}
-            collection="items"
-            value={mechanicId}
-            formatLabel={mechanicLabel}
-            renderOption={(row) => <span className="font-medium">{mechanicLabel(row)}</span>}
-            onChange={setMechanicId}
-          />
+          <Field label="Technician">
+            <select
+              className={inputCls}
+              value={technicianId}
+              onChange={(event) => setTechnicianId(event.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {technicians.map((technician) => (
+                <option key={technician.id} value={technician.id}>
+                  {technician.firstName} {technician.lastName}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Button type="submit" disabled={!labourItemId || addLine.isPending}>
             <Plus className="size-4" />
             Add labour

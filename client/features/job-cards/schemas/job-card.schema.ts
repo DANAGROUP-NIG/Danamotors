@@ -10,6 +10,7 @@ export const createJobCardSchema = z
     serviceTypeId: z.string().uuid("Select a service type"),
     bayId: z.string().uuid("Select a bay"),
     serviceAdvisorId: z.string().uuid("Select a service advisor"),
+    engineerId: z.union([z.string().uuid(), z.literal("")]).optional(),
     technicianId: z.union([z.string().uuid(), z.literal("")]).optional(),
     teamId: z.union([z.string().uuid(), z.literal("")]).optional(),
     mileage: z

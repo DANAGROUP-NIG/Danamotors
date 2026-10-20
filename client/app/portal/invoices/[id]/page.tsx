@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
@@ -20,13 +21,7 @@ export default function PortalInvoiceDetailPage() {
     invoice?.creditApplications?.filter((a) => a.status === "Pending") ?? [];
 
   if (isLoading) {
-    return (
-      <div className="p-4 lg:p-6">
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
-        </Card>
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   if (!invoice) {

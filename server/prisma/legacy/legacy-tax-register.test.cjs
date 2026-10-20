@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const {legacyTaxSnapshot}=require('./legacy-tax-register.cjs');
+const bill={ServiceCharge:100,InternalLabourAmount:0,ExternalLabourAmount:0,labordiscount:10,externallabdiscount:0,ServTaxAmt:6.75,RoundOff:0.12,wct:5,billamount:214};
+const taxes=[{taxpercentage:7.5,saleamount:100,DiscountAmount:10,discountamt:10,handlingcharge:5,taxableamount:95,taxamount:7.13},{taxpercentage:0,saleamount:20,DiscountAmount:0,taxableamount:0,taxamount:0}];
+const snapshot=legacyTaxSnapshot(bill,taxes,{GovtVehicle:true});
+assert.equal(snapshot.values.taxableDiscount,10);
+assert.equal(snapshot.values.taxableHandlingCharge,5);
+assert.equal(snapshot.values.taxableSubtotal,102.13);
+assert.equal(snapshot.values.nonTaxableSubtotal,20);
+assert.equal(snapshot.values.upstGovernment,7.13);
+assert.equal(snapshot.values.upstNonGovernment,0);
+assert.equal(snapshot.values.labourAmount,90);
+assert.equal(snapshot.values.wctAmount,5);
+assert.equal(snapshot.values.netTotal,214);
+assert.equal(legacyTaxSnapshot(bill,taxes,{GovtVehicle:false}).values.upstNonGovernment,7.13);
+assert.throws(()=>legacyTaxSnapshot({...bill,billamount:300},taxes,{GovtVehicle:false}),/reconcile/);
+assert.throws(()=>legacyTaxSnapshot(bill,taxes,{}),/explicit source boolean/);
+console.log('Legacy taxable/non-taxable, discounts, charges, government split, labour, WCT and reconciliation checks passed.');
