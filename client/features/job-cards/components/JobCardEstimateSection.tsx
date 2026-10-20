@@ -1,4 +1,10 @@
 "use client";
+import Image from "next/image";
+import { Printer, PenLine } from "lucide-react";
+import { EstimateApprovalCard } from "./EstimateApprovalCard";
+import { WORKSPACE_COPY as COPY } from "./repair-workspace-copy";
+import { formatEstimateMoney, formatSignedDate, toEstimateViewModel } from "./repair-workspace-helpers";
+import { EstimateSignatureDialog } from "./EstimateSignatureDialog";
 import { useState } from "react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
@@ -11,7 +17,7 @@ import { EstimatePartPicker } from "./EstimatePartPicker";
 import { WorkshopPicker } from "./WorkshopPicker";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { jobCardKeys } from "../api/job-card.keys";
-import type { JobCard } from "../types/job-card.types";
+import type { CustomerApproval, JobCard } from "../types/job-card.types";
 
 type Line = {
   type: "COMPLAINT" | "PART" | "LABOUR" | "SERVICE";
@@ -20,18 +26,18 @@ type Line = {
   quantity: number;
   includedInService?: boolean;
 };
-const money = (value: number) =>
-  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
-    value,
-  );
+function SignatureEvidence({ signature }: { signature: NonNullable<CustomerApproval["signature"]> }) {
+  return <div className="space-y-2 rounded-xl border border-border p-4"><Image src={signature.imageReference} alt={COPY.signature} width={600} height={200} className="h-auto max-w-full" /><p className="text-sm text-muted-foreground">{COPY.signedBy(signature.signerName, formatSignedDate(signature.signedAt))}</p></div>;
+}
+
 export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const serviceReference = jobCard.serviceId ?? jobCard.serviceTypeId;
-  const serviceDescription = jobCard.serviceType?.description ?? jobCard.service?.name ?? "Service charge";
+  const serviceDescription = jobCard.serviceType?.description ?? jobCard.service?.name ?? COPY.service;
   const estimates = jobCard.estimates ?? [];
   const latest = estimates[0];
-  const [editing, setEditing] = useState(!latest);
+  const [editing, setEditing] = useState(false);
   const [lines, setLines] = useState<Line[]>(
     serviceReference
       ? [
@@ -49,7 +55,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [includedInService, setIncluded] = useState(false);
-  const [comments, setComments] = useState("");
+  const [signing, setSigning] = useState(false);
+  const [viewingSignature, setViewingSignature] = useState(false);
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: jobCardKeys.all });
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -57,25 +64,12 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const create = useMutation({
     mutationFn: () =>
       apiPost(latest ? `/service/estimates/${latest.id}/revisions` : `/service/job-cards/${jobCard.id}/estimates`, {
-        description: `Workshop estimate · revision ${estimates.length + 1}`,
+        description: COPY.editor.description(estimates.length + 1),
         lines,
       }),
     onSuccess: async () => {
-      toast.success("Estimate submitted for customer approval");
+      toast.success(COPY.editor.submitted);
       setEditing(false);
-      await refresh();
-    },
-  });
-  const approval = useMutation({
-    mutationFn: (approved: boolean) =>
-      apiPost(`/service/estimates/${latest!.id}/approvals`, {
-        customerId: jobCard.customerId,
-        approved,
-        comments: comments.trim() || undefined,
-      }),
-    onSuccess: async () => {
-      toast.success("Customer decision recorded");
-      setComments("");
       await refresh();
     },
   });
@@ -84,15 +78,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     !["BILLED", "DELIVERED", "CANCELLED"].includes(
       canonicalJobStatus(jobCard.status),
     );
-  const state = !latest
-    ? "Draft"
-    : latest.status === "Approved"
-      ? "Approved"
-      : latest.status === "Declined"
-        ? "Revision Required"
-        : "Awaiting Approval";
-  const error = create.error ?? approval.error;
-  const busy = create.isPending || approval.isPending;
+  const error = create.error;
+  const busy = create.isPending;
   function revise() {
     const draft =
       latest?.lines?.map((line) => ({
@@ -113,38 +100,21 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     setLines(draft);
     setEditing(true);
   }
+  const view = latest ? toEstimateViewModel(latest) : undefined;
+  const signature = view?.decision?.signature;
+  const printAction = latest && hasPermission("estimate:print") ? <Button asChild variant="outline" className="print:hidden"><a href={`/job-cards/${jobCard.id}/estimates/${latest.id}/print`}><Printer aria-hidden="true" />{COPY.print}</a></Button> : null;
   return (
-    <section
-      id="estimate-approval"
-      className="grid gap-4 rounded-xl border bg-white p-5 print:hidden"
-    >
-      <div className="flex justify-between gap-3">
-        <h2 className="font-semibold">Estimate &amp; Approval</h2>
-        <span className="text-sm font-medium">{editing ? "Draft" : state}</span>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        The latest approved revision authorizes work and sets the billing
-        limits. Additional parts, hours or charges require a new
-        customer-approved revision. Amounts below exclude VAT and bill
-        discounts.
-      </p>
-      {open && hasPermission("estimate:revise") && latest && !editing && (
-        <Button
-          type="button"
-          variant="outline"
-          className="print:hidden"
-          disabled={busy}
-          onClick={revise}
-        >
-          Revise estimate
-        </Button>
-      )}
+    <div id="estimate-approval" className="min-w-0 space-y-5 print:hidden">
+      <EstimateApprovalCard estimate={view} printAction={printAction} actions={<>
+        {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={() => setSigning(true)}><PenLine aria-hidden="true" />{COPY.sign}</Button>}
+        {view?.status === "approved" && signature && <Button variant="outline" aria-expanded={viewingSignature} aria-controls={`signature-${view.id}`} onClick={() => setViewingSignature(value => !value)}><PenLine aria-hidden="true" />{COPY.viewSignature}</Button>}
+        {open && !editing && latest && hasPermission("estimate:revise") && <Button variant="outline" onClick={revise}>{COPY.revise}</Button>}
+        {open && !latest && !editing && hasPermission("estimate:create") && <Button onClick={() => setEditing(true)}>{COPY.create}</Button>}
+      </>}>
       {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
         <div className="grid gap-3 print:hidden" inert={busy}>
           <p className="text-sm text-muted-foreground">
-            The service uses the saved job-card charge. Parts use retail rates;
-            labour uses model rates. Mark package inclusions explicitly to avoid
-            an additional charge.
+            {COPY.editor.help}
           </p>
           {lines.map((line, index) => (
             <div
@@ -152,10 +122,10 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               className="flex justify-between gap-3 border-b py-2 text-sm"
             >
               <span>
-                {line.description || line.type} {"\u00b7"} {line.quantity}
-                {line.includedInService ? " · included in service charge" : ""}
+                {line.description || line.type}{COPY.separator}{line.quantity}
+                {line.includedInService ? `${COPY.separator}${COPY.included}` : ""}
                 {line.type === "SERVICE"
-                  ? ` · ${money(jobCard.serviceCharge ?? 0)}`
+                  ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
                   : ""}
               </span>
               {line.type !== "SERVICE" && (
@@ -165,12 +135,12 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                     setLines((current) => current.filter((_, i) => i !== index))
                   }
                 >
-                  Remove
+                  {COPY.editor.remove}
                 </button>
               )}
             </div>
           ))}
-          <Field label="Add work">
+          <Field label={COPY.editor.addWork}>
             <select
               className={inputCls}
               value={type}
@@ -179,8 +149,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                 setReferenceId("");
               }}
             >
-              <option value="PART">Part</option>
-              <option value="LABOUR">Labour operation</option>
+              <option value="PART">{COPY.editor.part}</option>
+              <option value="LABOUR">{COPY.editor.operation}</option>
             </select>
           </Field>
           {type === "PART" ? (
@@ -192,7 +162,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
             />
           ) : (
             <WorkshopPicker
-              label="Labour operation"
+              label={COPY.editor.operation}
               endpoint="/service/labour-items"
               collection="labourItems"
               value={referenceId}
@@ -200,7 +170,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               onSelect={(row) => setDescription(row.name ?? row.description ?? "")}
             />
           )}
-          <Field label="Quantity / hours">
+          <Field label={COPY.editor.quantity}>
             <input
               type="number"
               min="0.01"
@@ -218,7 +188,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               disabled={!serviceReference}
               onChange={(event) => setIncluded(event.target.checked)}
             />
-            Included in the service charge (no additional charge)
+            {COPY.editor.included}
           </label>
           <Button
             type="button"
@@ -241,7 +211,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               setReferenceId("");
             }}
           >
-            Add to estimate
+            {COPY.editor.add}
           </Button>
           <div className="flex gap-2">
             <Button
@@ -249,7 +219,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               disabled={!lines.length || busy}
               onClick={() => create.mutate()}
             >
-              Submit for approval
+              {COPY.editor.submit}
             </Button>
             {latest && (
               <Button
@@ -257,102 +227,18 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                 variant="outline"
                 onClick={() => setEditing(false)}
               >
-                Discard draft
+                {COPY.editor.discard}
               </Button>
             )}
           </div>
         </div>
       )}
-      {estimates.map((estimate, index) => (
-        <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
-          <p className="font-medium">
-            {estimate.description.replace(/^Workshop estimate \? revision (\d+)$/, "Workshop estimate \u00b7 revision $1")} {"\u00b7"} {money(estimate.amount)} {"\u00b7"}{" "}
-            {index
-              ? "Previous revision"
-              : estimate.status === "Pending"
-                ? "Awaiting Approval"
-                : estimate.status}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th>Description</th>
-                  <th>Qty / hours</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estimate.lines?.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-2">
-                      {line.description}
-                      {line.type.startsWith("INCLUDED_")
-                        ? " (included in service charge)"
-                        : ""}
-                    </td>
-                    <td>{line.quantity}</td>
-                    <td>{money(line.rate)}</td>
-                    <td>{money(line.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {estimate.approvals?.map((decision) => (
-            <p key={decision.id}>
-              {decision.approved ? "Approved" : "Declined"}
-              {decision.decisionDate
-                ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
-                : ""}
-              {decision.comments ? ` · ${decision.comments}` : ""}
-            </p>
-          ))}
-        </div>
-      ))}
-      {open &&
-        !editing &&
-        latest &&
-        !latest.approvals?.length &&
-        hasPermission("estimate:approve") && (
-          <div className="grid gap-3 print:hidden" inert={busy}>
-            <Field label="Customer decision notes">
-              <textarea
-                className={inputCls}
-                maxLength={2000}
-                placeholder="Who confirmed, how, and any agreed conditions"
-                value={comments}
-                onChange={(event) => setComments(event.target.value)}
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={() => approval.mutate(true)}
-              >
-                Record customer approval
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => approval.mutate(false)}
-              >
-                Record decline
-              </Button>
-            </div>
-          </div>
-        )}
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {isAxiosError(error)
-            ? error.response?.data?.message ||
-              "Could not save estimate or decision"
-            : "Could not save estimate or decision"}
-        </p>
-      )}
-    </section>
+
+        {viewingSignature && signature && <div id={`signature-${view!.id}`}><SignatureEvidence signature={signature} /></div>}
+        {error && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{isAxiosError(error) ? error.response?.data?.message || COPY.saveError : COPY.saveError}</p><Button variant="outline" disabled={busy} onClick={() => create.mutate()}>{COPY.retry}</Button></div>}
+      </EstimateApprovalCard>
+      {estimates.length > 1 && <details className="min-w-0"><summary className="cursor-pointer rounded-lg py-3 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{COPY.history}</summary><div className="space-y-4">{estimates.slice(1).map(estimate => <EstimateApprovalCard key={estimate.id} estimate={toEstimateViewModel(estimate)} latest={false} printAction={hasPermission("estimate:print") ? <Button asChild variant="outline"><a href={`/job-cards/${jobCard.id}/estimates/${estimate.id}/print`}><Printer aria-hidden="true" />{COPY.print}</a></Button> : null}>{estimate.approvals?.map(approval => approval.signature && <details key={approval.id}><summary className="cursor-pointer rounded-lg py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{COPY.viewSignature}</summary><SignatureEvidence signature={approval.signature} /></details>)}</EstimateApprovalCard>)}</div></details>}
+      {signing && latest && <EstimateSignatureDialog estimate={latest} customerId={jobCard.customerId} customerName={`${jobCard.customer.firstName} ${jobCard.customer.lastName}`} onSaved={refresh} onClose={() => setSigning(false)} />}
+    </div>
   );
 }

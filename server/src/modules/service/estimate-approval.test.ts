@@ -38,3 +38,9 @@ it('still caps package quantities', () => {
 it('requires revision for ambiguous legacy duplicate estimate lines', () => {
   expect(review([part], { ...approved, lines: [part, part] }).canBill).toBe(false);
 });
+
+it('rejects missing signature on a new approval and tampered signed scope',()=>{
+ const current={...approved,version:1,approvals:[{customerId:'customer',approved:true,signatureRequired:true}]};
+ expect(reviewApprovedScope(current,[],'customer').canBill).toBe(false);
+ expect(reviewApprovedScope(current,[],'customer').status).toBe('Invalid');
+});

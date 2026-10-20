@@ -15,7 +15,8 @@ permissions are seeded into the database; API routes enforce access with
 | `StoreOfficer` | Own branch | Inventory + transfers for the assigned branch. |
 | `WorkshopManager` | Cross-branch operations; own-branch inventory | Workshop floor: job cards, technician assignment, QC, inventory. |
 | `Accountant` | Own branch | Finance create/read/update. |
-| `ServiceAdviser` | Own branch | Estimates, approvals, customer liaison, finance reads. |
+| `ServiceAdviser` | Own branch | Opens and edits job cards; revises, prints and captures signatures on estimates; finance reads. |
+| `BillingOfficer` | Home branch only | Views job cards and invoices; creates job bills, without job-card writes or estimate rights. |
 | `Technician` | Own branch | Vehicle/service reads, job-card progress updates, workshop updates. |
 | `CCUOfficer` | Own branch | Registers customers, books appointments, manages vehicles. |
 | `CCUManager` | Cross-branch operations | Manages CCU staff and reception operations. |
@@ -97,3 +98,25 @@ are deferred per the user's instruction; a TODO is recorded in `client/constant.
 ## Author
 
 Built by **buildwithzeke** (Aye Oluwaseyi) — <ayeoluwaseyi@gmail.com>
+
+## Job cards and estimate actions (issue #117)
+
+Built-in permissions are reconstructed by the role seed, so change `ROLE_PERMISSIONS`, then use the approved local/deployment seed workflow. Never grant a built-in role only through a database edit.
+
+| Role | Job card | Estimate | Parts | Job bill |
+| --- | --- | --- | --- | --- |
+| CCUOfficer, CCUManager | Read only | None | None | None |
+| ServiceAdviser | Create from appointment, read, update; existing labour/charge-line rights retained | Read, revise, print, sign; cannot create | Cannot issue | Cannot create |
+| ServiceManager | Existing job-card rights retained | Read, revise, print, sign; cannot create | Cannot issue | Cannot create |
+| WorkshopManager | Existing workshop actions, assignment, progress, QC, labour | Create first estimate, read, print; cannot sign | Cannot issue | Cannot create |
+| GeneralStoreManager, StoreOfficer | Read only | None | Existing issue/return rights | Cannot create |
+| BillingOfficer | Read only | None | Cannot issue | Create; existing invoice/receipt rights retained |
+| Admin, SuperAdmin | Existing access | New revise, print and sign actions included | Existing access | Existing access |
+
+`estimate:revise`, `estimate:print` and `estimate:sign` are independent permissions. `estimate:approve` is retained for compatibility but no longer authorizes staff sign-off. Existing `invoice:create` is retained for service roles: the job bill endpoint separately requires `invoice:job-bill:create`. The current finance routes expose no generic invoice-create endpoint.
+
+Job-card detail omits estimates without `estimate:read` and invoices without `invoice:read`. Nested monetary fields and the separate job labour response are omitted unless one of those read permissions exists. Operational status, customer, vehicle, complaints and progress remain available. Signature images are private estimate data; billing integrity queries select only version/total/hash evidence.
+
+### Billing officer account runbook
+
+No production account is created by this change. An authorized administrator should use **Users**, confirm the intended name and proposed login `billingofficer@kiamotors.com`, select **BillingOfficer**, and assign the agreed **home branch**. Do not grant `branch:all` or estimate permissions. Set and send the password privately; never put it in an issue, seed or documentation. Verify login, job-card view and job-bill creation in that branch, plus 403 for job-card writes, estimates and parts issue. Account existence and production login remain an operational acceptance check.

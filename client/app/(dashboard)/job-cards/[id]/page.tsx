@@ -5,7 +5,7 @@ import {
   hasJobBill,
 } from "@/features/job-cards/types/job-card-status";
 import { JobCardPartsSection } from "@/features/job-cards/components/JobCardPartsSection";
-import { JobCardEstimateSection } from "@/features/job-cards/components/JobCardEstimateSection";
+import { RepairWorkspacePage } from "@/features/job-cards/components/RepairWorkspacePage";
 import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
 
 import { useParams, useRouter } from "next/navigation";
@@ -91,27 +91,7 @@ export default function JobCardDetailPage() {
       ?.scrollIntoView({ behavior: "smooth" });
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
-  if (error || !jobCard) {
-    return (
-      <div className="px-4 py-10 lg:px-6">
-        <Link
-          href="/job-cards"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
-        >
-          <ArrowLeft className="size-4" /> Back to Job Cards
-        </Link>
-        <p className="text-sm text-red-500">Job card not found.</p>
-      </div>
-    );
-  }
+  if (isLoading || error || !jobCard) return <div className="p-4 lg:p-5"><RepairWorkspacePage id={id} /></div>;
 
   const tone = STATUS_TONES[jobCard.status as JobCardStatus] ?? "gray";
   const vehicleLabel = jobCard.vehicle
@@ -161,8 +141,9 @@ export default function JobCardDetailPage() {
 
   return (
     <div className="px-4 py-4 lg:px-5 print:px-0 print:py-0">
+      <RepairWorkspacePage id={id} />
       {/* Screen-only top bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
+      <div className="mb-4 mt-8 flex flex-wrap items-center justify-between gap-2 print:hidden">
         <Link
           href="/job-cards"
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
@@ -363,7 +344,7 @@ export default function JobCardDetailPage() {
                 {jobCard.estimatedHours ?? "—"}
               </p>
             </div>
-            <div>
+            {jobCard.estimatedCost !== undefined && <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 Estimated Cost
               </p>
@@ -372,7 +353,7 @@ export default function JobCardDetailPage() {
                   ? fmtCurrency(jobCard.estimatedCost)
                   : "—"}
               </p>
-            </div>
+            </div>}
             <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 QC Status
@@ -414,7 +395,7 @@ export default function JobCardDetailPage() {
                 ["Estimated labour", jobCard.estimatedLabour],
                 ["Service charge", jobCard.serviceCharge],
               ] as const
-            ).map(([label, amount]) => (
+            ).filter(([,amount]) => amount !== undefined).map(([label, amount]) => (
               <div key={label}>
                 <dt className="text-sm text-muted-foreground">{label}</dt>
                 <dd className="mt-1 text-sm font-medium">
@@ -610,7 +591,6 @@ export default function JobCardDetailPage() {
           </section>
         )}
         <JobCardPartsSection jobCard={jobCard} />
-        {jobCard.estimates && <JobCardEstimateSection jobCard={jobCard} />}
         <JobCardLabourSection
           jobCardId={jobCard.id}
           status={jobCard.status}
