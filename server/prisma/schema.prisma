@@ -8,7 +8,6 @@ datasource db {
 }
 
 model Branch {
-  documentTerms DocumentTerms[]
   standaloneEstimates Estimate[]
   outstandingLetters OutstandingLetter[]
   partyNotes             PartyNote[]
@@ -3593,20 +3592,6 @@ model EstimateSignature {
   @@index([estimateId])
 }
 
-// Branch terms take precedence over the company-wide (null branch) record.
-model DocumentTerms {
-  id String @id @default(uuid())
-  type String
-  branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  terms String[]
-  footer String?
-  companyName String?
-  companyAddress String?
-  companyPhone String?
-  updatedAt DateTime @updatedAt
-  @@unique([type, branchId])
-  @@index([type])
 // ============================================================
 // EMPLOYEE MASTER (legacy Employee)
 // ============================================================
@@ -3742,13 +3727,20 @@ enum DocumentTermType {
 // (branchId null) or for one branch, which then overrides the company text.
 model DocumentTerms {
   id           String           @id @default(uuid())
+  // Text alias retained for estimate printing; the migration synchronizes it with documentType.
+  type         String
   documentType DocumentTermType
   branchId     String?
   branch       Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   terms        String[]         @default([])
   footer       String?
+  companyName  String?
+  companyAddress String?
+  companyPhone String?
   updatedAt    DateTime         @updatedAt
 
+  @@unique([type, branchId])
+  @@index([type])
   @@index([documentType, branchId])
 }
 
