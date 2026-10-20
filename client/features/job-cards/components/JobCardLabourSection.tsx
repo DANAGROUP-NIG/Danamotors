@@ -48,6 +48,7 @@ export function JobCardLabourSection({
 }) {
   const queryClient = useQueryClient();
   const { hasPermission, isAdminOrAbove } = useAuth();
+  const canSeeAmounts = hasPermission("estimate:read") || hasPermission("invoice:read");
   const canEdit =
     !billedAt &&
     hasPermission("jobcard:labour:update") &&
@@ -172,7 +173,7 @@ export function JobCardLabourSection({
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{line.description}</p>
               <p className="text-sm text-slate-500">
-                {formatMoney(line.amount)}
+                {canSeeAmounts && formatMoney(line.amount)}
               </p>
             </div>
             <Field label="Hours">
@@ -191,7 +192,7 @@ export function JobCardLabourSection({
                 }
               />
             </Field>
-            <Field label="Rate">
+            {canSeeAmounts && <Field label="Rate">
               <input
                 type="number"
                 min="0"
@@ -206,7 +207,7 @@ export function JobCardLabourSection({
                   }))
                 }
               />
-            </Field>
+            </Field>}
             <Field label="Technician">
               <select
                 className={inputCls}

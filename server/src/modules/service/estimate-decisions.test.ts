@@ -2,7 +2,7 @@ jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   $transaction: jest.fn(), $queryRaw: jest.fn(),
   estimate: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
   jobCard: { findUniqueOrThrow: jest.fn(), update: jest.fn() },
-  customerApproval: { create: jest.fn() }, auditLog:{create:jest.fn()},
+  customerApproval: { create: jest.fn() }, customer:{findUniqueOrThrow:jest.fn()}, estimateSignature:{create:jest.fn()}, auditLog:{create:jest.fn()},
 } }));
 import prisma from '../../prisma/client';
 import { ServiceService } from './service.service';
@@ -57,4 +57,16 @@ it('requires a signature for new decisions', async()=>{
 });
 it('rejects override by a non-admin', async()=>{
  await expect(new ServiceService().addApproval('latest',{customerId:'customer',approved:true,expectedVersion:1,expectedHash:estimateContentHash(latest),overrideReason:'Paper'},'actor',{deviceOrIp:'test'})).rejects.toThrow('Only Admin');
+});
+
+it('saves signature and approval under the shared transaction with exact signed evidence',async()=>{
+ (prisma.customerApproval.create as jest.Mock).mockResolvedValue({id:'approval'});
+ (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({firstName:'Test',lastName:'Customer'});
+ const signatureImage='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+ await new ServiceService().addApproval('latest',{customerId:'customer',approved:true,expectedVersion:1,expectedHash:estimateContentHash(latest),signerName:'Test Customer',signatureImage},'actor',{deviceOrIp:'test-device'});
+ expect(prisma.estimateSignature.create).toHaveBeenCalledWith({data:expect.objectContaining({approvalId:'approval',capturedByUserId:'actor',deviceOrIp:'test-device',estimateVersion:1,totalSigned:500,contentHash:estimateContentHash(latest),imageReference:signatureImage})});
+});
+it('requires a relationship when signing for another customer',async()=>{
+ (prisma.customer.findUniqueOrThrow as jest.Mock).mockResolvedValue({firstName:'Test',lastName:'Customer'});
+ await expect(new ServiceService().addApproval('latest',{customerId:'customer',approved:true,expectedVersion:1,expectedHash:estimateContentHash(latest),signerName:'Other Person',signatureImage:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='},'actor')).rejects.toThrow('Relationship');
 });

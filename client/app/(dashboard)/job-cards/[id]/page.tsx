@@ -363,7 +363,7 @@ export default function JobCardDetailPage() {
                 {jobCard.estimatedHours ?? "—"}
               </p>
             </div>
-            <div>
+            {jobCard.estimatedCost !== undefined && <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 Estimated Cost
               </p>
@@ -372,7 +372,7 @@ export default function JobCardDetailPage() {
                   ? fmtCurrency(jobCard.estimatedCost)
                   : "—"}
               </p>
-            </div>
+            </div>}
             <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 QC Status
@@ -414,7 +414,7 @@ export default function JobCardDetailPage() {
                 ["Estimated labour", jobCard.estimatedLabour],
                 ["Service charge", jobCard.serviceCharge],
               ] as const
-            ).map(([label, amount]) => (
+            ).filter(([,amount]) => amount !== undefined).map(([label, amount]) => (
               <div key={label}>
                 <dt className="text-sm text-muted-foreground">{label}</dt>
                 <dd className="mt-1 text-sm font-medium">

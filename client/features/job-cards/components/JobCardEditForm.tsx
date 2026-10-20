@@ -28,7 +28,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const current = canonicalJobStatus(jobCard.status);
   const billed = hasJobBill(jobCard);
   const canDeliver = (billed && !(jobCard.invoices ?? []).some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) || !!jobCard.creditApprovedById;
-  const estimateApproved = jobCard.estimates?.[0]?.status === "Approved";
+  const estimateApproved = jobCard.estimates?.[0]?.status === "Approved" && !jobCard.estimates[0].approvals?.some(approval => approval.signatureState === "invalid");
   const [qcNotes, setQcNotes] = useState(jobCard.qcNotes ?? "");
   const late = !!jobCard.promisedAt && new Date() > new Date(jobCard.promisedAt);
   const [serviceCharge, setServiceCharge] = useState(String(jobCard.serviceCharge ?? 0));
@@ -115,7 +115,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       }}
     >
       <h2 className="font-semibold">Workshop actions</h2>
-      {!estimateApproved && !billed && <p className="text-sm text-amber-700">Approve the latest estimate before starting or completing work. <a className="underline" href="#estimate-approval">Open Estimate &amp; Approval</a></p>}
+      {!estimateApproved && !billed && <p className="text-sm text-amber-700">Approve the latest estimate before starting or completing work. <a className="underline" href="#estimate-approval">Revise estimate and obtain customer signature</a></p>}
       {current === "QC" && hasPermission("qcstatus:update") && <div className="grid gap-2 border-b pb-3"><Field label="Quality-check findings"><textarea className={inputCls} value={qcNotes} onChange={event => setQcNotes(event.target.value)} /></Field><p className="text-sm">QC: {jobCard.qcStatus || "Pending"}</p><div className="flex gap-2"><Button type="button" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("PASSED")}>Record QC pass</Button><Button type="button" variant="outline" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("FAILED")}>Record QC failure</Button></div></div>}
       <ol className="flex flex-wrap gap-3 text-sm">
         {["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED"].map(
