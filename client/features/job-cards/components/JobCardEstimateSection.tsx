@@ -118,207 +118,208 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const printAction = latest && hasPermission("estimate:print") ? <Button asChild variant="outline" className="print:hidden"><a href={`/job-cards/${jobCard.id}/estimates/${latest.id}/print`}><Printer aria-hidden="true" />{COPY.print}</a></Button> : null;
   return (
     <div id="estimate-approval" className="min-w-0 space-y-5 print:hidden">
-      <EstimateApprovalCard estimate={view} printAction={printAction} actions={<>
-        {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={() => setSigning(true)}><PenLine aria-hidden="true" />{COPY.sign}</Button>}
-        {view?.status === "approved" && signature && <Button variant="outline" aria-expanded={viewingSignature} aria-controls={`signature-${view.id}`} onClick={() => setViewingSignature(value => !value)}><PenLine aria-hidden="true" />{COPY.viewSignature}</Button>}
-        {open && !editing && latest && hasPermission("estimate:revise") && <Button variant="outline" onClick={revise}>{COPY.revise}</Button>}
-        {open && !latest && !editing && hasPermission("estimate:create") && <Button onClick={() => setEditing(true)}>{COPY.create}</Button>}
-      </>}>
-      {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
-        <div className="grid gap-3 print:hidden" inert={busy}>
-          <p className="text-sm text-muted-foreground">
-            {COPY.editor.help}
-          </p>
-          {lines.map((line, index) => (
-            <div
-              key={index}
-              className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
-            >
-              <span>
-                {line.description || line.type}{COPY.separator}{line.quantity}
-                {line.includedInService ? `${COPY.separator}${COPY.included}` : ""}
-                {line.type === "SERVICE"
-                  ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
-                  : ""}
-              </span>
-              {line.type === "PART" && line.referenceId && (
-                <PartSourceSelect
-                  partId={line.referenceId}
-                  branchId={jobCard.branchId}
-                  onChange={(record) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index
-                          ? { ...row, referenceId: record.id, description: record.name }
-                          : row,
-                      ),
-                    )
-                  }
-                />
-              )}
-              {line.type !== "SERVICE" && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLines((current) => current.filter((_, i) => i !== index))
-                  }
-                >
-                  {COPY.editor.remove}
-                </button>
-              )}
-            </div>
-          ))}
-          <Field label={COPY.editor.addWork}>
-            <select
-              className={inputCls}
-              value={type}
-              onChange={(event) => {
-                setType(event.target.value as typeof type);
+      <EstimateApprovalCard estimate={view} printAction={printAction} actions={
+        <>
+          {open && !editing && latest && !latest.approvals?.length && hasPermission("estimate:sign") && <Button onClick={() => setSigning(true)}><PenLine aria-hidden="true" />{COPY.sign}</Button>}
+          {view?.status === "approved" && signature && <Button variant="outline" aria-expanded={viewingSignature} aria-controls={`signature-${view.id}`} onClick={() => setViewingSignature(value => !value)}><PenLine aria-hidden="true" />{COPY.viewSignature}</Button>}
+          {open && !editing && latest && hasPermission("estimate:revise") && <Button variant="outline" onClick={revise}>{COPY.revise}</Button>}
+          {open && !latest && !editing && hasPermission("estimate:create") && <Button onClick={() => setEditing(true)}>{COPY.create}</Button>}
+        </>}>
+        {open && editing && hasPermission(latest ? "estimate:revise" : "estimate:create") && (
+          <div className="grid gap-3 print:hidden" inert={busy}>
+            <p className="text-sm text-muted-foreground">
+              {COPY.editor.help}
+            </p>
+            {lines.map((line, index) => (
+              <div
+                key={index}
+                className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
+              >
+                <span>
+                  {line.description || line.type}{COPY.separator}{line.quantity}
+                  {line.includedInService ? `${COPY.separator}${COPY.included}` : ""}
+                  {line.type === "SERVICE"
+                    ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
+                    : ""}
+                </span>
+                {line.type === "PART" && line.referenceId && (
+                  <PartSourceSelect
+                    partId={line.referenceId}
+                    branchId={jobCard.branchId}
+                    onChange={(record) =>
+                      setLines((current) =>
+                        current.map((row, i) =>
+                          i === index
+                            ? { ...row, referenceId: record.id, description: record.name }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                )}
+                {line.type !== "SERVICE" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLines((current) => current.filter((_, i) => i !== index))
+                    }
+                  >
+                    {COPY.editor.remove}
+                  </button>
+                )}
+              </div>
+            ))}
+            <Field label={COPY.editor.addWork}>
+              <select
+                className={inputCls}
+                value={type}
+                onChange={(event) => {
+                  setType(event.target.value as typeof type);
+                  setReferenceId("");
+                }}
+              >
+                <option value="PART">{COPY.editor.part}</option>
+                <option value="LABOUR">{COPY.editor.operation}</option>
+              </select>
+            </Field>
+            {type === "PART" ? (
+              <EstimatePartPicker
+                key={jobCard.branchId}
+                branchId={jobCard.branchId}
+                value={referenceId}
+                onChange={(id, name) => { setReferenceId(id); setDescription(name); }}
+              />
+            ) : (
+              <WorkshopPicker
+                label={COPY.editor.operation}
+                endpoint="/service/labour-items"
+                collection="labourItems"
+                value={referenceId}
+                onChange={setReferenceId}
+                onSelect={(row) => setDescription(row.name ?? row.description ?? "")}
+              />
+            )}
+            <Field label={COPY.editor.quantity}>
+              <input
+                type="number"
+                min="0.01"
+                max="1000000"
+                step="0.01"
+                className={inputCls}
+                value={quantity}
+                onChange={(event) => setQuantity(Number(event.target.value))}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={includedInService}
+                disabled={!serviceReference}
+                onChange={(event) => setIncluded(event.target.checked)}
+              />
+              {COPY.editor.included}
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                !referenceId ||
+                !Number.isFinite(quantity) ||
+                quantity <= 0 ||
+                lines.length >= 200 ||
+                lines.some(
+                  (line) =>
+                    line.type === type && line.referenceId === referenceId,
+                )
+              }
+              onClick={() => {
+                setLines((current) => [
+                  ...current,
+                  { type, referenceId, description, quantity, includedInService },
+                ]);
                 setReferenceId("");
               }}
             >
-              <option value="PART">{COPY.editor.part}</option>
-              <option value="LABOUR">{COPY.editor.operation}</option>
-            </select>
-          </Field>
-          {type === "PART" ? (
-            <EstimatePartPicker
-              key={jobCard.branchId}
-              branchId={jobCard.branchId}
-              value={referenceId}
-              onChange={(id, name) => { setReferenceId(id); setDescription(name); }}
-            />
-          ) : (
-            <WorkshopPicker
-              label={COPY.editor.operation}
-              endpoint="/service/labour-items"
-              collection="labourItems"
-              value={referenceId}
-              onChange={setReferenceId}
-              onSelect={(row) => setDescription(row.name ?? row.description ?? "")}
-            />
-          )}
-          <Field label={COPY.editor.quantity}>
-            <input
-              type="number"
-              min="0.01"
-              max="1000000"
-              step="0.01"
-              className={inputCls}
-              value={quantity}
-              onChange={(event) => setQuantity(Number(event.target.value))}
-            />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={includedInService}
-              disabled={!serviceReference}
-              onChange={(event) => setIncluded(event.target.checked)}
-            />
-            {COPY.editor.included}
-          </label>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={
-              !referenceId ||
-              !Number.isFinite(quantity) ||
-              quantity <= 0 ||
-              lines.length >= 200 ||
-              lines.some(
-                (line) =>
-                  line.type === type && line.referenceId === referenceId,
-              )
-            }
-            onClick={() => {
-              setLines((current) => [
-                ...current,
-                { type, referenceId, description, quantity, includedInService },
-              ]);
-              setReferenceId("");
-            }}
-          >
-            {COPY.editor.add}
-          </Button>
-          {duplicatePart && (
-            <p role="alert" className="text-sm text-destructive">
-              The same part record is listed twice. Change a source or remove
-              the extra line.
-            </p>
-          )}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              disabled={!lines.length || busy || duplicatePart}
-              onClick={() => create.mutate()}
-            >
-              {COPY.editor.submit}
+              {COPY.editor.add}
             </Button>
-            {latest && (
+            {duplicatePart && (
+              <p role="alert" className="text-sm text-destructive">
+                The same part record is listed twice. Change a source or remove
+                the extra line.
+              </p>
+            )}
+            <div className="flex gap-2">
               <Button
                 type="button"
-                variant="outline"
-                onClick={() => setEditing(false)}
+                disabled={!lines.length || busy || duplicatePart}
+                onClick={() => create.mutate()}
               >
-                {COPY.editor.discard}
+                {COPY.editor.submit}
               </Button>
-            )}
+              {latest && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditing(false)}
+                >
+                  {COPY.editor.discard}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-      {estimates.map((estimate, index) => (
-        <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
-          <p className="font-medium">
-            {estimate.description} ? {money(estimate.amount)} ?{" "}
-            {index
-              ? "Previous revision"
-              : estimate.status === "Pending"
-                ? "Awaiting Approval"
-                : estimate.status}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th>Description</th>
-                  <th className="print:hidden">Source</th>
-                  <th>Qty / hours</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estimate.lines?.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-2">
-                      {line.description}
-                      {line.type.startsWith("INCLUDED_")
-                        ? " (included in service charge)"
-                        : ""}
-                    </td>
-                    <td className="print:hidden">
-                      {partSourceLabel(line.partSource)}
-                    </td>
-                    <td>{line.quantity}</td>
-                    <td>{money(line.rate)}</td>
-                    <td>{money(line.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {estimate.approvals?.map((decision) => (
-            <p key={decision.id}>
-              {decision.approved ? "Approved" : "Declined"}
-              {decision.decisionDate
-                ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
-                : ""}
-              {decision.comments ? ` ? ${decision.comments}` : ""}
+        )}
+        {estimates.map((estimate, index) => (
+          <div key={estimate.id} className="grid gap-2 border-t pt-3 text-sm">
+            <p className="font-medium">
+              {estimate.description} ? {money(estimate.amount)} ?{" "}
+              {index
+                ? "Previous revision"
+                : estimate.status === "Pending"
+                  ? "Awaiting Approval"
+                  : estimate.status}
             </p>
-          ))}
-        </div>
-      ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th>Description</th>
+                    <th className="print:hidden">Source</th>
+                    <th>Qty / hours</th>
+                    <th>Rate</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {estimate.lines?.map((line) => (
+                    <tr key={line.id} className="border-b">
+                      <td className="py-2">
+                        {line.description}
+                        {line.type.startsWith("INCLUDED_")
+                          ? " (included in service charge)"
+                          : ""}
+                      </td>
+                      <td className="print:hidden">
+                        {partSourceLabel(line.partSource)}
+                      </td>
+                      <td>{line.quantity}</td>
+                      <td>{money(line.rate)}</td>
+                      <td>{money(line.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {estimate.approvals?.map((decision) => (
+              <p key={decision.id}>
+                {decision.approved ? "Approved" : "Declined"}
+                {decision.decisionDate
+                  ? ` on ${new Date(decision.decisionDate).toLocaleString()}`
+                  : ""}
+                {decision.comments ? ` ? ${decision.comments}` : ""}
+              </p>
+            ))}
+          </div>
+        ))}
       {open &&
         !editing &&
         latest &&
