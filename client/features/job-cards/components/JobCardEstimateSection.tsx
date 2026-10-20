@@ -74,7 +74,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     );
   const state = !latest
     ? "Draft"
-    : latest.status === "Approved"
+    : latest.approvals?.some(approval => approval.signatureState === "invalid")
+      ? "Invalid signature"
+      : latest.status === "Approved"
       ? "Approved"
       : latest.status === "Declined"
         ? "Revision Required"

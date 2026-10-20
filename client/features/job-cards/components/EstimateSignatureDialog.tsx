@@ -1,4 +1,5 @@
 "use client";
+import { signatureFieldsValid } from "./signature-fields";
 import { useRef, useState, type PointerEvent } from "react";
 import { apiPost } from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ export function EstimateSignatureDialog({estimate,customerId,customerName,onSave
  function point(event:PointerEvent<HTMLCanvasElement>) { const rect=event.currentTarget.getBoundingClientRect(); return [(event.clientX-rect.left)*600/rect.width,(event.clientY-rect.top)*200/rect.height]; }
  function start(event:PointerEvent<HTMLCanvasElement>) { event.currentTarget.setPointerCapture(event.pointerId); drawing.current=true; const ctx=canvas.current!.getContext("2d")!; ctx.beginPath(); const [x,y]=point(event); ctx.moveTo(x,y); }
  function move(event:PointerEvent<HTMLCanvasElement>) { if(!drawing.current)return; const ctx=canvas.current!.getContext("2d")!; const [x,y]=point(event); ctx.lineWidth=2;ctx.lineCap="round";ctx.lineTo(x,y);ctx.stroke();setDrawn(true); }
- const valid=drawn && !!name.trim() && (name.trim().toLowerCase()===customerName.trim().toLowerCase() || !!relationship.trim()) && (approved || !!reason.trim());
+ const valid=signatureFieldsValid({drawn,name,customerName,relationship,approved,reason});
  async function save() { if(!valid || busy)return;setBusy(true);setError("");try {
   const signatureImage=canvas.current!.toDataURL("image/png");
   if(signatureImage.length>88000)throw new Error("Signature is too large; please clear and sign again.");
