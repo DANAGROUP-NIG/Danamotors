@@ -610,7 +610,7 @@ export default function JobCardDetailPage() {
           </section>
         )}
         <JobCardPartsSection jobCard={jobCard} />
-        <JobCardEstimateSection jobCard={jobCard} />
+        {jobCard.estimates && <JobCardEstimateSection jobCard={jobCard} />}
         <JobCardLabourSection
           jobCardId={jobCard.id}
           status={jobCard.status}

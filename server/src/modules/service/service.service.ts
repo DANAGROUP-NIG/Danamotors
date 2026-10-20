@@ -1,3 +1,4 @@
+import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
 import {
@@ -531,7 +532,7 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string) {
+  async getJobCard(id: string, permissions: readonly string[] = []) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
@@ -555,7 +556,7 @@ export class ServiceService {
             },
           })
         : [];
-    return {
+    return scopeJobCard({
       ...card,
       campaigns: card.campaigns.map((c) => ({
         ...c,
@@ -563,7 +564,7 @@ export class ServiceService {
           campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
           null,
       })),
-    };
+    }, permissions);
   }
 
   async updateJobCard(
