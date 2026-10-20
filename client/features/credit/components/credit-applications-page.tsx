@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import { Plus, Wallet } from "lucide-react";
@@ -79,9 +80,7 @@ export function CreditApplicationsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-              Loading…
-            </div>
+            <LoadingSkeleton variant="list" compact />
           ) : applications.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
               <Wallet className="size-8 text-muted-foreground" />

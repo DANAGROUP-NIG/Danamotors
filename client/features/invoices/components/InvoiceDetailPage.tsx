@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { VatBreakdownTable } from './VatBreakdownTable';
 
 import Link from "next/link";
@@ -20,7 +21,7 @@ export function InvoiceDetailPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  if (isLoading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading bill...</div>;
+  if (isLoading) return <LoadingSkeleton label="Loading bill" />;
   if (isError || !invoice) return <div className="p-8 text-center"><p role="alert" className="text-sm text-destructive">Bill could not be loaded.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button></div>;
 
   const cancelled = invoice.status.toLowerCase() === "cancelled";

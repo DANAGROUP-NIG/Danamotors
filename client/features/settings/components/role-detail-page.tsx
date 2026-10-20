@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -70,7 +71,7 @@ export function RoleDetailPage() {
   }
 
   if (!role) {
-    return <div className="p-6">Loading…</div>;
+    return <LoadingSkeleton variant="detail" />;
   }
 
   function handleSaveMeta() {

@@ -1,5 +1,6 @@
 "use client";
 
+import { SkeletonRows } from "@/components/ui/loading-skeleton";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,7 +68,8 @@ export function DataTable<T>({
 
       <div className="overflow-hidden rounded-xl border border-[#e8edf3] bg-white shadow-sm transition-shadow hover:shadow-md">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" aria-busy={!!isLoading}>
+            {isLoading && <caption className="sr-only">Loading records</caption>}
             <thead className="border-b border-[#e8edf3] bg-[#f8fafc]">
               <tr>
                 {effectiveColumns.map((col, i) => (
@@ -155,24 +157,4 @@ function selectionColumn<T>(
       );
     },
   };
-}
-
-function SkeletonRows({ count, columns }: { count: number; columns: number }) {
-  const widths = ["60%", "75%", "45%", "55%", "70%", "50%", "65%", "40%"];
-  return (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
-        <tr key={i} className="border-t border-border">
-          {Array.from({ length: columns }).map((_, j) => (
-            <td key={j} className="px-4 py-3">
-              <div
-                className="h-4 animate-pulse rounded bg-muted"
-                style={{ width: widths[j % widths.length] }}
-              />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
-  );
 }

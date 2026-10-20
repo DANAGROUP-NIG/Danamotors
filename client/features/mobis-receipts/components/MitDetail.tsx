@@ -1,8 +1,9 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Ban, ClipboardCheck, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, Ban, ClipboardCheck, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -191,11 +192,7 @@ export function MitDetail({ id }: { id: string }) {
   const cases = useMemo(() => new Set((mit?.lines ?? []).map((l) => l.caseNumbers).filter(Boolean)).size, [mit]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (error || !mit) {
     return (

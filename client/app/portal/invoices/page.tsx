@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import Link from "next/link";
 import { PageHeader } from "@/components/headers/page-header";
@@ -20,7 +21,7 @@ export default function PortalInvoicesPage() {
 
       {isLoading ? (
         <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
+          <CardContent className="p-6 text-sm text-muted-foreground"><LoadingSkeleton variant="list" compact /></CardContent>
         </Card>
       ) : data && data.length > 0 ? (
         <SimpleTable
