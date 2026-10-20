@@ -69,3 +69,9 @@ Pass below means implementation and automated checks pass; it does not claim a p
 4. BillingOfficer remains home-branch only, retains invoice/job-bill rights and receives no estimate rights.
 5. Counter capture only; future portal compatible schema, remote flow deferred. Reasoned/audited Admin override retained.
 6. Billing account creation is a Users runbook, with proposed role-based login requiring operational confirmation. No named person or password is seeded.
+
+## Follow-up: existing DocumentTerms migration collision
+
+Reported deployment failed with P3018 / 42P07 because `DocumentTerms` already existed. The original implementation incorrectly inferred database absence from checkout absence. Corrected the failed migration to preserve compatible existing terms and safely resume either a clean or partial application, with an atomic transaction and early compatibility checks. No deployed database was accessed. Recovery uses `migrate resolve --rolled-back` followed by the corrected `migrate deploy`, not a reset or unverified applied marker. See `doc/testing/issue-117-migration-recovery.md` for operator commands and local regression coverage. Existing deployment table column layout has not yet been supplied.
+
+Follow-up verification: all four migration regression scenarios passed on a newly initialized PostgreSQL 18 cluster bound to 127.0.0.1. The test cluster was stopped afterward. No existing/local service or non-local database was modified. `git diff --check` passed.
