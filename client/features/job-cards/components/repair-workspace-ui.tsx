@@ -39,7 +39,7 @@ export function MoneyDisplay({ amount, currency }: { amount: number; currency: s
   return <p className="break-words text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl"><span>{money.whole}</span><span className="text-xl font-medium text-muted-foreground sm:text-2xl">{money.decimals}</span></p>;
 }
 export function EstimateLinesTable({ estimate }: { estimate: EstimateViewModel }) {
-  return <div className="min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label={COPY.estimate}><table className="w-full min-w-[34rem] text-left text-xs sm:text-sm">
+  return <div className="relative min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label={COPY.estimate}><table className="w-full min-w-[34rem] text-left text-xs sm:text-sm">
     <caption className="sr-only">{COPY.estimate}</caption><thead className="bg-muted text-muted-foreground"><tr><th scope="col" className="px-3 py-3 font-medium">{COPY.description}</th>{[COPY.quantity, COPY.rate, COPY.amount].map(label => <th key={label} scope="col" className="whitespace-nowrap px-3 py-3 text-right font-medium">{label}</th>)}</tr></thead>
     <tbody>{estimate.lines.map(line => <tr key={line.id} className="border-b border-border"><td className="max-w-80 px-3 py-4"><p className="font-medium">{line.title}</p><p className="mt-1 text-xs text-muted-foreground">{line.secondary}</p></td><td className="px-3 py-4 text-right tabular-nums">{line.quantity}</td><td className="whitespace-nowrap px-3 py-4 text-right tabular-nums">{formatEstimateMoney(line.rate, estimate.currency, true)}</td><td className="whitespace-nowrap px-3 py-4 text-right tabular-nums">{formatEstimateMoney(line.amount, estimate.currency, true)}</td></tr>)}</tbody>
   </table></div>;
