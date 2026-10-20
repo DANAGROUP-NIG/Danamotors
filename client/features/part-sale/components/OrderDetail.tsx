@@ -22,6 +22,7 @@ import {
   openQuantity,
 } from "../lib/part-sale-format";
 import type { CustomerOrder } from "../types/part-sale.types";
+import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -247,6 +248,7 @@ export function OrderDetail({ id }: { id: string }) {
             </p>
           )}
         </div>
+        <DocumentTermsBlock documentType="PARTS_QUOTATION" branchId={order.branchId} />
       </div>
 
       {cancelling && <CancelDialog order={order} onClose={() => setCancelling(false)} />}

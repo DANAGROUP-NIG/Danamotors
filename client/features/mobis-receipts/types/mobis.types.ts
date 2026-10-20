@@ -77,7 +77,7 @@ export type ImportMitPayload = {
   receivedMode: ReceivedMode;
   remarks?: string;
   sourceFileName?: string;
-  createMissingParts: boolean;
+  ignoreMissingParts: boolean;
   lines: {
     orderNumber?: string;
     lineNumber?: string;

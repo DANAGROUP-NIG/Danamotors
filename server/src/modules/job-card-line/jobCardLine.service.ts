@@ -1,6 +1,6 @@
 import { ChargeType, Prisma } from "@prisma/client";
+import { getBranchSettings } from '../company-settings/company-settings.service';
 import prisma from "../../prisma/client";
-import { config } from "../../config";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { coveredItemMatches } from "../campaign/campaign.logic";
 import { assertChargeChange, chargeTotals, defaultChargeType, lineAmount } from "./jobCardLine.logic";
@@ -13,8 +13,6 @@ const RETURNED_STATUSES = ["Approved", "Completed"];
 const VOID_INVOICE = /cancel|void/i;
 /** Claim statuses after which the claimed line's charge type is frozen. */
 const FROZEN_CLAIM_STATUSES = ["SUBMITTED", "APPROVED", "PARTIALLY_APPROVED", "REJECTED", "SETTLED"] as const;
-/** The job bill applies VAT as a percentage (config.JOB_BILL_VAT_RATE); line totals use the fraction. */
-const VAT_FRACTION = config.JOB_BILL_VAT_RATE / 100;
 
 const lineInclude = {
   sparePart: { select: { id: true, partNumber: true, name: true, warrantyApplicable: true } },
@@ -142,6 +140,7 @@ export class JobCardLineService {
           partWarrantyApplicable: part.warrantyApplicable,
           campaignMatchId: this.campaignMatch(context, { kind: "PART", partNumber: part.partNumber, description: part.name }),
         });
+        const partSource = issuance.partSource ?? part.partFlag;
         const rate = this.partRate(part, chargeType);
         await tx.jobCardLine.create({
           data: {
@@ -149,6 +148,7 @@ export class JobCardLineService {
             kind: "PART",
             sparePartId: part.id,
             partIssuanceId: issuance.id,
+            partSource,
             description: part.name,
             quantity: net,
             rate,
@@ -216,6 +216,8 @@ export class JobCardLineService {
 
   async list(jobCardId: string) {
     const ctx = await this.context(prisma, jobCardId);
+    // The running total uses the branch's labour VAT, as the bill does.
+    const vatFraction = (await getBranchSettings(ctx.jobCard.branchId)).labourVatPercent / 100;
     await prisma.$transaction((tx) => this.syncLines(tx, jobCardId, ctx));
     const [lines, warrantyCase] = await Promise.all([
       prisma.jobCardLine.findMany({ where: { jobCardId }, include: lineInclude, orderBy: [{ kind: "desc" }, { createdAt: "asc" }] }),
@@ -223,8 +225,8 @@ export class JobCardLineService {
     ]);
     return {
       lines: lines.map((line) => this.present(line, ctx)),
-      totals: chargeTotals(lines, VAT_FRACTION),
-      vatRate: VAT_FRACTION,
+      totals: chargeTotals(lines, vatFraction),
+      vatRate: vatFraction,
       bill: ctx.bill,
       coverageAtCreation: ctx.jobCard.warrantyStatusAtCreation,
       warrantyCase,

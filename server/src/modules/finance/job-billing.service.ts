@@ -14,11 +14,12 @@ import { config } from "../../config";
 import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
 import { categoryOf } from "../reports/report.logic";
 import { taxRegisterValues } from '../reports/tax-register-layout';
+import { getBranchSettings } from '../company-settings/company-settings.service';
+import { calculateJobBillTotals } from "./job-bill-calculator";
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
 const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
-const VAT_RATE = config.JOB_BILL_VAT_RATE;
 
 function isActiveBillStatus(status: string) {
   return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
@@ -97,6 +98,8 @@ export class JobBillingService {
           `Retail rate is not set for ${issuance.sparePart.partNumber}`,
         );
       }
+      // Each source is its own part record, priced by its own retail rate.
+      const rate = issuance.sparePart.retailRate;
       return [
         {
           type: "PART",
@@ -105,10 +108,11 @@ export class JobBillingService {
           taxable: issuance.sparePart.taxable,
           partId: issuance.sparePartId,
           referenceId: issuance.sparePartId,
+          partSource: issuance.partSource ?? issuance.sparePart.partFlag,
           description: issuance.sparePart.name,
           quantity,
-          rate: issuance.sparePart.retailRate,
-          amount: lineAmount(quantity, issuance.sparePart.retailRate),
+          rate,
+          amount: lineAmount(quantity, rate),
           customerPaid: customerPays(issuance.jobCardLine),
         },
       ];
@@ -191,13 +195,16 @@ export class JobBillingService {
       .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
     const taxSettings = await partsVatSettings(prisma);
     const {totals,breakdown} = calculateBillWithPartsVat({
+    const settings = await getBranchSettings(jobCard.branchId);
+    const totals = calculateJobBillTotals({
       partsTotal,
       labourTotal,
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
       serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-      vatRate: VAT_RATE,
-    }, lines.filter(line => line.type === "PART").map(line => ({amount:line.amount,category:"taxCategory" in line ? String(line.taxCategory) : "UNCLASSIFIED",taxable:"taxable" in line && line.taxable === true,customerPaid:line.customerPaid})), taxSettings.enabled, taxSettings.rates);
+      vatRate: settings.labourVatPercent,
+      roundOffValue: settings.roundOffValue,
+    });
     return {
       jobCard,
       review,
@@ -253,15 +260,16 @@ export class JobBillingService {
             const labourTotal = lines
               .filter((line) => line.type === "LABOUR")
               .reduce((sum, line) => sumMoney([sum, line.amount]), 0);
-            const taxSettings = await partsVatSettings(transaction);
-            const {totals,breakdown} = calculateBillWithPartsVat({
+            const settings = await getBranchSettings(jobCard.branchId, transaction);
+            const totals = calculateJobBillTotals({
               partsTotal,
               labourTotal,
               partsDiscountPercent: input.partsDiscountPercent,
               labourDiscountPercent: input.labourDiscountPercent,
               serviceTotal: sumMoney(lines.filter((line) => line.type === "SERVICE").map((line) => line.amount)),
-              vatRate: VAT_RATE,
-            }, lines.filter(line => line.type === "PART").map(line => ({amount:line.amount,category:"taxCategory" in line ? String(line.taxCategory) : "UNCLASSIFIED",taxable:"taxable" in line && line.taxable === true,customerPaid:line.customerPaid})), taxSettings.enabled, taxSettings.rates);
+              vatRate: settings.labourVatPercent,
+              roundOffValue: settings.roundOffValue,
+            });
             const invoiceNumber = await nextDocumentNumber(
               transaction,
               "JOB_BILL",

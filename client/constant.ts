@@ -27,6 +27,7 @@ import {
   BadgeCheck,
   PackageSearch,
   Ship,
+  Truck,
   Landmark,
   Megaphone,
   ShoppingCart,
@@ -99,7 +100,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Workshop",
-    permissions: ["jobcard:read", "inspection:read", "services:read"],
+    permissions: ["jobcard:read", "inspection:read", "services:read", "employee:read"],
     items: [
       {
         label: "Job Cards",
@@ -130,6 +131,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/technicians",
         icon: UserCog,
         permissions: ["workshop:read"],
+      },
+      {
+        label: "Employees",
+        href: "/employees",
+        icon: Users,
+        permissions: ["employee:read"],
       },
     ],
   },
@@ -171,6 +178,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "MIT",
         href: "/inventory/mobis-receipts",
         icon: Ship,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Vendor Receipts",
+        href: "/inventory/vendor-receipts",
+        icon: Truck,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {

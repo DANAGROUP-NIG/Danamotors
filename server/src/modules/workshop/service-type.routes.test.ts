@@ -9,7 +9,9 @@ jest.mock('../../middleware/authMiddleware', () => ({
     next();
   },
 }));
-jest.mock('../../prisma/client', () => ({ __esModule: true, default: { warrantyDefectCode: { findMany: jest.fn() } } }));
+jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
+  workshopMaster: { findMany: jest.fn() }, defectModelEstimate: { findMany: jest.fn() }, $queryRaw: jest.fn(),
+} }));
 import prisma from '../../prisma/client';
 import { ServiceTypeService } from './service-type.service';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from './service-type.routes';
@@ -66,11 +68,16 @@ it('returns 204 after removing a setting', async () => {
   expect((await fetch(`${base}/service-type-model-settings/${id}`, { method: 'DELETE' })).status).toBe(204);
   expect(remove).toHaveBeenCalledWith(id);
 });
-it('exposes compact active defect codes to job-card creators without requiring warranty read', async () => {
-  const lookup = prisma.warrantyDefectCode.findMany as jest.Mock;
-  lookup.mockResolvedValue([{ id, code: 'D07', description: 'Internal short' }]);
-  expect((await fetch(`${base}/job-cards/defect-codes?search=short&limit=20`)).status).toBe(200);
-  expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ take: 20, select: { id: true, code: true, description: true }, where: expect.objectContaining({ isActive: true }) }));
+it('lists workshop defects for job-card creators, with the vehicle model estimate', async () => {
+  const lookup = prisma.workshopMaster.findMany as jest.Mock;
+  lookup.mockResolvedValue([{ id, code: 'A000100', description: 'Timing system' }]);
+  (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ modelId: 'model' }]);
+  (prisma.defectModelEstimate.findMany as jest.Mock).mockResolvedValue([{ defectId: id, partAmount: 42000, oilAmount: 5200, labourAmount: 50000 }]);
+  const response = await fetch(`${base}/job-cards/defect-codes?search=timing&limit=20&vehicleId=${id}`);
+  expect(response.status).toBe(200);
+  expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ take: 20, where: expect.objectContaining({ kind: 'COMPLAINT', active: true }) }));
+  const body = await response.json() as { data: { items: { estimate: unknown }[] } };
+  expect(body.data.items[0].estimate).toEqual({ partAmount: 42000, oilAmount: 5200, labourAmount: 50000 });
   expect((await fetch(`${base}/job-cards/defect-codes?limit=1000`)).status).toBe(400);
   expect((await fetch(`${base}/job-cards/defect-codes`, { headers: { 'x-test-permission': 'none' } })).status).toBe(403);
   expect(lookup).toHaveBeenCalledTimes(1);

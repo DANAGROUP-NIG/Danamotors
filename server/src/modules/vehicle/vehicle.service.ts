@@ -7,6 +7,23 @@ import prisma from '../../prisma/client';
 import { VehicleRepository } from './vehicle.repository';
 import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
 import { linkCampaignVehiclesByVin } from '../campaign/campaign.hooks';
+import { requireMaster } from '../workshop/workshop-master.service';
+
+type FitmentInput = { tyres?: { makeId?: string; number?: string }[]; batteryMakeId?: string | null };
+
+// Tyres and battery are stored like the job card snapshot: make descriptions resolved from the masters.
+async function resolveFitment(tx: Prisma.TransactionClient, { tyres, batteryMakeId }: FitmentInput) {
+  const fitment: Prisma.VehicleUncheckedUpdateInput = {};
+  if (tyres)
+    fitment.tyres = await Promise.all(tyres.map(async tyre => ({
+      makeId: tyre.makeId ?? '',
+      make: tyre.makeId ? (await requireMaster(tx, tyre.makeId, 'TYRE_MAKE')).description : '',
+      number: tyre.number ?? '',
+    })));
+  if (batteryMakeId !== undefined)
+    fitment.batteryMake = batteryMakeId ? (await requireMaster(tx, batteryMakeId, 'BATTERY_MAKE')).description : null;
+  return fitment;
+}
 
 export class VehicleService {
   private vehicleRepository: VehicleRepository;
@@ -161,10 +178,12 @@ export class VehicleService {
         ? await this.workshopCatalog.identity(tx, data.catalogueId, data.colourId)
         : await resolveVehicleIdentity(tx, data);
 
+      const { tyres, batteryMakeId, ...rest } = data;
       const vehicle = await tx.vehicle.create({
         data: {
-          ...data,
+          ...rest,
           ...identity,
+          ...await resolveFitment(tx, { tyres, batteryMakeId }) as Prisma.VehicleUncheckedCreateInput,
           createdById,
           saleDate: data.saleDate ? new Date(data.saleDate) : null,
           pdiDate: data.pdiDate ? new Date(data.pdiDate) : null,
@@ -230,14 +249,16 @@ export class VehicleService {
       if (data.vehicleModelId !== undefined && data.vehicleModelId !== vehicle.vehicleModelId)
         await this.assertWarrantyModel(tx, data.vehicleModelId);
 
+      const { tyres, batteryMakeId, ...rest } = data;
       return tx.vehicle.update({
         where: {
           id,
         },
 
         data: {
-          ...data,
+          ...rest,
           ...identity,
+          ...await resolveFitment(tx, { tyres, batteryMakeId }),
           saleDate: data.saleDate === undefined ? undefined : data.saleDate ? new Date(data.saleDate) : null,
           pdiDate: data.pdiDate === undefined ? undefined : data.pdiDate ? new Date(data.pdiDate) : null,
         },

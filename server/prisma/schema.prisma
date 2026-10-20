@@ -18,6 +18,8 @@ model Branch {
   name        String   @unique
   // Legacy store-location code (e.g. A, QS, DH, VI).
   code           String?  @unique
+  // Legacy storelocation.ShortName, e.g. VI-2.
+  shortName      String?
   // Set when this is a sub-location (store, godown) at another branch's premises.
   parentBranchId String?
   parentBranch   Branch?  @relation("BranchSubLocations", fields: [parentBranchId], references: [id], onDelete: SetNull)
@@ -66,6 +68,12 @@ model Branch {
   partBinChanges PartBinHistory[]
 
   stockTakes StockTake[]
+
+  employees Employee[]
+
+  partCategorySettings PartCategoryBranchSetting[]
+  documentTerms        DocumentTerms[]
+  settings             BranchSettings?
 }
 
 // ============================================================
@@ -181,6 +189,8 @@ model User {
   stockTakeSheetsIssued   StockTakeSheet[] @relation("StockTakeSheetIssuedBy")
   stockTakeSheetsUploaded StockTakeSheet[] @relation("StockTakeSheetUploadedBy")
   stockTakeCounts         StockTakeCount[] @relation("StockTakeCountRecordedBy")
+
+  employee Employee?
 }
 
 model Role {
@@ -280,6 +290,21 @@ model Customer {
   tallyPartyCode String?
   mergedIntoId   String?
 
+  // Legacy Customer/Vendor profile fields.
+  segment           String?
+  district          String?
+  // Legacy comptype (L, P) and, for vendors, purchase source (LOCAL, IMP) and MRN rate (D dealer, R retail).
+  companyType       String?
+  vendorType        String?
+  mrnRateType       String?
+  governmentVehicle Boolean   @default(false)
+  ownCompanyVehicle Boolean   @default(false)
+  creditLimit       Float?
+  // Legacy Organization: the corporate group this customer belongs to.
+  organizationId    String?
+  organization      Customer?  @relation("CustomerOrganization", fields: [organizationId], references: [id], onDelete: SetNull)
+  members           Customer[] @relation("CustomerOrganization")
+
   // Read-only compatibility cache, derived by financial-document triggers.
   creditBalance     Float                  @default(0)
   creditDays        Int?
@@ -317,10 +342,14 @@ model Customer {
   customerOrders CustomerOrder[]
   saleReturns    CounterSaleReturn[]
 
+  // Vendors: material receipt notes for parts bought from them.
+  vendorReceipts MaterialReceiptNote[] @relation("MrnVendor")
+
   @@index([branchId])
   @@index([branchId, partyStatus, code])
   @@index([phoneNumber])
   @@index([mergedIntoId])
+  @@index([organizationId])
 }
 
 model CustomerAccount {
@@ -693,6 +722,25 @@ model Vehicle {
 
   ownershipStatus String?
 
+  // Legacy vehiclemaster sale, stock and fitment details (Vehicle screen tabs).
+  colourType             String?
+  parkedAt               VehicleParkedAt?
+  purchaseAmount         Float?
+  saleInvoiceNumber      String?
+  saleInvoiceDate        DateTime?
+  saleAmount             Float?
+  wcoNumber              String?
+  wcoDate                DateTime?
+  principalInvoiceNumber String?
+  principalInvoiceDate   DateTime?
+  theft                  Boolean          @default(false)
+  manufactureMonth       Int?
+  manufactureYear        Int?
+  // Current tyres and battery, same shape as the job card snapshot: [{ makeId, make, number }].
+  tyres                  Json?
+  batteryMake            String?
+  batteryNumber          String?
+
   createdById String?
   createdBy   User?   @relation("CreatedVehicles", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -730,6 +778,13 @@ model VehicleImage {
 }
 
 // ============================================================
+// Legacy vehiclemaster.parkedat: R showroom, Y stockyard, S sold.
+enum VehicleParkedAt {
+  SHOWROOM
+  STOCKYARD
+  SOLD
+}
+
 enum PartStatus {
   ACTIVE
   BLOCKED
@@ -767,7 +822,9 @@ model SparePart {
   retailRate        Float?
   // Legacy tax status (partmast.taxable).
   taxable           Boolean       @default(true)
-  // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local.
+  // Legacy part flag = "Source of purchase": O original part, A authorised source, F FOC item, L local,
+  // plus U second-hand/used and R repaired. It is the part's source; other sources of the same part
+  // are their own records (see sourceOfPartId).
   partFlag          String        @default("O")
   // Legacy partmast.parttype: S spare part, O oil, A accessory.
   partType          String        @default("S")
@@ -783,11 +840,34 @@ model SparePart {
   warrantyApplicable Boolean @default(false)
   warrantyRate       Float?
 
+  // Legacy partmast classification and ordering fields from the Part screen.
+  vehicleSystem    String?
+  vehicleGroup     String?
+  // Model codes the part fits; empty = all models (legacy partmodel / allmodelpart).
+  applicableModels String[]  @default([])
+  moq              Float?
+  conversionFactor Float     @default(1)
+  // Supplier base price in foreign currency (legacy basicrate).
+  basicRate        Float?
+  nspDate          DateTime?
+  nlaDate          DateTime?
+  blockReserve     Boolean   @default(false)
+  includeInTopN    Boolean   @default(false)
+  topMover         Boolean   @default(false)
+  underAmc         Boolean   @default(false)
+
   // --- new: main/alternate relationship ---
   role           PartRole    @default(MAIN)
   mainPartId     String?
   mainPart       SparePart?  @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
   alternateParts SparePart[] @relation("PartAlternates")
+
+  // Part source records: a local, used or repaired version of a part is its own record, with its
+  // own part number, stock, rates and bin, linked to its main part. Its source is its part flag.
+  // Separate from alternates (supersession); one level deep, one record per source.
+  sourceOfPartId String?
+  sourceOfPart   SparePart?  @relation("PartSourceRecords", fields: [sourceOfPartId], references: [id], onDelete: Restrict)
+  sourceRecords  SparePart[] @relation("PartSourceRecords")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -818,6 +898,9 @@ model SparePart {
 
   stockTakeLines StockTakeLine[]
 
+  checklistLines ServiceChecklistLine[]
+
+  @@unique([sourceOfPartId, partFlag])
   @@index([mainPartId])
 }
 
@@ -1074,6 +1157,9 @@ model PartIssuance {
 
   quantity Int
 
+  // Part source code (part flag list) the part is supplied and charged from.
+  partSource String?
+
   issuedAt DateTime @default(now())
 
   notes String?
@@ -1281,8 +1367,19 @@ model LabourItem {
 
   vehicleSystem String?
   group         String?
+  // Legacy labour master flags. Per-model time or amount pricing is LabourRate.pricing.
+  majorLabour      Boolean   @default(false)
+  insured          Boolean   @default(false)
+  approvalRequired Boolean   @default(false)
+  externalLabour   Boolean   @default(false)
+  underAmc         Boolean   @default(false)
+  followUpAnalysis Boolean   @default(true)
+  amountEditable   Boolean   @default(true)
+  includeInTopN    Boolean   @default(true)
+  inactiveDate     DateTime?
   modelRates    LabourRate[]
   jobCardLines  JobCardLabour[]
+  checklistLines ServiceChecklistLine[]
 }
 
 model JobCardLabour {
@@ -1297,6 +1394,10 @@ model JobCardLabour {
   amount       Float
   technicianId String?
   technician   User?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  // Legacy joblabordetail.mechanic: the employee who did the work. technicianId is that
+  // employee's login, when they have one.
+  mechanicId   String?
+  mechanic     Employee?  @relation(fields: [mechanicId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -1307,6 +1408,7 @@ model JobCardLabour {
 
   @@index([jobCardId])
   @@index([labourItemId])
+  @@index([mechanicId])
 }
 
 model InvoiceLine {
@@ -1318,6 +1420,8 @@ model InvoiceLine {
   type            String
   partId          String?
   part            SparePart?     @relation(fields: [partId], references: [id], onDelete: Restrict)
+  // Job bill part lines: the part source the rate came from (internal only, not printed).
+  partSource      String?
   jobCardLabourId String?
   jobCardLabour   JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: Restrict)
   description     String
@@ -1742,6 +1846,9 @@ model WorkshopMaster {
   kind             String
   code             String
   description      String
+  shortDescription String?
+  // Extra legacy fields per kind, validated by workshop/master-kinds.ts.
+  attributes       Json?
   active           Boolean          @default(true)
   category         String?
   chargedTo        String           @default("CUSTOMER")
@@ -1766,6 +1873,17 @@ model WorkshopMaster {
   colouredVehicles Vehicle[]        @relation("VehicleColour")
   labourRates      LabourRate[]
   serviceTypeSettings ServiceTypeModelSetting[] @relation("ServiceTypeSettings")
+  designationEmployees Employee[] @relation("EmployeeDesignation")
+  departmentEmployees  Employee[] @relation("EmployeeDepartment")
+  teamEmployees        Employee[] @relation("EmployeeTeam")
+  defectEstimates      DefectModelEstimate[] @relation("DefectEstimates")
+  modelDefectEstimates DefectModelEstimate[] @relation("ModelDefectEstimates")
+  checklistLines         ServiceChecklistLine[]    @relation("ChecklistLines")
+  modelChecklistLines    ServiceChecklistLine[]    @relation("ChecklistLineModel")
+  variantChecklistLines  ServiceChecklistLine[]    @relation("ChecklistLineVariant")
+  checklistMileages      ServiceChecklistMileage[] @relation("ChecklistMileageChecklist")
+  modelChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageModel")
+  variantChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageVariant")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
 
   @@unique([kind, code])
@@ -1783,9 +1901,33 @@ model ServiceTypeModelSetting {
   previousCharge Float?
   effectiveFrom  DateTime?
   active         Boolean        @default(true)
+  // Legacy servicedetail: when the service falls due and how long it takes on this model.
+  hoursRequired     Float?
+  mileageLimit      Int?
+  daysLimit         Int?
+  mileageVariation  Int?
+  daysVariation     Int?
+  checklistFollowed Boolean @default(false)
 
   @@unique([serviceTypeId, modelId])
   @@index([modelId, active, serviceTypeId])
+}
+
+// Legacy trouble: the expected part, oil and labour amounts for a defect on one model,
+// used to estimate a repair before parts and labour are picked.
+model DefectModelEstimate {
+  id           String         @id @default(uuid())
+  defectId     String
+  defect       WorkshopMaster @relation("DefectEstimates", fields: [defectId], references: [id], onDelete: Cascade)
+  modelId      String
+  model        WorkshopMaster @relation("ModelDefectEstimates", fields: [modelId], references: [id], onDelete: Restrict)
+  partAmount   Float          @default(0)
+  oilAmount    Float          @default(0)
+  labourAmount Float          @default(0)
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([defectId, modelId])
+  @@index([modelId])
 }
 
 model JobComplaint {
@@ -1837,6 +1979,8 @@ model EstimateLine {
   estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
   type        String
   referenceId String?
+  // Part lines: the part source code the rate was priced from. Internal only; never shown to the customer.
+  partSource  String?
   description String
   quantity    Float    @default(1)
   rate        Float    @default(0)
@@ -1991,7 +2135,25 @@ model PartCategory {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @default(now()) @updatedAt
 
-  parts SparePart[]
+  parts          SparePart[]
+  branchSettings PartCategoryBranchSetting[]
+}
+
+// Legacy Part Category Master percentages. Each legacy database (branch) kept its own
+// discount, handling, direct cost and operational cost % for a category.
+model PartCategoryBranchSetting {
+  categoryCode           String
+  category               PartCategory @relation(fields: [categoryCode], references: [code], onDelete: Cascade)
+  branchId               String
+  branch                 Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  discountPercent        Float        @default(0)
+  handlingPercent        Float        @default(0)
+  directCostPercent      Float        @default(0)
+  operationalCostPercent Float        @default(0)
+  updatedAt              DateTime     @updatedAt
+
+  @@id([categoryCode, branchId])
+  @@index([branchId])
 }
 
 enum MitStatus {
@@ -2002,10 +2164,12 @@ enum MitStatus {
   CANCELLED
 }
 
-// Where the stock on an MRN came from: a Mobis invoice (MIT) or a branch transfer (STN).
+// Where the stock on an MRN came from: a Mobis invoice (MIT), a branch transfer (STN), or a
+// direct purchase from a vendor (local, used or repaired parts; CPD's non-Mobis purchases).
 enum MrnSource {
   MOBIS
   BRANCH_TRANSFER
+  VENDOR
 }
 
 model BranchIndent {
@@ -2470,9 +2634,13 @@ model MaterialReceiptNote {
   receivingBranchId String
   receivingBranch   Branch @relation("MrnReceivingBranch", fields: [receivingBranchId], references: [id], onDelete: Restrict)
 
-  // Mobis only.
+  // Mobis and vendor receipts. `vendor` is the name as printed; vendor receipts also link the vendor.
   vendor         String?
+  vendorId       String?
+  vendorParty    Customer? @relation("MrnVendor", fields: [vendorId], references: [id], onDelete: Restrict)
   invoiceNumber  String?
+  // Vendor receipts: the vendor's invoice date.
+  invoiceDate    DateTime?
   // Legacy tax form: P for Mobis purchases; a transfer MRN takes the STN's form, if any.
   taxForm        String?
   // Invoice currency to naira; 1 for branch transfers, which are already in naira.
@@ -2496,6 +2664,7 @@ model MaterialReceiptNote {
   @@index([receivingBranchId])
   @@index([stnId])
   @@index([source])
+  @@index([vendorId])
 }
 
 model MaterialReceiptLine {
@@ -2503,7 +2672,7 @@ model MaterialReceiptLine {
   mrnId String
   mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
 
-  // Exactly one of these is set, matching the MRN's source.
+  // Mobis and transfer MRNs: exactly one of these is set, matching the MRN's source. Vendor MRNs: neither.
   mitLineId String?
   mitLine   MaterialInTransitLine? @relation(fields: [mitLineId], references: [id], onDelete: Restrict)
   stnLineId String?
@@ -2656,6 +2825,8 @@ model JobCardLine {
 
   operationCode String?
   description   String
+  // Part lines: the part source code the rate comes from (internal only).
+  partSource    String?
   // Quantity for parts, hours for labour.
   quantity      Float
   rate          Float
@@ -3436,4 +3607,183 @@ model DocumentTerms {
   updatedAt DateTime @updatedAt
   @@unique([type, branchId])
   @@index([type])
+// ============================================================
+// EMPLOYEE MASTER (legacy Employee)
+// ============================================================
+
+enum EmployeeType {
+  OWN
+  CONTRACT
+}
+
+enum EmployeeGrade {
+  SENIOR
+  JUNIOR
+}
+
+// Every workshop employee, with or without a login. Legacy jobs name mechanics,
+// the main mechanic and the employee group by these codes.
+model Employee {
+  id   String @id @default(uuid())
+  code String
+  name String
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  designationId String?
+  designation   WorkshopMaster? @relation("EmployeeDesignation", fields: [designationId], references: [id], onDelete: Restrict)
+  departmentId  String?
+  department    WorkshopMaster? @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  // Legacy empgroup: the workshop group / team the employee works in.
+  teamId        String?
+  team          WorkshopMaster? @relation("EmployeeTeam", fields: [teamId], references: [id], onDelete: Restrict)
+
+  employeeType EmployeeType   @default(OWN)
+  grade        EmployeeGrade?
+
+  dateOfBirth     DateTime?
+  qualification   String?
+  bloodGroup      String?
+  experienceYears Float?
+
+  block    String?
+  street   String?
+  district String?
+  city     String?
+  state    String?
+  pin      String?
+  phone    String?
+
+  joinDate DateTime?
+  // Set when the employee leaves; they then drop out of pickers but stay on old jobs.
+  leftDate DateTime?
+
+  // Optional login account for employees who use the system.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  labourLines JobCardLabour[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, code])
+  @@index([branchId, leftDate])
+  @@index([teamId])
+}
+
+// ============================================================
+// SERVICE CHECKLISTS (legacy ChecklistMaster, ChecklistDefinitionMaster,
+// MileageChecklistDefinition). The checklist itself is a CHECKLIST master.
+// ============================================================
+
+enum ChecklistLineKind {
+  PART
+  LABOUR
+}
+
+// A part (with quantity) or a labour (with amount) to do under a checklist on a model,
+// for one variant or, when variantId is null, all variants of the model.
+model ServiceChecklistLine {
+  id           String            @id @default(uuid())
+  checklistId  String
+  checklist    WorkshopMaster    @relation("ChecklistLines", fields: [checklistId], references: [id], onDelete: Cascade)
+  modelId      String
+  model        WorkshopMaster    @relation("ChecklistLineModel", fields: [modelId], references: [id], onDelete: Restrict)
+  variantId    String?
+  variant      WorkshopMaster?   @relation("ChecklistLineVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  kind         ChecklistLineKind
+  sparePartId  String?
+  sparePart    SparePart?        @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+  labourItemId String?
+  labourItem   LabourItem?       @relation(fields: [labourItemId], references: [id], onDelete: Restrict)
+  quantity     Float             @default(1)
+  // Labour amount; part lines are priced from the part's current rate.
+  amount       Float             @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([checklistId, modelId, variantId])
+  @@index([sparePartId])
+  @@index([labourItemId])
+}
+
+// Which checklist to follow at a mileage, for a model (and variant, or all variants).
+model ServiceChecklistMileage {
+  id          String          @id @default(uuid())
+  modelId     String
+  model       WorkshopMaster  @relation("ChecklistMileageModel", fields: [modelId], references: [id], onDelete: Restrict)
+  variantId   String?
+  variant     WorkshopMaster? @relation("ChecklistMileageVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  mileage     Int
+  checklistId String
+  checklist   WorkshopMaster  @relation("ChecklistMileageChecklist", fields: [checklistId], references: [id], onDelete: Restrict)
+  createdAt   DateTime        @default(now())
+
+  @@index([modelId, variantId, mileage])
+}
+
+// ============================================================
+// DOCUMENT TERMS (legacy Quotation Terms and Conditions Master and the
+// Control screen's terms and footer messages)
+// ============================================================
+
+enum DocumentTermType {
+  JOB_ESTIMATE
+  JOB_CARD
+  JOB_BILL
+  PARTS_QUOTATION
+  COUNTER_SALE
+  RECEIPT
+}
+
+// Numbered terms and the footer message printed on a document, company-wide
+// (branchId null) or for one branch, which then overrides the company text.
+model DocumentTerms {
+  id           String           @id @default(uuid())
+  documentType DocumentTermType
+  branchId     String?
+  branch       Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  terms        String[]         @default([])
+  footer       String?
+  updatedAt    DateTime         @updatedAt
+
+  @@index([documentType, branchId])
+}
+
+// ============================================================
+// BRANCH SETTINGS (legacy Control screen: Control Information,
+// Control Calculation and Workshop Information, which each legacy
+// database set for its own location)
+// ============================================================
+
+model BranchSettings {
+  branchId String @id
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  // Billing
+  labourVatPercent Float @default(7.5)
+  // Job bills are rounded down to a multiple of this (legacy RoundOffValue).
+  roundOffValue    Int   @default(10)
+
+  // Workshop rules
+  repeatWindowDays Int  @default(30)
+  repeatWindowKm   Int? @default(1500)
+  bookingMaxDays   Int  @default(30)
+
+  // Workshop information
+  contactPerson   String?
+  shifts          Int     @default(1)
+  workStartTime   String  @default("07:30")
+  workingHours    Float   @default(10)
+  weeklyHoliday   String?
+  vorOrderDays    Int     @default(7)
+  reorderMonths   Int     @default(3)
+  courtLocation   String?
+  // Printed on reminder letters (legacy reminderletterdesig, Sign1-5).
+  reminderLetterDesignation String?
+  signatories               String[] @default([])
+
+  updatedAt DateTime @updatedAt
 }

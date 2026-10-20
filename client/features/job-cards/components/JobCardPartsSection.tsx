@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { jobCardKeys } from "../api/job-card.keys";
 import type { JobCard } from "../types/job-card.types";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
+import { partSourceLabel } from "@/features/inventory/lib/part-codes";
 
 type IssuableStock = {
   partId: string;
@@ -26,6 +27,8 @@ type IssuableStock = {
     unitPrice: number;
     retailRate?: number | null;
     partStatus: "ACTIVE" | "BLOCKED";
+    /** Part source (Mobis, local, used, repaired…); each source is its own record. Staff-only. */
+    partFlag: string;
   };
 };
 
@@ -276,6 +279,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
                               {row.part.partNumber} · {row.part.name}
                             </span>
                             <span className="block text-xs text-muted-foreground">
+                              {partSourceLabel(row.part.partFlag)} ·{" "}
                               {row.part.uom} · Retail{" "}
                               {retailRate == null
                                 ? "not set"
@@ -301,7 +305,8 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
             <div className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 sm:col-span-3">
               <span className="min-w-0 truncate text-sm">
                 <strong>{selectedPart.part.partNumber}</strong> ·{" "}
-                {selectedPart.part.name}
+                {selectedPart.part.name} ·{" "}
+                {partSourceLabel(selectedPart.part.partFlag)}
               </span>
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {selectedPart.availableQuantity} available
@@ -339,7 +344,8 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
                     value={row.id}
                     disabled={remaining === 0}
                   >
-                    {row.sparePart.partNumber} · {row.sparePart.name} (
+                    {row.sparePart.partNumber} · {row.sparePart.name}
+                    {row.partSource ? ` · ${partSourceLabel(row.partSource)}` : ""} (
                     {remaining} remaining)
                   </option>
                 );

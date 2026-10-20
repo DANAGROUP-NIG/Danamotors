@@ -32,6 +32,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/mobis-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
   "/inventory/mobis-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
+  "/inventory/vendor-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
+  "/inventory/vendor-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/stock-taking": [STOCK_TAKE_PERMISSIONS.READ],
   "/inventory/stock-audit": [STOCK_AUDIT_PERMISSIONS.READ],
   "/inventory": [

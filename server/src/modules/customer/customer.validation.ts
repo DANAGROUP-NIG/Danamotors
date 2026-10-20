@@ -25,7 +25,8 @@ export const customerBody = z.object({
   creditDays: z.number().int().min(0).max(3650).nullable().optional(),
   partyStatus: z.enum(['CUSTOMER','DEALER','FA_PARTY']).optional(),
   type: z.enum(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'VENDOR']).default('INDIVIDUAL'),
-  salutation: z.enum(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Chief', 'M/S.']).nullable().optional(),
+  // Codes from the SALUTATION master (legacy has PROF., MAJ., REV. and more).
+  salutation: z.string().trim().min(1).max(20).nullable().optional(),
   companyName: z.string().trim().max(200).nullable().optional(),
   contactPerson: z.string().trim().max(200).nullable().optional(),
   registeredName: z.string().trim().max(200).nullable().optional(),
@@ -51,6 +52,15 @@ export const customerBody = z.object({
   preferredFollowupDay: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).nullable().optional(),
   preferredFollowupTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   preferredContactMethod: z.string().optional(),
+  segment: z.string().trim().max(20).nullable().optional(),
+  district: z.string().trim().max(100).nullable().optional(),
+  companyType: z.string().trim().max(10).nullable().optional(),
+  vendorType: z.string().trim().max(20).nullable().optional(),
+  mrnRateType: z.enum(['D', 'R']).nullable().optional(),
+  governmentVehicle: z.boolean().optional(),
+  ownCompanyVehicle: z.boolean().optional(),
+  creditLimit: z.number().min(0).max(1e12).nullable().optional(),
+  organizationId: z.string().uuid().nullable().optional(),
   branchId: z.string().uuid(),
 }).strict();
 

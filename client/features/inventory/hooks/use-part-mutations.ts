@@ -5,6 +5,7 @@ import {
   adjustStockRequest,
   createAlternateRequest,
   createPartRequest,
+  createSourceRecordRequest,
   deletePartRequest,
   updatePartRequest,
   updateStockLocationRequest,
@@ -13,6 +14,7 @@ import type {
   AlternatePartPayload,
   PartMaster,
   PartMasterPayload,
+  SourceRecordPayload,
   StockLocationPayload,
   UpdatePartMasterPayload,
 } from "../types/inventory.types";
@@ -105,6 +107,18 @@ export function useCreateAlternate(mainPartId: string) {
       toast.success(`Alternate ${part.partNumber} added`);
     },
     onError: (error) => toast.error(partErrorMessage(error, "Failed to add alternate part")),
+  });
+}
+
+export function useCreateSourceRecord(mainPartId: string) {
+  const refresh = useInvalidateParts();
+  return useMutation({
+    mutationFn: (payload: SourceRecordPayload) => createSourceRecordRequest(mainPartId, payload),
+    onSuccess: (part) => {
+      refresh();
+      toast.success(`Source record ${part.partNumber} added`);
+    },
+    onError: (error) => toast.error(partErrorMessage(error, "Failed to add the source record")),
   });
 }
 

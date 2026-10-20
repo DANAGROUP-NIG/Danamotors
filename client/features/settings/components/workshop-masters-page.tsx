@@ -12,13 +12,18 @@ import { Button } from "@/components/ui/button";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ServiceTypeModelSettings } from "./service-type-model-settings";
+import { DefectModelEstimates } from "./defect-model-estimates";
+import { MASTER_KIND_GROUPS, MASTER_KINDS, type AttributeField } from "./master-kinds";
 
 type Master = {
   id: string;
   code: string;
   description: string;
+  shortDescription?: string | null;
+  attributes?: Record<string, unknown> | null;
   active: boolean;
   parentId?: string | null;
+  parent?: { code: string; description: string } | null;
   category?: string | null;
   chargedTo?: string;
   freeService?: boolean;
@@ -31,27 +36,46 @@ type Master = {
   warrantyKm?: number | null;
 };
 
-const kinds = [
-  "SERVICE_TYPE",
-  "BAY",
-  "COMPLAINT",
-  "TEAM",
-  "LATE_REASON",
-  "MAKE",
-  "PRODUCT",
-  "MODEL",
-  "VARIANT",
-  "COLOUR",
-  "TYRE_MAKE",
-  "BATTERY_MAKE",
-];
+function AttributeInput({ field, value, onChange }: {
+  field: AttributeField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}) {
+  if (field.type === "checkbox")
+    return <label className="flex gap-2"><input
+        type="checkbox"
+        checked={value === true}
+        onChange={e => onChange(e.target.checked)} />{field.label}</label>;
 
-const parentKinds: Record<string, string> = {
-  PRODUCT: "MAKE",
-  MODEL: "PRODUCT",
-  VARIANT: "MODEL",
-  COLOUR: "MODEL",
-};
+  if (field.type === "master")
+    return <WorkshopPicker
+      label={field.label}
+      endpoint={`/workshop-masters?kind=${field.kind}`}
+      collection="items"
+      value={typeof value === "string" ? value : ""}
+      getOptionId={row => row.code ?? row.id}
+      onChange={code => onChange(code || null)} />;
+
+  if (field.type === "select")
+    return <Field label={field.label}><select
+        className={inputCls}
+        value={typeof value === "string" ? value : ""}
+        onChange={e => onChange(e.target.value || null)}><option value="">Not set</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>;
+
+  if (field.type === "textarea")
+    return <Field label={field.label}><textarea
+        className={inputCls}
+        rows={4}
+        value={typeof value === "string" ? value : ""}
+        onChange={e => onChange(e.target.value || null)} /></Field>;
+
+  return <Field label={field.label}><input
+      className={inputCls}
+      type={field.type}
+      min={field.type === "number" ? 1 : undefined}
+      value={value == null ? "" : String(value)}
+      onChange={e => onChange(e.target.value === "" ? null : field.type === "number" ? Number(e.target.value) : e.target.value)} /></Field>;
+}
 
 export function WorkshopMastersPage() {
   const {
@@ -63,6 +87,7 @@ export function WorkshopMastersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<Master | null>(null);
+  const config = MASTER_KINDS[kind];
 
   const query = useQuery({
     queryKey: ["workshop-masters", kind, search, page],
@@ -83,6 +108,8 @@ export function WorkshopMastersPage() {
       const payload = {
         code: record.code,
         description: record.description,
+        shortDescription: record.shortDescription || null,
+        attributes: config.attributes ? record.attributes ?? {} : undefined,
         active: record.active,
         parentId: record.parentId,
         category: record.category,
@@ -130,7 +157,7 @@ export function WorkshopMastersPage() {
           onChange={e => {
             setKind(e.target.value);
             setPage(1);
-          }}>{kinds.map(value => <option key={value}>{value}</option>)}</select><input
+          }}>{MASTER_KIND_GROUPS.map(group => <optgroup key={group} label={group}>{Object.entries(MASTER_KINDS).filter(([, value]) => value.group === group).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</optgroup>)}</select><input
           aria-label="Search masters"
           className={inputCls}
           value={search}
@@ -159,16 +186,22 @@ export function WorkshopMastersPage() {
           header: "Code",
           render: row => row.code,
         }, {
+          header: "Short",
+          render: row => row.shortDescription ?? "",
+        }, {
           header: "Description",
           render: row => row.description,
-        }, {
+        }, ...(config.parent ? [{
+          header: config.parent.label,
+          render: (row: Master) => row.parent ? `${row.parent.code} | ${row.parent.description}` : "",
+        }] : []), {
           header: "Status",
           render: row => <StatusBadge status={row.active ? "Active" : "Inactive"} tone={row.active ? "emerald" : "gray"} />,
         }, {
           header: "Actions",
           render: row => isAdminOrAbove && <Button variant="outline" size="sm" onClick={() => setForm(row)}>Edit</Button>,
         }]} />
-      <ModalFame isOpen={!!form} size={kind === "SERVICE_TYPE" ? "wide" : "default"} title={form?.id ? "Edit master" : "Create master"} onClose={() => setForm(null)}>{form && <form
+      <ModalFame isOpen={!!form} size={kind === "SERVICE_TYPE" || kind === "COMPLAINT" ? "wide" : "default"} title={`${form?.id ? "Edit" : "Create"} ${config.label.toLowerCase()}`} onClose={() => setForm(null)}>{form && <form
           className="grid gap-3 p-5"
           onSubmit={e => {
             e.preventDefault();
@@ -190,17 +223,36 @@ export function WorkshopMastersPage() {
                 ...form,
                 description: e.target.value,
               })} /></Field>
-          {parentKinds[kind] && <WorkshopPicker
-            required
-            label={parentKinds[kind]}
-            endpoint={`/workshop-masters?kind=${parentKinds[kind]}`}
+          <Field label="Short description"><input
+              className={inputCls}
+              maxLength={50}
+              value={form.shortDescription ?? ""}
+              onChange={e => setForm({
+                ...form,
+                shortDescription: e.target.value,
+              })} /></Field>
+          {config.parent && <WorkshopPicker
+            required={config.parent.required}
+            label={config.parent.label}
+            endpoint={`/workshop-masters?kind=${config.parent.kind}`}
             collection="items"
             value={form.parentId ?? ""}
-            disabled={!!form.id}
+            disabled={!!form.id && config.parent.fixed}
             onChange={id => setForm({
               ...form,
-              parentId: id,
+              parentId: id || null,
             })} />}
+          {config.attributes?.map(field => <AttributeInput
+            key={field.key}
+            field={field}
+            value={form.attributes?.[field.key]}
+            onChange={value => setForm({
+              ...form,
+              attributes: {
+                ...form.attributes,
+                [field.key]: value,
+              },
+            })} />)}
           {kind === "SERVICE_TYPE" && <><Field label="Charged to"><select
                 className={inputCls}
                 value={form.chargedTo ?? "CUSTOMER"}
@@ -220,13 +272,26 @@ export function WorkshopMastersPage() {
             <label className="flex gap-2"><input type="checkbox" checked={form.preDelivery ?? false}
               onChange={event => setForm({ ...form, preDelivery: event.target.checked })} />Pre-delivery service (unsold vehicles only)</label>
           </>}
-          {kind === "BAY" && <Field label="Category"><input
+          {kind === "BAY" && <Field label="Bay group"><input
               className={inputCls}
               value={form.category ?? ""}
               onChange={e => setForm({
                 ...form,
                 category: e.target.value,
               })} /></Field>}
+          {(kind === "MODEL" || kind === "VARIANT") && <>{(["fuel", "gearbox"] as const).filter(key => kind === "VARIANT" || key === "fuel").map(key => <Field key={key} label={key === "fuel" ? "Fuel" : "Gearbox"}><input
+                className={inputCls}
+                value={form[key] ?? ""}
+                onChange={e => setForm({
+                  ...form,
+                  [key]: e.target.value,
+                })} /></Field>)}<label className="flex gap-2"><input
+                type="checkbox"
+                checked={form.acFitted ?? false}
+                onChange={e => setForm({
+                  ...form,
+                  acFitted: e.target.checked,
+                })} />AC fitted</label></>}
           {kind === "MODEL" && <>{(["warrantyDays", "warrantyKm"] as const).map(key => <Field key={key} label={key === "warrantyDays" ? "Warranty days" : "Warranty km"}><input
                 type="number"
                 min="0"
@@ -236,19 +301,6 @@ export function WorkshopMastersPage() {
                   ...form,
                   [key]: e.target.value ? Number(e.target.value) : null,
                 })} /></Field>)}</>}
-          {kind === "VARIANT" && <>{(["fuel", "gearbox"] as const).map(key => <Field key={key} label={key}><input
-                className={inputCls}
-                value={form[key] ?? ""}
-                onChange={e => setForm({
-                  ...form,
-                  [key]: e.target.value,
-                })} /></Field>)}<label><input
-                type="checkbox"
-                checked={form.acFitted ?? false}
-                onChange={e => setForm({
-                  ...form,
-                  acFitted: e.target.checked,
-                })} />AC fitted</label></>}
           <label><input
               type="checkbox"
               checked={form.active}
@@ -261,6 +313,8 @@ export function WorkshopMastersPage() {
         </form>}
         {form?.id && kind === "SERVICE_TYPE" && <ServiceTypeModelSettings key={form.id} serviceTypeId={form.id} />}
         {form && !form.id && kind === "SERVICE_TYPE" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the service type first, then edit it to configure model charges.</p>}
+        {form?.id && kind === "COMPLAINT" && <DefectModelEstimates key={form.id} defectId={form.id} />}
+        {form && !form.id && kind === "COMPLAINT" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the defect first, then edit it to enter model-wise estimates.</p>}
       </ModalFame>
     </div>
   );

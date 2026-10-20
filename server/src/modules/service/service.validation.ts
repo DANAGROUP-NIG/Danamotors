@@ -312,6 +312,14 @@ export const createLabourItemSchema = z.object({
       group: z.string().trim().max(100).optional(),
       defaultHours: z.number().positive(),
       rate: z.number().nonnegative(),
+      majorLabour: z.boolean().optional(),
+      insured: z.boolean().optional(),
+      approvalRequired: z.boolean().optional(),
+      externalLabour: z.boolean().optional(),
+      underAmc: z.boolean().optional(),
+      followUpAnalysis: z.boolean().optional(),
+      amountEditable: z.boolean().optional(),
+      includeInTopN: z.boolean().optional(),
     })
     .strict(),
 });
@@ -326,6 +334,14 @@ export const updateLabourItemSchema = z.object({
       defaultHours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       active: z.boolean().optional(),
+      majorLabour: z.boolean().optional(),
+      insured: z.boolean().optional(),
+      approvalRequired: z.boolean().optional(),
+      externalLabour: z.boolean().optional(),
+      underAmc: z.boolean().optional(),
+      followUpAnalysis: z.boolean().optional(),
+      amountEditable: z.boolean().optional(),
+      includeInTopN: z.boolean().optional(),
     })
     .strict()
     .refine(
@@ -345,6 +361,7 @@ export const createJobCardLabourSchema = z.object({
       hours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       technicianId: z.string().uuid("Invalid technician ID").optional(),
+      mechanicId: z.string().uuid("Invalid mechanic ID").optional(),
     })
     .strict(),
 
@@ -364,6 +381,7 @@ export const updateJobCardLabourSchema = z.object({
         .uuid("Invalid technician ID")
         .nullable()
         .optional(),
+      mechanicId: z.string().uuid("Invalid mechanic ID").nullable().optional(),
     })
     .strict()
     .refine(

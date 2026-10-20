@@ -6,7 +6,30 @@ export type VehicleCustomer = {
   phoneNumber?: string | null;
 };
 
-export type Vehicle = {
+
+export type VehicleTyre = { makeId: string; make: string; number: string };
+
+/** Legacy vehiclemaster sale, stock and fitment details. */
+export type VehicleLegacyFields = {
+  colourType?: string | null;
+  parkedAt?: "SHOWROOM" | "STOCKYARD" | "SOLD" | null;
+  purchaseAmount?: number | null;
+  saleInvoiceNumber?: string | null;
+  saleInvoiceDate?: string | null;
+  saleAmount?: number | null;
+  wcoNumber?: string | null;
+  wcoDate?: string | null;
+  principalInvoiceNumber?: string | null;
+  principalInvoiceDate?: string | null;
+  theft?: boolean;
+  manufactureMonth?: number | null;
+  manufactureYear?: number | null;
+  tyres?: VehicleTyre[] | null;
+  batteryMake?: string | null;
+  batteryNumber?: string | null;
+};
+
+export type Vehicle = VehicleLegacyFields & {
   modelId?: string | null;
   generationId?: string | null;
   engineId?: string | null;
@@ -45,7 +68,7 @@ export type Vehicle = {
   updatedAt: string;
 };
 
-export type CreateVehiclePayload = {
+export type CreateVehiclePayload = VehicleLegacyPayload & {
   modelId?: string | null;
   generationId?: string | null;
   engineId?: string | null;
@@ -71,6 +94,11 @@ export type CreateVehiclePayload = {
   color?: string;
   vehicleModelId?: string | null;
   ownershipStatus?: string;
+};
+
+export type VehicleLegacyPayload = Omit<VehicleLegacyFields, "tyres" | "batteryMake"> & {
+  tyres?: { makeId?: string; number?: string }[];
+  batteryMakeId?: string | null;
 };
 
 export type UpdateVehiclePayload = Partial<Omit<CreateVehiclePayload, "customerId" | "vin">>;

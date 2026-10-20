@@ -3,6 +3,7 @@ import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
+import { getBranchSettings } from "../company-settings/company-settings.service";
 import {
   serviceChargeDescription,
   serviceChargeReference,
@@ -54,6 +55,16 @@ export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
   Cancelled: [],
 };
 
+// Legacy "Service Booking For Maximum N days": a booking cannot be made further ahead than the branch allows.
+export async function assertWithinBookingHorizon(branchId: string, scheduledAt: Date, now = new Date()) {
+  const { bookingMaxDays } = await getBranchSettings(branchId);
+  const latest = new Date(now);
+  latest.setDate(latest.getDate() + bookingMaxDays);
+  latest.setHours(23, 59, 59, 999);
+  if (scheduledAt > latest)
+    throw new BadRequestError(`Bookings can be made up to ${bookingMaxDays} days ahead at this branch`);
+}
+
 export class ServiceService {
   private serviceRepository: ServiceRepository;
 
@@ -99,6 +110,8 @@ export class ServiceService {
       });
       if (!service) throw new NotFoundError("Service not found");
     }
+
+    await assertWithinBookingHorizon(branch.id, new Date(data.scheduledAt));
 
     const activeAppointment = await prisma.serviceAppointment.findFirst({
       where: {
@@ -272,6 +285,8 @@ export class ServiceService {
         new Date(appointment.scheduledAt).toISOString();
 
     const oldScheduledAt = appointment.scheduledAt;
+    if (isRescheduled)
+      await assertWithinBookingHorizon(appointment.branchId, new Date(data.scheduledAt!));
 
     // ── Persist update ────────────────────────────────────────────────────────
     // Check-in with an odometer reading records it and runs the warranty & campaign check;
@@ -633,6 +648,7 @@ export class ServiceService {
             "Estimates can only be added to unbilled jobs",
           );
         const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
+        // Each part record once: a used or local version of a part is its own record (source record).
         if (
           new Set(billable.map((line) => `${line.type}:${line.referenceId}`))
             .size !== billable.length
@@ -672,6 +688,7 @@ export class ServiceService {
           let description = line.description ?? "";
           let rate = 0;
           let quantity = line.quantity;
+          let partSource: string | null = null;
           if (line.type === "PART") {
             const part = line.referenceId
               ? await tx.sparePart.findUnique({
@@ -683,6 +700,8 @@ export class ServiceService {
               throw new BadRequestError(
                 `Retail rate is not set for ${part.partNumber}`,
               );
+            // Snapshot of the chosen record's source (part flag), kept for reporting.
+            partSource = part.partFlag;
             description = part.name;
             rate = part.retailRate;
           } else if (line.type === "LABOUR") {
@@ -730,6 +749,7 @@ export class ServiceService {
           const { includedInService, ...fields } = line;
           lines.push({
             ...fields,
+            partSource,
             type: includedInService ? `INCLUDED_${line.type}` : line.type,
             description,
             rate: includedInService ? 0 : rate,

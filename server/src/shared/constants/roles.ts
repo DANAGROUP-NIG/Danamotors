@@ -107,6 +107,10 @@ export const PERMISSIONS = {
   LABOUR_ITEM_CREATE: "labour-item:create",
   LABOUR_ITEM_UPDATE: "labour-item:update",
 
+  // ── Employee Master ───────────────────────────────────────────────────────
+  EMPLOYEE_READ: "employee:read",
+  EMPLOYEE_MANAGE: "employee:manage",
+
   // ── Service — Inspections ─────────────────────────────────────────────────
   INSPECTION_READ: "inspection:read",
   INSPECTION_CREATE: "inspection:create",
@@ -265,6 +269,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.DELIVERED_SERVICE_READ, PERMISSIONS.WARRANTY_ATTENDED_READ,
     PERMISSIONS.WARRANTY_PARTS_READ, PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
     PERMISSIONS.CORPORATE_MANAGE,
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.OUTSTANDING_RECALCULATE,
     PERMISSIONS.OUTSTANDING_LETTER,
     PERMISSIONS.PARTY_LEDGER_READ,
@@ -455,6 +461,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
+  //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.BOOKED_VS_AVAILED_READ,
@@ -468,6 +475,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
     PERMISSIONS.CORPORATE_MANAGE,
 
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
@@ -595,6 +604,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.DELIVERED_SERVICE_READ,
     PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
 
+    PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -632,6 +642,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    PERMISSIONS.EMPLOYEE_READ,
+    PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,

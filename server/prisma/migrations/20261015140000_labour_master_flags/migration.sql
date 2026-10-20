@@ -1,0 +1,10 @@
+-- Legacy labourhead / labour flags. Defaults follow what most legacy labour codes have.
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "majorLabour" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "insured" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "approvalRequired" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "externalLabour" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "underAmc" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "followUpAnalysis" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "amountEditable" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "includeInTopN" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "LabourItem" ADD COLUMN IF NOT EXISTS "inactiveDate" TIMESTAMP(3);

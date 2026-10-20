@@ -162,3 +162,21 @@ describe("listPartsQuerySchema", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("legacy part master fields", () => {
+  const base = { partNumber: "0001217203", name: "RING-SNAP", category: "Engine", uom: "NOS", unitRate: 1021.14 };
+
+  it("accepts the legacy classification and ordering fields", async () => {
+    const result = await createPartMasterSchema.parseAsync({
+      body: { ...base, vehicleSystem: "GEN", vehicleGroup: "SER", applicableModels: ["X5", "X3"], moq: 2000, conversionFactor: 1,
+        basicRate: 51.33, nspDate: "2023-11-14", nlaDate: null, blockReserve: true, topMover: true },
+    });
+    expect(result.body.applicableModels).toEqual(["X5", "X3"]);
+    expect(result.body.nspDate).toEqual(new Date("2023-11-14"));
+  });
+
+  it("rejects a zero MOQ or conversion factor", async () => {
+    await expect(createPartMasterSchema.parseAsync({ body: { ...base, moq: 0 } })).rejects.toThrow();
+    await expect(createPartMasterSchema.parseAsync({ body: { ...base, conversionFactor: 0 } })).rejects.toThrow();
+  });
+});

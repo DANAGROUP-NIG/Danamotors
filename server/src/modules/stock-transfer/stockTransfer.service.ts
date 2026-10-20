@@ -38,6 +38,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../shared/erro
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationPayload, NotificationService } from "../notification/notification.service";
 import { reportEnd, reportStart } from "../finance/party-report";
+import { indentablePartWhere, indentProblem } from "../inventory/partSource";
 import {
   DOC_TYPES,
   DocType,
@@ -94,6 +95,7 @@ const partSelect = {
     storeLocation: true,
     role: true,
     mainPartId: true,
+    sourceOfPartId: true,
     partStatus: true,
     partFlag: true,
     priceCategoryCode: true,
@@ -508,12 +510,16 @@ export class StockTransferService {
       ...partSelect,
     });
     if (!part) throw new NotFoundError("Part not found");
+    // CPD supplies Mobis parts; local, used and repaired records are bought by the branch.
+    const problem = indentProblem(part);
+    if (problem) throw new BadRequestError(problem);
 
     const rootId = part.mainPartId ?? part.id;
     const family = await prisma.sparePart.findMany({
       where: {
         id: { not: part.id },
         partStatus: PartStatus.ACTIVE,
+        ...indentablePartWhere,
         OR: [{ id: rootId }, { mainPartId: rootId }],
       },
       ...partSelect,
@@ -559,6 +565,8 @@ export class StockTransferService {
     const parts = await prisma.sparePart.findMany({
       where: {
         partStatus: PartStatus.ACTIVE,
+        // Local, used and repaired records are bought by the branch, never transferred.
+        ...indentablePartWhere,
         OR: [
           { partNumber: { contains: params.search, mode: "insensitive" } },
           { name: { contains: params.search, mode: "insensitive" } },
@@ -614,6 +622,8 @@ export class StockTransferService {
       if (part.partStatus !== PartStatus.ACTIVE) {
         throw new BadRequestError(`Part ${part.partNumber} is blocked and cannot be requested`);
       }
+      const problem = indentProblem(part);
+      if (problem) throw new BadRequestError(problem);
     }
 
     const jobCardIds = [...new Set(input.lines.map((l) => l.jobCardId).filter(Boolean))] as string[];
@@ -830,6 +840,8 @@ export class StockTransferService {
         if (alt.partStatus !== PartStatus.ACTIVE) {
           throw new BadRequestError(`Alternate part ${alt.partNumber} is blocked`);
         }
+        const problem = indentProblem(alt);
+        if (problem) throw new BadRequestError(problem);
         if (!isSameFamily(line.part, alt)) {
           throw new BadRequestError(
             `Part ${alt.partNumber} is not an alternate of requested part ${line.part.partNumber}`,
@@ -1367,6 +1379,8 @@ export class StockTransferService {
       const part = parts.find((p) => p.id === line.partId);
       if (!part) throw new NotFoundError(`Part ${line.partId} not found`);
       if (part.partStatus !== PartStatus.ACTIVE) throw new BadRequestError(`Part ${part.partNumber} is blocked`);
+      const problem = indentProblem(part);
+      if (problem) throw new BadRequestError(problem);
       if (!Number.isInteger(line.quantity) || line.quantity <= 0) {
         throw new BadRequestError(`${part.partNumber}: quantity must be a whole number above zero`);
       }

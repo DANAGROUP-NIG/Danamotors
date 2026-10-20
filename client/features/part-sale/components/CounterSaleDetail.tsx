@@ -23,6 +23,7 @@ import {
   previewSale,
 } from "../lib/part-sale-format";
 import type { CounterSale } from "../types/part-sale.types";
+import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -358,6 +359,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
             </div>
           </div>
         )}
+        <DocumentTermsBlock documentType="COUNTER_SALE" branchId={sale.branchId} />
       </div>
 
       {dialog === "return" && <ReturnDialog sale={sale} onClose={() => setDialog(null)} />}

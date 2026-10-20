@@ -5,7 +5,8 @@ import { z } from "zod";
 import prisma from "../../prisma/client";
 import { assertBranchOwnership, requireRole } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
-import { repeatWindowStart, jobStatusFilter } from "./job-card-workflow.service";
+import { repeatCandidateWhere, jobStatusFilter } from "./job-card-workflow.service";
+import { defaultBranchSettings, getBranchSettings } from "../company-settings/company-settings.service";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
@@ -96,13 +97,22 @@ router.get(
 router.get(
   "/vehicles/:id/recent-jobs",
   requirePermission(PERMISSIONS.JOBCARD_READ),
-  validateRequest(jobCardIdParamSchema),
+  validateRequest(jobCardIdParamSchema.extend({
+    query: z.object({
+      branchId: z.string().uuid().optional(),
+      mileage: z.coerce.number().int().nonnegative().optional(),
+    }),
+  })),
   async (req, res, next) => {
     try {
+      // Candidates for a repeat job at the branch opening the job card.
+      const branchId = (req.query.branchId as string | undefined) ?? req.user?.branchId ?? undefined;
+      const window = branchId ? await getBranchSettings(branchId) : defaultBranchSettings();
+      const mileage = req.query.mileage === undefined ? undefined : Number(req.query.mileage);
       const jobs = await prisma.jobCard.findMany({
         where: {
           vehicleId: req.params.id,
-          createdAt: { gte: repeatWindowStart() },
+          ...repeatCandidateWhere(window, mileage),
           status: { notIn: ["Cancelled", "CANCELLED"] },
         },
         select: {

@@ -8,13 +8,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getJobCardRequest } from "../../api/job-card.api";
 import type { CreateJobCardFormValues } from "../../schemas/job-card.schema";
-import { WorkshopPicker } from "../WorkshopPicker";
+import { WorkshopPicker, type PickerRecord } from "../WorkshopPicker";
 import { CurrencyInput, OpeningCard, openingInput, money, formatDate } from "./opening-ui";
+
+type DefectOption = PickerRecord & { estimate?: { partAmount: number; oilAmount: number; labourAmount: number } | null };
 
 export const emptyRequest = () => ({
   description: "",
   complaintCodeId: "",
-  defectCode: "",
   spare: 0,
   oil: 0,
   labour: 0,
@@ -63,13 +64,18 @@ export function CustomerRequestsTab(
     name: "complaints",
   });
 
+  const vehicleId = useWatch({
+    control,
+    name: "vehicleId",
+  });
+
   const totals = requestTotals(rows);
   const table = useRef<HTMLDivElement>(null);
 
   return (
     <div className="space-y-5"><OpeningCard
         title="Customer requests"
-        description="Select a database defect code to fill the description, then add request details. Amounts update the opening estimate automatically."
+        description="Type the customer's request. Optionally pick a workshop defect code: it fills the description and its estimate for this model. Amounts update the opening estimate automatically."
         action={<Button
           type="button"
           variant="outline"
@@ -114,45 +120,36 @@ export function CustomerRequestsTab(
                     });
                   }}><Trash2 className="h-4 w-4" /></button></div>
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"><Controller
-                  name={`complaints.${index}.defectCode`}
+                  name={`complaints.${index}.complaintCodeId`}
                   control={control}
                   render={(
                     {
                       field,
                     },
                   ) => <WorkshopPicker
-                    label="Defect"
-                    required
-                    endpoint="/job-cards/defect-codes"
+                    label="Defect code (optional)"
+                    endpoint={`/job-cards/defect-codes${vehicleId ? `?vehicleId=${vehicleId}` : ""}`}
                     collection="items"
                     requestLimit={20} staleTime={60_000} loadOnValue={false}
-                    getOptionId={record => record.code ?? record.id}
                     value={field.value || ""}
-                    selectedRecord={field.value ? {
-                      id: field.value,
-                      code: field.value,
-                      description: rows[index]?.description,
-                    } : undefined}
                     onBlur={field.onBlur}
-                    error={errors.complaints?.[index]?.defectCode?.message}
-                    onChange={id => {
-                      field.onChange(id);
-
-                      setValue(`complaints.${index}.complaintCodeId`, "", {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
-                    }}
+                    onChange={field.onChange}
                     onSelect={record => {
-                      setValue(`complaints.${index}.defectCode`, record.code ?? "", {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
+                      const row = getValues(`complaints.${index}`);
+                      if (!row.description?.trim())
+                        setValue(`complaints.${index}.description`, record.description ?? "", {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
 
-                      setValue(`complaints.${index}.description`, record.description ?? "", {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      });
+                      // Fill the defect's estimate for this model unless amounts were already entered.
+                      const estimate = (record as DefectOption).estimate;
+                      if (estimate && !row.spare && !row.oil && !row.labour)
+                        for (const [key, amount] of [["spare", estimate.partAmount], ["oil", estimate.oilAmount], ["labour", estimate.labourAmount]] as const)
+                          setValue(`complaints.${index}.${key}`, amount, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
                     }} />} /><label className="grid content-start gap-1.5 text-sm font-medium"><span>Description <span className="text-destructive">*</span></span><input
                     aria-label={`Request ${index + 1} description`}
                     className={openingInput}
