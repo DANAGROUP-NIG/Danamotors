@@ -67,14 +67,8 @@ jobs:
       - name: 🏗️  Build (compile to dist/)
         run: npm run build
 
-      # Placeholder — wire up real tests (Jest / Vitest) when added.
       - name: 🧪  Run tests
-        run: |
-          if npm run test --if-present 2>/dev/null; then
-            echo "✅ Tests passed"
-          else
-            echo "ℹ️  No test script found — skipping"
-          fi
+        run: npm test -- --runInBand
         continue-on-error: false
 
 # ─────────────────────────────────────────────────────────────

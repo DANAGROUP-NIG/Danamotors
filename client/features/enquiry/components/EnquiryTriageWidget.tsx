@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import Link from "next/link";
 import { useEnquiries } from "../hooks/use-enquires";
@@ -23,7 +24,7 @@ export default function EnquiryTriageWidget() {
     <div className="rounded-lg bg-[#071225] p-4 text-white">
       <h3 className="mb-3 text-sm font-semibold">Triage Queue</h3>
       {isLoading ? (
-        <div>Loading…</div>
+        <LoadingSkeleton variant="list" compact />
       ) : (
         <ul className="flex flex-col gap-2">
           {(data?.enquiries ?? []).map((e) => (

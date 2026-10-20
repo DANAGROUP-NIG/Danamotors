@@ -11,6 +11,7 @@ export type AppRole =
   | "billingofficer"
   | "serviceadviser"
   | "technician"
+  | "engineer"
   | "receptionist"
   | "receptionmanager"
   | "warrantyofficer"
@@ -262,3 +263,7 @@ export const APPOINTMENT_CREATE_ROLES: AppRole[] = [
   'receptionmanager',
   'serviceadviser',
 ];
+export const MONTHLY_REPORT_PERMISSIONS = ["report:tax-register", "report:booked-vs-availed", "report:estimate-vs-job", "report:unbilled-parts", "report:corporate-bills", "report:delivered-model", "report:delivered-service", "report:warranty-attended", "report:warranty-parts", "report:vehicle-history-card"] as const;
+
+// Estimate actions are independent API permissions.
+export const ESTIMATE_PERMISSIONS = { READ: "estimate:read", CREATE: "estimate:create", REVISE: "estimate:revise", PRINT: "estimate:print", SIGN: "estimate:sign" } as const;

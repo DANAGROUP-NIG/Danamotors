@@ -1,3 +1,4 @@
+import { scopeJobCard } from "./job-card-visibility";
 import { Request, Response, NextFunction } from "express";
 import { ServiceService } from "./service.service";
 import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
@@ -82,7 +83,7 @@ export class ServiceController {
       );
       res
         .status(200)
-        .json({ status: "success", statusCode: 200, data: { labourLines } });
+        .json({ status: "success", statusCode: 200, data: scopeJobCard({ labourLines }, req.user?.permissions ?? []) });
     } catch (error) {
       next(error);
     }
@@ -405,7 +406,7 @@ export class ServiceController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.serviceService.getJobCard(id);
+      const result = await this.serviceService.getJobCard(id, req.user?.permissions ?? []);
       assertBranchOwnership(req, result.branchId);
       res.status(200).json({
         status: "success",
@@ -530,13 +531,14 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { jobCard: { select: { branchId: true } } },
+        select: { branchId:true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
       const result = await this.serviceService.addApproval(
         id,
         req.body,
         req.user?.userId,
+        { deviceOrIp: `${req.ip ?? "unknown"} ${req.get("user-agent") ?? ""}`.slice(0, 1000), allowOverride: [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user!.role as "Admin" | "SuperAdmin") },
       );
       res.status(201).json({
         status: "success",
@@ -558,9 +560,9 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { jobCard: { select: { branchId: true } } },
+        select: { branchId:true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId);
+      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
       const result = await this.serviceService.getApprovals(id);
       res.status(200).json({
         status: "success",

@@ -35,6 +35,7 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 }
 
 export interface CreateJobCardPayload {
+  engineerId?: string;
   branchName: string;
   serviceId?: string;
   serviceTypeId: string;

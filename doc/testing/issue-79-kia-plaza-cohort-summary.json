@@ -1,0 +1,139 @@
+{
+  "selection": {
+    "maxJobs": 100,
+    "maxBookings": 100,
+    "historyScope": "Selected cohort only, not full lifetime history",
+    "graceDays": 7,
+    "matchingPeriodBookings": 166,
+    "matchingPeriodJobs": 177,
+    "completePeriodJobSelection": false,
+    "from": "2026-07-01",
+    "completePeriodBookingSelection": false,
+    "to": "2026-07-31"
+  },
+  "counts": {
+    "Job": 104,
+    "servbook": 100,
+    "jobbill": 75,
+    "jobfatax": 110,
+    "requisitionpartheader": 67,
+    "requisitionpartdetail": 140,
+    "requisitionreturndetail": 3,
+    "requisitionreturnheader": 2,
+    "joblaborhead": 70,
+    "joblabordetail": 86,
+    "JOBLABOR": 0,
+    "JobTrouble": 266,
+    "estimate": 64,
+    "estimateparts": 259,
+    "estimatelabour": 388,
+    "estimatetrouble": 0,
+    "vehiclemaster": 156,
+    "CorporateCustomerVins": 4,
+    "Customer": 143,
+    "model": 17,
+    "variant": 38,
+    "servhead": 8,
+    "partmast": 159,
+    "labourhead": 217,
+    "Employee": 12,
+    "WarrantyHead": 0,
+    "WarrantyDetails": 0
+  },
+  "joins": {
+    "jobbill->Job": {
+      "rows": 75,
+      "unmatched": 0
+    },
+    "jobfatax->jobbill": {
+      "rows": 110,
+      "unmatched": 0
+    },
+    "requisitionpartheader->Job": {
+      "rows": 67,
+      "unmatched": 0
+    },
+    "requisitionpartdetail->requisitionpartheader": {
+      "rows": 140,
+      "unmatched": 0
+    },
+    "requisitionreturndetail->requisitionpartheader": {
+      "rows": 3,
+      "unmatched": 0
+    },
+    "joblaborhead->Job": {
+      "rows": 70,
+      "unmatched": 0
+    },
+    "joblabordetail->joblaborhead": {
+      "rows": 86,
+      "unmatched": 0
+    },
+    "estimateparts->estimate": {
+      "rows": 259,
+      "unmatched": 0
+    },
+    "estimatelabour->estimate": {
+      "rows": 388,
+      "unmatched": 0
+    },
+    "requisitionpartdetail->partmast": {
+      "rows": 140,
+      "unmatched": 0
+    }
+  },
+  "duplicateKeys": {
+    "Job": 0,
+    "servbook": 0,
+    "jobbill": 0,
+    "vehiclemaster": 0,
+    "Customer": 0,
+    "partmast": 0,
+    "estimate": 0
+  },
+  "flags": {
+    "jobbill.cashinv": {
+      "I": 72,
+      "Z": 3
+    },
+    "jobbill.billtype": {
+      "S": 75
+    },
+    "jobbill.cancelled": {
+      "false": 74,
+      "true": 1
+    },
+    "requisitionpartdetail.partflag": {
+      "L": 74,
+      "O": 66
+    },
+    "requisitionpartdetail.warranty": {
+      "N": 137,
+      "W": 3
+    },
+    "partmast.taxcategory": {
+      "A": 140,
+      "B": 12,
+      "C": 7
+    },
+    "partmast.taxable": {
+      "true": 159
+    }
+  },
+  "sourceTotals": {
+    "activeBillAmount": 7422930,
+    "activeBillOutstanding": 7422930,
+    "allCategorySaleAmount": 4432438.05,
+    "allCategoryTaxAmount": 293067.03
+  },
+  "limitations": [
+    "Capped cohort; totals are not complete-month totals.",
+    "Vehicle history is limited to exported jobs.",
+    "No historical warranty snapshot may be invented.",
+    "No claims exported; claim report needs other data.",
+    "Cash/credit and tax category flags require verified source meanings.",
+    "Target conflicts, migrations and branch identity require a reachable target."
+  ],
+  "databaseWrites": 0,
+  "sourceSha256": "898133b684270d3142a88338ff0633dd5d64fb05104095d7a8edef34b2251359"
+}

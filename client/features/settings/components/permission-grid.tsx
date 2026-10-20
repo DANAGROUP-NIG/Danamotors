@@ -1,7 +1,8 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { cn } from "@/lib/utils";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAdminPermissions } from "../hooks/use-admin-roles";
 import { PermissionGroup } from "../api/role.api";
@@ -46,12 +47,7 @@ export function PermissionGrid({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        <Loader2 className="mr-2 size-4 animate-spin" />
-        Loading permissions…
-      </div>
-    );
+    return <LoadingSkeleton variant="form" />;
   }
 
   if (isError || groups.length === 0) {

@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -88,11 +89,7 @@ export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kin
   const notRequired = useSetNotRequired(id);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (error || !take) {
     return (

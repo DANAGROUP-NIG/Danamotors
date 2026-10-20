@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Branch {
+  standaloneEstimates Estimate[]
   outstandingLetters OutstandingLetter[]
   partyNotes             PartyNote[]
   partyAdjustmentBatches PartyAdjustmentBatch[]
@@ -79,6 +80,8 @@ model Branch {
 // ============================================================
 
 model User {
+  capturedEstimateSignatures EstimateSignature[]
+  engineerJobs JobCard[] @relation("JobEngineer")
   createdPartyNotes              PartyNote[]            @relation("PartyNoteCreator")
   partyAdjustmentBatches         PartyAdjustmentBatch[] @relation("PartyAdjustmentActor")
   reversedPartyAdjustmentBatches PartyAdjustmentBatch[] @relation("PartyAdjustmentReverser")
@@ -248,6 +251,7 @@ model AuditLog {
 // ============================================================
 
 model Customer {
+  standaloneEstimates Estimate[]
   outstandingLetters OutstandingLetter[]
   id                     String    @id @default(uuid())
   firstName              String
@@ -397,6 +401,8 @@ model Service {
 }
 
 model ServiceAppointment {
+  serviceTypeId String?
+  serviceType WorkshopMaster? @relation("BookingServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
 
   customerId String
@@ -440,6 +446,8 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  engineerId String?
+  engineer User? @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
 
   appointmentId String?
@@ -553,6 +561,7 @@ model JobCard {
   @@index([customerId])
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
+  @@index([deliveredAt])
   @@index([appointmentId])
   @@index([createdAt, id])
   @@index([branchId, createdAt, id])
@@ -588,14 +597,28 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  version Int @default(1)
+  supersedesId String? @unique
+  supersedes Estimate? @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)
+  successor Estimate? @relation("EstimateVersions")
+  signatures EstimateSignature[]
+
+  estimateNumber String? @unique
+  estimateDate DateTime?
+  vehicleId String?
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
 
-  jobCardId String
-  jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  jobCardId String?
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
 
   description String
   amount      Float
-  currency    String @default("USD")
+  currency    String @default("NGN")
   status      String @default("Pending")
 
   createdAt DateTime @default(now())
@@ -604,10 +627,14 @@ model Estimate {
   lines     EstimateLine[]
   approvals CustomerApproval[]
 
-  @@index([jobCardId])
+  @@index([jobCardId, version])
 }
 
 model CustomerApproval {
+  signatureRequired Boolean @default(true)
+  overrideReason String?
+  signature EstimateSignature?
+
   id String @id @default(uuid())
 
   estimateId String
@@ -632,6 +659,9 @@ model CustomerApproval {
 // ============================================================
 
 model Vehicle {
+  corporateGroupId String?
+  corporateGroup CorporateGroup? @relation(fields: [corporateGroupId], references: [id], onDelete: Restrict)
+  standaloneEstimates Estimate[]
   modelId             String?
   catalogModel        VehicleCatalogModel? @relation(fields: [modelId], references: [id], onDelete: Restrict)
   generationId        String?
@@ -768,6 +798,8 @@ enum PartRole {
 // ============================================================
 
 model SparePart {
+  reportTaxCategoryCode String?
+  reportTaxCategory PartTaxCategory? @relation(fields: [reportTaxCategoryCode], references: [code], onDelete: Restrict)
   id String @id @default(uuid())
 
   partCode    String  @unique @default(uuid())
@@ -1251,6 +1283,9 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  taxRegisterSnapshot Json?
+  billType String?
+  vatBreakdown InvoiceVatBreakdown[]
   serviceTotal Float @default(0)
   id String @id @default(uuid())
 
@@ -1311,6 +1346,7 @@ model Invoice {
   // Set when the invoice is a CPD counter-sale bill (parts sold against customer purchase orders).
   counterSale CounterSale?
 
+  @@index([issuedDate])
   @@index([dueDate, status])
   @@index([customerId])
   @@index([jobCardId])
@@ -1375,6 +1411,8 @@ model JobCardLabour {
 }
 
 model InvoiceLine {
+  jobCardLineId String?
+  jobCardLine JobCardLine? @relation(fields: [jobCardLineId], references: [id], onDelete: Restrict)
   id              String         @id @default(uuid())
   invoiceId       String
   invoice         Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -1802,6 +1840,7 @@ model Enquiry {
 
 // Typed master families share search, activation and legacy-code handling.
 model WorkshopMaster {
+  serviceAppointments ServiceAppointment[] @relation("BookingServiceType")
   id               String           @id @default(uuid())
   kind             String
   code             String
@@ -2764,6 +2803,7 @@ model VehicleModel {
 
 // A priced part or labour line on a job card, with who pays for it.
 model JobCardLine {
+  invoiceLines InvoiceLine[]
   id String @id @default(uuid())
 
   jobCardId String
@@ -2811,6 +2851,7 @@ model JobCardLine {
 
   warrantyCaseLines WarrantyCaseLine[]
 
+  @@index([kind, chargeType, createdAt])
   @@index([jobCardId])
   @@index([campaignId])
   @@index([sparePartId])
@@ -3503,6 +3544,54 @@ model StockTakeCount {
   @@index([lineId])
 }
 
+model PartTaxCategory {
+  code String @id
+  name String
+  parts SparePart[]
+}
+model InvoiceVatBreakdown {
+  id String @id @default(uuid())
+  invoiceId String
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  category String
+  rate Decimal @db.Decimal(5, 2)
+  saleAmount Decimal @db.Decimal(18, 2)
+  discount Decimal @db.Decimal(18, 2)
+  taxableAmount Decimal @db.Decimal(18, 2)
+  vat Decimal @db.Decimal(18, 2)
+  @@unique([invoiceId, category, rate])
+}
+model CorporateGroup {
+  id String @id @default(uuid())
+  code String @unique
+  name String
+  active Boolean @default(true)
+  vehicles Vehicle[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EstimateSignature {
+  id String @id @default(uuid())
+  estimateId String
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Restrict)
+  approvalId String @unique
+  approval CustomerApproval @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  imageReference String
+  signerName String
+  relationship String?
+  capturedByUserId String?
+  capturedBy User? @relation(fields: [capturedByUserId], references: [id], onDelete: Restrict)
+  deviceOrIp String
+  estimateVersion Int
+  totalSigned Float
+  contentHash String
+  signedAt DateTime @default(now())
+  channel String @default("COUNTER")
+  consentStatement String?
+  @@index([estimateId])
+}
+
 // ============================================================
 // EMPLOYEE MASTER (legacy Employee)
 // ============================================================
@@ -3638,13 +3727,20 @@ enum DocumentTermType {
 // (branchId null) or for one branch, which then overrides the company text.
 model DocumentTerms {
   id           String           @id @default(uuid())
+  // Text alias retained for estimate printing; the migration synchronizes it with documentType.
+  type         String
   documentType DocumentTermType
   branchId     String?
   branch       Branch?          @relation(fields: [branchId], references: [id], onDelete: Cascade)
   terms        String[]         @default([])
   footer       String?
+  companyName  String?
+  companyAddress String?
+  companyPhone String?
   updatedAt    DateTime         @updatedAt
 
+  @@unique([type, branchId])
+  @@index([type])
   @@index([documentType, branchId])
 }
 

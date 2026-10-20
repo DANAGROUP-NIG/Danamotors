@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -109,7 +110,7 @@ export default function PortalProfilePage() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+              <LoadingSkeleton variant="form" compact />
             ) : (
               <form
                 className="grid gap-4"

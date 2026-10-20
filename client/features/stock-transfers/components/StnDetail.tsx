@@ -1,8 +1,9 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Boxes, Loader2, PackageCheck, Printer } from "lucide-react";
+import { ArrowLeft, Boxes, PackageCheck, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
@@ -40,11 +41,7 @@ export function StnDetail({ id }: { id: string }) {
   const [receiving, setReceiving] = useState(false);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (error || !stn) {
     return (

@@ -1,3 +1,4 @@
+import { signatureState, type SignatureEvidence } from "./estimate-signature";
 import { Prisma } from '@prisma/client';
 import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { BadRequestError } from '../../shared/errors/appError';
@@ -5,14 +6,42 @@ import { money, sumMoney } from '../finance/money';
 
 // Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
 export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
-export type ApprovalEstimate = { id: string; status: string; currency?: string; amount: number; lines: ScopeLine[]; approvals: { approved: boolean | null; customerId: string }[] };
-export const latestEstimateQuery = { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], take: 1, include: { lines: true, approvals: true } };
+export type ApprovalEstimate = {
+  id: string;
+  version?: number;
+  status: string;
+  currency?: string;
+  amount: number;
+  lines: ScopeLine[];
+  approvals: {
+    approved: boolean | null;
+    customerId: string;
+    signatureRequired?: boolean;
+    overrideReason?: string | null;
+    signature?: SignatureEvidence | null;
+  }[];
+};
+// Every operation gate must load the evidence used to verify the signed revision.
+export const latestEstimateQuery = {
+  orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+  take: 1,
+  include: {
+    lines: true,
+    approvals: {
+      include: {
+        signature: { select: { estimateVersion: true, totalSigned: true, contentHash: true } },
+      },
+    },
+  },
+} satisfies Prisma.EstimateFindManyArgs;
 const baseType = (type: string) => type.replace('INCLUDED_', '');
 const key = (line: ScopeLine) => `${baseType(line.type)}:${line.referenceId ?? ''}`;
 
 export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actual: ScopeLine[], customerId?: string | null) {
-  const approved = !!estimate && estimate.status.toUpperCase() === 'APPROVED' && estimate.approvals.some(a => a.approved === true && a.customerId === customerId);
+  const approved = !!estimate && estimate.status.toUpperCase() === 'APPROVED' && estimate.approvals.some(a => a.approved === true && a.customerId === customerId && signatureState(estimate, a) !== 'invalid');
   const issues: string[] = [];
+  const invalid = estimate?.approvals.some(a => signatureState(estimate, a) === 'invalid');
+  if (invalid) issues.push('Estimate signature is invalid. Revise and obtain a new signature.');
   if (!approved) issues.push(!estimate ? 'Prepare an estimate and record customer approval first.' : 'The latest estimate needs customer approval.');
   if (estimate?.currency && estimate.currency !== 'NGN') issues.push('Create an NGN estimate revision before proceeding.');
   const expected = new Map<string, ScopeLine>();
@@ -39,7 +68,7 @@ export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actu
     if (reason) issues.push(`${used?.description ?? planned?.description}: ${reason}. Revise the estimate and obtain approval.`);
     return { type: baseType((used ?? planned)!.type), referenceId: (used ?? planned)!.referenceId, partSource: (used ?? planned)!.partSource ?? null, description: (used ?? planned)!.description, approvedQuantity: planned?.quantity ?? 0, actualQuantity: used?.quantity ?? 0, approvedAmount, actualAmount, difference: money(actualAmount - approvedAmount), included, reason };
   });
-  return { estimateId: estimate?.id ?? null, status: !estimate ? 'Draft' : approved ? (issues.length ? 'Revision Required' : 'Approved') : estimate.status.toUpperCase() === 'DECLINED' ? 'Revision Required' : 'Awaiting Approval', canBill: issues.length === 0, issues, rows, approvedSubtotal: sumMoney(rows.map(row => row.approvedAmount)), actualSubtotal: sumMoney(rows.map(row => row.actualAmount)) };
+  return { estimateId: estimate?.id ?? null, status: invalid ? 'Invalid' : !estimate ? 'Draft' : approved ? (issues.length ? 'Revision Required' : 'Approved') : estimate.status.toUpperCase() === 'DECLINED' ? 'Revision Required' : 'Awaiting Approval', canBill: issues.length === 0, issues, rows, approvedSubtotal: sumMoney(rows.map(row => row.approvedAmount)), actualSubtotal: sumMoney(rows.map(row => row.actualAmount)) };
 }
 
 // Call while holding the JobCard row lock. All estimate decisions and work writes share it.
