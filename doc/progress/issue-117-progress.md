@@ -1,0 +1,13 @@
+# Issue 117 progress
+
+Plan: M1 permissions and seed regression; M2 permission-based job detail scope; M3 additive version/signature schema; M4 immutable revisions; M5 signed decisions and integrity gate; M6 isolated print; M7 runbook and verification. Commit each milestone locally. Never push or access a non-local database.
+
+- [x] M1 Permissions: 85 role/action and repeated-seed tests passed. Existing job-bill route uses its own permission. System Node executable required because default nvm shim has no active version.
+- [x] M2 Job detail scope: two nested-data visibility tests passed; service defaults to no financial access.
+- [x] M3 Schema: additive migration; historical versions backfilled; legacy approvals explicitly preserved, new approvals require signatures. Prisma schema validation passed using a localhost placeholder (no database contacted). Client types generated, but engine DLL replacement hit Windows EPERM (existing process lock); final generation remains to verify.
+- [x] M4 Revisions: pure revision plan tests passed; existing catalogue validation and shared job lock reused. Create rejects existing scope; revise requires latest source; old values and new scope audited transactionally.
+- [ ] M5 Signatures
+- [ ] M6 Print
+- [ ] M7 Documentation and verification
+
+Defaults: WorkshopManager creates first estimates and prints, without signing. ServiceManager revises/prints/signs without creating. BillingOfficer remains home-branch only, without estimate access. View-only callers receive operational fields without prices. Remote signatures deferred. Account creation is a runbook only. Existing estimate number/date fields from #79 will be reused.

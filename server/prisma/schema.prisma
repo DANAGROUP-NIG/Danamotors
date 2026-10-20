@@ -72,6 +72,7 @@ model Branch {
 // ============================================================
 
 model User {
+  capturedEstimateSignatures EstimateSignature[]
   engineerJobs JobCard[] @relation("JobEngineer")
   createdPartyNotes              PartyNote[]            @relation("PartyNoteCreator")
   partyAdjustmentBatches         PartyAdjustmentBatch[] @relation("PartyAdjustmentActor")
@@ -567,6 +568,12 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  version Int @default(1)
+  supersedesId String? @unique
+  supersedes Estimate? @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)
+  successor Estimate? @relation("EstimateVersions")
+  signatures EstimateSignature[]
+
   estimateNumber String? @unique
   estimateDate DateTime?
   vehicleId String?
@@ -591,10 +598,14 @@ model Estimate {
   lines     EstimateLine[]
   approvals CustomerApproval[]
 
-  @@index([jobCardId])
+  @@index([jobCardId, version])
 }
 
 model CustomerApproval {
+  signatureRequired Boolean @default(true)
+  overrideReason String?
+  signature EstimateSignature?
+
   id String @id @default(uuid())
 
   estimateId String
@@ -3387,4 +3398,25 @@ model CorporateGroup {
   vehicles Vehicle[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model EstimateSignature {
+  id String @id @default(uuid())
+  estimateId String
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Restrict)
+  approvalId String @unique
+  approval CustomerApproval @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+  imageReference String
+  signerName String
+  relationship String?
+  capturedByUserId String?
+  capturedBy User? @relation(fields: [capturedByUserId], references: [id], onDelete: Restrict)
+  deviceOrIp String
+  estimateVersion Int
+  totalSigned Float
+  contentHash String
+  signedAt DateTime @default(now())
+  channel String @default("COUNTER")
+  consentStatement String?
+  @@index([estimateId])
 }

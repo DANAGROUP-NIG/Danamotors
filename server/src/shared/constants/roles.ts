@@ -115,6 +115,9 @@ export const PERMISSIONS = {
   ESTIMATE_READ: "estimate:read",
   ESTIMATE_CREATE: "estimate:create",
   ESTIMATE_APPROVE: "estimate:approve",
+  ESTIMATE_REVISE: "estimate:revise",
+  ESTIMATE_PRINT: "estimate:print",
+  ESTIMATE_SIGN: "estimate:sign",
 
   // ── Services Catalog ──────────────────────────────────────────────────────
   SERVICES_READ: "services:read",
@@ -369,6 +372,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CREDIT_NOTE_CANCEL,
     PERMISSIONS.DEBIT_NOTE_REGISTER_READ,
     PERMISSIONS.CREDIT_NOTE_REGISTER_READ,
+    PERMISSIONS.ESTIMATE_REVISE,
+    PERMISSIONS.ESTIMATE_PRINT,
+    PERMISSIONS.ESTIMATE_SIGN,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -470,7 +476,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
-    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.ESTIMATE_CREATE,
     PERMISSIONS.ESTIMATE_READ,
     PERMISSIONS.VEHICLE_READ,
@@ -507,6 +512,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.ESTIMATE_PRINT,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
@@ -580,6 +586,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TALLY_POST,
     PERMISSIONS.TALLY_IMPORT,
     PERMISSIONS.CUSTOMER_TALLY_MAPPING,
+    PERMISSIONS.JOBCARD_READ,
   ],
 
   // Handles estimates, approvals, customer liaison during service
@@ -606,8 +613,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.ESTIMATE_READ,
-    PERMISSIONS.ESTIMATE_CREATE,
-    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.WORKSHOP_READ,
     PERMISSIONS.SPAREPART_READ,
     PERMISSIONS.STOCK_READ,
@@ -619,6 +624,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.ESTIMATE_REVISE,
+    PERMISSIONS.ESTIMATE_PRINT,
+    PERMISSIONS.ESTIMATE_SIGN,
+    PERMISSIONS.JOBCARD_UPDATE,
   ],
 
   // Manages service operations, oversees service advisors and technicians
@@ -642,8 +651,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.ESTIMATE_READ,
-    PERMISSIONS.ESTIMATE_CREATE,
-    PERMISSIONS.ESTIMATE_APPROVE,
     PERMISSIONS.WORKSHOP_READ,
     PERMISSIONS.SPAREPART_READ,
     PERMISSIONS.STOCK_READ,
@@ -655,6 +662,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
+    PERMISSIONS.ESTIMATE_REVISE,
+    PERMISSIONS.ESTIMATE_PRINT,
+    PERMISSIONS.ESTIMATE_SIGN,
   ],
 
   // Executes repairs, updates job card progress
@@ -695,6 +705,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.JOBCARD_READ,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
@@ -726,7 +737,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ENQUIRY_UPDATE,
     PERMISSIONS.ENQUIRY_DELETE,
     PERMISSIONS.JOBCARD_READ,
-    PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,

@@ -1,3 +1,5 @@
+import { planEstimateRevision } from "./estimate-revision";
+import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
 import {
@@ -531,7 +533,7 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string) {
+  async getJobCard(id: string, permissions: readonly string[] = []) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
@@ -555,7 +557,7 @@ export class ServiceService {
             },
           })
         : [];
-    return {
+    return scopeJobCard({
       ...card,
       campaigns: card.campaigns.map((c) => ({
         ...c,
@@ -563,7 +565,7 @@ export class ServiceService {
           campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
           null,
       })),
-    };
+    }, permissions);
   }
 
   async updateJobCard(
@@ -603,6 +605,7 @@ export class ServiceService {
     jobCardId: string,
     input: z.infer<typeof estimateBody>,
     actorId?: string,
+    supersedesId?: string,
   ) {
     const data = estimateBody.parse(input);
     return prisma.$transaction(
@@ -761,9 +764,12 @@ export class ServiceService {
             where: { jobCardId },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
-            select: { createdAt: true },
+            include: { lines: true },
           })
         )?.[0];
+        const revision = planEstimateRevision(previous, supersedesId, { description: data.description, amount: sumMoney(lines.map(line => line.amount)), lines });
+        if (previous) await tx.estimate.update({ where: { id: previous.id }, data: { status: "SUPERSEDED" } });
+        if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: previous ? "ESTIMATE_REVISED" : "ESTIMATE_CREATED", details: JSON.stringify({ jobCardId, supersedesId: revision.supersedesId, version: revision.version, ...revision.diff }) } });
         // Strict ordering under the shared row lock, including transactions started earlier.
         const createdAt = new Date(
           Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1),
@@ -773,6 +779,8 @@ export class ServiceService {
             createdAt,
             estimateDate: createdAt,
             estimateNumber: await nextDocumentNumber(tx, "ESTIMATE"),
+            version: revision.version,
+            supersedesId: revision.supersedesId,
             jobCardId,
             description: data.description,
             currency: "NGN",
