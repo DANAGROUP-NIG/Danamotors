@@ -137,3 +137,33 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - server/src/modules/requisition/requisition.logic.ts
 - server/src/routes/index.ts
 - doc/progress/issue-113-progress.md
+
+
+## P5 milestone
+- Extended the existing ServiceAppointment model and APIs; no second booking model or additional migration. Portal/campaign creation uses ServiceService and enquiry approval uses ServiceRepository; all now share the transactional numbered creator.
+- Booking numbers use DocumentSequence per branch and Lagos year. The stored number is `<branch UUID>/<YYYY + six-digit sequence>` because bookingNumber is globally unique. TODO(confirm): a shorter business-facing branch prefix can replace the UUID once a stable branch code is agreed; no existing numbers are rewritten.
+- createdAt remains the automatic booking timestamp, scheduledAt remains booked-for. Detail/list responses retain linked customer/vehicle data and include workshop service type, AC flag, booking mileage, optional earlier same-vehicle/same-branch follow-up job, requests and decimal-derived parts/oil/labour/total estimates. Booking search includes the number; scheduled-date filtering and notifications use Lagos time.
+- Optional requests reuse the job complaint validator/resolver: complaint master, defect code, description and spare/oil/labour estimates. Header totals cannot override calculated request totals. Replacing requests is transactional and audited with old/new values. Booking mileage does not update the actual vehicle odometer until check-in or job opening.
+- Canonical bookingStatus is BOOKED, CONVERTED, CANCELLED or NO_SHOW. Existing legacy appointment status remains compatible with its workshop lifecycle; canonical cancellation/no-show maps to its legacy status. Both cancellation paths require a reason, terminal bookings cannot be reopened, and cancelled/no-show bookings release the existing active-booking restriction. Cancellation retains existing role notifications.
+- POST /api/service/appointments/:id/convert requires both appointment:update and jobcard:create. It derives customer, vehicle, service, AC and saved requests from the booking and runs the existing job-opening workflow. Empty bookings remain valid, but job opening still requires a complaint supplied by the caller. Booking totals exclude the model service charge; normal job opening adds that charge as before.
+- Vehicle-then-booking locks serialize conversion, check-in and booking edits. A booking version check rejects stale conversion data. Job creation, the appointmentId reverse link, CONVERTED status, numbering, actual mileage and conversion audit share one transaction. The legacy job-opening endpoint applies the same copying and single-conversion rule; even a subsequently cancelled job cannot cause a second conversion.
+- Branch-bound create/list/get/update/delete/convert requests reject foreign branches with 403; branch:all and SuperAdmin retain all-branch access. Unassigned accounts cannot convert. No permission grants were added. Converted/linked bookings reject header/request changes. TODO(confirm), safe deletion default: numbered bookings retain their history and must be cancelled with a reason; legacy unnumbered deletion rechecks links under a row lock.
+- Customer/vehicle creation and duplicate warnings remain on the existing customer/vehicle APIs. P7 can use those APIs for inline creation before booking; booking IDs and bill-to behavior are preserved rather than introducing a parallel customer form or new vehicle validation rules. A follow-up link does not silently mark a job as a repeat.
+- Passed: 3 new pure/validation tests, 2 new permission/branch tests, existing branch and job-opening regressions; full backend suite 81 passed suites / 985 passed tests, 20 database suites / 158 tests skipped in the non-database run. All 12 new booking integration tests passed on a disposable localhost database, including simultaneous conversion, duplicate creation, follow-up validation, request replacement, cancellation/no-show, legacy opening, failed validation, audit-failure rollback, mileage and warranty/campaign acknowledgement.
+- Strict backend typecheck/lint and build passed. No dependencies, screenshots, browser/dev-server runs, frontend changes or non-local database writes. No push, PR or issue mutation. P6-P8 remain pending.
+
+### P5 files changed
+- server/src/modules/service/booking.logic.ts
+- server/src/modules/service/booking.logic.test.ts
+- server/src/modules/service/booking.persistence.ts
+- server/src/modules/service/booking.routes.test.ts
+- server/src/modules/service/booking.integration.test.ts
+- server/src/modules/service/service.validation.ts
+- server/src/modules/service/service.repository.ts
+- server/src/modules/service/service.service.ts
+- server/src/modules/service/service.controller.ts
+- server/src/modules/service/service.routes.ts
+- server/src/modules/service/job-card-workflow.service.ts
+- server/src/modules/service/branch-access.test.ts
+- server/src/modules/enquiry/enquiry.service.ts
+- doc/progress/issue-113-progress.md

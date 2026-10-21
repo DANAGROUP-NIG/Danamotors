@@ -4,7 +4,7 @@ import { ServiceService } from "./service.service";
 import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import prisma from "../../prisma/client";
-import { ForbiddenError } from "../../shared/errors/appError";
+import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 import { LabourService } from "./labour.service";
 
 export class ServiceController {
@@ -177,20 +177,9 @@ export class ServiceController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      // Admin can only create appointments in their own branch
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user) &&
-        req.user.branchId &&
-        req.body.branchName
-      ) {
-        const userBranch = await prisma.branch.findUnique({
-          where: { id: req.user.branchId },
-        });
-        if (userBranch) {
-          req.body.branchName = userBranch.name;
-        }
-      }
+      const branch = await prisma.branch.findUnique({ where: { name: req.body.branchName } });
+      if (!branch) throw new NotFoundError("Branch not found");
+      assertBranchOwnership(req, branch.id);
 
       const createdById = req.user?.userId;
       const result = await this.serviceService.createAppointment({
@@ -231,6 +220,7 @@ export class ServiceController {
         !canAccessAllBranches(req.user)
       ) {
         if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+        if (branchId && branchId !== req.user.branchId) throw new ForbiddenError("Cannot access another branch");
         branchId = req.user.branchId;
       }
 
@@ -291,6 +281,7 @@ export class ServiceController {
       const result = await this.serviceService.updateAppointment(id, {
         ...req.body,
         requestingUserRole: req.user?.role,
+        actorId: req.user?.userId,
       });
       res.status(200).json({
         status: "success",
@@ -301,6 +292,15 @@ export class ServiceController {
     } catch (error) {
       next(error);
     }
+  };
+
+  convertAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const appointment = await this.serviceService.getAppointment(req.params.id);
+      assertBranchOwnership(req, appointment.branchId);
+      const result = await this.serviceService.convertAppointment(req.params.id, req.body, req.user!.userId);
+      res.status(201).json({ status: "success", statusCode: 201, data: { jobCard: result } });
+    } catch (error) { next(error); }
   };
 
   deleteAppointment = async (
