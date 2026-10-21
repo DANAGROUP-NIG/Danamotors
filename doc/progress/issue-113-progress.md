@@ -263,3 +263,10 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - server/src/modules/requisition/requisition.integration.test.ts
 - server/src/modules/requisition/return-slip.integration.test.ts
 - doc/progress/issue-113-progress.md
+
+
+## Post-P8 startup repair
+- Reported startup failure: AppointmentRequest.defectCode missing despite all recorded migrations being applied. The original table migration includes the column; the specific cause of database drift was not established and no remote database was inspected or modified.
+- Added forward migration 20261021140000_appointment_request_defect_code_repair using ADD COLUMN IF NOT EXISTS, nullable TEXT. Existing migration history and request data are preserved. Updated deployment documentation.
+- Passed two live integration cases on disposable localhost PostgreSQL: missing column and existing column, including nullability/type, row preservation and repeat application with a populated defect code.
+- Backend strict TypeScript check passed (also the backend lint command). Remote database untouched; rerun db:prepare from server before restarting.
