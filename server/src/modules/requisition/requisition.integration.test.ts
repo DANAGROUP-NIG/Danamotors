@@ -64,6 +64,7 @@ describeDb('Requisitions on isolated local PostgreSQL', () => {
     const document = await service.create(input(card.id, { lines: [{ sparePartId: partId, quantityRequired: 3, quantityIssued: 3 }, { sparePartId: secondPartId, quantityRequired: 2, quantityIssued: 2 }] }), actor);
     expect(document.requisitionNumber).toMatch(/^\d{10}$/);
     expect(document.lines).toHaveLength(2);
+    expect(document.lines.find(line => line.sparePartId === partId)?.partNumber).toBe(`REQ1-${run}`);
     expect(document.totals.totalAmount).toBe(400.03);
     expect(await stock()).toBe(before - 3);
     expect(await db.stockTransaction.count({ where: { referenceId: { in: document.lines.map(line => line.partIssuanceId!) }, type: 'ISSUED' } })).toBe(2);

@@ -16,7 +16,7 @@ const include = {
   requisition: { select: { requisitionNumber: true, requisitionDate: true, chargeType: true } },
   branch: { select: { id: true, name: true } },
   jobCard: { select: { jobNumber: true, createdAt: true, mileage: true, vehicle: { select: { registrationNumber: true, vin: true, model: true, trim: true } } } },
-  lines: { include: { requisitionLine: true } },
+  lines: { include: { requisitionLine: { include: { sparePart: { select: { partNumber: true } } } } } },
 } satisfies Prisma.PartReturnSlipInclude;
 
 export class ReturnSlipService {
@@ -43,7 +43,7 @@ export class ReturnSlipService {
     const slip = await db.partReturnSlip.findUnique({ where: { id }, include });
     if (!slip) throw new NotFoundError('Return slip not found');
     assertRequisitionBranch(actor, slip.branchId);
-    return { ...slip, totals: returnSlipFooter(slip.lines) };
+    return { ...slip, lines: slip.lines.map(line => ({ ...line, partNumber: line.requisitionLine?.sparePart.partNumber ?? null, description: line.requisitionLine?.description ?? null, partSource: line.requisitionLine?.partSource ?? null, uom: line.requisitionLine?.uom ?? null })), totals: returnSlipFooter(slip.lines) };
   }
 
   private assertIssuedLine(line: IssuedLine, requisition: { id: string; branchId: string; jobCardId: string }) {

@@ -125,6 +125,8 @@ describeDb('Item return slips on isolated local PostgreSQL', () => {
     const before = await stock();
     const secondBefore = await stock(secondPartId);
     const slip = await returns.create({ requisitionId: document.id, lines: document.lines.map(line => ({ requisitionLineId: line.id, quantity: line.sparePartId === partId ? 1 : 2 })) }, actor);
+    expect(slip.lines.map(line => line.partNumber).sort()).toEqual([`RET1-${run}`, `RET2-${run}`].sort());
+    expect(slip.lines.find(line => line.partNumber === `RET1-${run}`)?.description).toBe("Original source");
     expect(slip.totals).toEqual({ numberOfItems: 2, netQuantityReturned: 3, totalAmount: 200.01 });
     expect(await stock()).toBe(before + 1);
     expect(await stock(secondPartId)).toBe(secondBefore + 2);

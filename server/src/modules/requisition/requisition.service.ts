@@ -9,7 +9,7 @@ import { assertRequisitionBranch, assertRequisitionJob, RequisitionActor, requis
 import { RequisitionInput, RequisitionQuery, requisitionBody } from './requisition.validation';
 
 const include = {
-  lines: { include: { returns: { select: { quantity: true, status: true } }, jobCardLines: true } },
+  lines: { include: { sparePart: { select: { partNumber: true } }, returns: { select: { quantity: true, status: true } }, jobCardLines: true } },
   jobCard: { select: { jobNumber: true, createdAt: true, mileage: true, vehicle: { select: { registrationNumber: true, vin: true, model: true, trim: true } } } },
   branch: { select: { id: true, name: true } },
   engineer: { select: { id: true, firstName: true, lastName: true } },
@@ -35,7 +35,7 @@ export class RequisitionService {
     const document = await db.partRequisition.findUnique({ where: { id }, include });
     if (!document) throw new NotFoundError('Requisition not found');
     assertRequisitionBranch(actor, document.branchId);
-    return { ...document, totals: requisitionFooter(document.lines) };
+    return { ...document, lines: document.lines.map(line => ({ ...line, partNumber: line.sparePart.partNumber })), totals: requisitionFooter(document.lines) };
   }
 
   async create(input: RequisitionInput, actor: RequisitionActor) {

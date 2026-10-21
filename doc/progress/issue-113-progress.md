@@ -27,7 +27,7 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - [x] P5 numbered bookings, optional requests, cancellation and linked conversion
 - [x] P6 audited remarks in any status, document output and picking print
 - [x] P7 existing-component frontend and permission gating
-- [ ] P8 documentation and Swagger examples
+- [x] P8 documentation and Swagger examples
 
 ## P1 milestone
 - Added bookingNumber, BookingStatus, mileage, cancellation reason, AC flag, optional request rows and follow-up-job relation. The existing appointmentId/jobCards relation already supplies conversion links in both directions.
@@ -242,4 +242,24 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - client/features/service-transactions/transaction.logic.ts
 - client/test/service-transactions-ui.test.mjs
 - client/test/service-transactions.test.mjs
+- doc/progress/issue-113-progress.md
+
+
+## P8 milestone
+- Updated doc/job-cards.md with the six transaction flows, route/permission tables, request and response ownership, per-branch numbering/Lagos dates, booking status vs legacy lifecycle, atomic conversion, warranty acknowledgement, payer splits, stock/return bounds, saved pricing, QC readiness, remarks-only exceptions and internal picking semantics. Corrected the older financial-estimate immutability wording to distinguish audited remarks and clarified booking conversion's saved-customer behavior.
+- Documented the four additive P1/P2/P4/P6 migrations, ROLE_PERMISSIONS seed-reset behavior, no legacy business-data backfill/reset, synthetic examples, local-only testing and the P7 DOM/browser QA limitation. No deployment, migration, seed, remote issue operation or PR was performed.
+- Added service-transactions.openapi.ts as the assembled Swagger source for 21 paths / 29 operations / 10 schemas. It replaces obsolete booking field/status docs (scheduledAt, not scheduledDate), documents all transaction endpoints, uses the configured BearerAuth scheme and preserves existing methods on shared paths. Examples cover minimal/optional booking requests, reschedule/cancel/no-show/conversion, all four parts payers, returns/cancellation, technician/employee labour, remarks/clearing, workDone/READY and selected read responses. Both source assembly and the compiled runtime were verified.
+- Documentation review found a P7 read-contract gap: requisition/return detail and print grids expected a partNumber, while their read models exposed only part IDs. Added a narrow read-only projection from the linked part master; return rows also expose their requisition description/source/UOM. Nullable historical links remain readable with null fields. Stock, rate snapshots, amounts, audit and mutation logic are unchanged. Added assertions to the existing live requisition/return regression tests.
+- Passed: 9 new OpenAPI contract checks using the real Zod route validators, assembled path/security/component/path-parameter checks and preservation of shared job GET/PUT routes. Full backend suite: 84 passed suites / 1006 passed tests; 21 database suites / 174 tests skipped in the non-database run. All 32 affected live tests passed separately on disposable localhost clusters (15 requisition, 17 return), including part-number projection, stock/return history and existing billing/audit rollback behavior.
+- Strict backend typecheck/lint and build passed. Compiled Swagger verified all 21 paths, 29 operations and 10 schemas. No new dependencies or frontend changes. P1-P8 implementation milestones are complete; interactive browser/paper-layout QA and the two external-runtime legacy DOM scripts remain the documented P7 validation limitation.
+
+### P8 files changed
+- doc/job-cards.md
+- server/src/config/swagger.ts
+- server/src/modules/service/service-transactions.openapi.ts
+- server/src/modules/service/service-transactions.openapi.test.ts
+- server/src/modules/requisition/requisition.service.ts
+- server/src/modules/requisition/return-slip.service.ts
+- server/src/modules/requisition/requisition.integration.test.ts
+- server/src/modules/requisition/return-slip.integration.test.ts
 - doc/progress/issue-113-progress.md
