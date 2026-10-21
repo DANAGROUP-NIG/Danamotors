@@ -1,6 +1,6 @@
 # Issue 113 progress
 
-Step 0 and P1 complete on `issue-113/service-transactions`. Stop here; await authorization for P2.
+Step 0, P1 and P2 complete on `issue-113/service-transactions`. Stop here; await authorization for P3.
 
 ## Plan
 1. P1: reconcile shared schema, then add only missing fields in one additive migration.
@@ -21,7 +21,7 @@ Step 0 and P1 complete on `issue-113/service-transactions`. Stop here; await aut
 
 ## Acceptance checklist
 - [x] P1 shared schema reconciled and additive migration verified locally
-- [ ] P2 stock-safe requisitions, rate snapshots, goodwill splits, cancellation and permissions
+- [x] P2 stock-safe requisitions, rate snapshots, goodwill splits, cancellation and permissions
 - [ ] P3 bounded returns, split reductions, reversal and historical row readability
 - [ ] P4 labour slips, separate hours, totals and QC-gated READY
 - [ ] P5 numbered bookings, optional requests, cancellation and linked conversion
@@ -41,3 +41,37 @@ Step 0 and P1 complete on `issue-113/service-transactions`. Stop here; await aut
 - Full backend suite: PASS, 73 suites / 921 tests passed; 16 suites / 100 tests skipped. TEST_DATABASE_URL was empty and DATABASE_URL pointed to an unused localhost port, so database integration tests were intentionally skipped. The separate P1 migration tests ran against disposable local PostgreSQL and passed.
 - Database writes were limited to disposable, localhost-only PostgreSQL clusters under .audit-local. No non-local database access, push, PR or issue mutation.
 - P2–P8 remain pending. Runtime issuance, return, cancellation, numbering and branch-authorization behavior will be implemented and tested in their respective phases.
+
+## P2 milestone
+- Added branch-scoped list/detail/create/cancel and store print-data endpoints under /api/inventory/requisitions, with strict Zod validation and Swagger examples. Actual frontend screens/print layout remain P7.
+- Each requisition uses the existing transactional DocumentSequence helper with a branch-specific key and the Africa/Lagos year. The header, issuance records, stock movements, charge lines and audit write commit or roll back together.
+- Locks the job first, then stock records in stable order. Available stock excludes reserved quantities. Request-only lines can have zero issuance, including when no stock record exists.
+- Source-record prices follow the existing warranty/retail/unit-price rule and are snapshotted with decimal helpers. Warranty requires coverage/case and an eligible part (100/0); goodwill requires its separate permission, a reason and a valid split; free lines retain the existing linked-campaign rule.
+- Both goodwill charge shares reconcile to the original amount. Billing consumes the saved customer charge rather than current source prices. Job-card line synchronization leaves document-managed charges intact, including after cancellation. Existing issuance behavior remains the legacy path.
+- Preserved existing approved-estimate scope checks for issued work. Booking request/estimate optionality does not bypass the existing work-approval gate.
+- Cancellation requires a reason, restores stock once, removes both charge shares and audits the original document amounts/status. Billed/delivered/cancelled jobs or active bills reject writes. Manual charge reallocation and the bare return endpoint cannot bypass requisition snapshots.
+- TODO(confirm), safe default: cancel active returns before cancelling their requisition; existing claim/bill references block cancellation rather than silently losing claim history.
+- TODO(confirm), safe default: issuing/cancelling parts on READY jobs reopens them to IN_PROGRESS, clears readyAt and requires another QC. Request-only documents do not change readiness.
+- Added requisition:read/create/cancel/goodwill to server/client permission constants and ROLE_PERMISSIONS, plus an idempotent permission migration. Store roles get read/create/cancel without goodwill, labour or booking grants. Read grants extend to workshop/service managers, advisors and warranty officers; goodwill defaults to Admin/WarrantyOfficer (SuperAdmin retains its standard bypass).
+- Passed: strict backend typecheck/lint and final build; full backend suite (75 suites, 948 tests passed; 17 suites, 114 tests skipped). After the final QC safeguard, reran the changed requisition logic and database files: 38 tests passed, including 15 real database integration tests. The permission migration applied twice with exactly 19 default grants and no duplicates.
+- Database tests prove multi-part atomic issuance, all four charge types, price snapshots through sync/approval checks and actual invoice creation, no-stock requests, reserved-stock rejection, cross-branch 403, cancellation reversal, concurrency, audit-failure rollback and repeat QC.
+- All database writes used fresh localhost-only PostgreSQL clusters under .audit-local. No non-local database writes, dependency changes, push, PR or issue mutation. P3–P8 remain pending.
+
+### P2 files changed
+- client/features/auth/roles.ts
+- server/prisma/migrations/20261021110000_requisition_permissions/migration.sql
+- server/src/modules/requisition/requisition.logic.ts
+- server/src/modules/requisition/requisition.logic.test.ts
+- server/src/modules/requisition/requisition.validation.ts
+- server/src/modules/requisition/requisition.service.ts
+- server/src/modules/requisition/requisition.controller.ts
+- server/src/modules/requisition/requisition.controller.test.ts
+- server/src/modules/requisition/requisition.routes.ts
+- server/src/modules/requisition/requisition.integration.test.ts
+- server/src/modules/finance/job-billing.service.ts
+- server/src/modules/inventory/inventory.service.ts
+- server/src/modules/job-card-line/jobCardLine.service.ts
+- server/src/modules/service/estimate-approval.ts
+- server/src/routes/index.ts
+- server/src/shared/constants/roles.ts
+- doc/progress/issue-113-progress.md

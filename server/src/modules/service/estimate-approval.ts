@@ -2,7 +2,7 @@ import { signatureState, type SignatureEvidence } from "./estimate-signature";
 import { Prisma } from '@prisma/client';
 import { serviceChargeDescription, serviceChargeReference } from './job-service-charge';
 import { BadRequestError } from '../../shared/errors/appError';
-import { money, sumMoney } from '../finance/money';
+import { lineAmount, money, sumMoney } from '../finance/money';
 
 // Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
 export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
@@ -80,13 +80,19 @@ export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobC
 }
 
 export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardId: string) {
-  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true } }, labourLines: true } });
+  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { include: { requisition: { select: { status: true } } } } } }, labourLines: true } });
   const lines: ScopeLine[] = [];
   const chargeReference = serviceChargeReference(card);
   if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
   for (const row of card.partIssuances) {
-    const quantity = row.quantity - row.returns.filter(r => r.status.toUpperCase() !== 'REJECTED').reduce((sum, r) => sum + r.quantity, 0);
+    if (row.requisitionLine?.requisition.status === 'CANCELLED') continue;
+    const quantity = row.quantity - row.returns.filter(r => !['REJECTED', 'CANCELLED'].includes(r.status.toUpperCase())).reduce((sum, r) => sum + r.quantity, 0);
     if (quantity > 0) {
+      if (row.requisitionLine) {
+        const rate = row.requisitionLine.rate.toNumber();
+        lines.push({ type: 'PART', referenceId: row.sparePartId, partSource: row.partSource, description: row.requisitionLine.description, quantity, rate, amount: lineAmount(quantity, rate) });
+        continue;
+      }
       if (row.sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before completing this job');
       lines.push({ type: 'PART', referenceId: row.sparePartId, partSource: row.partSource ?? row.sparePart.partFlag, description: row.sparePart.name, quantity, rate: row.sparePart.retailRate, amount: money(quantity * row.sparePart.retailRate) });
     }

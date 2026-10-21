@@ -19,6 +19,10 @@ export type AppRole =
 
 // Inventory permissions mirror server/src/shared/constants/roles.ts.
 export const INVENTORY_PERMISSIONS = {
+  REQUISITION_READ: "requisition:read",
+  REQUISITION_CREATE: "requisition:create",
+  REQUISITION_CANCEL: "requisition:cancel",
+  REQUISITION_GOODWILL: "requisition:goodwill",
   SPAREPART_READ: "sparepart:read",
   SPAREPART_CREATE: "sparepart:create",
   SPAREPART_UPDATE: "sparepart:update",
