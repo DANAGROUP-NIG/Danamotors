@@ -1,6 +1,6 @@
 # Issue 113 progress
 
-Step 0 and P1–P3 complete on `issue-113/service-transactions`. Stop here; await authorization for P4.
+Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; await authorization for P5.
 
 ## Plan
 1. P1: reconcile shared schema, then add only missing fields in one additive migration.
@@ -23,7 +23,7 @@ Step 0 and P1–P3 complete on `issue-113/service-transactions`. Stop here; awai
 - [x] P1 shared schema reconciled and additive migration verified locally
 - [x] P2 stock-safe requisitions, rate snapshots, goodwill splits, cancellation and permissions
 - [x] P3 bounded returns, split reductions, reversal and historical row readability
-- [ ] P4 labour slips, separate hours, totals and QC-gated READY
+- [x] P4 labour slips, separate hours, totals and QC-gated READY
 - [ ] P5 numbered bookings, optional requests, cancellation and linked conversion
 - [ ] P6 audited remarks in any status, document output and picking print
 - [ ] P7 existing-component frontend and permission gating
@@ -101,5 +101,39 @@ Step 0 and P1–P3 complete on `issue-113/service-transactions`. Stop here; awai
 - server/src/modules/requisition/return-slip.integration.test.ts
 - server/src/modules/finance/job-billing.service.ts
 - server/src/modules/inventory/inventory.service.ts
+- server/src/routes/index.ts
+- doc/progress/issue-113-progress.md
+
+## P4 milestone
+- Implemented /api/service/labour-slips list/detail/create, add line, save replacement line and internal print-data endpoints using jobcard:read / jobcard:labour:update. Work done and vehicle-ready use the existing job-card update endpoint and its jobcard:update permission. No additional role grants.
+- Reused LabourService's model-rate and technician/employee resolver. One technician login or current employee mechanic per line; no second/third technician structure. Header/line groups and branch-active engineer fields reuse existing masters/users.
+- Standard hours and charged hours are stored separately (standardHours and existing hours); API responses also expose chargedHours. TIME uses decimal hours × rate; FIXED keeps its model amount independently of charged hours. Amounts use the existing decimal money helpers.
+- Schema correction discovered during P4: a nullable JobCardLabour.pricing snapshot is necessary to preserve FIXED/TIME semantics when charged hours or catalogue pricing change. Added one small additive/idempotent migration, rather than guessing from amounts or adding another hours field. Historical pricing remains null and existing hours/rate/amount are not backfilled or rewritten.
+- Rates, standard hours and pricing mode remain snapshotted when editing the same operation. Changing the operation resolves the new model rate. Charge type is explicit on every submitted line; goodwill needs warranty:update and a reason, warranty needs coverage/case, and free labour needs a linked campaign.
+- Each slip line owns the existing JobCardLabour and its JobCardLine. Billing and approval scope consume the saved fixed-unit/time quantity. Sync and legacy edit/delete/reclassification paths cannot overwrite document-managed charges. Legacy and slip labour can share the same approved operation without treating fixed-operation charged hours as billed units.
+- Job-row locks serialize writes, approved scope is checked before changes, and audit entries include old/new line values. Billed/delivered/cancelled jobs and active bills reject all slip writes. Existing claim/bill references block edits rather than invalidating their history.
+- Vehicle ready still calls the existing lifecycle: transition to QC, record passed QC, then READY; a pending QC leaves status/readyAt unchanged and returns the existing clear error. Work done persists through the same workflow. New/edited work on READY jobs reopens them and resets QC, preserving the P2/P3 safeguard.
+- TODO(confirm), safe footer default: goodwill is a separate subtotal; it is not silently included in customer, warranty or free amounts. All four subtotals reconcile to totalAmount.
+- Passed: new pure/validation/permission-route tests and existing mechanic tests; updated billing regression test; strict backend typecheck/lint and build; 46 live database tests (14 labour, 15 requisition and 17 return tests). The pricing migration was applied twice, preserved a pre-existing legacy labour row, and rejected an invalid pricing mode. Full backend suite passed: 79 suites / 980 tests; 19 suites / 146 database-dependent tests skipped in the non-database run.
+- Live tests include actual fixed-price invoice creation after catalogue changes, time vs standard hours, line editing/addition, all payer totals, employee-without-login assignment, branch 403, closed-job rejection, legacy-path protection, QC refusal/pass, mixed legacy/slip scope, concurrent writes and audit-failure rollback.
+- All database writes used fresh localhost-only clusters under .audit-local. No new dependencies, frontend/screenshots/browser/dev-server work, non-local database writes, push, PR or issue mutation. P5–P8 remain pending.
+
+### P4 files changed
+- server/prisma/schema.prisma
+- server/prisma/migrations/20261021120000_labour_pricing_snapshot/migration.sql
+- server/src/modules/service/labour-slip.logic.ts
+- server/src/modules/service/labour-slip.logic.test.ts
+- server/src/modules/service/labour-slip.validation.ts
+- server/src/modules/service/labour-slip.service.ts
+- server/src/modules/service/labour-slip.controller.ts
+- server/src/modules/service/labour-slip.routes.ts
+- server/src/modules/service/labour-slip.routes.test.ts
+- server/src/modules/service/labour-slip.integration.test.ts
+- server/src/modules/service/labour.service.ts
+- server/src/modules/service/estimate-approval.ts
+- server/src/modules/finance/job-billing.service.ts
+- server/src/modules/finance/job-billing.service.test.ts
+- server/src/modules/job-card-line/jobCardLine.service.ts
+- server/src/modules/requisition/requisition.logic.ts
 - server/src/routes/index.ts
 - doc/progress/issue-113-progress.md

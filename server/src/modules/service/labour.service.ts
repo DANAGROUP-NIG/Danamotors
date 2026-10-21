@@ -1,15 +1,14 @@
 import { assertApprovedOperation } from './estimate-approval';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
-import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
+import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { canonicalJobStatus } from './job-card-workflow.service';
 import { ROLES } from '../../shared/constants/roles';
 import { currentEmployeeWhere } from '../employee/employee.service';
+import { labourSlipPricing } from './labour-slip.logic';
 
 export const LABOUR_FLAGS = ['majorLabour', 'insured', 'approvalRequired', 'externalLabour', 'underAmc', 'followUpAnalysis', 'amountEditable', 'includeInTopN'] as const;
 type LabourFlags = Partial<Record<typeof LABOUR_FLAGS[number], boolean>>;
-
-const roundMoney = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
 
 export class LabourService {
   async listItems(search?: string, includeInactive = false) {
@@ -67,7 +66,7 @@ export class LabourService {
     return jobCard;
   }
 
-  private async resolveLine(transaction: Prisma.TransactionClient, input: { labourItemId: string; hours?: number; rate?: number; technicianId?: string | null; mechanicId?: string | null; keepMechanic?: boolean; branchId: string; vehicleId?: string | null }) {
+  async resolveLine(transaction: Prisma.TransactionClient, input: { labourItemId: string; hours?: number; rate?: number; standardHours?: number; pricing?: string; storeChargedHours?: boolean; technicianId?: string | null; mechanicId?: string | null; keepMechanic?: boolean; branchId: string; vehicleId?: string | null }) {
     const labourItem = await transaction.labourItem.findFirst({ where: { id: input.labourItemId, active: true } });
     if (!labourItem) throw new NotFoundError('Active labour item not found');
     // The mechanic is an employee of the job card's branch; their login, if any, becomes the technician.
@@ -88,13 +87,16 @@ export class LabourService {
     const modelId = vehicle?.catalogue?.parentId;
     const modelRate = modelId ? await transaction.labourRate.findFirst({ where: { labourItemId: labourItem.id, modelId, active: true } }) : null;
     const rate = input.rate ?? modelRate?.rate ?? labourItem.rate;
-    const hours = modelRate?.pricing === 'FIXED' ? 1 : input.hours ?? modelRate?.hours ?? labourItem.defaultHours;
+    const pricing = input.pricing ?? modelRate?.pricing ?? 'TIME';
+    const priced = labourSlipPricing({ pricing, standardHours: input.standardHours ?? modelRate?.hours ?? labourItem.defaultHours, chargedHours: pricing === 'FIXED' && !input.storeChargedHours ? 1 : input.hours, rate });
     return {
       labourItemId: labourItem.id,
       description: labourItem.description,
-      hours,
-      rate,
-      amount: roundMoney(hours * rate),
+      hours: priced.hours,
+      standardHours: priced.standardHours,
+      pricing: priced.pricing,
+      rate: priced.rate,
+      amount: priced.amount,
       technicianId,
       mechanicId: input.mechanicId ?? null,
     };
@@ -113,7 +115,7 @@ export class LabourService {
         vehicleId: jobCard.vehicleId,
       });
       const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId, labourItemId: values.labourItemId } });
-      await assertApprovedOperation(transaction, jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.hours, rate: line.rate, amount: line.amount })));
+      await assertApprovedOperation(transaction, jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.pricing === 'FIXED' ? 1 : line.hours, rate: line.rate, amount: line.amount })));
       await transaction.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING' } });
       return transaction.jobCardLabour.create({
         data: { jobCardId: jobCard.id, ...values },
@@ -126,6 +128,7 @@ export class LabourService {
     return prisma.$transaction(async (transaction) => {
       const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
       if (!existing) throw new NotFoundError('Job-card labour line not found');
+      if (existing.labourSlipId) throw new ConflictError('Edit the labour slip to change this labour line');
       await this.lockJobCard(transaction, existing.jobCardId);
       const jobCard = await this.assertJobCardOpen(existing.jobCardId, transaction);
       const values = await this.resolveLine(transaction, {
@@ -133,6 +136,8 @@ export class LabourService {
         labourItemId: input.labourItemId ?? existing.labourItemId,
         hours: input.hours ?? existing.hours,
         rate: input.rate ?? existing.rate,
+        standardHours: !input.labourItemId || input.labourItemId === existing.labourItemId ? existing.standardHours ?? undefined : undefined,
+        pricing: !input.labourItemId || input.labourItemId === existing.labourItemId ? existing.pricing ?? undefined : undefined,
         // A line assigned by mechanic keeps its mechanic unless another is chosen.
         mechanicId: input.mechanicId !== undefined ? input.mechanicId : input.technicianId !== undefined ? null : existing.mechanicId,
         // An unchanged mechanic stays valid even after they leave.
@@ -141,7 +146,7 @@ export class LabourService {
         branchId: (await transaction.jobCard.findUniqueOrThrow({ where: { id: existing.jobCardId }, select: { branchId: true } })).branchId,
       });
       const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId: existing.jobCardId, labourItemId: values.labourItemId, id: { not: id } } });
-      await assertApprovedOperation(transaction, existing.jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.hours, rate: line.rate, amount: line.amount })));
+      await assertApprovedOperation(transaction, existing.jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.pricing === 'FIXED' ? 1 : line.hours, rate: line.rate, amount: line.amount })));
       await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });
       return transaction.jobCardLabour.update({
         where: { id },
@@ -155,6 +160,7 @@ export class LabourService {
     await prisma.$transaction(async (transaction) => {
       const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
       if (!existing) throw new NotFoundError('Job-card labour line not found');
+      if (existing.labourSlipId) throw new ConflictError('Document-managed labour cannot be removed through the legacy labour endpoint');
       await this.lockJobCard(transaction, existing.jobCardId);
       await this.assertJobCardOpen(existing.jobCardId, transaction);
       await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });

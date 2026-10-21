@@ -40,7 +40,7 @@ export class JobBillingService {
         branch: true,
         partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { select: { id: true } }, jobCardLine: { select: { id: true, chargeType: true } } } },
         lines: { where: { quantity: { gt: 0 }, requisitionLine: { requisition: { status: 'ISSUED' } } }, include: { sparePart: true } },
-        labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
+        labourLines: { include: { chargeLine: { select: { id: true, chargeType: true, quantity: true, rate: true, amount: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
         },
@@ -117,16 +117,19 @@ export class JobBillingService {
         },
       ];
     });
-    const labourLines = jobCard.labourLines.map((line) => ({
+    const labourLines = jobCard.labourLines.map((line) => {
+      if (line.labourSlipId && !line.chargeLine) throw new BadRequestError('Labour slip charge is missing');
+      return {
       type: "LABOUR" as const,
       jobCardLabourId: line.id,
       referenceId: line.labourItemId,
       description: line.description,
-      quantity: line.hours,
-      rate: line.rate,
+      jobCardLineId: line.labourSlipId ? line.chargeLine?.id : undefined,
+      quantity: line.labourSlipId ? line.chargeLine!.quantity : line.hours,
+      rate: line.labourSlipId ? line.chargeLine!.rate : line.rate,
       amount: money(line.amount),
       customerPaid: customerPays(line.chargeLine),
-    }));
+    }; });
     const serviceLines = jobCard.serviceCharge == null ? [] : [{
       type: "SERVICE" as const, referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
       amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,

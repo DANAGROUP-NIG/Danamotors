@@ -80,7 +80,7 @@ export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobC
 }
 
 export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardId: string) {
-  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { include: { requisition: { select: { status: true } } } } } }, labourLines: true } });
+  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { service: true, serviceType: { select: { description: true } }, partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { include: { requisition: { select: { status: true } } } } } }, labourLines: { include: { chargeLine: true } } } });
   const lines: ScopeLine[] = [];
   const chargeReference = serviceChargeReference(card);
   if (chargeReference) lines.push({ type: 'SERVICE', referenceId: chargeReference, description: serviceChargeDescription(card), quantity: 1, rate: card.serviceCharge ?? 0, amount: card.serviceCharge ?? 0 });
@@ -97,6 +97,9 @@ export async function assertRecordedScope(tx: Prisma.TransactionClient, jobCardI
       lines.push({ type: 'PART', referenceId: row.sparePartId, partSource: row.partSource ?? row.sparePart.partFlag, description: row.sparePart.name, quantity, rate: row.sparePart.retailRate, amount: money(quantity * row.sparePart.retailRate) });
     }
   }
-  for (const row of card.labourLines) lines.push({ type: 'LABOUR', referenceId: row.labourItemId, description: row.description, quantity: row.hours, rate: row.rate, amount: row.amount });
+  for (const row of card.labourLines) {
+    if (row.labourSlipId && !row.chargeLine) throw new BadRequestError('Labour slip charge is missing');
+    lines.push({ type: 'LABOUR', referenceId: row.labourItemId, description: row.description, quantity: row.labourSlipId ? row.chargeLine!.quantity : row.hours, rate: row.rate, amount: row.amount });
+  }
   return assertApprovedOperation(tx, jobCardId, card.customerId, lines);
 }

@@ -1420,6 +1420,8 @@ model LabourItem {
 }
 
 model JobCardLabour {
+  // Snapshot the model's TIME/FIXED pricing independently of charged hours.
+  pricing String?
   labourSlipId String?
   labourSlip LabourSlip? @relation(fields: [labourSlipId], references: [id], onDelete: Restrict)
   // Existing hours stores charged hours; do not add a second source of truth.

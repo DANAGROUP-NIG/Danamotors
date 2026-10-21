@@ -9,25 +9,25 @@ export interface RequisitionActor {
   goodwill: boolean;
 }
 
-export function assertRequisitionBranch(actor: RequisitionActor, branchId?: string) {
+export function assertRequisitionBranch(actor: RequisitionActor, branchId?: string, label = 'requisitions') {
   if (!actor.allBranches && (!actor.branchId || (branchId && branchId !== actor.branchId))) {
-    throw new ForbiddenError('You can only access requisitions in your branch');
+    throw new ForbiddenError(`You can only access ${label} in your branch`);
   }
 }
 
-export function assertRequisitionJob(job: { status: string; billedAt: Date | null; invoices: { status: string }[] }) {
+export function assertRequisitionJob(job: { status: string; billedAt: Date | null; invoices: { status: string }[] }, label = 'Requisitions') {
   if (job.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED', 'CANCELED', 'CLOSED'].includes(job.status.toUpperCase()) ||
       job.invoices.some(invoice => !/cancel|void/i.test(invoice.status))) {
-    throw new BadRequestError('Requisitions cannot change on billed, delivered or cancelled jobs');
+    throw new BadRequestError(`${label} cannot change on billed, delivered or cancelled jobs`);
   }
 }
 
-export function requisitionWorkUpdate(status: string, userId: string): Prisma.JobCardUpdateInput {
+export function requisitionWorkUpdate(status: string, userId: string, label = 'Requisition'): Prisma.JobCardUpdateInput {
   if (!['READY', 'COMPLETED'].includes(status.toUpperCase())) return { qcStatus: 'PENDING' };
   // TODO(confirm): changing issued work on a ready job reopens it for another QC.
   return {
     qcStatus: 'PENDING', status: 'IN_PROGRESS', readyAt: null,
-    statusHistory: { create: { fromStatus: status, toStatus: 'IN_PROGRESS', actorId: userId, remarks: 'Requisition changed; repeat quality check before marking ready' } },
+    statusHistory: { create: { fromStatus: status, toStatus: 'IN_PROGRESS', actorId: userId, remarks: `${label} changed; repeat quality check before marking ready` } },
   };
 }
 
