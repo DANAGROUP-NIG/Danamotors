@@ -24,8 +24,8 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - [x] P2 stock-safe requisitions, rate snapshots, goodwill splits, cancellation and permissions
 - [x] P3 bounded returns, split reductions, reversal and historical row readability
 - [x] P4 labour slips, separate hours, totals and QC-gated READY
-- [ ] P5 numbered bookings, optional requests, cancellation and linked conversion
-- [ ] P6 audited remarks in any status, document output and picking print
+- [x] P5 numbered bookings, optional requests, cancellation and linked conversion
+- [x] P6 audited remarks in any status, document output and picking print
 - [ ] P7 existing-component frontend and permission gating
 - [ ] P8 documentation and Swagger examples
 
@@ -166,4 +166,30 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - server/src/modules/service/job-card-workflow.service.ts
 - server/src/modules/service/branch-access.test.ts
 - server/src/modules/enquiry/enquiry.service.ts
+- doc/progress/issue-113-progress.md
+
+
+## P6 milestone
+- Added dedicated GET/PUT /api/service/job-cards/:id/remarks and /api/service/estimates/:id/remarks. Reads reuse jobcard:read / estimate:read; writes require jobcard:remarks:update. These endpoints update only the existing remarks fields, normalize blank text to null, reject extra fields and leave workDone, lifecycle/QC, quantities, amounts and estimate versions unchanged.
+- Remarks are editable in any status, including billed/delivered/cancelled jobs and approved/rejected/superseded estimates. Each actual change writes JOB_REMARKS_UPDATED or ESTIMATE_REMARKS_UPDATED with actor, branch, document ID and old/new values in the same transaction. No-op saves do not create false change entries. Job-then-estimate locks preserve the preceding value under concurrent writes; an audit failure rolls the edit back.
+- Added GET /api/service/job-cards/:id/picking-list/print and /api/service/estimates/:id/picking-list/print, gated by jobcard:picking-list:print. These return internal print data only: branch, job/estimate references and dates, estimate version/status/currency, vehicle, service, mileage, current document remarks, part number, snapshotted flag/description/quantity/rate/amount, UOM and decimal totals. Dates remain ISO timestamps with Africa/Lagos print metadata for P7 formatting.
+- TODO(confirm), safe picking source: a job action uses its latest estimate; an estimate action uses that specific revision, including historical revisions. PART and INCLUDED_PART rows represent planned parts. Issued customer/warranty payer shares are never summed into physical picking quantities. Jobs without an estimate return a clear 400 rather than inventing rows. Missing legacy catalogue references remain null, with original descriptions and prices retained.
+- Picking print requests write a PICKING_LIST_PRINTED audit event in a consistent snapshot transaction. They do not allocate a document number, create a picking-list record, update job/estimate fields or touch stock, stock transactions, issuances or returns. The existing branch-indent/STN PickingList is untouched.
+- Remarks are included in the new internal document output. Existing customer estimate print projection remains unchanged and continues to exclude internal remarks, source flags, costs and unrelated records; its regression test passes.
+- Branch-bound document reads, writes and prints reject foreign branches or branchless users with 403; branch:all permits other assigned branches. Linked estimates use the owning job branch and inconsistent branch links are rejected. Standalone estimates are supported; unassigned legacy estimates need a branch before document actions can be performed.
+- Added the two permissions to PERMISSIONS and grants to ROLE_PERMISSIONS, plus one additive/idempotent permission migration for existing installations. Safe default remarks editors: SuperAdmin, Admin, WorkshopManager, ServiceAdviser, ServiceManager. Picking printers additionally include GeneralStoreManager and StoreOfficer. A test compares every migration grant to the seed-reset defaults; the migration was applied twice locally and produced exactly 12 grants without duplicates.
+- Passed: 12 new pure/validation/route/seed-consistency tests and the existing customer estimate-print regression; 16 live localhost database tests covering all closed-status edits, signature/content preservation, no-op/clear saves, branch denials, standalone estimates, snapshot picking prices, latest vs explicit revision, payer-share duplication avoidance, no business/stock/STN/sequence writes, missing documents, concurrent audit chains and real audit-failure rollback.
+- Full backend suite passed: 83 suites / 997 tests; 21 database suites / 174 tests skipped in the non-database run. Strict backend typecheck/lint (same tsc --noEmit command) and build passed. No new dependencies, frontend changes, screenshots/browser/dev-server runs, non-local database writes, push, PR or issue mutation. P7-P8 remain pending.
+
+### P6 files changed
+- server/prisma/migrations/20261021130000_service_document_permissions/migration.sql
+- server/src/modules/service/service-document.logic.ts
+- server/src/modules/service/service-document.validation.ts
+- server/src/modules/service/service-document.service.ts
+- server/src/modules/service/service-document.routes.ts
+- server/src/modules/service/service-document.logic.test.ts
+- server/src/modules/service/service-document.routes.test.ts
+- server/src/modules/service/service-document.integration.test.ts
+- server/src/shared/constants/roles.ts
+- server/src/routes/index.ts
 - doc/progress/issue-113-progress.md
