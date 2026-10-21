@@ -39,7 +39,7 @@ export class JobBillingService {
         vehicle: true,
         branch: true,
         partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { select: { id: true } }, jobCardLine: { select: { id: true, chargeType: true } } } },
-        lines: { where: { requisitionLine: { requisition: { status: 'ISSUED' } } }, include: { sparePart: true } },
+        lines: { where: { quantity: { gt: 0 }, requisitionLine: { requisition: { status: 'ISSUED' } } }, include: { sparePart: true } },
         labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },

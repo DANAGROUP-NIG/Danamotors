@@ -1,6 +1,6 @@
 # Issue 113 progress
 
-Step 0, P1 and P2 complete on `issue-113/service-transactions`. Stop here; await authorization for P3.
+Step 0 and P1–P3 complete on `issue-113/service-transactions`. Stop here; await authorization for P4.
 
 ## Plan
 1. P1: reconcile shared schema, then add only missing fields in one additive migration.
@@ -22,7 +22,7 @@ Step 0, P1 and P2 complete on `issue-113/service-transactions`. Stop here; await
 ## Acceptance checklist
 - [x] P1 shared schema reconciled and additive migration verified locally
 - [x] P2 stock-safe requisitions, rate snapshots, goodwill splits, cancellation and permissions
-- [ ] P3 bounded returns, split reductions, reversal and historical row readability
+- [x] P3 bounded returns, split reductions, reversal and historical row readability
 - [ ] P4 labour slips, separate hours, totals and QC-gated READY
 - [ ] P5 numbered bookings, optional requests, cancellation and linked conversion
 - [ ] P6 audited remarks in any status, document output and picking print
@@ -74,4 +74,32 @@ Step 0, P1 and P2 complete on `issue-113/service-transactions`. Stop here; await
 - server/src/modules/service/estimate-approval.ts
 - server/src/routes/index.ts
 - server/src/shared/constants/roles.ts
+- doc/progress/issue-113-progress.md
+
+## P3 milestone
+- Added /api/inventory/return-slips list/detail/create/cancel and internal print-data routes. Reused requisition:read/create/cancel and branch:all access rules; no new permission or schema migration.
+- A slip derives its branch, job and charge type from its requisition. Strict validation rejects duplicate rows, foreign requisition lines, unissued requests, non-positive quantities and caller-supplied rate/type/header overrides.
+- Numbers use the existing transactional DocumentSequence helper with a branch-specific RETURN key and the Africa/Lagos year.
+- The job row lock serializes return, requisition, billing and cancellation writes. Stock rows lock in stable order. Returns cannot exceed issued minus all active previous returns, including bare historical return rows attached to the issuance; rejected/cancelled rows do not consume capacity.
+- Stock, PartReturn lines, slip header, both charge shares, QC state and audit commit atomically. New returns use the original requisition source/rate snapshots and normal RETURNED stock movements.
+- Remaining warranty/goodwill/customer/free charges are recalculated from the original allocation with decimal helpers. Full returns retain zero-quantity/zero-amount charge rows to preserve tax, campaign, source, rate and primary-issuance snapshots for reversal. Billing excludes those zeroed rows.
+- Cancellation requires a reason, takes the returned stock out again with an ISSUED movement, marks the return lines/slip cancelled and restores the correct remaining shares even when slips are cancelled out of order. It refuses insufficient available stock, including stock reserved for transfers; repeated cancellation cannot reverse twice.
+- Billed/delivered/cancelled jobs and active bills reject return or cancellation writes. Cancelled requisitions reject returns. Existing P2 safe defaults remain: resolve claim/bill references before changing their charges; changes on READY jobs reopen them for passed QC again.
+- Fixed legacy issuance scope accounting so cancelled slip returns no longer reduce quantities counted against approved estimates. Historical bare PartReturn rows remain readable through the existing inventory readers; the legacy writer still refuses document-managed requisition parts.
+- Passed: 18 pure-rule/validation/permission-route tests; 32 live local database tests (17 return-slip tests plus 15 requisition regressions); strict backend typecheck/lint and build; full backend suite (77 suites / 967 tests passed, 18 suites / 132 database-dependent tests skipped).
+- Database tests cover actual invoice reduction after a price change; all four charge-type full return/cancel round trips; original tax/campaign/rate preservation; multi-part slips; remaining-quantity limits; out-of-order cancellation; branch 403; closed-job refusal; reserved-stock cancellation refusal; concurrent returns/cancellations; QC reset; legacy reads; and rollback on both create/cancel audit failure.
+- All database writes were confined to disposable localhost-only PostgreSQL clusters under .audit-local. No dependencies, schema changes, non-local database writes, browser/dev-server runs, push, PR or issue mutation. Frontend return screens/print layouts remain P7; P4–P8 are pending.
+
+### P3 files changed
+- server/src/modules/requisition/return-slip.logic.ts
+- server/src/modules/requisition/return-slip.logic.test.ts
+- server/src/modules/requisition/return-slip.validation.ts
+- server/src/modules/requisition/return-slip.service.ts
+- server/src/modules/requisition/return-slip.controller.ts
+- server/src/modules/requisition/return-slip.routes.ts
+- server/src/modules/requisition/return-slip.routes.test.ts
+- server/src/modules/requisition/return-slip.integration.test.ts
+- server/src/modules/finance/job-billing.service.ts
+- server/src/modules/inventory/inventory.service.ts
+- server/src/routes/index.ts
 - doc/progress/issue-113-progress.md
