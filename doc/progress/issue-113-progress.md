@@ -26,7 +26,7 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - [x] P4 labour slips, separate hours, totals and QC-gated READY
 - [x] P5 numbered bookings, optional requests, cancellation and linked conversion
 - [x] P6 audited remarks in any status, document output and picking print
-- [ ] P7 existing-component frontend and permission gating
+- [x] P7 existing-component frontend and permission gating
 - [ ] P8 documentation and Swagger examples
 
 ## P1 milestone
@@ -192,4 +192,54 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - server/src/modules/service/service-document.integration.test.ts
 - server/src/shared/constants/roles.ts
 - server/src/routes/index.ts
+- doc/progress/issue-113-progress.md
+
+
+## P7 milestone
+- Extended the existing appointments create/detail/list/edit flow rather than adding another customer or vehicle form. CustomerSelectWithCreate and VehicleSelectWithCreate remain the inline creation paths, preserving their existing validation and duplicate warnings. Selected vehicle registration/model/variant/VIN/engine details are read from the existing vehicle hook.
+- Booking UI includes automatic booking number/status/created timestamp, Lagos booked-for entry, workshop service type, optional catalogue service, mileage, AC flag, optional follow-up job, optional complaint/defect requests and parts/oil/labour estimates. Previews reuse the existing requestTotals helper; saved total estimates come from the server. Terminal/converted/linked bookings are read-only, cancellation requires a reason, no-show is explicit, and linked jobs are navigable. Numbered/linked bookings are excluded from legacy delete actions. Branch selection uses branch:all rather than a role name.
+- Conversion reuses JobCardOpeningModal/JobCardCreateForm. A pure adapter prefills saved booking customer, vehicle, service and requests (one blank request when the optional booking requests are absent). Existing warranty/campaign acknowledgement remains intact. The API adapter calls /appointments/:id/convert for linked openings and the normal job endpoint otherwise. The regular opening form also copies saved booking requests and service metadata when selecting a booking.
+- Added a Service transactions section to the existing RepairWorkspacePage, with keyboard-accessible Requisition/Returns/Labour/Remarks tabs, shared vehicle/job context, lazy first visits and preserved form state when changing tabs. Panels are permission-gated; closed jobs retain readable documents while stock/labour edits are disabled.
+- Requisition UI supports multiple part rows, quantities required/issued, non-warranty/warranty/free/goodwill, linked campaign, group/engineer and goodwill reason/approval percentage with complementary customer percentage. Saved document details show source flag, UOM, snapshot rates, amounts, splits and server totals. Goodwill is hidden without requisition:goodwill. Existing stock/approval rules remain server-authoritative and error responses preserve form input.
+- Return UI selects a job requisition, displays issued quantities and snapshot rates, calculates the remaining return allowance from active returns, bounds each entered quantity, and submits only positive returns. Saved requisition/return lists are paginated; cancellation requires a reason and requisition:cancel. Cancelled/closed documents cannot be edited.
+- Labour UI supports multiple lines on a new slip, adding to an existing slip and editing saved lines. Standard hours and charged hours remain distinct in the saved grid. Each line selects one technician login or one employee mechanic, with employee lookup gated by employee:read. Group/engineer, payer/campaign and goodwill reason follow the backend contract; labour goodwill uses warranty:update. Model rates/standard hours and fixed-price snapshots remain server-derived. Work done uses the existing job update endpoint; vehicle ready is enabled only in QC with a passed result, with the backend gate unchanged.
+- Remarks UI selects the job or a particular estimate revision, reads/writes the P6 endpoints with their specific permissions, and remains editable on billed/delivered/cancelled jobs. It does not reuse workDone or change amounts. Errors/retry, pending controls and read-only states are explicit.
+- Added internal print pages at /service-transactions/:kind/:id/print for requisitions, returns, labour slips and job/estimate picking data. Print permission is checked before fetching. Picking includes job/estimate references, revision/status, vehicle/service/mileage, part flag/UOM/required quantity, snapshot rates/totals and internal remarks. Currency follows the estimate; dates use Africa/Lagos. Print CSS isolates the document. No stored/numbered picking list, stock operation, STN change or new customer-facing source exposure.
+- Shared data reads/mutations stay in hooks and refresh document, job, appointment, inventory and picker caches. Pure helpers cover date conversion, booking-prefill mapping, terminal guards, return allowances and labour payload sanitation. All styling uses existing tokens/components; no dependencies added.
+- Passed: 29 self-contained client tests in total (17 new pure/API-contract/render tests plus 12 existing tests), strict client TypeScript, scoped ESLint with zero warnings/errors, and production Next build. Render tests cover permission denial before print fetch, closed transaction controls, delivered-job remarks, QC readiness, one-assignee labour, error states, internal print projection and single-conversion UI. Generated Next/typecheck files were restored and accidental Windows line-ending changes removed.
+- QA limitation: the two older client/tests/*.cjs DOM scripts need an external QA directory containing jsdom/esbuild. They could not run because the existing isolated runtime has missing package files; their node --test attempt failed at setup, before assertions. No dependencies were installed. The available client/test suite and targeted new checks passed. No browser, dev server or screenshots were needed for the render/pure checks; interactive browser and paper-output layout QA remain unperformed.
+- No backend changes, database writes, dependency changes, push, PR or issue mutation. P8 remains pending.
+
+### P7 files changed
+- client/app/(dashboard)/appointments/[id]/page.tsx
+- client/app/(dashboard)/service-transactions/[kind]/[id]/print/page.tsx
+- client/features/appointments/components/AppointmentCreateForm.tsx
+- client/features/appointments/components/AppointmentEditForm.tsx
+- client/features/appointments/components/AppointmentsTable.tsx
+- client/features/appointments/schemas/appointment.schema.ts
+- client/features/appointments/types/appointment.types.ts
+- client/features/job-cards/api/job-card.api.ts
+- client/features/job-cards/components/JobCardCreateForm.tsx
+- client/features/job-cards/components/RepairWorkspacePage.tsx
+- client/features/job-cards/components/WorkshopPicker.tsx
+- client/features/job-cards/types/job-card.types.ts
+- client/features/service-transactions/booking.logic.ts
+- client/features/service-transactions/components/BookingFields.tsx
+- client/features/service-transactions/components/BookingPanel.tsx
+- client/features/service-transactions/components/BookingVehicleSummary.tsx
+- client/features/service-transactions/components/LabourLineEditor.tsx
+- client/features/service-transactions/components/LabourPanel.tsx
+- client/features/service-transactions/components/RemarksPanel.tsx
+- client/features/service-transactions/components/RequisitionPanel.tsx
+- client/features/service-transactions/components/ReturnPanel.tsx
+- client/features/service-transactions/components/SavedLabourLine.tsx
+- client/features/service-transactions/components/SavedSlip.tsx
+- client/features/service-transactions/components/ServiceDocumentPrint.tsx
+- client/features/service-transactions/components/ServiceTransactions.tsx
+- client/features/service-transactions/components/TransactionFields.tsx
+- client/features/service-transactions/document.types.ts
+- client/features/service-transactions/hooks/use-service-transactions.ts
+- client/features/service-transactions/transaction.logic.ts
+- client/test/service-transactions-ui.test.mjs
+- client/test/service-transactions.test.mjs
 - doc/progress/issue-113-progress.md

@@ -1,4 +1,5 @@
 "use client";
+import { ServiceTransactions } from "@/features/service-transactions/components/ServiceTransactions";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Button } from "@/components/ui/button";
 import { useJobCard } from "../hooks/use-job-card";
@@ -14,6 +15,7 @@ export function RepairWorkspacePage({ id }: { id: string }) {
   return <section className="min-w-0 space-y-7 rounded-2xl border border-border bg-muted/40 p-4 text-foreground sm:p-6 print:hidden">
     <WorkspaceHeader status={jobCard.status} />
     <JobProgressStepper status={jobCard.status} />
+    <ServiceTransactions job={jobCard} />
     {jobCard.estimates ? <JobCardEstimateSection jobCard={jobCard} /> : <p className={cn(workspaceCardClass, "p-6 text-sm text-muted-foreground")}>{COPY.noAccess}</p>}
   </section>;
 }
