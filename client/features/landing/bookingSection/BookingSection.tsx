@@ -20,10 +20,20 @@ function withTime(date: Date, time: string) {
   return result;
 }
 
+/** Appointment date and time are required and must be in the future. */
+function appointmentError(date: Date | undefined, time: string) {
+  if (!date) return 'Choose an appointment date';
+  if (!time) return 'Choose an appointment time';
+  if (withTime(date, time) <= new Date()) return 'Choose a time later than now';
+  return undefined;
+}
+
 export default function BookingSection() {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState('09:00');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [showDateError, setShowDateError] = useState(false);
+  const dateError = showDateError ? appointmentError(selectedDate, selectedTime) : undefined;
 
   const createEnquiry = useCreateEnquiry();
   const { data: branchesData, isLoading: branchesLoading } = useBranches();
@@ -45,9 +55,10 @@ export default function BookingSection() {
   });
 
   function onSubmit(values: CreateEnquiryFormValues) {
+    if (!selectedDate || appointmentError(selectedDate, selectedTime)) return;
     const payload = {
       ...values,
-      preferredDate: selectedDate ? withTime(selectedDate, selectedTime).toISOString() : undefined,
+      preferredDate: withTime(selectedDate, selectedTime).toISOString(),
       vehicleYear: values.vehicleYear ? Number(values.vehicleYear) : undefined,
       vehicleMake: values.vehicleMake || undefined,
       vehicleModel: values.vehicleModel || undefined,
@@ -60,7 +71,8 @@ export default function BookingSection() {
         setConfirmedId(data.enquiry.id);
         reset();
         setSelectedDate(undefined);
-        setSelectedTime('09:00');
+        setSelectedTime('');
+        setShowDateError(false);
       },
     });
   }
@@ -93,7 +105,7 @@ export default function BookingSection() {
 
         <div className="grid gap-8 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="flex flex-col gap-6">
-            <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} selectedTime={selectedTime} onSelectTime={setSelectedTime} />
+            <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} selectedTime={selectedTime} onSelectTime={setSelectedTime} error={dateError} />
 
           
           </div>
@@ -158,7 +170,10 @@ export default function BookingSection() {
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
                     className="grid gap-4"
-                    onSubmit={handleSubmit(onSubmit)}
+                    onSubmit={(event) => {
+                      setShowDateError(true);
+                      return handleSubmit(onSubmit)(event);
+                    }}
                     noValidate
                   >
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -268,6 +283,12 @@ export default function BookingSection() {
                         {...register('serviceDescription')}
                       />
                     </Field>
+
+                    {dateError && (
+                      <p role="alert" className="text-sm text-red-500">
+                        {dateError}. Pick it on the calendar.
+                      </p>
+                    )}
 
                     <Button
                       id="enquiry-submit"

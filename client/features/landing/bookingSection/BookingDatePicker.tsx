@@ -8,16 +8,25 @@ interface BookingDatePickerProps {
   onSelectDate: (date?: Date) => void;
   selectedTime: string;
   onSelectTime: (time: string) => void;
+  error?: string;
 }
+
+const pad = (n: number) => String(n).padStart(2, "0");
 
 export function BookingDatePicker({
   selectedDate,
   onSelectDate,
   selectedTime,
   onSelectTime,
+  error,
 }: BookingDatePickerProps) {
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
+  // On today's date only times after now can be picked.
+  const isToday = selectedDate?.toDateString() === now.toDateString();
+  const nextMinute = new Date(now.getTime() + 60_000);
+  const minTime = isToday ? `${pad(nextMinute.getHours())}:${pad(nextMinute.getMinutes())}` : undefined;
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-blue-500/20 bg-linear-to-br from-slate-950 via-slate-900 to-slate-900/95 p-5 text-white shadow-[0_30px_80px_-40px_rgba(30,64,175,0.75)] sm:p-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(96,165,250,0.28),_transparent_55%)]" aria-hidden />
@@ -35,7 +44,10 @@ export function BookingDatePicker({
           Pick a date, share your vehicle details, and let our team confirm the best time for your visit.
         </p>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/70 p-3 backdrop-blur-sm sm:p-4">
+        <p className="mt-6 text-sm font-medium text-slate-200">
+          Appointment date<span className="text-red-400" aria-hidden="true"> *</span>
+        </p>
+        <div className="mt-2 rounded-2xl border border-white/10 bg-slate-900/70 p-3 backdrop-blur-sm sm:p-4">
           <DayPicker
             mode="single"
             selected={selectedDate}
@@ -67,14 +79,18 @@ export function BookingDatePicker({
         </div>
 
         <label className="mt-4 flex items-center gap-3 text-sm font-medium text-slate-200">
-          Preferred time
+          <span>Appointment time<span className="text-red-400" aria-hidden="true"> *</span></span>
           <input
             type="time"
+            required
+            min={minTime}
             value={selectedTime}
             onChange={(event) => onSelectTime(event.target.value)}
             className="h-10 rounded-lg border border-white/15 bg-slate-900/70 px-3 text-sm text-white outline-none [color-scheme:dark] focus:ring-2 focus:ring-blue-400/50"
           />
         </label>
+
+        {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
 
         <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-sm font-medium text-blue-100">
           <span className="size-2 rounded-full bg-white" aria-hidden />
