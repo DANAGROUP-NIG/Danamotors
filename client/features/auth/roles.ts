@@ -226,15 +226,9 @@ export const INVENTORY_MANAGER_ROLES: AppRole[] = [
   "workshopmanager",
 ];
 
-export const USER_ROLES: AppRole[] = [
-  "superadmin",
-  "admin",
-];
+export const USER_ROLES: AppRole[] = ["superadmin", "admin"];
 
-export const USER_UPDATE_ROLES: AppRole[] = [
-  "superadmin",
-  "admin",
-];
+export const USER_UPDATE_ROLES: AppRole[] = ["superadmin", "admin"];
 
 export const TRANSFER_ROLES: AppRole[] = [
   "superadmin",
@@ -243,31 +237,47 @@ export const TRANSFER_ROLES: AppRole[] = [
   "branchstoremanager",
 ];
 
-
 // Roles that can see and act on the Enquiry triage queue
 export const ENQUIRY_READ_ROLES: AppRole[] = [
-  'superadmin',
-  'admin',
-  'receptionist',
-  'receptionmanager',
+  "superadmin",
+  "admin",
+  "receptionist",
+  "receptionmanager",
 ];
 
 // Roles that can approve/reject enquiries (service:update)
 export const ENQUIRY_REVIEW_ROLES: AppRole[] = [
-  'superadmin',
-  'admin',
-  'receptionmanager',
+  "superadmin",
+  "admin",
+  "receptionmanager",
 ];
 
 // Roles that can create walk-in appointments (service:create)
 export const APPOINTMENT_CREATE_ROLES: AppRole[] = [
-  'superadmin',
-  'admin',
-  'receptionist',
-  'receptionmanager',
-  'serviceadviser',
+  "superadmin",
+  "admin",
+  "receptionist",
+  "receptionmanager",
+  "serviceadviser",
 ];
-export const MONTHLY_REPORT_PERMISSIONS = ["report:tax-register", "report:booked-vs-availed", "report:estimate-vs-job", "report:unbilled-parts", "report:corporate-bills", "report:delivered-model", "report:delivered-service", "report:warranty-attended", "report:warranty-parts", "report:vehicle-history-card"] as const;
+export const MONTHLY_REPORT_PERMISSIONS = [
+  "report:tax-register",
+  "report:booked-vs-availed",
+  "report:estimate-vs-job",
+  "report:unbilled-parts",
+  "report:corporate-bills",
+  "report:delivered-model",
+  "report:delivered-service",
+  "report:warranty-attended",
+  "report:warranty-parts",
+  "report:vehicle-history-card",
+] as const;
 
 // Estimate actions are independent API permissions.
-export const ESTIMATE_PERMISSIONS = { READ: "estimate:read", CREATE: "estimate:create", REVISE: "estimate:revise", PRINT: "estimate:print", SIGN: "estimate:sign" } as const;
+export const ESTIMATE_PERMISSIONS = {
+  READ: "estimate:read",
+  CREATE: "estimate:create",
+  REVISE: "estimate:revise",
+  PRINT: "estimate:print",
+  SIGN: "estimate:sign",
+} as const;
