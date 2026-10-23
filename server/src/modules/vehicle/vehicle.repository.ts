@@ -34,6 +34,7 @@ export class VehicleRepository {
               id: true,
               firstName: true,
               lastName: true,
+              companyName: true,
               email: true,
               branchId: true,
             },
