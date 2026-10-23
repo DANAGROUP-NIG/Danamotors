@@ -3286,6 +3286,8 @@ model CounterSale {
   grNumber         String?
   grDate           DateTime?
   numberOfCases    Int?
+  // Legacy countersale.gatepass: issued with the bill, from the gate pass series job cards and STNs share.
+  gatePassNumber   String?        @unique
 
   createdAt DateTime @default(now())
 

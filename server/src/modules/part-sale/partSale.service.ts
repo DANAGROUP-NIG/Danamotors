@@ -567,6 +567,7 @@ export class PartSaleService {
               grNumber: input.grNumber,
               grDate: input.grDate,
               numberOfCases: input.numberOfCases,
+              gatePassNumber: await nextDocumentNumber(tx, DOC_TYPES.GATE_PASS, now),
             },
           },
         },

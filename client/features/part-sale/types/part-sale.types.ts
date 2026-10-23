@@ -130,6 +130,7 @@ export type CounterSale = {
   grNumber: string | null;
   grDate: string | null;
   numberOfCases: number | null;
+  gatePassNumber: string | null;
   createdAt: string;
   invoice: {
     id: string;
