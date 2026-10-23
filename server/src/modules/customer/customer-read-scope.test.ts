@@ -1,4 +1,4 @@
-﻿jest.mock('../../prisma/client', () => ({ __esModule: true, default: { customer: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() } } }));
+jest.mock('../../prisma/client', () => ({ __esModule: true, default: { customer: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() } } }));
 import type { Request, Response } from 'express';
 import prisma from '../../prisma/client';
 import { accountantCustomerReadScope } from './customer-read-scope';
