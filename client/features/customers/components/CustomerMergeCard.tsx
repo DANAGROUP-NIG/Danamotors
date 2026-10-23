@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { apiPost } from "@/lib/api/apiClient";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 import { Button } from "@/components/ui/button";
 import type { Customer } from "../types/customer.types";
 
@@ -47,6 +47,8 @@ export function CustomerMergeCard(
           label="Customer to keep"
           endpoint="/customers"
           collection="customers"
+          formatLabel={customerLabel}
+          renderOption={customerOption}
           value={targetId}
           onChange={id => {
             setTargetId(id);

@@ -35,7 +35,7 @@ import {
   createJobCardSchema,
   type CreateJobCardFormValues,
 } from "../schemas/job-card.schema";
-import { WorkshopPicker, type PickerRecord } from "./WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption, type PickerRecord } from "./WorkshopPicker";
 import { ServiceTypePicker } from "./ServiceTypePicker";
 import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
 import {
@@ -889,6 +889,8 @@ export function JobCardCreateForm({
                         value={field.value ?? ""}
                         selectedRecord={customer}
                         error={errors.customerId?.message}
+                        formatLabel={customerLabel}
+                        renderOption={customerOption}
                         onBlur={field.onBlur}
                         onChange={(id) => {
                           field.onChange(id);

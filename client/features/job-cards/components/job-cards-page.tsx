@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useAuth } from "@/features/auth/hooks/use-auth";
-import { JobCardOpeningModal } from "./JobCardOpeningModal";
-import { Download, FileSpreadsheet, Plus } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -84,8 +81,6 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
 }
 
 export function JobCardsPage() {
-  const [opening, setOpening] = useState(false);
-  const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data } = useJobCards({
     page: 1,
@@ -115,7 +110,6 @@ export function JobCardsPage() {
         }
       />
       <JobCardsTable />
-      <JobCardOpeningModal isOpen={opening} onClose={() => setOpening(false)} />
     </div>
   );
 }

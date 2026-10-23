@@ -52,7 +52,7 @@ describeDb("Parts reports (database)", () => {
       data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A", binLocation: "53B3" },
     });
     oil = await prisma.sparePart.create({
-      data: { partCode: `RPT-O-${run}`, partNumber: `RPT-O-${run}`, name: "ENGINE OIL 4L", unitPrice: 4700, retailRate: 7050, taxable: false, priceCategoryCode: "O" },
+      data: { partCode: `RPT-O-${run}`, partNumber: `RPT-O-${run}`, name: "ENGINE OIL 4L", unitPrice: 4700, retailRate: 7050, taxable: false, priceCategoryCode: "O", partType: "O" },
     });
     await prisma.inventoryStock.createMany({
       data: [
@@ -100,24 +100,35 @@ describeDb("Parts reports (database)", () => {
   });
 
   it("lists bill lines priced like the bill, excluding cancelled bills", async () => {
-    const r = await report("counter-sales");
+    const r = await report("counter-sales", { option: "LINES" });
     expect(r.rows).toHaveLength(2);
     const mirrorLine = r.rows.find((row) => row.partNumber === `RPT-M-${run}`)!;
     expect(mirrorLine).toMatchObject({ gross: 273313.81, discount: 61495.61, vat: 15886.37, net: 227704.57 });
     // Lines add up to the bill before its ₦10 round-off (bill total 249,550).
     expect(r.totals.net).toBe(249559.57);
+
+    // The same bill in the legacy layout: one line, with its round-off, adding up to the bill total.
+    const bills = await report("counter-sales");
+    expect(bills.rows).toEqual([expect.objectContaining({ vat: 15886.37, roundOff: -9.57, net: 249550 })]);
+    const [bill] = bills.rows as Record<string, number>[];
+    // The mirror is taxable spares and the oil non-taxable oil, both before the 22.5% cash discount.
+    expect(bill).toMatchObject({ sparesTaxable: 273313.81, sparesExempt: 0, oilTaxable: 0, oilExempt: 28200 });
+    expect(bill.gatePass).toMatch(/^\d{10}$/);
+    expect(bills.totals.net).toBe(249550);
   });
 
   it("summarises bills, splits taxable and exempt value by day, and lists cancellations", async () => {
+    // Defaults to the legacy executive-wise layout: value by part type before the cash discount.
     const summary = await report("counter-sales-summary");
-    expect(summary.rows).toEqual([expect.objectContaining({ net: 249550, roundOff: -9.57 })]);
+    expect(summary.rows).toEqual([expect.objectContaining({ spares: 273313.81, accessories: 0, oil: 28200, net: 249550, roundOff: -9.57 })]);
 
-    const datewise = await report("counter-sales-tax-datewise");
+    const datewise = await report("counter-sales-summary", { option: "DAY" });
     expect(datewise.rows[0]).toMatchObject({ bills: 1, taxable: 211818.2, exempt: 21855, vat: 15886.37, net: 249550 });
 
     const annexure = await report("counter-sales-tax-annexure", { includeCancelled: true });
     expect(annexure.rows.map((row) => row.status).sort()).toEqual(["Cancelled", "Partially Paid"]);
     expect(annexure.totals.net).toBe(249550);
+    expect(annexure.totals.gross).toBe(301513.81);
 
     const foc = await report("counter-sales-cancellations", { option: "FOC" });
     expect(foc.rows).toEqual([expect.objectContaining({ type: "FOC", remark: "Raised in error", cancelledBy: "Emeka Store" })]);
@@ -138,7 +149,8 @@ describeDb("Parts reports (database)", () => {
   });
 
   it("groups bills by sales executive", async () => {
-    const r = await report("sales-executive-register", { executiveId: user.id });
+    const r = await report("counter-sales-summary", { option: "EXECUTIVE", executiveId: user.id });
+    expect(r.grouped).toBe(true);
     expect(r.rows).toEqual([expect.objectContaining({ group: "Emeka Store", net: 249550 })]);
   });
 

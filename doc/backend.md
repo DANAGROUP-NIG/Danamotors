@@ -53,7 +53,7 @@ Express 4 + Prisma 6 + PostgreSQL + TypeScript. All routes are mounted under `/a
 
 | Method | Path | Permission | Description |
 | --- | --- | --- | --- |
-| GET | `/` | `customer:read` | List (branch-scoped for non-SuperAdmin; `branchId`, `search`, `page`, `limit`) |
+| GET | `/` | `customer:read` | List (`branchId` narrows to a branch, coerced to own branch for branch-scoped users; omit it to search all branches, as pickers do; Accountant always own branch; `search`, `page`, `limit`) |
 | GET | `/:id` | `customer:read` | Get customer |
 | POST | `/` | `customer:create` | Create customer |
 | PUT | `/:id` | `customer:update` | Update customer |
@@ -66,7 +66,7 @@ Express 4 + Prisma 6 + PostgreSQL + TypeScript. All routes are mounted under `/a
 
 | Method | Path | Permission | Description |
 | --- | --- | --- | --- |
-| GET | `/` | `vehicle:read` | List (branch-scoped via `customer.branchId`) |
+| GET | `/` | `vehicle:read` | List (`branchId` filters via `customer.branchId`, same rules as customers; `customerId`, `search`) |
 | GET | `/:id` | `vehicle:read` | Get vehicle |
 | POST | `/` | `vehicle:create` | Create vehicle |
 | PUT | `/:id` | `vehicle:update` | Update vehicle |

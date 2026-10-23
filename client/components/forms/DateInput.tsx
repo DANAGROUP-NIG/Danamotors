@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { CalendarDays } from "lucide-react";
 import { inputCls } from "./FormField";
+import { openNativePicker } from "./native-picker";
 
 interface DateInputProps {
   value?: string;
@@ -11,6 +13,8 @@ interface DateInputProps {
   disabled?: boolean;
   onBlur?: () => void;
   invalid?: boolean;
+  min?: string;
+  max?: string;
 }
 
 function formatToDisplay(iso?: string): string {
@@ -58,11 +62,15 @@ export function DateInput({
   disabled,
   onBlur,
   invalid,
+  min,
+  max,
 }: DateInputProps) {
   const [display, setDisplay] = useState(() => formatToDisplay(value));
+  const picker = useRef<HTMLInputElement>(null);
 
+  // Keep a half-typed date while the parent holds "" for it.
   useEffect(() => {
-    setDisplay(formatToDisplay(value));
+    setDisplay(current => (displayToISO(current) === value ? current : formatToDisplay(value)));
   }, [value]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
@@ -72,16 +80,38 @@ export function DateInput({
   }
 
   return (
-    <input
-      type="text"
-      inputMode="numeric"
-      value={display}
-      onChange={handleChange}
-      onBlur={onBlur}
-      aria-invalid={invalid}
-      className={className}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
+    <div className="relative w-full min-w-0">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={display}
+        onChange={handleChange}
+        onBlur={onBlur}
+        aria-invalid={invalid}
+        className={`${className} pr-10`}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+      <button
+        type="button"
+        aria-label="Choose date from calendar"
+        disabled={disabled}
+        onClick={() => openNativePicker(picker.current)}
+        className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+      >
+        <CalendarDays className="h-4 w-4" />
+      </button>
+      <input
+        ref={picker}
+        type="date"
+        tabIndex={-1}
+        aria-hidden="true"
+        min={min}
+        max={max}
+        value={/^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : ""}
+        onChange={event => onChange(event.target.value)}
+        className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
+      />
+    </div>
   );
 }
