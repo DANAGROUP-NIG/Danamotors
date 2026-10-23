@@ -142,8 +142,9 @@ export function PartMasterTable() {
       ),
     },
     {
-      header: "Part code",
-      render: (p) => <span className="font-mono text-sm text-muted-foreground">{p.partCode}</span>,
+      header: "Part description",
+      className: "min-w-44",
+      render: (p) => <span className="text-muted-foreground">{p.description || "—"}</span>,
     },
     {
       header: "Category",
@@ -154,21 +155,12 @@ export function PartMasterTable() {
         </span>
       ),
     },
-    { header: "UOM", render: (p) => <span className="text-muted-foreground">{p.uom}</span> },
     {
       header: "Dealer / Retail",
       render: (p) => (
         <span className="text-muted-foreground">
           {fmtNaira(p.unitRate)}
           <span className="block text-sm">{p.retailRate != null ? fmtNaira(p.retailRate) : "—"}</span>
-        </span>
-      ),
-    },
-    {
-      header: "Min / Max",
-      render: (p) => (
-        <span className="text-muted-foreground">
-          {p.minLevel ?? "—"} / {p.maxLevel ?? "—"}
         </span>
       ),
     },
