@@ -55,13 +55,19 @@ function exportColumns() {
   ];
 }
 
+/** Company name for corporate customers, else first and last name. */
+function customerName(v: Vehicle): string {
+  if (!v.customer) return "";
+  return v.customer.companyName?.trim() || [v.customer.firstName, v.customer.lastName].filter(Boolean).join(" ");
+}
+
 function toExportableVehicle(v: Vehicle): Record<string, string> {
   return {
     make: v.make ?? "",
     model: v.model ?? "",
     vin: v.vin,
     registrationNumber: v.registrationNumber ?? "",
-    customer: v.customer ? `${v.customer.firstName} ${v.customer.lastName}` : "",
+    customer: customerName(v),
     year: v.year != null ? String(v.year) : "",
     color: v.color ?? "",
     ownershipStatus: v.ownershipStatus ?? "",
@@ -69,9 +75,7 @@ function toExportableVehicle(v: Vehicle): Record<string, string> {
 }
 
 function formatVehicleText(v: Vehicle) {
-  const customer = v.customer
-    ? `${v.customer.firstName} ${v.customer.lastName}`
-    : "N/A";
+  const customer = customerName(v) || "N/A";
   return `*${v.make ?? ""} ${v.model ?? ""}*\nVIN: ${v.vin}\nRegistration: ${v.registrationNumber ?? "N/A"}\nCustomer: ${customer}\nYear: ${v.year ?? "N/A"}\nColor: ${v.color ?? "N/A"}\nOwnership: ${v.ownershipStatus ?? "N/A"}`;
 }
 
@@ -194,10 +198,7 @@ export function VehiclesTable() {
     },
     {
       header: "Customer",
-      render: (v) =>
-        v.customer
-          ? `${v.customer.firstName} ${v.customer.lastName}`
-          : "—",
+      render: (v) => customerName(v) || <span className="text-border">—</span>,
       className: "text-muted-foreground",
     },
     {

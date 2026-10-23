@@ -1,6 +1,6 @@
 "use client";
 import { useId, useState, type ReactNode } from "react";
-import { CalendarDays, LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { DateInput } from "@/components/forms/DateInput";
 export const openingInput = "h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 export const openingGrid = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
@@ -136,19 +136,12 @@ export function OpeningDatePicker(
   },
 ) {
   return (
-    <div className="relative"><DateInput
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        invalid={invalid}
-        className={`${openingInput} pr-12`} /><span
-        className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-r-lg border-l border-border text-muted-foreground"><CalendarDays className="h-4 w-4" /><input
-          type="date"
-          aria-label="Choose promised date from calendar"
-          min={min}
-          value={value || ""}
-          onChange={event => onChange(event.target.value)}
-          onBlur={onBlur}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></span></div>
+    <DateInput
+      value={value}
+      onChange={onChange}
+      onBlur={onBlur}
+      invalid={invalid}
+      min={min}
+      className={openingInput} />
   );
 }

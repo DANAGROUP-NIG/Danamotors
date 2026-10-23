@@ -34,7 +34,6 @@ export default function CustomerDetailPage() {
   const { data: vehiclesData, isLoading: loadingVehicles } = useVehicles({
     customerId: id,
     limit: 50,
-    branchId,
   });
   const { data: appointmentsData, isLoading: loadingAppointments } =
     useAppointments({ customerId: id, limit: 50, branchId });

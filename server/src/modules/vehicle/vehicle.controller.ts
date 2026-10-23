@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { VehicleService } from './vehicle.service';
+import { directoryBranchFilter } from '../../middleware/authorize';
 
 export class VehicleController {
   private vehicleService: VehicleService;
@@ -14,7 +15,7 @@ export class VehicleController {
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
       const customerId = req.query.customerId as string | undefined;
-      const result = await this.vehicleService.listVehicles({ page, limit, search, customerId });
+      const result = await this.vehicleService.listVehicles({ page, limit, search, customerId, branchId: directoryBranchFilter(req) });
 
       res.status(200).json({
         status: 'success',

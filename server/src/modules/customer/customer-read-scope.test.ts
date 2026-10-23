@@ -33,6 +33,15 @@ it('passes the assigned branch to the customer list service', async () => {
   await new CustomerController().getCustomers(request('/'), response(), jest.fn());
   expect(list).toHaveBeenCalledWith(expect.objectContaining({ branchId: 'own' }));
 });
+it('narrows the list to the header branch, keeping branch users on their own and pickers unscoped', async () => {
+  const list = jest.spyOn(CustomerService.prototype, 'listCustomers').mockResolvedValue({ customers: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } });
+  const listFor = (role: string, query: Record<string, string>) => new CustomerController().getCustomers(
+    { method: 'GET', path: '/', user: { role, branchId: 'own', permissions: [] }, query } as unknown as Request, response(), jest.fn());
+  await listFor(ROLES.SUPER_ADMIN, { branchId: 'other' });
+  await listFor(ROLES.SERVICE_ADVISOR, { branchId: 'other' });
+  await listFor(ROLES.SERVICE_ADVISOR, {});
+  expect(list.mock.calls.map(([params]) => params.branchId)).toEqual(['other', 'own', undefined]);
+});
 it('applies the same branch predicate to list rows and count', async () => {
   (prisma.customer.findMany as jest.Mock).mockResolvedValue([]); (prisma.customer.count as jest.Mock).mockResolvedValue(0);
   await new CustomerRepository().listCustomers({ skip: 0, take: 10, branchId: 'own' });

@@ -7,7 +7,7 @@ import { Download, Printer } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
-import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
@@ -372,7 +372,8 @@ export function PartyReportsPage({ kind }: { kind: ReportKind }) {
               value={filters[key]}
               onChange={(id) => change(key, id || undefined)}
               disabled={!validBranch}
-              formatLabel={(r) => [r.code, r.name].filter(Boolean).join(" · ")}
+              formatLabel={customerLabel}
+              renderOption={customerOption}
             />
           ))}
         {kind === "age" && (

@@ -130,62 +130,61 @@ export function PartMasterTable() {
     );
   }
 
+  // Text columns left, money right; short columns never wrap so rows stay one line high.
   const columns: Column<PartMaster>[] = [
     {
-      header: "Part",
-      className: "min-w-44",
+      header: "Part number",
+      headerClassName: "whitespace-nowrap",
+      className: "whitespace-nowrap",
       render: (p) => (
-        <Link href={`/inventory/${p.id}`} className="block hover:underline">
-          <p className="font-medium">{p.name}</p>
-          <p className="font-mono text-sm text-muted-foreground">{p.partNumber}</p>
+        <Link href={`/inventory/${p.id}`} className="font-mono font-medium text-foreground hover:underline">
+          {p.partNumber}
         </Link>
       ),
     },
     {
-      header: "Part code",
-      render: (p) => <span className="font-mono text-sm text-muted-foreground">{p.partCode}</span>,
+      header: "Part description",
+      headerClassName: "whitespace-nowrap",
+      className: "min-w-56",
+      render: (p) => <span className="font-medium text-foreground">{p.name}</span>,
     },
     {
       header: "Category",
-      render: (p) => (
-        <span className="text-muted-foreground">
-          {p.category || "—"}
-          {p.priceCategoryCode && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 font-mono text-sm">{p.priceCategoryCode}</span>}
-        </span>
-      ),
-    },
-    { header: "UOM", render: (p) => <span className="text-muted-foreground">{p.uom}</span> },
-    {
-      header: "Dealer / Retail",
-      render: (p) => (
-        <span className="text-muted-foreground">
-          {fmtNaira(p.unitRate)}
-          <span className="block text-sm">{p.retailRate != null ? fmtNaira(p.retailRate) : "—"}</span>
-        </span>
-      ),
+      className: "whitespace-nowrap",
+      render: (p) =>
+        p.priceCategoryCode || p.category ? (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            {p.priceCategoryCode && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground">{p.priceCategoryCode}</span>}
+            {p.category}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
-      header: "Min / Max",
-      render: (p) => (
-        <span className="text-muted-foreground">
-          {p.minLevel ?? "—"} / {p.maxLevel ?? "—"}
-        </span>
-      ),
+      header: "Dealer rate",
+      headerClassName: "whitespace-nowrap text-right",
+      className: "whitespace-nowrap text-right tabular-nums text-muted-foreground",
+      render: (p) => fmtNaira(p.unitRate),
+    },
+    {
+      header: "Retail rate",
+      headerClassName: "whitespace-nowrap text-right",
+      className: "whitespace-nowrap text-right font-medium tabular-nums text-foreground",
+      render: (p) => (p.retailRate != null ? fmtNaira(p.retailRate) : "—"),
     },
     {
       header: "Location",
-      render: (p) => (
-        <span className="text-muted-foreground">
-          {[p.binLocation, p.storeLocation].filter(Boolean).join(" · ") || "—"}
-        </span>
-      ),
+      headerClassName: "pl-8",
+      className: "whitespace-nowrap pl-8 text-muted-foreground",
+      render: (p) => [p.binLocation, p.storeLocation].filter(Boolean).join(" · ") || "—",
     },
-    { header: "Role", render: (p) => <PartRoleBadge role={p.role} /> },
-    { header: "Status", render: (p) => <PartStatusBadge status={p.partStatus} /> },
+    { header: "Role", className: "whitespace-nowrap", render: (p) => <PartRoleBadge role={p.role} /> },
+    { header: "Status", className: "whitespace-nowrap", render: (p) => <PartStatusBadge status={p.partStatus} /> },
     {
       header: "Actions",
-      headerClassName: "text-right",
-      className: "text-right",
+      headerClassName: "w-px whitespace-nowrap text-right",
+      className: "w-px whitespace-nowrap text-right",
       render: (p) => (
         <DataTableRowActions
           item={p}

@@ -3,6 +3,7 @@ import { CustomerService } from './customer.service';
 import { ROLES } from '../../shared/constants/roles';
 import { TallyService } from '../finance/tally.service';
 import { ForbiddenError } from '../../shared/errors/appError';
+import { directoryBranchFilter } from '../../middleware/authorize';
 
 export class CustomerController {
   private customerService: CustomerService;
@@ -32,7 +33,7 @@ export class CustomerController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
-      const result = await this.customerService.listCustomers({ page, limit, search, branchId: req.user?.role === ROLES.ACCOUNTANT ? req.user.branchId ?? undefined : undefined });
+      const result = await this.customerService.listCustomers({ page, limit, search, branchId: req.user?.role === ROLES.ACCOUNTANT ? req.user.branchId ?? undefined : directoryBranchFilter(req) });
 
       res.status(200).json({
         status: 'success',
