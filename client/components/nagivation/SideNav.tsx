@@ -149,10 +149,14 @@ export default function SideNav({
         }
       : (branch ?? { branches: [], activeBranch: null });
 
+  // Every link in the sidebar, so a parent path (/inventory) yields to a closer link (/inventory/part-query).
+  const allHrefs = navGroups.flatMap(group => group.items.flatMap(item => [item.href, ...(item.children ?? []).map(child => child.href)]))
+    .filter((href): href is string => !!href);
+
   function isItemActive(href: string, pathname: string) {
     if (href === "/logout") return false;
     if (href === exactRoot || href === "/finance") return pathname === href;
-    return isActive(href, pathname);
+    return isActive(href, pathname) && !allHrefs.some(other => other.length > href.length && isActive(other, pathname));
   }
 
   return (
