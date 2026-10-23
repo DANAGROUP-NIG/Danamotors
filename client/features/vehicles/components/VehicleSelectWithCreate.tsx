@@ -68,7 +68,6 @@ export function VehicleSelectWithCreate({
 
   const { data: vehicles = [], isLoading: loadingVehicles } = useAllVehicles({
     customerId: customerId || undefined,
-    branchId,
   });
 
   const createVehicleMutation = useCreateVehicle();

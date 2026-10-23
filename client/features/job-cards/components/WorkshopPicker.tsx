@@ -66,6 +66,18 @@ export function recordLabel(row: PickerRecord) {
   );
 }
 
+/** Customer pickers lead with the customer code, then the name; search still matches names. */
+export function customerLabel(row: PickerRecord) {
+  return [row.code, row.companyName || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.name].filter(Boolean).join(" · ") || row.id;
+}
+
+export function customerOption(row: PickerRecord) {
+  return <span className="min-w-0">
+    <span className="block break-words font-medium">{customerLabel(row)}</span>
+    {row.phoneNumber && <span className="block text-sm text-muted-foreground">{row.phoneNumber}</span>}
+  </span>;
+}
+
 function recordHint(row: PickerRecord) {
   if (row.vin && row.registrationNumber) return row.vin;
 

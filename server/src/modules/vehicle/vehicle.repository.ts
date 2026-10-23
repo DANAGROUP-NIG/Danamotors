@@ -19,6 +19,9 @@ export class VehicleRepository {
       where.customerId = params.customerId;
     }
 
+    if (params.branchId) {
+      where.customer = { branchId: params.branchId };
+    }
 
     const [vehicles, total] = await Promise.all([
       prisma.vehicle.findMany({
@@ -31,6 +34,7 @@ export class VehicleRepository {
               id: true,
               firstName: true,
               lastName: true,
+              companyName: true,
               email: true,
               branchId: true,
             },
