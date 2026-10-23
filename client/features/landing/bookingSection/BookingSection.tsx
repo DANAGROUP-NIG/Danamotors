@@ -13,9 +13,17 @@ import { useCreateEnquiry } from '@/features/enquiry/hooks/use-create-enquiry';
 import { createEnquirySchema, type CreateEnquiryFormValues } from '@/features/enquiry/schemas/enquiry.schema';
 import { BookingDatePicker } from './BookingDatePicker';
 
+function withTime(date: Date, time: string) {
+  const [hours, minutes] = time.split(':').map(Number);
+  const result = new Date(date);
+  result.setHours(hours || 0, minutes || 0, 0, 0);
+  return result;
+}
+
 export default function BookingSection() {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState('09:00');
 
   const createEnquiry = useCreateEnquiry();
   const { data: branchesData, isLoading: branchesLoading } = useBranches();
@@ -39,7 +47,7 @@ export default function BookingSection() {
   function onSubmit(values: CreateEnquiryFormValues) {
     const payload = {
       ...values,
-      preferredDate: selectedDate?.toISOString(),
+      preferredDate: selectedDate ? withTime(selectedDate, selectedTime).toISOString() : undefined,
       vehicleYear: values.vehicleYear ? Number(values.vehicleYear) : undefined,
       vehicleMake: values.vehicleMake || undefined,
       vehicleModel: values.vehicleModel || undefined,
@@ -52,6 +60,7 @@ export default function BookingSection() {
         setConfirmedId(data.enquiry.id);
         reset();
         setSelectedDate(undefined);
+        setSelectedTime('09:00');
       },
     });
   }
@@ -84,7 +93,7 @@ export default function BookingSection() {
 
         <div className="grid gap-8 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="flex flex-col gap-6">
-            <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+            <BookingDatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} selectedTime={selectedTime} onSelectTime={setSelectedTime} />
 
           
           </div>

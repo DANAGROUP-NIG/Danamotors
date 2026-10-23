@@ -6,12 +6,18 @@ import { Badge } from "@/components/ui/badge";
 interface BookingDatePickerProps {
   selectedDate?: Date;
   onSelectDate: (date?: Date) => void;
+  selectedTime: string;
+  onSelectTime: (time: string) => void;
 }
 
 export function BookingDatePicker({
   selectedDate,
   onSelectDate,
+  selectedTime,
+  onSelectTime,
 }: BookingDatePickerProps) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return (
     <div className="relative overflow-hidden rounded-[28px] border border-blue-500/20 bg-linear-to-br from-slate-950 via-slate-900 to-slate-900/95 p-5 text-white shadow-[0_30px_80px_-40px_rgba(30,64,175,0.75)] sm:p-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(96,165,250,0.28),_transparent_55%)]" aria-hidden />
@@ -34,6 +40,9 @@ export function BookingDatePicker({
             mode="single"
             selected={selectedDate}
             onSelect={onSelectDate}
+            disabled={{ before: today }}
+            startMonth={today}
+            endMonth={new Date(today.getFullYear() + 1, 11)}
             className="mx-auto w-full text-slate-100"
             classNames={{
               months: "flex w-full justify-center",
@@ -57,13 +66,23 @@ export function BookingDatePicker({
           />
         </div>
 
+        <label className="mt-4 flex items-center gap-3 text-sm font-medium text-slate-200">
+          Preferred time
+          <input
+            type="time"
+            value={selectedTime}
+            onChange={(event) => onSelectTime(event.target.value)}
+            className="h-10 rounded-lg border border-white/15 bg-slate-900/70 px-3 text-sm text-white outline-none [color-scheme:dark] focus:ring-2 focus:ring-blue-400/50"
+          />
+        </label>
+
         <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1.5 text-sm font-medium text-blue-100">
           <span className="size-2 rounded-full bg-white" aria-hidden />
-          {selectedDate ? selectedDate.toLocaleDateString(undefined, {
+          {selectedDate ? `${selectedDate.toLocaleDateString(undefined, {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
-          }) : 'No date selected yet'}
+          })}${selectedTime ? ` at ${selectedTime}` : ''}` : 'No date selected yet'}
         </div>
       </div>
     </div>
