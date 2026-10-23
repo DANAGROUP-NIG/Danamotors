@@ -30,14 +30,12 @@ title, filters, options and columns are defined once, in
 
 | Legacy report | Kind | What it shows |
 |---|---|---|
-| Counter Sales Register | `counter-sales` | Bill lines: part, qty, rate, cash discount, VAT, net (filters: customer, part filters) |
-| Counter Sales Register Summary | `counter-sales-summary` | One line per bill, with round-off, outstanding and status |
-| Counter Sales Tax Register (Datewise) | `counter-sales-tax-datewise` | Day totals of taxable and exempt value, VAT and net |
+| Counter Sales Register | `counter-sales` | **Show** Bills (legacy layout, one line per bill: spares/kit and oil value, each taxable and non-taxable, cash discount, VAT, round-off and total amount) or Lines (every bill line: part, quantity, rate, discount, VAT and net, before the bill's round-off). Filters: customer, part filters. With a part filter, Bills lists only the matching lines' value and no round-off |
+| Counter Sales Register Summary, Counter Sales Tax Register (Datewise), Sales Executive Wise Counter Sales Register | `counter-sales-summary` | **Group by** Bill (one line per bill: sales executive, taxable and exempt value, VAT, round-off, outstanding and status), Sales executive (the same bills under each executive, with subtotals) or Day (one line per day: bills, taxable and exempt value, VAT, round-off and net). Filters: customer, sales executive |
 | Counter Sales Tax Register (Annexure) | `counter-sales-tax-annexure` | Bill-wise VAT with customer address; can list cancelled bills, which are never totalled |
 | Counter Sales Return Register | `counter-sales-returns` | Returned lines at the bill's discount and VAT, with the credit note number |
 | Counter Sales Cancellation Register | `counter-sales-cancellations` | Cancelled bills: All, Counter sales, or FOC (a 100% cash discount) |
 | Counter Sale Revenue | `counter-sales-revenue` | Sales less returns by price category against dealer cost, with margin; optionally by customer |
-| Sales Executive Wise Counter Sales Register | `sales-executive-register` | Bills grouped by sales executive, with subtotals |
 | CPO Register | `cpo-register` | CPO lines with ordered, picked, billed, cancelled and pending; Pending, Cancelled or Executed (and only fully executed) |
 | MRN Register | `mrn-register` | Vendor (Mobis) MRN lines grouped by vendor with subtotals, or **Summary (invoice wise)**: one line per MRN and supplier invoice (filters: vendor, MRN no., part filters) |
 | Material In Transit Report | `mit-register` | Mobis MIT lines by case and order number: invoiced, received, damaged, short and still in transit, valued at the conversion rate; **All** or **Pending** (no MRN yet) |
@@ -85,7 +83,22 @@ The legacy **Stock Reports** menu. Reports marked *as on* take one date; *now* r
 - **Receipt Summary (Invoice Wise)** is the MRN Register's **Summary (invoice wise)** option, not a
   separate report.
 - The **Dispatch Challan Register**. Dispatch challans (internal fuel and consumable
-issues) are not built yet; see [part-sale.md](./part-sale.md).
+issues) are not built yet; see [part-sale.md](./part-sale.md). Its layout and filters are kept there,
+for when challans are built.
+
+Counter-sale reports merged or left out, so that no report repeats another:
+
+- The legacy **Counter Sales Register Summary**, **Counter Sales Tax Register (Datewise)** and **Sales
+  Executive Wise Counter Sales Register** all totalled the same bills, so they are the three **Group by**
+  choices of one report. The legacy executive screen took a *From exec* and *To exec* range; the
+  **Sales executive** filter picks one executive, or all.
+- **Cash and credit totals** (legacy printed every bill register in a CASH and a CREDIT section) are left
+  out. Part sale is a CPD feature and every CPD bill is on credit. What is still owed is on the summary's
+  Outstanding and Status columns.
+- **Accessories** have no column of their own: as on the legacy register, they are in the spares/kit value.
+  The **Part type** filter still splits any register by type.
+- **Handling, entry tax, LST surcharge, other charges and CST** columns are left out: no CPD bill has them
+  (handling is applied only on some branch cash and credit bills, which part sale does not cover).
 
 Stock reports merged or left out, so that no report repeats another:
 
