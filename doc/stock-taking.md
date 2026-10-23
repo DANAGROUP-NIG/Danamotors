@@ -42,7 +42,7 @@ Audit, Audit by Audit Head, Audit by Visiting Management); see [Stock audit](#st
 ## Handheld (HHDC)
 
 The handheld is a Motorola MC3190 (Windows CE 6.0, .NET Compact Framework 3.5). Two programs in
-`hhdc/` replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`, with **no server
+`dana_projects/hhdc/` (a sibling of this repo, not inside it) replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`, with **no server
 changes**. They use the same two calls as the web count sheet:
 
 - `GET /api/stock-takes/:id/sheets/:sheetId`: the sheet's parts (bin, part, description, and
@@ -66,8 +66,13 @@ How it works:
 - **Counting.** A scan arrives as keystrokes (DataWedge). Enter, Tab, or a burst of fast characters
   followed by a short pause ends a scan. The same part in two bins is two entries. The same part and
   bin again asks **add** or **replace**. A part not on the sheet asks first and is marked; a bin that
-  differs from the sheet's bin warns but is allowed (the Update bins step uses it). A battery pull
-  loses at most the entry being typed.
+  differs from the sheet's bin warns (and beeps) but is allowed (the Update bins step uses it). A battery
+  pull loses at most the entry being typed. **Scan modes** (Esc menu): the checker types the quantity,
+  or each scan of a part adds 1 (or removes 1) in the current bin, saved at once, as the legacy Qty+1 and
+  Qty-1 did. **F1** lists the sheet's parts for the current bin that are not counted yet, and finds a
+  part by the start of its number. The bin of the last entry is restored when a sheet is reopened; a part
+  label scanned into the Bin box is questioned; the bin `UNDEFINED` is refused. A 38,723-part sheet (the
+  legacy maximum) opens in about 3 seconds on the device.
 - **Receiving.** HHDC Link needs the sheet **finished**. It shows entries, quantity, damaged, parts not
   on the sheet and parts not counted, and requires a choice for the uncounted parts (`ZERO` or
   `RELEASE`) before it uploads. It checks the server first (sheet still open), writes `Uploading` to its
@@ -83,7 +88,7 @@ How it works:
 Build and test (no Visual Studio; only the free `csc.exe` of .NET Framework 4):
 
 ```powershell
-cd hhdc
+cd ..\hhdc             # dana_projects\hhdc, next to this repo (not inside it)
 .\build.ps1            # builds both programs and runs the unit tests
 .\build.ps1 -UiTest    # also drives the real device exe through a counting session on this PC
 ```

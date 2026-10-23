@@ -97,11 +97,9 @@ export class PartsReportService {
     if (stockRows) return stockRows;
     switch (definition.kind) {
       case "counter-sales":
-        return this.counterSalesLines(f);
+        return f.option === "LINES" ? this.counterSalesLines(f) : this.counterSalesBills(f);
       case "counter-sales-summary":
         return this.counterSalesSummary(f);
-      case "counter-sales-tax-datewise":
-        return this.taxDatewise(f);
       case "counter-sales-tax-annexure":
         return this.taxAnnexure(f);
       case "counter-sales-returns":
@@ -110,8 +108,6 @@ export class PartsReportService {
         return this.cancellations(f);
       case "counter-sales-revenue":
         return this.revenue(f);
-      case "sales-executive-register":
-        return this.executiveRegister(f);
       case "cpo-register":
         return this.cpoRegister(f);
       case "mrn-register":
@@ -164,6 +160,46 @@ export class PartsReportService {
     };
   }
 
+  /** One line per bill (legacy Counter Sale Register): value by part type, discount, taxable and exempt value, VAT, round-off and total. */
+  private async counterSalesBills(f: ReportFilters): Promise<Row[]> {
+    const partFilter = partWhere(f);
+    const filtered = Object.keys(partFilter).length > 0;
+    const invoices = await prisma.invoice.findMany({
+      where: { ...this.saleInvoiceWhere(f), ...(filtered && { lines: { some: { part: partFilter } } }) },
+      include: {
+        customer: customerSelect,
+        counterSale: { select: { gatePassNumber: true } },
+        lines: { include: { part: { select: { partType: true, id: true } } } },
+      },
+      orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
+    });
+    const wanted = filtered ? new Set((await prisma.sparePart.findMany({ where: partFilter, select: { id: true } })).map((p) => p.id)) : null;
+    return invoices.map((i) => {
+      const row = { sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, discount: 0, vat: 0 };
+      for (const l of i.lines) {
+        if (wanted && !(l.partId && wanted.has(l.partId))) continue;
+        const v = lineValues(l.quantity, l.rate, i.partsDiscountPercent, l.vatPercent);
+        // Legacy columns: spares/kit (accessories included) and oil, each split into taxable and non-taxable value before discount.
+        const column = `${l.part?.partType === "O" ? "oil" : "spares"}${(l.vatPercent ?? 0) > 0 ? "Taxable" : "Exempt"}` as keyof typeof row;
+        row[column] = money(row[column] + v.gross);
+        row.discount = money(row.discount + v.discount);
+        row.vat = money(row.vat + v.vat);
+      }
+      // The ₦10 round-off belongs to the whole bill, so it is shown only when every line is listed.
+      const roundOff = filtered ? 0 : i.roundOff;
+      return {
+        billNumber: i.invoiceNumber,
+        date: i.issuedDate.toISOString(),
+        gatePass: i.counterSale?.gatePassNumber ?? null,
+        customerCode: i.customer.code,
+        customer: partyName(i.customer),
+        ...row,
+        roundOff,
+        net: money(row.sparesTaxable + row.sparesExempt + row.oilTaxable + row.oilExempt - row.discount + row.vat + roundOff),
+      };
+    });
+  }
+
   private async counterSalesLines(f: ReportFilters): Promise<Row[]> {
     const lines = await prisma.invoiceLine.findMany({
       where: { invoice: this.saleInvoiceWhere(f), part: partWhere(f) },
@@ -195,7 +231,7 @@ export class PartsReportService {
         customer: customerSelect,
         cancelledBy: { select: { firstName: true, lastName: true } },
         counterSale: { select: { salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
-        lines: { select: { quantity: true, rate: true, vatPercent: true } },
+        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true } } } },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
@@ -213,22 +249,32 @@ export class PartsReportService {
     return { taxable: money(taxable), exempt: money(exempt) };
   }
 
+  /** Bills grouped by sales executive (legacy Sales Executive Wise register), or one line per day (legacy datewise register). */
   private async counterSalesSummary(f: ReportFilters): Promise<Row[]> {
+    if (f.option === "DAY") return this.taxDatewise(f);
     const invoices = await this.saleInvoices(f);
-    return invoices.map((i) => ({
-      billNumber: i.invoiceNumber,
-      date: i.issuedDate.toISOString(),
-      customer: partyName(i.customer),
-      lines: i.lines.length,
-      quantity: i.lines.reduce((s, l) => s + l.quantity, 0),
-      gross: i.partsTotal,
-      discount: i.partsDiscountAmount,
-      vat: i.vatAmount,
-      roundOff: i.roundOff,
-      net: i.total,
-      outstanding: i.outstandingAmount,
-      status: i.status,
-    }));
+    const rows = invoices.map((i) => {
+      // Value by part type before discount, as the legacy executive register printed it.
+      const byType = { spares: 0, accessories: 0, oil: 0 };
+      for (const l of i.lines) {
+        const type = l.part?.partType === "O" ? "oil" : l.part?.partType === "A" ? "accessories" : "spares";
+        byType[type] = money(byType[type] + lineValues(l.quantity, l.rate, 0, null).gross);
+      }
+      return {
+        group: userName(i.counterSale?.salesExecutive) || "No sales executive",
+        date: i.issuedDate.toISOString(),
+        billNumber: i.invoiceNumber,
+        customer: partyName(i.customer),
+        ...byType,
+        discount: i.partsDiscountAmount,
+        vat: i.vatAmount,
+        roundOff: i.roundOff,
+        net: i.total,
+        outstanding: i.outstandingAmount,
+        status: i.status,
+      };
+    });
+    return rows.sort((a, b) => a.group.localeCompare(b.group));
   }
 
   private async taxDatewise(f: ReportFilters): Promise<Row[]> {
@@ -263,6 +309,8 @@ export class PartsReportService {
       customerCode: i.customer.code,
       customer: partyName(i.customer),
       address: [i.customer.house, i.customer.street, i.customer.address, i.customer.city, i.customer.state].filter(Boolean).join(", "),
+      gross: i.partsTotal,
+      discount: i.partsDiscountAmount,
       ...this.taxSplit(i),
       vat: i.vatAmount,
       net: i.total,
@@ -390,22 +438,6 @@ export class PartsReportService {
       return { ...row, netSales, margin, marginPercent: netSales ? money((margin / netSales) * 100) : 0 };
     });
     return rows.sort((a, b) => String(a.group ?? "").localeCompare(String(b.group ?? "")) || String(a.category).localeCompare(String(b.category)));
-  }
-
-  private async executiveRegister(f: ReportFilters): Promise<Row[]> {
-    const invoices = await this.saleInvoices(f);
-    return invoices
-      .map((i) => ({
-        group: userName(i.counterSale?.salesExecutive) || "No sales executive",
-        billNumber: i.invoiceNumber,
-        date: i.issuedDate.toISOString(),
-        customer: partyName(i.customer),
-        gross: i.partsTotal,
-        discount: i.partsDiscountAmount,
-        vat: i.vatAmount,
-        net: i.total,
-      }))
-      .sort((a, b) => a.group.localeCompare(b.group));
   }
 
   // ── Customer orders ───────────────────────────────────────────────────────

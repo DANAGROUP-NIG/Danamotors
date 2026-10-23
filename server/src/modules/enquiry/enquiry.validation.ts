@@ -13,7 +13,9 @@ export const createEnquirySchema = z.object({
     vehicleYear:        z.number().int().min(1900).max(new Date().getFullYear() + 1).optional(),
     vehicleRegNumber:   z.string().max(20).optional(),
     serviceDescription: z.string().min(10, 'Please describe the service needed').max(500),
-    preferredDate:      z.string().datetime({ offset: true }).optional(),
+    // Appointment slot: required and in the future (a few minutes' grace for clock drift).
+    preferredDate:      z.string({ required_error: 'Appointment date and time are required' }).datetime({ offset: true })
+                          .refine(value => new Date(value).getTime() > Date.now() - 5 * 60 * 1000, 'Appointment must be in the future'),
     branchId:           z.string().uuid('Invalid branch ID'),
   }),
 });

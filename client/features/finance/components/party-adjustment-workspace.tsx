@@ -8,7 +8,7 @@ import { Field, inputCls } from '@/components/forms/FormField';
 import { DataTable, type Column } from '@/components/ui/table-components/DataTable';
 import { PageHeader } from '@/components/headers/page-header';
 import ModalFame from '@/components/modals/ModalFame';
-import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
+import { WorkshopPicker, customerLabel, customerOption } from '@/features/job-cards/components/WorkshopPicker';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useBranchStore } from '@/store/branch.store';
 import { getPartyDocuments, getAdjustmentBatches, previewFifo, type PartyDocument, type AdjustmentSelection, type FifoPreview } from '../api/party-account.api';
@@ -35,7 +35,7 @@ export function PartyAdjustmentWorkspace({ initialCustomerId = '' }: { initialCu
     <PageHeader title="Advance adjustment" description="Apply available receipts and credits to bills and opening debits." />
     <section className="grid gap-4 rounded-xl border bg-background p-4 sm:grid-cols-[180px_minmax(0,1fr)]" aria-label="Party selection">
       <Field label="Party order"><select className={inputCls} value={order} onChange={event=>setOrder(event.target.value as typeof order)}><option value="name">Name-wise</option><option value="code">Code-wise</option></select></Field>
-      <WorkshopPicker label="Party" endpoint={'/finance/parties?order='+order+(branchId ? '&branchId='+branchId : '')} selectedRecord={party.data ? { id: customerId, name: party.data.customer.name, code: party.data.customer.code } : undefined} collection="customers" value={customerId} onChange={setCustomerId} formatLabel={row=>order==='code' ? [row.code,row.name || row.companyName || [row.firstName,row.lastName].filter(Boolean).join(' ')].filter(Boolean).join(' · ') : row.companyName || [row.firstName,row.lastName].filter(Boolean).join(' ')} />
+      <WorkshopPicker label="Party" endpoint={'/finance/parties?order='+order+(branchId ? '&branchId='+branchId : '')} selectedRecord={party.data ? { id: customerId, name: party.data.customer.name, code: party.data.customer.code } : undefined} collection="customers" value={customerId} onChange={setCustomerId} formatLabel={customerLabel} renderOption={customerOption} />
     </section>
     {!branchId ? <p role="alert" className="text-sm text-destructive">Select a branch in the app header to adjust its documents.</p> : !customerId ? <p className="py-10 text-center text-sm text-muted-foreground">Select a party to review debit and credit balances.</p> : <AdjustmentSession key={customerId+branchId} customerId={customerId} branchId={branchId} />}
   </div>;

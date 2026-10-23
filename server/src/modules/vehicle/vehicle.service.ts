@@ -76,6 +76,7 @@ export class VehicleService {
           email: vehicle.customer.email,
           firstName: vehicle.customer.firstName,
           lastName: vehicle.customer.lastName,
+          companyName: vehicle.customer.companyName,
         } : null,
 
         createdBy: (vehicle as any).createdBy ?? null,

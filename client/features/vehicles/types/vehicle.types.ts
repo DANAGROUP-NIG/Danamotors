@@ -3,6 +3,7 @@ export type VehicleCustomer = {
   email: string;
   firstName: string;
   lastName: string;
+  companyName?: string | null;
   phoneNumber?: string | null;
 };
 

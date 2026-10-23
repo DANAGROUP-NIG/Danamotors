@@ -240,6 +240,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <DetailField label="Invoice date" value={fmtDate(invoice.issuedDate)} />
             <DetailField label="Due date" value={fmtDate(invoice.dueDate)} />
+            <DetailField label="Gate pass" value={sale.gatePassNumber} />
             <DetailField wide label="Address" value={customerAddress(invoice.customer) || null} />
             <DetailField
               label="Sales executive"

@@ -42,8 +42,8 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
       <div className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
         <div className="min-w-0 text-sm">
           <p className="font-medium text-slate-800">
+            {value.code && <span className="mr-2 font-mono text-slate-500">{value.code}</span>}
             {customerName(value)}
-            {value.code && <span className="ml-2 font-mono text-slate-500">{value.code}</span>}
           </p>
           <p className="truncate text-slate-500">{customerAddress(value) || "No address on file"}</p>
           {value.phoneNumber && <p className="text-slate-500">{value.phoneNumber}</p>}
@@ -100,8 +100,8 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
               >
                 <span className="min-w-0">
                   <span className="block font-medium">
+                    {c.code && <span className="mr-2 font-mono text-muted-foreground">{c.code}</span>}
                     {c.name}
-                    {c.code && <span className="ml-2 font-mono text-muted-foreground">{c.code}</span>}
                   </span>
                   <span className="block truncate text-muted-foreground">{customerAddress(c) || c.phoneNumber || "—"}</span>
                 </span>

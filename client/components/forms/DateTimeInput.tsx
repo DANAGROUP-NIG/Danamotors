@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { CalendarClock } from "lucide-react";
 import { inputCls } from "./FormField";
+import { openNativePicker } from "./native-picker";
 
 interface DateTimeInputProps {
   value?: string;
@@ -9,6 +11,8 @@ interface DateTimeInputProps {
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  min?: string;
+  max?: string;
 }
 
 type Meridiem = "am" | "pm";
@@ -89,11 +93,18 @@ export function DateTimeInput({
   className = inputCls,
   placeholder = "dd/mm/yyyy hh:mm",
   disabled,
+  min,
+  max,
 }: DateTimeInputProps) {
   const [display, setDisplay] = useState("");
   const [meridiem, setMeridiem] = useState<Meridiem>("am");
+  const picker = useRef<HTMLInputElement>(null);
+  const typed = useRef({ display: "", meridiem: "am" as Meridiem });
+  typed.current = { display, meridiem };
 
+  // Keep a half-typed value while the parent holds "" for it.
   useEffect(() => {
+    if (displayToISO(typed.current.display, typed.current.meridiem) === value) return;
     const { display: d, meridiem: m } = formatToDisplay(value);
     setDisplay(d);
     setMeridiem(m);
@@ -113,15 +124,37 @@ export function DateTimeInput({
 
   return (
     <div className="flex items-stretch gap-2">
-      <input
-        type="text"
-        inputMode="numeric"
-        value={display}
-        onChange={handleChange}
-        className={className}
-        placeholder={placeholder}
-        disabled={disabled}
-      />
+      <div className="relative w-full min-w-0">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={display}
+          onChange={handleChange}
+          className={`${className} pr-10`}
+          placeholder={placeholder}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          aria-label="Choose date and time from calendar"
+          disabled={disabled}
+          onClick={() => openNativePicker(picker.current)}
+          className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+        >
+          <CalendarClock className="h-4 w-4" />
+        </button>
+        <input
+          ref={picker}
+          type="datetime-local"
+          tabIndex={-1}
+          aria-hidden="true"
+          min={min}
+          max={max}
+          value={/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? value.slice(0, 16) : ""}
+          onChange={event => onChange(event.target.value)}
+          className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
+        />
+      </div>
       <button
         type="button"
         onClick={toggleMeridiem}

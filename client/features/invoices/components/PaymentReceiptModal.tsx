@@ -8,7 +8,7 @@ import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useBranchStore } from "@/store/branch.store";
-import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 import { getBanksRequest, getInvoiceRequest, getInvoicesRequest, type CreateReceiptPayload } from "../api/invoice.api";
 import { useCreateReceipt } from "../hooks/use-create-receipt";
 
@@ -81,7 +81,7 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
 
   return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title="Payment receipt">
     <form className="grid gap-4" onSubmit={submit} inert={create.isPending}>
-      {invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
+      {invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
       {customerId && hasPermission("receipt:adjust") && <Link className="text-sm font-medium text-primary hover:underline" href={"/finance/receipts/advance-adjustment?customerId="+customerId}>Use existing advances or credits</Link>}
       {!branchId && <p role="alert" className="text-sm text-destructive">Select a receiving branch from the app header.</p>}
       <section className="grid gap-2"><h3 className="text-sm font-semibold">Unpaid bills</h3>
