@@ -33,7 +33,6 @@ import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
 
-
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-slate-100 text-slate-700",
   "Checked In": "bg-sky-50 text-sky-700",
@@ -45,7 +44,6 @@ const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-green-50 text-green-700",
   Cancelled: "bg-red-50 text-red-600",
 };
-
 
 const NEXT_STATUS: Record<string, string | null> = {
   Pending: "Checked In",
@@ -112,14 +110,23 @@ export default function AppointmentDetailPage() {
     nextStatus &&
     hasPermission(STATUS_TRANSITION_PERMISSIONS[nextStatus] ?? "");
   const canCancel =
-    !appointment.bookingNumber && hasPermission("appointment:update") &&
+    !appointment.bookingNumber &&
+    hasPermission("appointment:update") &&
     appointment.status !== "Completed" &&
     appointment.status !== "Cancelled";
-  const canEdit = hasPermission("appointment:update") && !appointment.bookingNumber;
-  const canDelete = hasPermission("appointment:delete") && !appointment.bookingNumber && !appointment.jobCards?.length;
+  const canEdit =
+    hasPermission("appointment:update") && !appointment.bookingNumber;
+  const canDelete =
+    hasPermission("appointment:delete") &&
+    !appointment.bookingNumber &&
+    !appointment.jobCards?.length;
   const canCreateJobCard =
-    !appointment.bookingNumber && (appointment.bookingStatus ?? "BOOKED") === "BOOKED" && !appointment.jobCards?.length && hasPermission("jobcard:create") && hasPermission("appointment:update") && appointment.status !== "Cancelled";
-
+    !appointment.bookingNumber &&
+    (appointment.bookingStatus ?? "BOOKED") === "BOOKED" &&
+    !appointment.jobCards?.length &&
+    hasPermission("jobcard:create") &&
+    hasPermission("appointment:update") &&
+    appointment.status !== "Cancelled";
 
   function handleStatusTransition() {
     if (!nextStatus) return;
@@ -136,7 +143,6 @@ export default function AppointmentDetailPage() {
     if (!reason?.trim()) return;
     update.mutate({ status: "Cancelled", cancelReason: reason.trim() });
   }
-
 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-6">
@@ -168,10 +174,9 @@ export default function AppointmentDetailPage() {
         </div>
 
         {/* Status Stepper */}
-          <div className="mt-8 mb-4">
-            <AppointmentStatusStepper currentStatus={appointment.status} />
-          </div>
-
+        <div className="mt-8 mb-4">
+          <AppointmentStatusStepper currentStatus={appointment.status} />
+        </div>
 
         <BookingPanel key={appointment.updatedAt} appointment={appointment} />
         <div className="mb-6 flex flex-wrap gap-2">
@@ -415,10 +420,23 @@ export default function AppointmentDetailPage() {
         />
       </ModalFame>
 
-      <JobCardOpeningModal isOpen={showJobCardCreate} onClose={() => setShowJobCardCreate(false)} defaultValues={{
-        appointmentId: appointment.id, customerId: appointment.customerId, vehicleId: appointment.vehicleId, serviceId: appointment.serviceId ?? "", branchName: (branch?.name as string) ?? "",
-      }} />
-      {showCheckIn && <CheckInDialog appointment={appointment} onClose={() => setShowCheckIn(false)} />}
+      <JobCardOpeningModal
+        isOpen={showJobCardCreate}
+        onClose={() => setShowJobCardCreate(false)}
+        defaultValues={{
+          appointmentId: appointment.id,
+          customerId: appointment.customerId,
+          vehicleId: appointment.vehicleId,
+          serviceId: appointment.serviceId ?? "",
+          branchName: (branch?.name as string) ?? "",
+        }}
+      />
+      {showCheckIn && (
+        <CheckInDialog
+          appointment={appointment}
+          onClose={() => setShowCheckIn(false)}
+        />
+      )}
 
       <ConfirmDeleteModal
         isOpen={showDelete}
