@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Search, UserPlus, Check, ChevronDown, X, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customerKeys } from "@/features/customers/api/customer.keys";
-import { useAllCustomers } from "@/features/appointments/hooks/use-all-customers";
+import { getCustomersRequest } from "@/features/customers/api/customer.api";
+import { useCustomer } from "@/features/customers/hooks/use-customer";
 import { useCreateCustomer } from "@/features/customers/hooks/use-create-customer";
 import {
   createCustomerSchema,
@@ -18,6 +19,11 @@ import {
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { Customer } from "@/features/customers/types/customer.types";
+
+/** Customer code first, then the company or personal name. */
+function customerName(c: Customer) {
+  return [c.code, c.companyName || `${c.firstName} ${c.lastName}`].filter(Boolean).join(" · ");
+}
 
 interface CustomerSelectWithCreateProps {
   value?: string;
@@ -57,25 +63,22 @@ export function CustomerSelectWithCreate({
   const branches = useBranchStore((s) => s.branches);
   const { isSuperAdmin } = useAuth();
 
-  const { data: customers = [], isLoading: loadingCustomers } = useAllCustomers();
+  // Search the whole directory on the server: code, name, phone, email or vehicle.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const { data: filteredCustomers = [], isFetching } = useQuery({
+    queryKey: [...customerKeys.all, "picker", debouncedSearch],
+    queryFn: () => getCustomersRequest({ limit: 50, search: debouncedSearch || undefined }).then((r) => r.customers),
+    enabled: isOpen,
+    staleTime: 30_000,
+  });
+  const loadingCustomers = isFetching || searchQuery.trim() !== debouncedSearch;
   const createCustomerMutation = useCreateCustomer();
 
-  // Selected customer object
-  const selectedCustomer = useMemo(() => {
-    return customers.find((c) => c.id === value);
-  }, [customers, value]);
-
-  // Filtered customer list based on typing
-  const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customers;
-    const q = searchQuery.toLowerCase();
-    return customers.filter((c) => {
-      const fullName = `${c.companyName ?? ""} ${c.code ?? ""} ${c.firstName} ${c.lastName}`.toLowerCase();
-      const email = c.email?.toLowerCase() ?? "";
-      const phone = c.phoneNumber?.toLowerCase() ?? "";
-      return fullName.includes(q) || email.includes(q) || phone.includes(q);
-    });
-  }, [customers, searchQuery]);
+  const { data: selectedCustomer } = useCustomer(value ?? "");
 
   // Update fixed position dropdown coordinates (Viewport relative)
   const updateCoords = useCallback(() => {
@@ -198,7 +201,7 @@ export function CustomerSelectWithCreate({
           <div className="flex items-center gap-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
             <User className="h-4 w-4 text-primary shrink-0" />
             <span className="font-medium text-foreground truncate">
-              {selectedCustomer.firstName} {selectedCustomer.lastName}
+              {customerName(selectedCustomer)}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-2 bg-background pl-1">
@@ -227,10 +230,10 @@ export function CustomerSelectWithCreate({
             type="text"
             className={`${inputCls} pl-9 pr-8`}
             placeholder={
-              loadingCustomers ? "Loading customers…" : "Type customer name, email, or phone…"
+              "Type customer code, name, email, or phone…"
             }
             value={searchQuery}
-            disabled={disabled || loadingCustomers}
+            disabled={disabled}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               if (!isOpen) setIsOpen(true);
@@ -266,7 +269,7 @@ export function CustomerSelectWithCreate({
           {loadingCustomers ? (
             <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading customer directory…
+              Searching customers…
             </div>
           ) : filteredCustomers.length > 0 ? (
             <div className="py-1">
@@ -288,7 +291,7 @@ export function CustomerSelectWithCreate({
                       <User className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="truncate">
                         <span className="font-medium">
-                          {c.companyName || `${c.firstName} ${c.lastName}`}
+                          {customerName(c)}
                         </span>
                         <span className="ml-2 text-sm text-muted-foreground">
                           {c.email} {c.phoneNumber ? `• ${c.phoneNumber}` : ""}

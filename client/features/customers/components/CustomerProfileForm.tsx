@@ -12,7 +12,7 @@ import { createCustomerSchema, type CreateCustomerFormValues } from "../schemas/
 import type { Customer } from "../types/customer.types";
 import { MasterOptions } from "@/components/forms/MasterOptions";
 import { useMasterCodes } from "@/hooks/use-master-codes";
-import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 
 const DEFAULT_SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."];
 // Geography inputs suggest names from the ZONE / STATE / CITY masters.
@@ -146,7 +146,7 @@ export function CustomerProfileForm(
           <Field label="Vendor purchase source"><select className={inputCls} {...register("vendorType")}><option value="">Not set</option><option value="LOCAL">Local</option><option value="IMP">Imported</option></select></Field>
           <Field label="MRN rate"><select className={inputCls} {...register("mrnRateType")}><option value="">Not set</option><option value="D">Dealer rate</option><option value="R">Retail rate</option></select></Field>
         </>}
-        <WorkshopPicker label="Organization (corporate group)" endpoint="/customers" collection="customers" value={watch("organizationId") ?? ""}
+        <WorkshopPicker label="Organization (corporate group)" endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={watch("organizationId") ?? ""}
           onChange={id => setValue("organizationId", id, { shouldDirty: true })} />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("governmentVehicle")} />Government vehicle</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("ownCompanyVehicle")} />Own company vehicle</label>

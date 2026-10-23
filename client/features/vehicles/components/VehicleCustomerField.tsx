@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCustomer } from "@/features/customers/hooks/use-customer";
-import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
@@ -41,6 +41,8 @@ export function VehicleCustomerField({ value, onChange, onBlur, error, readOnly,
           selectedRecord={customer}
           error={error}
           disabled={disabled}
+          formatLabel={customerLabel}
+          renderOption={customerOption}
         />
       )}
       {value && isLoading && <p role="status" className="text-sm text-muted-foreground">Loading customer details...</p>}

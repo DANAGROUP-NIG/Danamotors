@@ -106,10 +106,12 @@ export class PartSaleService {
 
   /** Any active party can buy at CPD, whichever branch registered it. Includes current outstanding. */
   async searchCustomers(search: string) {
+    const nameParts = search.trim().split(/\s+/);
     const customers = await prisma.customer.findMany({
       where: {
         mergedIntoId: null,
         OR: [
+          ...(nameParts.length > 1 ? [{ firstName: { contains: nameParts[0], mode: "insensitive" as const }, lastName: { contains: nameParts.slice(1).join(" "), mode: "insensitive" as const } }] : []),
           { code: { contains: search, mode: "insensitive" } },
           { companyName: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },

@@ -6,7 +6,7 @@ import ModalFame from '@/components/modals/ModalFame';
 import {Field,inputCls} from '@/components/forms/FormField';
 import {Button} from '@/components/ui/button';
 import {DataTable,type Column} from '@/components/ui/table-components/DataTable';
-import {WorkshopPicker,type PickerRecord} from '@/features/job-cards/components/WorkshopPicker';
+import {WorkshopPicker,customerLabel,customerOption,type PickerRecord} from '@/features/job-cards/components/WorkshopPicker';
 import {creditKeys} from '@/features/credit/api/credit.keys';
 import {amountCents} from './party-adjustment-workspace';
 import {createPartyNote,getNoteCustomer,getNoteReceipts,type NoteDirection,type NoteInput,type NoteReceipt} from '../api/party-note.api';
@@ -51,7 +51,7 @@ export function PartyNoteForm({direction,branchId,onClose,onSaved}:{direction:No
  return <ModalFame isOpen onClose={()=>{if(!busy)onClose();}} title={direction==='DEBIT'?'New debit note':'New credit note'} description="The note number is assigned when saved."><form className="grid gap-4" onSubmit={e=>{e.preventDefault();submit();}}>
  <fieldset disabled={busy} className="grid gap-4">
  <div className="grid gap-4 sm:grid-cols-2"><Field label="Note date"><input className={inputCls} type="date" required max={noteToday()} value={date} onChange={e=>setDate(e.target.value)}/></Field><Field label="Party order"><select className={inputCls} value={order} onChange={e=>setOrder(e.target.value)}><option value="name">Name-wise</option><option value="code">Code-wise</option></select></Field></div>
- <WorkshopPicker label="Customer" required endpoint={'/finance/party-notes/parties?branchId='+branchId+'&order='+order} collection="customers" value={customerId} onChange={id=>{setCustomerId(id);setSelected({});setPage(1);}} formatLabel={r=>[r.code,r.name].filter(Boolean).join(' · ')}/>
+ <WorkshopPicker label="Customer" required endpoint={'/finance/party-notes/parties?branchId='+branchId+'&order='+order} collection="customers" value={customerId} onChange={id=>{setCustomerId(id);setSelected({});setPage(1);}} formatLabel={customerLabel} renderOption={customerOption}/>
  {customer.isLoading&&<p className="text-sm text-muted-foreground">Loading party details…</p>}{customer.isError&&<p role="alert" className="text-sm text-destructive">Could not load the party. <button type="button" onClick={()=>customer.refetch()}>Retry</button></p>}
  {customer.data&&<div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{customer.data.customer.code??'No customer code'}</p><p>{[customer.data.customer.house,customer.data.customer.street,customer.data.customer.address,customer.data.customer.city,customer.data.customer.state].filter(Boolean).join(', ')||'No address recorded'}</p></div>}
  {direction==='DEBIT'&&<Field label="Debit type"><select className={inputCls} value={type} onChange={e=>{setType(e.target.value as typeof type);setSelected({});}}><option value="AMOUNT">Amount — plain debit</option><option value="RECEIPT">Receipt — bounced cheque or receipt correction</option></select></Field>}

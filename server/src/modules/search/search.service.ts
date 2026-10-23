@@ -37,20 +37,27 @@ export class SearchService {
   }
 
   private async searchCustomers(q: string) {
+    const nameParts = q.split(/\s+/);
     const rows = await prisma.customer.findMany({
       where: {
+        mergedIntoId: null,
         OR: [
+          ...(nameParts.length > 1 ? [{ firstName: { contains: nameParts[0], mode: 'insensitive' as const }, lastName: { contains: nameParts.slice(1).join(' '), mode: 'insensitive' as const } }] : []),
+          { code: { contains: q, mode: 'insensitive' } },
+          { companyName: { contains: q, mode: 'insensitive' } },
           { firstName: { contains: q, mode: 'insensitive' } },
           { lastName: { contains: q, mode: 'insensitive' } },
           { email: { contains: q, mode: 'insensitive' } },
+          { phoneNumber: { contains: q } },
         ],
       },
       take: TAKE_PER_CATEGORY,
     });
 
+    // Customer code leads, as in every customer picker.
     return rows.map((c) => ({
       id: c.id,
-      name: `${c.firstName} ${c.lastName}`,
+      name: [c.code, c.companyName || `${c.firstName} ${c.lastName}`.trim()].filter(Boolean).join(' · '),
       email: c.email,
     }));
   }
