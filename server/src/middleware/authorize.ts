@@ -66,6 +66,18 @@ export function canAccessAllBranches(user: Request["user"]): boolean {
     user?.permissions.includes(PERMISSIONS.BRANCH_ALL) === true;
 }
 
+/**
+ * Branch filter for shared directory lists (customers, vehicles). A requested
+ * `branchId` narrows the list; branch-scoped users asking for any branch get
+ * their own. No `branchId` lists every branch, so pickers can find a party
+ * registered elsewhere.
+ */
+export function directoryBranchFilter(req: Request): string | undefined {
+  const requested = req.query.branchId as string | undefined;
+  if (!requested || canAccessAllBranches(req.user)) return requested;
+  return req.user?.branchId ?? requested;
+}
+
 /** Ensures branch-scoped users can only access their own branch's resources. */
 export function assertBranchOwnership(
   req: Request,

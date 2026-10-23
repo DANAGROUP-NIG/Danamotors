@@ -57,9 +57,7 @@ export function CustomerSelectWithCreate({
   const branches = useBranchStore((s) => s.branches);
   const { isSuperAdmin } = useAuth();
 
-  const effectiveBranchId = branchId || (isSuperAdmin ? undefined : activeBranch?.id);
-
-  const { data: customers = [], isLoading: loadingCustomers } = useAllCustomers(effectiveBranchId);
+  const { data: customers = [], isLoading: loadingCustomers } = useAllCustomers();
   const createCustomerMutation = useCreateCustomer();
 
   // Selected customer object
