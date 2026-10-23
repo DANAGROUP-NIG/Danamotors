@@ -1,0 +1,276 @@
+{
+  "date": "2026-10-19",
+  "scope": "Existing #79 reports only; two additional report types excluded by user",
+  "backendUnit": {
+    "numPassedTestSuites": 59,
+    "numPassedTests": 724,
+    "numFailedTests": 0,
+    "numPendingTests": 98
+  },
+  "reportTestsWithLocalDb": {
+    "passedSuites": 9,
+    "passedTests": 66,
+    "failedTests": 0,
+    "finalIntegrationRerun": "PASS after final assertions"
+  },
+  "backendTypecheckBuild": "PASS",
+  "frontendLintBuild": "PASS, zero lint errors, 80 pages",
+  "browserScope": "Actual output components on synthetic local data; screen/print/Excel and true 390px; not authenticated E2E",
+  "limitations": [
+    "Historical dealer rates/amounts and requisition numbers unavailable; shown blank",
+    "Unknown free-service sequences remain Unspecified",
+    "Full DB suite not rerun; prior unrelated stock-transfer failures remain documented"
+  ],
+  "reports": [
+    {
+      "slug": "delivered-model",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 Delivery details"
+      ],
+      "detailRows": 7,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 2
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "delivered-service",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 Break-up of free service",
+        "3 Delivery details"
+      ],
+      "detailRows": 10,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "warranty-attended",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792419730476 Rio",
+        "3 QA79AUDIT1792419730476 Sporta"
+      ],
+      "detailRows": 4,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "warranty-parts",
+      "orientation": "portrait",
+      "sheets": [
+        "1 QA79AUDIT1792419730476VIN01",
+        "2 Grand totals"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 1
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "booked-vs-availed",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Booked and availed",
+        "2 Booked but not availed",
+        "3 Walk-ins",
+        "4 Summary by service type",
+        "5 Grand totals"
+      ],
+      "detailRows": 7,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 4
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 2,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "estimate-vs-job",
+      "orientation": "landscape",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792419730476-J1",
+        "3 Estimate QA79AUDIT17924197304"
+      ],
+      "detailRows": 2,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 841.91998 594.95996"
+    },
+    {
+      "slug": "unbilled-parts",
+      "orientation": "landscape",
+      "sheets": [
+        "1 Report",
+        "2 QA79AUDIT1792419730476-J1",
+        "3 WARRANTY"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 3
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 841.91998 594.95996"
+    },
+    {
+      "slug": "tax-register",
+      "orientation": "landscape",
+      "sheets": [
+        "1 CASH",
+        "2 CREDIT",
+        "3 VAT annexure",
+        "4 Grand totals"
+      ],
+      "detailRows": 4,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 4
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 1,
+        "overflow": false
+      },
+      "pdfPages": 2,
+      "pdfMediaBox": "0 0 841.91998 594.95996"
+    },
+    {
+      "slug": "corporate-bills",
+      "orientation": "portrait",
+      "sheets": [
+        "1 QA79AUDIT1792419730476-FLEET ",
+        "2 QA79AUDIT1792419730476-FLEET ",
+        "3 Grand totals"
+      ],
+      "detailRows": 1,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 2
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 0,
+        "overflow": false
+      },
+      "pdfPages": 1,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    },
+    {
+      "slug": "vehicle-history-card",
+      "orientation": "portrait",
+      "sheets": [
+        "1 Vehicle and warranty",
+        "2 Customer and ownership",
+        "3 Selling dealer",
+        "4 Free services",
+        "5 Job visits",
+        "6 Customer requests",
+        "7 Parts and oil",
+        "8 Labour and service charges",
+        "9 Expenses by service type",
+        "10 Warranty, FOC and goodwill",
+        "11 Repair cost and repeat jobs"
+      ],
+      "detailRows": 12,
+      "frontendFilterContract": "PASS",
+      "workbookRows": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "document": 390,
+        "tables": 10
+      },
+      "print": {
+        "fixedTables": true,
+        "sectionBreaks": 10,
+        "overflow": false
+      },
+      "pdfPages": 11,
+      "pdfMediaBox": "0 0 594.95996 841.91998"
+    }
+  ],
+  "implementationCommit": "5adc58e"
+}

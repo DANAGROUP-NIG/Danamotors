@@ -1,0 +1,24 @@
+{
+  "sections": [
+    {
+      "title": "Unclassified billing type",
+      "rows": 74,
+      "columns": 24
+    },
+    {
+      "title": "VAT annexure",
+      "rows": 1
+    }
+  ],
+  "bills": 74,
+  "netTotal": 7422930,
+  "labourAmount": 2910003.84,
+  "wctAmount": 0,
+  "allRequiredAmountsPresent": true,
+  "originalDocumentNumbersPresent": true,
+  "warnings": [
+    "7 legacy bills have a one-kobo component rounding difference. Net total preserves the stored invoice amount.",
+    "74 historical bills have no category breakdown. Stored VAT appears as legacy unallocated; no amounts were reconstructed.",
+    "Imported cash/credit flags are unconfirmed. Those bills are shown separately and excluded from Cash-only and Credit-only selections."
+  ]
+}

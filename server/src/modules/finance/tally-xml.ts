@@ -1,4 +1,18 @@
+import { Prisma } from '@prisma/client';
+import type { JobBillTotals } from './job-bill-calculator';
 export type TallyDocumentType = 'JOB_BILL' | 'RECEIPT' | 'DEBIT_NOTE' | 'CREDIT_NOTE';
+export function jobBillMappingAmounts(invoice: JobBillTotals) {
+  const negative = (value: number) => new Prisma.Decimal(value).negated().toNumber();
+  return [
+    ['PARTS_SALES', negative(invoice.partsTotal)],
+    ['LABOUR_SALES', negative(invoice.labourTotal)],
+    ['SERVICE_SALES', negative(invoice.serviceTotal ?? 0)],
+    ['PARTS_DISCOUNT', invoice.partsDiscountAmount],
+    ['LABOUR_DISCOUNT', invoice.labourDiscountAmount],
+    ['VAT', negative(invoice.vatAmount)],
+    ['ROUND_OFF', negative(invoice.roundOff)],
+  ] as const;
+}
 export type LedgerEntry = { name: string; amount: number; bills?: { name: string; type: 'New Ref' | 'Agst Ref' | 'Advance' | 'On Account'; amount: number }[] };
 
 const escapeXml = (value: string) => value.replace(/[<>&"']/g, (character) => ({

@@ -1,8 +1,9 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Ban, FileText, Loader2, Printer, Undo2 } from "lucide-react";
+import { ArrowLeft, Ban, FileText, Printer, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -175,11 +176,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
   const [dialog, setDialog] = useState<"return" | "cancel" | null>(null);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (error || !sale) {
     return (

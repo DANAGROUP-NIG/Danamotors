@@ -34,3 +34,12 @@ it('limits the number and length of terms', () => {
   expect(saveTermsSchema.safeParse({ body: { ...body, terms: ['x'.repeat(501)] } }).success).toBe(false);
   expect(saveTermsSchema.safeParse({ body: { ...body, documentType: 'INVOICE', terms: [] } }).success).toBe(false);
 });
+
+it('creates terms with matching enum and print alias values', async () => {
+  (prisma.documentTerms.findFirst as jest.Mock).mockResolvedValue(null);
+  await service.save({ documentType: 'JOB_ESTIMATE', branchId: null, terms: ['Approval required'], footer: null });
+  expect(prisma.documentTerms.create).toHaveBeenCalledWith({ data: {
+    documentType: 'JOB_ESTIMATE', type: 'JOB_ESTIMATE', branchId: null,
+    terms: ['Approval required'], footer: null,
+  } });
+});

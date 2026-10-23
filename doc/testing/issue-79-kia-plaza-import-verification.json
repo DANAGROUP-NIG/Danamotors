@@ -1,0 +1,43 @@
+{
+  "verifiedAt": "2026-10-19T09:27:50.235Z",
+  "branch": "KIA PLAZA - KP",
+  "period": {
+    "maxJobs": 100,
+    "maxBookings": 100,
+    "historyScope": "Selected cohort only, not full lifetime history",
+    "graceDays": 7,
+    "matchingPeriodBookings": 166,
+    "matchingPeriodJobs": 177,
+    "completePeriodJobSelection": false,
+    "from": "2026-07-01",
+    "completePeriodBookingSelection": false,
+    "to": "2026-07-31"
+  },
+  "counts": {
+    "customer": 143,
+    "vehicle": 156,
+    "workshopMaster": 8,
+    "serviceAppointment": 99,
+    "jobCard": 104,
+    "sparePart": 159,
+    "invoice": 75,
+    "jobCardLine": 223,
+    "invoiceLine": 200,
+    "estimate": 64,
+    "estimateLine": 647
+  },
+  "skipped": {
+    "Booking missing customer, vehicle or date": 1,
+    "Fully returned or zero-quantity part line": 3
+  },
+  "activeBills": 74,
+  "activeBillTotal": 7422930,
+  "storedValuesMatch": true,
+  "limitations": [
+    "Capped cohort; totals are not complete-month totals.",
+    "Vehicle history is limited to exported jobs.",
+    "No historical warranty snapshot may be invented.",
+    "No claims exported; claim report needs other data.",
+    "Cash/credit and tax category flags require verified source meanings."
+  ]
+}

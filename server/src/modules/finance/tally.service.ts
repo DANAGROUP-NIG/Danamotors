@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
-import { generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type TallyDocumentType } from './tally-xml';
+import { jobBillMappingAmounts, generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type TallyDocumentType } from './tally-xml';
 
 export { generateTallyImportXml, generateTallyVoucherXml } from './tally-xml';
 
@@ -220,15 +220,7 @@ export class TallyService {
             skipped.push({ ...selected, documentNumber, reason: 'Customer has no active Tally ledger mapping' });
             continue;
           }
-          const values = [
-            ['PARTS_SALES', -invoice.partsTotal],
-            ['LABOUR_SALES', -invoice.labourTotal],
-            ['SERVICE_SALES', -(invoice.serviceTotal ?? 0)],
-            ['PARTS_DISCOUNT', invoice.partsDiscountAmount],
-            ['LABOUR_DISCOUNT', invoice.labourDiscountAmount],
-            ['VAT', -invoice.vatAmount],
-            ['ROUND_OFF', -invoice.roundOff],
-          ] as const;
+          const values = jobBillMappingAmounts(invoice);
           const missingMapping = values.find(([key, amount]) => amount !== 0 && !mappings.has(key));
           if (missingMapping) {
             skipped.push({ ...selected, documentNumber, reason: `Missing Tally account mapping: ${missingMapping[0]}` });

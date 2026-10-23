@@ -1,9 +1,10 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Loader2, Plus, Printer, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Copy, Plus, Printer, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -50,11 +51,7 @@ export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sh
   }, [lines, find]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-slate-400" />
-      </div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
   if (error || !sheet) {
     return (

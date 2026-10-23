@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm, Controller } from "react-hook-form";
+import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -52,6 +53,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
   function onSubmit(values: CreateAppointmentFormValues) {
     const payload = {
       ...values,
+      serviceTypeId: values.serviceTypeId || undefined,
       scheduledAt: new Date(values.scheduledAt).toISOString(),
     };
     create.mutate(payload, {
@@ -92,6 +94,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
+      <Controller name="serviceTypeId" control={control} render={({field})=><WorkshopPicker label="Workshop service type (optional)" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={field.value??''} onChange={field.onChange} onBlur={field.onBlur}/>}/>
       <Field label="Service" error={errors.serviceId?.message}>
         {servicesLoading ? (
           <p className="py-1 text-sm text-muted-foreground">Loading services…</p>

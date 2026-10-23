@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
@@ -39,9 +40,7 @@ export default function EnquiryPage() {
   const canReview = hasAccess(ENQUIRY_REVIEW_ROLES);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">Loading…</div>
-    );
+    return <LoadingSkeleton variant="detail" />;
   }
 
   if (error || !enquiry) {

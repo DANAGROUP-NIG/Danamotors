@@ -1,4 +1,5 @@
 "use client";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import Link from "next/link";
 import { Car, Wrench, CheckCircle2, CalendarClock, Wallet } from "lucide-react";
@@ -71,7 +72,7 @@ export default function PortalDashboardPage() {
             href="/portal/service-history"
           >
             {isLoading ? (
-              <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+              <LoadingSkeleton variant="list" compact />
             ) : data?.recentJobCards?.length ? (
               <SimpleTable
                 headers={["Job", "Vehicle", "Status", "Date"]}
@@ -100,7 +101,7 @@ export default function PortalDashboardPage() {
         <div>
           <PortalSection title="Outstanding balance" href="/portal/invoices">
             {isLoading ? (
-              <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+              <LoadingSkeleton variant="list" compact />
             ) : (
               <div className="flex flex-col items-center gap-2 py-4 text-center">
                 <Wallet className="size-10 text-muted-foreground" />
@@ -118,7 +119,7 @@ export default function PortalDashboardPage() {
 
       <PortalSection title="Recent invoices" href="/portal/invoices">
         {isLoading ? (
-          <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+          <LoadingSkeleton variant="list" compact />
         ) : data?.recentInvoices?.length ? (
           <SimpleTable
             headers={["Invoice", "Job", "Status", "Total", "Issued"]}

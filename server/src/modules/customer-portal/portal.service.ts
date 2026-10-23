@@ -1,3 +1,4 @@
+import { jobScope } from "../reports/report.repository";
 import bcrypt from 'bcryptjs';
 import prisma from "../../prisma/client";
 import { PortalRepository, JobCardWithRelations } from "./portal.repository";
@@ -130,10 +131,10 @@ export class PortalService {
     ] = await Promise.all([
       prisma.vehicle.count({ where: { customerId } }),
       prisma.jobCard.count({
-        where: { customerId, status: { in: activeStatuses } },
+        where: { ...jobScope({}), customerId, status: { in: activeStatuses } },
       }),
       prisma.jobCard.count({
-        where: { customerId, status: { in: ["Completed", "Closed", "DELIVERED"] } },
+        where: { ...jobScope({}), customerId, status: { in: ["Completed", "Closed", "DELIVERED"] } },
       }),
       prisma.serviceAppointment.count({
         where: {
@@ -147,7 +148,7 @@ export class PortalService {
         _sum: { outstandingAmount: true },
       }),
       prisma.jobCard.findMany({
-        where: { customerId },
+        where: { ...jobScope({}), customerId },
         orderBy: { createdAt: "desc" },
         take: 5,
         include: {
@@ -164,12 +165,13 @@ export class PortalService {
         },
       }),
       prisma.invoice.findMany({
-        where: { customerId },
+        where: { customerId, OR:[{jobCardId:null},{jobCard:{is:jobScope({})}}] },
         orderBy: { issuedDate: "desc" },
         take: 5,
         include: {
           jobCard: {
-            include: {
+            select: {
+              id:true,jobNumber:true,status:true,
               vehicle: {
                 select: {
                   id: true,
@@ -384,12 +386,10 @@ export class PortalService {
       estimatedCost: jobCard.estimatedCost,
       progress: jobCard.progress,
       qcStatus: jobCard.qcStatus,
-      assignedTo: jobCard.assignedTo,
       createdAt: jobCard.createdAt,
       updatedAt: jobCard.updatedAt,
       vehicle: jobCard.vehicle,
       branch: jobCard.branch,
-      technician: jobCard.technician,
       estimates: jobCard.estimates,
       invoices: jobCard.invoices,
       inspections: jobCard.inspections,
@@ -426,7 +426,7 @@ export class PortalService {
       },
     });
 
-    if (!estimate || estimate.jobCard.customerId !== customerId) {
+    if (!estimate?.jobCard || estimate.jobCard.customerId !== customerId) {
       throw new NotFoundError("Estimate not found");
     }
 
@@ -461,7 +461,7 @@ export class PortalService {
 
   async getCreditApplications(customerId: string) {
     return prisma.customerCreditApplication.findMany({
-      where: { customerId },
+      where: { customerId, OR: [{ invoice: { jobCardId: null } }, { invoice: { jobCard: { is: jobScope({}) } } }] },
       orderBy: { createdAt: "desc" },
       include: {
         invoice: {
@@ -473,7 +473,7 @@ export class PortalService {
           },
         },
         requestedBy: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { id: true },
         },
       },
     });

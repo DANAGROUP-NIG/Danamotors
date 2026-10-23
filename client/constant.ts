@@ -1,3 +1,4 @@
+import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
 import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
 
@@ -334,6 +335,29 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Wallet,
         permissions: ["credit:application:create"],
       },
+      {
+        label: "Warranty",
+        href: "/warranty",
+        icon: BadgeCheck,
+        permissions: [WARRANTY_PERMISSIONS.READ],
+      },
+      {
+        label: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
+      },
+      {
+        label: "Reports",
+        href: "/reports",
+        icon: FileText,
+        permissions: [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+      },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
       {
         label: "Settings",
         href: "/settings",
