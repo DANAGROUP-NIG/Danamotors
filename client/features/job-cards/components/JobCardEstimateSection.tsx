@@ -59,7 +59,8 @@ function SignatureEvidence({
 export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const serviceReference = jobCard.serviceId ?? jobCard.serviceTypeId;
+  // Must match the server's serviceChargeReference: service type first, then service.
+  const serviceReference = jobCard.serviceTypeId ?? jobCard.serviceId;
   const serviceDescription =
     jobCard.serviceType?.description ?? jobCard.service?.name ?? COPY.service;
   const estimates = jobCard.estimates ?? [];
@@ -121,7 +122,10 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     const draft: Line[] =
       latest?.lines?.map((line) => ({
         type: line.type.replace("INCLUDED_", "") as Line["type"],
-        referenceId: line.referenceId ?? undefined,
+        referenceId:
+          line.type === "SERVICE"
+            ? serviceReference ?? line.referenceId ?? undefined
+            : line.referenceId ?? undefined,
         description: line.description,
         quantity: line.quantity,
         includedInService: line.type.startsWith("INCLUDED_"),
