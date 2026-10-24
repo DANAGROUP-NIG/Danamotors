@@ -123,11 +123,14 @@ export class JobCardLineService {
       where: { jobCardId },
       include: {
         sparePart: true,
+        requisitionLine: { select: { id: true } },
         returns: { where: { status: { in: RETURNED_STATUSES } }, select: { quantity: true } },
         jobCardLine: { include: lineInclude },
       },
     });
     for (const issuance of issuances) {
+      // Requisition charges are already split and snapshotted by the document flow.
+      if (issuance.requisitionLine) continue;
       const net = issuance.quantity - issuance.returns.reduce((s, r) => s + r.quantity, 0);
       const line = issuance.jobCardLine;
       if (!line) {
@@ -176,6 +179,7 @@ export class JobCardLineService {
       include: { labourItem: { select: { code: true } }, chargeLine: { select: { id: true, description: true, quantity: true, rate: true, amount: true } } },
     });
     for (const item of labour) {
+      if (item.labourSlipId) continue;
       const line = item.chargeLine;
       if (!line) {
         const { chargeType, campaignId } = defaultChargeType({
@@ -252,8 +256,10 @@ export class JobCardLineService {
   ) {
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "JobCardLine" WHERE "id" = ${lineId} FOR UPDATE`;
-      const line = await tx.jobCardLine.findFirst({ where: { id: lineId, jobCardId }, include: { ...lineInclude, sparePart: true } });
+      const line = await tx.jobCardLine.findFirst({ where: { id: lineId, jobCardId }, include: { ...lineInclude, sparePart: true, jobCardLabour: { select: { labourSlipId: true } } } });
       if (!line) throw new NotFoundError("Line not found on this job card");
+      if (line.requisitionLineId) throw new ConflictError('Cancel and reissue the requisition to change its charge allocation');
+      if (line.jobCardLabour?.labourSlipId) throw new ConflictError('Edit the labour slip to change its charge allocation');
       const ctx = await this.context(tx, jobCardId);
       if (ctx.bill) throw new ConflictError(`Job card ${ctx.jobCard.jobNumber} is billed on ${ctx.bill.invoiceNumber}; who pays can no longer change`);
 

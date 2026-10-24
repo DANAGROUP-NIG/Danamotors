@@ -258,6 +258,10 @@ export function JobCardCreateForm({
   const applyBooking = (record: PickerRecord) => {
     resetVehicle();
 
+    if (record.serviceTypeId) setValue('serviceTypeId', record.serviceTypeId);
+    if (record.mileage != null) setValue('mileage', record.mileage);
+    if (record.acFitted != null) setValue('acFitted', record.acFitted);
+    if (record.requests?.length) setValue('complaints', record.requests.map(row => ({ complaintCodeId: row.complaintCodeId ?? '', defectCode: row.defectCode ?? undefined, description: row.description, spare: Number(row.estimatedParts), oil: Number(row.estimatedOil), labour: Number(row.estimatedLabour) })));
     setValue("customerId", record.customerId ?? "", {
       shouldDirty: true,
       shouldValidate: true,
@@ -590,11 +594,11 @@ export function JobCardCreateForm({
                 render={({ field }) => (
                   <WorkshopPicker
                     label="Booking"
-                    endpoint={`/service/appointments?branchId=${branchId ?? ""}`}
+                    endpoint={`/service/appointments?branchId=${branchId ?? ""}&status=BOOKED`}
                     collection="appointments"
                     value={field.value ?? ""}
                     selectedRecord={bookingQuery.data?.appointment}
-                    disabled={!branchId}
+                    disabled={!branchId || !hasPermission("appointment:update")}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
                     onSelect={applyBooking}

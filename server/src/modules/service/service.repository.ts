@@ -1,3 +1,5 @@
+import { ConflictError } from '../../shared/errors/appError';
+import { BookingCreate, createBooking } from './booking.persistence';
 import prisma from '../../prisma/client';
 import { jobStatusFilter } from './job-card-workflow.service';
 import {
@@ -10,34 +12,8 @@ import {
 } from '@prisma/client';
 
 export class ServiceRepository {
-  async createAppointment(data: {
-    customerId: string;
-    vehicleId: string;
-    branchId: string;
-    serviceId?: string;
-    serviceTypeId?: string;
-    createdById?: string;
-    scheduledAt: Date;
-    durationMins?: number;
-    notes?: string;
-    status?: string;
-    source?: string;
-  }): Promise<ServiceAppointment> {
-    return prisma.serviceAppointment.create({
-      data: { ...data, source: data.source ?? 'WalkIn' },
-      include: {
-        service: {
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            description: true,
-            durationMins: true,
-            price: true,
-          },
-        },
-      },
-    });
+  async createAppointment(data: BookingCreate) {
+    return createBooking(data);
   }
 
   async listAppointments(params: {
@@ -59,7 +35,8 @@ export class ServiceRepository {
     }
 
     if (params.status) {
-      where.status = params.status;
+      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      else where.status = params.status;
     }
 
     if (params.source) {
@@ -76,10 +53,10 @@ export class ServiceRepository {
 
     const scheduledAtFilter: Record<string, Date> = {};
     if (params.dateFrom) {
-      scheduledAtFilter.gte = new Date(`${params.dateFrom}T00:00:00`);
+      scheduledAtFilter.gte = new Date(`${params.dateFrom}T00:00:00+01:00`);
     }
     if (params.dateTo) {
-      scheduledAtFilter.lte = new Date(`${params.dateTo}T23:59:59.999`);
+      scheduledAtFilter.lte = new Date(`${params.dateTo}T23:59:59.999+01:00`);
     }
     if (Object.keys(scheduledAtFilter).length > 0) {
       where.scheduledAt = scheduledAtFilter;
@@ -87,6 +64,7 @@ export class ServiceRepository {
 
     if (params.search) {
       where.OR = [
+        { bookingNumber: { contains: params.search, mode: 'insensitive' } },
         { notes: { contains: params.search, mode: 'insensitive' } },
         { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
         { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
@@ -133,6 +111,9 @@ export class ServiceRepository {
             },
           },
           jobCards: true,
+          requests: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+          serviceType: true,
+          followUpJob: { select: { id: true, jobNumber: true } },
           enquiry: {
             select: {
               id: true,
@@ -185,6 +166,9 @@ export class ServiceRepository {
           },
         },
         jobCards: true,
+        requests: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        serviceType: true,
+        followUpJob: { select: { id: true, jobNumber: true } },
       },
     });
   }
@@ -197,7 +181,12 @@ export class ServiceRepository {
   }
 
   async deleteAppointment(id: string): Promise<void> {
-    await prisma.serviceAppointment.delete({ where: { id } });
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${id} FOR UPDATE`;
+      const booking = await tx.serviceAppointment.findUniqueOrThrow({ where: { id }, include: { jobCards: { select: { id: true } } } });
+      if (booking.bookingNumber || booking.jobCards.length || booking.bookingStatus !== 'BOOKED') throw new ConflictError('Cancel this booking with a reason instead of deleting it');
+      await tx.serviceAppointment.delete({ where: { id } });
+    });
   }
 
   async createJobCard(data: {
@@ -435,12 +424,14 @@ export class ServiceRepository {
     }
 
     if (params.status) {
-      where.status = params.status;
+      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      else where.status = params.status;
     }
 
     if (params.search) {
       where.OR = [
         { findings: { contains: params.search, mode: 'insensitive' } },
+        { bookingNumber: { contains: params.search, mode: 'insensitive' } },
         { notes: { contains: params.search, mode: 'insensitive' } },
         { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
         { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
@@ -493,7 +484,8 @@ export class ServiceRepository {
     }
 
     if (params.status) {
-      where.status = params.status;
+      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      else where.status = params.status;
     }
 
     if (params.search) {

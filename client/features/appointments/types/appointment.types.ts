@@ -1,3 +1,5 @@
+export type BookingRequest = { complaintCodeId?: string; defectCode?: string; description: string; spare?: number; oil?: number; labour?: number };
+export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: BookingRequest[] };
 export type AppointmentStatus =
   | "Pending"
   | "Checked In"
@@ -7,12 +9,22 @@ export type AppointmentStatus =
   | "Quality Check"
   | "Ready"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | "No Show";
 
 
   export type AppointmentSource = 'WalkIn' | 'OnlineBooking';
 
 export type Appointment = {
+  bookingNumber?: string | null;
+  bookingStatus?: 'BOOKED' | 'CONVERTED' | 'CANCELLED' | 'NO_SHOW';
+  serviceTypeId?: string | null;
+  mileage?: number | null;
+  acFitted?: boolean | null;
+  followUpJobId?: string | null;
+  cancelReason?: string | null;
+  requests?: { id: string; complaintCodeId: string | null; defectCode: string | null; description: string; estimatedParts: string | number; estimatedOil: string | number; estimatedLabour: string | number }[];
+  totals?: { estimatedParts: number; estimatedOil: number; estimatedLabour: number; estimatedTotal: number };
   id: string;
   customerId: string;
   vehicleId: string;
@@ -52,11 +64,11 @@ export type Appointment = {
   jobCards?: unknown[];
 };
 
-export type CreateAppointmentPayload = {
+export type CreateAppointmentPayload = BookingExtra & {
   customerId: string;
   vehicleId: string;
   branchName: string;
-  serviceId: string;
+  serviceId?: string;
   serviceTypeId?: string;
   scheduledAt: string;
   durationMins?: number;
@@ -64,7 +76,11 @@ export type CreateAppointmentPayload = {
   createdById?: string;
 };
 
-export type UpdateAppointmentPayload = {
+export type UpdateAppointmentPayload = BookingExtra & {
+  serviceId?: string;
+  serviceTypeId?: string;
+  bookingStatus?: "BOOKED" | "CANCELLED" | "NO_SHOW";
+  cancelReason?: string;
   scheduledAt?: string;
   durationMins?: number;
   notes?: string;

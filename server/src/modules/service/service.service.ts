@@ -1,3 +1,5 @@
+import { BookingFields, bookingRelations } from './booking.persistence';
+import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
 import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
@@ -72,7 +74,7 @@ export class ServiceService {
     this.serviceRepository = new ServiceRepository();
   }
 
-  async createAppointment(data: {
+  async createAppointment(data: BookingFields & {
     customerId: string;
     vehicleId: string;
     branchName: string;
@@ -113,20 +115,11 @@ export class ServiceService {
 
     await assertWithinBookingHorizon(branch.id, new Date(data.scheduledAt));
 
-    const activeAppointment = await prisma.serviceAppointment.findFirst({
-      where: {
-        customerId: data.customerId,
-        vehicleId: data.vehicleId,
-        status: { notIn: ["Closed", "Cancelled", "Completed"] },
-      },
-    });
-    if (activeAppointment) {
-      throw new ConflictError(
-        `This customer's vehicle already has an active appointment (${activeAppointment.status}). Close, cancel, or complete it before booking another.`,
-      );
-    }
-
     const appointment = await this.serviceRepository.createAppointment({
+      mileage: data.mileage,
+      acFitted: data.acFitted,
+      followUpJobId: data.followUpJobId,
+      requests: data.requests,
       customerId: data.customerId,
       vehicleId: data.vehicleId,
       branchId: branch.id,
@@ -141,7 +134,7 @@ export class ServiceService {
     });
 
     const notificationService = new NotificationService();
-    const appointmentMessage = `Walk-in: ${customer.firstName} ${customer.lastName} booked at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString()}.`;
+    const appointmentMessage = `Walk-in: ${customer.firstName} ${customer.lastName} booked at ${branch.name} for ${new Date(appointment.scheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })}.`;
     const appointmentPayload = {
       type: "APPOINTMENT_CREATE",
       title: "New walk-in appointment",
@@ -214,7 +207,7 @@ export class ServiceService {
       });
 
     return {
-      appointments,
+      appointments: appointments.map(bookingView),
       meta: {
         total,
         page: params.page,
@@ -230,12 +223,15 @@ export class ServiceService {
       throw new NotFoundError("Appointment not found");
     }
 
-    return appointment;
+    return bookingView(appointment);
   }
 
   async updateAppointment(
     id: string,
-    data: {
+    data: BookingFields & {
+      actorId?: string;
+      bookingStatus?: "BOOKED" | "CANCELLED" | "NO_SHOW";
+      cancelReason?: string;
       scheduledAt?: string;
       durationMins?: number;
       notes?: string;
@@ -250,16 +246,10 @@ export class ServiceService {
     if (!appointment) {
       throw new NotFoundError("Appointment not found");
     }
-    if (data.mileage !== undefined && data.status !== "Checked In") {
-      throw new BadRequestError(
-        "Mileage is recorded when the vehicle is checked in",
-      );
-    }
-
     const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
 
     // ── Status transition validation ──────────────────────────────────────────
-    if (data.status && data.status !== appointment.status) {
+    if (data.status && data.status !== appointment.status && !["Cancelled", "No Show"].includes(data.status)) {
       const currentStatus = appointment.status;
       const allowedTransitions = APPOINTMENT_STATUS_TRANSITIONS[currentStatus];
 
@@ -293,8 +283,21 @@ export class ServiceService {
     // a covered vehicle or open campaign must be acknowledged, like on the job card form.
     let checkInCampaigns: { code: string; title: string }[] = [];
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Vehicle" WHERE id = ${appointment.vehicleId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.serviceAppointment.findUniqueOrThrow({ where: { id }, include: { requests: true, jobCards: { select: { id: true } } } });
+      const hasBookingEdit = data.requests !== undefined || data.serviceTypeId !== undefined || data.serviceId !== undefined || data.followUpJobId !== undefined || data.acFitted !== undefined || data.mileage !== undefined || data.scheduledAt !== undefined || data.bookingStatus !== undefined || data.cancelReason !== undefined || data.notes !== undefined || data.durationMins !== undefined || data.status === "Cancelled" || data.status === "No Show";
+      if (hasBookingEdit) {
+        assertBookable(current);
+        if (current.jobCards.length) throw new ConflictError("Linked bookings cannot be edited");
+      }
+      if (data.status && ["CANCELLED", "NO_SHOW"].includes(current.bookingStatus)) assertBookable(current);
+      if (data.status && current.status !== appointment.status) throw new ConflictError("Appointment changed; reload before updating");
+      const state = bookingState(current, data.status, data.bookingStatus, data.cancelReason);
+      data.status = state.status;
+      const requests = await bookingRelations(tx, data, current.vehicleId, current.branchId);
+      if (data.requests !== undefined) await tx.appointmentRequest.deleteMany({ where: { appointmentId: id } });
       if (data.status === "Checked In" && data.mileage !== undefined) {
-        await tx.$queryRaw`SELECT "id" FROM "Vehicle" WHERE "id" = ${appointment.vehicleId} FOR UPDATE`;
         const vehicle = await loadVehicleForWarranty(tx, appointment.vehicleId);
         assertMileage(data.mileage, vehicle.lastRecordedMileage);
         const openCampaigns = await findOpenCampaigns(tx, vehicle);
@@ -324,7 +327,7 @@ export class ServiceService {
           title: c.title,
         }));
       }
-      return tx.serviceAppointment.update({
+      const saved = await tx.serviceAppointment.update({
         where: { id },
         data: {
           scheduledAt: data.scheduledAt
@@ -332,20 +335,28 @@ export class ServiceService {
             : undefined,
           durationMins: data.durationMins,
           notes: data.notes,
-          status: data.status,
+          ...state,
+          mileage: data.mileage,
+          serviceId: data.serviceId,
+          serviceTypeId: data.serviceTypeId,
+          acFitted: data.acFitted,
+          followUpJobId: data.followUpJobId,
+          requests: data.requests !== undefined ? { create: requests } : undefined,
         },
+        include: { requests: true },
       });
+      await tx.auditLog.create({ data: { userId: data.actorId, action: 'BOOKING_UPDATED', details: JSON.stringify({ bookingId: id, oldValue: current, newValue: saved }) } });
+      return bookingView(saved);
     });
 
     // ── Post-update notifications ─────────────────────────────────────────────
     const notificationService = new NotificationService();
 
     // Resolve customer + branch from the fetched appointment
-    const apptAny = appointment as any;
-    const customerName = apptAny.customer
-      ? `${apptAny.customer.firstName} ${apptAny.customer.lastName}`
+    const customerName = appointment.customer
+      ? `${appointment.customer.firstName} ${appointment.customer.lastName}`
       : "Customer";
-    const branchName = apptAny.branch?.name ?? "branch";
+    const branchName = appointment.branch?.name ?? "branch";
     const branchId: string = appointment.branchId;
 
     // 1. Reschedule notification
@@ -353,7 +364,7 @@ export class ServiceService {
       const rescheduledPayload = {
         type: "APPOINTMENT_RESCHEDULED",
         title: "Appointment rescheduled",
-        message: `Appointment for ${customerName} at ${branchName} rescheduled from ${new Date(oldScheduledAt).toLocaleString()} to ${new Date(data.scheduledAt!).toLocaleString()}.`,
+        message: `Appointment for ${customerName} at ${branchName} rescheduled from ${new Date(oldScheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })} to ${new Date(data.scheduledAt!).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })}.`,
         link: `/appointments/${id}`,
         branchId,
       };
@@ -446,7 +457,17 @@ export class ServiceService {
     if (!appointment) {
       throw new NotFoundError("Appointment not found");
     }
+    // TODO(confirm): numbered bookings retain their audit trail; cancel them instead.
+    if (appointment.bookingNumber || appointment.jobCards.length || appointment.bookingStatus !== 'BOOKED') throw new ConflictError('Cancel this booking with a reason instead of deleting it');
     await this.serviceRepository.deleteAppointment(id);
+  }
+
+  async convertAppointment(id: string, input: Record<string, unknown>, actorId: string) {
+    const booking = await this.getAppointment(id);
+    assertBookable(booking);
+    const complaints = booking.requests.length ? bookingComplaints(booking.requests) : input.complaints;
+    const data = jobOpeningBody.parse({ ...input, appointmentId: id, customerId: booking.customerId, vehicleId: booking.vehicleId, branchName: booking.branch.name, serviceId: booking.serviceId ?? undefined, serviceTypeId: booking.serviceTypeId ?? input.serviceTypeId, acFitted: booking.acFitted ?? undefined, mileage: input.mileage ?? booking.mileage ?? undefined, description: input.description ?? booking.notes ?? booking.requests.map(row => row.description).join('; '), complaints });
+    return new JobCardWorkflowService().open({ ...data, createdById: actorId, bookingVersion: booking.updatedAt.toISOString() });
   }
 
   async createJobCard(

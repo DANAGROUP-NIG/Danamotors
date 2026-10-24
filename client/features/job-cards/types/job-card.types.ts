@@ -78,6 +78,7 @@ export type JobCardCustomer = {
 };
 
 export type JobCardVehicle = {
+  trim?: string | null;
   id: string;
   vin: string;
   registrationNumber: string | null;
