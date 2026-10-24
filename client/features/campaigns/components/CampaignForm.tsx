@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { DateInput } from "@/components/forms/DateInput";
 import { cn } from "@/lib/utils";
+import { API_ROUTES } from "@/lib/constants/apiRoutes";
+import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useVehicleModels } from "@/features/warranty/hooks/use-warranty";
 import { Pill } from "@/features/warranty/components/ui";
 import { toDateInput } from "@/features/warranty/lib/warranty-format";
@@ -264,19 +266,36 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
                     return (
                       <tr key={idx}>
                         <td className="px-3 py-2">
-                          <select className={cn(inputCls, "h-9 w-28")} value={it.kind} onChange={(e) => set({ kind: e.target.value as ItemRow["kind"] })}>
+                          <select className={cn(inputCls, "h-9 w-28")} value={it.kind} onChange={(e) => set({ kind: e.target.value as ItemRow["kind"], ref: "" })}>
                             <option value="PART">Part</option>
                             <option value="LABOUR">Labour</option>
                           </select>
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            className={cn(inputCls, "h-9 font-mono")}
-                            value={it.ref}
-                            onChange={(e) => set({ ref: e.target.value })}
-                            placeholder={it.kind === "PART" ? "91200-D3xxx" : "HRN-01"}
-                            title={it.kind === "PART" ? "End with x or * to match a prefix" : undefined}
-                          />
+                          <div className="min-w-60" title={it.kind === "PART" ? "Pick a part, or type a pattern ending in x or * to match a prefix" : undefined}>
+                            <WorkshopPicker
+                              key={it.kind}
+                              hideLabel
+                              label={it.kind === "PART" ? "Part" : "Labour operation"}
+                              endpoint={it.kind === "PART" ? API_ROUTES.inventory.parts.base : API_ROUTES.service.labourItems}
+                              collection={it.kind === "PART" ? "items" : "labourItems"}
+                              requestLimit={20}
+                              loadOnValue={false}
+                              getOptionId={(row) => (it.kind === "PART" ? row.partNumber : row.code) ?? row.id}
+                              formatLabel={(row) => (it.kind === "PART" ? row.partNumber : row.code) ?? row.id}
+                              renderOption={(row) => (
+                                <span className="min-w-0">
+                                  <span className="block font-mono font-medium">{it.kind === "PART" ? row.partNumber : row.code}</span>
+                                  <span className="block truncate text-xs text-slate-500">{it.kind === "PART" ? row.name : row.description}</span>
+                                </span>
+                              )}
+                              selectedRecord={it.ref ? { id: it.ref, partNumber: it.ref, code: it.ref } : undefined}
+                              value={it.ref}
+                              onChange={(ref) => set({ ref })}
+                              onSelect={(row) => set({ description: it.description || ((it.kind === "PART" ? row.name : row.description) ?? "") })}
+                              onCustom={(ref) => set({ ref })}
+                            />
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <input className={cn(inputCls, "h-9")} value={it.description} onChange={(e) => set({ description: e.target.value })} />
