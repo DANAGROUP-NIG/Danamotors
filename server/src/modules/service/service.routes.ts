@@ -16,6 +16,7 @@ import { requirePermission } from "../../middleware/authorize";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import {
   createAppointmentSchema,
+  convertAppointmentSchema,
   updateAppointmentSchema,
   createJobCardSchema,
   listJobCardsSchema,
@@ -762,7 +763,7 @@ router.post(
   "/appointments/:id/convert",
   requirePermission(PERMISSIONS.APPOINTMENT_UPDATE),
   requirePermission(PERMISSIONS.JOBCARD_CREATE),
-  validateRequest(serviceIdParamSchema),
+  validateRequest(convertAppointmentSchema),
   controller.convertAppointment,
 );
 router.delete(

@@ -29,3 +29,12 @@ it('rejects conversion across branches and branchless accounts before opening a 
     expect(convert).not.toHaveBeenCalled();
   } finally { get.mockRestore(); convert.mockRestore(); }
 });
+it('keeps the job card body when validating a conversion', async () => {
+  const handlers = (router.stack as Layer[]).find(layer => layer.route?.path === '/appointments/:id/convert')?.route?.stack;
+  if (!handlers) throw new Error('Missing conversion route');
+  const req = { params: { id: '22030c3d-c2cc-434c-94e6-79722f6c0fb5' }, query: {}, body: { mileage: 45025 } } as unknown as Request;
+  const next = jest.fn();
+  await handlers[2].handle(req, {} as Response, next);
+  expect(next).toHaveBeenCalledWith();
+  expect(req.body).toEqual({ mileage: 45025 });
+});
