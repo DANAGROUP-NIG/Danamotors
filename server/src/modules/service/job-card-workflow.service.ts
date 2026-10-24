@@ -1,3 +1,5 @@
+import { sumMoney } from '../finance/money';
+import { assertBookable, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
@@ -145,9 +147,10 @@ export class JobCardWorkflowService {
   async open(
     input: z.infer<typeof jobOpeningBody> & {
       createdById?: string;
+      bookingVersion?: string;
     },
   ) {
-    const { createdById, ...body } = input;
+    const { createdById, bookingVersion, ...body } = input;
 
     if (!createdById) throw new UnauthorizedError();
 
@@ -198,32 +201,37 @@ export class JobCardWorkflowService {
         ).withCode("WARRANTY_ACK_REQUIRED", check);
 
       if (data.appointmentId) {
+        await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${data.appointmentId} FOR UPDATE`;
         const appointment = await tx.serviceAppointment.findUnique({
           where: {
             id: data.appointmentId,
           },
+          include: { requests: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
         });
 
         if (
           !appointment ||
           appointment.branchId !== branch.id ||
-          appointment.vehicleId !== vehicle.id
+          appointment.vehicleId !== vehicle.id ||
+          appointment.customerId !== data.customerId
         )
           throw new BadRequestError(
             "Appointment must match the vehicle and branch",
           );
 
-        if (["Cancelled", "Completed", "Closed"].includes(appointment.status))
-          throw new BadRequestError("Appointment is no longer open");
+        assertBookable(appointment);
+        if (bookingVersion && appointment.updatedAt.toISOString() !== bookingVersion) throw new ConflictError("Booking changed; reload before converting");
+        if (appointment.serviceTypeId && appointment.serviceTypeId !== data.serviceTypeId) throw new ConflictError('Booking service changed; reload before converting');
+        data.serviceId = appointment.serviceId ?? undefined;
+        data.acFitted = appointment.acFitted ?? data.acFitted;
+        if (appointment.acFitted !== null) data.acType = undefined;
+        if (appointment.requests.length) data.complaints = bookingComplaints(appointment.requests);
 
         if (
           await tx.jobCard.count({
             where: {
               appointmentId: appointment.id,
 
-              status: {
-                notIn: ["CANCELLED", "Cancelled"],
-              },
             },
           })
         )
@@ -298,11 +306,7 @@ export class JobCardWorkflowService {
           row.oil !== undefined ||
           row.labour !== undefined,
       );
-      const sum = (key: "spare" | "oil" | "labour") =>
-        complaints.reduce(
-          (total, row) => total + Math.round(row[key] * 100),
-          0,
-        ) / 100;
+      const sum = (key: "spare" | "oil" | "labour") => sumMoney(complaints.map(row => row[key]));
       const estimatedParts = hasRequestAmounts
         ? sum("spare")
         : data.estimatedParts;
@@ -341,15 +345,7 @@ export class JobCardWorkflowService {
             estimatedLabour,
             serviceCharge,
           ].some((value) => value !== undefined)
-            ? [
-                estimatedParts,
-                estimatedOil,
-                estimatedLabour,
-                serviceCharge,
-              ].reduce<number>(
-                (total, value) => total + Math.round((value ?? 0) * 100),
-                0,
-              ) / 100
+            ? sumMoney([estimatedParts ?? 0, estimatedOil ?? 0, estimatedLabour ?? 0, serviceCharge ?? 0])
             : data.estimatedCost,
           branchId: branch.id,
           createdById,
@@ -385,6 +381,11 @@ export class JobCardWorkflowService {
           ...(check.requiresAcknowledgement && { warrantyAcknowledgedById: createdById, warrantyAcknowledgedAt: now }),
         },
       });
+
+      if (data.appointmentId) {
+        await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: 'CONVERTED' } });
+        await tx.auditLog.create({ data: { userId: createdById, action: 'BOOKING_CONVERTED', details: JSON.stringify({ bookingId: data.appointmentId, jobCardId: card.id, branchId: branch.id }) } });
+      }
 
       await tx.vehicle.update({
         where: {

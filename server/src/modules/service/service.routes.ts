@@ -758,6 +758,13 @@ router.put(
   validateRequest(updateAppointmentSchema),
   controller.updateAppointment,
 );
+router.post(
+  "/appointments/:id/convert",
+  requirePermission(PERMISSIONS.APPOINTMENT_UPDATE),
+  requirePermission(PERMISSIONS.JOBCARD_CREATE),
+  validateRequest(serviceIdParamSchema),
+  controller.convertAppointment,
+);
 router.delete(
   "/appointments/:id",
   requirePermission(PERMISSIONS.APPOINTMENT_DELETE),

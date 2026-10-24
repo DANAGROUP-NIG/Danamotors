@@ -25,13 +25,34 @@ export const estimateIdParamSchema = z.object({
   }),
 });
 
+export const bookingRequestBody = z.object({
+  complaintCodeId: z.string().uuid().optional(),
+  defectCode: z.string().trim().max(50).optional(),
+  spare: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+  oil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+  labour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+  description: z.string().trim().max(2000).optional(),
+}).strict().refine(
+  row => !!row.complaintCodeId || !!row.defectCode || !!row.description,
+  "Enter a complaint code or description",
+);
+
+const bookingFields = {
+  serviceTypeId: z.string().uuid().optional(),
+  mileage: mileageField.optional(),
+  acFitted: z.boolean().optional(),
+  followUpJobId: z.string().uuid().nullable().optional(),
+  requests: z.array(bookingRequestBody).max(100).optional(),
+};
+
 export const createAppointmentSchema = z.object({
   body: z.object({
+    ...bookingFields,
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),
     serviceTypeId: z.string().uuid("Invalid service type ID").optional(),
-    serviceId: z.string().uuid("Invalid service ID"),
+    serviceId: z.string().uuid("Invalid service ID").optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date"),
     durationMins: z.number().int().optional(),
     notes: z.string().optional(),
@@ -42,6 +63,9 @@ export const createAppointmentSchema = z.object({
 
 export const updateAppointmentSchema = z.object({
   body: z.object({
+    ...bookingFields,
+    bookingStatus: z.enum(["BOOKED", "CANCELLED", "NO_SHOW"]).optional(),
+    cancelReason: z.string().trim().min(1).max(2000).optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date").optional(),
     serviceId: z.string().uuid("Invalid service ID").optional(),
     durationMins: z.number().int().optional(),
@@ -120,25 +144,7 @@ export const jobOpeningBody = z
     teamId: z.string().uuid().optional(),
     promisedAt: z.string().datetime(),
 
-    complaints: z
-      .array(
-        z
-          .object({
-            complaintCodeId: z.string().uuid().optional(),
-            defectCode: z.string().trim().max(50).optional(),
-            spare: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-            oil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-            labour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-            description: z.string().trim().max(2000).optional(),
-          })
-          .strict()
-          .refine(
-            (c) => !!c.complaintCodeId || !!c.defectCode || !!c.description,
-            "Enter a complaint code or description",
-          ),
-      )
-      .min(1)
-      .max(100),
+    complaints: z.array(bookingRequestBody).min(1).max(100),
 
     acFitted: z.boolean().optional(),
     inHouse: z.boolean().optional(),

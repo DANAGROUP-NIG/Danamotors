@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -52,6 +53,7 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
   Ready: "Ready",
   Completed: "Completed",
   Cancelled: "Cancelled",
+  "No Show": "No Show",
 };
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
@@ -64,6 +66,7 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
   Ready: "bg-emerald-50 text-emerald-700",
   Completed: "bg-green-50 text-green-700",
   Cancelled: "bg-red-50 text-red-600",
+  "No Show": "bg-muted text-muted-foreground",
 };
 
 const SOURCE_LABELS: Record<AppointmentSource, string> = {
@@ -84,7 +87,7 @@ const SOURCE_OPTIONS = [
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as AppointmentStatus[];
 
-const STATUS_OPTIONS = [{ label: "All", value: "" }, ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))];
+const STATUS_OPTIONS = [{ label: "All", value: "" }, ...["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].map(value => ({ label: value.replace("_", " "), value })), ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))];
 
 function customerName(a: Appointment) {
   return a.customer ? `${a.customer.firstName} ${a.customer.lastName}` : "—";
@@ -96,7 +99,8 @@ function vehicleReg(a: Appointment) {
 }
 
 function scheduledLabel(a: Appointment) {
-  return new Date(a.scheduledAt).toLocaleString(undefined, {
+  return new Date(a.scheduledAt).toLocaleString("en-GB", {
+      timeZone: "Africa/Lagos",
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -230,7 +234,9 @@ export function AppointmentsTable() {
   }
 
   function confirmDeleteSelected(items: Appointment[]) {
-    setDeleteCandidates(items);
+    const candidates = items.filter(item => !item.bookingNumber && !item.jobCards?.length);
+    if (!candidates.length) { toast.info("Numbered or linked bookings must be cancelled with a reason"); return; }
+    setDeleteCandidates(candidates);
   }
 
   function handleConfirmDelete() {
@@ -244,6 +250,10 @@ export function AppointmentsTable() {
   }
 
   const columns: Column<Appointment>[] = [
+    {
+      header: "Booking",
+      render: (appointment) => <span className="text-sm"><span className="block max-w-48 break-all">{appointment.bookingNumber ?? "Legacy booking"}</span><span className="text-xs text-muted-foreground">{appointment.bookingStatus ?? appointment.status}</span></span>,
+    },
     {
       header: "Customer",
       render: (a) => (
@@ -323,7 +333,7 @@ export function AppointmentsTable() {
           quickActions={[
             canEdit && {
               id: "edit",
-              label: "Edit",
+              label: "Booking details",
               icon: <Pencil className="size-3.5" />,
               onClick: () => setEditingId(a.id),
             },
@@ -378,7 +388,7 @@ export function AppointmentsTable() {
                   "Appointment link copied",
                 ),
             },
-            canDelete && {
+            canDelete && !a.bookingNumber && !a.jobCards?.length && {
               id: "delete",
               label: "Delete",
               icon: <Trash2 className="size-4" />,
