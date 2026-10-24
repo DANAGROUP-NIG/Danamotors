@@ -31,6 +31,7 @@ danamotors/
 | [stock-taking.md](./stock-taking.md) | Physical stock taking: annual/perpetual batches, count sheets (handheld stand-in), S/E confirmation adjusting stock, bin update; stock audit (report only) |
 | [data-management.md](./data-management.md) | Data Management: cancelling pending CPO and indent lines (legacy CPO and Branch Indent From / To Other Branch Cancellation), Part List, and why Parts Posting is not needed |
 | [utilities.md](./utilities.md) | Utilities: why the legacy SRN, STN, counter sale, SAN and part deletion uploads need no new screens, and where each is handled now |
+| [demo-data.md](./demo-data.md) | Demo data seed: dummy job cards, estimates, bills, part issues, warranty and TEST cases, campaigns; run, re-run, `--reset-test`, safety rules. Testing guide: [demo-data-testing-walkthrough.md](./demo-data-testing-walkthrough.md) |
 | [parts-reports.md](./parts-reports.md) | Parts reports: counter sales, CPO, purchase, picking, STN/SRN, indents, consumption, issues, SAN, the stock reports (ledger, summary, balances, ageing, blocked) and the MIS reports (levels, consumption, profitability, fill, rate and bin history, packing lists) |
 
 ## Quick start
