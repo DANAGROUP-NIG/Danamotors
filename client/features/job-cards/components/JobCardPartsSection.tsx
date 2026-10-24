@@ -345,8 +345,10 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
                     disabled={remaining === 0}
                   >
                     {row.sparePart.partNumber} · {row.sparePart.name}
-                    {row.partSource ? ` · ${partSourceLabel(row.partSource)}` : ""} (
-                    {remaining} remaining)
+                    {row.partSource
+                      ? ` · ${partSourceLabel(row.partSource)}`
+                      : ""}{" "}
+                    ({remaining} remaining)
                   </option>
                 );
               })}

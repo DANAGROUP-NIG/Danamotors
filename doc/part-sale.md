@@ -103,6 +103,10 @@ The rest of the legacy data is covered elsewhere or not included:
 - **Dispatch Challan** and **Challan Return** are not part of CPD part sale. In AutoEnhancer
   they record unbilled issues of fuel and consumables (petrol, diesel, gloves) to internal
   group cost centres. They will be built separately as an internal issue.
+  The legacy **Dispatch Challan Register** to rebuild with them: filters date range, **Spare / Oil /
+  Both** and **Pending / All**; one challan per heading (date, challan number, customer code and name
+  as the cost centre, gate pass issued) with its lines (part number, description, UOM, quantity, rate,
+  amount) and a sub total per challan.
 
 ## Not yet built
 

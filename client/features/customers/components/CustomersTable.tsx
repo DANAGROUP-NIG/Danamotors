@@ -37,7 +37,12 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCustomers } from "../hooks/use-customers";
 import { useBulkDeleteCustomers } from "../hooks/use-bulk-delete-customers";
-import { getCustomerInitials } from "../services/customer.service";
+import {
+  getCustomerAddress,
+  getCustomerFullName,
+  getCustomerInitials,
+  getCustomerPhone,
+} from "../services/customer.service";
 import { CustomerEditForm } from "./CustomerEditForm";
 import type { Customer } from "../types/customer.types";
 
@@ -169,30 +174,39 @@ export function CustomersTable() {
             {getCustomerInitials(c)}
           </span>
           <span className="font-medium">
-            {c.companyName || `${c.firstName} ${c.lastName}`}
+            {getCustomerFullName(c)}
           </span>
         </div>
       ),
     },
     {
       header: "Email",
-      render: (c) => <span className="text-muted-foreground">{c.email}</span>,
+      render: (c) => (
+        <span className="text-muted-foreground">
+          {c.email?.trim() || <span className="text-border">—</span>}
+        </span>
+      ),
     },
     {
       header: "Phone",
       render: (c) => (
-        <span className="text-muted-foreground">
-          {c.phoneNumber ?? <span className="text-border">—</span>}
+        <span className="whitespace-nowrap text-muted-foreground">
+          {getCustomerPhone(c) ?? <span className="text-border">—</span>}
         </span>
       ),
     },
     {
       header: "Address",
-      render: (c) => (
-        <span className="text-muted-foreground">
-          {c.address ?? <span className="text-border">—</span>}
-        </span>
-      ),
+      render: (c) => {
+        const address = getCustomerAddress(c);
+        return address ? (
+          <span className="block max-w-64 truncate text-muted-foreground" title={address}>
+            {address}
+          </span>
+        ) : (
+          <span className="text-border">—</span>
+        );
+      },
     },
     {
       header: "Agent",

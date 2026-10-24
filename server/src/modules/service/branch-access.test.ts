@@ -80,8 +80,13 @@ describe('service lists', () => {
       req.query.branchId = 'other';
       const next = jest.fn();
       await controller[method](req, response(), next);
-      expect(next).not.toHaveBeenCalled();
-      expect(mock).toHaveBeenLastCalledWith(expect.objectContaining({ branchId: expected }));
+      if (method === 'listAppointments' && expected === 'home') {
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+        expect(mock).not.toHaveBeenCalled();
+      } else {
+        expect(next).not.toHaveBeenCalled();
+        expect(mock).toHaveBeenLastCalledWith(expect.objectContaining({ branchId: expected }));
+      }
     }
     await controller[method](request([PERMISSIONS.BRANCH_ALL]), response(), jest.fn());
     expect(mock).toHaveBeenLastCalledWith(expect.objectContaining({ branchId: undefined }));
@@ -94,7 +99,7 @@ describe('service lists', () => {
 });
 
 it('uses branch:all rather than role names when creating an appointment in another branch', async () => {
-  (prisma.branch.findUnique as jest.Mock).mockResolvedValue({ name: 'Home branch' });
+  (prisma.branch.findUnique as jest.Mock).mockResolvedValue({ id: 'other', name: 'Other branch' });
   const create = ServiceService.prototype.createAppointment as jest.Mock;
   create.mockResolvedValue({});
   const controller = new ServiceController();
@@ -107,8 +112,13 @@ it('uses branch:all rather than role names when creating an appointment in anoth
     req.body = { branchName: 'Other branch' };
     const next = jest.fn();
     await controller.createAppointment(req, response(), next);
-    expect(next).not.toHaveBeenCalled();
-    expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ branchName: expected }));
+    if (expected === 'Home branch') {
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+      expect(create).not.toHaveBeenCalled();
+    } else {
+      expect(next).not.toHaveBeenCalled();
+      expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ branchName: expected }));
+    }
   }
 });
 

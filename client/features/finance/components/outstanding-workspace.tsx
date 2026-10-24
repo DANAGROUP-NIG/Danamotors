@@ -10,7 +10,7 @@ import {PageHeader} from '@/components/headers/page-header';
 import {Field,inputCls} from '@/components/forms/FormField';
 import {Button} from '@/components/ui/button';
 import {DataTable} from '@/components/ui/table-components/DataTable';
-import {WorkshopPicker} from '@/features/job-cards/components/WorkshopPicker';
+import {WorkshopPicker,customerLabel,customerOption} from '@/features/job-cards/components/WorkshopPicker';
 import {noteToday,noteError} from './PartyNoteForm';
 type Filters={branchId?:string;order:'name'|'code';partyStatus:'ALL'|'CUSTOMER'|'DEALER'|'FA_PARTY';fromCustomerId?:string;toCustomerId?:string};
 type Settings={defaultCreditDays:number;letterPrefix:string;letterTemplate:string};
@@ -63,8 +63,8 @@ function OutstandingSession({branchId,repair}:{branchId?:string;repair:boolean})
  <section className="grid gap-4 rounded-xl border bg-white p-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
  <Field label="Order"><select className={inputCls} value={order} onChange={e=>{setOrder(e.target.value as 'name'|'code');setFrom('');setTo('');}}><option value="name">Name wise</option><option value="code">Code wise</option></select></Field>
  <Field label="Party status"><select className={inputCls} value={partyStatus} onChange={e=>setStatus(e.target.value as Filters['partyStatus'])}><option value="ALL">{repair?"All parties":"Customers and dealers"}</option><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option>{repair&&<option value="FA_PARTY">FA party</option>}</select></Field>
- <WorkshopPicker label="From party" endpoint={picker} collection="customers" value={fromCustomerId} onChange={setFrom} formatLabel={r=>[r.code,r.name].filter(Boolean).join(' · ')}/>
- <WorkshopPicker label="To party" endpoint={picker} collection="customers" value={toCustomerId} onChange={setTo} formatLabel={r=>[r.code,r.name].filter(Boolean).join(' · ')}/>
+ <WorkshopPicker label="From party" endpoint={picker} collection="customers" value={fromCustomerId} onChange={setFrom} formatLabel={customerLabel} renderOption={customerOption}/>
+ <WorkshopPicker label="To party" endpoint={picker} collection="customers" value={toCustomerId} onChange={setTo} formatLabel={customerLabel} renderOption={customerOption}/>
  {!repair&&<><Field label="As on"><input type="date" max={noteToday()} required className={inputCls} value={asOn} onChange={e=>setAsOn(e.target.value)}/></Field><Field label="Net outstanding greater than NGN"><input type="number" min="0" step="0.01" className={inputCls} value={threshold} onChange={e=>setThreshold(e.target.value)}/></Field></>}
  </div>{admin&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={all} onChange={e=>{setAll(e.target.checked);setFrom('');setTo('');setSelected([]);setGenerated([]);}}/>All branches</label>}
  {!repair&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={includePrinted} onChange={e=>setIncludePrinted(e.target.checked)}/>Include parties with previously printed letters</label>}

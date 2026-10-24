@@ -17,6 +17,9 @@ export type PickerRecord = {
   registrationNumber?: string | null;
   vin?: string;
   jobNumber?: string;
+  requisitionNumber?: string;
+  slipNumber?: string;
+  partNumber?: string;
   scheduledAt?: string;
   customerId?: string | null;
   customer?: {
@@ -39,6 +42,10 @@ export type PickerRecord = {
   durationMins?: number | null;
   price?: number;
   serviceId?: string | null;
+  serviceTypeId?: string | null;
+  mileage?: number | null;
+  acFitted?: boolean | null;
+  requests?: { complaintCodeId?: string | null; defectCode?: string | null; description: string; estimatedParts: number | string; estimatedOil: number | string; estimatedLabour: number | string }[];
   parentId?: string | null;
   currency?: string;
   lines?: { type: string; description: string; amount: number }[];
@@ -58,12 +65,27 @@ export function recordLabel(row: PickerRecord) {
     row.registrationNumber ||
     row.vin ||
     row.jobNumber ||
+    row.requisitionNumber ||
+    row.slipNumber ||
+    row.partNumber ||
     row.companyName ||
     [row.firstName, row.lastName].filter(Boolean).join(" ") ||
     [row.code, row.description].filter(Boolean).join(" | ") ||
     row.name ||
     row.id
   );
+}
+
+/** Customer pickers lead with the customer code, then the name; search still matches names. */
+export function customerLabel(row: PickerRecord) {
+  return [row.code, row.companyName || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.name].filter(Boolean).join(" · ") || row.id;
+}
+
+export function customerOption(row: PickerRecord) {
+  return <span className="min-w-0">
+    <span className="block break-words font-medium">{customerLabel(row)}</span>
+    {row.phoneNumber && <span className="block text-sm text-muted-foreground">{row.phoneNumber}</span>}
+  </span>;
 }
 
 function recordHint(row: PickerRecord) {
@@ -257,6 +279,7 @@ export function WorkshopPicker({
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
+
               setOpen(true);
               setActive((current) =>
                 Math.max(
@@ -269,7 +292,6 @@ export function WorkshopPicker({
               );
             } else if (event.key === "Enter" && open) {
               event.preventDefault();
-
               if (!loading && active >= 0 && rows[active]) choose(rows[active]);
             } else if (event.key === "Escape" && open) {
               event.preventDefault();

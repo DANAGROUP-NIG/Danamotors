@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useAuth } from "@/features/auth/hooks/use-auth";
-import { JobCardOpeningModal } from "./JobCardOpeningModal";
-import { Download, FileSpreadsheet, Plus } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -19,7 +16,8 @@ function exportRows(jobCards: JobCard[]) {
     jobNumber: jobCard.jobNumber,
     vehicleRegistration: jobCard.vehicle?.registrationNumber ?? "",
     customer: jobCard.customer
-      ? jobCard.customer.companyName || `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
+      ? jobCard.customer.companyName ||
+        `${jobCard.customer.firstName} ${jobCard.customer.lastName}`
       : "",
     branch: jobCard.branch?.name ?? "",
     agent: jobCard.createdBy
@@ -64,13 +62,17 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
     >
       <ActionMenuItem
         icon={<Download className="size-4" />}
-        onClick={() => downloadCsv(filename, exportRows(jobCards), exportColumns())}
+        onClick={() =>
+          downloadCsv(filename, exportRows(jobCards), exportColumns())
+        }
       >
         Export as CSV
       </ActionMenuItem>
       <ActionMenuItem
         icon={<FileSpreadsheet className="size-4" />}
-        onClick={() => downloadExcel(filename, exportRows(jobCards), exportColumns())}
+        onClick={() =>
+          downloadExcel(filename, exportRows(jobCards), exportColumns())
+        }
       >
         Export as Excel
       </ActionMenuItem>
@@ -79,8 +81,6 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
 }
 
 export function JobCardsPage() {
-  const [opening, setOpening] = useState(false);
-  const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data } = useJobCards({
     page: 1,
@@ -97,10 +97,19 @@ export function JobCardsPage() {
             ? `${data.meta.total} ${data.meta.total === 1 ? "job card" : "job cards"} on record`
             : undefined
         }
-        actions={<div className="flex flex-wrap items-center gap-2"><ExportJobCardsButton branchId={activeBranch?.id} />{hasPermission("jobcard:create") && <Button onClick={() => setOpening(true)}><Plus className="mr-2 h-4 w-4" />Open job card</Button>}</div>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportJobCardsButton branchId={activeBranch?.id} />
+            {/* {hasPermission("jobcard:create") && (
+              <Button onClick={() => setOpening(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Open job card
+              </Button>
+            )} */}
+          </div>
+        }
       />
       <JobCardsTable />
-      <JobCardOpeningModal isOpen={opening} onClose={() => setOpening(false)} />
     </div>
   );
 }

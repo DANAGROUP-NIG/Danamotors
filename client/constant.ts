@@ -1,6 +1,13 @@
 import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "./features/auth/roles";
+import {
+  CAMPAIGN_PERMISSIONS,
+  INVENTORY_PERMISSIONS,
+  PART_SALE_PERMISSIONS,
+  STOCK_AUDIT_PERMISSIONS,
+  STOCK_TAKE_PERMISSIONS,
+  WARRANTY_PERMISSIONS,
+} from "./features/auth/roles";
 
 //icons
 import {
@@ -11,7 +18,6 @@ import {
   LogOut,
   Package,
   FileText,
-  Wrench,
   BarChart2,
   UserCog,
   Settings,
@@ -19,7 +25,6 @@ import {
   ClipboardList,
   Shield,
   ReceiptText,
-  ShieldCheck,
   Building2,
   ArrowLeftRight,
   Wallet,
@@ -52,7 +57,12 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Main",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
+      {
+        label: "Dashboard",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        permissions: ["dashboard:read"],
+      },
       {
         label: "Customers",
         href: "/customers",
@@ -84,23 +94,26 @@ export const NAV_GROUPS: NavGroup[] = [
           },
         ],
       },
-      {
-        label: "Users",
-        href: "/users",
-        icon: Shield,
-        permissions: ["user:read"],
-      },
-      {
-        label: "Branches",
-        href: "/branches",
-        icon: Building2,
-        permissions: ["branch:read"],
-      },
     ],
   },
   {
     label: "Workshop",
-    permissions: ["jobcard:read", "inspection:read", "services:read", "employee:read"],
+    permissions: [
+      "jobcard:read",
+      "services:read",
+      WARRANTY_PERMISSIONS.READ,
+      CAMPAIGN_PERMISSIONS.READ,
+      ...MONTHLY_REPORT_PERMISSIONS,
+      "corporate:manage",
+      "financereport:read",
+      "report:receipt-register",
+      "report:party-ledger",
+      "report:party-outstanding",
+      "report:party-outstanding-age",
+      "report:party-outstanding-bill",
+      "report:debit-note-register",
+      "report:credit-note-register",
+    ],
     items: [
       {
         label: "Job Cards",
@@ -109,34 +122,39 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: ["jobcard:read"],
       },
       {
-        label: "Inspection",
-        href: "/inspections",
-        icon: ShieldCheck,
-        permissions: ["inspection:read"],
-      },
-      {
-        label: "Repairs",
-        href: "/repairs",
-        icon: Wrench,
-        permissions: ["jobcard:update", "workshop:read"],
-      },
-      {
         label: "Services",
         href: "/services",
         icon: ListChecks,
         permissions: ["services:read"],
       },
       {
-        label: "Technicians",
-        href: "/technicians",
-        icon: UserCog,
-        permissions: ["workshop:read"],
+        label: "Warranty",
+        href: "/warranty",
+        icon: BadgeCheck,
+        permissions: [WARRANTY_PERMISSIONS.READ],
       },
       {
-        label: "Employees",
-        href: "/employees",
-        icon: Users,
-        permissions: ["employee:read"],
+        label: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
+      },
+      {
+        label: "Reports",
+        href: "/reports",
+        icon: FileText,
+        permissions: [
+          ...MONTHLY_REPORT_PERMISSIONS,
+          "corporate:manage",
+          "financereport:read",
+          "report:receipt-register",
+          "report:party-ledger",
+          "report:party-outstanding",
+          "report:party-outstanding-age",
+          "report:party-outstanding-bill",
+          "report:debit-note-register",
+          "report:credit-note-register",
+        ],
       },
     ],
   },
@@ -151,13 +169,9 @@ export const NAV_GROUPS: NavGroup[] = [
       PART_SALE_PERMISSIONS.ORDER,
       STOCK_TAKE_PERMISSIONS.READ,
       STOCK_AUDIT_PERMISSIONS.READ,
-      "labour-item:read",
-      WARRANTY_PERMISSIONS.READ,
-      CAMPAIGN_PERMISSIONS.READ,
-      "financereport:read","report:receipt-register","report:party-ledger","report:party-outstanding","report:party-outstanding-age","report:party-outstanding-bill","report:debit-note-register","report:credit-note-register",
     ],
     // Parts first, in the order a part moves: master, query, receive (MIT), count, sell, correct,
-    // transfer, report. Then the workshop-wide items.
+    // transfer, report.
     items: [
       {
         label: "Inventory",
@@ -172,7 +186,10 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Part Query",
         href: "/inventory/part-query",
         icon: PackageSearch,
-        permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ, INVENTORY_PERMISSIONS.STOCK_READ],
+        permissions: [
+          INVENTORY_PERMISSIONS.SPAREPART_READ,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+        ],
       },
       {
         label: "MIT",
@@ -204,18 +221,42 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ShoppingCart,
         permissions: [PART_SALE_PERMISSIONS.READ],
         children: [
-          { label: "Customer Orders", href: "/part-sale/orders", icon: ClipboardList, permissions: [PART_SALE_PERMISSIONS.READ] },
-          { label: "Counter Sales", href: "/part-sale/counter-sales", icon: ReceiptText, permissions: [PART_SALE_PERMISSIONS.READ] },
-          { label: "Sale Returns", href: "/part-sale/returns", icon: Undo2, permissions: [PART_SALE_PERMISSIONS.READ] },
+          {
+            label: "Customer Orders",
+            href: "/part-sale/orders",
+            icon: ClipboardList,
+            permissions: [PART_SALE_PERMISSIONS.READ],
+          },
+          {
+            label: "Counter Sales",
+            href: "/part-sale/counter-sales",
+            icon: ReceiptText,
+            permissions: [PART_SALE_PERMISSIONS.READ],
+          },
+          {
+            label: "Sale Returns",
+            href: "/part-sale/returns",
+            icon: Undo2,
+            permissions: [PART_SALE_PERMISSIONS.READ],
+          },
         ],
       },
       {
         label: "Data Management",
         href: "/data-management",
         icon: Database,
-        permissions: [PART_SALE_PERMISSIONS.ORDER, INVENTORY_PERMISSIONS.TRANSFER_CANCEL, INVENTORY_PERMISSIONS.STOCK_READ],
+        permissions: [
+          PART_SALE_PERMISSIONS.ORDER,
+          INVENTORY_PERMISSIONS.TRANSFER_CANCEL,
+          INVENTORY_PERMISSIONS.STOCK_READ,
+        ],
         children: [
-          { label: "CPO Cancellation", href: "/data-management/cpo-cancellation", icon: Ban, permissions: [PART_SALE_PERMISSIONS.ORDER] },
+          {
+            label: "CPO Cancellation",
+            href: "/data-management/cpo-cancellation",
+            icon: Ban,
+            permissions: [PART_SALE_PERMISSIONS.ORDER],
+          },
           {
             label: "Indent From Branch Cancellation",
             href: "/data-management/indent-inward-cancellation",
@@ -228,7 +269,12 @@ export const NAV_GROUPS: NavGroup[] = [
             icon: Ban,
             permissions: [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
           },
-          { label: "Part List", href: "/parts-reports/current-stock", icon: FileBarChart, permissions: [INVENTORY_PERMISSIONS.STOCK_READ] },
+          {
+            label: "Part List",
+            href: "/parts-reports/current-stock",
+            icon: FileBarChart,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+          },
         ],
       },
       {
@@ -250,30 +296,6 @@ export const NAV_GROUPS: NavGroup[] = [
           STOCK_AUDIT_PERMISSIONS.READ,
         ],
       },
-      {
-        label: "Labour Catalogue",
-        href: "/labour-catalogue",
-        icon: ListChecks,
-        permissions: ["labour-item:read"],
-      },
-      {
-        label: "Warranty",
-        href: "/warranty",
-        icon: BadgeCheck,
-        permissions: [WARRANTY_PERMISSIONS.READ],
-      },
-      {
-        label: "Campaigns",
-        href: "/campaigns",
-        icon: Megaphone,
-        permissions: [CAMPAIGN_PERMISSIONS.READ],
-      },
-      {
-        label: "Reports",
-        href: "/reports",
-        icon: FileText,
-        permissions: ["financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
-      },
     ],
   },
   {
@@ -283,13 +305,35 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Finance",
         href: "/finance",
         icon: BarChart2,
-        permissions: ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
+        permissions: [
+          "invoice:read",
+          "payment:read",
+          "receipt:create",
+          "receipt:adjust",
+          "outstanding:recalculate",
+          "letter:outstanding",
+          "debitnote:read",
+          "creditnote:read",
+          "debitnote:create",
+          "creditnote:create",
+        ],
         children: [
           {
             label: "Overview",
             href: "/finance",
             icon: BarChart2,
-            permissions: ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
+            permissions: [
+              "invoice:read",
+              "payment:read",
+              "receipt:create",
+              "receipt:adjust",
+              "outstanding:recalculate",
+              "letter:outstanding",
+              "debitnote:read",
+              "creditnote:read",
+              "debitnote:create",
+              "creditnote:create",
+            ],
           },
           {
             label: "Debit Notes",
@@ -335,35 +379,60 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Wallet,
         permissions: ["credit:application:create"],
       },
-      {
-        label: "Warranty",
-        href: "/warranty",
-        icon: BadgeCheck,
-        permissions: [WARRANTY_PERMISSIONS.READ],
-      },
-      {
-        label: "Campaigns",
-        href: "/campaigns",
-        icon: Megaphone,
-        permissions: [CAMPAIGN_PERMISSIONS.READ],
-      },
-      {
-        label: "Reports",
-        href: "/reports",
-        icon: FileText,
-        permissions: [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
-      },
     ],
   },
   {
-    label: "Account",
+    label: "Admin",
+    permissions: [
+      "branch:read",
+      "employee:read",
+      "user:read",
+      "workshop:read",
+      "labour-item:read",
+      "role:read",
+    ],
     items: [
+      {
+        label: "Branches",
+        href: "/branches",
+        icon: Building2,
+        permissions: ["branch:read"],
+      },
+      {
+        label: "Employees",
+        href: "/employees",
+        icon: Users,
+        permissions: ["employee:read"],
+      },
+      {
+        label: "Users",
+        href: "/users",
+        icon: Shield,
+        permissions: ["user:read"],
+      },
+      {
+        label: "Technicians",
+        href: "/technicians",
+        icon: UserCog,
+        permissions: ["workshop:read"],
+      },
+      {
+        label: "Labour Catalogue",
+        href: "/labour-catalogue",
+        icon: ListChecks,
+        permissions: ["labour-item:read"],
+      },
       {
         label: "Settings",
         href: "/settings",
         icon: Settings,
         permissions: ["role:read"],
       },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
       {
         label: "Log out",
         href: "/logout",
@@ -374,7 +443,12 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const BOTTOM_NAV: NavItem[] = [
-  { label: "Home", href: "/dashboard", icon: LayoutDashboard, permissions: ["dashboard:read"] },
+  {
+    label: "Home",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    permissions: ["dashboard:read"],
+  },
   {
     label: "Vehicles",
     href: "/vehicles",

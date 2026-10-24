@@ -6,13 +6,14 @@ export const inputCls =
 interface FieldProps {
   label: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }
 
-export function Field({ label, error, children }: FieldProps) {
+export function Field({ label, error, required, children }: FieldProps) {
   return (
     <label className="grid gap-1.5 min-w-0">
-      <span className="text-sm font-semibold">{label}</span>
+      <span className="text-sm font-semibold">{label}{required && <span className="text-red-500" aria-hidden="true"> *</span>}</span>
       {children}
       {error && <span className="text-sm text-red-500">{error}</span>}
     </label>
