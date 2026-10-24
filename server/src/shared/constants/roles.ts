@@ -18,6 +18,10 @@ export const ROLES = {
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
 
 export const PERMISSIONS = {
+  REQUISITION_READ: "requisition:read",
+  REQUISITION_CREATE: "requisition:create",
+  REQUISITION_CANCEL: "requisition:cancel",
+  REQUISITION_GOODWILL: "requisition:goodwill",
   PDI_READ: 'pdi:read',
   TAX_REGISTER_READ: "report:tax-register",
   BOOKED_VS_AVAILED_READ: "report:booked-vs-availed",
@@ -102,6 +106,8 @@ export const PERMISSIONS = {
   JOBCARD_READ: "jobcard:read",
   JOBCARD_CREATE: "jobcard:create",
   JOBCARD_UPDATE: "jobcard:update",
+  JOBCARD_REMARKS_UPDATE: "jobcard:remarks:update",
+  JOBCARD_PICKING_LIST_PRINT: "jobcard:picking-list:print",
   JOBLABOUR_UPDATE: "jobcard:labour:update",
   LABOUR_ITEM_READ: "labour-item:read",
   LABOUR_ITEM_CREATE: "labour-item:create",
@@ -262,6 +268,12 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.JOBCARD_REMARKS_UPDATE,
+    PERMISSIONS.REQUISITION_READ,
+    PERMISSIONS.REQUISITION_CREATE,
+    PERMISSIONS.REQUISITION_CANCEL,
+    PERMISSIONS.REQUISITION_GOODWILL,
     PERMISSIONS.PDI_READ,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
@@ -385,6 +397,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.REQUISITION_READ,
+    PERMISSIONS.REQUISITION_CREATE,
+    PERMISSIONS.REQUISITION_CANCEL,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
@@ -429,6 +445,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.REQUISITION_READ,
+    PERMISSIONS.REQUISITION_CREATE,
+    PERMISSIONS.REQUISITION_CANCEL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -463,6 +483,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.JOBCARD_REMARKS_UPDATE,
+    PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ,
@@ -600,6 +623,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.JOBCARD_REMARKS_UPDATE,
+    PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.DELIVERED_MODEL_READ,
     PERMISSIONS.DELIVERED_SERVICE_READ,
     PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
@@ -642,6 +668,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
+    PERMISSIONS.JOBCARD_REMARKS_UPDATE,
+    PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.EMPLOYEE_MANAGE,
     PERMISSIONS.BRANCH_ALL,
@@ -757,6 +786,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
   [ROLES.WARRANTY_OFFICER]: [
+    PERMISSIONS.REQUISITION_READ,
+    PERMISSIONS.REQUISITION_GOODWILL,
     PERMISSIONS.WARRANTY_ATTENDED_READ,
     PERMISSIONS.WARRANTY_PARTS_READ,
 

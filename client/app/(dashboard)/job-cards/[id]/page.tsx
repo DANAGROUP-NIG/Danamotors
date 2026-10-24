@@ -40,7 +40,10 @@ import type {
 import { JobCardLabourSection } from "@/features/job-cards/components/JobCardLabourSection";
 import { JobCardLinesCard } from "@/features/job-cards/components/JobCardLinesCard";
 import { partSourceLabel } from "@/features/inventory/lib/part-codes";
-import { LinkedCampaignsCard, WarrantySnapshotCard } from "@/features/job-cards/components/JobCardWarrantyCards";
+import {
+  LinkedCampaignsCard,
+  WarrantySnapshotCard,
+} from "@/features/job-cards/components/JobCardWarrantyCards";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
 const STATUS_TONES = JOB_CARD_STATUS_TONES;
@@ -65,7 +68,8 @@ export default function JobCardDetailPage() {
 
   const canManage = hasPermission("jobcard:update");
   const canCreateBill = hasPermission("invoice:job-bill:create");
-  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
+  const canSeeWarranty =
+    isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   function handlePrint() {
     window.print();
@@ -92,7 +96,12 @@ export default function JobCardDetailPage() {
       ?.scrollIntoView({ behavior: "smooth" });
   }
 
-  if (isLoading || error || !jobCard) return <div className="p-4 lg:p-5"><RepairWorkspacePage id={id} /></div>;
+  if (isLoading || error || !jobCard)
+    return (
+      <div className="p-4 lg:p-5">
+        <RepairWorkspacePage id={id} />
+      </div>
+    );
 
   const tone = STATUS_TONES[jobCard.status as JobCardStatus] ?? "gray";
   const vehicleLabel = jobCard.vehicle
@@ -345,16 +354,18 @@ export default function JobCardDetailPage() {
                 {jobCard.estimatedHours ?? "—"}
               </p>
             </div>
-            {jobCard.estimatedCost !== undefined && <div>
-              <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
-                Estimated Cost
-              </p>
-              <p className="mt-0.5 text-sm text-slate-800">
-                {jobCard.estimatedCost != null
-                  ? fmtCurrency(jobCard.estimatedCost)
-                  : "—"}
-              </p>
-            </div>}
+            {jobCard.estimatedCost !== undefined && (
+              <div>
+                <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
+                  Estimated Cost
+                </p>
+                <p className="mt-0.5 text-sm text-slate-800">
+                  {jobCard.estimatedCost != null
+                    ? fmtCurrency(jobCard.estimatedCost)
+                    : "—"}
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                 QC Status
@@ -396,14 +407,16 @@ export default function JobCardDetailPage() {
                 ["Estimated labour", jobCard.estimatedLabour],
                 ["Service charge", jobCard.serviceCharge],
               ] as const
-            ).filter(([,amount]) => amount !== undefined).map(([label, amount]) => (
-              <div key={label}>
-                <dt className="text-sm text-muted-foreground">{label}</dt>
-                <dd className="mt-1 text-sm font-medium">
-                  {amount == null ? "Not recorded" : fmtCurrency(amount)}
-                </dd>
-              </div>
-            ))}
+            )
+              .filter(([, amount]) => amount !== undefined)
+              .map(([label, amount]) => (
+                <div key={label}>
+                  <dt className="text-sm text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 text-sm font-medium">
+                    {amount == null ? "Not recorded" : fmtCurrency(amount)}
+                  </dd>
+                </div>
+              ))}
             <div>
               <dt className="text-sm text-muted-foreground">Received by</dt>
               <dd className="text-sm">

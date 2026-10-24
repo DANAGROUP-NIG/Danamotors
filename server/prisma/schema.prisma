@@ -8,6 +8,9 @@ datasource db {
 }
 
 model Branch {
+  requisitions PartRequisition[]
+  returnSlips PartReturnSlip[]
+  labourSlips LabourSlip[]
   standaloneEstimates Estimate[]
   outstandingLetters OutstandingLetter[]
   partyNotes             PartyNote[]
@@ -80,6 +83,13 @@ model Branch {
 // ============================================================
 
 model User {
+  createdRequisitions PartRequisition[] @relation("RequisitionCreator")
+  cancelledRequisitions PartRequisition[] @relation("RequisitionCanceller")
+  engineeredRequisitions PartRequisition[] @relation("RequisitionEngineer")
+  createdReturnSlips PartReturnSlip[] @relation("ReturnSlipCreator")
+  cancelledReturnSlips PartReturnSlip[] @relation("ReturnSlipCanceller")
+  createdLabourSlips LabourSlip[] @relation("LabourSlipCreator")
+  engineeredLabourSlips LabourSlip[] @relation("LabourSlipEngineer")
   capturedEstimateSignatures EstimateSignature[]
   engineerJobs JobCard[] @relation("JobEngineer")
   createdPartyNotes              PartyNote[]            @relation("PartyNoteCreator")
@@ -401,6 +411,17 @@ model Service {
 }
 
 model ServiceAppointment {
+  bookingNumber String? @unique
+  mileage Int?
+  bookingStatus BookingStatus @default(BOOKED)
+  cancelReason String?
+  acFitted Boolean?
+  followUpJobId String?
+  followUpJob JobCard? @relation("BookingFollowUp", fields: [followUpJobId], references: [id], onDelete: Restrict)
+  requests AppointmentRequest[]
+
+  @@index([followUpJobId])
+  @@index([branchId, bookingStatus, scheduledAt])
   serviceTypeId String?
   serviceType WorkshopMaster? @relation("BookingServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
@@ -446,6 +467,10 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  followUpAppointments ServiceAppointment[] @relation("BookingFollowUp")
+  requisitions PartRequisition[]
+  returnSlips PartReturnSlip[]
+  labourSlips LabourSlip[]
   engineerId String?
   engineer User? @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
   id String @id @default(uuid())
@@ -597,6 +622,7 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  remarks String?
   version Int @default(1)
   supersedesId String? @unique
   supersedes Estimate? @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)
@@ -798,6 +824,7 @@ enum PartRole {
 // ============================================================
 
 model SparePart {
+  requisitionLines PartRequisitionLine[]
   reportTaxCategoryCode String?
   reportTaxCategory PartTaxCategory? @relation(fields: [reportTaxCategoryCode], references: [code], onDelete: Restrict)
   id String @id @default(uuid())
@@ -1138,6 +1165,7 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  requisitionLine PartRequisitionLine?
   id String @id @default(uuid())
 
   // The branch whose inventory is being reduced
@@ -1182,6 +1210,16 @@ model PartIssuance {
 // ============================================================
 
 model PartReturn {
+  returnSlipId String?
+  returnSlip PartReturnSlip? @relation(fields: [returnSlipId], references: [id], onDelete: Restrict)
+  requisitionLineId String?
+  requisitionLine PartRequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: Restrict)
+  // Nullable snapshots keep historical bare returns readable.
+  rate Decimal? @db.Decimal(18, 2)
+  amount Decimal? @db.Decimal(18, 2)
+
+  @@index([returnSlipId])
+  @@index([requisitionLineId])
   id String @id @default(uuid())
 
   partIssuanceId String
@@ -1382,6 +1420,17 @@ model LabourItem {
 }
 
 model JobCardLabour {
+  // Snapshot the model's TIME/FIXED pricing independently of charged hours.
+  pricing String?
+  labourSlipId String?
+  labourSlip LabourSlip? @relation(fields: [labourSlipId], references: [id], onDelete: Restrict)
+  // Existing hours stores charged hours; do not add a second source of truth.
+  standardHours Float?
+  groupId String?
+  group WorkshopMaster? @relation("LabourLineGroup", fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@index([labourSlipId])
+  @@index([groupId])
   id           String     @id @default(uuid())
   jobCardId    String
   jobCard      JobCard    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
@@ -1840,6 +1889,10 @@ model Enquiry {
 
 // Typed master families share search, activation and legacy-code handling.
 model WorkshopMaster {
+  appointmentRequests AppointmentRequest[] @relation("AppointmentRequestComplaint")
+  requisitionGroups PartRequisition[] @relation("RequisitionGroup")
+  labourSlipGroups LabourSlip[] @relation("LabourSlipGroup")
+  labourLineGroups JobCardLabour[] @relation("LabourLineGroup")
   serviceAppointments ServiceAppointment[] @relation("BookingServiceType")
   id               String           @id @default(uuid())
   kind             String
@@ -2803,6 +2856,12 @@ model VehicleModel {
 
 // A priced part or labour line on a job card, with who pays for it.
 model JobCardLine {
+  // Both shares of a split charge point to the same requisition line.
+  // Keep the legacy unique issuance link on the primary share only.
+  requisitionLineId String?
+  requisitionLine PartRequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: Restrict)
+
+  @@index([requisitionLineId])
   invoiceLines InvoiceLine[]
   id String @id @default(uuid())
 
@@ -3780,4 +3839,147 @@ model BranchSettings {
   signatories               String[] @default([])
 
   updatedAt DateTime @updatedAt
+}
+
+// Service transaction documents. Numbers are allocated by DocumentSequence in the
+// creating transaction, using a branch-specific key (never MAX + 1).
+enum BookingStatus {
+  BOOKED
+  CONVERTED
+  CANCELLED
+  NO_SHOW
+}
+
+model AppointmentRequest {
+  id String @id @default(uuid())
+  appointmentId String
+  appointment ServiceAppointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  complaintCodeId String?
+  complaintCode WorkshopMaster? @relation("AppointmentRequestComplaint", fields: [complaintCodeId], references: [id], onDelete: Restrict)
+  defectCode String?
+  description String
+  estimatedParts Decimal @default(0) @db.Decimal(18, 2)
+  estimatedLabour Decimal @default(0) @db.Decimal(18, 2)
+  estimatedOil Decimal @default(0) @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId])
+  @@index([complaintCodeId])
+}
+
+model PartRequisition {
+  id String @id @default(uuid())
+  requisitionNumber String
+  requisitionDate DateTime @default(now())
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  jobCardId String
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  chargeType ChargeType
+  groupId String?
+  group WorkshopMaster? @relation("RequisitionGroup", fields: [groupId], references: [id], onDelete: Restrict)
+  engineerId String?
+  engineer User? @relation("RequisitionEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
+  goodwillReason String?
+  status String @default("ISSUED")
+  createdById String
+  createdBy User @relation("RequisitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledById String?
+  cancelledBy User? @relation("RequisitionCanceller", fields: [cancelledById], references: [id], onDelete: Restrict)
+  cancelledAt DateTime?
+  cancelReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lines PartRequisitionLine[]
+  returnSlips PartReturnSlip[]
+
+  @@unique([branchId, requisitionNumber])
+  @@index([jobCardId])
+  @@index([groupId])
+  @@index([engineerId])
+  @@index([branchId, requisitionDate])
+}
+
+model PartRequisitionLine {
+  id String @id @default(uuid())
+  requisitionId String
+  requisition PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  sparePartId String
+  sparePart SparePart @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+  partIssuanceId String? @unique
+  partIssuance PartIssuance? @relation(fields: [partIssuanceId], references: [id], onDelete: Restrict)
+  partSource String
+  description String
+  uom String?
+  location String?
+  binCard String?
+  quantityRequired Int
+  quantityIssued Int @default(0)
+  rate Decimal @db.Decimal(18, 2)
+  warrantyRate Decimal? @db.Decimal(18, 2)
+  amount Decimal @db.Decimal(18, 2)
+  // Null for CUSTOMER/FREE; WARRANTY is 100/0, GOODWILL may split.
+  approvalPercent Decimal? @db.Decimal(5, 2)
+  customerPercent Decimal? @db.Decimal(5, 2)
+  approvedAmount Decimal @default(0) @db.Decimal(18, 2)
+  customerAmount Decimal @default(0) @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+  jobCardLines JobCardLine[]
+  returns PartReturn[]
+
+  @@index([requisitionId])
+  @@index([sparePartId])
+}
+
+// PartReturn remains the return line, including historical rows without a slip.
+model PartReturnSlip {
+  id String @id @default(uuid())
+  returnNumber String
+  returnDate DateTime @default(now())
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  jobCardId String
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  requisitionId String
+  requisition PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  status String @default("COMPLETED")
+  createdById String
+  createdBy User @relation("ReturnSlipCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledById String?
+  cancelledBy User? @relation("ReturnSlipCanceller", fields: [cancelledById], references: [id], onDelete: Restrict)
+  cancelledAt DateTime?
+  cancelReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lines PartReturn[]
+
+  @@unique([branchId, returnNumber])
+  @@index([jobCardId])
+  @@index([requisitionId])
+  @@index([branchId, returnDate])
+}
+
+model LabourSlip {
+  id String @id @default(uuid())
+  slipNumber String
+  slipDate DateTime @default(now())
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  jobCardId String
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  groupId String?
+  group WorkshopMaster? @relation("LabourSlipGroup", fields: [groupId], references: [id], onDelete: Restrict)
+  engineerId String?
+  engineer User? @relation("LabourSlipEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy User @relation("LabourSlipCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lines JobCardLabour[]
+
+  @@unique([branchId, slipNumber])
+  @@index([jobCardId])
+  @@index([groupId])
+  @@index([engineerId])
+  @@index([branchId, slipDate])
 }
