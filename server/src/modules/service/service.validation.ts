@@ -258,6 +258,7 @@ export const createInspectionSchema = z.object({
 export const estimateBody = z
   .object({
     description: z.string().trim().min(1).max(2000),
+    upfrontPaymentPercent: z.number().finite().min(0).max(100).multipleOf(0.01).optional(),
 
     lines: z
       .array(
@@ -288,6 +289,7 @@ export const createApprovalSchema = z.object({
   body: z.object({
     customerId: z.string().uuid("Invalid customer ID"),
     approved: z.boolean(),
+    consentAccepted: z.boolean().optional(),
     expectedVersion: z.number().int().positive(),
     expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
     signerName: z.string().trim().min(1).max(200).optional(),

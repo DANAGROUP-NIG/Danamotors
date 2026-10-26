@@ -1,4 +1,5 @@
 "use client";
+import { WORKSPACE_COPY } from "./repair-workspace-copy";
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
@@ -158,7 +159,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="">{billed ? "Select an action" : "Save findings only"}</option>
+          <option value="">{billed ? "Select an action" : WORKSPACE_COPY.saveFindings}</option>
           {(nextStatuses[billed ? "BILLED" : current] ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
             <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
           ))}
@@ -216,7 +217,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
         </Button>
       )}
       <Button disabled={update.isPending || credit.isPending || reasons.length > 6 || (billed && !status) || (status === "CANCELLED" && !remarks.trim()) || (status === "DELIVERED" && (!advisor || !canDeliver || !jobCard.promisedAt || (late && !reasons.length)))}>
-        {update.isPending ? "Saving..." : status === "DELIVERED" ? "Deliver and issue gate pass" : "Save / apply action"}
+        {update.isPending ? "Saving..." : status === "DELIVERED" ? "Deliver and issue gate pass" : WORKSPACE_COPY.saveFindings}
       </Button>
     </form>
   );

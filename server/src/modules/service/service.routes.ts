@@ -1,3 +1,4 @@
+import { recordJobDeposit } from "./job-deposit.service";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
@@ -810,6 +811,13 @@ router.get(
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
 );
+router.post('/job-cards/:id/deposit', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ receiptId: z.string().uuid() }).strict() })), async (req, res, next) => {
+  try {
+    const card = await prisma.jobCard.findUniqueOrThrow({ where: { id: req.params.id } });
+    assertBranchOwnership(req, card.branchId);
+    res.json({ status: 'success', data: await recordJobDeposit(card.id, req.body.receiptId, req.user!.userId) });
+  } catch (error) { next(error); }
+});
 router.put(
   "/job-cards/:id",
   requirePermission(PERMISSIONS.JOBCARD_UPDATE),

@@ -467,6 +467,8 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  depositReceiptId String? @unique
+  depositReceipt Receipt? @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
   followUpAppointments ServiceAppointment[] @relation("BookingFollowUp")
   requisitions PartRequisition[]
   returnSlips PartReturnSlip[]
@@ -622,6 +624,7 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
   remarks String?
   version Int @default(1)
   supersedesId String? @unique
@@ -1534,6 +1537,7 @@ model Payment {
 // ============================================================
 
 model Receipt {
+  depositJobCard JobCard? @relation("JobDeposit")
   id String @id @default(uuid())
   branchId String?
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)

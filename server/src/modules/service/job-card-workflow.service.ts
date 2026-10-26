@@ -1,3 +1,4 @@
+import { assertDepositPaid } from "./job-deposit.service";
 import { sumMoney } from '../finance/money';
 import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
@@ -499,7 +500,9 @@ export class JobCardWorkflowService {
       if (data.status && data.status !== from && ['IN_PROGRESS', 'QC', 'READY'].includes(data.status)) {
         await assertApprovedOperation(tx, id, current.customerId, []);
       }
+      if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' && current.qcStatus?.toUpperCase() !== 'PASSED') throw new BadRequestError('Record a passed quality check before marking the job Ready');
+      if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' || (data.status === 'DELIVERED' && !billed)) await assertRecordedScope(tx, id);
       if (data.status && data.status !== from) {
         assertTransition(

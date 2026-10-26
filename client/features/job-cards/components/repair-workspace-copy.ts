@@ -1,6 +1,7 @@
 export const WORKSPACE_COPY = {
   separator: " \u00b7 ",
   completed: "Completed",
+  saveFindings: "Save diagnosis & findings",
   workshop: "Workshop", jobCard: "Job card", title: "Repair workspace",
   breadcrumb: "Job card / Repair workspace", subtitle: "Manage the estimate and keep work moving.",
   estimate: "Estimate & approval", latest: "Latest revision", revision: "Revision",

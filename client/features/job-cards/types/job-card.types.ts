@@ -17,6 +17,8 @@ export type Inspection = {
 };
 
 export type Estimate = {
+  upfrontPaymentPercent?: number | string;
+  upfrontAmount?: number;
   version: number;
   estimateNumber?: string | null;
   estimateDate?: string | null;
@@ -134,6 +136,7 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;
