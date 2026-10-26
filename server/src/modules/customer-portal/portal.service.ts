@@ -263,6 +263,7 @@ export class PortalService {
       scheduledAt: data.scheduledAt,
       durationMins: data.durationMins,
       notes: data.notes,
+      requests: [{ description: data.notes?.trim() ?? "" }],
     });
 
     return prisma.serviceAppointment.findUnique({

@@ -449,7 +449,7 @@ export function JobCardCreateForm({
                 const field = issue.field === "promisedAt" ? "promisedDate" : issue.field;
                 setError(field as keyof CreateJobCardFormValues, { type: "server", message: issue.message });
               }
-              if (fields.length) setTab(fields[0].field.startsWith("complaints") ? "Customer Requests" : "Other Details");
+              if (fields.length) setTab(fields[0].field.startsWith("complaints") ? "Customer Requests" : fields[0].field === "promisedAt" || otherErrors.includes(fields[0].field) ? "Other Details" : "Vehicle Details");
             }
             const latest = ackRequiredCheck(error);
             if (latest) {

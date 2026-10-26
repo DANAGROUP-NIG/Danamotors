@@ -99,7 +99,7 @@ const input = {
   serviceAdvisorId: id,
   technicianId: id,
   mileage: 100,
-  promisedAt: "2026-10-01T12:00:00.000Z",
+  promisedAt: "2099-10-01T12:00:00.000Z",
 
   complaints: [
     {

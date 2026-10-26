@@ -519,6 +519,7 @@ export function AppointmentsTable() {
       </DataTable>
 
       <ModalFame
+        preventAccidentalClose
         isOpen={!!editingId}
         onClose={() => setEditingId(null)}
         title="Edit appointment"

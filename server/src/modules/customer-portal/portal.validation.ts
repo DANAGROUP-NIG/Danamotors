@@ -56,7 +56,7 @@ export const createPortalAppointmentSchema = z.object({
     serviceId: z.string().min(1, "Service is required"),
     scheduledAt: z.string().datetime("Invalid scheduled date"),
     durationMins: z.number().int().positive().optional(),
-    notes: z.string().optional(),
+    notes: z.string().trim().min(1, "Customer request is required").max(2000),
   }),
 });
 

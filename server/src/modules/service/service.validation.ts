@@ -42,7 +42,7 @@ const bookingFields = {
   mileage: mileageField.optional(),
   acFitted: z.boolean().optional(),
   followUpJobId: z.string().uuid().nullable().optional(),
-  requests: z.array(bookingRequestBody).max(100).optional(),
+  requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100).optional(),
 };
 
 export const createAppointmentSchema = z.object({

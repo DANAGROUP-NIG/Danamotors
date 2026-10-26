@@ -124,6 +124,7 @@ export const receiptRegisterQuerySchema = z.object({
     to: z.string().date().optional(),
     category: z.enum(['ALL', 'SERVICE_PARTS', 'SALES_ENQUIRY']).default('ALL'),
     branchId: z.string().uuid().optional(),
+    customerId: z.string().uuid().optional(),
   }).refine((query) => !query.from || !query.to || query.from <= query.to, {
     path: ['to'], message: 'The end date must be on or after the start date',
   }),

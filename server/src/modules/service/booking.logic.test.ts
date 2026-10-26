@@ -21,6 +21,8 @@ it('requires customer requests and allows an optional service catalogue while re
   for (const spare of [-1, NaN, Infinity, 0.001, 1e13]) expect(bookingRequestBody.safeParse({ description: 'Noise', spare }).success).toBe(false);
   expect(bookingRequestBody.safeParse({}).success).toBe(false);
   expect(updateAppointmentSchema.safeParse({ params: { id }, body: { bookingStatus: 'CONVERTED' } }).success).toBe(false);
+  expect(updateAppointmentSchema.safeParse({ params: { id }, body: { requests: [] } }).success).toBe(false);
+  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z' } }).success).toBe(false);
 });
 
 it('rejects the booked day in Lagos and accepts the following day', () => {

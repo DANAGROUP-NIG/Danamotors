@@ -8,12 +8,14 @@ import type { Estimate } from "../types/job-card.types";
 export function EstimateSignatureDialog({
   estimate,
   customerId,
+  branchId,
   customerName,
   onSaved,
   onClose,
 }: {
   estimate: Estimate;
   customerId: string;
+  branchId?: string;
   customerName: string;
   onSaved: () => Promise<void>;
   onClose: () => void;
@@ -188,7 +190,7 @@ export function EstimateSignatureDialog({
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
-        <DocumentTermsBlock documentType="JOB_ESTIMATE" />
+        <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={branchId} />
         {approved && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} />I approve the job card and estimate and accept the terms and conditions above.</label>}
         {error && <p role="alert">{error}</p>}
         <div className="flex gap-2">

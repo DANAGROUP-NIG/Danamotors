@@ -67,7 +67,7 @@ export const bookPortalAppointmentSchema = z.object({
     .optional()
     .or(z.literal(""))
     .refine((v) => !v || (Number.isInteger(Number(v)) && Number(v) > 0), "Enter a positive number"),
-  notes: z.string().optional().or(z.literal("")),
+  notes: z.string().trim().min(1, "Customer request is required").max(2000),
 });
 
 export type BookPortalAppointmentFormValues = z.infer<typeof bookPortalAppointmentSchema>;

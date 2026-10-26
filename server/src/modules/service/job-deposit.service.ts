@@ -16,7 +16,7 @@ export async function assertDepositPaid(tx: Prisma.TransactionClient, jobCardId:
   if (required === 0) return;
   const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { depositReceipt: true } });
   const receipt = card.depositReceipt;
-  if (!receipt || receipt.status === 'CANCELLED' || money(receipt.amount) < required) throw new BadRequestError('Record the required upfront deposit before starting work');
+  if (!receipt || receipt.status === 'CANCELLED' || money(receipt.advanceAmount) < required) throw new BadRequestError('Record the required upfront deposit before starting work');
 }
 
 export async function recordJobDeposit(jobCardId: string, receiptId: string, actorId: string) {

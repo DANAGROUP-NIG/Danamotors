@@ -600,7 +600,7 @@ export class ServiceService {
       ...card,
       invoices: [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
       allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
-      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: estimate.upfrontPaymentPercent.toNumber(), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
+      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: (estimate.upfrontPaymentPercent?.toNumber() ?? 60), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent ?? 60), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({
         ...c,
         vehicleStatus:

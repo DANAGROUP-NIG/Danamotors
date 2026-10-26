@@ -71,7 +71,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
     create.mutate(payload, {
       onSuccess: () => {
         reset();
-        setExtra({ requests: [] });
+        setExtra({ requests: [{ description: "" }] });
         onSuccess?.();
       },
     });
@@ -110,7 +110,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
       </div>
       <details><summary className="cursor-pointer text-sm text-muted-foreground">Vehicle summary</summary>{selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}</details>
       {requestError && <p role="alert" className="text-sm text-destructive">{requestError}</p>}
-      <BookingFields value={extra} onChange={setExtra} vehicleId={selectedVehicleId} />
+      <BookingFields compact value={extra} onChange={setExtra} vehicleId={selectedVehicleId} />
       <Controller name="serviceTypeId" control={control} render={({field})=><WorkshopPicker label="Workshop service type (optional)" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={field.value??''} onChange={field.onChange} onBlur={field.onBlur}/>}/>
       <Field label="Appointment service (optional)" error={errors.serviceId?.message}>
         {servicesLoading ? (
