@@ -581,6 +581,12 @@ describe("JobCard workflow", () => {
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 
+  it("blocks delivery when a consolidated vehicle invoice still has a balance", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, status: "BILLED", billedAt: new Date(), invoices: [], consolidatedInvoices: [{ id: "vehicle-bill", status: "Unpaid", outstandingAmount: 100 }], creditApprovedById: null, promisedAt: new Date("2099-01-01T00:00:00Z") });
+    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("fully paid");
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
   it("delivers an approved-credit job with a gate pass and recorded late reason", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
       id, branchId: id, status: "READY", billedAt: null, invoices: [], creditApprovedById: id,

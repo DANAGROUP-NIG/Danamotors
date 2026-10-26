@@ -88,6 +88,7 @@ export const createReceiptSchema = z.object({
 export const jobBillPreviewSchema = z.object({
   body: z.object({
     jobCardId: z.string().uuid('Invalid job card ID'),
+    consolidateVehicle: z.boolean().optional(),
     partsDiscountPercent: z.number().min(0).max(100).default(0),
     labourDiscountPercent: z.number().min(0).max(100).default(0),
   }).strict(),
@@ -96,6 +97,7 @@ export const jobBillPreviewSchema = z.object({
 export const createJobBillSchema = z.object({
   body: z.object({
     jobCardId: z.string().uuid('Invalid job card ID'),
+    consolidateVehicle: z.boolean().optional(),
     partsDiscountPercent: z.number().min(0).max(100).default(0),
     labourDiscountPercent: z.number().min(0).max(100).default(0),
     serviceAdvisorId: z.string().uuid('Invalid service advisor ID'),

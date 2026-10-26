@@ -453,10 +453,12 @@ export class JobCardWorkflowService {
 
         include: {
           invoices: true,
+          consolidatedInvoices: true,
         },
       });
 
       if (!current) throw new NotFoundError("Job card not found");
+      current.invoices.push(...(current.consolidatedInvoices ?? []));
 
       const from = canonicalJobStatus(current.status);
 

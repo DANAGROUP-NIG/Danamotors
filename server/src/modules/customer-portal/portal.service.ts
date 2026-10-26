@@ -391,7 +391,7 @@ export class PortalService {
       vehicle: jobCard.vehicle,
       branch: jobCard.branch,
       estimates: jobCard.estimates,
-      invoices: jobCard.invoices,
+      invoices: [...new Map([...jobCard.invoices, ...(jobCard.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
       inspections: jobCard.inspections,
     };
   }

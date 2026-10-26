@@ -598,6 +598,7 @@ export class ServiceService {
         : [];
     return scopeJobCard({
       ...card,
+      invoices: [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
       allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
       estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: estimate.upfrontPaymentPercent.toNumber(), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({

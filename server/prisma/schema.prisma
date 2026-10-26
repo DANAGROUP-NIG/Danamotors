@@ -468,6 +468,7 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
   depositReceiptId String? @unique
   depositReceipt Receipt? @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
   followUpAppointments ServiceAppointment[] @relation("BookingFollowUp")
@@ -1329,6 +1330,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  jobCards JobCard[] @relation("WarrantyJobBills")
   taxRegisterSnapshot Json?
   billType String?
   vatBreakdown InvoiceVatBreakdown[]
