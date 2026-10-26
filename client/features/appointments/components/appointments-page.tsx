@@ -131,6 +131,7 @@ export function AppointmentsPage() {
 
       {/* ── Walk-in Creation Modal ───────────────────────────────────────── */}
       <ModalFame
+        preventAccidentalClose
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Book Walk-in Appointment"

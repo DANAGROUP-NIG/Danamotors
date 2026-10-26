@@ -13,6 +13,14 @@ export function bookingComplaints(requests: AppointmentRequest[]) {
   return requests.map(row => ({ complaintCodeId: row.complaintCodeId ?? undefined, defectCode: row.defectCode ?? undefined, description: row.description, spare: row.estimatedParts.toNumber(), oil: row.estimatedOil.toNumber(), labour: row.estimatedLabour.toNumber() }));
 }
 
+export function assertPromisedDate(promisedAt: string, bookedAt: Date) {
+  const promised = new Date(promisedAt);
+  const day = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+  if (!Number.isFinite(promised.getTime()) || promised <= bookedAt || day(promised) <= day(bookedAt)) {
+    throw new BadRequestError('Promised date must be after the booked date').withCode('FIELD_VALIDATION', { field: 'promisedAt' });
+  }
+}
+
 export function assertBookable(booking: Pick<ServiceAppointment, 'bookingStatus' | 'status'>) {
   if (booking.bookingStatus !== 'BOOKED' || ['Cancelled', 'Completed', 'Closed', 'No Show'].includes(booking.status)) throw new ConflictError('Booking is no longer open');
 }

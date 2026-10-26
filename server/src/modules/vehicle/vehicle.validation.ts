@@ -13,7 +13,7 @@ export const vehicleIdParamSchema = z.object({
 export const vehicleBody = z.object({
   customerId: z.string().uuid().nullable().optional(),
   vin: z.string().trim().toUpperCase().min(1).max(50),
-  registrationNumber: z.string().trim().toUpperCase().max(50).nullable().optional().transform(v => v === '' ? null : v),
+  registrationNumber: z.string().trim().toUpperCase().min(1, 'Registration number is required').max(50).optional(),
   catalogueId: z.string().uuid().nullable().optional(),
   colourId: z.string().uuid().nullable().optional(),
   modelId: z.string().uuid().nullable().optional(),
@@ -54,7 +54,7 @@ export const vehicleBody = z.object({
 }).strict();
 
 export const createVehicleSchema = z.object({
-  body: vehicleBody.refine(data => !!data.modelId || !!data.customModel?.trim() || (!!data.catalogueId && !!data.colourId), 'Select a catalog model or enter a custom model'),
+  body: vehicleBody.refine(data => !!data.registrationNumber, { message: 'Registration number is required', path: ['registrationNumber'] }).refine(data => !!data.modelId || !!data.customModel?.trim() || (!!data.catalogueId && !!data.colourId), 'Select a catalog model or enter a custom model'),
 });
 
 export const updateVehicleSchema = z.object({

@@ -48,6 +48,7 @@ const bookingFields = {
 export const createAppointmentSchema = z.object({
   body: z.object({
     ...bookingFields,
+    requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100),
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),

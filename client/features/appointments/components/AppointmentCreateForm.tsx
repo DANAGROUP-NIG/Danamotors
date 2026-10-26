@@ -29,7 +29,8 @@ interface AppointmentCreateFormProps {
 
 export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
-  const [extra, setExtra] = useState<BookingExtra>({ requests: [] });
+  const [extra, setExtra] = useState<BookingExtra>({ requests: [{ description: "" }] });
+  const [requestError, setRequestError] = useState("");
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
   const { hasPermission } = useAuth();
@@ -58,6 +59,8 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
   const selectedVehicleId = watch("vehicleId");
 
   function onSubmit(values: CreateAppointmentFormValues) {
+    if (!extra.requests?.some(row => row.description.trim() || row.complaintCodeId || row.defectCode)) { setRequestError("Add the customer request"); return; }
+    setRequestError("");
     const payload = {
       ...values,
       ...extra,
@@ -105,7 +108,8 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
-      {selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}
+      <details><summary className="cursor-pointer text-sm text-muted-foreground">Vehicle summary</summary>{selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}</details>
+      {requestError && <p role="alert" className="text-sm text-destructive">{requestError}</p>}
       <BookingFields value={extra} onChange={setExtra} vehicleId={selectedVehicleId} />
       <Controller name="serviceTypeId" control={control} render={({field})=><WorkshopPicker label="Workshop service type (optional)" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={field.value??''} onChange={field.onChange} onBlur={field.onBlur}/>}/>
       <Field label="Appointment service (optional)" error={errors.serviceId?.message}>
@@ -159,6 +163,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
+      <details><summary className="cursor-pointer text-sm text-muted-foreground">Additional booking details</summary>
       <Field label="Duration (minutes, optional)" error={errors.durationMins?.message}>
         <input
           type="number"
@@ -174,6 +179,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           {...register("notes")}
         />
       </Field>
+      </details>
       <Button type="submit" disabled={create.isPending} className="mt-1">
         {create.isPending ? "Booking…" : "Book appointment"}
       </Button>

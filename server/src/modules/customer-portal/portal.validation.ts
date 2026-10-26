@@ -47,7 +47,7 @@ export const jobCardListQuerySchema = z.object({
 });
 
 export const createPortalVehicleSchema = z.object({ body: z.object({
-  vin: z.string().trim().toUpperCase().min(1), registrationNumber: z.string().trim().toUpperCase().optional(), catalogueId: z.string().uuid(), colourId: z.string().uuid(), year: z.number().int().optional(),
+  vin: z.string().trim().toUpperCase().min(1), registrationNumber: z.string().trim().toUpperCase().min(1, 'Registration number is required').max(50), catalogueId: z.string().uuid(), colourId: z.string().uuid(), year: z.number().int().optional(),
 }).strict() });
 
 export const createPortalAppointmentSchema = z.object({

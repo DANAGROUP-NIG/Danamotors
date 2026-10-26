@@ -39,10 +39,9 @@ export const registerPortalVehicleSchema = z.object({
   registrationNumber: z
     .string()
     .trim()
+    .min(1, "Registration number is required")
     .max(50, "Max 50 characters")
-    .transform((v) => v.toUpperCase())
-    .optional()
-    .or(z.literal("")),
+    .transform((v) => v.toUpperCase()),
   make: z.string().optional().or(z.literal("")),
   model: z.string().optional().or(z.literal("")),
   year: z

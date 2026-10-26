@@ -1,5 +1,5 @@
 import { sumMoney } from '../finance/money';
-import { assertBookable, bookingComplaints } from './booking.logic';
+import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
@@ -220,6 +220,8 @@ export class JobCardWorkflowService {
           );
 
         assertBookable(appointment);
+        assertPromisedDate(data.promisedAt, appointment.scheduledAt);
+        data.remarks = [appointment.notes, data.remarks].filter(Boolean).join("\n") || undefined;
         if (bookingVersion && appointment.updatedAt.toISOString() !== bookingVersion) throw new ConflictError("Booking changed; reload before converting");
         if (appointment.serviceTypeId && appointment.serviceTypeId !== data.serviceTypeId) throw new ConflictError('Booking service changed; reload before converting');
         data.serviceId = appointment.serviceId ?? undefined;

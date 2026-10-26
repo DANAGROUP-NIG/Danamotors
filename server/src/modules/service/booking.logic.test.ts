@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { bookingView, bookingState } from './booking.logic';
+import { bookingView, bookingState, assertPromisedDate } from './booking.logic';
 import { bookingRequestBody, createAppointmentSchema, updateAppointmentSchema } from './service.validation';
 
 it('adds estimates using decimal arithmetic and returns zero for an empty booking', () => {
@@ -15,10 +15,16 @@ it('requires a reason on both cancellation paths and prevents reopening terminal
   expect(() => bookingState({ bookingStatus: 'CONVERTED', status: 'Pending' }, undefined, 'BOOKED')).toThrow('no longer open');
   expect(() => bookingState(booked, 'Cancelled', 'BOOKED', 'reason')).toThrow('disagree');
 });
-it('allows optional requests and service catalogue while rejecting invalid request amounts', () => {
+it('requires customer requests and allows an optional service catalogue while rejecting invalid request amounts', () => {
   const id = '00000000-0000-4000-8000-000000000001';
-  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z' } }).success).toBe(true);
+  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z', requests: [{ description: 'Noise' }] } }).success).toBe(true);
   for (const spare of [-1, NaN, Infinity, 0.001, 1e13]) expect(bookingRequestBody.safeParse({ description: 'Noise', spare }).success).toBe(false);
   expect(bookingRequestBody.safeParse({}).success).toBe(false);
   expect(updateAppointmentSchema.safeParse({ params: { id }, body: { bookingStatus: 'CONVERTED' } }).success).toBe(false);
+});
+
+it('rejects the booked day in Lagos and accepts the following day', () => {
+  const booked = new Date('2026-11-01T23:30:00Z');
+  expect(() => assertPromisedDate('2026-11-02T12:00:00Z', booked)).toThrow('after the booked date');
+  expect(() => assertPromisedDate('2026-11-03T00:00:00Z', booked)).not.toThrow();
 });

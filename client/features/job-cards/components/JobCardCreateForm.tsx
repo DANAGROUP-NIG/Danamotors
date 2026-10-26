@@ -118,6 +118,7 @@ export function JobCardCreateForm({
     register,
     control,
     setValue,
+    setError,
     watch,
     reset,
     handleSubmit,
@@ -410,7 +411,7 @@ export function JobCardCreateForm({
             .map((row) => row.description)
             .join("; ")
             .slice(0, 5000),
-          promisedAt: new Date(`${promisedDate}T${promisedTime}`).toISOString(),
+          promisedAt: new Date(`${promisedDate}T${promisedTime}:00+01:00`).toISOString(),
           engineerId: values.engineerId || undefined,
           technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
@@ -441,6 +442,15 @@ export function JobCardCreateForm({
           },
 
           onError: (error) => {
+            if (isAxiosError(error)) {
+              const response = error.response?.data;
+              const fields: { field: string; message: string }[] = response?.errors ?? (response?.details?.field ? [{ field: response.details.field, message: response.message }] : []);
+              for (const issue of fields) {
+                const field = issue.field === "promisedAt" ? "promisedDate" : issue.field;
+                setError(field as keyof CreateJobCardFormValues, { type: "server", message: issue.message });
+              }
+              if (fields.length) setTab(fields[0].field.startsWith("complaints") ? "Customer Requests" : "Other Details");
+            }
             const latest = ackRequiredCheck(error);
             if (latest) {
               // Coverage or campaigns changed since the check ran: show the server's view and ask again.
@@ -938,7 +948,7 @@ export function JobCardCreateForm({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           invalid={!!errors.promisedDate}
-                          min={localDate(openedAt)}
+                          min={(() => { const date = new Date(bookingQuery.data?.appointment.scheduledAt ?? openedAt); date.setUTCDate(date.getUTCDate() + 1); return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(date); })()}
                         />
                       </OpeningField>
                     )}
