@@ -1,9 +1,9 @@
+import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { assertRecordedScope } from '../service/estimate-approval';
 import { Prisma } from '@prisma/client';
 import { WorkshopRepository } from './workshop.repository';
 import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
 import prisma from '../../prisma/client';
-import { NotificationService } from '../notification/notification.service';
 import { jobUpdateBody } from '../service/service.validation';
 import { canonicalJobStatus } from '../service/job-card-workflow.service';
 import { ServiceService } from '../service/service.service';
@@ -69,7 +69,7 @@ export class WorkshopService {
   }
 
   async receiveParts(id: string, actorId: string) {
-    return prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "PartIssuance" WHERE id = ${id} FOR UPDATE`;
       const issue = await tx.partIssuance.findUnique({ where: { id }, include: { jobCard: true, requisitionLine: { include: { requisition: true } } } });
       if (!issue?.jobCard) throw new NotFoundError('Job part issuance not found');
@@ -81,6 +81,8 @@ export class WorkshopService {
       await tx.auditLog.create({ data: { userId: actorId, action: 'PART_RECEIVED', details: JSON.stringify({ partIssuanceId: id, jobCardId: issue.jobCard.id }) } });
       return received;
     });
+    if (result?.jobCardId) await notifyWorkshopEvent('PART_RECEIVED', result.jobCardId, id);
+    return result;
   }
 
   async assignTechnician(id: string, technicianId: string, qualityInspectorId?: string) {
@@ -112,14 +114,7 @@ export class WorkshopService {
       return tx.jobCard.update({ where: { id }, data: { technicianId, qualityInspectorId } });
     });
 
-    const notificationService = new NotificationService();
-    await notificationService.notifyUsers([technicianId], {
-      type: 'JOB_ASSIGNED',
-      title: 'Job card assigned to you',
-      message: `Job card ${updatedJobCard.jobNumber} has been assigned to you.`,
-      link: `/job-cards/${updatedJobCard.id}`,
-      branchId: updatedJobCard.branchId,
-    });
+    await notifyWorkshopEvent('TECHNICIAN_ASSIGNED', id, technicianId);
 
     return updatedJobCard;
   }
@@ -144,13 +139,16 @@ export class WorkshopService {
 
     if (jobCard.billedAt) throw new BadRequestError('Billed job cards cannot be edited');
     if (['READY', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))) throw new BadRequestError('This job card is no longer open');
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
       const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
       if (current.billedAt || ['READY', 'BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(current.status))) throw new BadRequestError('This job card is no longer open');
       if (canonicalJobStatus(current.status) !== 'QC') throw new BadRequestError('Send this job for QC before recording a review');
+      if (current.qcStatus === qcStatus && (current.qcNotes ?? '') === (qcNotes ?? '')) return current;
       if (qcStatus === 'PASSED') await assertRecordedScope(tx, id);
       return tx.jobCard.update({ where: { id }, data: { qcStatus, qcNotes } });
     }, { maxWait: 5000, timeout: 15000 });
+    if (qcStatus !== 'PENDING') await notifyWorkshopEvent(qcStatus === 'PASSED' ? 'QC_PASSED' : 'QC_FAILED', id, result.updatedAt.toISOString());
+    return result;
   }
 }

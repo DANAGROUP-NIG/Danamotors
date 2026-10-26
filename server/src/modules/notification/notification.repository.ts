@@ -2,7 +2,9 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 
 export interface CreateNotificationData {
-  userId: string;
+  userId?: string;
+  customerId?: string;
+  dedupeKey?: string;
   type: string;
   title: string;
   message: string;
@@ -14,9 +16,21 @@ export class NotificationRepository {
   async createMany(data: CreateNotificationData[]) {
     return prisma.notification.createMany({
       data,
+      skipDuplicates: true,
     });
   }
 
+  async listByCustomer(customerId: string, skip: number, take: number) {
+    const where = { customerId };
+    const [notifications, total, unread] = await Promise.all([
+      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+      prisma.notification.count({ where }), prisma.notification.count({ where: { ...where, readAt: null } }),
+    ]);
+    return { notifications, total, unread };
+  }
+  async markCustomerRead(id: string, customerId: string) {
+    return prisma.notification.updateMany({ where: { id, customerId, readAt: null }, data: { readAt: new Date() } });
+  }
   async listByUser(params: {
     userId: string;
     skip: number;

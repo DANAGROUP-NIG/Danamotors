@@ -1,3 +1,4 @@
+import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertDepositPaid } from "./job-deposit.service";
 import { sumMoney } from '../finance/money';
@@ -426,6 +427,7 @@ export class JobCardWorkflowService {
     }, { maxWait: 5000, timeout: 15000 });
 
     await notifyWarrantyJob(result);
+    if (result.card.technicianId) await notifyWorkshopEvent('TECHNICIAN_ASSIGNED', result.card.id, result.card.technicianId);
     return { ...result.card, warrantyCase: result.warrantyCase, warrantyCheck: result.check };
   }
 
@@ -438,6 +440,7 @@ export class JobCardWorkflowService {
 
     const data = jobUpdateBody.parse(input);
 
+    let transitionId: string | undefined;
     const card = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
@@ -549,7 +552,7 @@ export class JobCardWorkflowService {
 
         update.status = data.status;
 
-        await tx.jobCardStatusHistory.create({
+        const history = await tx.jobCardStatusHistory.create({
           data: {
             jobCardId: id,
             fromStatus: from,
@@ -558,6 +561,7 @@ export class JobCardWorkflowService {
             remarks: data.remarks,
           },
         });
+        transitionId = history?.id;
       }
 
       return tx.jobCard.update({
@@ -569,7 +573,10 @@ export class JobCardWorkflowService {
       });
     }, { maxWait: 5000, timeout: 15000 });
 
-    if (card.status === "READY" && data.status === "READY") {
+    if (transitionId && data.status === 'QC') await notifyWorkshopEvent('JOB_SENT_FOR_QC', id, transitionId);
+    if (transitionId && data.status === 'WAITING_PARTS') await notifyWorkshopEvent('PARTS_UNAVAILABLE', id, transitionId);
+    if (transitionId && data.status === 'READY') await notifyWorkshopEvent('JOB_READY', id, transitionId);
+    if (transitionId && card.status === "READY" && data.status === "READY") {
       await new NotificationService().notifyRole(
         ROLES.BILLING_OFFICER,
         card.branchId,

@@ -1,3 +1,4 @@
+import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { assertApprovedOperation } from '../service/estimate-approval';
 import { defaultSourceCategory, sourceLabel, sourceRecordProblem } from './partSource';
 import prisma from "../../prisma/client";
@@ -1119,6 +1120,7 @@ export class InventoryService {
     ).catch(() =>
       console.error("Low-stock notification could not be recorded"),
     );
+    if (data.jobCardId) await notifyWorkshopEvent('PARTS_ISSUED', data.jobCardId, result.issuance.id);
     return result.issuance;
   }
 

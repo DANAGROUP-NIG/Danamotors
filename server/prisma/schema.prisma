@@ -330,6 +330,7 @@ model Customer {
   branch    Branch @relation(fields: [branchId], references: [id])
   createdBy User?  @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
 
+  notifications     Notification[]
   account           CustomerAccount?
   documents         CustomerDocument[]
   serviceHistory    ServiceHistory[]
@@ -589,6 +590,7 @@ model JobCard {
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
   @@index([technicianId, status])
+  @@index([status, promisedAt])
   @@index([deliveredAt])
   @@index([appointmentId])
   @@index([createdAt, id])
@@ -1827,8 +1829,11 @@ model CustomerCreditApplication {
 model Notification {
   id String @id @default(uuid())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dedupeKey String?
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type    String
   title   String
@@ -1845,6 +1850,9 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([branchId, readAt])
+  @@unique([userId, dedupeKey])
+  @@unique([customerId, dedupeKey])
+  @@index([customerId, readAt, createdAt])
 }
 
 // ============================================================
