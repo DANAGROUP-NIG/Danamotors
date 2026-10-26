@@ -27,6 +27,7 @@ jest.mock("../../prisma/client", () => ({
     },
 
     user: {
+      findUnique: jest.fn().mockResolvedValue({ isActive: true, role: { name: "ServiceAdviser" } }),
       findFirst: jest.fn(),
     },
 

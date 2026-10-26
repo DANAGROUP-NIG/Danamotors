@@ -91,6 +91,8 @@ export type JobCardVehicle = {
 };
 
 export type PartIssuance = {
+  receivedById?: string | null;
+  receivedAt?: string | null;
   id: string;
   quantity: number;
   /** Part source code (internal; not shown to customers). */
@@ -136,6 +138,7 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  allowedTransitions?: string[];
   depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];
   tyres?: { make: string; number: string }[] | null;

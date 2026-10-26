@@ -218,7 +218,7 @@ export const jobUpdateBody = z
     observations: z.string().trim().max(10000).optional(),
     workDone: z.string().trim().max(10000).optional(),
     status: z
-      .enum(["IN_PROGRESS", "QC", "READY", "DELIVERED", "CANCELLED"])
+      .enum(["IN_PROGRESS", "WAITING_PARTS", "QC", "READY", "DELIVERED", "CANCELLED"])
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
     deliveryAdvisorId: z.string().uuid().optional(),

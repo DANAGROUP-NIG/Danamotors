@@ -1,3 +1,4 @@
+import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertDepositPaid } from "./job-deposit.service";
 import { sumMoney } from '../finance/money';
 import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
@@ -24,15 +25,7 @@ import { OpenCampaign, buildCheck, findOpenCampaigns, loadVehicleForWarranty } f
 import { WarrantyCaseService, notifyWarrantyOfficers } from "../warranty/warrantyCase.service";
 import { completeCampaignVehiclesForJobCard, markCampaignVehiclesInWorkshop } from "../campaign/campaign.hooks";
 
-export const JOB_TRANSITIONS: Record<string, readonly string[]> = {
-  OPEN: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["QC", "CANCELLED"],
-  QC: ["READY", "CANCELLED"],
-  READY: ["BILLED", "DELIVERED", "CANCELLED"],
-  BILLED: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
-};
+export const JOB_TRANSITIONS: Record<string, readonly string[]> = Object.fromEntries(Object.entries(JOB_TRANSITION_ROLES).map(([from, next]) => [from, Object.keys(next)]));
 
 // Legacy rows remain readable; new writes always use the canonical lifecycle.
 export function canonicalJobStatus(status: string) {
@@ -54,7 +47,7 @@ export function canonicalJobStatus(status: string) {
 
 export function jobStatusFilter(status: string) {
   const canonical = canonicalJobStatus(status);
-  return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
+  return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "WAITING_PARTS", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
 }
 
 export function repeatWindowStart(
@@ -505,6 +498,10 @@ export class JobCardWorkflowService {
       if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' || (data.status === 'DELIVERED' && !billed)) await assertRecordedScope(tx, id);
       if (data.status && data.status !== from) {
+        const actor = await tx.user.findUnique({ where: { id: actorId }, include: { role: true } });
+        if (!actor?.isActive) throw new UnauthorizedError();
+        assertTransitionRole(from, data.status, actor.role.name, actorId, current.technicianId);
+        if (from === 'QC' && data.status === 'IN_PROGRESS' && current.qcStatus?.toUpperCase() !== 'FAILED') throw new BadRequestError('QC must fail before returning the job for rework');
         assertTransition(
           from,
           data.status,

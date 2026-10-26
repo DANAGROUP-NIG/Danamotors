@@ -588,6 +588,7 @@ model JobCard {
   @@index([customerId])
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
+  @@index([technicianId, status])
   @@index([deliveredAt])
   @@index([appointmentId])
   @@index([createdAt, id])
@@ -1168,6 +1169,8 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  receivedById String?
+  receivedAt DateTime?
   requisitionLine PartRequisitionLine?
   id String @id @default(uuid())
 

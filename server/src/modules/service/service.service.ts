@@ -1,5 +1,6 @@
 import { BookingFields, bookingRelations } from './booking.persistence';
 import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
+import { allowedJobTransitions } from "./job-transitions";
 import { upfrontAmount } from "./job-deposit.service";
 import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
@@ -571,7 +572,7 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string, permissions: readonly string[] = []) {
+  async getJobCard(id: string, permissions: readonly string[] = [], role?: string) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
@@ -597,7 +598,8 @@ export class ServiceService {
         : [];
     return scopeJobCard({
       ...card,
-      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
+      allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
+      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: estimate.upfrontPaymentPercent.toNumber(), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({
         ...c,
         vehicleStatus:
