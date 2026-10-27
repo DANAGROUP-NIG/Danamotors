@@ -2,9 +2,10 @@
 
 - `device/` Danamotors Count: the app for the MC3190 (.NET Compact Framework 3.5, WinForms). `src/Core` is plain logic (scan detection, counting rules, files), `src/Ui` the forms.
 - `link/` HHDC Link: the PC tool (.NET Framework 4.8, x86). `src/Core` is the logic (API, device access, upload record), `src/Ui` the window, `cli/` the command-line twin.
-- `shared/` the file formats, compiled into both (`.sheet` PC to device, `.counts` device to PC). Compact Framework lacks `int.TryParse`, `Func<>`, LINQ: build the device app to find out what else.
+- `shared/` the file formats, compiled into both (`.sheet` PC to device, `.counts` device to PC). Compact Framework lacks `int.TryParse`, `Func<>`, `MethodInvoker`, LINQ: build the device app to find out what else.
+- Picking and MIT checking (indent, CPO, Mobis MIT; server side in Danamotors `doc/handheld.md`): `shared/HandheldDoc.cs` (`.hdoc` PC to device, `.hlog` device to PC, same append-only rules as `.counts`), `device/src/Core/DocSession.cs` (rules), `device/src/Ui/DocForm.cs` (screen), `link/src/Core/Documents.cs` (API, device files, send, receive once). The device lists documents after the count sheets; HHDC Link's "Show" box switches between sheets and the three document types. CLI: `sources TYPE`, `senddoc TYPE NUMBER PICKERCODE`, `receivedoc NUMBER`.
 - `tests/` unit tests (own tiny runner), `uitest/` drives the real device exe on a PC.
-- `build.ps1` builds everything with the free compiler. `-UiTest` runs the UI session; screenshots go to `build/ui-shots`.
+- `build.ps1` builds everything with the free compiler. `-UiTest` runs the three UI sessions (counting, scan modes, picking document); screenshots go to `build/ui-shots*`.
 
 C# 5 only (the compiler is the one in `C:\Windows\Microsoft.NET\Framework`): no `?.`, `$""`, `nameof`.
 
