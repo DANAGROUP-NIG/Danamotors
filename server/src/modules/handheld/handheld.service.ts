@@ -146,6 +146,16 @@ export class HandheldService {
     }));
   }
 
+  /** Current employees who can be chosen as the picker or checker (legacy picker list sent with a download). */
+  async listPickers(branchId?: string) {
+    return prisma.employee.findMany({
+      where: { leftDate: null, ...(branchId && { branchId }) },
+      orderBy: [{ name: "asc" }],
+      take: 500,
+      select: { id: true, code: true, name: true, branchId: true },
+    });
+  }
+
   /** Branch whose stock a source picks or receives (for the branch-access check before sending). */
   async sourceBranchId(type: HandheldDocumentType, sourceId: string): Promise<string> {
     let branchId: string | undefined;

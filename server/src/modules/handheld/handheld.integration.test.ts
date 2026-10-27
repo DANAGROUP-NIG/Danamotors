@@ -74,6 +74,8 @@ describeDb("Handheld documents (database)", () => {
     const approved = await transfers.approveIndent(indent.id, manager.id);
     const listId = approved.openPickingList.id;
 
+    expect((await service.listPickers(cpd.id)).map((p) => p.id)).toContain(picker.id);
+
     const sources = await service.listSources("INDENT_PICK", cpd.id);
     expect(sources.map((s) => s.sourceId)).toContain(listId);
 

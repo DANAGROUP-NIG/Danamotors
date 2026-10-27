@@ -57,6 +57,11 @@ export class HandheldController {
     ok(res, { sources: await this.service.listSources(q.type, scope(req, q.branchId)) });
   });
 
+  listPickers = handle(async (req, res) => {
+    if (!ALL_TYPES.some((t) => can(req, t, "write"))) throw new ForbiddenError("You do not have the required permissions to access this resource");
+    ok(res, { pickers: await this.service.listPickers(scope(req, req.query.branchId as string | undefined)) });
+  });
+
   listDocuments = handle(async (req, res) => {
     const q = req.query as { type?: HandheldDocumentType; status?: HandheldDocumentStatus; branchId?: string; sourceId?: string; indentId?: string };
     const types = (q.type ? [q.type] : ALL_TYPES).filter((t) => can(req, t, "read"));

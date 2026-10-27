@@ -7,6 +7,7 @@ import {
   createDocumentSchema,
   idParamSchema,
   listDocumentsSchema,
+  listPickersSchema,
   listSourcesSchema,
   uploadDocumentSchema,
 } from "./handheld.validation";
@@ -42,6 +43,13 @@ router.use(authMiddleware);
  *       - { in: query, name: type, required: true, schema: { type: string, enum: [INDENT_PICK, CPO_PICK, MIT_RECEIVE] } }
  *       - { in: query, name: branchId, schema: { type: string, format: uuid } }
  *     responses: { 200: { description: Open picking lists, picked CPOs or MITs in transit without a document on a device } }
+ * /handheld/pickers:
+ *   get:
+ *     tags: [Handheld]
+ *     summary: Current employees to choose as the picker or checker
+ *     description: For anyone who may send a handheld document of any type. Own branch unless cross-branch.
+ *     parameters: [{ in: query, name: branchId, schema: { type: string, format: uuid } }]
+ *     responses: { 200: { description: Employees (id, code, name) } }
  * /handheld/documents:
  *   get:
  *     tags: [Handheld]
@@ -98,6 +106,7 @@ router.use(authMiddleware);
  *     responses: { 200: { description: Cancelled; reservations are untouched } }
  */
 router.get("/sources", validateRequest(listSourcesSchema), controller.listSources);
+router.get("/pickers", validateRequest(listPickersSchema), controller.listPickers);
 router.get("/documents", validateRequest(listDocumentsSchema), controller.listDocuments);
 router.post("/documents", validateRequest(createDocumentSchema), controller.createDocument);
 router.get("/documents/:id", validateRequest(idParamSchema), controller.getDocument);

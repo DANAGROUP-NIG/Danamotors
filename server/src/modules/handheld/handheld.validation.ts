@@ -11,6 +11,8 @@ export const listSourcesSchema = z.object({
   query: z.object({ type: z.nativeEnum(HandheldDocumentType), branchId: uuid("branch ID").optional() }),
 });
 
+export const listPickersSchema = z.object({ query: z.object({ branchId: uuid("branch ID").optional() }) });
+
 export const listDocumentsSchema = z.object({
   query: z.object({
     type: z.nativeEnum(HandheldDocumentType).optional(),

@@ -57,7 +57,8 @@ Pickers do not sign in. They are chosen from employees when the document is sent
 
 ## API
 
-`GET /api/handheld/sources?type=`, `GET /api/handheld/documents` (filters `type`, `status`, `branchId`, `sourceId`,
+`GET /api/handheld/sources?type=`, `GET /api/handheld/pickers` (current employees, for anyone who may send a
+document), `GET /api/handheld/documents` (filters `type`, `status`, `branchId`, `sourceId`,
 `indentId`), `POST /api/handheld/documents`, `GET /api/handheld/documents/:id`,
 `POST /api/handheld/documents/:id/upload`, `PATCH /api/handheld/documents/:id/cancel`. See Swagger (`/api/docs`,
 tag Handheld).
