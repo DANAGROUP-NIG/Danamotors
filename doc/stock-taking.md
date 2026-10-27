@@ -63,16 +63,26 @@ How it works:
   time is written in it, because the device clock can read 2009. A sheet that has counts on the device
   is never overwritten. System stock goes to the device only if the sheet allows it; an audit sheet is
   always blind.
-- **Counting.** A scan arrives as keystrokes (DataWedge). Enter, Tab, or a burst of fast characters
+- **Counting.** A scan arrives as keystrokes (DataWedge; the app starts DataWedge if it is not running,
+  which was seen after a warm reset). Enter, Tab, or a burst of fast characters
   followed by a short pause ends a scan. The same part in two bins is two entries. The same part and
-  bin again asks **add** or **replace**. A part not on the sheet asks first and is marked; a bin that
-  differs from the sheet's bin warns (and beeps) but is allowed (the Update bins step uses it). A battery
+  bin again asks **add** or **replace**. A part not on the sheet asks first and is marked. A sheet line's
+  bin can list several bins (`1D3/1D2`, 38% of CPD parts); a bin outside that list warns (and beeps) but is
+  allowed (the Update bins step uses it). Saving with no bin asks first. A battery
   pull loses at most the entry being typed. **Scan modes** (Esc menu): the checker types the quantity,
   or each scan of a part adds 1 (or removes 1) in the current bin, saved at once, as the legacy Qty+1 and
-  Qty-1 did. **F1** lists the sheet's parts for the current bin that are not counted yet, and finds a
-  part by the start of its number. The bin of the last entry is restored when a sheet is reopened; a part
-  label scanned into the Bin box is questioned; the bin `UNDEFINED` is refused. A 38,723-part sheet (the
-  legacy maximum) opens in about 3 seconds on the device.
+  Qty-1 did. **F1** lists the sheet's parts for the current bin that are not counted yet, finds a
+  part by the start of its number, and lists the sheet's bins with the parts left in each (the legacy bin
+  selection grid). The bin of the last entry is restored when a sheet is reopened; a part
+  label or a sheet part number entered in the Bin box is questioned; the bin `UNDEFINED` is refused when
+  entered. A 38,723-part sheet (the legacy maximum) opens in about 3 seconds on the device, and its bin
+  list (1,040 bins) in about 2 seconds.
+- **Install.** HHDC Link copies the app to `\Application\Danamotors` and puts the shortcut on the desktop
+  and in Start > Programs (`\Windows\Programs`; CE 6 has no `Start Menu\Programs`). A running app locks
+  its file: close it or warm reset the device first. Only `\Application` survives a cold boot, so the app
+  and its sheets do; the shortcuts are restored by a StartUpCtl script that HHDC Link leaves in
+  `\Application\StartUpCtl\OnReset` (proven on the device with a warm reset). The legacy HHDC app was
+  installed into RAM and is lost on a cold boot.
 - **Receiving.** HHDC Link needs the sheet **finished**. It shows entries, quantity, damaged, parts not
   on the sheet and parts not counted, and requires a choice for the uncounted parts (`ZERO` or
   `RELEASE`) before it uploads. It checks the server first (sheet still open), writes `Uploading` to its
@@ -82,8 +92,9 @@ How it works:
 - **Times.** An entry's device time is used only if it falls between when the PC sent the sheet and
   now; otherwise `countedAt` is the time the PC received the sheet.
 - **Who may upload.** The upload needs `stocktake:manage` (`stockaudit:manage` for an audit), so
-  whoever signs in to HHDC Link needs it. Whether checkers get it or a supervisor runs HHDC Link is not
-  decided; HHDC Link works either way.
+  whoever signs in to HHDC Link needs it. Decided 2026-10-27: the store manager or a supervisor runs
+  HHDC Link; checkers only count on the handheld and are not given `stocktake:manage`, which would also
+  let them correct their own counts.
 
 Build and test (no Visual Studio; only the free `csc.exe` of .NET Framework 4):
 
