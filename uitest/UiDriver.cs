@@ -40,7 +40,9 @@ public static class UiDriver
         shots = args[2];
         Directory.CreateDirectory(shots);
         bool scanRun = Array.IndexOf(args, "--scan") >= 0;
-        if (Array.IndexOf(args, "--sample") >= 0) WriteSample(data);
+        bool docRun = Array.IndexOf(args, "--doc") >= 0;
+        if (docRun) WriteSampleDoc(data);
+        else if (Array.IndexOf(args, "--sample") >= 0) WriteSample(data);
         Assembly asm = Assembly.LoadFrom(exe);
         mainType = asm.GetType("Danamotors.Hhdc.Device.MainForm");
         Type repoType = asm.GetType("Danamotors.Hhdc.Device.SheetRepository");
@@ -53,7 +55,7 @@ public static class UiDriver
         main.Show();
         Check(main.ClientSize.Width == 318 && main.ClientSize.Height == 269, "client area is 318x269, was " + main.ClientSize.Width + "x" + main.ClientSize.Height);
 
-        foreach (string s in (scanRun ? ScanScenario : Scenario).Split('\n')) { string t = s.Trim(); if (t.Length > 0 && !t.StartsWith("#")) Tokenise(t); }
+        foreach (string s in (docRun ? DocScenario : scanRun ? ScanScenario : Scenario).Split('\n')) { string t = s.Trim(); if (t.Length > 0 && !t.StartsWith("#")) Tokenise(t); }
         Timer timer = new Timer { Interval = 60 };
         timer.Tick += delegate
         {
@@ -65,7 +67,7 @@ public static class UiDriver
         timer.Start();
         Application.Run();
 
-        if (scanRun) VerifyScanRun(data); else VerifySavedFile(data);
+        if (docRun) VerifyDocRun(data); else if (scanRun) VerifyScanRun(data); else VerifySavedFile(data);
         Console.WriteLine(failures.Count == 0 ? "UI test passed" : failures.Count + " UI check(s) failed");
         foreach (string f in failures) Console.WriteLine("  FAIL " + f);
         return failures.Count == 0 ? 0 : 1;
@@ -137,6 +139,24 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
 {F1}{WAIT:300}{EXPECT:findTitle~with parts left}{ESC}{WAIT:200}
 ";
 
+    // An indent pick: two lines in bin order. Scans add 1 and move on when a line is done; a typed short asks a reason;
+    // an unknown part is recorded as found instead; Finish asks first. Labels on the document screen are DocForm's.
+    const string DocScenario = @"
+{ENTER}{WAIT:400}{SHOT:30_doc_open}{EXPECT:lblBig~PICKED 0 of 2}{EXPECT:lblWhere~Bin AISLE 1 RACK 1}
+belt-serp-002{ENTER}{WAIT:100}{EXPECT:lblBig~PICKED 1 of 2}
+belt-serp-002{ENTER}{WAIT:150}{EXPECT:lblPart~AC-GAS-R134A}{EXPECT:lblStatus~Line done}{SHOT:31_next_line}
+# one too many of the first part is refused
+belt-serp-002{ENTER}{WAIT:150}{EXPECT:lblStatus~All 2 already picked}
+ac-gas-r134a{ENTER}{WAIT:100}{EXPECT:lblBig~PICKED 1 of 3}
+# type the quantity: 2 of 3 asks why
+{F2}{WAIT:150}2{ENTER}{WAIT:400}{SHOT:32_reason}3{WAIT:300}{EXPECT:lblNote~Short: Less in the bin}
+# a part that is not on the document
+zz-other{ENTER}{WAIT:400}{SHOT:33_not_on_doc}1{WAIT:300}{EXPECT:lblNote~Found instead: ZZ-OTHER}
+{F1}{WAIT:200}{EXPECT:linesTitle~2 of 2 lines done}{SHOT:34_lines}{ESC}{WAIT:200}
+{F4}{WAIT:400}{SHOT:35_finish}1{WAIT:400}{SHOT:36_finished}1{WAIT:400}
+{SHOT:37_list_after}
+";
+
     static void Tokenise(string line)
     {
         int i = 0;
@@ -169,8 +189,9 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
     /// <summary>The window and control that would get the key: a dialog if one is open, else the app's focused field.</summary>
     static IntPtr Target()
     {
-        Form top = main;
-        foreach (Form f in Application.OpenForms) if (f != main && f.Visible) top = f;
+        Form top = Top();
+        // The document screen takes keys in its scan box (its form previews the function keys).
+        if (top.GetType().Name == "DocForm") return ((Control)FieldOf(top, "txtScan")).Handle;
         if (top != main) return top.Handle;
         Control focused = (Control)Field("focused");
         return focused != null ? focused.Handle : main.Handle;
@@ -179,6 +200,20 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
     static object Field(string name)
     {
         return mainType.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(main);
+    }
+
+    /// <summary>The window in front: a dialog or the document screen if one is open, else the main window.</summary>
+    static Form Top()
+    {
+        Form top = main;
+        foreach (Form f in Application.OpenForms) if (f != main && f.Visible) top = f;
+        return top;
+    }
+
+    static object FieldOf(Form f, string name)
+    {
+        FieldInfo fi = f.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        return fi == null ? null : fi.GetValue(f);
     }
 
     // A character is posted as the key that produces it: the message loop's TranslateMessage then makes the
@@ -231,7 +266,10 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
     static void Expect(string spec)
     {
         string[] p = spec.Split('~');
-        string text = ((Control)Field(p[0])).Text;
+        // A label of the document screen when it is open (dialogs have no such fields), else of the main window.
+        object own = null;
+        foreach (Form f in Application.OpenForms) if (f.GetType().Name == "DocForm") own = FieldOf(f, p[0]);
+        string text = ((Control)(own ?? Field(p[0]))).Text;
         Check(text.IndexOf(p[1], StringComparison.Ordinal) >= 0, p[0] + " should contain [" + p[1] + "] but is [" + text.Replace("\r\n", " | ") + "]");
     }
 
@@ -284,6 +322,30 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
         s.Lines.Add(new SheetLine { Bin = "Aisle 1 Rack 12", PartNumber = "AC-GAS-R134A", Description = "Refrigerant R-134a (330g)", SystemStock = 56 });
         Directory.CreateDirectory(Path.Combine(data, "sheets"));
         File.WriteAllText(Path.Combine(data, "sheets", "SAMPLE-1.sheet"), s.Serialize());
+    }
+
+    static void VerifyDocRun(string data)
+    {
+        string path = Directory.GetFiles(Path.Combine(data, "sheets"), "*.hlog")[0];
+        PickState s = PickLog.Replay(File.ReadAllLines(path));
+        Check(s.Finished, "the document is finished and locked");
+        Check(s.Skipped == 0, "no unreadable records");
+        LineResult belt = s.Result("l1"), gas = s.Result("l2");
+        Check(belt != null && belt.Quantity == 2 && belt.Reason == "", "belt: 2 of 2 picked by scanning, the third scan refused");
+        Check(gas != null && gas.Quantity == 2 && gas.Reason == "LESS_IN_BIN", "gas: 2 of 3 typed, short reason Less in the bin");
+        Check(gas != null && gas.Scanned == "ZZ-OTHER", "the unknown part is recorded as found instead");
+    }
+
+    /// <summary>An indent pick with the parts of the sample sheet.</summary>
+    static void WriteSampleDoc(string data)
+    {
+        HandheldDoc d = new HandheldDoc();
+        d.DocumentId = "doc-ui"; d.DocumentNumber = "2026000099"; d.Type = DocTypes.IndentPick; d.Reference = "2026000214";
+        d.Party = "Kia Plaza"; d.Branch = "CPD"; d.Picker = "Picker 00015"; d.SentAtUtc = DateTime.UtcNow;
+        d.Lines.Add(new DocLine { Id = "l1", Number = 1, Bin = "AISLE 1 RACK 1", PartNumber = "BELT-SERP-002", Description = "Serpentine Belt (Heavy Duty)", Expected = 2 });
+        d.Lines.Add(new DocLine { Id = "l2", Number = 2, Bin = "AISLE 1 RACK 12", PartNumber = "AC-GAS-R134A", Description = "Refrigerant R-134a (330g)", Expected = 3 });
+        Directory.CreateDirectory(Path.Combine(data, "sheets"));
+        File.WriteAllText(Path.Combine(data, "sheets", d.FileStem + ".hdoc"), d.Serialize());
     }
 
     static CountEntry Find(CountState s, string bin, string part)

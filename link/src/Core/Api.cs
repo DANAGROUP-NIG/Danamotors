@@ -47,7 +47,7 @@ namespace Danamotors.Hhdc.Link
         void Upload(string stockTakeId, string sheetId, string uncounted, List<Dictionary<string, object>> entries);
     }
 
-    public sealed class ApiClient : IStockTakeApi
+    public sealed partial class ApiClient : IStockTakeApi
     {
         readonly string baseUrl;
         string token = "";

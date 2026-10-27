@@ -9,7 +9,8 @@ namespace Danamotors.Hhdc.Device
     /// <summary>
     /// The one window of Danamotors Count, built for the MC3190's 318x269 client area and its keypad.
     /// Three screens share it: the sheet list, counting, and review. All rules live in CountSession;
-    /// this class only shows state and passes keys.
+    /// this class only shows state and passes keys. Picking lists, CPOs and MITs are listed here too and
+    /// open in DocForm.
     /// </summary>
     public sealed class MainForm : Form
     {
@@ -148,7 +149,7 @@ namespace Danamotors.Hhdc.Device
 
         void BuildSheets()
         {
-            sheetsTitle.Text = "Count sheets";
+            sheetsTitle.Text = "Count sheets, picking and MIT";
             sheetsTitle.Font = Bold(11f);
             sheetsTitle.Bounds = new Rectangle(4, 2, 310, 22);
             sheetsPanel.Controls.Add(sheetsTitle);
@@ -248,12 +249,13 @@ namespace Danamotors.Hhdc.Device
             session = null;
             int t0 = Environment.TickCount;
             sheetItems = repo.List();
-            Timing("list " + sheetItems.Count + " sheets", t0);
+            sheetItems.AddRange(repo.ListDocs()); // picking lists, CPOs and MITs after the count sheets
+            Timing("list " + sheetItems.Count + " sheets and documents", t0);
             sheetsList.Items.Clear();
             foreach (SheetListItem item in sheetItems) sheetsList.Items.Add(item.Describe());
             if (sheetItems.Count > 0) sheetsList.SelectedIndex = 0;
             sheetsHelp.Text = sheetItems.Count == 0
-                ? "No sheets on this device.\r\nDock it and use HHDC Link on the PC: Send to device.\r\nEsc = exit"
+                ? "Nothing on this device.\r\nDock it and use HHDC Link on the PC: Send to device.\r\nEsc = exit"
                 : "Up/Down = choose   Enter = open   Esc = exit";
             countPanel.Visible = false;
             reviewPanel.Visible = false;
@@ -300,6 +302,24 @@ namespace Danamotors.Hhdc.Device
             offSheetOk.Clear();
             CheckScanner();
             if (session.Finished) ShowReview(); else ShowCount();
+        }
+
+        /// <summary>A picking list, CPO or MIT opens on its own screen; back here when it closes.</summary>
+        void OpenDoc(SheetListItem item)
+        {
+            if (item.Error.Length > 0)
+            {
+                ChoiceDialog.Tell(this, "Bad document file", item.Error + "\r\n\r\nAsk the store to send it again.");
+                return;
+            }
+            DocSession doc;
+            try { doc = repo.OpenDoc(item.Stem); }
+            catch (Exception ex) { ChoiceDialog.Tell(this, "Cannot open", ex.Message); return; }
+            CheckScanner();
+            scanTimer.Enabled = false; // the document screen has its own scan timer
+            try { using (DocForm f = new DocForm(doc)) f.ShowDialog(); }
+            finally { scanTimer.Enabled = true; }
+            ShowSheets();
         }
 
         void ShowCount()
@@ -364,7 +384,9 @@ namespace Danamotors.Hhdc.Device
         {
             if (k == Keys.Enter)
             {
-                if (sheetsList.SelectedIndex >= 0) OpenSheet(sheetItems[sheetsList.SelectedIndex]);
+                if (sheetsList.SelectedIndex < 0) return true;
+                SheetListItem item = sheetItems[sheetsList.SelectedIndex];
+                if (item.IsDoc) OpenDoc(item); else OpenSheet(item);
                 return true;
             }
             if (k == Keys.Escape) { Close(); return true; }

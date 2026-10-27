@@ -70,5 +70,11 @@ if ($UiTest) {
     Write-Host '== UI test (scan modes)'
     & "$out\tests\UiDriver.exe" "$out\device\DanamotorsCount.exe" $dataScan "$out\ui-shots-scan" --sample --scan
     if ($LASTEXITCODE -ne 0) { throw 'UI test (scan modes) failed.' }
+    # Third session: picking an indent on the document screen.
+    $dataDoc = Join-Path $out 'ui-test-data-doc'
+    if (Test-Path $dataDoc) { Remove-Item $dataDoc -Recurse -Force }
+    Write-Host '== UI test (picking document)'
+    & "$out\tests\UiDriver.exe" "$out\device\DanamotorsCount.exe" $dataDoc "$out\ui-shots-doc" --doc
+    if ($LASTEXITCODE -ne 0) { throw 'UI test (picking document) failed.' }
 }
 Write-Host "Built into $out"

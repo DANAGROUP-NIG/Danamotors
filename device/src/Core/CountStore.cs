@@ -19,6 +19,12 @@ namespace Danamotors.Hhdc.Device
 
         public CountState Load()
         {
+            return CountLog.Replay(ReadLines());
+        }
+
+        /// <summary>The raw records; also used for a document's results file, which shares this append-only format.</summary>
+        public List<string> ReadLines()
+        {
             List<string> lines = new List<string>();
             if (File.Exists(path))
             {
@@ -29,7 +35,7 @@ namespace Danamotors.Hhdc.Device
                     while ((line = r.ReadLine()) != null) lines.Add(line);
                 }
             }
-            return CountLog.Replay(lines);
+            return lines;
         }
 
         /// <summary>

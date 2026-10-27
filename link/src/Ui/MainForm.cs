@@ -6,7 +6,10 @@ using System.Windows.Forms;
 
 namespace Danamotors.Hhdc.Link
 {
-    /// <summary>HHDC Link: send count sheets to the handheld, and take finished ones back to the server.</summary>
+    /// <summary>
+    /// HHDC Link: send count sheets, picking lists, CPOs and MITs to the handheld, and take finished ones back to
+    /// the server.
+    /// </summary>
     public sealed class MainForm : Form
     {
         readonly string dataDir;
@@ -19,6 +22,9 @@ namespace Danamotors.Hhdc.Link
         readonly Button btnSignIn = new Button();
         readonly Label lblUser = new Label();
         readonly CheckBox chkAllBranches = new CheckBox();
+        readonly ComboBox cmbKind = new ComboBox();
+        static readonly string[] Kinds = { "Count sheets", "Indent picking", "CPO picking", "MIT checking" };
+        static readonly string[] KindTypes = { "", DocTypes.IndentPick, DocTypes.CpoPick, DocTypes.MitReceive };
 
         readonly ListView sheets = new ListView();
         readonly Button btnRefresh = new Button();
@@ -33,7 +39,11 @@ namespace Danamotors.Hhdc.Link
         readonly TextBox log = new TextBox();
 
         List<WorkItem> items = new List<WorkItem>();
-        List<DeviceSheet> deviceItems = new List<DeviceSheet>();
+        List<DocSource> sources = new List<DocSource>();
+        /// <summary>DeviceSheet or DeviceDoc, in the order shown.</summary>
+        List<object> deviceItems = new List<object>();
+
+        string KindType { get { return KindTypes[Math.Max(0, cmbKind.SelectedIndex)]; } }
 
         public MainForm(string dataDir, LinkSettings overrides)
         {
@@ -65,22 +75,27 @@ namespace Danamotors.Hhdc.Link
             AcceptButton = btnSignIn;
             Controls.Add(account);
 
-            GroupBox send = new GroupBox { Text = "2. Count sheets issued and not yet uploaded", Left = 12, Top = 98, Width = 796, Height = 200, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            GroupBox send = new GroupBox { Text = "2. Ready for the handheld", Left = 12, Top = 98, Width = 796, Height = 200, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             sheets.SetBounds(12, 22, 772, 140); sheets.View = View.Details; sheets.FullRowSelect = true; sheets.HideSelection = false; sheets.MultiSelect = false;
             sheets.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            foreach (string c in new string[] { "Sheet", "Stock taking", "Type", "Branch", "Checker", "Parts", "Selection" }) sheets.Columns.Add(c, c == "Selection" ? 200 : c == "Checker" ? 130 : c == "Parts" ? 50 : 100);
+            SetColumns();
             sheets.SelectedIndexChanged += delegate { UpdateButtons(); };
             send.Controls.Add(sheets);
             btnRefresh.Text = "Refresh list"; btnRefresh.SetBounds(12, 166, 110, 28); btnRefresh.Click += delegate { RefreshSheets(); }; send.Controls.Add(btnRefresh);
             btnSend.Text = "Send to device"; btnSend.SetBounds(130, 166, 130, 28); btnSend.Click += delegate { SendSelected(); }; send.Controls.Add(btnSend);
-            chkAllBranches.Text = "All branches (only if you may see them)"; chkAllBranches.SetBounds(280, 169, 300, 22); send.Controls.Add(chkAllBranches);
+            chkAllBranches.Text = "All branches (only if you may see them)"; chkAllBranches.SetBounds(280, 169, 260, 22); send.Controls.Add(chkAllBranches);
+            Add(send, new Label { Text = "Show", Left = 556, Top = 172, Width = 40 });
+            cmbKind.DropDownStyle = ComboBoxStyle.DropDownList; cmbKind.Items.AddRange(Kinds); cmbKind.SelectedIndex = 0;
+            cmbKind.SetBounds(600, 168, 184, 24);
+            cmbKind.SelectedIndexChanged += delegate { SetColumns(); if (api != null) RefreshSheets(); };
+            send.Controls.Add(cmbKind);
             Controls.Add(send);
 
             GroupBox dev = new GroupBox { Text = "3. Handheld", Left = 12, Top = 304, Width = 796, Height = 238, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             lblDevice.SetBounds(12, 22, 772, 20); lblDevice.Text = "Dock the handheld in its USB cradle and wake it."; dev.Controls.Add(lblDevice);
             onDevice.SetBounds(12, 46, 772, 140); onDevice.View = View.Details; onDevice.FullRowSelect = true; onDevice.HideSelection = false; onDevice.MultiSelect = false;
             onDevice.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            foreach (string c in new string[] { "Sheet", "State", "Entries", "Quantity", "Damaged", "Sent to device (PC time)" }) onDevice.Columns.Add(c, c.StartsWith("Sent") ? 180 : 110);
+            foreach (string c in new string[] { "Sheet / document", "State", "Entries / lines done", "Quantity", "Damaged", "Sent to device (PC time)" }) onDevice.Columns.Add(c, c.StartsWith("Sent") || c.StartsWith("Sheet") ? 170 : 100);
             onDevice.SelectedIndexChanged += delegate { UpdateButtons(); };
             dev.Controls.Add(onDevice);
             btnDeviceRefresh.Text = "Read device"; btnDeviceRefresh.SetBounds(12, 192, 110, 28); btnDeviceRefresh.Click += delegate { RefreshDevice(); }; dev.Controls.Add(btnDeviceRefresh);
@@ -96,6 +111,22 @@ namespace Danamotors.Hhdc.Link
         }
 
         static void Add(Control parent, Control c) { parent.Controls.Add(c); }
+
+        void SetColumns()
+        {
+            sheets.Items.Clear();
+            sheets.Columns.Clear();
+            string t = KindType;
+            string[] cols = t.Length == 0
+                ? new string[] { "Sheet", "Stock taking", "Type", "Branch", "Checker", "Parts", "Selection" }
+                : t == DocTypes.MitReceive
+                    ? new string[] { "MIT", "Invoice", "Vendor", "Date", "Lines", "Quantity" }
+                    : t == DocTypes.IndentPick
+                        ? new string[] { "Indent", "Picking list", "For branch", "Date", "Lines", "Reserved" }
+                        : new string[] { "CPO", "Customer ref.", "Customer", "Date", "Lines", "Reserved" };
+            foreach (string c in cols)
+                sheets.Columns.Add(c, c == "Selection" || c == "Customer" || c == "For branch" || c == "Vendor" ? 200 : c == "Checker" ? 130 : c == "Parts" || c == "Lines" ? 50 : 100);
+        }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -142,6 +173,11 @@ namespace Danamotors.Hhdc.Link
             return new LinkService(api, dev, new UploadLedger(Path.Combine(dataDir, "uploads.log")), delegate { return DateTime.UtcNow; });
         }
 
+        DocLinkService DocService(IDeviceStorage dev)
+        {
+            return new DocLinkService(api, dev, new UploadLedger(Path.Combine(dataDir, "uploads.log")), delegate { return DateTime.UtcNow; });
+        }
+
         void UpdateButtons()
         {
             bool signedIn = api != null;
@@ -172,6 +208,7 @@ namespace Danamotors.Hhdc.Link
 
         void RefreshSheets()
         {
+            if (KindType.Length > 0) { RefreshSources(); return; }
             Run(delegate
             {
                 items = api.ListOpenSheets(chkAllBranches.Checked);
@@ -187,9 +224,45 @@ namespace Danamotors.Hhdc.Link
             });
         }
 
+        void RefreshSources()
+        {
+            string type = KindType;
+            Run(delegate
+            {
+                sources = api.ListSources(type);
+                sheets.Items.Clear();
+                foreach (DocSource s in sources)
+                {
+                    ListViewItem row = new ListViewItem(s.Number);
+                    row.SubItems.Add(s.Reference); row.SubItems.Add(s.Party);
+                    row.SubItems.Add(s.Date.HasValue ? s.Date.Value.ToLocalTime().ToString("dd MMM yyyy") : "");
+                    row.SubItems.Add(s.Lines.ToString()); row.SubItems.Add(s.Quantity.ToString());
+                    sheets.Items.Add(row);
+                }
+                Say(sources.Count + " " + Kinds[cmbKind.SelectedIndex].ToLowerInvariant() + " document(s) ready to send.");
+            });
+        }
+
+        void SendDoc(DocSource s)
+        {
+            Run(delegate
+            {
+                Picker picker = PickerDialog.Ask(this, s, api.ListPickers());
+                if (picker == null) { Say("Send cancelled."); return; }
+                using (IDeviceStorage dev = OpenDevice())
+                {
+                    HandheldDoc doc = DocService(dev).Send(s, picker);
+                    Say("Sent " + DocTypes.Short(doc.Type) + " " + doc.Reference + " as document " + doc.DocumentNumber + " (" + doc.Lines.Count + " lines) for " + picker.Name + ".");
+                    ReadDevice(dev);
+                }
+            });
+            RefreshSheetsQuiet();
+        }
+
         void SendSelected()
         {
             if (sheets.SelectedIndices.Count != 1) return;
+            if (KindType.Length > 0) { SendDoc(sources[sheets.SelectedIndices[0]]); return; }
             WorkItem w = items[sheets.SelectedIndices[0]];
             Run(delegate
             {
@@ -209,11 +282,14 @@ namespace Danamotors.Hhdc.Link
 
         void ReadDevice(IDeviceStorage dev)
         {
-            DeviceSheets store = new DeviceSheets(dev);
-            deviceItems = store.List();
-            lblDevice.Text = dev.Describe() + " - " + deviceItems.Count + " sheet(s)";
+            List<DeviceSheet> sheetsOnDevice = new DeviceSheets(dev).List();
+            List<DeviceDoc> docsOnDevice = new DeviceDocs(dev).List();
+            deviceItems = new List<object>();
+            foreach (DeviceSheet d in sheetsOnDevice) deviceItems.Add(d);
+            foreach (DeviceDoc d in docsOnDevice) deviceItems.Add(d);
+            lblDevice.Text = dev.Describe() + " - " + sheetsOnDevice.Count + " sheet(s), " + docsOnDevice.Count + " picking/MIT document(s)";
             onDevice.Items.Clear();
-            foreach (DeviceSheet d in deviceItems)
+            foreach (DeviceSheet d in sheetsOnDevice)
             {
                 ListViewItem row = new ListViewItem(d.Sheet != null ? d.Sheet.SheetNumber : d.Stem);
                 if (d.Error.Length > 0) { row.SubItems.Add("unusable: " + d.Error); }
@@ -226,12 +302,72 @@ namespace Danamotors.Hhdc.Link
                 }
                 onDevice.Items.Add(row);
             }
+            foreach (DeviceDoc d in docsOnDevice)
+            {
+                ListViewItem row = new ListViewItem(d.Doc != null ? DocTypes.Short(d.Doc.Type) + " " + d.Doc.Reference : d.Stem);
+                if (d.Error.Length > 0) { row.SubItems.Add("unusable: " + d.Error); }
+                else
+                {
+                    int qty = 0, dmg = 0;
+                    foreach (LineResult r in d.State.Lines.Values) { qty += r.Quantity; dmg += r.Damaged; }
+                    row.SubItems.Add(d.Finished ? "FINISHED" : d.State.Lines.Count == 0 ? "not started" : d.Doc.Picking ? "picking" : "checking");
+                    row.SubItems.Add(d.State.Lines.Count + " of " + d.Doc.Lines.Count); row.SubItems.Add(qty.ToString()); row.SubItems.Add(dmg.ToString());
+                    row.SubItems.Add(d.Doc.SentAtUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm"));
+                }
+                onDevice.Items.Add(row);
+            }
+        }
+
+        void ReceiveDoc(DeviceDoc d)
+        {
+            Run(delegate
+            {
+                using (IDeviceStorage dev = OpenDevice())
+                {
+                    DocLinkService svc = DocService(dev);
+                    d = new DeviceDocs(dev).Read(d.Stem);
+                    DocSummary summary;
+                    try { summary = svc.Check(d); }
+                    catch (LinkException e) { Fail(e); return; }
+                    string head = DocTypes.Short(d.Doc.Type) + " " + d.Doc.Reference + "  -  " + d.Doc.Party + "\r\nPicker: " + d.Doc.Picker + "   Document " + d.Doc.DocumentNumber;
+                    string effect = d.Doc.Type == DocTypes.IndentPick ? "Short quantities go back to the indent's back order."
+                                  : d.Doc.Type == DocTypes.CpoPick ? "Short quantities go back to free stock."
+                                  : "The MIT becomes Verified; nothing goes into stock until the store posts the MRN.";
+                    if (MessageBox.Show(this, head + "\r\n\r\n" + summary.Describe() + "\r\n\r\n" + effect + "\r\nIt is uploaded once. Upload now?",
+                                        "Receive from handheld", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                    {
+                        Say("Receive cancelled; nothing was uploaded.");
+                        return;
+                    }
+                    try
+                    {
+                        ReceiveResult r = svc.Receive(d);
+                        Say("Uploaded " + DocTypes.Short(d.Doc.Type) + " " + d.Doc.Reference + " (document " + d.Doc.DocumentNumber + ")" + (r.WasAlreadyUploaded ? ": the server already had it." : "."));
+                        if (r.Cleared) Say("Removed it from the handheld.");
+                        else MessageBox.Show(this, "Uploaded, but it could not be removed from the handheld:\r\n\r\n" + r.ClearProblem + "\r\n\r\nDo NOT upload it again.", "HHDC Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (DocCancelledException e) { OfferClear(svc, d, e.Message); }
+                    catch (AlreadyUploadedException e) { OfferClear(svc, d, e.Message); }
+                    ReadDevice(dev);
+                }
+            });
+            RefreshSheetsQuiet();
+        }
+
+        void OfferClear(DocLinkService svc, DeviceDoc d, string message)
+        {
+            Say(message);
+            if (MessageBox.Show(this, message + "\r\n\r\nRemove it from the handheld now?", "HHDC Link", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            svc.ClearDone(d);
+            Say("Removed it from the handheld.");
         }
 
         void ReceiveSelected()
         {
             if (onDevice.SelectedIndices.Count != 1) return;
-            DeviceSheet d = deviceItems[onDevice.SelectedIndices[0]];
+            object picked = deviceItems[onDevice.SelectedIndices[0]];
+            if (picked is DeviceDoc) { ReceiveDoc((DeviceDoc)picked); return; }
+            DeviceSheet d = (DeviceSheet)picked;
             Run(delegate
             {
                 using (IDeviceStorage dev = OpenDevice())
@@ -273,7 +409,7 @@ namespace Danamotors.Hhdc.Link
         void RefreshSheetsQuiet()
         {
             if (api == null) return;
-            try { items = api.ListOpenSheets(chkAllBranches.Checked); } catch (LinkException) { return; }
+            if (KindType.Length == 0) { try { items = api.ListOpenSheets(chkAllBranches.Checked); } catch (LinkException) { return; } }
             RefreshSheets();
         }
 
@@ -298,6 +434,34 @@ namespace Danamotors.Hhdc.Link
                     MessageBox.Show(this, "Installed. On the handheld open Start > Programs > Danamotors Count.", "HHDC Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             });
+        }
+    }
+
+    /// <summary>Choose who picks or checks the document (an employee; pickers do not sign in).</summary>
+    public static class PickerDialog
+    {
+        public static Picker Ask(IWin32Window owner, DocSource s, List<Picker> pickers)
+        {
+            if (pickers.Count == 0) throw new LinkException("No employees are set up for this branch. Add the picker under Employees first.");
+            using (Form f = new Form())
+            {
+                f.Text = "Send " + s.Number + " to the handheld";
+                f.FormBorderStyle = FormBorderStyle.FixedDialog; f.StartPosition = FormStartPosition.CenterParent;
+                f.MaximizeBox = false; f.MinimizeBox = false; f.ShowInTaskbar = false;
+                f.ClientSize = new Size(420, 170);
+                Label head = new Label { Left = 12, Top = 10, Width = 396, Height = 40, Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                    Text = s.Number + (s.Reference.Length > 0 ? "  (" + s.Reference + ")" : "") + "  -  " + s.Party + "\r\n" + s.Lines + " line(s), " + s.Quantity + " pcs" };
+                Label q = new Label { Left = 12, Top = 60, Width = 396, Height = 20, Text = "Who picks or checks it on the handheld?" };
+                ComboBox who = new ComboBox { Left = 12, Top = 84, Width = 396, DropDownStyle = ComboBoxStyle.DropDownList };
+                foreach (Picker p in pickers) who.Items.Add(p);
+                Button ok = new Button { Text = "Send", Left = 226, Top = 128, Width = 90, Height = 28, Enabled = false, DialogResult = DialogResult.OK };
+                Button cancel = new Button { Text = "Cancel", Left = 318, Top = 128, Width = 90, Height = 28, DialogResult = DialogResult.Cancel };
+                who.SelectedIndexChanged += delegate { ok.Enabled = who.SelectedIndex >= 0; };
+                f.Controls.AddRange(new Control[] { head, q, who, ok, cancel });
+                f.AcceptButton = ok; f.CancelButton = cancel;
+                if (f.ShowDialog(owner) != DialogResult.OK) return null;
+                return (Picker)who.SelectedItem;
+            }
         }
     }
 

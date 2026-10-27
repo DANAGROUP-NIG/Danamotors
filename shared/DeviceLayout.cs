@@ -38,6 +38,19 @@ namespace Danamotors.Hhdc
         }
         public const string SheetExtension = ".sheet";
         public const string CountsExtension = ".counts";
+        /// <summary>A picking list, CPO or MIT (HandheldDoc), and its results (PickLog). Kept next to the sheets.</summary>
+        public const string DocExtension = ".hdoc";
+        public const string PicksExtension = ".hlog";
+
+        public static string DocPath(string root, string stem)
+        {
+            return SheetsDir(root) + "\\" + stem + DocExtension;
+        }
+
+        public static string PicksPath(string root, string stem)
+        {
+            return SheetsDir(root) + "\\" + stem + PicksExtension;
+        }
 
         public static string ResolveRoot(DirectoryTest exists)
         {

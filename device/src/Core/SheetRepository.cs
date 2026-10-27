@@ -16,11 +16,18 @@ namespace Danamotors.Hhdc.Device
         public bool Finished;
         /// <summary>Set when the sheet file cannot be used.</summary>
         public string Error = "";
+        /// <summary>A picking list, CPO or MIT (a .hdoc file) rather than a count sheet.</summary>
+        public bool IsDoc;
+        public string DocType = "";
+        public string Reference = "";
 
         /// <summary>One line for the sheet list, sized for the device screen.</summary>
         public string Describe()
         {
             if (Error.Length > 0) return Stem + "  (bad file)";
+            if (IsDoc)
+                return (DocTypes.IsPicking(DocType) ? "PICK " : "CHECK ") + DocTypes.Short(DocType) + " " + Reference + "  " + Lines + " lines" +
+                       (Finished ? "  FINISHED" : Entries > 0 ? "  " + Entries + " done" : "");
             if (Finished) return Number + "  " + Lines + " parts  FINISHED";
             return Number + "  " + Lines + " parts" + (Entries > 0 ? "  " + Entries + " counted" : "");
         }
@@ -75,6 +82,48 @@ namespace Danamotors.Hhdc.Device
                 items.Add(item);
             }
             return items;
+        }
+
+        /// <summary>The picking lists, CPOs and MITs on the device, from their headers.</summary>
+        public List<SheetListItem> ListDocs()
+        {
+            List<SheetListItem> items = new List<SheetListItem>();
+            if (!System.IO.Directory.Exists(dir)) return items;
+            string[] files = System.IO.Directory.GetFiles(dir, "*" + DeviceLayout.DocExtension);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            foreach (string file in files)
+            {
+                SheetListItem item = new SheetListItem();
+                item.IsDoc = true;
+                item.Stem = System.IO.Path.GetFileNameWithoutExtension(file);
+                try
+                {
+                    DocSession s = OpenDoc(item.Stem);
+                    item.Number = s.Doc.DocumentNumber;
+                    item.DocType = s.Doc.Type;
+                    item.Reference = s.Doc.Reference;
+                    item.Branch = s.Doc.Party;
+                    item.Lines = s.LineCount;
+                    item.Entries = s.DoneLines;
+                    item.Quantity = s.TotalQuantity;
+                    item.Finished = s.Finished;
+                }
+                catch (Exception e)
+                {
+                    item.Error = e.Message;
+                }
+                items.Add(item);
+            }
+            return items;
+        }
+
+        /// <summary>Documents are small (a few lines; an MIT a few hundred), so the whole file is read.</summary>
+        public DocSession OpenDoc(string stem)
+        {
+            HandheldDoc doc;
+            using (FileStream fs = new FileStream(System.IO.Path.Combine(dir, stem + DeviceLayout.DocExtension), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (StreamReader r = new StreamReader(fs, Encoding.UTF8)) doc = HandheldDoc.Parse(r, false);
+            return new DocSession(doc, new CountStore(System.IO.Path.Combine(dir, stem + DeviceLayout.PicksExtension)), clock);
         }
 
         /// <summary>The sheet ends with an END line; a copy cut short by a dropped USB link does not.</summary>
