@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, CheckCircle2, FileSpreadsheet, Loader2, PackageSearch, Upload, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, CheckCircle2, FileSpreadsheet, Loader2, PackageSearch, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import { cn } from "@/lib/utils";
@@ -124,6 +124,9 @@ export function PartCataloguePage() {
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
+      <Link href="/inventory" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <ArrowLeft className="size-4" /> Back to Inventory
+      </Link>
       <PageHeader
         title="Mobis Catalogue"
         description="Every part Mobis supplies, from the Mobis price list. Part Query finds a part here when it is not in Part Master, and it can be created from there."

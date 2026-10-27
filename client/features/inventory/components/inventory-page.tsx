@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Download, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
+import { Plus, Download, FileSpreadsheet, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
@@ -147,6 +148,14 @@ export function InventoryPage() {
               </div>
             )}
             {tab === "stock" && <ExportInventoryButton />}
+            {tab === "parts" && (
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+                <Link href="/inventory/part-catalogue">
+                  <BookOpen className="size-4" />
+                  Mobis catalogue
+                </Link>
+              </Button>
+            )}
             {canCreate && (
               <Button onClick={() => setShowForm(true)} size="sm">
                 <Plus className="size-4" />

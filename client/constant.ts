@@ -31,7 +31,6 @@ import {
   ListChecks,
   BadgeCheck,
   PackageSearch,
-  BookOpen,
   Ship,
   Truck,
   Landmark,
@@ -191,12 +190,6 @@ export const NAV_GROUPS: NavGroup[] = [
           INVENTORY_PERMISSIONS.SPAREPART_READ,
           INVENTORY_PERMISSIONS.STOCK_READ,
         ],
-      },
-      {
-        label: "Mobis Catalogue",
-        href: "/inventory/part-catalogue",
-        icon: BookOpen,
-        permissions: [INVENTORY_PERMISSIONS.SPAREPART_READ],
       },
       {
         label: "MIT",
@@ -437,8 +430,8 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  // No heading: log out sits on its own at the bottom.
   {
-    label: "Account",
     items: [
       {
         label: "Log out",
