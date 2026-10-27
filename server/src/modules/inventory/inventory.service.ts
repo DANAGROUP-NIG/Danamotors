@@ -11,6 +11,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
+import { preparePriceList, type PriceListRow } from "./partCatalogue";
 import { recordBinChange, recordPartChange } from "./partHistory";
 import type { LegacyPartFields } from "./inventory.validation";
 
@@ -895,12 +896,22 @@ export class InventoryService {
     return this.withAvailableQuantity(stock);
   }
 
-  /** Legacy Part Query: stock at the home premises, alternates, and other branches. */
+  /**
+   * Legacy Part Query and Part Enquiry: stock at the home premises, alternates, and other branches;
+   * a part missing from Part Master is looked up in the Mobis catalogue so it can be created.
+   */
   async partQuery(partNumber: string, homeBranchId?: string | null) {
     const part = await prisma.sparePart.findFirst({
       where: { partNumber: { equals: partNumber, mode: "insensitive" } },
     });
-    if (!part) throw new NotFoundError(`Part ${partNumber} not found`);
+    if (!part) {
+      const catalogue = await prisma.partCatalogueItem.findUnique({
+        where: { partNumber: partNumber.trim().toUpperCase() },
+      });
+      if (!catalogue)
+        throw new NotFoundError(`Part ${partNumber} not found in Part Master or the Mobis catalogue`);
+      return { source: "CATALOGUE" as const, catalogue };
+    }
 
     const rootId = part.mainPartId ?? part.id;
     const alternates = await prisma.sparePart.findMany({
@@ -927,7 +938,84 @@ export class InventoryService {
         },
       }),
     ]);
-    return buildPartQuery({ part, alternates, branches, stocks, homeBranchId });
+    return {
+      source: "PART_MASTER" as const,
+      ...buildPartQuery({ part, alternates, branches, stocks, homeBranchId }),
+    };
+  }
+
+  // ── Mobis catalogue (legacy FullpartList) ─────────────────────────────
+
+  async catalogueSummary() {
+    const agg = await prisma.partCatalogueItem.aggregate({
+      _count: true,
+      _max: { updatedAt: true },
+    });
+    return { count: agg._count, lastUpdatedAt: agg._max.updatedAt };
+  }
+
+  /** One batch of the Mobis price list: new parts are added, known ones take the new name and rates. */
+  async importPriceList(rows: PriceListRow[]) {
+    const categories = await prisma.partCategory.findMany();
+    const { items, problems } = preparePriceList(rows, categories);
+    if (problems.length) {
+      const more = problems.length > 10 ? ` and ${problems.length - 10} more` : "";
+      throw new BadRequestError(`The price list was not saved: ${problems.slice(0, 10).join("; ")}${more}`);
+    }
+    // xmax = 0 only on a freshly inserted row, which tells added from updated.
+    const saved = await prisma.$queryRaw<{ inserted: boolean }[]>`
+      INSERT INTO "PartCatalogueItem"
+        ("partNumber", "name", "partFlag", "priceCategoryCode", "dealerRate", "retailRate", "updatedAt")
+      SELECT t.*, NOW() FROM UNNEST(
+        ${items.map((i) => i.partNumber)}::text[],
+        ${items.map((i) => i.name)}::text[],
+        ${items.map((i) => i.partFlag)}::text[],
+        ${items.map((i) => i.priceCategoryCode)}::text[],
+        ${items.map((i) => i.dealerRate)}::float8[],
+        ${items.map((i) => i.retailRate)}::float8[]
+      ) AS t
+      ON CONFLICT ("partNumber") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "partFlag" = EXCLUDED."partFlag",
+        "priceCategoryCode" = EXCLUDED."priceCategoryCode",
+        "dealerRate" = EXCLUDED."dealerRate",
+        "retailRate" = EXCLUDED."retailRate",
+        "updatedAt" = NOW()
+      RETURNING (xmax = 0) AS inserted`;
+    const added = saved.filter((r) => r.inserted).length;
+    return { added, updated: saved.length - added };
+  }
+
+  /** Legacy Part Enquiry > Create Part: the catalogue row becomes a Part Master part. */
+  async createPartFromCatalogue(partNumber: string, category: string, changedById?: string) {
+    const item = await prisma.partCatalogueItem.findUnique({
+      where: { partNumber: partNumber.trim().toUpperCase() },
+    });
+    if (!item) throw new NotFoundError(`Part ${partNumber} is not in the Mobis catalogue`);
+    const existing = await prisma.sparePart.findFirst({
+      where: { partNumber: { equals: item.partNumber, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existing) throw new ConflictError(`Part ${item.partNumber} is already in Part Master`);
+    const priceCategory = item.priceCategoryCode
+      ? await prisma.partCategory.findUnique({ where: { code: item.priceCategoryCode } })
+      : null;
+    return this.createPart(
+      {
+        partNumber: item.partNumber,
+        name: item.name,
+        category,
+        uom: item.uom,
+        unitRate: item.dealerRate,
+        retailRate: item.retailRate ?? undefined,
+        taxable: item.taxable,
+        partFlag: item.partFlag,
+        partType: item.partType,
+        // A category deactivated since the upload is left off; the rates are still the list's.
+        priceCategoryCode: priceCategory?.isActive ? priceCategory.code : undefined,
+      },
+      changedById,
+    );
   }
 
   async listStockTransactions(branchId?: string, partId?: string) {

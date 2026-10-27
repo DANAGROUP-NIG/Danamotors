@@ -2208,6 +2208,23 @@ model PartCategoryBranchSetting {
   @@index([branchId])
 }
 
+// Legacy FullpartList: the Mobis catalogue, loaded from the Mobis price list. A part here is not
+// in Part Master until someone creates it from Part Query (legacy Part Enquiry > Create Part).
+model PartCatalogueItem {
+  partNumber        String   @id
+  name              String
+  partFlag          String   @default("O")
+  partType          String   @default("S")
+  uom               String   @default("UNIT")
+  taxable           Boolean  @default(true)
+  // Legacy pricing category code; retail rate = dealer rate x its multiplier unless the list gives one.
+  priceCategoryCode String?
+  dealerRate        Float
+  retailRate        Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 enum MitStatus {
   IN_TRANSIT
   VERIFIED

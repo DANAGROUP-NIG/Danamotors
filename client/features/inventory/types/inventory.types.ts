@@ -213,7 +213,36 @@ export type PartQueryAlternateRow = PartQueryRow & {
   partStatus: PartStatus;
 };
 
+/** Legacy FullpartList: a Mobis catalogue part, which may not be in Part Master yet. */
+export type PartCatalogueItem = {
+  partNumber: string;
+  name: string;
+  partFlag: string;
+  partType: string;
+  uom: string;
+  taxable: boolean;
+  priceCategoryCode: string | null;
+  dealerRate: number;
+  retailRate: number | null;
+  updatedAt: string;
+};
+
+export type PartCatalogueSummary = { count: number; lastUpdatedAt: string | null };
+
+export type PriceListRow = {
+  partNumber: string;
+  name: string;
+  partFlag?: string;
+  priceCategoryCode?: string | null;
+  dealerRate: number;
+  retailRate?: number | null;
+};
+
+/** Part Query answers from Part Master, or from the Mobis catalogue when the part is not there yet. */
+export type PartQueryResponse = PartQueryResult | { source: "CATALOGUE"; catalogue: PartCatalogueItem };
+
 export type PartQueryResult = {
+  source: "PART_MASTER";
   part: {
     id: string;
     partNumber: string;

@@ -133,6 +133,35 @@ UOM, tax category and tax form inputs suggest the codes from their master lists.
 parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
 over: `partlabour` and `troublepart` are empty in all three databases.
 
+### Mobis catalogue and Part Enquiry
+
+Legacy CPD had two part tables. `partmast` is Part Master, the parts the business uses. `FullpartList` is the
+Mobis catalogue, every part Mobis supplies, loaded in bulk from the Mobis price list (over 500,000 parts in 2019,
+45,000 more in 2025). Legacy **Part Query** searched `partmast` only, so a part missing from it was "not found".
+Legacy **Part Enquiry** searched `partmast`, then `FullpartList`, showed the catalogue's type, unit and rates,
+and its **Create Part** button copied the catalogue row into `partmast`. Example: 473004G350 (TRANSFER ASSY) was
+in `FullpartList` only.
+
+The new system has one screen for both. **Inventory → Part Query** answers from Part Master as before. A part
+not in Part Master is looked up in the catalogue (`PartCatalogueItem`) and shown with its flag, type, price
+category, unit and rates. A user with `sparepart:create` chooses the part's category and clicks **Create part**.
+The name, flag, type, unit, tax status, price category, dealer rate and retail rate are copied, and the query then
+shows the new part with its (empty) stock grids. Parts are never created from an MIT, so this is how a new Mobis
+part gets into Part Master.
+
+**Inventory → Mobis Catalogue** shows how many parts the catalogue holds and when it was last loaded. A user with
+`sparepart:create` and `sparepart:update` loads the Mobis price list there (.xls, .xlsx, .csv or tab-separated
+text). Columns are found by header: part no., part name and dealer rate (`DR` / `FINALDR`) are required; flag,
+part category and retail rate (`RR` / `NEW RR (NAIRA)`) are optional, matching the legacy price list layout.
+
+- New part numbers are added; known ones take the list's name, flag, category and rates. Part Master is not
+  changed: re-rating Part Master parts is a separate job.
+- Retail rate is the list's own, else dealer rate × the price category multiplier, as on `FullpartList`.
+- Rows with an unknown or inactive price category, an unreadable rate or a part number already listed in the file
+  are left out and listed before loading.
+- The browser sends the list in batches of 2,000 parts, each saved whole or not at all. If a batch fails, the
+  batches before it are kept, and loading the file again is safe.
+
 ### Part sources and source records
 
 The part flag codes double as **part sources**: O Mobis (original part), A authorised source, F FOC item,

@@ -4,6 +4,7 @@ import { inventoryKeys } from "../api/inventory.keys";
 import {
   adjustStockRequest,
   createAlternateRequest,
+  createPartFromCatalogueRequest,
   createPartRequest,
   createSourceRecordRequest,
   deletePartRequest,
@@ -56,6 +57,20 @@ export function useCreatePart() {
     onSuccess: (part) => {
       refresh(part);
       toast.success(`Part ${part.partNumber} created`);
+    },
+    onError: (error) => toast.error(partErrorMessage(error, "Failed to create part")),
+  });
+}
+
+/** Legacy Part Enquiry > Create Part: copies the Mobis catalogue row into Part Master. */
+export function useCreatePartFromCatalogue() {
+  const refresh = useInvalidateParts();
+  return useMutation({
+    mutationFn: ({ partNumber, category }: { partNumber: string; category: string }) =>
+      createPartFromCatalogueRequest(partNumber, category),
+    onSuccess: (part) => {
+      refresh(part);
+      toast.success(`Part ${part.partNumber} created in Part Master`);
     },
     onError: (error) => toast.error(partErrorMessage(error, "Failed to create part")),
   });

@@ -437,6 +437,54 @@ export class InventoryController {
     }
   };
 
+  catalogueSummary = async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.catalogueSummary();
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  importPriceList = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.importPriceList(req.body.rows);
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createPartFromCatalogue = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.createPartFromCatalogue(
+        req.params.partNumber,
+        req.body.category,
+        req.user?.userId,
+      );
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Part created successfully",
+        data: { part: result },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   updateStockLocation = async (
     req: Request,
     res: Response,

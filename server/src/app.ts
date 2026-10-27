@@ -44,6 +44,8 @@ app.use(
 );
 // Count sheet uploads and annual batches carry thousands of parts.
 app.use("/api/stock-takes", express.json({ limit: "10mb" }));
+// Mobis price list batches (2,000 rows each).
+app.use("/api/inventory/part-catalogue/import", express.json({ limit: "2mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

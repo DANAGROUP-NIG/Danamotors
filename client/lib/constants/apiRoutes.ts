@@ -99,6 +99,11 @@ export const API_ROUTES = {
       query: "/inventory/parts/query",
       categories: "/inventory/part-categories",
     },
+    catalogue: {
+      base: "/inventory/part-catalogue",
+      import: "/inventory/part-catalogue/import",
+      createPart: (partNumber: string) => `/inventory/part-catalogue/${encodeURIComponent(partNumber)}/part`,
+    },
   },
   finance: {
     quotations: {

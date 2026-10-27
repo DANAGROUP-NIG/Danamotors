@@ -151,7 +151,8 @@ MIS reports merged or left out, so that no report repeats another:
   its quantities, so there is never a mismatch to list.
 - **Log Report of Counter Sale / STN Editing** is left out: bills and STNs cannot be edited once posted.
   A bill can only be cancelled, and cancellations are on the Counter Sales Cancellation Register.
-- **Part Enquiry** is Part Query (**Inventory → Part Query**), which also shows alternates and other branches.
+- **Part Enquiry** is part of Part Query (**Inventory → Part Query**): a part not in Part Master is found in
+  the Mobis catalogue and can be created from it. See [masters.md](./masters.md#mobis-catalogue-and-part-enquiry).
 - **Data Downloading** and **Data Uploading** (full part list and part master files between CPD and the
   branches) are left out: every branch works in the one database.
 - **Only Top Movers** is left out, as on the stock reports, and so are the profitability's **With / without

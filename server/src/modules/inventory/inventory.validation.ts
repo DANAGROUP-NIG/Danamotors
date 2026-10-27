@@ -388,6 +388,32 @@ export const partQueryQuerySchema = z.object({
   }),
 });
 
+// The browser reads the whole Mobis price list and sends it in batches of up to 2,000 rows.
+export const PRICE_LIST_BATCH_MAX = 2000;
+
+export const importPriceListSchema = z.object({
+  body: z.object({
+    rows: z
+      .array(
+        z.object({
+          partNumber: z.string().trim().min(1, "Part number is required").max(40),
+          name: z.string().trim().min(1, "Part name is required").max(200),
+          partFlag: z.string().trim().max(2).optional(),
+          priceCategoryCode: z.string().trim().max(2).nullable().optional(),
+          dealerRate: z.number().positive("Dealer rate must be greater than zero"),
+          retailRate: z.number().nonnegative().nullable().optional(),
+        }),
+      )
+      .min(1, "No price list rows")
+      .max(PRICE_LIST_BATCH_MAX, `Send at most ${PRICE_LIST_BATCH_MAX} rows at a time`),
+  }),
+});
+
+export const createPartFromCatalogueSchema = z.object({
+  params: z.object({ partNumber: z.string().trim().min(1).max(40) }),
+  body: z.object({ category: basePartMasterFields.category }),
+});
+
 const optionalLocationText = (max: number) =>
   z
     .string()

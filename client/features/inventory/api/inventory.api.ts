@@ -8,7 +8,9 @@ import type {
   PartListResponse,
   PartMaster,
   PartMasterPayload,
-  PartQueryResult,
+  PartCatalogueSummary,
+  PartQueryResponse,
+  PriceListRow,
   PartStockItem,
   PartSources,
   SourceRecordPayload,
@@ -114,9 +116,29 @@ export async function getPriceCategoriesRequest(): Promise<PriceCategory[]> {
   return data.categories;
 }
 
-/** Legacy Part Query: premises locations, alternates and other branches for one part number. */
+/**
+ * Legacy Part Query: premises locations, alternates and other branches for one part number; a part not
+ * in Part Master comes back from the Mobis catalogue (legacy Part Enquiry).
+ */
 export function partQueryRequest(partNumber: string, branchId?: string) {
-  return apiGet<PartQueryResult>(`${API_ROUTES.inventory.parts.query}${qs({ partNumber, branchId })}`);
+  return apiGet<PartQueryResponse>(`${API_ROUTES.inventory.parts.query}${qs({ partNumber, branchId })}`);
+}
+
+// ── Mobis catalogue (legacy FullpartList) ───────────────────────────────────
+
+export function getCatalogueSummaryRequest() {
+  return apiGet<PartCatalogueSummary>(API_ROUTES.inventory.catalogue.base);
+}
+
+export function importPriceListRequest(rows: PriceListRow[]) {
+  return apiPost<{ added: number; updated: number }, { rows: PriceListRow[] }>(API_ROUTES.inventory.catalogue.import, { rows });
+}
+
+export async function createPartFromCatalogueRequest(partNumber: string, category: string): Promise<PartMaster> {
+  const data = await apiPost<{ part: RawPart }, { category: string }>(API_ROUTES.inventory.catalogue.createPart(partNumber), {
+    category,
+  });
+  return normalizePart(data.part);
 }
 
 export async function adjustStockRequest(payload: {

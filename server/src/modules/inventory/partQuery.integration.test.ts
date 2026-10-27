@@ -74,8 +74,15 @@ describeDb('Part Query (database)', () => {
     expect(created).toMatchObject({ quantity: 0, rackLocation: 'M2-BOX' });
   });
 
+  /** Part Query for a Part Master part. */
+  async function query(partNumber: string, homeBranchId: string) {
+    const result = await inventory.partQuery(partNumber, homeBranchId);
+    if (result.source !== 'PART_MASTER') throw new Error(`${partNumber} came from the catalogue`);
+    return result;
+  }
+
   it('returns the three legacy grids', async () => {
-    const result = await inventory.partQuery(`pq${run}`, ids.qs);
+    const result = await query(`pq${run}`, ids.qs);
     expect(result.part).toMatchObject({ dealerRate: 9056.34, retailRate: 18746.62, taxable: true, partFlag: 'O' });
     expect(result.locations.map((l) => [l.branchId, l.currentStock])).toEqual([
       [ids.kp, 5],
@@ -123,8 +130,60 @@ describeDb('Part Query (database)', () => {
   });
 
   it('finds a part by part number in any case and reports unknown parts', async () => {
-    const byNumber = await inventory.partQuery(`pq${run}`.toLowerCase(), ids.kp);
+    const byNumber = await query(`pq${run}`.toLowerCase(), ids.kp);
     expect(byNumber.part.id).toBe(ids.main);
     await expect(inventory.partQuery(`NOPE${run}`, ids.kp)).rejects.toThrow(/not found/);
+  });
+
+  describe('Mobis catalogue (legacy Part Enquiry)', () => {
+    const catNo = `CT${run}`;
+
+    afterAll(async () => {
+      await prisma?.partCatalogueItem.deleteMany({ where: { partNumber: { startsWith: `CT${run}` } } });
+    });
+
+    it('adds new price list parts and re-rates known ones', async () => {
+      const first = await inventory.importPriceList([
+        { partNumber: catNo.toLowerCase(), name: 'TRANSFER ASSY', priceCategoryCode: 'E', dealerRate: 2731733.64 },
+        { partNumber: `${catNo}B`, name: 'HOSE', dealerRate: 100, retailRate: 333 },
+      ]);
+      expect(first).toEqual({ added: 2, updated: 0 });
+      const second = await inventory.importPriceList([
+        { partNumber: catNo, name: 'TRANSFER ASSY-NEW', priceCategoryCode: 'E', dealerRate: 1000 },
+      ]);
+      expect(second).toEqual({ added: 0, updated: 1 });
+      const row = await prisma.partCatalogueItem.findUniqueOrThrow({ where: { partNumber: catNo } });
+      expect(row).toMatchObject({ name: 'TRANSFER ASSY-NEW', dealerRate: 1000, retailRate: 2500, partFlag: 'O', uom: 'UNIT' });
+      await expect(
+        inventory.importPriceList([{ partNumber: `${catNo}C`, name: 'X', priceCategoryCode: 'ZZ', dealerRate: 1 }]),
+      ).rejects.toThrow(/unknown price category ZZ/);
+      expect(await prisma.partCatalogueItem.count({ where: { partNumber: `${catNo}C` } })).toBe(0);
+    });
+
+    it('answers Part Query from the catalogue when the part is not in Part Master', async () => {
+      const result = await inventory.partQuery(catNo.toLowerCase(), ids.kp);
+      expect(result.source).toBe('CATALOGUE');
+      if (result.source !== 'CATALOGUE') return;
+      expect(result.catalogue).toMatchObject({ partNumber: catNo, name: 'TRANSFER ASSY-NEW', dealerRate: 1000 });
+    });
+
+    it('creates the part from the catalogue once', async () => {
+      const part = await inventory.createPartFromCatalogue(catNo.toLowerCase(), 'Transmission');
+      expect(part).toMatchObject({
+        partNumber: catNo,
+        name: 'TRANSFER ASSY-NEW',
+        category: 'Transmission',
+        unitRate: 1000,
+        retailRate: 2500,
+        priceCategoryCode: 'E',
+        partFlag: 'O',
+        partType: 'S',
+        taxable: true,
+      });
+      const result = await query(catNo, ids.kp);
+      expect(result.part.id).toBe(part.id);
+      await expect(inventory.createPartFromCatalogue(catNo, 'Transmission')).rejects.toThrow(/already in Part Master/);
+      await expect(inventory.createPartFromCatalogue(`${catNo}X`, 'Other')).rejects.toThrow(/not in the Mobis catalogue/);
+    });
   });
 });

@@ -36,10 +36,10 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
 
 ## Rules
 
-- **New parts.** Invoice parts missing from Part Master are refused unless "create new parts"
-  is ticked, which it is by default. Created parts get the invoice name, part code = part number,
-  category "Mobis import", and a dealer rate of unit price × conversion rate. Complete their
-  details in Part Master afterwards. The MIT marks them as NEW.
+- **New parts.** Parts are never created from an invoice. Invoice parts missing from Part Master
+  are refused unless the user chooses to proceed without them, which leaves their lines off the
+  MIT. To receive them, create them first from **Part Query** (they are found in the Mobis
+  catalogue, see [masters.md](./masters.md#mobis-catalogue-and-part-enquiry)), then upload again.
 - **No double import.** The same Mobis invoice number cannot be imported twice unless the
   earlier MIT was cancelled.
 - **No double posting.** An MIT has at most one MRN. The MIT row is locked while the MRN is

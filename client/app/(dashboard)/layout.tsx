@@ -30,6 +30,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/repairs": ["jobcard:update", "workshop:read"],
   "/technicians": ["workshop:read"],
   "/inventory/part-query": [INVENTORY_PERMISSIONS.STOCK_READ],
+  "/inventory/part-catalogue": [INVENTORY_PERMISSIONS.SPAREPART_READ],
   "/inventory/mobis-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],
   "/inventory/mobis-receipts": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/vendor-receipts/new": [INVENTORY_PERMISSIONS.STOCK_UPDATE],

@@ -29,6 +29,8 @@ import {
   branchPartParamSchema,
   stockQuerySchema,
   partQueryQuerySchema,
+  importPriceListSchema,
+  createPartFromCatalogueSchema,
   updateStockLocationSchema,
 } from './inventory.validation';
 
@@ -857,12 +859,14 @@ router.use(authMiddleware);
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: Part Query (legacy Master > Part Query)
+ *     summary: Part Query (legacy Master > Part Query and Part Enquiry)
  *     description: |
  *       Looks up a part by part number (or part code) and returns three grids:
  *       stock at every store location of the home premises (a branch plus its sub-locations),
  *       the same for each alternate part, and stock at the other branches. Each row carries part flag,
  *       tax status, current stock, location, bin card, dealer rate, retail rate and quantity blocked.
+ *       `source` is `PART_MASTER`. A part missing from Part Master but in the Mobis catalogue returns
+ *       `source: CATALOGUE` with the catalogue row instead (legacy Part Enquiry), so it can be created.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -886,7 +890,58 @@ router.use(authMiddleware);
  *                   - { branchName: "Utako Branch", currentStock: 12, location: "AUTO", binCard: "AUTO" }
  *                   - { branchName: "Victoria Island", currentStock: 52, location: "QSB" }
  *       404:
- *         description: Part not found
+ *         description: Part in neither Part Master nor the Mobis catalogue
+ */
+/**
+ * @openapi
+ * /inventory/part-catalogue:
+ *   get:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Mobis catalogue size and last update (legacy FullpartList)
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200: { description: "{ count, lastUpdatedAt }" }
+ * /inventory/part-catalogue/import:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Load one batch of the Mobis price list into the catalogue
+ *     description: |
+ *       The browser reads the price list file and sends it in batches of up to 2,000 rows. New part numbers
+ *       are added; known ones take the new name and rates. Retail rate is the list's, else dealer rate x the
+ *       price category multiplier. A batch with a repeated part number or an unknown or inactive price category
+ *       is not saved. Part Master is not changed.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example:
+ *             rows:
+ *               - { partNumber: "473004G350", name: "TRANSFER ASSY", partFlag: "O", priceCategoryCode: "E", dealerRate: 2731733.64 }
+ *     responses:
+ *       200: { description: "{ added, updated }" }
+ *       400: { description: Invalid rows; nothing in the batch was saved }
+ * /inventory/part-catalogue/{partNumber}/part:
+ *   post:
+ *     tags:
+ *       - Inventory & Parts
+ *     summary: Create a Part Master part from the Mobis catalogue (legacy Part Enquiry > Create Part)
+ *     description: Copies the catalogue's name, flag, type, unit, tax status, price category and rates.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - { in: path, name: partNumber, required: true, schema: { type: string, example: "473004G350" } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { category: "Transmission" }
+ *     responses:
+ *       201: { description: Part created }
+ *       404: { description: Not in the catalogue }
+ *       409: { description: Already in Part Master }
  */
 /**
  * @openapi
@@ -910,6 +965,9 @@ router.use(authMiddleware);
 router.get('/part-categories', requirePermission(PERMISSIONS.SPAREPART_READ), controller.listPartCategories);
 router.use('/part-categories', partCategoryRoutes);
 router.get('/parts/query', requirePermission(PERMISSIONS.SPAREPART_READ, PERMISSIONS.STOCK_READ), validateRequest(partQueryQuerySchema), controller.partQuery);
+router.get('/part-catalogue', requirePermission(PERMISSIONS.SPAREPART_READ), controller.catalogueSummary);
+router.post('/part-catalogue/import', requirePermission(PERMISSIONS.SPAREPART_CREATE, PERMISSIONS.SPAREPART_UPDATE), validateRequest(importPriceListSchema), controller.importPriceList);
+router.post('/part-catalogue/:partNumber/part', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartFromCatalogueSchema), controller.createPartFromCatalogue);
 router.get('/parts/:id', requirePermission(PERMISSIONS.SPAREPART_READ), validateRequest(partMasterIdParamSchema), controller.getPart);
 
 router.post('/parts', requirePermission(PERMISSIONS.SPAREPART_CREATE), validateRequest(createPartMasterSchema), controller.createPart);
