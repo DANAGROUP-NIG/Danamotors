@@ -118,8 +118,14 @@ describeDb("Parts reports (database)", () => {
   });
 
   it("summarises bills, splits taxable and exempt value by day, and lists cancellations", async () => {
-    // Defaults to the legacy executive-wise layout: value by part type before the cash discount.
-    const summary = await report("counter-sales-summary");
+    // Defaults to the legacy Register Summary: the period's bills in one credit line.
+    const total = await report("counter-sales-summary");
+    expect(total.rows).toEqual([
+      expect.objectContaining({ section: "Credit", bills: 1, sparesTaxable: 273313.81, oilExempt: 28200, handling: 0, tradeDiscount: 0, discount: 67840.61, net: 249550 }),
+    ]);
+
+    // The legacy executive-wise layout: value by part type before the cash discount.
+    const summary = await report("counter-sales-summary", { option: "EXECUTIVE" });
     expect(summary.rows).toEqual([expect.objectContaining({ spares: 273313.81, accessories: 0, oil: 28200, net: 249550, roundOff: -9.57 })]);
 
     const datewise = await report("counter-sales-summary", { option: "DAY" });

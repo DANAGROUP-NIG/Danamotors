@@ -31,7 +31,7 @@ title, filters, options and columns are defined once, in
 | Legacy report | Kind | What it shows |
 |---|---|---|
 | Counter Sales Register | `counter-sales` | **Show** Bills (legacy layout, one line per bill: spares/kit and oil value, each taxable and non-taxable, cash discount, VAT, round-off and total amount) or Lines (every bill line: part, quantity, rate, discount, VAT and net, before the bill's round-off). Filters: customer, part filters. With a part filter, Bills lists only the matching lines' value and no round-off |
-| Counter Sales Register Summary, Counter Sales Tax Register (Datewise), Sales Executive Wise Counter Sales Register | `counter-sales-summary` | **Group by** Bill (one line per bill: sales executive, taxable and exempt value, VAT, round-off, outstanding and status), Sales executive (the same bills under each executive, with subtotals) or Day (one line per day: bills, taxable and exempt value, VAT, round-off and net). Filters: customer, sales executive |
+| Counter Sales Register Summary, Counter Sales Tax Register (Datewise), Sales Executive Wise Counter Sales Register | `counter-sales-summary` | **Group by** Total (the legacy Register Summary: the period's bills in one Credit line, with spares/kit and oil each taxable and non-taxable, handling, discount, cash discount, VAT, accessories, round-off and total), Sales executive (each bill under its executive, with spares, accessories and oil, discounts, VAT, round-off, net, outstanding and status, and subtotals) or Day (one line per day: bills, spare total, handling, discounts, taxable and exempt value, VAT, round-off and net). Filters: customer, sales executive |
 | Counter Sales Tax Register (Annexure) | `counter-sales-tax-annexure` | Bill-wise VAT with customer address; can list cancelled bills, which are never totalled |
 | Counter Sales Return Register | `counter-sales-returns` | Returned lines at the bill's discount and VAT, with the credit note number |
 | Counter Sales Cancellation Register | `counter-sales-cancellations` | Cancelled bills: All, Counter sales, or FOC (a 100% cash discount) |
@@ -90,15 +90,27 @@ Counter-sale reports merged or left out, so that no report repeats another:
 
 - The legacy **Counter Sales Register Summary**, **Counter Sales Tax Register (Datewise)** and **Sales
   Executive Wise Counter Sales Register** all totalled the same bills, so they are the three **Group by**
-  choices of one report. The legacy executive screen took a *From exec* and *To exec* range; the
+  choices of one report. On **Total**, accessories have their own column and are not in the spares/kit
+  value, so the columns add up to the total. The legacy executive screen took a *From exec* and *To exec* range; the
   **Sales executive** filter picks one executive, or all.
 - **Cash and credit totals** (legacy printed every bill register in a CASH and a CREDIT section) are left
-  out. Part sale is a CPD feature and every CPD bill is on credit. What is still owed is on the summary's
+  out. CPD never made a cash bill, and the branches made none after 2009. Every bill here is on credit. The summary's **Total** prints the one Credit line. What is still owed is on the summary's
   Outstanding and Status columns.
 - **Accessories** have no column of their own: as on the legacy register, they are in the spares/kit value.
   The **Part type** filter still splits any register by type.
-- **Handling, entry tax, LST surcharge, other charges and CST** columns are left out: no CPD bill has them
-  (handling is applied only on some branch cash and credit bills, which part sale does not cover).
+- **Handling** and the trade **Discount** (legacy DISCOUNT, apart from CASH DISCOUNT) are kept on the
+  register, the summary and the annexure. CPD charged handling in 2011 and 2013. Lagos charged it every
+  year from 2011 to 2025, and ABJ from 2011 to 2016 and in 2021. A trade discount was given at Lagos
+  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. A bill here can carry only a cash
+  discount, so both columns show zero until bills can record them.
+- **Entry tax, LST surcharge and other charges** are left out: they are zero on every counter-sale bill,
+  in every year, in all three databases.
+- **Tax form is not covered yet.** Legacy gave each bill a tax form: L (VAT, a local sale), X
+  (TRNSFR WO/V, a transfer without VAT), or P, Y or Z (purchase forms). The datewise register's
+  "Local sales" and "Central sales" blocks split bills by form, and the annexure groups them under the
+  form's name. CPD billed form X up to 2024 (15 non-VAT-form bills since 2010, one of ₦19.3m in 2022),
+  and Lagos billed form X in 2026. Our bills have no tax form, so a bill without VAT cannot be told
+  apart from a bill of VAT-exempt parts.
 
 Stock reports merged or left out, so that no report repeats another:
 

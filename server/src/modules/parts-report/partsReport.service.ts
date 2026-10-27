@@ -49,6 +49,8 @@ const CHARGE_COLUMN: Record<ChargeType, string> = { CUSTOMER: "job", WARRANTY: "
 const CONSUMPTION_AMOUNTS: Record<string, string> = { job: "jobAmount", counterSale: "counterSaleAmount" };
 /** Legacy part flag F: samples, issued at no value. */
 const SAMPLE_FLAG = "F";
+/** Legacy counter-sale handling and trade discount: bills cannot carry them yet (see SALE_HANDLING). */
+const NO_SALE_CHARGES = { handling: 0, tradeDiscount: 0 };
 
 /** A document's heading line, as legacy prints it: "number · dd/mm/yyyy · store". */
 const documentHeading = (number: string, date: Date, store: string) =>
@@ -194,6 +196,7 @@ export class PartsReportService {
         customerCode: i.customer.code,
         customer: partyName(i.customer),
         ...row,
+        ...NO_SALE_CHARGES,
         roundOff,
         net: money(row.sparesTaxable + row.sparesExempt + row.oilTaxable + row.oilExempt - row.discount + row.vat + roundOff),
       };
@@ -249,9 +252,13 @@ export class PartsReportService {
     return { taxable: money(taxable), exempt: money(exempt) };
   }
 
-  /** Bills grouped by sales executive (legacy Sales Executive Wise register), or one line per day (legacy datewise register). */
+  /**
+   * The period's bills in one line (legacy Register Summary), bills grouped by sales executive (legacy
+   * Sales Executive Wise register), or one line per day (legacy datewise register).
+   */
   private async counterSalesSummary(f: ReportFilters): Promise<Row[]> {
     if (f.option === "DAY") return this.taxDatewise(f);
+    if (f.option === "TOTAL") return this.saleTotal(f);
     const invoices = await this.saleInvoices(f);
     const rows = invoices.map((i) => {
       // Value by part type before discount, as the legacy executive register printed it.
@@ -266,6 +273,7 @@ export class PartsReportService {
         billNumber: i.invoiceNumber,
         customer: partyName(i.customer),
         ...byType,
+        ...NO_SALE_CHARGES,
         discount: i.partsDiscountAmount,
         vat: i.vatAmount,
         roundOff: i.roundOff,
@@ -277,12 +285,33 @@ export class PartsReportService {
     return rows.sort((a, b) => a.group.localeCompare(b.group));
   }
 
+  /** Legacy Counter Sale Register Summary: spares/kit and oil (taxable and non-taxable) and accessories before discount, then discount, VAT, round-off and total. */
+  private async saleTotal(f: ReportFilters): Promise<Row[]> {
+    const invoices = await this.saleInvoices(f);
+    if (invoices.length === 0) return [];
+    const row = { sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
+    for (const i of invoices) {
+      for (const l of i.lines) {
+        const { gross } = lineValues(l.quantity, l.rate, 0, null);
+        const column =
+          l.part?.partType === "A" ? "accessories" : (`${l.part?.partType === "O" ? "oil" : "spares"}${(l.vatPercent ?? 0) > 0 ? "Taxable" : "Exempt"}` as const);
+        row[column] = money(row[column] + gross);
+      }
+      row.discount = money(row.discount + i.partsDiscountAmount);
+      row.vat = money(row.vat + i.vatAmount);
+      row.roundOff = money(row.roundOff + i.roundOff);
+      row.net = money(row.net + i.total);
+    }
+    // Every bill is on credit (legacy printed a CASH and a CREDIT line; no cash bill since 2018).
+    return [{ section: "Credit", bills: invoices.length, ...row, ...NO_SALE_CHARGES }];
+  }
+
   private async taxDatewise(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f);
     const days = new Map<string, Row>();
     for (const i of invoices) {
       const day = LAGOS_DAY.format(i.issuedDate);
-      const row = days.get(day) ?? { date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
+      const row = days.get(day) ?? { date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, ...NO_SALE_CHARGES, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
       const split = this.taxSplit(i);
       row.bills = Number(row.bills) + 1;
       for (const [key, value] of Object.entries({
@@ -310,6 +339,7 @@ export class PartsReportService {
       customer: partyName(i.customer),
       address: [i.customer.house, i.customer.street, i.customer.address, i.customer.city, i.customer.state].filter(Boolean).join(", "),
       gross: i.partsTotal,
+      ...NO_SALE_CHARGES,
       discount: i.partsDiscountAmount,
       ...this.taxSplit(i),
       vat: i.vatAmount,
