@@ -38,6 +38,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../shared/erro
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationPayload, NotificationService } from "../notification/notification.service";
 import { reportEnd, reportStart } from "../finance/party-report";
+import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import { indentablePartWhere, indentProblem } from "../inventory/partSource";
 import {
   DOC_TYPES,
@@ -1009,6 +1010,9 @@ export class StockTransferService {
     if (picking && released.length === picking.lines.length) {
       await tx.pickingList.update({ where: { id: picking.id }, data: { status: PickingListStatus.CANCELLED } });
     }
+    if (picking && released.length) {
+      await cancelSentHandheldDocuments(tx, { pickingListId: picking.id }, "Indent lines cancelled on the web", actorId);
+    }
 
     let total = 0;
     const now = new Date();
@@ -1043,6 +1047,61 @@ export class StockTransferService {
       await refreshIndentStatus(tx, indentId, actorId, [{ to: from, remarks: historyRemark(total) }]);
     }
     return total;
+  }
+
+  /**
+   * Applies a handheld pick to an open picking list (legacy HHDC BI upload of QtyUploaded): each line's
+   * reservation drops to what was physically picked and the short goes back to the indent's back order,
+   * as dispatch does with picked-but-unshipped units. A list with nothing picked is cancelled, so the
+   * indent can be picked again. Runs inside the caller's transaction.
+   */
+  async applyHandheldPickInTx(
+    tx: Tx,
+    pickingListId: string,
+    picked: { pickingLineId: string; quantity: number }[],
+    pickerName: string,
+    actorId: string,
+  ): Promise<{ short: number; cancelled: boolean }> {
+    const head = await tx.pickingList.findUnique({ where: { id: pickingListId }, select: { indentId: true } });
+    if (!head) throw new NotFoundError("Picking list not found");
+    const from = await lockIndent(tx, head.indentId);
+    const picking = await tx.pickingList.findUniqueOrThrow({
+      where: { id: pickingListId },
+      include: { lines: { include: { part: { select: { partNumber: true } } } }, indent: { select: { indentNumber: true } } },
+    });
+    if (picking.status !== PickingListStatus.OPEN) {
+      throw new ConflictError(`Picking list ${picking.pickingNumber} is ${picking.status.toLowerCase()}; the handheld result cannot be applied`);
+    }
+
+    let short = 0;
+    for (const line of [...picking.lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
+      const entry = picked.find((p) => p.pickingLineId === line.id);
+      if (!entry) continue;
+      if (entry.quantity > line.pickedQuantity) {
+        throw new ConflictError(`${line.part.partNumber}: ${entry.quantity} picked but only ${line.pickedQuantity} reserved now`);
+      }
+      const released = line.pickedQuantity - entry.quantity;
+      if (released === 0) continue;
+      const stock = await lockStock(tx, picking.branchId, line.partId);
+      if (!stock || stock.reservedQuantity < released) {
+        throw new ConflictError("Reserved stock does not match the picking list; contact an administrator");
+      }
+      await tx.inventoryStock.update({ where: { id: stock.id }, data: { reservedQuantity: { decrement: released } } });
+      await tx.pickingListLine.update({ where: { id: line.id }, data: { pickedQuantity: entry.quantity } });
+      await tx.branchIndentLine.update({ where: { id: line.indentLineId }, data: { backOrderQuantity: { increment: released } } });
+      short += released;
+    }
+
+    const remaining = await tx.pickingListLine.aggregate({ where: { pickingListId }, _sum: { pickedQuantity: true } });
+    const cancelled = (remaining._sum.pickedQuantity ?? 0) === 0;
+    await tx.pickingList.update({
+      where: { id: pickingListId },
+      data: { pickerName: picking.pickerName ?? pickerName, ...(cancelled && { status: PickingListStatus.CANCELLED }) },
+    });
+    const remarks = `Handheld pick by ${pickerName}${short ? `: ${short} unit(s) short, back to back order` : ": picked in full"}`;
+    if (cancelled) await refreshIndentStatus(tx, head.indentId, actorId, [{ to: from, remarks }]);
+    else await recordHistory(tx, head.indentId, [{ from, to: from, remarks }], actorId);
+    return { short, cancelled };
   }
 
   /**
@@ -1304,6 +1363,12 @@ export class StockTransferService {
         where: { id: { in: pickings.map((p) => p.id) } },
         data: { status: PickingListStatus.COMPLETED, stnId: stn.id, completedById: actorId, completedAt: now },
       });
+      await cancelSentHandheldDocuments(
+        tx,
+        pickings.map((p) => ({ pickingListId: p.id })),
+        `Dispatched on STN ${stn.stnNumber} before the handheld result was uploaded`,
+        actorId,
+      );
       const indentNumberOf = new Map(pickLines.map((l) => [l.id, l.indentNumber]));
       await tx.stockTransaction.createMany({
         data: stn.lines.map((line) => ({

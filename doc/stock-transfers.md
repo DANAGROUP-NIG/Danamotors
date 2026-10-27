@@ -134,7 +134,7 @@ with `inventory:cross-branch` and super admins can act on any branch.
 | `BranchIndentDetail` (orderid, UrgentQty, Qty, BackOrdQty, Rate, VIN, Registrationno, Model, Jobno, JobDate, AuthorisedBy, ApprovalDate, partflag) | `BranchIndent` and `BranchIndentLine` |
 | `PickingHead`, `PickingDetail` | `PickingList`, `PickingListLine` |
 | `countersale` with trantype `M`, and `csissue` (parts STN; `OrderNo` = indent, empty on a direct STN) | `StockTransferNote` (linked to its indents), `StockTransferNoteLine` |
-| HHDC `BI` picking downloads (one indent each; picker recorded) | `PickingList` with `pickerName`; HHDC itself is not integrated yet |
+| HHDC `BI` picking downloads (one indent each; picker recorded) | `PickingList` with `pickerName`; picking on the handheld: [handheld.md](./handheld.md) |
 | `CaseHeader` and `CaseDetail` with trantype `CB` | `TransferCase`, `TransferCaseLine` |
 | `CaseHeader` with trantype `PB` (PackId, WayBillNo, CourierName, ConsignmentWeight) | `PackingList` |
 | `branchInTransithead`, `branchInTransitDetail` (PartOrdered vs PARTNO, QTYRECIEVED, QtyRejected) | The STN and its lines: the received, damaged and short totals on `StockTransferNoteLine` |

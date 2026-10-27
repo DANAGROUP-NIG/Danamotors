@@ -9,6 +9,7 @@ datasource db {
 
 model Branch {
   requisitions           PartRequisition[]
+  handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
   returnSlips            PartReturnSlip[]
   labourSlips            LabourSlip[]
   standaloneEstimates    Estimate[]
@@ -84,6 +85,9 @@ model Branch {
 
 model User {
   createdRequisitions            PartRequisition[]      @relation("RequisitionCreator")
+  handheldDocumentsSent          HandheldDocument[]     @relation("HandheldDocumentSentBy")
+  handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
+  handheldDocumentsCancelled     HandheldDocument[]     @relation("HandheldDocumentCancelledBy")
   cancelledRequisitions          PartRequisition[]      @relation("RequisitionCanceller")
   engineeredRequisitions         PartRequisition[]      @relation("RequisitionEngineer")
   createdReturnSlips             PartReturnSlip[]       @relation("ReturnSlipCreator")
@@ -823,9 +827,10 @@ enum PartRole {
 
 model SparePart {
   requisitionLines      PartRequisitionLine[]
+  handheldLines         HandheldDocumentLine[] @relation("HandheldLinePart")
   reportTaxCategoryCode String?
-  reportTaxCategory     PartTaxCategory?      @relation(fields: [reportTaxCategoryCode], references: [code], onDelete: Restrict)
-  id                    String                @id @default(uuid())
+  reportTaxCategory     PartTaxCategory?       @relation(fields: [reportTaxCategoryCode], references: [code], onDelete: Restrict)
+  id                    String                 @id @default(uuid())
 
   partCode   String @unique @default(uuid())
   partNumber String @unique
@@ -2399,7 +2404,8 @@ model PickingList {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lines PickingListLine[]
+  lines             PickingListLine[]
+  handheldDocuments HandheldDocument[]
 
   @@index([indentId])
   @@index([stnId])
@@ -2429,7 +2435,8 @@ model PickingListLine {
 
   createdAt DateTime @default(now())
 
-  stnLine StockTransferNoteLine?
+  stnLine       StockTransferNoteLine?
+  handheldLines HandheldDocumentLine[]
 
   @@unique([pickingListId, indentLineId])
   @@index([partId])
@@ -2627,8 +2634,9 @@ model MaterialInTransit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lines MaterialInTransitLine[]
-  mrn   MaterialReceiptNote?
+  lines             MaterialInTransitLine[]
+  mrn               MaterialReceiptNote?
+  handheldDocuments HandheldDocument[]
 
   @@index([vendor, invoiceNumber])
   @@index([status])
@@ -2667,7 +2675,8 @@ model MaterialInTransitLine {
 
   createdAt DateTime @default(now())
 
-  mrnLines MaterialReceiptLine[]
+  mrnLines      MaterialReceiptLine[]
+  handheldLines HandheldDocumentLine[]
 
   @@index([mitId])
   @@index([partId])
@@ -3349,7 +3358,8 @@ model CustomerOrder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lines CustomerOrderLine[]
+  lines             CustomerOrderLine[]
+  handheldDocuments HandheldDocument[]
 
   @@index([branchId, status])
   @@index([customerId])
@@ -3378,7 +3388,8 @@ model CustomerOrderLine {
 
   createdAt DateTime @default(now())
 
-  invoiceLines InvoiceLine[]
+  invoiceLines  InvoiceLine[]
+  handheldLines HandheldDocumentLine[]
 
   @@unique([orderId, partId])
   @@index([partId])
@@ -3619,6 +3630,119 @@ model StockTakeCount {
   @@index([lineId])
 }
 
+// Handheld (HHDC) documents other than stock-take sheets: a picking list, a CPO or a Mobis MIT sent to
+// the handheld and the result uploaded from it (legacy HHDCDownloadHead/Detail for BI and CPO, and the
+// MIT/BIT pctohhdc/hhdctopc line flags). At most one SENT document per source (partial unique indexes).
+model HandheldDocument {
+  id             String                 @id @default(uuid())
+  documentNumber String                 @unique
+  type           HandheldDocumentType
+  status         HandheldDocumentStatus @default(SENT)
+
+  // Exactly one source, matching the type (check constraint in the migration).
+  pickingListId   String?
+  pickingList     PickingList?       @relation(fields: [pickingListId], references: [id], onDelete: Cascade)
+  customerOrderId String?
+  customerOrder   CustomerOrder?     @relation(fields: [customerOrderId], references: [id], onDelete: Cascade)
+  mitId           String?
+  mit             MaterialInTransit? @relation(fields: [mitId], references: [id], onDelete: Cascade)
+
+  // Branch whose stock is picked or received.
+  branchId String
+  branch   Branch @relation("HandheldDocumentBranch", fields: [branchId], references: [id], onDelete: Restrict)
+
+  // Who works the device (legacy picker / checker); pickers do not sign in.
+  pickerId   String?
+  picker     Employee? @relation("HandheldDocumentPicker", fields: [pickerId], references: [id], onDelete: SetNull)
+  pickerName String
+
+  lineCount Int
+
+  sentById      String?
+  sentBy        User?     @relation("HandheldDocumentSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  sentAt        DateTime  @default(now())
+  // Server time of the upload; the device clock is not trusted.
+  uploadedById  String?
+  uploadedBy    User?     @relation("HandheldDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt    DateTime?
+  cancelledById String?
+  cancelledBy   User?     @relation("HandheldDocumentCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelledAt   DateTime?
+  cancelRemark  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines HandheldDocumentLine[]
+
+  @@index([type, status])
+  @@index([branchId])
+  @@index([pickingListId])
+  @@index([customerOrderId])
+  @@index([mitId])
+}
+
+// One line as sent (snapshot) and, after upload, what the device recorded. A line keeps its result
+// when its source line is later deleted (an indent line cancelled after the upload).
+model HandheldDocumentLine {
+  id         String           @id @default(uuid())
+  documentId String
+  document   HandheldDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lineNumber Int
+
+  pickingListLineId   String?
+  pickingListLine     PickingListLine?       @relation(fields: [pickingListLineId], references: [id], onDelete: SetNull)
+  customerOrderLineId String?
+  customerOrderLine   CustomerOrderLine?     @relation(fields: [customerOrderLineId], references: [id], onDelete: SetNull)
+  mitLineId           String?
+  mitLine             MaterialInTransitLine? @relation(fields: [mitLineId], references: [id], onDelete: SetNull)
+
+  // Expected part; null only for an extra part scanned on an MIT that is not in Part Master.
+  partId      String?
+  part        SparePart? @relation("HandheldLinePart", fields: [partId], references: [id], onDelete: Restrict)
+  partNumber  String
+  partName    String?
+  binLocation String?
+  caseNumber  String?
+
+  // Reserved quantity (picking) or invoiced quantity (MIT) when sent; 0 for an extra part.
+  expectedQuantity Int
+  // An MIT part that is not on the MIT (legacy newpart); recorded for the store, never posted.
+  extra            Boolean @default(false)
+
+  // Device result: picked or received in good condition, damaged (MIT), why less than expected,
+  // and a different part scanned in place of the expected one (substitute, for the store to decide).
+  quantity          Int?
+  damagedQuantity   Int                  @default(0)
+  shortReason       HandheldShortReason?
+  scannedPartNumber String?
+  note              String?
+
+  @@unique([documentId, lineNumber])
+  @@index([pickingListLineId])
+  @@index([customerOrderLineId])
+  @@index([mitLineId])
+}
+
+enum HandheldDocumentType {
+  INDENT_PICK
+  CPO_PICK
+  MIT_RECEIVE
+}
+
+enum HandheldDocumentStatus {
+  SENT
+  UPLOADED
+  CANCELLED
+}
+
+enum HandheldShortReason {
+  NOT_FOUND
+  DAMAGED
+  LESS_IN_BIN
+  OTHER
+}
+
 model PartTaxCategory {
   code  String      @id
   name  String
@@ -3688,9 +3812,10 @@ enum EmployeeGrade {
 // Every workshop employee, with or without a login. Legacy jobs name mechanics,
 // the main mechanic and the employee group by these codes.
 model Employee {
-  id   String @id @default(uuid())
-  code String
-  name String
+  id                String             @id @default(uuid())
+  handheldDocuments HandheldDocument[] @relation("HandheldDocumentPicker")
+  code              String
+  name              String
 
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)

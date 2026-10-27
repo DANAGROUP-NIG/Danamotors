@@ -91,7 +91,7 @@ All endpoints are under `/api/part-sale`: `GET /customers`, `GET /parts`,
 | Legacy (CPDAutoEnhancer) | New |
 | --- | --- |
 | `CUSTOMERORDERHEAD` / `customerorderdetail` with OrderType `C` | `CustomerOrder`, `CustomerOrderLine` |
-| `QtyPicked`, HHDC `CPO` picking downloads, `PickingHead` | `CustomerOrderLine.pickedQuantity` and reserved stock |
+| `QtyPicked`, HHDC `CPO` picking downloads, `PickingHead` | `CustomerOrderLine.pickedQuantity` and reserved stock; picking on the handheld: [handheld.md](./handheld.md) |
 | `countersale` with trantype `C` | `Invoice` + `CounterSale` (despatch mode, transporter, GR no./date, cases, sales executive) |
 | `csissue` with trantype `C` (`OrderNo` = CPO) | `InvoiceLine` with `customerOrderLineId` and `vatPercent` |
 | `csrethead` / `csretdetail` | `CounterSaleReturn`, `CounterSaleReturnLine`, and a `SALE_RETURN` credit note |
