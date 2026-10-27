@@ -22,7 +22,6 @@ const partSelect = {
     partFlag: true,
     unitPrice: true,
     priceCategoryCode: true,
-    binLocation: true,
     minLevel: true,
     maxLevel: true,
     reorderQty: true,
@@ -160,7 +159,7 @@ export class StockReportService {
         reserved: s.reservedQuantity,
         minimumStock: s.minimumStock,
         maximumStock: s.maximumStock,
-        bin: s.rackLocation ?? s.part.binLocation ?? "",
+        bin: s.rackLocation ?? "",
         binCard: s.binCard,
         movements: byHolding.get(`${s.branchId}:${s.part.id}`) ?? [],
       }))

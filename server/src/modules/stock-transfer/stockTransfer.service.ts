@@ -88,11 +88,8 @@ const partSelect = {
     partNumber: true,
     partCode: true,
     name: true,
-    description: true,
     uom: true,
     unitPrice: true,
-    binLocation: true,
-    storeLocation: true,
     role: true,
     mainPartId: true,
     sourceOfPartId: true,
@@ -255,11 +252,12 @@ interface LockedStock {
   quantity: number;
   reservedQuantity: number;
   minimumStock: number;
+  rackLocation: string | null;
 }
 
 export async function lockStock(tx: Tx, branchId: string, partId: string): Promise<LockedStock | null> {
   const rows = await tx.$queryRaw<LockedStock[]>`
-    SELECT "id", "quantity", "reservedQuantity", "minimumStock"
+    SELECT "id", "quantity", "reservedQuantity", "minimumStock", "rackLocation"
     FROM "InventoryStock"
     WHERE "branchId" = ${branchId} AND "partId" = ${partId}
     FOR UPDATE`;
@@ -866,7 +864,8 @@ export class StockTransferService {
           isAlternate: supplied.id !== line.partId,
           availableQuantity: Math.max(0, available),
           pickedQuantity: plan.pickedQuantity,
-          binLocation: supplied.binLocation,
+          // The bin is where the supplying branch keeps the part.
+          binLocation: stock.rackLocation,
         });
       }
       if (plan.backOrderQuantity > 0) {

@@ -7,7 +7,7 @@
  * stockReport.service.ts, so they agree with the stock ledger. Rate and bin changes are the
  * history Part Master keeps (inventory/partHistory.ts).
  */
-import { CustomerOrderStatus, IndentStatus, PartChangeAction, Prisma } from "@prisma/client";
+import { CustomerOrderStatus, IndentStatus, PartChangeAction } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { reportEnd } from "../finance/party-report";
 import { money } from "../finance/money";
@@ -382,25 +382,17 @@ export class MisReportService {
       }));
   }
 
-  /** Bin changes at the branch (rack location) and in Part Master, which applies to every branch. */
+  /** Changes of a part's bin (rack location) at a branch. */
   private async binHistory(f: ReportFilters): Promise<Row[]> {
-    const where: Prisma.PartBinHistoryWhereInput =
-      f.option === "PART_MASTER"
-        ? { branchId: null }
-        : f.option === "BRANCH"
-          ? { branchId: f.branchId ?? { not: null } }
-          : f.branchId
-            ? { OR: [{ branchId: f.branchId }, { branchId: null }] }
-            : {};
     const entries = await prisma.partBinHistory.findMany({
-      where: { ...where, changedAt: dateRange(f), part: partWhere(f) },
+      where: { ...(f.branchId && { branchId: f.branchId }), changedAt: dateRange(f), part: partWhere(f) },
       include: { part: partSelect, branch: { select: { name: true } }, changedBy: userSelect },
       orderBy: { changedAt: "asc" },
     });
     return entries.map((e) => ({
       changedAt: e.changedAt.toISOString(),
       ...partColumns(e.part),
-      location: e.branch?.name ?? "Part Master",
+      location: e.branch.name,
       oldBin: e.oldBin,
       newBin: e.newBin,
       by: userName(e.changedBy),

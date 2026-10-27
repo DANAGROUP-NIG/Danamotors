@@ -41,7 +41,6 @@ export const createSparePartSchema = z.object({
   body: z.object({
     partNumber: z.string().min(1, "Part number is required"),
     name: z.string().min(1, "Name is required"),
-    description: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
     branchStock: z
       .array(
@@ -59,7 +58,6 @@ export const createSparePartSchema = z.object({
 export const updateSparePartSchema = z.object({
   body: z.object({
     name: z.string().optional(),
-    description: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
   }),
   params: z.object({
@@ -148,8 +146,6 @@ const basePartMasterFields = {
     .toUpperCase()
     .max(2, "Part category must be 1 or 2 characters")
     .optional(),
-  binLocation: z.string().optional(),
-  storeLocation: z.string().optional(),
   // Legacy partmast.WTYAPPLICABLE / warrrate.
   warrantyApplicable: z.boolean().optional(),
   warrantyRate: z.number().nonnegative('Warranty rate must be 0 or more').nullable().optional(),
@@ -194,8 +190,6 @@ export const updatePartMasterSchema = z.object({
       partFlag: basePartMasterFields.partFlag,
       partType: basePartMasterFields.partType,
       priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
-      binLocation: basePartMasterFields.binLocation,
-      storeLocation: basePartMasterFields.storeLocation,
       warrantyApplicable: basePartMasterFields.warrantyApplicable,
       warrantyRate: basePartMasterFields.warrantyRate,
       partStatus: partStatusEnum.optional(),
@@ -242,7 +236,6 @@ export const createSourceRecordSchema = z.object({
       dealerRate: z.number().finite().positive("Dealer rate must be greater than zero"),
       // Omitted: L (local consumable, 1.5x) for local, used and repaired records, else the main part's category.
       priceCategoryCode: z.string().trim().toUpperCase().max(2, "Part category must be 1 or 2 characters").nullable().optional(),
-      binLocation: z.string().trim().max(30).optional(),
     })
     .strict(),
 });

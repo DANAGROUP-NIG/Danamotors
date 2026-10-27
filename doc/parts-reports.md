@@ -117,7 +117,7 @@ Physical stock taking and stock audit reports merged or left out:
 - The legacy menus had nine report screens over the same count lines. Here they are two reports (physical
   counts and audits) with options, and two logs. See [stock-taking.md](./stock-taking.md#reports).
 - **Bin Location Updation Mismatch** had the same screen as **Part BIN Location History** (Part Master and
-  PST bin location updation). A stock taking's bin update is a branch bin change on that report.
+  PST bin location updation). Both changed a store's bin, as a stock taking's bin update does here.
 - The **S/E Approved By**, **Checker** and **Auditor** filters are left out. The **Summary** shows who
   approved each count, and **Checker wise** / **Auditor wise** lists each person's parts under their name.
 
@@ -137,7 +137,7 @@ The legacy **MIS Reports** menu.
 | Profitability Statement, Profitability Statement Revised | `profitability` | Sale value against cost, by kind: counter sales, FOC bills, workshop jobs, PDI jobs, STNs and SANs; cost FIFO or at dealer rate. **Only summary** totals by part category |
 | Percent Fill Report | `percent-fill` | Ordered against supplied, part by part: CPO quantities billed and branch indent quantities sent on STNs. **Order type** CPO, branch indent or all |
 | Part Rate History | `part-rate-history` | Every dealer and retail rate set in Part Master, with date, time and user. **Changed retail rate**, **Changed dealer rate**, **Both**, or **Only deleted records** (parts deleted from Part Master) |
-| Part BIN Location History | `part-bin-history` | Every bin change, with date, time and user: the branch's rack location, the Part Master bin, or both |
+| Part BIN Location History | `part-bin-history` | Every change of a part's bin (rack location) at a branch, with date, time and user |
 | Packing List Cum Gate Pass Report for STN | `packing-list-register` | Packing lists for STNs sent from the branch, **Branch**, **Courier name**, **Packing list date** or **Packing list no.** wise: each case and part, or with **Only summary** one line per packing list (gate pass, STN, mode, courier, waybill, cases, quantity, weight and value) |
 
 MIS reports merged or left out, so that no report repeats another:
@@ -234,9 +234,8 @@ MIS reports merged or left out, so that no report repeats another:
   still being approved, picked or back-ordered) are shown but not counted; fill % is supplied ÷ (supplied
   + not supplied).
 - **Rate and bin history** start when this system went live: Part Master records each part added,
-  re-rated or deleted, and each bin change, including parts created from a Mobis invoice. The rate history
-  covers every branch (rates are the same everywhere). A Part Master bin change shows on every branch's bin
-  history.
+  re-rated or deleted, and each branch bin change. The rate history covers every branch (rates are the same
+  everywhere); a bin change belongs to one branch, as in legacy.
 
 ## Tests
 

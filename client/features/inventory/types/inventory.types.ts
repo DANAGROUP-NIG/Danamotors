@@ -50,7 +50,6 @@ export type PartMaster = LegacyPartFields & {
   partCode: string;
   partNumber: string;
   name: string;
-  description: string | null;
   uom: string;
   taxCategory: string | null;
   taxForm: string | null;
@@ -69,8 +68,6 @@ export type PartMaster = LegacyPartFields & {
   partType: string;
   /** Legacy pricing category (A, C, E…); its multiplier derives the retail rate. */
   priceCategoryCode: string | null;
-  binLocation: string | null;
-  storeLocation: string | null;
   partStatus: PartStatus;
   /** Legacy partmast.WTYAPPLICABLE: only these parts can be claimed under warranty. */
   warrantyApplicable: boolean;
@@ -96,7 +93,6 @@ export type PartSourceRecord = {
   priceCategoryCode: string | null;
   dealerRate: number;
   retailRate: number | null;
-  binLocation: string | null;
   /** Stock at the branch asked for; null when no branch was given. */
   stock: { quantity: number; available: number; rackLocation: string | null } | null;
 };
@@ -108,7 +104,6 @@ export type SourceRecordPayload = {
   partNumber: string;
   dealerRate: number;
   priceCategoryCode?: string | null;
-  binLocation?: string;
 };
 
 export type PartMasterPayload = {
@@ -126,8 +121,6 @@ export type PartMasterPayload = {
   partFlag?: string;
   partType?: string;
   priceCategoryCode?: string | null;
-  binLocation?: string;
-  storeLocation?: string;
   partStatus?: PartStatus;
   warrantyApplicable?: boolean;
   warrantyRate?: number | null;
@@ -162,7 +155,6 @@ export type PartListResponse = {
 export type AlternatePartPayload = {
   partNumber: string;
   name: string;
-  description?: string;
 };
 
 export type PartStockItem = {
@@ -245,7 +237,6 @@ export type PartQueryResult = {
     id: string;
     partNumber: string;
     name: string;
-    description: string | null;
     uom: string;
     partFlag: string;
     taxable: boolean;

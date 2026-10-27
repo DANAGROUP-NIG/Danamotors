@@ -225,7 +225,7 @@ export function OrderDetail({ id }: { id: string }) {
                         </Link>
                       </td>
                       <td className={cn(tdCls, "max-w-64 truncate")}>{l.part.name}</td>
-                      <td className={cn(tdCls, "font-mono text-slate-500")}>{l.part.binLocation ?? ""}</td>
+                      <td className={cn(tdCls, "font-mono text-slate-500")}>{l.bin ?? ""}</td>
                       <td className={cn(tdCls, "text-right")}>{l.orderedQuantity}</td>
                       <td className={cn(tdCls, "text-right", l.pickedQuantity ? "font-medium text-blue-700" : "text-slate-300")}>{l.pickedQuantity}</td>
                       <td className={cn(tdCls, "text-right", l.billedQuantity ? "font-medium text-emerald-700" : "text-slate-300")}>{l.billedQuantity}</td>

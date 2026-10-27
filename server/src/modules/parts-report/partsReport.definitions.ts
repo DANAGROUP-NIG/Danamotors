@@ -1327,15 +1327,9 @@ export const REPORTS: ReportDefinition[] = [
     kind: "part-bin-history",
     title: "Part Bin Location History",
     group: "MIS",
-    description: "Every change of a part's bin: the branch's rack location, or the default bin in Part Master.",
+    description: "Every change of a part's bin (rack location) at a branch.",
     permission: PERMISSIONS.STOCK_READ,
-    filters: [...PART_FILTERS, "option"],
-    labels: { option: "Show" },
-    options: [
-      { value: "ALL", label: "All" },
-      { value: "BRANCH", label: "Branch bin changes" },
-      { value: "PART_MASTER", label: "Part Master bin changes" },
-    ],
+    filters: PART_FILTERS,
     columns: [
       datetime("changedAt", "Changed on"),
       ...PART_COLUMNS,

@@ -35,7 +35,7 @@ const STATUS_OPTIONS = [
 
 export const PART_EXPORT_COLUMNS = [
   { key: "partNumber", label: "Part Number" },
-  { key: "name", label: "Name" },
+  { key: "name", label: "Part Description" },
   { key: "uom", label: "UOM" },
   { key: "taxCategory", label: "Tax Category" },
   { key: "taxForm", label: "Tax Form" },
@@ -47,8 +47,6 @@ export const PART_EXPORT_COLUMNS = [
   { key: "taxable", label: "Taxable" },
   { key: "unitRate", label: "Dealer Rate" },
   { key: "retailRate", label: "Retail Rate" },
-  { key: "binLocation", label: "Bin Location" },
-  { key: "storeLocation", label: "Store Location" },
   { key: "partStatus", label: "Status" },
   { key: "role", label: "Role" },
 ];
@@ -68,8 +66,6 @@ export function partExportRow(p: PartMaster): Record<string, string | number> {
     taxable: p.taxable ? "Yes" : "No",
     unitRate: p.unitRate,
     retailRate: p.retailRate ?? "",
-    binLocation: p.binLocation ?? "",
-    storeLocation: p.storeLocation ?? "",
     partStatus: p.partStatus,
     role: p.role,
   };
@@ -168,12 +164,6 @@ export function PartMasterTable() {
       headerClassName: "whitespace-nowrap text-right",
       className: "whitespace-nowrap text-right font-medium tabular-nums text-foreground",
       render: (p) => (p.retailRate != null ? fmtNaira(p.retailRate) : "—"),
-    },
-    {
-      header: "Location",
-      headerClassName: "pl-8",
-      className: "whitespace-nowrap pl-8 text-muted-foreground",
-      render: (p) => [p.binLocation, p.storeLocation].filter(Boolean).join(" · ") || "—",
     },
     { header: "Role", className: "whitespace-nowrap", render: (p) => <PartRoleBadge role={p.role} /> },
     { header: "Status", className: "whitespace-nowrap", render: (p) => <PartStatusBadge status={p.partStatus} /> },

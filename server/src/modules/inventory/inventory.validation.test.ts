@@ -97,8 +97,6 @@ describe("createPartMasterSchema", () => {
       minLevel: 10,
       maxLevel: 100,
       reorderQty: 50,
-      binLocation: "A-12-3",
-      storeLocation: "Main Warehouse",
       partStatus: "ACTIVE" as const,
     };
     const result = await createPartMasterSchema.parseAsync({

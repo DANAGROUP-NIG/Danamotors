@@ -35,7 +35,6 @@ export class InventoryRepository {
   async createSparePart(data: {
     partNumber: string;
     name: string;
-    description?: string;
     unitPrice?: number;
   }, changedById?: string): Promise<SparePart> {
     return this.createTracked(data, changedById);
@@ -59,7 +58,6 @@ export class InventoryRepository {
     partCode?: string;
     partNumber: string;
     name: string;
-    description?: string | null;
     uom: string;
     taxCategory?: string | null;
     taxForm?: string | null;
@@ -72,8 +70,6 @@ export class InventoryRepository {
     partFlag?: string;
     partType?: string;
     priceCategoryCode?: string | null;
-    binLocation?: string | null;
-    storeLocation?: string | null;
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     // Source records: the main part this local, used or repaired record is a source of.
@@ -82,7 +78,7 @@ export class InventoryRepository {
     return this.createTracked(data, changedById);
   }
 
-  // Every create, rate or bin change and delete is kept in the part's rate and bin history.
+  // Every create, rate change and delete is kept in the part's rate history.
   private async createTracked(data: Prisma.SparePartUncheckedCreateInput, changedById?: string): Promise<SparePart> {
     return prisma.$transaction(async (tx) => {
       const part = await tx.sparePart.create({ data: { ...data, ...canonicalPartTax(data.taxCategory) } });

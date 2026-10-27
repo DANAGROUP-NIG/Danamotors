@@ -125,6 +125,15 @@ derives the retail rate. In the code it is `priceCategoryCode`. The free-text "C
 first version of Part Master had is removed: no legacy database has such a field and nothing used it. The stock
 taking **Part type** filter, which wrongly used it, now uses the legacy part type (S spare part, O oil, A accessory).
 
+**Part description** is legacy `partmast.partdesc`, the part's only text (in the code `name`). The separate free-text
+description is removed, for the same reason.
+
+**Location** is not on the part. Legacy `partmast` has no bin or store; legacy keeps each part's location per store
+(`PARTBAL.location` and `bincard`), and every legacy bin change (`PartBinHistory`) belongs to a store. Here that is the
+branch stock record's **rack location** and **bin card**, shown in Part Query and the branch stock, and set from
+**Inventory → stock location** or a stock taking's **Update bins**. The part-level bin and store location are removed,
+so pickings, CPOs, vendor receipts, reports and stock taking always show the branch's own bin.
+
 | Legacy field | New field |
 | --- | --- |
 | vehiclesystem, vehiclegroup | `vehicleSystem`, `vehicleGroup` (codes; suggested from the masters) |

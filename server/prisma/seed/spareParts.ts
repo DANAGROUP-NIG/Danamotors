@@ -154,7 +154,6 @@ export default async function seedSpareParts(prisma: PrismaClient) {
         partNumber: p.partNumber,
         name: p.name,
         unitPrice: p.unitPrice,
-        description: `${p.name} — genuine replacement part`,
       })),
       skipDuplicates: true,
     });

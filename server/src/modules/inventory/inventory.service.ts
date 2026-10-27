@@ -28,7 +28,6 @@ const INHERITABLE_FIELDS = [
   "partFlag",
   "partType",
   "priceCategoryCode",
-  "storeLocation",
 ] as const;
 
 type InheritableField = (typeof INHERITABLE_FIELDS)[number];
@@ -37,7 +36,6 @@ type InheritedDefaults = Pick<SparePart, InheritableField>;
 interface CreateMainPartInput {
   partNumber: string;
   name: string;
-  description?: string;
   uom?: string;
   taxCategory?: string;
   taxForm?: string;
@@ -46,8 +44,6 @@ interface CreateMainPartInput {
   mainPartId?: string;
   reorderQty?: number;
   unitPrice?: number;
-  binLocation?: string;
-  storeLocation?: string;
   branchStock?: {
     branchId: string;
     quantity: number;
@@ -61,8 +57,6 @@ interface CreateAlternatePartInput {
   mainPartId: string;
   partNumber: string;
   name: string;
-  description?: string;
-  binLocation?: string;
   // Any of these, if provided, OVERRIDE the inherited value from main.
   overrides?: Partial<InheritedDefaults>;
 }
@@ -257,7 +251,6 @@ export class InventoryService {
     id: string,
     data: {
       name?: string;
-      description?: string;
       unitPrice?: number;
     },
     changedById?: string,
@@ -321,8 +314,6 @@ export class InventoryService {
       mainPartId,
       partNumber,
       name,
-      description,
-      binLocation,
       overrides,
     } = data;
 
@@ -332,8 +323,6 @@ export class InventoryService {
           mainPartId,
           partNumber,
           name,
-          description,
-          binLocation,
           role: PartRole.ALTERNATE,
           ...inherited,
           ...overrides,
@@ -463,8 +452,6 @@ export class InventoryService {
     partFlag?: string;
     partType?: string;
     priceCategoryCode?: string;
-    binLocation?: string;
-    storeLocation?: string;
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     warrantyRate?: number | null;
@@ -558,8 +545,6 @@ export class InventoryService {
       partFlag?: string;
       partType?: string;
       priceCategoryCode?: string | null;
-      binLocation?: string;
-      storeLocation?: string;
       partStatus?: PartStatus;
       warrantyApplicable?: boolean;
       warrantyRate?: number | null;
@@ -649,7 +634,6 @@ export class InventoryService {
         priceCategoryCode: record.priceCategoryCode,
         dealerRate: record.unitPrice,
         retailRate: record.retailRate,
-        binLocation: record.binLocation,
         stock: branchId
           ? { quantity: stock?.quantity ?? 0, available: (stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0), rackLocation: stock?.rackLocation ?? null }
           : null,
@@ -666,7 +650,7 @@ export class InventoryService {
    */
   async createSourceRecord(
     mainPartId: string,
-    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null; binLocation?: string | null },
+    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null },
     changedById?: string,
   ) {
     const main = await prisma.sparePart.findUnique({
@@ -694,7 +678,6 @@ export class InventoryService {
           partCode: partNumber,
           partNumber,
           name: main.name,
-          description: `${sourceLabel(data.source)} source of ${main.partNumber}`,
           uom: main.uom,
           taxCategory: main.taxCategory,
           taxForm: main.taxForm,
@@ -708,7 +691,6 @@ export class InventoryService {
           retailRate,
           partFlag: data.source,
           priceCategoryCode,
-          binLocation: data.binLocation?.trim() || null,
           partStatus: PartStatus.ACTIVE,
           warrantyApplicable: false,
           sourceOfPartId: main.id,

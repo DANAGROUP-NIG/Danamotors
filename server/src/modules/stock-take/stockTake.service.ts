@@ -142,7 +142,7 @@ export class StockTakeService {
         partId: true,
         quantity: true,
         rackLocation: true,
-        part: { select: { partNumber: true, name: true, partFlag: true, unitPrice: true, binLocation: true } },
+        part: { select: { partNumber: true, name: true, partFlag: true, unitPrice: true } },
       },
     });
     let rows = stocks
@@ -151,7 +151,7 @@ export class StockTakeService {
         partNumber: st.part.partNumber,
         name: st.part.name,
         partFlag: st.part.partFlag,
-        bin: st.rackLocation ?? st.part.binLocation ?? "",
+        bin: st.rackLocation ?? "",
         dealerRate: st.part.unitPrice,
         stock: st.quantity,
       }))
@@ -543,10 +543,10 @@ export class StockTakeService {
     const byId = [...new Set(entries.filter((e) => e.partId).map((e) => e.partId!))];
     const byNumber = [...new Set(entries.filter((e) => !e.partId && e.partNumber?.trim()).map((e) => e.partNumber!.trim().toUpperCase()))];
     const parts = [
-      ...(byId.length ? await tx.sparePart.findMany({ where: { id: { in: byId } }, select: { id: true, partNumber: true, binLocation: true } }) : []),
+      ...(byId.length ? await tx.sparePart.findMany({ where: { id: { in: byId } }, select: { id: true, partNumber: true } }) : []),
       ...(byNumber.length
-        ? await tx.$queryRaw<{ id: string; partNumber: string; binLocation: string | null }[]>`
-            SELECT "id", "partNumber", "binLocation" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${byNumber}::text[])`
+        ? await tx.$queryRaw<{ id: string; partNumber: string }[]>`
+            SELECT "id", "partNumber" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${byNumber}::text[])`
         : []),
     ];
     const missing = byId.find((pid) => !parts.some((p) => p.id === pid));
@@ -587,7 +587,7 @@ export class StockTakeService {
             stockTakeId: take.id,
             partId: part?.id ?? null,
             partNumber: part?.partNumber ?? group.partNumber!,
-            binLocation: st?.rackLocation ?? part?.binLocation ?? null,
+            binLocation: st?.rackLocation ?? null,
             systemStock: st?.quantity ?? 0,
             addedDuringCount: true,
           },
@@ -718,8 +718,8 @@ export class StockTakeService {
   private async relinkUnknownParts(tx: Tx, take: { id: string; branchId: string; type: StockTakeType }) {
     const unknown = await tx.stockTakeLine.findMany({ where: { stockTakeId: take.id, partId: null } });
     if (!unknown.length) return;
-    const parts = await tx.$queryRaw<{ id: string; partNumber: string; binLocation: string | null }[]>`
-      SELECT "id", "partNumber", "binLocation" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${unknown.map((l) => l.partNumber.toUpperCase())}::text[])`;
+    const parts = await tx.$queryRaw<{ id: string; partNumber: string }[]>`
+      SELECT "id", "partNumber" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${unknown.map((l) => l.partNumber.toUpperCase())}::text[])`;
     if (!parts.length) return;
     const busy = await this.partsInOpenCounts(tx, take.branchId);
     const stock = await this.stockOf(tx, take.branchId, parts.map((p) => p.id));
@@ -749,7 +749,7 @@ export class StockTakeService {
             partId: part.id,
             partNumber: part.partNumber,
             notRequired: false,
-            binLocation: st?.rackLocation ?? part.binLocation,
+            binLocation: st?.rackLocation ?? null,
             systemStock: st?.quantity ?? 0,
             stockAtCount: st?.quantity ?? 0,
           },
@@ -831,7 +831,7 @@ export class StockTakeService {
     if (!take) throw new NotFoundError("Stock taking not found");
     const lines = await prisma.stockTakeLine.findMany({
       where: { stockTakeId: id, partId: { not: null }, countedBins: { not: null } },
-      select: { id: true, partId: true, partNumber: true, countedBins: true, part: { select: { name: true, partFlag: true, binLocation: true } } },
+      select: { id: true, partId: true, partNumber: true, countedBins: true, part: { select: { name: true, partFlag: true } } },
       orderBy: { partNumber: "asc" },
     });
     const stock = await this.stockOf(prisma, take.branchId, lines.map((l) => l.partId!));
@@ -842,7 +842,7 @@ export class StockTakeService {
         partNumber: l.partNumber,
         name: l.part?.name ?? "",
         partFlag: l.part?.partFlag ?? "",
-        currentBin: stock.get(l.partId!)?.rackLocation ?? l.part?.binLocation ?? null,
+        currentBin: stock.get(l.partId!)?.rackLocation ?? null,
         countedBins: l.countedBins!,
       }))
       .filter((l) => (l.currentBin ?? "").toUpperCase() !== l.countedBins.toUpperCase());

@@ -57,8 +57,6 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     partFlag: part.partFlag,
     partType: (part.partType ?? "S") as PartMasterFormInput["partType"],
     priceCategoryCode: part.priceCategoryCode ?? "",
-    binLocation: part.binLocation ?? "",
-    storeLocation: part.storeLocation ?? "",
     partStatus: part.partStatus,
     warrantyApplicable: part.warrantyApplicable ?? false,
     warrantyRate: part.warrantyRate ?? undefined,
@@ -129,8 +127,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       warrantyRate: values.warrantyRate ?? (isEdit ? null : undefined),
       taxCategory: text(values.taxCategory),
       taxForm: text(values.taxForm),
-      binLocation: text(values.binLocation),
-      storeLocation: text(values.storeLocation),
       vehicleSystem: values.vehicleSystem?.trim() || null,
       vehicleGroup: values.vehicleGroup?.trim() || null,
       applicableModels: (values.applicableModels ?? "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean),
@@ -189,7 +185,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("partNumber")}
             />
           </Field>
-          <Field label="Name" error={errors.name?.message}>
+          <Field label="Part description" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />
           </Field>
           <Field label="Part type" error={errors.partType?.message}>
@@ -355,7 +351,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       </div>
 
       <div className={sectionCls}>
-        <p className={sectionTitle}>Stock levels and location</p>
+        <p className={sectionTitle}>Stock levels</p>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Min level (optional)" error={errors.minLevel?.message}>
             <input type="number" min={0} className={inputCls} {...register("minLevel")} />
@@ -365,12 +361,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           </Field>
           <Field label="Reorder qty (optional)" error={errors.reorderQty?.message}>
             <input type="number" min={0} className={inputCls} {...register("reorderQty")} />
-          </Field>
-          <Field label="Bin location (optional)" error={errors.binLocation?.message}>
-            <input className={inputCls} placeholder="e.g. A-12" {...register("binLocation")} />
-          </Field>
-          <Field label="Store location (optional)" error={errors.storeLocation?.message}>
-            <input className={inputCls} placeholder="e.g. MAINSTORE" {...register("storeLocation")} />
           </Field>
         </div>
       </div>

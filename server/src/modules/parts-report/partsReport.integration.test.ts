@@ -49,14 +49,14 @@ describeDb("Parts reports (database)", () => {
     await prisma.partCategory.upsert({ where: { code: "A" }, update: {}, create: { code: "A", description: "Co-op parts", markupMultiplier: 2.07 } });
     await prisma.partCategory.upsert({ where: { code: "O" }, update: {}, create: { code: "O", description: "Oil & lubricants", markupMultiplier: 1.5 } });
     mirror = await prisma.sparePart.create({
-      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A", binLocation: "53B3" },
+      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A" },
     });
     oil = await prisma.sparePart.create({
       data: { partCode: `RPT-O-${run}`, partNumber: `RPT-O-${run}`, name: "ENGINE OIL 4L", unitPrice: 4700, retailRate: 7050, taxable: false, priceCategoryCode: "O", partType: "O" },
     });
     await prisma.inventoryStock.createMany({
       data: [
-        { branchId: cpd.id, partId: mirror.id, quantity: 10 },
+        { branchId: cpd.id, partId: mirror.id, quantity: 10, rackLocation: "53B3" },
         { branchId: cpd.id, partId: oil.id, quantity: 50 },
       ],
     });

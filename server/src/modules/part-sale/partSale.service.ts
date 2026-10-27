@@ -91,7 +91,7 @@ const customerSelect = {
   },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, binLocation: true, partFlag: true, taxable: true, unitPrice: true },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, taxable: true, unitPrice: true },
 } as const;
 
 const customerName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
@@ -243,13 +243,14 @@ export class PartSaleService {
     if (!order) throw new NotFoundError("Customer purchase order not found");
     const stocks = await prisma.inventoryStock.findMany({
       where: { branchId: order.branchId, partId: { in: order.lines.map((l) => l.partId) } },
-      select: { partId: true, quantity: true, reservedQuantity: true },
+      select: { partId: true, quantity: true, reservedQuantity: true, rackLocation: true },
     });
     return {
       ...order,
       lines: order.lines.map((line) => {
         const stock = stocks.find((s) => s.partId === line.partId);
-        return { ...line, freeStock: stock ? stock.quantity - stock.reservedQuantity : 0 };
+        // The bin is where the order's branch keeps the part (legacy PARTBAL.location).
+        return { ...line, freeStock: stock ? stock.quantity - stock.reservedQuantity : 0, bin: stock?.rackLocation ?? null };
       }),
     };
   }

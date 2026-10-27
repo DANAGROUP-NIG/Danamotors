@@ -16,7 +16,7 @@ const optionalText = (max: number) => z.string().trim().max(max, `Max ${max} cha
 export const partMasterSchema = z
   .object({
     partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
-    name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
+    name: z.string().trim().min(1, "Part description is required").max(200, "Max 200 characters"),
     uom: z.string().trim().min(1, "Unit of measure is required").max(20, "Max 20 characters"),
     taxCategory: optionalText(50),
     taxForm: optionalText(10),
@@ -34,8 +34,6 @@ export const partMasterSchema = z
     partFlag: z.string().trim().min(1, "Purchase source is required").max(2, "Purchase source must be 1 or 2 characters"),
     partType: z.enum(["S", "O", "A"]),
     priceCategoryCode: z.string().optional(),
-    binLocation: optionalText(40),
-    storeLocation: optionalText(40),
     partStatus: z.enum(["ACTIVE", "BLOCKED"]),
     warrantyApplicable: z.boolean(),
     warrantyRate: optionalNumber("Warranty rate"),
@@ -64,8 +62,7 @@ export type PartMasterFormInput = z.input<typeof partMasterSchema>;
 
 export const alternatePartSchema = z.object({
   partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
-  name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
-  description: optionalText(500),
+  name: z.string().trim().min(1, "Part description is required").max(200, "Max 200 characters"),
 });
 
 export type AlternatePartFormValues = z.infer<typeof alternatePartSchema>;

@@ -121,8 +121,6 @@ router.use(authMiddleware);
  *             minLevel: 10
  *             maxLevel: 100
  *             reorderQty: 50
- *             binLocation: A-12-3
- *             storeLocation: Main Warehouse
  *             partStatus: ACTIVE
  *     responses:
  *       201:
@@ -244,8 +242,6 @@ router.use(authMiddleware);
  *             properties:
  *               partNumber: { type: string, example: ENG-OIL-5W30-ALT }
  *               name: { type: string, example: Toyota 5W-30 Engine Oil Alternative (4L) }
- *               description: { type: string }
- *               binLocation: { type: string, example: A-12-4 }
  *     responses:
  *       201:
  *         description: Alternate part created. The response contains its generated `id` and the `mainPartId` from the path.

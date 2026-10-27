@@ -39,7 +39,7 @@ const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, binLocation: true, unitPrice: true, retailRate: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, unitPrice: true, retailRate: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
 } as const;
 
 /** Consumption Report issue columns (legacy order): workshop issues by job type and who pays the line, then the other issues. */
@@ -612,7 +612,7 @@ export class PartsReportService {
     const rack = await this.racks(f, lines.map((l) => l.partId));
     return lines
       .map((l) => ({
-        bin: rack.get(l.partId) ?? l.part.binLocation ?? "",
+        bin: rack.get(l.partId) ?? "",
         partNumber: l.part.partNumber,
         description: l.part.name,
         date: l.mrn.receiptDate.toISOString(),
@@ -718,7 +718,7 @@ export class PartsReportService {
       partNumber: l.part.partNumber,
       description: l.part.name,
       requestedPart: l.isAlternate ? l.requestedPart.partNumber : null,
-      bin: l.binLocation ?? l.part.binLocation,
+      bin: l.binLocation,
       picked: l.pickedQuantity,
       picker: l.pickingList.pickerName || userName(l.pickingList.createdBy),
       status: statusLabel(l.pickingList.status),

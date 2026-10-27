@@ -29,7 +29,6 @@ export type SalePart = {
   partNumber: string;
   name: string;
   uom: string;
-  binLocation: string | null;
   partFlag: string;
   taxable: boolean;
 };
@@ -65,6 +64,8 @@ export type CustomerOrderLine = OrderLineCounts & {
   retailRate: number;
   amount: number;
   freeStock: number;
+  /** Where the order's branch keeps the part (its rack location). */
+  bin: string | null;
   invoiceLines: {
     quantity: number;
     invoice: { id: string; invoiceNumber: string; issuedDate: string; status: string; counterSale: { id: string } | null };
