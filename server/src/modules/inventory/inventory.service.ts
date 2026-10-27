@@ -16,7 +16,6 @@ import { recordBinChange, recordPartChange } from "./partHistory";
 import type { LegacyPartFields } from "./inventory.validation";
 
 const INHERITABLE_FIELDS = [
-  "category",
   "uom",
   "taxCategory",
   "taxForm",
@@ -39,7 +38,6 @@ interface CreateMainPartInput {
   partNumber: string;
   name: string;
   description?: string;
-  category?: string;
   uom?: string;
   taxCategory?: string;
   taxForm?: string;
@@ -74,7 +72,7 @@ interface ListPartsQuery {
   partCode?: string;
   partNumber?: string;
   name?: string;
-  category?: string;
+  priceCategoryCode?: string;
   partStatus?: PartStatus | string;
   role?: PartRole | string;
   mainPartId?: string;
@@ -126,9 +124,9 @@ export class InventoryService {
   ): Promise<number | null> {
     if (!code) return null;
     const category = await prisma.partCategory.findUnique({ where: { code } });
-    if (!category) throw new BadRequestError(`Unknown price category ${code}`);
+    if (!category) throw new BadRequestError(`Unknown part category ${code}`);
     if (!category.isActive)
-      throw new BadRequestError(`Price category ${code} is inactive`);
+      throw new BadRequestError(`Part category ${code} is inactive`);
     return Math.round(dealerRate * category.markupMultiplier * 100) / 100;
   }
 
@@ -260,7 +258,6 @@ export class InventoryService {
     data: {
       name?: string;
       description?: string;
-      category?: string;
       unitPrice?: number;
     },
     changedById?: string,
@@ -371,7 +368,7 @@ export class InventoryService {
       name,
       partCode,
       partNumber,
-      category,
+      priceCategoryCode,
       partStatus,
       mainPartId,
       search,
@@ -383,9 +380,7 @@ export class InventoryService {
       ...(partCode && { partCode }),
       ...(partNumber && { partNumber }),
       ...(name && { name: { contains: name, mode: "insensitive" } }),
-      ...(category && {
-        category: { contains: category, mode: "insensitive" },
-      }),
+      ...(priceCategoryCode && { priceCategoryCode }),
       ...(partStatus && { partStatus: partStatus as PartStatus }),
       ...(role && { role: role as PartRole }),
       ...(mainPartId && { mainPartId }),
@@ -456,7 +451,6 @@ export class InventoryService {
     partCode?: string;
     partNumber: string;
     name: string;
-    category: string;
     uom: string;
     taxCategory?: string;
     taxForm?: string;
@@ -509,7 +503,6 @@ export class InventoryService {
     partCode?: string;
     partNumber?: string;
     name?: string;
-    category?: string;
     partStatus?: PartStatus;
     page?: number;
     limit?: number;
@@ -522,7 +515,6 @@ export class InventoryService {
       partCode: filters?.partCode,
       partNumber: filters?.partNumber,
       name: filters?.name,
-      category: filters?.category,
       partStatus: filters?.partStatus,
       skip,
       take: limit,
@@ -554,7 +546,6 @@ export class InventoryService {
       partCode?: string;
       partNumber?: string;
       name?: string;
-      category?: string;
       uom?: string;
       taxCategory?: string;
       taxForm?: string;
@@ -704,7 +695,6 @@ export class InventoryService {
           partNumber,
           name: main.name,
           description: `${sourceLabel(data.source)} source of ${main.partNumber}`,
-          category: main.category ?? "",
           uom: main.uom,
           taxCategory: main.taxCategory,
           taxForm: main.taxForm,
@@ -987,7 +977,7 @@ export class InventoryService {
   }
 
   /** Legacy Part Enquiry > Create Part: the catalogue row becomes a Part Master part. */
-  async createPartFromCatalogue(partNumber: string, category: string, changedById?: string) {
+  async createPartFromCatalogue(partNumber: string, changedById?: string) {
     const item = await prisma.partCatalogueItem.findUnique({
       where: { partNumber: partNumber.trim().toUpperCase() },
     });
@@ -1004,7 +994,6 @@ export class InventoryService {
       {
         partNumber: item.partNumber,
         name: item.name,
-        category,
         uom: item.uom,
         unitRate: item.dealerRate,
         retailRate: item.retailRate ?? undefined,

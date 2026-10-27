@@ -35,7 +35,7 @@ title, filters, options and columns are defined once, in
 | Counter Sales Tax Register (Annexure) | `counter-sales-tax-annexure` | Bill-wise VAT with customer address; can list cancelled bills, which are never totalled |
 | Counter Sales Return Register | `counter-sales-returns` | Returned lines at the bill's discount and VAT, with the credit note number |
 | Counter Sales Cancellation Register | `counter-sales-cancellations` | Cancelled bills: All, Counter sales, or FOC (a 100% cash discount) |
-| Counter Sale Revenue | `counter-sales-revenue` | Sales less returns by price category against dealer cost, with margin; optionally by customer |
+| Counter Sale Revenue | `counter-sales-revenue` | Sales less returns by part category against dealer cost, with margin; optionally by customer |
 | CPO Register | `cpo-register` | CPO lines with ordered, picked, billed, cancelled and pending; Pending, Cancelled or Executed (and only fully executed) |
 | MRN Register | `mrn-register` | Vendor (Mobis) MRN lines grouped by vendor with subtotals, or **Summary (invoice wise)**: one line per MRN and supplier invoice (filters: vendor, MRN no., part filters) |
 | Material In Transit Report | `mit-register` | Mobis MIT lines by case and order number: invoiced, received, damaged, short and still in transit, valued at the conversion rate; **All** or **Pending** (no MRN yet) |
@@ -181,7 +181,7 @@ MIS reports merged or left out, so that no report repeats another:
     spare, but the branch (AutoEnhancer) has 889 accessories and 122 oils
   - **Purchase source:** Original part (O), Authorised source (A), FOC item (F) or Local (L): the
     legacy part flag
-  - **Part category:** the price category
+  - **Part category:** legacy `partmast.partcategory`
 - **Counter-sale values** are priced exactly as the bill was: cash discount first, then VAT on
   taxable parts. Line totals therefore equal the bill before its round-off to ₦10 below, and
   the round-off is shown on the summary and datewise reports.

@@ -36,7 +36,6 @@ export class InventoryRepository {
     partNumber: string;
     name: string;
     description?: string;
-    category?: string;
     unitPrice?: number;
   }, changedById?: string): Promise<SparePart> {
     return this.createTracked(data, changedById);
@@ -61,7 +60,6 @@ export class InventoryRepository {
     partNumber: string;
     name: string;
     description?: string | null;
-    category: string;
     uom: string;
     taxCategory?: string | null;
     taxForm?: string | null;
@@ -97,7 +95,6 @@ export class InventoryRepository {
     partCode?: string;
     partNumber?: string;
     name?: string;
-    category?: string;
     partStatus?: PartStatus;
     skip?: number;
     take?: number;
@@ -112,9 +109,6 @@ export class InventoryRepository {
     }
     if (filters?.name) {
       where.name = { contains: filters.name, mode: "insensitive" };
-    }
-    if (filters?.category) {
-      where.category = { contains: filters.category, mode: "insensitive" };
     }
     if (filters?.partStatus) {
       where.partStatus = filters.partStatus;

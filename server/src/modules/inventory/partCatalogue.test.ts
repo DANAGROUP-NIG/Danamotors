@@ -38,8 +38,8 @@ describe('preparePriceList', () => {
     expect(items).toEqual([]);
     expect(problems).toEqual([
       'A1 appears more than once',
-      'B1: unknown price category ZZ',
-      'C1: price category R is inactive',
+      'B1: unknown part category ZZ',
+      'C1: part category R is inactive',
     ]);
   });
 });

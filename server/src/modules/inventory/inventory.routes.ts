@@ -71,10 +71,6 @@ router.use(authMiddleware);
  *         schema: { type: string }
  *         description: Filter by part name (case-insensitive partial match)
  *       - in: query
- *         name: category
- *         schema: { type: string }
- *         description: Filter by category (case-insensitive partial match)
- *       - in: query
  *         name: partStatus
  *         schema: { type: string, enum: [ACTIVE, BLOCKED] }
  *         description: Filter by part status
@@ -118,7 +114,6 @@ router.use(authMiddleware);
  *           example:
  *             partNumber: ENG-OIL-5W30
  *             name: Toyota 5W-30 Engine Oil (4L)
- *             category: Lubricants
  *             uom: Litre
  *             unitRate: 4500
  *             taxCategory: VAT
@@ -911,7 +906,7 @@ router.use(authMiddleware);
  *     description: |
  *       The browser reads the price list file and sends it in batches of up to 2,000 rows. New part numbers
  *       are added; known ones take the new name and rates. Retail rate is the list's, else dealer rate x the
- *       price category multiplier. A batch with a repeated part number or an unknown or inactive price category
+ *       part category multiplier. A batch with a repeated part number or an unknown or inactive part category
  *       is not saved. Part Master is not changed.
  *     security:
  *       - BearerAuth: []
@@ -929,15 +924,11 @@ router.use(authMiddleware);
  *     tags:
  *       - Inventory & Parts
  *     summary: Create a Part Master part from the Mobis catalogue (legacy Part Enquiry > Create Part)
- *     description: Copies the catalogue's name, flag, type, unit, tax status, price category and rates.
+ *     description: Copies the catalogue's name, flag, type, unit, tax status, part category and rates.
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - { in: path, name: partNumber, required: true, schema: { type: string, example: "473004G350" } }
- *     requestBody:
- *       content:
- *         application/json:
- *           example: { category: "Transmission" }
  *     responses:
  *       201: { description: Part created }
  *       404: { description: Not in the catalogue }
@@ -949,7 +940,7 @@ router.use(authMiddleware);
  *   get:
  *     tags:
  *       - Inventory & Parts
- *     summary: List price categories (legacy Category master)
+ *     summary: List part categories (legacy Category master)
  *     description: Each category's multiplier derives a part's retail rate from its dealer rate, e.g. category A x 2.07.
  *     security:
  *       - BearerAuth: []
@@ -1014,7 +1005,7 @@ router.get('/parts/:id/replacement-options', requirePermission(PERMISSIONS.SPARE
  *     summary: Add a source record (local, used, repaired...) to a main part
  *     description: >
  *       Creates a Part Master record for the main part from another source, copying its name, UOM, tax and
- *       classification. The retail rate is the dealer rate x the price category multiplier; the category defaults
+ *       classification. The retail rate is the dealer rate x the part category multiplier; the category defaults
  *       to L (local consumable) for L, U and R records and to the main part's category otherwise. One record per
  *       source; source records cannot have source records, alternates or warranty. Suggested part number:
  *       main part number + "-" + source code.

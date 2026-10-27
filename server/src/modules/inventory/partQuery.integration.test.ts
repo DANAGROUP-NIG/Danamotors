@@ -32,7 +32,6 @@ describeDb('Part Query (database)', () => {
     const main = await inventory.createPart({
       partNumber: `PQ${run}`,
       name: 'FILTER ASSY-ENGINE OIL',
-      category: 'Filters',
       uom: 'NOS',
       unitRate: 9056.34,
       retailRate: 18746.62,
@@ -96,11 +95,10 @@ describeDb('Part Query (database)', () => {
     expect(result.otherBranches.some((b) => b.branchId === ids.kp || b.branchId === ids.qs)).toBe(false);
   });
 
-  it('derives the retail rate from the legacy price category', async () => {
+  it('derives the retail rate from the legacy part category', async () => {
     const part = await inventory.createPart({
       partNumber: `RR${run}`,
       name: 'FILTER ASSY-ENGINE OIL',
-      category: 'Filters',
       uom: 'NOS',
       unitRate: 9056.34,
       priceCategoryCode: 'A',
@@ -114,7 +112,7 @@ describeDb('Part Query (database)', () => {
     expect(explicit.retailRate).toBe(25000);
     const recategorised = await inventory.updatePart(part.id, { priceCategoryCode: 'C' });
     expect(recategorised.retailRate).toBe(36630);
-    await expect(inventory.updatePart(part.id, { priceCategoryCode: 'ZZ' })).rejects.toThrow(/Unknown price category/);
+    await expect(inventory.updatePart(part.id, { priceCategoryCode: 'ZZ' })).rejects.toThrow(/Unknown part category/);
   });
 
   it('generates part codes that are unique and unrelated to the part number', async () => {
@@ -156,7 +154,7 @@ describeDb('Part Query (database)', () => {
       expect(row).toMatchObject({ name: 'TRANSFER ASSY-NEW', dealerRate: 1000, retailRate: 2500, partFlag: 'O', uom: 'UNIT' });
       await expect(
         inventory.importPriceList([{ partNumber: `${catNo}C`, name: 'X', priceCategoryCode: 'ZZ', dealerRate: 1 }]),
-      ).rejects.toThrow(/unknown price category ZZ/);
+      ).rejects.toThrow(/unknown part category ZZ/);
       expect(await prisma.partCatalogueItem.count({ where: { partNumber: `${catNo}C` } })).toBe(0);
     });
 
@@ -168,11 +166,10 @@ describeDb('Part Query (database)', () => {
     });
 
     it('creates the part from the catalogue once', async () => {
-      const part = await inventory.createPartFromCatalogue(catNo.toLowerCase(), 'Transmission');
+      const part = await inventory.createPartFromCatalogue(catNo.toLowerCase());
       expect(part).toMatchObject({
         partNumber: catNo,
         name: 'TRANSFER ASSY-NEW',
-        category: 'Transmission',
         unitRate: 1000,
         retailRate: 2500,
         priceCategoryCode: 'E',
@@ -182,8 +179,8 @@ describeDb('Part Query (database)', () => {
       });
       const result = await query(catNo, ids.kp);
       expect(result.part.id).toBe(part.id);
-      await expect(inventory.createPartFromCatalogue(catNo, 'Transmission')).rejects.toThrow(/already in Part Master/);
-      await expect(inventory.createPartFromCatalogue(`${catNo}X`, 'Other')).rejects.toThrow(/not in the Mobis catalogue/);
+      await expect(inventory.createPartFromCatalogue(catNo)).rejects.toThrow(/already in Part Master/);
+      await expect(inventory.createPartFromCatalogue(`${catNo}X`)).rejects.toThrow(/not in the Mobis catalogue/);
     });
   });
 });

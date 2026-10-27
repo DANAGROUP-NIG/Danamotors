@@ -233,7 +233,7 @@ export class MisReportService {
         type,
         row: {
           group: f.branchId ? type : `${h.branch} · ${type}`,
-          ...(f.summary ? { category: category || null, categoryName: categoryName.get(category) ?? "No price category" } : partColumns(h.part)),
+          ...(f.summary ? { category: category || null, categoryName: categoryName.get(category) ?? "No part category" } : partColumns(h.part)),
           quantity: 0,
           sales: 0,
           cost: 0,

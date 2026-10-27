@@ -51,7 +51,6 @@ export type PartMaster = LegacyPartFields & {
   partNumber: string;
   name: string;
   description: string | null;
-  category: string | null;
   uom: string;
   taxCategory: string | null;
   taxForm: string | null;
@@ -115,7 +114,6 @@ export type SourceRecordPayload = {
 export type PartMasterPayload = {
   partNumber: string;
   name: string;
-  category: string;
   uom: string;
   taxCategory?: string;
   taxForm?: string;
@@ -146,7 +144,7 @@ export type UpdatePartMasterPayload = Partial<PartMasterPayload>;
 
 export type PartListParams = {
   search?: string;
-  category?: string;
+  priceCategoryCode?: string;
   partStatus?: PartStatus;
   role?: PartRole;
   mainPartId?: string;

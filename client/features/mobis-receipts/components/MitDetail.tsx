@@ -269,7 +269,7 @@ export function MitDetail({ id }: { id: string }) {
                   </Link>
                 </span>
               ))}
-              . Complete their category, price category and location there.
+              . Complete their part category and location there.
             </p>
           )}
         </div>

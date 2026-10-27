@@ -10,7 +10,6 @@ const mockSparePart = (overrides: Partial<SparePart> = {}): SparePart => ({
   partNumber: "ENG-OIL-5W30",
   name: "Toyota 5W-30 Engine Oil (4L)",
   description: null,
-  category: "Lubricants",
   uom: "Litre",
   taxCategory: null,
   reportTaxCategoryCode: null,
@@ -70,7 +69,6 @@ describe("InventoryService - Part Master", () => {
         partCode: "TYT-OIL-5W30",
         partNumber: "ENG-OIL-5W30",
         name: "Toyota 5W-30 Engine Oil (4L)",
-        category: "Lubricants",
         uom: "Litre",
         unitRate: 4500,
       }, "user-1");
@@ -79,7 +77,6 @@ describe("InventoryService - Part Master", () => {
         partCode: "TYT-OIL-5W30",
         partNumber: "ENG-OIL-5W30",
         name: "Toyota 5W-30 Engine Oil (4L)",
-        category: "Lubricants",
         uom: "Litre",
         unitPrice: 4500,
       }, "user-1");
@@ -97,7 +94,6 @@ describe("InventoryService - Part Master", () => {
           partCode: "TYT-OIL-5W30",
           partNumber: "ENG-OIL-10W40",
           name: "Engine Oil 10W-40 (4L)",
-          category: "Lubricants",
           uom: "Litre",
           unitRate: 7500,
         }),

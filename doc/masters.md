@@ -117,8 +117,13 @@ Per-model time / amount (legacy `labour`: model, time required, amount or time) 
 ## Part master
 
 **Inventory → Parts**. On top of the fields the part already had (number, name, UOM, purchase source / part flag,
-part type, dealer and retail rate, price category, tax category / form, min / max / reorder, warranty), the form's
+part type, dealer and retail rate, part category, tax category / form, min / max / reorder, warranty), the form's
 **Classification and ordering** section keeps the remaining legacy `partmast` fields:
+
+**Part category** is legacy `partmast.partcategory` (A, C, E…, from the Part Category master); its multiplier
+derives the retail rate. In the code it is `priceCategoryCode`. The free-text "Category" (Engine, Brakes…) the
+first version of Part Master had is removed: no legacy database has such a field and nothing used it. The stock
+taking **Part type** filter, which wrongly used it, now uses the legacy part type (S spare part, O oil, A accessory).
 
 | Legacy field | New field |
 | --- | --- |
@@ -143,9 +148,9 @@ and its **Create Part** button copied the catalogue row into `partmast`. Example
 in `FullpartList` only.
 
 The new system has one screen for both. **Inventory → Part Query** answers from Part Master as before. A part
-not in Part Master is looked up in the catalogue (`PartCatalogueItem`) and shown with its flag, type, price
-category, unit and rates. A user with `sparepart:create` chooses the part's category and clicks **Create part**.
-The name, flag, type, unit, tax status, price category, dealer rate and retail rate are copied, and the query then
+not in Part Master is looked up in the catalogue (`PartCatalogueItem`) and shown with its flag, type, part
+category, unit and rates. A user with `sparepart:create` clicks **Create part**, as in legacy, with nothing to fill in.
+The name, flag, type, unit, tax status, part category, dealer rate and retail rate are copied, and the query then
 shows the new part with its (empty) stock grids. Parts are never created from an MIT, so this is how a new Mobis
 part gets into Part Master.
 
@@ -156,8 +161,8 @@ part category and retail rate (`RR` / `NEW RR (NAIRA)`) are optional, matching t
 
 - New part numbers are added; known ones take the list's name, flag, category and rates. Part Master is not
   changed: re-rating Part Master parts is a separate job.
-- Retail rate is the list's own, else dealer rate × the price category multiplier, as on `FullpartList`.
-- Rows with an unknown or inactive price category, an unreadable rate or a part number already listed in the file
+- Retail rate is the list's own, else dealer rate × the part category multiplier, as on `FullpartList`.
+- Rows with an unknown or inactive part category, an unreadable rate or a part number already listed in the file
   are left out and listed before loading.
 - The browser sends the list in batches of 2,000 parts, each saved whole or not at all. If a batch fails, the
   batches before it are kept, and loading the file again is safe.
@@ -174,10 +179,10 @@ its source is its part flag. This link is separate from alternates (supersession
 
 - **Sources card.** The part page lists the main part and its source records with the stock at the current branch,
   the dealer rate and the retail rate. **Add source record** (`sparepart:create`) takes the source, the part number
-  (suggested as main part number + `-` + code, e.g. `54651-U`), the dealer rate and a price category, and copies the
+  (suggested as main part number + `-` + code, e.g. `54651-U`), the dealer rate and a part category, and copies the
   name, UOM, tax and classification from the main part. A source record's page shows the part it is a source of.
   API: `GET`/`POST /api/inventory/parts/:id/sources`.
-- **Price.** Retail = dealer rate × price category multiplier, as for Mobis parts. New local, used and repaired
+- **Price.** Retail = dealer rate × part category multiplier, as for Mobis parts. New local, used and repaired
   records default to category **L** (local consumable, 1.5×), which is how legacy prices local purchases; the
   Mobis general category C is 3.33×. Other sources default to the main part's category. A vendor receipt sets the
   dealer rate to the received cost and recalculates retail the same way (see

@@ -17,20 +17,6 @@ import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues }
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
 
-export const PART_CATEGORIES = [
-  "Engine",
-  "Electrical",
-  "Brakes",
-  "Tyres",
-  "Body",
-  "Lubricants",
-  "Fluids",
-  "Filters",
-  "Suspension",
-  "Transmission",
-  "Accessories",
-  "Other",
-];
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
 const LEGACY_FLAGS = [
@@ -59,7 +45,6 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
   return {
     partNumber: part.partNumber,
     name: part.name,
-    category: part.category ?? "",
     uom: part.uom,
     taxCategory: part.taxCategory ?? "",
     taxForm: part.taxForm ?? "",
@@ -207,14 +192,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           <Field label="Name" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />
           </Field>
-          <Field label="Category" error={errors.category?.message}>
-            <input className={inputCls} list="part-categories" placeholder="Select or type" {...register("category")} />
-            <datalist id="part-categories">
-              {PART_CATEGORIES.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </Field>
           <Field label="Part type" error={errors.partType?.message}>
             <select className={inputCls} {...register("partType")}>
               {Object.keys(PART_TYPE_LABELS).map((code) => (
@@ -260,7 +237,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
           </Field>
-          <Field label="Price category" error={errors.priceCategoryCode?.message}>
+          <Field label="Part category" error={errors.priceCategoryCode?.message}>
             <select className={inputCls} {...register("priceCategoryCode")}>
               <option value="">None</option>
               {(priceCategories ?? [])
@@ -283,8 +260,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             />
             {derivedRetail != null && !retailDirty && (
               <span className="text-sm text-muted-foreground">
-                {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from category {selectedCategory?.code} when
-                the dealer rate or category changes. Type a value to override.
+                {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from part category {selectedCategory?.code} when
+                the dealer rate or part category changes. Type a value to override.
               </span>
             )}
           </Field>

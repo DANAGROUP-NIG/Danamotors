@@ -48,9 +48,9 @@ export interface PartSelection {
   to?: string;
   /** Legacy "Source of Purchase" (O original, A authorised source, L local, F FOC). */
   partFlag?: string;
-  /** Legacy "Part Type" (Part Master category). */
-  category?: string;
-  /** Legacy "Part Category" (price category). */
+  /** Legacy "Part Type" (partmast.parttype): S spare part, O oil, A accessory. */
+  partType?: string;
+  /** Legacy "Part Category" (partmast.partcategory). */
   priceCategoryCode?: string;
   dealerRateFrom?: number;
   dealerRateTo?: number;
@@ -131,7 +131,7 @@ export class StockTakeService {
         part: {
           partStatus: PartStatus.ACTIVE,
           ...(s.partFlag && { partFlag: s.partFlag }),
-          ...(s.category && { category: s.category }),
+          ...(s.partType && { partType: s.partType }),
           ...(s.priceCategoryCode && { priceCategoryCode: s.priceCategoryCode }),
           ...((s.dealerRateFrom != null || s.dealerRateTo != null) && {
             unitPrice: { ...(s.dealerRateFrom != null && { gte: s.dealerRateFrom }), ...(s.dealerRateTo != null && { lte: s.dealerRateTo }) },

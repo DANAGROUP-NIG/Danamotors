@@ -17,7 +17,6 @@ export const partMasterSchema = z
   .object({
     partNumber: z.string().trim().min(1, "Part number is required").max(40, "Max 40 characters"),
     name: z.string().trim().min(1, "Name is required").max(200, "Max 200 characters"),
-    category: z.string().trim().min(1, "Category is required").max(100, "Max 100 characters"),
     uom: z.string().trim().min(1, "Unit of measure is required").max(20, "Max 20 characters"),
     taxCategory: optionalText(50),
     taxForm: optionalText(10),

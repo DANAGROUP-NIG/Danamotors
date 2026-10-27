@@ -25,7 +25,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   return {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
-    category: stock.part.category ?? "",
+    partCategory: stock.part.priceCategoryCode ?? "",
     unitPrice: stock.part.unitPrice,
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
@@ -39,7 +39,7 @@ function exportColumns() {
   return [
     { key: "partName", label: "Part Name" },
     { key: "partNumber", label: "Part Number" },
-    { key: "category", label: "Category" },
+    { key: "partCategory", label: "Part Category" },
     { key: "unitPrice", label: "Unit Rate" },
     { key: "quantity", label: "Quantity" },
     { key: "minimumStock", label: "Minimum Stock" },

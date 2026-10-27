@@ -525,7 +525,7 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales-revenue",
     title: "Counter Sale Revenue",
     group: "Part sales",
-    description: "Sales less returns by price category, against dealer cost, with the margin.",
+    description: "Sales less returns by part category, against dealer cost, with the margin.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option"],
     options: [

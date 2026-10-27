@@ -54,8 +54,8 @@ export function PartCataloguePage() {
     const problems = [...parsed.problems];
     for (const row of parsed.rows) {
       const category = row.priceCategoryCode ? byCode.get(row.priceCategoryCode) : undefined;
-      if (row.priceCategoryCode && !category) problems.push(`${row.partNumber}: unknown price category ${row.priceCategoryCode}`);
-      else if (category && !category.isActive) problems.push(`${row.partNumber}: price category ${row.priceCategoryCode} is inactive`);
+      if (row.priceCategoryCode && !category) problems.push(`${row.partNumber}: unknown part category ${row.priceCategoryCode}`);
+      else if (category && !category.isActive) problems.push(`${row.partNumber}: part category ${row.priceCategoryCode} is inactive`);
       else rows.push(row);
     }
     return { rows, problems };
@@ -223,7 +223,7 @@ export function PartCataloguePage() {
                       <th className={thCls}>Part no.</th>
                       <th className={thCls}>Part name</th>
                       <th className={thCls}>Flag</th>
-                      <th className={thCls}>Price category</th>
+                      <th className={thCls}>Part category</th>
                       <th className={cn(thCls, "text-right")}>Dealer rate</th>
                       <th className={cn(thCls, "text-right")}>Retail rate</th>
                     </tr>

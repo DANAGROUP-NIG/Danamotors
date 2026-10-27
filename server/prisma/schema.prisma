@@ -834,7 +834,6 @@ model SparePart {
   name        String
   // `unitPrice` is the legacy column name; it maps to Part Master `unitRate`.
   description String?
-  category    String?
 
   uom         String  @default("UNIT")
   taxCategory String?
@@ -854,7 +853,7 @@ model SparePart {
   partFlag          String        @default("O")
   // Legacy partmast.parttype: S spare part, O oil, A accessory.
   partType          String        @default("S")
-  // Legacy pricing category (A, C, E…). Its multiplier derives the retail rate.
+  // Legacy partmast.partcategory, the Part Category (A, C, E…). Its multiplier derives the retail rate.
   priceCategoryCode String?
   priceCategory     PartCategory? @relation(fields: [priceCategoryCode], references: [code], onDelete: SetNull)
 

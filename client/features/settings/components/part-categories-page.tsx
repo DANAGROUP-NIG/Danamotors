@@ -85,7 +85,7 @@ export function PartCategoriesPage() {
   });
   const multiplier = Number(form?.markupMultiplier);
   return <div className="grid gap-5 p-4 lg:p-6">
-    <PageHeader title="Part categories" description="Price categories: the retail multiplier and each branch's discount, handling and cost percentages." />
+    <PageHeader title="Part categories" description="Legacy Part Category master: the retail multiplier and each branch's discount, handling and cost percentages." />
     {hasPermission("sparepart:create") && <div><Button onClick={() => { save.reset(); setForm({ code: "", description: "", markupMultiplier: "1", isActive: true, isNew: true }); }}>Add category</Button></div>}
     {query.isError && <p role="alert" className="text-red-600">Could not load part categories. <button onClick={() => query.refetch()}>Retry</button></p>}
     <DataTable data={query.data?.categories ?? []} rowKey={row => row.code} isLoading={query.isLoading}

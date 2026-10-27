@@ -107,7 +107,6 @@ export class SearchService {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { partNumber: { contains: q, mode: 'insensitive' } },
-          { category: { contains: q, mode: 'insensitive' } },
         ],
       },
       take: TAKE_PER_CATEGORY,

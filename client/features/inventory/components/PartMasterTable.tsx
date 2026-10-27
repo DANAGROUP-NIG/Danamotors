@@ -18,10 +18,10 @@ import { copyToClipboard, downloadCsv, downloadExcel, pluralize } from "@/lib/ta
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
-import { useParts } from "../hooks/use-parts";
+import { useParts, usePriceCategories } from "../hooks/use-parts";
 import { useSetPartStatus } from "../hooks/use-part-mutations";
 import { useBulkDeleteParts } from "../hooks/use-bulk-delete-inventory";
-import { PartForm, PART_CATEGORIES } from "./PartForm";
+import { PartForm } from "./PartForm";
 import { PartRoleBadge, PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster, PartRole, PartStatus } from "../types/inventory.types";
 
@@ -36,7 +36,6 @@ const STATUS_OPTIONS = [
 export const PART_EXPORT_COLUMNS = [
   { key: "partNumber", label: "Part Number" },
   { key: "name", label: "Name" },
-  { key: "category", label: "Category" },
   { key: "uom", label: "UOM" },
   { key: "taxCategory", label: "Tax Category" },
   { key: "taxForm", label: "Tax Form" },
@@ -44,7 +43,7 @@ export const PART_EXPORT_COLUMNS = [
   { key: "maxLevel", label: "Max Level" },
   { key: "reorderQty", label: "Reorder Qty" },
   { key: "partFlag", label: "Part Flag" },
-  { key: "priceCategoryCode", label: "Price Category" },
+  { key: "priceCategoryCode", label: "Part Category" },
   { key: "taxable", label: "Taxable" },
   { key: "unitRate", label: "Dealer Rate" },
   { key: "retailRate", label: "Retail Rate" },
@@ -58,7 +57,6 @@ export function partExportRow(p: PartMaster): Record<string, string | number> {
   return {
     partNumber: p.partNumber,
     name: p.name,
-    category: p.category ?? "",
     uom: p.uom,
     taxCategory: p.taxCategory ?? "",
     taxForm: p.taxForm ?? "",
@@ -86,6 +84,7 @@ export function PartMasterTable() {
   const [status, setStatus] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [category, setCategory] = useState("");
+  const { data: partCategories } = usePriceCategories();
   const [editing, setEditing] = useState<PartMaster | null>(null);
   const [deleting, setDeleting] = useState<PartMaster[] | null>(null);
   const { hasPermission } = useAuth();
@@ -98,7 +97,7 @@ export function PartMasterTable() {
     search: committedSearch || undefined,
     partStatus: (status || undefined) as PartStatus | undefined,
     role: (role || undefined) as PartRole | undefined,
-    category: category || undefined,
+    priceCategoryCode: category || undefined,
     page,
     limit: PAGE_SIZE,
   });
@@ -149,14 +148,11 @@ export function PartMasterTable() {
       render: (p) => <span className="font-medium text-foreground">{p.name}</span>,
     },
     {
-      header: "Category",
+      header: "Part category",
       className: "whitespace-nowrap",
       render: (p) =>
-        p.priceCategoryCode || p.category ? (
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            {p.priceCategoryCode && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground">{p.priceCategoryCode}</span>}
-            {p.category}
-          </span>
+        p.priceCategoryCode ? (
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground">{p.priceCategoryCode}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -284,12 +280,12 @@ export function PartMasterTable() {
                 className={cn(inputCls, "h-9 w-auto")}
                 value={category}
                 onChange={(e) => resetPage(setCategory)(e.target.value)}
-                aria-label="Filter by category"
+                aria-label="Filter by part category"
               >
-                <option value="">All categories</option>
-                {PART_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                <option value="">All part categories</option>
+                {(partCategories ?? []).map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} · {c.description}
                   </option>
                 ))}
               </select>

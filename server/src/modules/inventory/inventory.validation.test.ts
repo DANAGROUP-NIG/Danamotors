@@ -8,7 +8,6 @@ import {
 const validCreateInput = {
   partNumber: "ENG-OIL-5W30",
   name: "Toyota 5W-30 Engine Oil (4L)",
-  category: "Lubricants",
   uom: "Litre",
   unitRate: 4500,
 };
@@ -164,7 +163,7 @@ describe("listPartsQuerySchema", () => {
 });
 
 describe("legacy part master fields", () => {
-  const base = { partNumber: "0001217203", name: "RING-SNAP", category: "Engine", uom: "NOS", unitRate: 1021.14 };
+  const base = { partNumber: "0001217203", name: "RING-SNAP", uom: "NOS", unitRate: 1021.14 };
 
   it("accepts the legacy classification and ordering fields", async () => {
     const result = await createPartMasterSchema.parseAsync({

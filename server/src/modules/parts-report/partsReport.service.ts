@@ -405,7 +405,7 @@ export class PartsReportService {
         row = {
           ...(byCustomer && { group: [customer.code, partyName(customer)].filter(Boolean).join(" · ") }),
           category,
-          categoryName: part?.priceCategory?.description ?? "No price category",
+          categoryName: part?.priceCategory?.description ?? "No part category",
           quantity: 0,
           sales: 0,
           returns: 0,
@@ -955,7 +955,7 @@ export class PartsReportService {
       const key = f.summary ? (t.part.priceCategoryCode ?? "") : t.partId;
       const row = byPart.get(key) ?? {
         ...(f.summary
-          ? { categoryName: t.part.priceCategory?.description ?? "No price category" }
+          ? { categoryName: t.part.priceCategory?.description ?? "No part category" }
           : { partNumber: t.part.partNumber, flag: t.part.partFlag, description: t.part.name }),
         category: t.part.priceCategoryCode,
         ...(!f.summary && { dealerRate: t.part.unitPrice, retailRate }),

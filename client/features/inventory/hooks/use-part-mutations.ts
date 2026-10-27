@@ -66,8 +66,7 @@ export function useCreatePart() {
 export function useCreatePartFromCatalogue() {
   const refresh = useInvalidateParts();
   return useMutation({
-    mutationFn: ({ partNumber, category }: { partNumber: string; category: string }) =>
-      createPartFromCatalogueRequest(partNumber, category),
+    mutationFn: (partNumber: string) => createPartFromCatalogueRequest(partNumber),
     onSuccess: (part) => {
       refresh(part);
       toast.success(`Part ${part.partNumber} created in Part Master`);

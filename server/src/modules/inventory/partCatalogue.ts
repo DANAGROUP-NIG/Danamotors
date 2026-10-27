@@ -57,11 +57,11 @@ export function preparePriceList(
     seen.add(partNumber);
     const category = code ? byCode.get(code) : undefined;
     if (code && !category) {
-      problems.push(`${partNumber}: unknown price category ${code}`);
+      problems.push(`${partNumber}: unknown part category ${code}`);
       continue;
     }
     if (category && !category.isActive) {
-      problems.push(`${partNumber}: price category ${code} is inactive`);
+      problems.push(`${partNumber}: part category ${code} is inactive`);
       continue;
     }
     const retailRate =

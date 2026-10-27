@@ -15,7 +15,6 @@ import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { usePartQuery } from "../hooks/use-parts";
 import { useCreatePartFromCatalogue } from "../hooks/use-part-mutations";
 import { PART_TYPE_LABELS } from "../lib/part-codes";
-import { PART_CATEGORIES } from "./PartForm";
 import { PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartCatalogueItem, PartQueryAlternateRow, PartQueryRow } from "../types/inventory.types";
 
@@ -137,13 +136,6 @@ function AlternateRows({ rows }: { rows: PartQueryAlternateRow[] }) {
  */
 function CatalogueResult({ item, canCreate }: { item: PartCatalogueItem; canCreate: boolean }) {
   const createPart = useCreatePartFromCatalogue();
-  const [category, setCategory] = useState("");
-
-  function create(e: FormEvent) {
-    e.preventDefault();
-    if (!category.trim()) return;
-    createPart.mutate({ partNumber: item.partNumber, category: category.trim() });
-  }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -160,7 +152,7 @@ function CatalogueResult({ item, canCreate }: { item: PartCatalogueItem; canCrea
         {[
           ["Flag", item.partFlag],
           ["Type", PART_TYPE_LABELS[item.partType] ?? item.partType],
-          ["Price category", item.priceCategoryCode ?? "—"],
+          ["Part category", item.priceCategoryCode ?? "—"],
           ["UOM", item.uom],
           ["Dealer rate", fmtNaira(item.dealerRate)],
           ["Retail rate", item.retailRate != null ? fmtNaira(item.retailRate) : "—"],
@@ -174,32 +166,21 @@ function CatalogueResult({ item, canCreate }: { item: PartCatalogueItem; canCrea
       <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-medium">This part is not in Part Master, so no branch holds stock of it.</p>
         {canCreate ? (
-          <form onSubmit={create} className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="grid w-60 gap-1.5">
-              <span className="font-semibold">Category</span>
-              <input
-                className={inputCls}
-                list="catalogue-part-categories"
-                placeholder="Select or type"
-                value={category}
-                maxLength={60}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-              <datalist id="catalogue-part-categories">
-                {PART_CATEGORIES.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </label>
-            <Button type="submit" className="gap-1.5" disabled={!category.trim() || createPart.isPending}>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              className="gap-1.5"
+              disabled={createPart.isPending}
+              onClick={() => createPart.mutate(item.partNumber)}
+            >
               {createPart.isPending ? <Loader2 className="size-4 animate-spin" /> : <PackagePlus className="size-4" />}
               Create part
             </Button>
-            <p className="basis-full text-amber-800">
-              The name, flag, type, unit, price category and rates are copied from the catalogue. Complete the rest in
+            <p className="text-amber-800">
+              The name, flag, type, unit, part category and rates are copied from the catalogue. Complete the rest in
               Part Master.
             </p>
-          </form>
+          </div>
         ) : (
           <p className="mt-1">Ask someone who can create parts to add it to Part Master.</p>
         )}
@@ -321,7 +302,7 @@ export function PartQueryPage() {
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
               {[
                 ["Flag", data.part.partFlag],
-                ["Price category", data.part.priceCategoryCode ?? "—"],
+                ["Part category", data.part.priceCategoryCode ?? "—"],
                 ["Taxable", data.part.taxable ? "Yes" : "No"],
                 ["UOM", data.part.uom],
                 ["Dealer rate", fmtNaira(data.part.dealerRate)],

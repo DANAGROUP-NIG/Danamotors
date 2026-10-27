@@ -23,7 +23,7 @@ const selection = z
     from: optionalText(40),
     to: optionalText(40),
     partFlag: optionalText(2),
-    category: optionalText(60),
+    partType: z.enum(["S", "O", "A"]).optional(),
     priceCategoryCode: optionalText(10),
     dealerRateFrom: z.number().nonnegative().optional(),
     dealerRateTo: z.number().nonnegative().optional(),

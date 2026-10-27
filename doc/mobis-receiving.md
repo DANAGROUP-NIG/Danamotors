@@ -73,7 +73,7 @@ invoice, numbered like every MRN.
   [masters.md](./masters.md#part-sources-and-source-records)), but any active part can be received; legacy branches
   also buy some O-flag parts from local vendors.
 - Posting adds the stock to the branch, writes a RECEIVED stock transaction, sets each record's dealer rate to the
-  unit cost, recalculates its retail rate from its price category and records the rate change in the part's history.
+  unit cost, recalculates its retail rate from its part category and records the rate change in the part's history.
 - Discounts, handling, tax and other charges are not recorded: they were zero on every legacy MRN since 2024.
 - The same vendor invoice cannot be received twice. A vendor whose name contains "Mobis" is refused: Mobis
   invoices come in through the MIT upload above.

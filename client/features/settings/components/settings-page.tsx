@@ -32,7 +32,7 @@ const SETTINGS_CARDS = [
   },
   {
     title: "Part Categories",
-    description: "Retail multiplier per price category and each branch's discount, handling and cost %.",
+    description: "Retail multiplier per part category and each branch's discount, handling and cost %.",
     href: "/settings/part-categories",
   },
   {

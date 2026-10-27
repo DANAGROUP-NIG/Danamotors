@@ -98,7 +98,7 @@ function AlternateForm({ mainPartId, onDone }: { mainPartId: string; onDone: () 
       )}
     >
       <p className="text-sm text-slate-600">
-        The alternate copies category, unit of measure, tax, stock levels, unit rate and store location from the main
+        The alternate copies part category, unit of measure, tax, stock levels, unit rate and store location from the main
         part. You can change them afterwards on the alternate’s own page.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -277,12 +277,11 @@ export function PartDetail({ id }: { id: string }) {
             </p>
           )}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
             <DetailField label="Part type" value={codeLabel(PART_TYPE_LABELS, part.partType ?? "S")} />
             <DetailField label="Purchase source" value={codeLabel(PART_FLAG_LABELS, part.partFlag)} />
             <DetailField
-              label="Price category"
+              label="Part category"
               value={
                 part.priceCategoryCode
                   ? (() => {

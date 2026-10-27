@@ -134,10 +134,8 @@ export function importPriceListRequest(rows: PriceListRow[]) {
   return apiPost<{ added: number; updated: number }, { rows: PriceListRow[] }>(API_ROUTES.inventory.catalogue.import, { rows });
 }
 
-export async function createPartFromCatalogueRequest(partNumber: string, category: string): Promise<PartMaster> {
-  const data = await apiPost<{ part: RawPart }, { category: string }>(API_ROUTES.inventory.catalogue.createPart(partNumber), {
-    category,
-  });
+export async function createPartFromCatalogueRequest(partNumber: string): Promise<PartMaster> {
+  const data = await apiPost<{ part: RawPart }>(API_ROUTES.inventory.catalogue.createPart(partNumber));
   return normalizePart(data.part);
 }
 
