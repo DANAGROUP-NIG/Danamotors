@@ -8,7 +8,8 @@ namespace Danamotors.Hhdc.Link
 {
     /// <summary>
     /// HHDC Link: send count sheets, picking lists, CPOs and MITs to the handheld, and take finished ones back to
-    /// the server.
+    /// the server. Since 2026-10-28 the store does this from the web and the station (StationTray) moves the files;
+    /// this window is the IT tool: register the station, fault finding, manual send and receive.
     /// </summary>
     public sealed class MainForm : Form
     {
@@ -20,6 +21,7 @@ namespace Danamotors.Hhdc.Link
         readonly TextBox txtEmail = new TextBox();
         readonly TextBox txtPassword = new TextBox();
         readonly Button btnSignIn = new Button();
+        readonly Button btnStation = new Button();
         readonly Label lblUser = new Label();
         readonly CheckBox chkAllBranches = new CheckBox();
         readonly ComboBox cmbKind = new ComboBox();
@@ -72,6 +74,7 @@ namespace Danamotors.Hhdc.Link
             txtPassword.SetBounds(348, 50, 140, 24); txtPassword.UseSystemPasswordChar = true; account.Controls.Add(txtPassword);
             btnSignIn.Text = "Sign in"; btnSignIn.SetBounds(500, 49, 90, 26); btnSignIn.Click += delegate { SignIn(); }; account.Controls.Add(btnSignIn);
             lblUser.SetBounds(420, 25, 360, 20); lblUser.Text = "Not signed in"; account.Controls.Add(lblUser);
+            btnStation.Text = "Station..."; btnStation.SetBounds(664, 49, 120, 26); btnStation.Click += delegate { StationDialog.Show(this, dataDir, settings, txtServer.Text, txtFolder.Text); }; account.Controls.Add(btnStation);
             AcceptButton = btnSignIn;
             Controls.Add(account);
 
@@ -434,6 +437,71 @@ namespace Danamotors.Hhdc.Link
                     MessageBox.Show(this, "Installed. On the handheld open Start > Programs > Danamotors Count.", "HHDC Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             });
+        }
+    }
+
+    /// <summary>
+    /// IT: register this PC as the branch's handheld station (the key issued on the web, Settings > HHDC),
+    /// start it at Windows sign-in, and test it. Store staff never see this.
+    /// </summary>
+    public static class StationDialog
+    {
+        public static void Show(IWin32Window owner, string dataDir, LinkSettings settings, string server, string folder)
+        {
+            using (Form f = new Form())
+            {
+                f.Text = "Handheld station";
+                f.FormBorderStyle = FormBorderStyle.FixedDialog; f.StartPosition = FormStartPosition.CenterParent;
+                f.MaximizeBox = false; f.MinimizeBox = false; f.ShowInTaskbar = false;
+                f.ClientSize = new Size(560, 300);
+                Label head = new Label { Left = 12, Top = 10, Width = 536, Height = 54,
+                    Text = "Register this PC on the web (Settings > HHDC > Register station), then paste the key here. " +
+                           "The station runs at Windows sign-in with no window: it delivers jobs sent from the web to a docked handheld " +
+                           "and collects finished ones." };
+                Label lblKey = new Label { Left = 12, Top = 72, Width = 536, Height = 20,
+                    Text = "Station key" + (settings.StationKey.Length > 0 ? " (a key is saved; paste a new one to replace it)" : " (none saved)") };
+                TextBox key = new TextBox { Left = 12, Top = 94, Width = 536, UseSystemPasswordChar = true };
+                CheckBox auto = new CheckBox { Left = 12, Top = 128, Width = 536, Height = 22, Text = "Start the station when this Windows user signs in", Checked = StationAutostart.Enabled };
+                Label result = new Label { Left = 12, Top = 158, Width = 536, Height = 90 };
+                Button save = new Button { Text = "Save and test", Left = 254, Top = 258, Width = 110, Height = 28 };
+                Button remove = new Button { Text = "Remove key", Left = 370, Top = 258, Width = 90, Height = 28 };
+                Button close = new Button { Text = "Close", Left = 466, Top = 258, Width = 82, Height = 28, DialogResult = DialogResult.Cancel };
+                save.Click += delegate
+                {
+                    Cursor old = Cursor.Current;
+                    Cursor.Current = Cursors.WaitCursor;
+                    try
+                    {
+                        if (key.Text.Trim().Length > 0) settings.StationKey = key.Text.Trim();
+                        settings.Server = server.Trim();
+                        settings.Save(dataDir);
+                        StationAutostart.Set(auto.Checked);
+                        // A pass as the station would make one, with whatever is docked now.
+                        StationLog log = new StationLog(LinkSettings.LogDir(dataDir), delegate { return DateTime.UtcNow; });
+                        LinkSettings s = LinkSettings.Load(dataDir);
+                        s.DeviceFolder = folder.Trim();
+                        StationRunner runner = new StationRunner(ApiClient.ForStation(s.Server, s.StationKey), delegate { return s.OpenDevice(); },
+                                                                 delegate { return DateTime.UtcNow; }, log, StationTray.LinkVersion(), null);
+                        runner.Tick();
+                        result.ForeColor = runner.Status.StartsWith("Problem") ? Color.DarkRed : Color.DarkGreen;
+                        result.Text = "Saved. " + runner.Status + "\r\n" + (auto.Checked ? "The station starts at Windows sign-in. To start it now: HhdcLink.exe --station" : "The station does not start by itself.");
+                    }
+                    catch (LinkException e) { result.ForeColor = Color.DarkRed; result.Text = e.Message; }
+                    finally { Cursor.Current = old; }
+                };
+                remove.Click += delegate
+                {
+                    settings.StationKey = "";
+                    settings.Save(dataDir);
+                    StationAutostart.Set(false);
+                    auto.Checked = false;
+                    result.ForeColor = Color.Black;
+                    result.Text = "Key removed. This PC is no longer a station (revoke it on the web too).";
+                };
+                f.Controls.AddRange(new Control[] { head, lblKey, key, auto, result, save, remove, close });
+                f.CancelButton = close;
+                f.ShowDialog(owner);
+            }
         }
     }
 

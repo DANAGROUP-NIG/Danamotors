@@ -51,6 +51,8 @@ namespace Danamotors.Hhdc.Link
     {
         readonly string baseUrl;
         string token = "";
+        // Station mode: the PC's own key ("<stationId>.<secret>") instead of a user's sign-in.
+        string stationKey = "";
         string userName = "";
         string branchId = "";
 
@@ -58,6 +60,16 @@ namespace Danamotors.Hhdc.Link
         {
             baseUrl = NormalizeUrl(serverUrl);
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        }
+
+        /// <summary>A client for the station endpoints, authenticated by the station key issued on the web.</summary>
+        public static ApiClient ForStation(string serverUrl, string key)
+        {
+            ApiClient c = new ApiClient(serverUrl);
+            c.stationKey = (key ?? "").Trim();
+            if (c.stationKey.Length == 0) throw new LinkException("This PC has no station key. Register it on the web (Settings > HHDC) and enter the key in HHDC Link.");
+            c.userName = "station";
+            return c;
         }
 
         public string UserName { get { return userName; } }
@@ -131,12 +143,17 @@ namespace Danamotors.Hhdc.Link
         public FetchedSheet GetSheet(string stockTakeId, string sheetId, DateTime nowUtc)
         {
             object r = Send("GET", "/stock-takes/" + stockTakeId + "/sheets/" + sheetId, null, 120000, true);
-            object s = Json.At(r, "data", "sheet");
+            return SheetFromJson(Json.At(r, "data", "sheet"), stockTakeId, nowUtc);
+        }
+
+        /// <summary>The server's sheet (as GET /stock-takes/:id/sheets/:sheetId returns it) as the device file.</summary>
+        public static FetchedSheet SheetFromJson(object s, string stockTakeId, DateTime nowUtc)
+        {
             if (s == null) throw new LinkException("The server returned no sheet");
 
             FetchedSheet f = new FetchedSheet();
             CountSheet c = new CountSheet();
-            c.StockTakeId = stockTakeId;
+            c.StockTakeId = stockTakeId.Length > 0 ? stockTakeId : Json.Str(s, "stockTake", "id");
             c.SheetId = Json.Str(s, "id");
             c.SheetNumber = Json.Str(s, "sheetNumber");
             c.BatchNumber = Json.Str(s, "stockTake", "batchNumber");
@@ -184,7 +201,7 @@ namespace Danamotors.Hhdc.Link
             req.ReadWriteTimeout = timeoutMs;
             req.Accept = "application/json";
             req.UserAgent = "HHDC-Link";
-            if (auth) req.Headers["Authorization"] = "Bearer " + token;
+            if (auth) req.Headers["Authorization"] = stationKey.Length > 0 ? "Station " + stationKey : "Bearer " + token;
             if (body != null)
             {
                 byte[] bytes = new UTF8Encoding(false).GetBytes(Json.Write(body));
@@ -205,7 +222,10 @@ namespace Danamotors.Hhdc.Link
                 using (err)
                 {
                     string message = ErrorMessage(Read(err), (int)err.StatusCode);
-                    if (err.StatusCode == HttpStatusCode.Unauthorized && auth) message = "Your sign-in has expired. Sign in again.";
+                    if (err.StatusCode == HttpStatusCode.Unauthorized && auth)
+                        message = stationKey.Length > 0
+                            ? "The server refused this station's key. Register the PC again on the web (Settings > HHDC) and enter the new key."
+                            : "Your sign-in has expired. Sign in again.";
                     throw new ApiException((int)err.StatusCode, message);
                 }
             }

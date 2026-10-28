@@ -8,10 +8,14 @@ using Danamotors.Hhdc.Link;
 /// HHDC Link on a command line: the same logic as the window, for scripts and the end-to-end test.
 ///   HhdcLinkCli [options] list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE
 ///                         sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER
+///                         station key KEY | station once | station run
 /// TYPE is INDENT_PICK, CPO_PICK or MIT_RECEIVE; NUMBER is the indent, CPO or MIT number.
 /// Options: --server URL  --email E  --password P (or HHDC_PASSWORD)  --folder DIR (stand-in device)
 ///          --data DIR (settings and upload record)  --all-branches
 /// SHEET is a sheet number such as SHT-000012.
+/// station: the PC's handheld station (no user sign-in): "key" saves the key issued on the web, "once" makes one
+/// pass (heartbeat, deliver, collect), "run" loops as the tray station does until Ctrl+C. --app EXE installs that
+/// device app on a handheld that differs.
 /// </summary>
 public static class Cli
 {
@@ -28,7 +32,7 @@ public static class Cli
             }
             else words.Add(args[i]);
         }
-        if (words.Count == 0) { Console.Error.WriteLine("Commands: list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE | sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER"); return 1; }
+        if (words.Count == 0) { Console.Error.WriteLine("Commands: list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE | sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER | station key KEY|once|run"); return 1; }
 
         try
         {
@@ -37,6 +41,7 @@ public static class Cli
             if (opt.ContainsKey("server")) settings.Server = opt["server"];
             if (opt.ContainsKey("folder")) settings.DeviceFolder = opt["folder"];
             Clock clock = delegate { return DateTime.UtcNow; };
+            if (words[0].ToLowerInvariant() == "station") return Station(words, opt, dataDir, settings, clock);
 
             using (IDeviceStorage device = settings.OpenDevice())
             {
@@ -123,6 +128,38 @@ public static class Cli
             Console.Error.WriteLine(e.Message);
             return 2;
         }
+    }
+
+    static int Station(List<string> words, Dictionary<string, string> opt, string dataDir, LinkSettings settings, Clock clock)
+    {
+        string sub = words.Count > 1 ? words[1].ToLowerInvariant() : "";
+        if (sub == "key")
+        {
+            if (words.Count < 3) throw new LinkException("station key KEY");
+            settings.StationKey = words[2].Trim();
+            settings.Save(dataDir);
+            Console.WriteLine("Station key saved for this Windows user.");
+            return 0;
+        }
+        StationLog log = new StationLog(opt.ContainsKey("no-log") ? "" : LinkSettings.LogDir(dataDir), clock);
+        byte[] app = opt.ContainsKey("app") ? File.ReadAllBytes(opt["app"]) : null;
+        LinkSettings s = settings;
+        StationRunner runner = new StationRunner(ApiClient.ForStation(s.Server, s.StationKey), delegate { return s.OpenDevice(); }, clock, log, "cli", app);
+        if (sub == "once")
+        {
+            runner.Tick();
+            foreach (string line in log.Recent()) Console.WriteLine(line);
+            Console.WriteLine(runner.Status);
+            return runner.Status.StartsWith("Problem") ? 2 : 0;
+        }
+        if (sub == "run")
+        {
+            Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs e) { e.Cancel = true; runner.Stop(); };
+            log.Echo = true;
+            runner.Run();
+            return 0;
+        }
+        throw new LinkException("station key KEY | station once | station run");
     }
 
     static WorkItem Find(List<WorkItem> items, string number)

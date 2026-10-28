@@ -41,7 +41,7 @@ Compile 'Danamotors Count (device)' (@('/noconfig', '/nostdlib', '/target:winexe
 if ($DeviceOnly) { return }
 
 # PC tool and its command-line twin (shared logic in link\src\Core).
-$fw = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Web.Extensions.dll') | ForEach-Object { "/r:$_" }
+$fw = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Web.Extensions.dll', 'System.Security.dll') | ForEach-Object { "/r:$_" }
 Compile 'HHDC Link' (@('/platform:x86', '/target:winexe', "/out:$out\link\HhdcLink.exe") + $fw + (Sources 'shared', 'link\src'))
 # The CLI is a test and scripting aid; antivirus often locks or quarantines a freshly built copy. Do not fail the build for that.
 try { Compile 'HHDC Link CLI' (@('/platform:x86', '/target:exe', "/out:$out\link\HhdcLinkCli.exe") + $fw + (Sources 'shared', 'link\src\Core', 'link\cli')) }

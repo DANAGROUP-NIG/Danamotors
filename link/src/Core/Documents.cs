@@ -90,6 +90,8 @@ namespace Danamotors.Hhdc.Link
             body["type"] = type;
             body["sourceId"] = sourceId;
             body["pickerId"] = pickerId;
+            // HHDC Link writes it to the device itself (IT tool), so the job skips the station queue.
+            body["manual"] = true;
             return DocFromJson(Json.At(Send("POST", "/handheld/documents", body, 60000, true), "data", "document"));
         }
 
