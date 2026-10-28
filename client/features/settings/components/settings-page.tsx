@@ -46,6 +46,11 @@ const SETTINGS_CARDS = [
     href: "/settings",
   },
   {
+    title: "HHDC",
+    description: "Handheld stations (store PCs with the cradle), the handhelds, jobs not yet posted, and what is ready to send.",
+    href: "/settings/hhdc",
+  },
+  {
     title: "Warranty",
     description: "Model warranty policies and manufacturer claim codes.",
     href: "/warranty/settings",

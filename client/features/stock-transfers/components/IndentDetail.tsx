@@ -363,7 +363,15 @@ export function IndentDetail({ id }: { id: string }) {
           </div>
         </SectionCard>
 
-        <HandheldCard filter={{ indentId: indent.id }} canWrite={hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH)} />
+        <HandheldCard
+          filter={{ indentId: indent.id }}
+          canWrite={hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH)}
+          send={
+            indent.openPickingList?.status === "OPEN" && indent.openPickingList.lines.some((l) => l.pickedQuantity > 0)
+              ? { type: "INDENT_PICK", sourceId: indent.openPickingList.id, branchId: indent.sourceBranchId, label: `indent ${indent.indentNumber}` }
+              : null
+          }
+        />
 
         {/* ── Documents ── */}
         <Documents indent={indent} />

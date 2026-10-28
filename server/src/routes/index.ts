@@ -20,6 +20,7 @@ import partSaleRoutes from '../modules/part-sale/partSale.routes';
 import partsReportRoutes from '../modules/parts-report/partsReport.routes';
 import stockTakeRoutes from '../modules/stock-take/stockTake.routes';
 import handheldRoutes from '../modules/handheld/handheld.routes';
+import handheldStationRoutes from '../modules/handheld/handheld.station.routes';
 import financeRoutes from '../modules/finance/finance.routes';
 import branchRoutes from '../modules/branch/branch.routes';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes';
@@ -104,6 +105,8 @@ router.use('/workshop', workshopRoutes);
 router.use('/part-sale', partSaleRoutes);
 router.use('/parts-reports', partsReportRoutes);
 router.use('/stock-takes', stockTakeRoutes);
+// Station endpoints use a station key, not a user session; mounted before the user routes.
+router.use('/handheld/station', handheldStationRoutes);
 router.use('/handheld', handheldRoutes);
 router.use('/inventory', mobisPurchaseRoutes);
 router.use('/inventory', vendorReceiptRoutes);

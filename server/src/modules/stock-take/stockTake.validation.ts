@@ -111,7 +111,7 @@ export const cancelSheetSchema = z.object({
   body: z.object({ remark: z.string().trim().min(1, "A cancellation remark is required").max(500) }),
 });
 
-const entry = z
+export const countEntrySchema = z
   .object({
     partId: uuid("part ID").optional(),
     partNumber: z.string().trim().min(1).max(40).optional(),
@@ -127,14 +127,14 @@ const entry = z
 export const uploadSheetSchema = z.object({
   params: sheetParams,
   body: z.object({
-    entries: z.array(entry).max(50_000),
+    entries: z.array(countEntrySchema).max(50_000),
     uncounted: z.enum(["ZERO", "RELEASE"]),
   }),
 });
 
 export const recordCountsSchema = z.object({
   params: z.object({ id: uuid("stock taking ID") }),
-  body: z.object({ entries: z.array(entry).min(1, "Enter at least one count").max(500) }),
+  body: z.object({ entries: z.array(countEntrySchema).min(1, "Enter at least one count").max(500) }),
 });
 
 export const correctLineSchema = z.object({

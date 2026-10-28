@@ -1,4 +1,5 @@
 import { startOverdueSweep } from './modules/finance/credit-terms';
+import { startHandheldSweep } from './modules/handheld/handheld.station.service';
 import app from './app';
 import { config } from './config';
 import prisma from './prisma/client';
@@ -8,6 +9,7 @@ async function start(): Promise<void> {
   await prisma.$connect();
   await checkDatabaseSchema();
   const stopOverdueSweep = startOverdueSweep();
+  const stopHandheldSweep = startHandheldSweep();
   const server = app.listen(config.PORT, () => {
     console.log(`Dana Motors backend running on port ${config.PORT} in ${config.NODE_ENV} mode`);
   });
@@ -21,6 +23,7 @@ async function start(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     stopOverdueSweep();
+    stopHandheldSweep();
     const deadline = setTimeout(() => process.exit(1), 30_000);
     deadline.unref();
     server.close(async () => {

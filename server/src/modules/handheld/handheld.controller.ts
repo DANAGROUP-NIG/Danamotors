@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
-import { HandheldDocumentStatus, HandheldDocumentType } from "@prisma/client";
+import { HandheldDocumentStatus, HandheldDocumentType, StockTakeType } from "@prisma/client";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import { ForbiddenError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
+import { permissionsOf } from "./handheld.logic";
 import { HandheldService } from "./handheld.service";
+import { AuthedStation, HandheldStationService } from "./handheld.station.service";
 
 const handle =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
@@ -18,43 +20,45 @@ const handle =
 const ok = (res: Response, data: unknown, message?: string, statusCode = 200) =>
   res.status(statusCode).json({ status: "success", statusCode, ...(message && { message }), data });
 
-// Each document type uses the permissions of the web screen it stands in for (user decision 2026-10-27):
-// indent picking -> transfers, CPO picking -> part sale, MIT receiving -> stock.
-const TYPE_PERMISSIONS: Record<HandheldDocumentType, { read: string; write: string }> = {
-  INDENT_PICK: { read: PERMISSIONS.TRANSFER_READ, write: PERMISSIONS.TRANSFER_DISPATCH },
-  CPO_PICK: { read: PERMISSIONS.PART_SALE_READ, write: PERMISSIONS.PART_SALE_ORDER },
-  MIT_RECEIVE: { read: PERMISSIONS.STOCK_READ, write: PERMISSIONS.STOCK_UPDATE },
-};
+const ALL_TYPES = Object.values(HandheldDocumentType);
 
-const ALL_TYPES = Object.keys(TYPE_PERMISSIONS) as HandheldDocumentType[];
-
-function can(req: Request, type: HandheldDocumentType, access: "read" | "write"): boolean {
-  if (req.user?.role === ROLES.SUPER_ADMIN) return true;
-  const perms = req.user?.permissions ?? [];
-  // Write implies read, as on the web screens.
-  return perms.includes(TYPE_PERMISSIONS[type][access]) || (access === "read" && perms.includes(TYPE_PERMISSIONS[type].write));
+function has(req: Request, permission: string) {
+  return req.user?.role === ROLES.SUPER_ADMIN || (req.user?.permissions ?? []).includes(permission);
 }
 
-function assertCan(req: Request, type: HandheldDocumentType, access: "read" | "write") {
-  if (!can(req, type, access)) throw new ForbiddenError("You do not have the required permissions to access this resource");
+// A count sheet of a stock audit uses stockaudit:*; any sheet is listed for either kind's readers.
+function can(req: Request, type: HandheldDocumentType, access: "read" | "write", audit?: boolean): boolean {
+  const kinds = type === HandheldDocumentType.COUNT_SHEET && audit === undefined ? [false, true] : [!!audit];
+  return kinds.some((a) => {
+    const p = permissionsOf(type, a);
+    // Write implies read, as on the web screens.
+    return has(req, p[access]) || (access === "read" && has(req, p.write));
+  });
 }
+
+function assertCan(req: Request, type: HandheldDocumentType, access: "read" | "write", audit?: boolean) {
+  if (!can(req, type, access, audit)) throw new ForbiddenError("You do not have the required permissions to access this resource");
+}
+
+const isAudit = (doc: { stockTakeSheet?: { stockTake: { type: StockTakeType } } | null }) => doc.stockTakeSheet?.stockTake.type === StockTakeType.AUDIT;
 
 /** Branch filter for lists: none for cross-branch users, otherwise the user's own branch. */
 function scope(req: Request, branchId?: string): string | undefined {
-  const cross =
-    req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(PERMISSIONS.INVENTORY_CROSS_BRANCH) === true;
-  if (cross) return branchId;
+  if (has(req, PERMISSIONS.INVENTORY_CROSS_BRANCH)) return branchId;
   assertInventoryBranchAccess(req, [req.user?.branchId]);
   return req.user!.branchId ?? undefined;
 }
 
 export class HandheldController {
   private service = new HandheldService();
+  private stations = new HandheldStationService();
 
   listSources = handle(async (req, res) => {
     const q = req.query as { type: HandheldDocumentType; branchId?: string };
     assertCan(req, q.type, "write");
-    ok(res, { sources: await this.service.listSources(q.type, scope(req, q.branchId)) });
+    const sources = await this.service.listSources(q.type, scope(req, q.branchId));
+    // Count sheets of both kinds come back together: keep those of the kind the user may send.
+    ok(res, { sources: sources.filter((s) => !("audit" in s) || can(req, q.type, "write", !!s.audit)) });
   });
 
   listPickers = handle(async (req, res) => {
@@ -63,29 +67,43 @@ export class HandheldController {
   });
 
   listDocuments = handle(async (req, res) => {
-    const q = req.query as { type?: HandheldDocumentType; status?: HandheldDocumentStatus; branchId?: string; sourceId?: string; indentId?: string };
+    const q = req.query as { type?: HandheldDocumentType; status?: HandheldDocumentStatus; branchId?: string; sourceId?: string; indentId?: string; stockTakeId?: string };
     const types = (q.type ? [q.type] : ALL_TYPES).filter((t) => can(req, t, "read"));
     if (!types.length) throw new ForbiddenError("You do not have the required permissions to access this resource");
-    ok(res, { documents: await this.service.listDocuments({ types, status: q.status, branchId: scope(req, q.branchId), sourceId: q.sourceId, indentId: q.indentId }) });
+    const documents = await this.service.listDocuments({ types, status: q.status, branchId: scope(req, q.branchId), sourceId: q.sourceId, indentId: q.indentId, stockTakeId: q.stockTakeId });
+    ok(res, { documents: documents.filter((d) => can(req, d.type, "read", isAudit(d))) });
   });
 
   getDocument = handle(async (req, res) => {
     const document = await this.service.getDocument(req.params.id);
-    assertCan(req, document.type, "read");
+    assertCan(req, document.type, "read", isAudit(document));
     assertInventoryBranchAccess(req, [document.branchId]);
     ok(res, { document });
   });
 
   createDocument = handle(async (req, res) => {
-    assertCan(req, req.body.type, "write");
-    assertInventoryBranchAccess(req, [await this.service.sourceBranchId(req.body.type, req.body.sourceId)]);
+    const source = await this.service.sourceInfo(req.body.type, req.body.sourceId);
+    assertCan(req, req.body.type, "write", source.audit);
+    assertInventoryBranchAccess(req, [source.branchId]);
     const document = await this.service.createDocument(req.body, req.user!.userId);
-    ok(res, { document }, `Handheld document ${document.documentNumber} ready for ${document.pickerName}`, 201);
+    const message =
+      document.status === HandheldDocumentStatus.QUEUED
+        ? `Job ${document.documentNumber} is waiting for the next handheld docked at ${document.branch.name}`
+        : `Handheld document ${document.documentNumber} ready for ${document.pickerName}`;
+    ok(res, { document }, message, 201);
+  });
+
+  post = handle(async (req, res) => {
+    const existing = await this.service.getDocument(req.params.id);
+    assertCan(req, existing.type, "write", isAudit(existing));
+    assertInventoryBranchAccess(req, [existing.branchId]);
+    const result = await this.service.post(req.params.id, req.body, req.user!.userId);
+    ok(res, result, `Handheld result ${existing.documentNumber} posted`);
   });
 
   upload = handle(async (req, res) => {
     const existing = await this.service.getDocument(req.params.id);
-    assertCan(req, existing.type, "write");
+    assertCan(req, existing.type, "write", isAudit(existing));
     assertInventoryBranchAccess(req, [existing.branchId]);
     const result = await this.service.upload(req.params.id, req.body, req.user!.userId);
     ok(res, result, `Handheld document ${existing.documentNumber} uploaded`);
@@ -93,9 +111,72 @@ export class HandheldController {
 
   cancel = handle(async (req, res) => {
     const existing = await this.service.getDocument(req.params.id);
-    assertCan(req, existing.type, "write");
+    assertCan(req, existing.type, "write", isAudit(existing));
     assertInventoryBranchAccess(req, [existing.branchId]);
     const document = await this.service.cancel(req.params.id, req.body.remark, req.user!.userId);
-    ok(res, { document }, `Handheld document ${document.documentNumber} cancelled`);
+    ok(res, { document }, `Handheld job ${document.documentNumber} cancelled`);
   });
+
+  // ── Stations (web) ──
+
+  stationState = handle(async (req, res) => {
+    if (!ALL_TYPES.some((t) => can(req, t, "read"))) throw new ForbiddenError("You do not have the required permissions to access this resource");
+    const branchId = scope(req, req.query.branchId as string | undefined) ?? req.user!.branchId;
+    if (!branchId) throw new ForbiddenError("Choose a branch");
+    ok(res, await this.service.stationState(branchId));
+  });
+
+  overview = handle(async (req, res) => {
+    if (!has(req, PERMISSIONS.HANDHELD_STATIONS) && !ALL_TYPES.some((t) => can(req, t, "read"))) {
+      throw new ForbiddenError("You do not have the required permissions to access this resource");
+    }
+    ok(res, { ...(await this.stations.overview(scope(req, req.query.branchId as string | undefined))), canManage: has(req, PERMISSIONS.HANDHELD_STATIONS) });
+  });
+
+  createStation = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [req.body.branchId]);
+    const { station, key } = await this.stations.createStation(req.body, req.user!.userId);
+    ok(res, { station, key }, `Station ${station.name} registered. Enter the key in HHDC Link on that PC now: it is shown only once.`, 201);
+  });
+
+  rotateKey = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [await this.stations.stationBranchId(req.params.id)]);
+    const { station, key } = await this.stations.rotateKey(req.params.id);
+    ok(res, { station, key }, `New key for ${station.name}. The old key no longer works.`);
+  });
+
+  revokeStation = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [await this.stations.stationBranchId(req.params.id)]);
+    ok(res, { station: await this.stations.revoke(req.params.id) }, "Station revoked");
+  });
+
+  renameDevice = handle(async (req, res) => {
+    assertInventoryBranchAccess(req, [await this.stations.deviceBranchId(req.params.id)]);
+    ok(res, { device: await this.stations.renameDevice(req.params.id, req.body.name) }, "Handheld renamed");
+  });
+}
+
+/** Station endpoints: the station set by `stationAuth` is the only identity. */
+export class HandheldStationController {
+  private stations = new HandheldStationService();
+
+  private station(res: Response): AuthedStation {
+    return res.locals.station as AuthedStation;
+  }
+
+  authenticate: RequestHandler = async (req, res, next) => {
+    try {
+      res.locals.station = await this.stations.authenticate(req.headers.authorization);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  heartbeat = handle(async (req, res) => ok(res, await this.stations.heartbeat(this.station(res), req.body)));
+  claim = handle(async (req, res) => ok(res, await this.stations.claim(this.station(res), req.body.deviceId)));
+  confirm = handle(async (req, res) => ok(res, await this.stations.confirm(this.station(res), req.params.id, req.body.deviceId)));
+  release = handle(async (req, res) => ok(res, await this.stations.release(this.station(res), req.params.id, req.body.reason)));
+  result = handle(async (req, res) => ok(res, await this.stations.submitResult(this.station(res), req.body)));
+  cleared = handle(async (req, res) => ok(res, await this.stations.cleared(this.station(res), req.params.deviceId, req.body)));
 }

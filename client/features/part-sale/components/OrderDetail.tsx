@@ -249,7 +249,11 @@ export function OrderDetail({ id }: { id: string }) {
             </p>
           )}
         </div>
-        <HandheldCard filter={{ sourceId: order.id }} canWrite={hasPermission(PART_SALE_PERMISSIONS.ORDER)} />
+        <HandheldCard
+          filter={{ sourceId: order.id }}
+          canWrite={hasPermission(PART_SALE_PERMISSIONS.ORDER)}
+          send={active && picked > 0 ? { type: "CPO_PICK", sourceId: order.id, branchId: order.branchId, label: `CPO ${order.cpoNumber}` } : null}
+        />
         <DocumentTermsBlock documentType="PARTS_QUOTATION" branchId={order.branchId} />
       </div>
 

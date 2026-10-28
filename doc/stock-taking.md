@@ -42,8 +42,14 @@ Audit, Audit by Audit Head, Audit by Visiting Management); see [Stock audit](#st
 ## Handheld (HHDC)
 
 The handheld is a Motorola MC3190 (Windows CE 6.0, .NET Compact Framework 3.5). Two programs in
-`dana_projects/hhdc/` (a sibling of this repo, not inside it) replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`, with **no server
-changes**. They use the same two calls as the web count sheet:
+`dana_projects/hhdc/` (a sibling of this repo, not inside it) replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`.
+
+**Since 2026-10-28 a sheet is sent and posted on its own page** (Send to handheld, then Post), like the indent, CPO and
+MIT jobs: the sheet becomes a handheld job (`COUNT_SHEET`) that waits for the next handheld docked at the branch, and
+HHDC Link runs unattended on the store PC as a station. States, station, notifications and permissions are in
+[handheld.md](./handheld.md). Posting applies the counts through the same upload below, once, with ZERO or RELEASE
+chosen on the page; while a sheet has an active job its counts cannot be typed on the web. What follows describes the
+files, the device app and the IT tool, which are unchanged. The calls behind them:
 
 - `GET /api/stock-takes/:id/sheets/:sheetId`: the sheet's parts (bin, part, description, and
   system stock if `showSystemStock`).
@@ -54,7 +60,7 @@ changes**. They use the same two calls as the web count sheet:
 | Program | Where it runs | What it does |
 | --- | --- | --- |
 | **Danamotors Count** (`hhdc/device`) | The handheld, offline | The checker picks a sheet, scans or types bin then part, enters quantity, damaged and remark. Each entry is saved at once to an append-only file. Review (edit, delete) and **Finish sheet** (locks it). |
-| **HHDC Link** (`hhdc/link`) | The store PC with Windows Mobile Device Center | Signs in with a Danamotors account, lists issued sheets not yet uploaded, **Send to device**, **Receive from device** (summary, ZERO or RELEASE, upload once, clear the device), **Install / update app**. `HhdcLinkCli.exe` does the same on a command line. |
+| **HHDC Link** (`hhdc/link`) | The store PC with Windows Mobile Device Center | **Station** (`--station`, tray, started at sign-in): delivers waiting jobs to a docked handheld, collects finished ones, installs the app when it differs. **IT window**: register the station, and for fault finding sign in, **Send to device**, **Receive from device** (summary, ZERO or RELEASE, upload once, clear the device), **Install / update app**. `HhdcLinkCli.exe` does the same on a command line. |
 
 How it works:
 
@@ -91,10 +97,9 @@ How it works:
   A sheet already uploaded, from this PC or from the web, is refused (the server also answers 409).
 - **Times.** An entry's device time is used only if it falls between when the PC sent the sheet and
   now; otherwise `countedAt` is the time the PC received the sheet.
-- **Who may upload.** The upload needs `stocktake:manage` (`stockaudit:manage` for an audit), so
-  whoever signs in to HHDC Link needs it. Decided 2026-10-27: the store manager or a supervisor runs
-  HHDC Link; checkers only count on the handheld and are not given `stocktake:manage`, which would also
-  let them correct their own counts.
+- **Who may post.** Sending and posting need `stocktake:manage` (`stockaudit:manage` for an audit), as
+  uploading did (decision 2026-10-28: permissions unchanged). Checkers only count on the handheld and are not
+  given `stocktake:manage`, which would also let them correct their own counts. The station needs no user.
 
 Build and test (no Visual Studio; only the free `csc.exe` of .NET Framework 4):
 

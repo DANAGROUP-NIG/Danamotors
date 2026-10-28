@@ -2,8 +2,100 @@
  * Rules for handheld document uploads (legacy HHDC BI/CPO picking and MIT receiving), kept free of
  * the database so they can be unit tested.
  */
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { HandheldDocumentType, HandheldShortReason } from "@prisma/client";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import { BadRequestError } from "../../shared/errors/appError";
+
+// Each job type uses the permissions of the web screen it stands in for (user decisions 2026-10-27 and
+// 2026-10-28): indent picking -> transfers, CPO picking -> part sale, MIT receiving -> stock, count
+// sheets -> stock taking (stock audits -> stockaudit). Write = send, post and cancel.
+const TYPE_PERMISSIONS: Record<HandheldDocumentType, { read: string; write: string }> = {
+  INDENT_PICK: { read: PERMISSIONS.TRANSFER_READ, write: PERMISSIONS.TRANSFER_DISPATCH },
+  CPO_PICK: { read: PERMISSIONS.PART_SALE_READ, write: PERMISSIONS.PART_SALE_ORDER },
+  MIT_RECEIVE: { read: PERMISSIONS.STOCK_READ, write: PERMISSIONS.STOCK_UPDATE },
+  COUNT_SHEET: { read: PERMISSIONS.STOCK_TAKE_READ, write: PERMISSIONS.STOCK_TAKE_MANAGE },
+};
+const AUDIT_PERMISSIONS = { read: PERMISSIONS.STOCK_AUDIT_READ, write: PERMISSIONS.STOCK_AUDIT_MANAGE };
+
+export function permissionsOf(type: HandheldDocumentType, audit = false): { read: string; write: string } {
+  return type === HandheldDocumentType.COUNT_SHEET && audit ? AUDIT_PERMISSIONS : TYPE_PERMISSIONS[type];
+}
+
+/** A station is online while it has sent a heartbeat in the last 2 minutes (it sends one every 20 s). */
+export const STATION_OFFLINE_MS = 2 * 60 * 1000;
+export const isStationOnline = (lastSeenAt: Date | null | undefined, now = new Date()) =>
+  !!lastSeenAt && now.getTime() - lastSeenAt.getTime() <= STATION_OFFLINE_MS;
+
+/** A station that took jobs for a docked handheld has this long to write and confirm them. */
+export const DELIVERY_LEASE_MINUTES = 5;
+/** A job still waiting for a handheld after this long is reported once. */
+export const WAITING_NOTICE_HOURS = 2;
+
+/**
+ * Station keys: "<stationId>.<secret>". Only the sha-256 of the secret is stored (the secret is 32
+ * random bytes, so a slow hash adds nothing); its first 8 characters are shown on the web.
+ */
+export function newStationSecret() {
+  const secret = randomBytes(32).toString("base64url");
+  return { secret, prefix: secret.slice(0, 8), hash: hashSecret(secret) };
+}
+export const hashSecret = (secret: string) => createHash("sha256").update(secret, "utf8").digest("hex");
+export function parseStationKey(header: string | undefined): { stationId: string; secret: string } | null {
+  const m = /^Station\s+([0-9a-f-]{36})\.([A-Za-z0-9_-]{20,})$/i.exec(header?.trim() ?? "");
+  return m ? { stationId: m[1].toLowerCase(), secret: m[2] } : null;
+}
+export function secretMatches(secret: string, storedHash: string) {
+  const a = Buffer.from(hashSecret(secret), "hex");
+  const b = Buffer.from(storedHash, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** JSON with object keys sorted, so the same device result always hashes the same. */
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined);
+    return `{${entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+export const resultHash = (result: unknown) => createHash("sha256").update(canonicalJson(result), "utf8").digest("hex");
+
+/**
+ * The hash that decides "same result again" for a station submission. A count sheet's times are left
+ * out: the station stamps its receive time when the device clock is wrong (it reads 2009), so a repeat
+ * of the same counts would otherwise look different.
+ */
+export function resultFingerprint(kind: "DOC" | "SHEET", result: unknown): string {
+  if (kind !== "SHEET") return resultHash(result);
+  const entries = ((result as { entries?: Record<string, unknown>[] }).entries ?? []).map(({ countedAt: _countedAt, ...rest }) => rest);
+  return resultHash({ entries });
+}
+
+/** Next free handheld name of a branch: MC3190-1, MC3190-2, ... */
+export function nextDeviceName(taken: string[]): string {
+  const used = new Set(taken.map((n) => n.toUpperCase()));
+  for (let i = 1; ; i++) if (!used.has(`MC3190-${i}`)) return `MC3190-${i}`;
+}
+
+/** The end of "CPO 2026000016 was picked on the handheld: 2 lines short". */
+export function describeOutcome(
+  type: HandheldDocumentType,
+  t: { lines: number; short?: number; unreported?: number; damaged?: number; extras?: number; differences?: number; counted?: number },
+): string {
+  if (type === HandheldDocumentType.COUNT_SHEET) return `was counted on the handheld: ${t.counted ?? 0} of ${t.lines} part(s) counted`;
+  if (type === HandheldDocumentType.MIT_RECEIVE) {
+    const notes = [
+      t.differences ? `${t.differences} line(s) differ from the invoice` : "",
+      t.unreported ? `${t.unreported} line(s) not checked` : "",
+      t.extras ? `${t.extras} part(s) not on the MIT` : "",
+    ].filter(Boolean);
+    return `was checked on the handheld${notes.length ? `: ${notes.join(", ")}` : ": all as invoiced"}`;
+  }
+  const short = (t.short ?? 0) + (t.unreported ?? 0);
+  return `was picked on the handheld${short ? `: ${short} line(s) short` : ": all picked"}`;
+}
 
 export interface SnapshotLine {
   id: string;

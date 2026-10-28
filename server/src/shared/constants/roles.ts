@@ -203,6 +203,8 @@ export const PERMISSIONS = {
   // ── Stock audit (report only; kept apart so a branch store cannot audit itself) ──
   STOCK_AUDIT_READ: "stockaudit:read",
   STOCK_AUDIT_MANAGE: "stockaudit:manage",
+  // Register store PCs as handheld stations and issue their keys.
+  HANDHELD_STATIONS: "handheld:stations",
 
   // ── Finance — Payments ────────────────────────────────────────────────────
   PAYMENT_READ: "payment:read",
@@ -363,6 +365,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.STOCK_TAKE_CONFIRM,
     PERMISSIONS.STOCK_AUDIT_READ,
     PERMISSIONS.STOCK_AUDIT_MANAGE,
+    PERMISSIONS.HANDHELD_STATIONS,
     PERMISSIONS.INVOICE_READ,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.INVOICE_CREATE,

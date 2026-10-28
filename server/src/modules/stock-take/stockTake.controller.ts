@@ -122,7 +122,7 @@ export class StockTakeController {
 
   cancelSheet = handle(async (req, res) => {
     await this.access(req);
-    ok(res, { stockTake: await this.service.cancelSheet(req.params.id, req.params.sheetId, req.body.remark) }, "Count sheet cancelled");
+    ok(res, { stockTake: await this.service.cancelSheet(req.params.id, req.params.sheetId, req.body.remark, req.user!.userId) }, "Count sheet cancelled");
   });
 
   // ── Counts ──

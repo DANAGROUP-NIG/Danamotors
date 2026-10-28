@@ -1,9 +1,13 @@
 /**
- * Demo data for trying the handheld (HHDC Link and the indent, CPO and MIT pages) locally. At CPD:
- * - ready to send: one indent picking list, one picked CPO and one MIT in transit;
- * - on a handheld: one of each, sent to picker 00015 (Handheld card shows them as Sent);
- * - uploaded: one MIT checked on the handheld (Verified, Generate MRN is filled in from it).
- * Goes through the real services. Local database only. Run it again to add another set.
+ * Demo data for trying the web-driven handheld locally (the indent, CPO and MIT pages, Inventory >
+ * Handheld, and HHDC Link in station mode). At CPD, through the real services and station protocol:
+ * - a station DEMO-PC and a handheld DEMO-MC3190 (its key is printed: enter it in HHDC Link, Station...);
+ * - ready to send: one indent picking list, one picked CPO and one MIT in transit (Send to handheld);
+ * - waiting for a handheld: one CPO (QUEUED);
+ * - on a handheld: one of each, picker 00015 (SENT to DEMO-MC3190; no file on any device);
+ * - finished on the handheld: one indent with a short line and an unreported line (RECEIVED: Post it);
+ * - posted: one MIT checked on the handheld (Verified, Generate MRN is filled in from it).
+ * Local database only. Run it again to add another set (the station gets a new key).
  *
  *   npx ts-node prisma/seed/handheld-demo.ts
  */
@@ -22,12 +26,14 @@ const { StockTransferService } = require("../../src/modules/stock-transfer/stock
 const { MobisPurchaseService } = require("../../src/modules/mobis-purchase/mobisPurchase.service");
 const { InventoryService } = require("../../src/modules/inventory/inventory.service");
 const { HandheldService } = require("../../src/modules/handheld/handheld.service");
+const { HandheldStationService } = require("../../src/modules/handheld/handheld.station.service");
 
 const sales = new PartSaleService();
 const transfers = new StockTransferService();
 const mobis = new MobisPurchaseService();
 const inventory = new InventoryService();
 const handheld = new HandheldService();
+const stations = new HandheldStationService();
 
 /** Part number, name, bin, dealer rate. Bins are spread so the device's bin order shows. */
 const PARTS = [
@@ -84,6 +90,8 @@ async function main() {
     sales.createOrder({ branchId: cpd.id, customerId: customer.id, customerRefNo: "HH DEMO", pick: true, lines: picks.map((p, k) => ({ partId: p.id, quantity: qty + k })) }, actor.id);
   const cpoReady = await order(at(2, 4, 0), 2);
   const cpoSent = await order(at(3, 5), 1);
+  const cpoQueued = await order(at(1), 1);
+  const indentBack = await indent(at(2, 3, 0), 2);
 
   // ── Mobis MITs in transit, two cases each ──
   const mit = async (picks: Part[], tag: string) =>
@@ -107,31 +115,67 @@ async function main() {
   const mitSent = await mit(at(1, 3, 5), "S");
   const mitDone = await mit(at(0, 2, 4, 5), "U");
 
-  // ── On a handheld: one of each sent to picker 00015 ──
+  // ── A station and a handheld at CPD (as if DEMO-PC had seen DEMO-MC3190 docked) ──
+  const existing = await prisma.handheldStation.findFirst({ where: { branchId: cpd.id, name: "DEMO-PC", revokedAt: null } });
+  const { station, key } = existing ? await stations.rotateKey(existing.id) : await stations.createStation({ branchId: cpd.id, name: "DEMO-PC" }, actor.id);
+  const pc = await stations.authenticate(`Station ${key}`);
+  const device =
+    (await prisma.handheldDevice.findFirst({ where: { branchId: cpd.id, name: "DEMO-MC3190" } })) ??
+    (await prisma.handheldDevice.create({ data: { branchId: cpd.id, name: "DEMO-MC3190" } }));
+  // Delivers whatever is waiting at CPD to the demo handheld (the station's claim and confirm).
+  const deliver = async () => {
+    const { jobs } = await stations.claim(pc, device.id);
+    for (const j of jobs) await stations.confirm(pc, j.id, device.id);
+  };
+
+  // ── Waiting for a handheld: a CPO ──
   const send = (type: string, sourceId: string) => handheld.createDocument({ type, sourceId, pickerId: picker.id }, actor.id);
   const sentIndent = await send("INDENT_PICK", indentSent.listId);
   const sentCpo = await send("CPO_PICK", cpoSent.id);
   const sentMit = await send("MIT_RECEIVE", mitSent.id);
-
-  // ── Uploaded: an MIT checked on the handheld, one line damaged, one short, one extra part ──
+  const backDoc = await send("INDENT_PICK", indentBack.listId);
   const doneDoc = await send("MIT_RECEIVE", mitDone.id);
-  await handheld.upload(
-    doneDoc.id,
-    {
+  await deliver();
+  const queuedCpo = await send("CPO_PICK", cpoQueued.id);
+
+  // ── Finished on the handheld: an indent, one line short (less in bin), one never reported ──
+  await stations.submitResult(pc, {
+    deviceId: device.id,
+    kind: "DOC",
+    id: backDoc.id,
+    result: {
+      lines: backDoc.lines
+        .slice(0, 2)
+        .map((l: Line, i: number) => (i === 0 ? { lineId: l.id, quantity: l.expectedQuantity - 1, shortReason: "LESS_IN_BIN" } : { lineId: l.id, quantity: l.expectedQuantity })),
+    },
+  });
+
+  // ── Posted: an MIT checked on the handheld, one line damaged, one short, one extra part ──
+  await stations.submitResult(pc, {
+    deviceId: device.id,
+    kind: "DOC",
+    id: doneDoc.id,
+    result: {
       lines: doneDoc.lines.map((l: Line, i: number) =>
         i === 0 ? { lineId: l.id, quantity: l.expectedQuantity - 1, damagedQuantity: 1 } : i === 1 ? { lineId: l.id, quantity: l.expectedQuantity - 2 } : { lineId: l.id, quantity: l.expectedQuantity },
       ),
       extras: [{ partNumber: "96611P2710", quantity: 1, note: "In case SPD2APD00183, not on the invoice" }],
     },
-    actor.id,
-  );
+  });
+  await handheld.post(doneDoc.id, {}, actor.id);
 
   console.log(`Done at ${cpd.name} (picker ${picker.code} ${picker.name}).
-Ready to send in HHDC Link:
+Station ${station.name}, handheld ${device.name}. Station key (local demo only; HHDC Link > Station...):
+  ${key}
+Ready to send from the web:
   Indent ${indentReady.indentNumber}   CPO ${cpoReady.cpoNumber}   MIT ${mitReady.mitNumber}
-On a handheld (Sent):
+Waiting for a handheld:
+  CPO ${cpoQueued.cpoNumber} as ${queuedCpo.documentNumber}
+On handheld ${device.name}:
   Indent ${indentSent.indentNumber} as ${sentIndent.documentNumber}   CPO ${cpoSent.cpoNumber} as ${sentCpo.documentNumber}   MIT ${mitSent.mitNumber} as ${sentMit.documentNumber}
-Uploaded (MIT Verified, MRN to post):
+Finished on the handheld (Post it on the indent page):
+  Indent ${indentBack.indentNumber} as ${backDoc.documentNumber}
+Posted (MIT Verified, MRN to post):
   MIT ${mitDone.mitNumber} as ${doneDoc.documentNumber}`);
 }
 

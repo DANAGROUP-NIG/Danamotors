@@ -10,6 +10,8 @@ datasource db {
 model Branch {
   requisitions           PartRequisition[]
   handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
+  handheldStations       HandheldStation[]      @relation("HandheldStationBranch")
+  handheldDevices        HandheldDevice[]       @relation("HandheldDeviceBranch")
   returnSlips            PartReturnSlip[]
   labourSlips            LabourSlip[]
   standaloneEstimates    Estimate[]
@@ -88,6 +90,7 @@ model User {
   handheldDocumentsSent          HandheldDocument[]     @relation("HandheldDocumentSentBy")
   handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
   handheldDocumentsCancelled     HandheldDocument[]     @relation("HandheldDocumentCancelledBy")
+  handheldStationsCreated        HandheldStation[]      @relation("HandheldStationCreatedBy")
   cancelledRequisitions          PartRequisition[]      @relation("RequisitionCanceller")
   engineeredRequisitions         PartRequisition[]      @relation("RequisitionEngineer")
   createdReturnSlips             PartReturnSlip[]       @relation("ReturnSlipCreator")
@@ -3604,8 +3607,9 @@ model StockTakeSheet {
   cancelledAt  DateTime?
   cancelRemark String?
 
-  lines  StockTakeLine[]
-  counts StockTakeCount[]
+  lines             StockTakeLine[]
+  counts            StockTakeCount[]
+  handheldDocuments HandheldDocument[]
 
   @@index([stockTakeId])
 }
@@ -3637,30 +3641,61 @@ model HandheldDocument {
   id             String                 @id @default(uuid())
   documentNumber String                 @unique
   type           HandheldDocumentType
-  status         HandheldDocumentStatus @default(SENT)
+  status         HandheldDocumentStatus @default(QUEUED)
 
   // Exactly one source, matching the type (check constraint in the migration).
-  pickingListId   String?
-  pickingList     PickingList?       @relation(fields: [pickingListId], references: [id], onDelete: Cascade)
-  customerOrderId String?
-  customerOrder   CustomerOrder?     @relation(fields: [customerOrderId], references: [id], onDelete: Cascade)
-  mitId           String?
-  mit             MaterialInTransit? @relation(fields: [mitId], references: [id], onDelete: Cascade)
+  pickingListId    String?
+  pickingList      PickingList?       @relation(fields: [pickingListId], references: [id], onDelete: Cascade)
+  customerOrderId  String?
+  customerOrder    CustomerOrder?     @relation(fields: [customerOrderId], references: [id], onDelete: Cascade)
+  mitId            String?
+  mit              MaterialInTransit? @relation(fields: [mitId], references: [id], onDelete: Cascade)
+  // COUNT_SHEET: the sheet's own lines are the job; no HandheldDocumentLine rows.
+  stockTakeSheetId String?
+  stockTakeSheet   StockTakeSheet?    @relation(fields: [stockTakeSheetId], references: [id], onDelete: Cascade)
 
   // Branch whose stock is picked or received.
   branchId String
   branch   Branch @relation("HandheldDocumentBranch", fields: [branchId], references: [id], onDelete: Restrict)
 
-  // Who works the device (legacy picker / checker); pickers do not sign in.
+  // Who works the device (legacy picker / checker); pickers do not sign in. A count sheet's checker
+  // is a user (StockTakeSheet.checkerId): pickerId stays null and pickerName holds the name.
   pickerId   String?
   picker     Employee? @relation("HandheldDocumentPicker", fields: [pickerId], references: [id], onDelete: SetNull)
   pickerName String
 
   lineCount Int
 
-  sentById      String?
-  sentBy        User?     @relation("HandheldDocumentSentBy", fields: [sentById], references: [id], onDelete: SetNull)
-  sentAt        DateTime  @default(now())
+  // sentBy queued it on the web; sentAt is when a station wrote it to a handheld.
+  sentById String?
+  sentBy   User?     @relation("HandheldDocumentSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  queuedAt DateTime  @default(now())
+  sentAt   DateTime?
+
+  // Delivery lease: a station took the job for a docked handheld and is writing it (QUEUED until confirmed).
+  claimStationId     String?
+  claimDeviceId      String?
+  claimExpiresAt     DateTime?
+  deliveredStationId String?
+  deliveredStation   HandheldStation? @relation("HandheldDocumentDeliveredStation", fields: [deliveredStationId], references: [id], onDelete: SetNull)
+  deliveredDeviceId  String?
+  deliveredDevice    HandheldDevice?  @relation("HandheldDocumentDeliveredDevice", fields: [deliveredDeviceId], references: [id], onDelete: SetNull)
+
+  // Device result as the station collected it (RECEIVED), applied only when posted.
+  receivedAt        DateTime?
+  receivedStationId String?
+  receivedStation   HandheldStation? @relation("HandheldDocumentReceivedStation", fields: [receivedStationId], references: [id], onDelete: SetNull)
+  result            Json?
+  resultHash        String?
+
+  // What the station did with the device file after a cancel: removed, or kept because it had entries.
+  deviceClearedAt   DateTime?
+  deviceKeptEntries Boolean   @default(false)
+  // "Still waiting" notice sent (once per job).
+  waitNotifiedAt    DateTime?
+  // The sender was told of the cancel (by the sweep, so always after the cancelling transaction commits).
+  cancelNotifiedAt  DateTime?
+
   // Server time of the upload; the device clock is not trusted.
   uploadedById  String?
   uploadedBy    User?     @relation("HandheldDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
@@ -3680,6 +3715,60 @@ model HandheldDocument {
   @@index([pickingListId])
   @@index([customerOrderId])
   @@index([mitId])
+  @@index([stockTakeSheetId])
+  @@index([branchId, status])
+}
+
+// A store PC running HHDC Link in station mode. It authenticates with its own key (never a user
+// password), delivers queued jobs to a docked handheld and collects finished results.
+model HandheldStation {
+  id          String    @id @default(uuid())
+  branchId    String
+  branch      Branch    @relation("HandheldStationBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  // PC name, e.g. STORE-PC1.
+  name        String
+  // First characters of the key, shown on the web; the key itself is stored hashed (sha-256).
+  keyPrefix   String
+  keyHash     String
+  createdById String?
+  createdBy   User?     @relation("HandheldStationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  // Heartbeat: online while lastSeenAt is within about 2 minutes.
+  lastSeenAt        DateTime?
+  linkVersion       String?
+  dockedDeviceId    String?
+  dockedDevice      HandheldDevice? @relation("HandheldStationDocked", fields: [dockedDeviceId], references: [id], onDelete: SetNull)
+  lastError         String?
+  offlineNotifiedAt DateTime?
+
+  delivered   HandheldDocument[] @relation("HandheldDocumentDeliveredStation")
+  received    HandheldDocument[] @relation("HandheldDocumentReceivedStation")
+  devicesSeen HandheldDevice[]   @relation("HandheldDeviceLastStation")
+
+  @@index([branchId])
+}
+
+// A handheld (MC3190). The station writes its id and name to \Application\Danamotors\device.txt on
+// first contact, since the devices look alike.
+model HandheldDevice {
+  id            String           @id @default(uuid())
+  branchId      String
+  branch        Branch           @relation("HandheldDeviceBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  name          String
+  appVersion    String?
+  appStatus     String?
+  appError      String?
+  lastSeenAt    DateTime?
+  lastStationId String?
+  lastStation   HandheldStation? @relation("HandheldDeviceLastStation", fields: [lastStationId], references: [id], onDelete: SetNull)
+  createdAt     DateTime         @default(now())
+
+  dockedAt  HandheldStation[]  @relation("HandheldStationDocked")
+  delivered HandheldDocument[] @relation("HandheldDocumentDeliveredDevice")
+
+  @@unique([branchId, name])
 }
 
 // One line as sent (snapshot) and, after upload, what the device recorded. A line keeps its result
@@ -3728,10 +3817,14 @@ enum HandheldDocumentType {
   INDENT_PICK
   CPO_PICK
   MIT_RECEIVE
+  COUNT_SHEET
 }
 
+// QUEUED (waiting for a handheld) -> SENT (on a handheld) -> RECEIVED (result stored) -> UPLOADED (posted).
 enum HandheldDocumentStatus {
+  QUEUED
   SENT
+  RECEIVED
   UPLOADED
   CANCELLED
 }

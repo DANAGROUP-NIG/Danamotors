@@ -201,7 +201,9 @@ function CancelDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) 
 export function MitDetail({ id }: { id: string }) {
   const { data: mit, isLoading, error } = useMobisMit(id);
   const { data: handheld } = useHandheldDocuments({ sourceId: id });
-  const verified = handheld?.find((d) => d.status === "UPLOADED");
+  // The job just posted on this page, until the list catches up (Generate MRN is filled in from it).
+  const [posted, setPosted] = useState<HandheldDocument | null>(null);
+  const verified = posted ?? handheld?.find((d) => d.status === "UPLOADED");
   const { hasPermission } = useAuth();
   const canPost = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
   const [dialog, setDialog] = useState<"mrn" | "cancel" | null>(null);
@@ -310,7 +312,16 @@ export function MitDetail({ id }: { id: string }) {
           </div>
         )}
 
-        <HandheldCard filter={{ sourceId: mit.id }} canWrite={canPost} />
+        <HandheldCard
+          filter={{ sourceId: mit.id }}
+          canWrite={canPost}
+          send={mit.status === "IN_TRANSIT" ? { type: "MIT_RECEIVE", sourceId: mit.id, branchId: mit.destinationBranchId, label: `MIT ${mit.mitNumber}` } : null}
+          // Posting verifies the MIT; the store then posts the MRN, filled in from the handheld counts.
+          onPosted={(doc) => {
+            setPosted(doc);
+            setDialog("mrn");
+          }}
+        />
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <p className="mb-4 text-sm font-semibold text-slate-700">Invoice lines</p>

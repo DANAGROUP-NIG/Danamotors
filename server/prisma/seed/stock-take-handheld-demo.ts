@@ -1,6 +1,7 @@
 /**
  * Demo data for counting on the handheld locally: a perpetual stock taking at CPD over 12 demo parts
- * (HHCOUNT-...) with stock and bins, and three count sheets issued to a checker, ready for HHDC Link.
+ * (HHCOUNT-...) with stock and bins, and three count sheets issued to a checker, ready to send to the
+ * handheld from each sheet's page (Send to handheld).
  * - by bin, A-row bins, system stock shown;
  * - by bin, 1D3/1D2 and the B bins, system stock hidden (the usual blind count);
  * - by part, the rest (C bins).

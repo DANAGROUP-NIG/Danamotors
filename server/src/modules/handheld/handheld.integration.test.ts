@@ -79,12 +79,12 @@ describeDb("Handheld documents (database)", () => {
     const sources = await service.listSources("INDENT_PICK", cpd.id);
     expect(sources.map((s) => s.sourceId)).toContain(listId);
 
-    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id, manual: true }, manager.id);
     expect(doc).toMatchObject({ status: "SENT", pickerName: "Picker 00015", lineCount: 2 });
     expect(doc.documentNumber).toMatch(/^\d{10}$/);
     // Bin order: 1D3/1D2 before 59A3.
     expect(doc.lines.map((l) => [l.binLocation, l.expectedQuantity])).toEqual([["1D3/1D2", 1], ["59A3", 10]]);
-    await expect(service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id }, manager.id)).rejects.toThrow(/Already on a handheld/);
+    await expect(service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id, manual: true }, manager.id)).rejects.toThrow(/Already sent to a handheld/);
     expect((await service.listSources("INDENT_PICK", cpd.id)).map((s) => s.sourceId)).not.toContain(listId);
 
     const [hornLine, retainerLine] = doc.lines;
@@ -104,7 +104,7 @@ describeDb("Handheld documents (database)", () => {
     expect(retainerIndentLine.backOrderQuantity).toBe(3);
     expect(after.openPickingList.pickerName).toBe("Picker 00015");
 
-    await expect(service.upload(doc.id, { lines: [{ lineId: hornLine.id, quantity: 1 }] }, manager.id)).rejects.toThrow(/already uploaded/);
+    await expect(service.upload(doc.id, { lines: [{ lineId: hornLine.id, quantity: 1 }] }, manager.id)).rejects.toThrow(/already posted/);
 
     // The indent page lists every document of the indent, with lines.
     const listed = await service.listDocuments({ types: ["INDENT_PICK"], indentId: indent.id });
@@ -122,7 +122,7 @@ describeDb("Handheld documents (database)", () => {
       requester.id,
     );
     const approved = await transfers.approveIndent(indent.id, manager.id);
-    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: approved.openPickingList.id, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: approved.openPickingList.id, pickerId: picker.id, manual: true }, manager.id);
     const before = await stockOf(horn.id);
     await expect(service.upload(doc.id, { lines: [] }, manager.id)).rejects.toThrow(/Nothing was recorded/);
     await service.upload(doc.id, { lines: [{ lineId: doc.lines[0].id, quantity: 0, shortReason: "NOT_FOUND" }] }, manager.id);
@@ -139,7 +139,7 @@ describeDb("Handheld documents (database)", () => {
       requester.id,
     );
     const approved = await transfers.approveIndent(indent.id, manager.id);
-    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: approved.openPickingList.id, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: approved.openPickingList.id, pickerId: picker.id, manual: true }, manager.id);
     await transfers.dispatchIndent(indent.id, manager.id);
     const stale = await service.getDocument(doc.id);
     expect(stale.status).toBe("CANCELLED");
@@ -153,7 +153,7 @@ describeDb("Handheld documents (database)", () => {
       manager.id,
     );
     const reservedBefore = (await stockOf(retainer.id)).reservedQuantity;
-    const doc = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id, manual: true }, manager.id);
     const retainerLine = doc.lines.find((l) => l.partId === retainer.id)!;
     const hornLine = doc.lines.find((l) => l.partId === horn.id)!;
     await service.upload(
@@ -178,7 +178,7 @@ describeDb("Handheld documents (database)", () => {
       { branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: retainer.id, quantity: 1 }] },
       manager.id,
     );
-    const doc = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id, manual: true }, manager.id);
     await partSale.releaseOrder(order.id);
     expect((await service.getDocument(doc.id)).status).toBe("CANCELLED");
   });
@@ -202,7 +202,7 @@ describeDb("Handheld documents (database)", () => {
       },
       include: { lines: true },
     });
-    const doc = await service.createDocument({ type: "MIT_RECEIVE", sourceId: mit.id, pickerId: picker.id }, manager.id);
+    const doc = await service.createDocument({ type: "MIT_RECEIVE", sourceId: mit.id, pickerId: picker.id, manual: true }, manager.id);
     expect(doc.lines.map((l) => [l.caseNumber, l.expectedQuantity])).toEqual([["SPD2APD00183", 1], ["SPD2APD00183", 2]]);
     const hornLine = doc.lines.find((l) => l.partId === horn.id)!;
     await expect(service.upload(doc.id, { lines: [{ lineId: hornLine.id, quantity: 2, damagedQuantity: 1 }] }, manager.id)).rejects.toThrow(/invoice has 2/);
