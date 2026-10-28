@@ -101,7 +101,8 @@ export const heartbeatSchema = z.object({
         appStatus: z.enum(["OK", "UPDATED", "INSTALL_FAILED", "MISSING"]).optional(),
         appError: shortText(500),
         files: z
-          .array(z.object({ kind: z.enum(["DOC", "SHEET"]), id: uuid("job or sheet ID"), started: z.boolean(), finished: z.boolean() }))
+          // Any id: files written by test or older tools are reported too, and kept (KEEP).
+          .array(z.object({ kind: z.enum(["DOC", "SHEET"]), id: z.string().trim().min(1).max(64), started: z.boolean(), finished: z.boolean() }))
           .max(200)
           .optional(),
       })
