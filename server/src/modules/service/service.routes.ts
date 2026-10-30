@@ -783,7 +783,7 @@ router.post(
   "/appointments/:id/convert",
   requirePermission(PERMISSIONS.APPOINTMENT_UPDATE),
   requirePermission(PERMISSIONS.JOBCARD_CREATE),
-  validateRequest(serviceIdParamSchema),
+  validateRequest(serviceIdParamSchema.extend({ body: z.record(z.unknown()) })),
   controller.convertAppointment,
 );
 router.delete(

@@ -14,11 +14,17 @@ import { AppointmentCreateForm } from "./AppointmentCreateForm";
 import { useAppointments } from "../hooks/use-appointments";
 import type { Appointment } from "../types/appointment.types";
 
-function toExportRow(a: Appointment): Record<string, string | number | boolean | null | undefined> {
+function toExportRow(
+  a: Appointment,
+): Record<string, string | number | boolean | null | undefined> {
   const vehicle = a.vehicle as Record<string, unknown> | null | undefined;
   return {
-    customer: a.customer ? `${a.customer.firstName} ${a.customer.lastName}` : "",
-    vehicleRegNo: vehicle?.registrationNumber ? String(vehicle.registrationNumber) : "",
+    customer: a.customer
+      ? `${a.customer.firstName} ${a.customer.lastName}`
+      : "",
+    vehicleRegNo: vehicle?.registrationNumber
+      ? String(vehicle.registrationNumber)
+      : "",
     branch: a.branch?.name ?? "",
     scheduledAt: new Date(a.scheduledAt).toLocaleString(undefined, {
       dateStyle: "medium",
@@ -27,7 +33,9 @@ function toExportRow(a: Appointment): Record<string, string | number | boolean |
     status: a.status,
     source: a.source,
     notes: a.notes ?? "",
-    agent: a.createdBy ? `${a.createdBy.firstName} ${a.createdBy.lastName}` : "",
+    agent: a.createdBy
+      ? `${a.createdBy.firstName} ${a.createdBy.lastName}`
+      : "",
   };
 }
 
@@ -76,7 +84,11 @@ function ExportAppointmentsButton() {
       <ActionMenuItem
         icon={<Download className="size-4" />}
         onClick={() =>
-          downloadCsv(filename(), appointments.map(toExportRow), exportColumns())
+          downloadCsv(
+            filename(),
+            appointments.map(toExportRow),
+            exportColumns(),
+          )
         }
       >
         Export as CSV
@@ -84,7 +96,11 @@ function ExportAppointmentsButton() {
       <ActionMenuItem
         icon={<FileSpreadsheet className="size-4" />}
         onClick={() =>
-          downloadExcel(filename(), appointments.map(toExportRow), exportColumns())
+          downloadExcel(
+            filename(),
+            appointments.map(toExportRow),
+            exportColumns(),
+          )
         }
       >
         Export as Excel

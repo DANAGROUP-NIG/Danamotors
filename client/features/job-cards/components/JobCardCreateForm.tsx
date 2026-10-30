@@ -480,11 +480,15 @@ export function JobCardCreateForm({
             : "Vehicle Details",
       );
 
-      requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        content.current?.querySelectorAll<HTMLElement>('[aria-invalid="true"]').forEach((field) => {
+          const card = field.closest("details");
+          if (card) card.open = true;
+        });
         content.current
           ?.querySelector<HTMLElement>('[aria-invalid="true"]')
-          ?.focus(),
-      );
+          ?.focus();
+      });
     },
   );
 
@@ -699,7 +703,8 @@ export function JobCardCreateForm({
               className="space-y-5"
             >
               <OpeningCard
-                title="Vehicle"
+                title="Vehicle Details"
+                collapsible
                 description="Search registration or VIN. Saved vehicle details load automatically."
                 action={
                   vehicle && (
@@ -1053,6 +1058,7 @@ export function JobCardCreateForm({
               </OpeningCard>
               <OpeningCard
                 title="Delivery & closing"
+                collapsible
                 description="Available after quality check and billing or credit approval on the saved job card."
               >
                 <div className={openingGrid}>
