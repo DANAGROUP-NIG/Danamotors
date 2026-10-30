@@ -330,6 +330,7 @@ model Customer {
   branch    Branch @relation(fields: [branchId], references: [id])
   createdBy User?  @relation("CreatedCustomers", fields: [createdById], references: [id], onDelete: SetNull)
 
+  notifications     Notification[]
   account           CustomerAccount?
   documents         CustomerDocument[]
   serviceHistory    ServiceHistory[]
@@ -467,6 +468,9 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
+  depositReceiptId String? @unique
+  depositReceipt Receipt? @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
   followUpAppointments ServiceAppointment[] @relation("BookingFollowUp")
   requisitions PartRequisition[]
   returnSlips PartReturnSlip[]
@@ -586,6 +590,8 @@ model JobCard {
   @@index([customerId])
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
+  @@index([technicianId, status])
+  @@index([status, promisedAt])
   @@index([deliveredAt])
   @@index([appointmentId])
   @@index([createdAt, id])
@@ -622,6 +628,7 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
   remarks String?
   version Int @default(1)
   supersedesId String? @unique
@@ -1165,6 +1172,8 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  receivedById String?
+  receivedAt DateTime?
   requisitionLine PartRequisitionLine?
   id String @id @default(uuid())
 
@@ -1321,6 +1330,7 @@ model ServiceHistory {
 // ============================================================
 
 model Invoice {
+  jobCards JobCard[] @relation("WarrantyJobBills")
   taxRegisterSnapshot Json?
   billType String?
   vatBreakdown InvoiceVatBreakdown[]
@@ -1534,6 +1544,7 @@ model Payment {
 // ============================================================
 
 model Receipt {
+  depositJobCard JobCard? @relation("JobDeposit")
   id String @id @default(uuid())
   branchId String?
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -1820,8 +1831,11 @@ model CustomerCreditApplication {
 model Notification {
   id String @id @default(uuid())
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dedupeKey String?
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type    String
   title   String
@@ -1838,6 +1852,9 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
   @@index([branchId, readAt])
+  @@unique([userId, dedupeKey])
+  @@unique([customerId, dedupeKey])
+  @@index([customerId, readAt, createdAt])
 }
 
 // ============================================================

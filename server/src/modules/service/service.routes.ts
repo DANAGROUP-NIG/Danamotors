@@ -1,3 +1,4 @@
+import { recordJobDeposit } from "./job-deposit.service";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
@@ -782,7 +783,7 @@ router.post(
   "/appointments/:id/convert",
   requirePermission(PERMISSIONS.APPOINTMENT_UPDATE),
   requirePermission(PERMISSIONS.JOBCARD_CREATE),
-  validateRequest(serviceIdParamSchema),
+  validateRequest(serviceIdParamSchema.extend({ body: z.record(z.unknown()) })),
   controller.convertAppointment,
 );
 router.delete(
@@ -810,6 +811,13 @@ router.get(
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
 );
+router.post('/job-cards/:id/deposit', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ receiptId: z.string().uuid() }).strict() })), async (req, res, next) => {
+  try {
+    const card = await prisma.jobCard.findUniqueOrThrow({ where: { id: req.params.id } });
+    assertBranchOwnership(req, card.branchId);
+    res.json({ status: 'success', data: await recordJobDeposit(card.id, req.body.receiptId, req.user!.userId) });
+  } catch (error) { next(error); }
+});
 router.put(
   "/job-cards/:id",
   requirePermission(PERMISSIONS.JOBCARD_UPDATE),
@@ -912,6 +920,7 @@ router.get('/job-cards/:id/estimates/:estimateId/print', requirePermission(PERMI
    prisma.labourItem.findMany({where:{id:{in:estimate.lines.filter(l=>l.type.endsWith('LABOUR')).map(l=>l.referenceId!).filter(Boolean)}},select:{id:true,code:true}})
   ]);
   const terms=branchTerms ?? companyTerms;
+  const signedTerms=estimate.approvals.find(approval=>approval.approved && approval.signature?.consentStatement)?.signature?.consentStatement?.split("\n").slice(1);
   const codes=new Map([...parts.map(p=>[p.id,p.partNumber] as [string,string]),...labour.map(l=>[l.id,l.code] as [string,string])]);
   res.json({status:'success',data:{
    estimate:projectEstimatePrint(estimate,codes),
@@ -920,7 +929,7 @@ router.get('/job-cards/:id/estimates/:estimateId/print', requirePermission(PERMI
    customer:card.customer ? {name:card.customer.companyName || `${card.customer.firstName} ${card.customer.lastName}`,address:[card.customer.address,card.customer.house,card.customer.street,card.customer.city,card.customer.state].filter(Boolean).join(', '),phone:card.customer.phoneNumber} : null,
    vehicle:card.vehicle ? {registration:card.vehicle.registrationNumber,vin:card.vehicle.vin,make:card.vehicle.make,model:card.vehicle.model,variant:card.vehicle.trim,mileage:card.mileage} : null,
    job:{number:card.jobNumber,date:card.createdAt,serviceType:card.serviceType?.description ?? card.service?.name,complaints:card.complaints.map(c=>c.description)},
-   terms:terms?.terms ?? [],footer:terms?.footer ?? null,printedAt:new Date().toISOString()
+   terms:signedTerms ?? terms?.terms ?? [],footer:terms?.footer ?? null,printedAt:new Date().toISOString()
   }});
  }catch(error){next(error);}
 });

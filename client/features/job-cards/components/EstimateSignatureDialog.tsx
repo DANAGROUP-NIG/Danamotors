@@ -1,4 +1,5 @@
 "use client";
+import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 import { signatureFieldsValid } from "./signature-fields";
 import { useRef, useState, type PointerEvent } from "react";
 import { apiPost } from "@/lib/api/apiClient";
@@ -7,12 +8,14 @@ import type { Estimate } from "../types/job-card.types";
 export function EstimateSignatureDialog({
   estimate,
   customerId,
+  branchId,
   customerName,
   onSaved,
   onClose,
 }: {
   estimate: Estimate;
   customerId: string;
+  branchId?: string;
   customerName: string;
   onSaved: () => Promise<void>;
   onClose: () => void;
@@ -22,6 +25,7 @@ export function EstimateSignatureDialog({
   const [drawn, setDrawn] = useState(false);
   const [name, setName] = useState(customerName);
   const [relationship, setRelationship] = useState("");
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [approved, setApproved] = useState(true);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,7 +55,7 @@ export function EstimateSignatureDialog({
     ctx.stroke();
     setDrawn(true);
   }
-  const valid = signatureFieldsValid({
+  const valid = (!approved || consentAccepted) && signatureFieldsValid({
     drawn,
     name,
     customerName,
@@ -70,6 +74,7 @@ export function EstimateSignatureDialog({
       await apiPost(`/service/estimates/${estimate.id}/approvals`, {
         customerId,
         approved,
+        consentAccepted,
         comments: reason.trim() || undefined,
         signerName: name.trim(),
         relationship: relationship.trim() || undefined,
@@ -185,6 +190,8 @@ export function EstimateSignatureDialog({
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
+        <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={branchId} />
+        {approved && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} />I approve the job card and estimate and accept the terms and conditions above.</label>}
         {error && <p role="alert">{error}</p>}
         <div className="flex gap-2">
           <Button disabled={!valid || busy} onClick={save}>

@@ -29,3 +29,16 @@ it('rejects conversion across branches and branchless accounts before opening a 
     expect(convert).not.toHaveBeenCalled();
   } finally { get.mockRestore(); convert.mockRestore(); }
 });
+it('preserves opening fields when validating the booking conversion route', async () => {
+  const handlers = (router.stack as Layer[]).find(layer => layer.route?.path === '/appointments/:id/convert')?.route?.stack;
+  if (!handlers) throw new Error('Missing conversion route');
+  const req = request([PERMISSIONS.APPOINTMENT_UPDATE, PERMISSIONS.JOBCARD_CREATE]);
+  req.params.id = 'e5e4c4c0-b4bb-4613-9409-f43a631b774e';
+  const body = { mileage: 12000, bayId: 'bay', complaints: [{ description: 'Inspect brakes' }] };
+  req.body = body;
+  const next = jest.fn();
+  await handlers[2].handle(req, {} as Response, next);
+  expect(next).toHaveBeenCalledWith();
+  expect(req.body).toEqual(body);
+  expect(req.params.id).toBe('e5e4c4c0-b4bb-4613-9409-f43a631b774e');
+});

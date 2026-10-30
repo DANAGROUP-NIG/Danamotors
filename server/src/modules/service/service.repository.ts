@@ -346,6 +346,7 @@ export class ServiceRepository {
             receipts: true,
           },
         },
+        consolidatedInvoices: { include: { payments: true, receipts: true } },
         warrantyAcknowledgedBy: {
           select: { id: true, firstName: true, lastName: true },
         },

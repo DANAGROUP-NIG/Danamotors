@@ -156,6 +156,7 @@ export class VehicleService {
     } = input;
 
     const data = vehicleBody.parse(body);
+    if (!data.registrationNumber) throw new BadRequestError("Registration number is required").withCode("FIELD_VALIDATION", { field: "registrationNumber" });
 
     return prisma.$transaction(async tx => {
       if (data.customerId && !(await tx.customer.findFirst({

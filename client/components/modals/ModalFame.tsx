@@ -10,6 +10,7 @@ interface ModalProps {
   description?: string;
   size?: "default" | "wide";
   flush?: boolean;
+  preventAccidentalClose?: boolean;
 }
 
 export default function ModalFame({
@@ -20,6 +21,7 @@ export default function ModalFame({
   description,
   size = "default",
   flush = false,
+  preventAccidentalClose = false,
 }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -50,7 +52,7 @@ export default function ModalFame({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
 
-      if (event.key === "Escape") close.current();
+      if (event.key === "Escape" && !preventAccidentalClose) close.current();
 
       if (event.key !== "Tab") return;
 
@@ -88,7 +90,7 @@ export default function ModalFame({
       document.body.style.overflow = overflow;
       previous?.focus();
     };
-  }, [isOpen]);
+  }, [isOpen, preventAccidentalClose]);
 
   if (!isOpen) return null;
 
@@ -102,7 +104,7 @@ export default function ModalFame({
       {}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-md"
-        onClick={onClose}
+        onClick={preventAccidentalClose ? undefined : onClose}
         aria-hidden="true"
       />
 

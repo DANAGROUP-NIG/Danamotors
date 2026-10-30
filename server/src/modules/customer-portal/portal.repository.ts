@@ -24,6 +24,7 @@ export type JobCardWithRelations = JobCard & {
     createdAt: Date;
     approvals: { id: string; approved: boolean | null; decisionDate: Date | null; comments: string | null; status: string }[];
   }[];
+  consolidatedInvoices?: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
   invoices: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
   inspections: { id: string; findings: string; status: string; passed: boolean | null }[];
 };
@@ -94,6 +95,7 @@ export class PortalRepository {
             },
           },
         },
+        consolidatedInvoices: { select: { id: true, invoiceNumber: true, status: true, total: true, issuedDate: true } },
         invoices: {
           select: {
             id: true,
@@ -144,6 +146,7 @@ export class PortalRepository {
             },
           },
         },
+        consolidatedInvoices: { select: { id: true, invoiceNumber: true, status: true, total: true, issuedDate: true } },
         invoices: {
           select: {
             id: true,

@@ -1,6 +1,7 @@
 export const WORKSPACE_COPY = {
   separator: " \u00b7 ",
   completed: "Completed",
+  saveFindings: "Save diagnosis & findings",
   workshop: "Workshop", jobCard: "Job card", title: "Repair workspace",
   breadcrumb: "Job card / Repair workspace", subtitle: "Manage the estimate and keep work moving.",
   estimate: "Estimate & approval", latest: "Latest revision", revision: "Revision",
@@ -18,8 +19,8 @@ export const WORKSPACE_COPY = {
   close: "Close signature", noAccess: "Estimate details are not available with your permissions.",
   previous: "Previous revision", unavailable: "Not recorded",
   service: "Service charge", labour: "Labour", parts: "Parts", complaint: "Complaint", included: "Included in service charge",
-  steps: { OPEN: "Open", IN_PROGRESS: "In progress", QC: "QC", READY: "Ready", BILLED: "Billed", DELIVERED: "Delivered" },
-  jobStates: { OPEN: "Open job", IN_PROGRESS: "In progress", QC: "Quality check", READY: "Ready", BILLED: "Billed", DELIVERED: "Delivered", CANCELLED: "Cancelled" },
+  steps: { WAITING_PARTS: "Waiting for parts", OPEN: "Open", IN_PROGRESS: "In progress", QC: "QC", READY: "Ready", BILLED: "Billed", DELIVERED: "Delivered" },
+  jobStates: { WAITING_PARTS: "Waiting for parts", OPEN: "Open job", IN_PROGRESS: "In progress", QC: "Quality check", READY: "Ready", BILLED: "Billed", DELIVERED: "Delivered", CANCELLED: "Cancelled" },
   estimateStates: { awaiting: "Awaiting approval", approved: "Approved", declined: "Declined", superseded: "Superseded", revision: "Revision required", draft: "Draft" },
   signedBy: (name: string, date: string) => `Signed by ${name} on ${date}`,
   editor: {
