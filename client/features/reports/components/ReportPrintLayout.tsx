@@ -25,6 +25,7 @@ export function periodLabel(period: ReportConfig["period"], options: Record<stri
 
 export function periodText(config: Pick<ReportConfig, "period">, data: Pick<ReportResponse, "filters">): string {
   const query = data.filters.query as Record<string, string>;
+  if (config.period.kind === "none") return "";
   const label = periodLabel(config.period, query);
   if (config.period.kind === "date") return `${label} ${fmtDate(`${query.date}T12:00:00Z`)}`;
   return `${label} ${fmtDate(`${query.from}T12:00:00Z`)} to ${fmtDate(`${query.to}T12:00:00Z`)}`;
@@ -83,7 +84,7 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
         </div>
         <div className="text-center">
           <p className="text-base font-bold uppercase">{config.title}</p>
-          <p className="text-[9pt] font-semibold">{periodText(config, data)}</p>
+          {config.period.kind !== "none" && <p className="text-[9pt] font-semibold">{periodText(config, data)}</p>}
           {branch !== "ALL" && <p className="text-[9pt]">{branch.name}</p>}
         </div>
         <div className="w-24" aria-hidden />

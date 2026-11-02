@@ -7,6 +7,7 @@ import { AlertCircle, AlertTriangle, ChevronRight, FileSpreadsheet, FileText, Lo
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { BRANCH_ALL } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useReportQuery } from "../hooks/use-reports";
 import { exportReportExcel } from "../lib/report-excel";
@@ -49,6 +50,8 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   const { user, isAdminOrAbove, hasPermission, isHydrated } = useAuth();
   const activeBranch = useBranchStore((state) => state.activeBranch);
   const genericConfig = config as unknown as ReportConfig;
+  // Admin, SuperAdmin and cross-branch (branch:all) users may choose the branch, as on the server.
+  const canChooseBranch = isAdminOrAbove || hasPermission(BRANCH_ALL);
 
   const searchKey = searchParams.toString();
   // Admins without a branch in the URL get their own branch, as the server does, so the
@@ -56,11 +59,11 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   const ownBranch = user?.branchId ?? "ALL";
   const applied = useMemo(() => {
     const parsed = parseParams(genericConfig, new URLSearchParams(searchKey));
-    return parsed && isAdminOrAbove && !parsed.branchId ? { ...parsed, branchId: ownBranch } : parsed;
-  }, [genericConfig, searchKey, isAdminOrAbove, ownBranch]);
+    return parsed && canChooseBranch && !parsed.branchId ? { ...parsed, branchId: ownBranch } : parsed;
+  }, [genericConfig, searchKey, canChooseBranch, ownBranch]);
   const defaults = useMemo<ReportParams>(
-    () => ({ ...defaultParams(genericConfig), branchId: isAdminOrAbove ? activeBranch?.id ?? ownBranch : undefined }),
-    [genericConfig, isAdminOrAbove, activeBranch?.id, ownBranch],
+    () => ({ ...defaultParams(genericConfig), branchId: canChooseBranch ? activeBranch?.id ?? ownBranch : undefined }),
+    [genericConfig, canChooseBranch, activeBranch?.id, ownBranch],
   );
   const [draft, setDraft] = useState<ReportParams>(() => applied ?? defaults);
   const [error, setError] = useState<string | null>(null);
@@ -116,10 +119,14 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
           description={config.description}
           actions={
             <>
-              <Button variant="outline" disabled={!data || report.isFetching} onClick={() => window.print()}>
-                <Printer className="size-4" />
-                Print
-              </Button>
+              {config.printAction ? (
+                config.printAction({ data, options, disabled: !data || report.isFetching, print: () => window.print() })
+              ) : (
+                <Button variant="outline" disabled={!data || report.isFetching} onClick={() => window.print()}>
+                  <Printer className="size-4" />
+                  Print
+                </Button>
+              )}
               <Button variant="outline" disabled={!data || report.isFetching} onClick={() => data && void exportReportExcel(config, data, options)}>
                 <FileSpreadsheet className="size-4" />
                 Export Excel
@@ -144,14 +151,16 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
         isRunning={report.isFetching}
         dirty={dirty}
         error={error}
-        canChooseBranch={isAdminOrAbove}
+        canChooseBranch={canChooseBranch}
       />
 
       {!applied ? (
         <Panel>
           <FileText className="mx-auto size-8 text-slate-400" />
           <p className="mt-3 font-semibold">Set the filters and select Run report</p>
-          <p className="mt-1 text-sm text-muted-foreground">The report runs for your branch. Bookmark the page after running to keep these filters.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {canChooseBranch ? "Choose the branch, or all branches." : "The report runs for your branch."} Bookmark the page after running to keep these filters.
+          </p>
         </Panel>
       ) : report.isLoading ? (
         <LoadingRows />
@@ -202,7 +211,8 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
             {config.footnote && !isEmpty && <p className="border-t border-border px-5 py-2.5 text-sm text-muted-foreground">{config.footnote}</p>}
           </section>
 
-          <ReportPrintLayout config={config} data={data} options={options} printedBy={printedBy} />
+          {(config.printList?.(options) ?? true) && <ReportPrintLayout config={config} data={data} options={options} printedBy={printedBy} />}
+          {config.printSections?.(data, options)}
         </>
       ) : null}
     </div>

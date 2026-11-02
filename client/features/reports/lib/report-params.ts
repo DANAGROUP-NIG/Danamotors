@@ -1,4 +1,4 @@
-import type { FilterKey, ReportConfig } from "../types";
+import type { FilterKey, OptionDef, ReportConfig } from "../types";
 import { daysBetween, isDateString, presetRange } from "./report-dates";
 
 export const MAX_RANGE_DAYS = 366;
@@ -15,6 +15,13 @@ export interface ReportParams {
   /** Admin / SuperAdmin only: a branch id or ALL. */
   branchId?: string;
 }
+
+/** Options hidden by visibleWhen are not applied (nor sent to the server). */
+export function isOptionVisible(option: OptionDef, options: Record<string, string>): boolean {
+  return !option.visibleWhen || option.visibleWhen.values.includes(options[option.visibleWhen.key] ?? "");
+}
+
+const RANGE_VALUE = { number: /^\d{1,9}$/, date: /^\d{4}-\d{2}-\d{2}$/ } as const;
 
 export function defaultParams(config: ReportConfig): ReportParams {
   const { from, to } = presetRange(config.period.defaultPreset);
@@ -35,12 +42,13 @@ export function defaultParams(config: ReportConfig): ReportParams {
  * malformed in a hand-edited URL falls back to the default instead of failing the request.
  */
 export function parseParams(config: ReportConfig, search: URLSearchParams): ReportParams | null {
+  const base = defaultParams(config);
   const isRange = config.period.kind === "range";
-  const from = search.get(isRange ? "from" : "date");
-  const to = isRange ? search.get("to") : from;
+  // A report without a period has run once the URL carries run=1.
+  const from = config.period.kind === "none" ? (search.has("run") ? base.from : null) : search.get(isRange ? "from" : "date");
+  const to = config.period.kind === "none" ? from : isRange ? search.get("to") : from;
   if (!isDateString(from) || !isDateString(to)) return null;
 
-  const base = defaultParams(config);
   const filters: ReportParams["filters"] = {};
   for (const key of config.filters) {
     const ids = (search.get(key) ?? "").split(",").filter((id) => UUID.test(id));
@@ -52,7 +60,7 @@ export function parseParams(config: ReportConfig, search: URLSearchParams): Repo
     if (option.kind === "range") {
       for (const key of [option.fromKey, option.toKey]) {
         const value = search.get(key);
-        if (value && /^\d{1,9}$/.test(value)) options[key] = value;
+        if (value && RANGE_VALUE[option.valueType ?? "number"].test(value)) options[key] = value;
       }
       continue;
     }
@@ -86,7 +94,8 @@ export function toSearch(config: ReportConfig, params: ReportParams): string {
   if (config.period.kind === "range") {
     search.set("from", params.from);
     search.set("to", params.to);
-  } else search.set("date", params.from);
+  } else if (config.period.kind === "date") search.set("date", params.from);
+  else search.set("run", "1");
   for (const key of config.filters) if (params.filters[key]?.length) search.set(key, params.filters[key]!.join(","));
   for (const [key, value] of Object.entries(params.options)) if (value !== "") search.set(key, value);
   if (params.branchId) search.set("branchId", params.branchId);
@@ -95,12 +104,13 @@ export function toSearch(config: ReportConfig, params: ReportParams): string {
 
 /** Query sent to GET /reports/:slug — display-only options stay on the client. */
 export function toApiQuery(config: ReportConfig, params: ReportParams): Record<string, string> {
-  const local = new Set((config.options ?? []).filter((option) => option.local).map((option) => option.key));
+  const hidden = (config.options ?? []).filter((option) => option.local || !isOptionVisible(option, params.options));
+  const local = new Set(hidden.flatMap((option) => (option.kind === "range" ? [option.fromKey, option.toKey] : [option.key])));
   const query: Record<string, string> = {};
   if (config.period.kind === "range") {
     query.from = params.from;
     query.to = params.to;
-  } else query.date = params.from;
+  } else if (config.period.kind === "date") query.date = params.from;
   for (const key of config.filters) if (params.filters[key]?.length) query[key] = params.filters[key]!.join(",");
   // Blank values (e.g. an "All" range) are left out.
   for (const [key, value] of Object.entries(params.options)) if (!local.has(key) && value !== "") query[key] = value;
@@ -110,7 +120,7 @@ export function toApiQuery(config: ReportConfig, params: ReportParams): Record<s
 
 /** Client-side check matching the server's rules, so the user sees the problem before running. */
 export function validateParams(config: ReportConfig, params: ReportParams): string | null {
-  if (!isDateString(params.from) || !isDateString(params.to)) return "Enter a valid date.";
+  if (config.period.kind !== "none" && (!isDateString(params.from) || !isDateString(params.to))) return "Enter a valid date.";
   if (config.period.kind === "range") {
     const span = daysBetween(params.from, params.to);
     if (span < 0) return "The end date must be on or after the start date.";
@@ -120,9 +130,12 @@ export function validateParams(config: ReportConfig, params: ReportParams): stri
     if (option.kind !== "range") continue;
     const from = params.options[option.fromKey];
     const to = params.options[option.toKey];
-    if (from !== "" && to !== "" && Number(to) < Number(from)) return `${option.label}: the upper value must be at least the lower value.`;
+    if (option.valueType === "date") {
+      if ((from === "") !== (to === "")) return `${option.label}: enter both dates, or tick All.`;
+      if (from !== "" && to < from) return `${option.label}: the last date must be on or after the first.`;
+    } else if (from !== "" && to !== "" && Number(to) < Number(from)) return `${option.label}: the upper value must be at least the lower value.`;
   }
-  return null;
+  return config.validateOptions?.(params.options) ?? null;
 }
 
 export function sameParams(config: ReportConfig, a: ReportParams | null, b: ReportParams | null): boolean {

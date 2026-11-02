@@ -10,13 +10,13 @@ import { useBranchStore } from "@/store/branch.store";
 import { useReportLookup } from "../hooks/use-reports";
 import type { LookupSource } from "../api/reports.api";
 import { PRESET_LABELS, presetRange } from "../lib/report-dates";
-import type { ReportParams } from "../lib/report-params";
+import { isOptionVisible, type ReportParams } from "../lib/report-params";
 import type { FilterKey, ReportConfig } from "../types";
 import { AllToggleMultiSelect } from "./AllToggleMultiSelect";
 import { periodLabel } from "./ReportPrintLayout";
 import { SegmentedControl } from "./SegmentedControl";
 
-const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSource }> = {
+const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSource; followsOption?: string }> = {
   model: { label: "Model", all: "All models", source: "model" },
   variant: { label: "Variant", all: "All variants", source: "variant" },
   serviceType: { label: "Service type", all: "All service types", source: "serviceType" },
@@ -26,6 +26,8 @@ const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSou
   technician: { label: "Technician", all: "All technicians", source: "technician" },
   complaint: { label: "Customer request", all: "All requests", source: "complaint" },
   labourOperation: { label: "Labour operation", all: "All operations", source: "labourOperation" },
+  // Campaign options carry their type as parentId, so the list follows the campaign type option.
+  campaign: { label: "FPC bulletin", all: "All bulletins", source: "campaign", followsOption: "campaignType" },
 };
 
 export const MODE_CHOICES = [
@@ -43,17 +45,23 @@ function Section({ label, children, className }: { label: string; children: Reac
   );
 }
 
-function FilterField({ filterKey, value, onChange, branchId, modelIds }: {
+function FilterField({ filterKey, value, onChange, branchId, modelIds, followValue }: {
   filterKey: FilterKey;
   value: string[] | undefined;
   onChange: (value: string[] | undefined) => void;
   branchId?: string;
   modelIds?: string[];
+  /** Value of the option this filter follows (e.g. the campaign type); "ALL" or blank keeps every option. */
+  followValue?: string;
 }) {
   const meta = FILTERS[filterKey];
   const lookup = useReportLookup(meta.source, branchId);
-  // Variants follow the model filter when models are picked.
-  const options = (lookup.data ?? []).filter((option) => filterKey !== "variant" || !modelIds?.length || modelIds.includes(option.parentId ?? ""));
+  // Variants follow the model filter when models are picked; campaigns follow the type option.
+  const options = (lookup.data ?? []).filter(
+    (option) =>
+      (filterKey !== "variant" || !modelIds?.length || modelIds.includes(option.parentId ?? "")) &&
+      (!followValue || followValue === "ALL" || option.parentId === followValue || value?.includes(option.id)),
+  );
   return (
     <AllToggleMultiSelect
       label={meta.label}
@@ -67,8 +75,15 @@ function FilterField({ filterKey, value, onChange, branchId, modelIds }: {
   );
 }
 
-/** From/to number filter with an "All" toggle (blank = no limit). */
-function RangeField({ label, unit, from, to, onChange }: { label: string; unit?: string; from: string; to: string; onChange: (from: string, to: string) => void }) {
+/** From/to number or date filter with an "All" toggle (blank = no limit). */
+function RangeField({ label, unit, valueType = "number", from, to, onChange }: {
+  label: string;
+  unit?: string;
+  valueType?: "number" | "date";
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}) {
   const [open, setOpen] = useState(from !== "" || to !== "");
   const all = !open && from === "" && to === "";
   const box = "h-10 w-full min-w-0 rounded-md border border-border px-3 text-sm tabular-nums outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted/60";
@@ -89,10 +104,21 @@ function RangeField({ label, unit, from, to, onChange }: { label: string; unit?:
           All
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <input type="number" min={0} disabled={all} aria-label={`${label} from`} placeholder={all ? "Any" : `From${unit ? ` (${unit})` : ""}`} className={box} value={from} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""), to)} />
-        <input type="number" min={0} disabled={all} aria-label={`${label} to`} placeholder={all ? "Any" : `To${unit ? ` (${unit})` : ""}`} className={box} value={to} onChange={(event) => onChange(from, event.target.value.replace(/\D/g, ""))} />
-      </div>
+      {valueType === "date" ? (
+        all ? (
+          <p className={cn(box, "flex items-center text-muted-foreground")}>Any date</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <DateInput value={from} onChange={(value) => onChange(value, to)} />
+            <DateInput value={to} onChange={(value) => onChange(from, value)} />
+          </div>
+        )
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <input type="number" min={0} disabled={all} aria-label={`${label} from`} placeholder={all ? "Any" : `From${unit ? ` (${unit})` : ""}`} className={box} value={from} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""), to)} />
+          <input type="number" min={0} disabled={all} aria-label={`${label} to`} placeholder={all ? "Any" : `To${unit ? ` (${unit})` : ""}`} className={box} value={to} onChange={(event) => onChange(from, event.target.value.replace(/\D/g, ""))} />
+        </div>
+      )}
     </div>
   );
 }
@@ -141,6 +167,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
         onRun();
       }}
     >
+      {period.kind !== "none" && (
       <Section label="Period">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
           {period.basis && (
@@ -190,6 +217,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
           </p>
         )}
       </Section>
+      )}
 
       {(config.filters.length > 0 || rangeOptions.length > 0 || canChooseBranch) && (
         <Section label="Filters">
@@ -210,6 +238,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
                 key={option.key}
                 label={option.label}
                 unit={option.unit}
+                valueType={option.valueType}
                 from={draft.options[option.fromKey] ?? ""}
                 to={draft.options[option.toKey] ?? ""}
                 onChange={(from, to) => onChange({ ...draft, options: { ...draft.options, [option.fromKey]: from, [option.toKey]: to } })}
@@ -223,6 +252,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
                 onChange={(value) => setFilter(key, value)}
                 branchId={lookupBranch}
                 modelIds={key === "variant" ? draft.filters.model : undefined}
+                followValue={FILTERS[key].followsOption ? draft.options[FILTERS[key].followsOption!] : undefined}
               />
             ))}
           </div>
@@ -232,7 +262,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
       <Section label="Options">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           {(config.options ?? []).map((option) => {
-            if (option.kind === "range") return null;
+            if (option.kind === "range" || !isOptionVisible(option, draft.options)) return null;
             if (option.kind === "checkbox")
               return (
                 <label key={option.key} className="inline-flex cursor-pointer items-center gap-2 text-sm">
@@ -274,6 +304,14 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
             );
           })}
           {config.hasMode && <SegmentedControl label="Print" value={draft.options.mode ?? "both"} choices={MODE_CHOICES} onChange={(value) => setOption("mode", value)} />}
+          {(config.options ?? [])
+            .filter((option) => option.hint && isOptionVisible(option, draft.options))
+            .map((option) => (
+              <p key={`${option.key}-hint`} className="flex w-full items-start gap-1.5 text-xs text-muted-foreground">
+                <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+                {option.hint}
+              </p>
+            ))}
 
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
             {error ? (

@@ -10,11 +10,12 @@ export type FilterKey =
   | "deliveredBy"
   | "technician"
   | "complaint"
-  | "labourOperation";
+  | "labourOperation"
+  | "campaign";
 
 export type ReportMode = "both" | "summary" | "detail";
 export type ReportWidth = 80 | 132;
-export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance";
+export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC";
 
 export interface ReportBranch {
   id: string;
@@ -80,6 +81,8 @@ export interface ReportColumn<Row extends ReportRow = ReportRow> {
   renderTotal?: (value: number) => ReactNode;
   /** Shown only when this option is on (e.g. printAddress). */
   whenOption?: string;
+  /** Shown only while an option has one of these values (e.g. job columns on visit lists). */
+  showWhen?: { key: string; values: string[] };
   /** Hidden in print (screen-only helper columns). */
   printHidden?: boolean;
   className?: string;
@@ -98,17 +101,22 @@ export type OptionDef = (
       max: number;
       default: number;
     }
-  /** A from/to numeric filter with an "All" toggle (e.g. mileage). Shown with the filters. */
-  | { kind: "range"; key: string; label: string; fromKey: string; toKey: string; unit?: string }
+  /** A from/to filter with an "All" toggle (e.g. mileage, or dates). Shown with the filters. */
+  | { kind: "range"; key: string; label: string; fromKey: string; toKey: string; unit?: string; valueType?: "number" | "date" }
 ) & {
   /** Display-only option: kept in the URL but not sent to the server (e.g. print address). */
   local?: boolean;
+  /** Shown (and sent) only while another option has one of these values. */
+  visibleWhen?: { key: string; values: string[] };
+  /** Help text under the options. */
+  hint?: string;
 };
 
 export type PresetKey = "today" | "yesterday" | "tomorrow" | "thisWeek" | "thisMonth" | "lastMonth";
 
 export interface PeriodDef {
-  kind: "range" | "date";
+  /** "none": the report has no period (e.g. FPC vehicle lists). */
+  kind: "range" | "date" | "none";
   label: string;
   /** Label for the single date, e.g. "As on". */
   dateLabel?: string;
@@ -159,4 +167,12 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   /** Legend / footnote under the table. */
   footnote?: string;
   emptyMessage?: string;
+  /** Print the table (the default). False leaves only printSections, e.g. letters alone. */
+  printList?: (options: Record<string, string>) => boolean;
+  /** Extra print-only sections after the table (letters, labels). */
+  printSections?: (data: ReportResponse<Row>, options: Record<string, string>) => ReactNode;
+  /** Replaces the Print button, e.g. to confirm recording contacts before printing. */
+  printAction?: (context: { data: ReportResponse<Row> | undefined; options: Record<string, string>; disabled: boolean; print: () => void }) => ReactNode;
+  /** Problem with the chosen options before running, or null. */
+  validateOptions?: (options: Record<string, string>) => string | null;
 }

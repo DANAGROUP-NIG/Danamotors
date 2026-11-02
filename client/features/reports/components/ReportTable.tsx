@@ -7,7 +7,11 @@ import { formatValue, isNumericFormat, plural } from "../lib/report-format";
 import type { ReportColumn, ReportConfig, ReportGroup, ReportResponse, ReportRow } from "../types";
 
 export function visibleColumns<Row extends ReportRow>(config: ReportConfig<Row>, options: Record<string, string>): ReportColumn<Row>[] {
-  return config.columns.filter((column) => !column.whenOption || options[column.whenOption] === "true");
+  return config.columns.filter(
+    (column) =>
+      (!column.whenOption || options[column.whenOption] === "true") &&
+      (!column.showWhen || column.showWhen.values.includes(options[column.showWhen.key] ?? "")),
+  );
 }
 
 export function cellValue<Row extends ReportRow>(column: ReportColumn<Row>, row: Row) {
