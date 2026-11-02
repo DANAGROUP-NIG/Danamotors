@@ -12,6 +12,7 @@ export const LOOKUP_SOURCES = [
   'labourOperation',
   'serviceAdvisor',
   'technician',
+  'campaign',
 ] as const;
 export type LookupSource = (typeof LOOKUP_SOURCES)[number];
 
@@ -24,7 +25,7 @@ export interface LookupOption {
   id: string;
   label: string;
   code?: string | null;
-  /** Model id for a variant, so the variant list can follow the model filter. */
+  /** Model id for a variant (so the variant list follows the model filter); the type for a campaign. */
   parentId?: string | null;
   active: boolean;
 }
@@ -55,6 +56,15 @@ export async function listLookup(db: ReportDb, scope: ReportScope, source: Looku
       orderBy: [{ active: 'desc' }, { description: 'asc' }],
     });
     return masters.map((m) => ({ id: m.id, label: m.description, code: m.code, parentId: m.parentId, active: m.active }));
+  }
+
+  if (source === 'campaign') {
+    // Campaigns are not branch-scoped. Closed ones are listed (and flagged) for history.
+    const campaigns = await db.campaign.findMany({
+      select: { id: true, code: true, title: true, type: true, status: true },
+      orderBy: [{ status: 'asc' }, { code: 'asc' }],
+    });
+    return campaigns.map((c) => ({ id: c.id, label: `${c.code} · ${c.title}`, code: c.code, parentId: c.type, active: c.status !== 'CLOSED' }));
   }
 
   const role = STAFF_ROLE[source];

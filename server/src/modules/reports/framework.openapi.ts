@@ -13,7 +13,7 @@ const idListParam = (name: string, label: string): ReportParamDoc => ({
 const SHARED_PARAMS: ReportParamDoc[] = [
   {
     name: 'branchId',
-    description: 'Admin and SuperAdmin only: a branch id or ALL. Other users always get their own branch.',
+    description: 'Admin, SuperAdmin and branch:all users only: a branch id or ALL. Other users always get their own branch.',
     schema: { type: 'string' },
   },
   {
@@ -24,6 +24,7 @@ const SHARED_PARAMS: ReportParamDoc[] = [
 ];
 
 function dateParams(definition: ReportDefinition): ReportParamDoc[] {
+  if (definition.period === 'none') return [];
   if (definition.period === 'date') return [{ name: 'date', required: true, description: 'Report date (YYYY-MM-DD, branch local time).', schema: { type: 'string', format: 'date' } }];
   return [
     { name: 'from', required: true, description: 'First day (YYYY-MM-DD, branch local time).', schema: { type: 'string', format: 'date' } },
@@ -62,6 +63,36 @@ export function buildReportPaths(reports: ReportDefinition[]): Record<string, un
           403: { description: 'No report permission' },
         },
       },
+    },
+  };
+
+  paths['/reports/settings'] = {
+    get: {
+      tags: ['Reports'],
+      summary: 'Report settings: the FPC letter template and its placeholders',
+      description: 'Requires any report permission.',
+      security: [{ BearerAuth: [] }],
+      responses: {
+        200: {
+          description: 'Settings',
+          content: {
+            'application/json': {
+              schema: responseSchema({ fpcLetterTemplate: 'Dear {{customer}}, …', fpcLetterIsDefault: true, fpcLetterPlaceholders: ['customer', 'vin', 'subject', 'measures', 'branchPhone'] }),
+            },
+          },
+        },
+      },
+    },
+    put: {
+      tags: ['Reports'],
+      summary: 'Save report settings',
+      description: 'Requires `report:settings`. `fpcLetterTemplate: null` resets the letter to the default. Unknown {{placeholders}} are rejected.',
+      security: [{ BearerAuth: [] }],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: { type: 'object', properties: { fpcLetterTemplate: { type: 'string', nullable: true, maxLength: 5000 } } }, example: { fpcLetterTemplate: 'Dear {{customer}},\n\nRE: {{subject}} ({{bulletin}}) …' } } },
+      },
+      responses: { 200: { description: 'Saved settings' }, 400: { description: 'Unknown placeholder or template too short/long' }, 403: { description: 'Missing report:settings' } },
     },
   };
 

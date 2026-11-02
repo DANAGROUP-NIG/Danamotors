@@ -13,7 +13,8 @@ export type FilterKey =
   | 'deliveredBy'
   | 'technician'
   | 'complaint'
-  | 'labourOperation';
+  | 'labourOperation'
+  | 'campaign';
 
 export type DimensionFilters = Partial<Record<FilterKey, string[]>>;
 
@@ -96,8 +97,8 @@ export interface ReportDefinition<Q extends BaseReportQuery = BaseReportQuery> {
   width: 80 | 132;
   permission: string;
   summary: string;
-  /** 'range' takes from/to, 'date' takes a single date. */
-  period: 'range' | 'date';
+  /** 'range' takes from/to, 'date' takes a single date, 'none' has no period (e.g. FPC vehicle lists). */
+  period: 'range' | 'date' | 'none';
   /** Zod schema for req.query. */
   query: z.ZodType<Q, z.ZodTypeDef, unknown>;
   filterKeys: FilterKey[];

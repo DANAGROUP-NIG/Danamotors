@@ -10,6 +10,7 @@ export const FILTER_LABELS: Record<FilterKey, string> = {
   technician: 'Technician',
   complaint: 'Customer request',
   labourOperation: 'Labour operation',
+  campaign: 'Campaign / FPC bulletin',
 };
 
 const MASTER_KEYS: FilterKey[] = ['model', 'variant', 'serviceType', 'team', 'complaint'];
@@ -25,16 +26,19 @@ export async function resolveFilterLabels(
   const masterIds = ids(MASTER_KEYS);
   const userIds = ids(USER_KEYS);
   const labourIds = ids(['labourOperation']);
+  const campaignIds = ids(['campaign']);
 
-  const [masters, users, labour] = await Promise.all([
+  const [masters, users, labour, campaigns] = await Promise.all([
     masterIds.length ? db.workshopMaster.findMany({ where: { id: { in: masterIds } }, select: { id: true, description: true } }) : [],
     userIds.length ? db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
     labourIds.length ? db.labourItem.findMany({ where: { id: { in: labourIds } }, select: { id: true, code: true, description: true } }) : [],
+    campaignIds.length ? db.campaign.findMany({ where: { id: { in: campaignIds } }, select: { id: true, code: true } }) : [],
   ]);
   const names = new Map<string, string>([
     ...masters.map((m) => [m.id, m.description] as [string, string]),
     ...users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()] as [string, string]),
     ...labour.map((l) => [l.id, `${l.code} ${l.description}`] as [string, string]),
+    ...campaigns.map((c) => [c.id, c.code] as [string, string]),
   ]);
 
   return keys.map((key) => ({
