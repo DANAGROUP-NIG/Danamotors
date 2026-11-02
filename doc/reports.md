@@ -61,3 +61,53 @@ The audit uses a disposable localhost PostgreSQL database. See [audited progress
 Issue #79 is authoritative. The duplicate metric cards above report output are removed. Table footers, required subtotals/grand totals, M2's service-type summary and M4's selectable per-job/per-charge summary remain.
 
 M7 is the requested delivery-date by actual service-type grid, with every delivered job counted once. The additional free-service-sequence table, hard-coded service buckets and accidental-excluding total are removed. M5 groups by corporate membership with its required bill columns and one subtotal per corporate; extra customer/bill-type subdivisions are removed. M2, M4 and M9 expose the issue's full column sets, rather than photo-only columns that hid required fields. M1 uses the issue's category/VAT columns; the extra legacy-layout selector is removed. Historical report snapshots remain readable and invoice amounts are unchanged.
+
+# Framework reports (#75)
+
+Reports built on the report framework from PR #81 share one route (`/reports/<slug>`), one endpoint
+(`GET /api/reports/<slug>`) and one screen: filter bar, sortable table with group subtotals, browser
+print (80 column on A4 portrait, 132 column on A4 landscape) and Excel export. The monthly reports
+above keep their own screens; both are served from `/reports/[report]`.
+
+PR #81 was dropped from `main` by merge `70b7699`. Only the framework was restored. The 14 workshop
+daily reports and their schema (bookings, pre-job estimates, labour technicians, mileage bands) come
+back with #75 / #97.
+
+## Using a report
+
+1. Pick the period, if the report has one (a date range or a single date).
+2. Narrow with the filters. Each has an **All** tick, on by default. Variant options follow the
+   models picked.
+3. Set the options and select **Run report**. The filters are kept in the page address, so a run
+   can be bookmarked or shared.
+
+## Rules
+
+- **Branch:** a report covers the user's own branch. Admin and SuperAdmin may choose a branch or
+  *All branches*. Anyone else asking for another branch gets 403.
+- **Excluded:** cancelled job cards and bills, and PDI jobs (a pre-delivery service type, or the
+  legacy `PDI` category).
+- **Dates** are local calendar days (`Africa/Lagos`). A range is at most 366 days.
+- **Size:** at most 25,000 rows. Beyond that the page asks for narrower filters.
+- **Consistency:** each run reads one read-only, repeatable-read snapshot with a 30-second limit.
+
+## API
+
+`GET /api/reports/<slug>` needs the report's permission (`report:<slug>`). Filter ids go comma
+separated (`model`, `variant`, …); omitted means All. `branchId` (Admin / SuperAdmin) is a branch
+id or `ALL`. Unknown parameters are rejected (400). Swagger (`/api/docs`, tag *Reports*) is
+generated from the registry.
+
+`GET /api/reports/lookups/<source>` feeds the filter dropdowns (`model`, `variant`, `serviceType`,
+`team`, `complaint`, `labourOperation`, `serviceAdvisor`, `technician`). Any report permission is
+enough. Inactive entries are included and flagged.
+
+## Adding a report
+
+1. Server: write a report with `defineReport({ slug, title, width, permission, period, query,
+   filterKeys, run })` and list it in `server/src/modules/reports/reports.registry.ts`. The route,
+   permission check, validation and Swagger entry follow from the registry.
+2. Add `report:<slug>` to `PERMISSIONS` and `ROLE_PERMISSIONS` in `shared/constants/roles.ts`,
+   with an idempotent migration that inserts the permission and its default grants.
+3. Client: add a `ReportConfig` in `client/features/reports/configs` and list it in
+   `configs/index.ts`. The hub card, page, filter bar, table, print and Excel follow from it.
