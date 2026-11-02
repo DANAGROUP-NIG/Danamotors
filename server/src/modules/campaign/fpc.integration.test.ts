@@ -8,6 +8,7 @@
  *   TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/danamotors_test npx jest fpc.integration
  */
 import type { PrismaClient } from "@prisma/client";
+import { estimateContentHash } from "../service/estimate-signature";
 import type { ServiceService as ServiceServiceType } from "../service/service.service";
 import type { CampaignService as CampaignServiceType } from "./campaign.service";
 import type { JobCardWorkflowService as WorkflowType } from "../service/job-card-workflow.service";
@@ -68,7 +69,13 @@ describeDb("FPC bulletins (database)", () => {
   /** Approved estimate, then OPEN → IN_PROGRESS → QC (passed); READY is left to the test. */
   const toQc = async (jobCardId: string) => {
     const estimate = await service.addEstimate(jobCardId, { description: "Approved scope", lines: [{ type: "SERVICE", referenceId: serviceType.id, quantity: 1 }] });
-    await service.addApproval(estimate.id, { customerId: customer.id, approved: true });
+    const signed = await prisma.estimate.findUniqueOrThrow({ where: { id: estimate.id }, include: { lines: true } });
+    await service.addApproval(
+      estimate.id,
+      { customerId: customer.id, approved: true, expectedVersion: signed.version, expectedHash: estimateContentHash(signed), overrideReason: "Paper approval on file" },
+      adviser.id,
+      { deviceOrIp: "test", allowOverride: true },
+    );
     await service.updateJobCard(jobCardId, { status: "IN_PROGRESS" }, adviser.id);
     await service.updateJobCard(jobCardId, { status: "QC" }, adviser.id);
     await workshop.updateQC(jobCardId, "PASSED", "Checked");

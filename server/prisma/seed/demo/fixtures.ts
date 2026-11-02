@@ -270,6 +270,7 @@ export const JOBS: JobFixture[] = [
     }],
     labour: [["service", 2]], issues: [["sparkPlug", 4], ["engineOil", 1]],
     workDone: "Service done, spark plugs replaced. ECU software updated under free fix campaign.",
+    campaignWork: { attended: true },
     target: "BILLED_PAID", startDaysAgo: 21, spanHours: 30,
   },
   {
