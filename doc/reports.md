@@ -111,3 +111,49 @@ enough. Inactive entries are included and flagged.
    with an idempotent migration that inserts the permission and its default grants.
 3. Client: add a `ReportConfig` in `client/features/reports/configs` and list it in
    `configs/index.ts`. The hub card, page, filter bar, table, print and Excel follow from it.
+
+## Service · FPC reports (#98)
+
+Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis
+(F2). Called, visited and attended are defined in `doc/warranty.md` (FPC bulletins).
+
+### F1. FPC vehicles (`/reports/fpc-vehicles`, 80 column, `report:fpc-vehicles`)
+
+- **Filters:** model, variant, FPC bulletin (each with All); campaign type (FPC by default; picking bulletins
+  overrides it); branch (the vehicle owner's branch) for Admin, SuperAdmin and `branch:all` users.
+- **Show:**
+
+  | Show | Campaign vehicles listed |
+  |---|---|
+  | To be called | not completed or not applicable, campaign active |
+  | Called but not visited | a contact logged, no job card |
+  | Visited but not attended | job cards, none recording the work as done. One row per visit |
+  | Attended | the job card that recorded the work as done |
+  | Attended but not called | attended, with no contact logged before that job card was opened |
+
+  The tiles above the table show the count of every list for the same filters.
+- **Order:** model, variant, registration or VIN. Not-registered VINs come last.
+- **Print as** (any combination): **List** (bulletin, VIN, registration, model, variant, customer, phone, branch,
+  status; job no, job date, bill date and not-attended reason on visit lists), **Letters** (one A4 page per vehicle,
+  template under *Letter template*, `report:settings`) and **Labels** (A4 sheet of 3 × 8). VINs not registered yet
+  appear in the list only.
+- **Record as called** (To be called only, needs `campaign:vehicle:update`): on Print the page asks for confirmation
+  with the count, then adds one contact per vehicle printed: `LETTER` for letters and labels, `PHONE` for the call
+  list, outcome `SENT`. Those vehicles then show under *Called but not visited*. Without the tick nothing is recorded.
+
+### F2. FPC analysis (`/reports/fpc-analysis`, 132 column, `report:fpc-analysis`)
+
+- **Filters:** bill date from / to (the period); model (All); FPC bulletin date from / to, or All; campaign type.
+- **Order:** model (one row per bulletin and model, totals per model) or bulletin date.
+- **Columns:** bulletin, bulletin date, subject, effective – close; vehicles affected (less not applicable); called;
+  visited in the period (job cards **billed** in the period); attended and not attended in the period, with the count
+  per reason (*Not answered* for visits from before the job card asked); attended % of visited; attended % of affected
+  (to date); still outstanding.
+- Totals per model and a grand total; percentages are worked out from the summed counts. For the same bulletin and
+  period, visited = attended + not attended, as in F1.
+
+### Settings
+
+`GET /api/reports/settings` (any report permission) returns the FPC letter template and its placeholders.
+`PUT /api/reports/settings` (`report:settings`) saves it; `{ "fpcLetterTemplate": null }` resets it to the default.
+Unknown `{{placeholders}}` are rejected. TODO(confirm): match the template to a printed legacy FPC letter (#98 question 5).
