@@ -12,8 +12,10 @@ import {
   Car,
   CheckCircle2,
   Download,
+  FileText,
   Hourglass,
   Phone,
+  Printer,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -33,6 +35,7 @@ import { CAMPAIGN_TYPE_LABELS, CAMPAIGN_TYPE_TONES, CAMPAIGN_VEHICLE_LABELS, CAM
 import { useBulkUpdateCampaignVehicles, useCampaign, useCampaignStatus, useCampaignVehicles } from "../hooks/use-campaigns";
 import type { CampaignVehicleRow, CampaignVehicleStatus, Progress } from "../types/campaign.types";
 import { AddVehiclesDialog } from "./AddVehiclesDialog";
+import { VinRangesCard } from "./VinRangesCard";
 import { CampaignStatusPill } from "./campaigns-page";
 import { OUTCOME_SHORT, OutreachDialog } from "./OutreachDialog";
 
@@ -107,13 +110,21 @@ export function CampaignDetail({ id }: { id: string }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [outreach, setOutreach] = useState<{ vehicleId: string; section: "contact" | "schedule" } | null>(null);
 
-  // /campaigns/:id?add=1 (from "Save & add vehicles") opens the add dialog once.
+  // /campaigns/:id?add=1 (from "Save & add vehicles") opens the add dialog once;
+  // ?ranges=1 (from "Save & add VIN ranges") scrolls to the VIN ranges.
+  const rangesRequested = searchParams.get("ranges") === "1";
   useEffect(() => {
     if (searchParams.get("add") === "1") {
       setAdding(true);
       router.replace(pathname);
     }
   }, [searchParams, router, pathname]);
+  useEffect(() => {
+    if (!rangesRequested || !campaign) return;
+    document.getElementById("vin-ranges")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(`vin-from-${campaign.id}`)?.focus({ preventScroll: true });
+    router.replace(pathname);
+  }, [rangesRequested, campaign, router, pathname]);
 
   const vehicles = useCampaignVehicles(id, {
     status: status || undefined,
@@ -141,6 +152,8 @@ export function CampaignDetail({ id }: { id: string }) {
   const counts = vehicles.data?.counts;
   const branchRows = (campaign.byBranch ?? []).filter((b) => b.branchId);
   const active = campaign.status === "ACTIVE";
+  const isFpc = campaign.type === "FPC";
+  const hasRanges = (campaign.vinRanges?.length ?? 0) > 0;
 
   const columns: Column<CampaignVehicleRow>[] = [
     { header: "VIN", render: (v) => <span className={cn("font-mono text-xs", v.vehicle ? "text-blue-700" : "text-slate-500")}>{v.vehicle ? <Link href={`/vehicles/${v.vehicle.id}`} className="hover:underline">{v.vin}</Link> : v.vin}</span> },
@@ -247,7 +260,13 @@ export function CampaignDetail({ id }: { id: string }) {
             </Button>
           )}
           {canUpdate && campaign.status === "DRAFT" && (
-            <Button size="sm" variant="outline" disabled={statusMutation.isPending || p.affected === 0} onClick={() => statusMutation.mutate("activate")} title={p.affected === 0 ? "Add vehicles first" : undefined}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={statusMutation.isPending || (p.affected === 0 && !hasRanges)}
+              onClick={() => statusMutation.mutate("activate")}
+              title={p.affected === 0 && !hasRanges ? "Add vehicles or VIN ranges first" : undefined}
+            >
               Activate
             </Button>
           )}
@@ -265,11 +284,20 @@ export function CampaignDetail({ id }: { id: string }) {
           <Pill status={CAMPAIGN_TYPE_LABELS[campaign.type]} tone={CAMPAIGN_TYPE_TONES[campaign.type]} />
           <CampaignStatusPill status={campaign.status} />
         </div>
-        <p className="mt-2 font-mono text-lg text-slate-600">{campaign.code}</p>
+        <p className="mt-2 font-mono text-lg text-slate-600">
+          {isFpc && <span className="mr-2 font-sans text-xs font-semibold uppercase tracking-wider text-slate-400">Bulletin</span>}
+          {campaign.code}
+        </p>
         <h1 className="text-2xl font-bold text-slate-900">{campaign.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+          {campaign.bulletinDate && (
+            <span className="inline-flex items-center gap-2">
+              <FileText className="size-4" /> Bulletin of {fmtDate(campaign.bulletinDate)}
+            </span>
+          )}
           <span className="inline-flex items-center gap-2">
-            <CalendarDays className="size-4" /> {fmtDate(campaign.startDate)} – {campaign.endDate ? fmtDate(campaign.endDate) : "open"}
+            <CalendarDays className="size-4" /> {isFpc ? "Effective " : ""}
+            {fmtDate(campaign.startDate)} – {campaign.endDate ? fmtDate(campaign.endDate) : "open"}
           </span>
           <span className="inline-flex flex-wrap items-center gap-2">
             <Car className="size-4" />
@@ -287,7 +315,27 @@ export function CampaignDetail({ id }: { id: string }) {
             {campaign.labourCovered && campaign.partsCovered ? "Labour and parts covered" : campaign.labourCovered ? "Labour covered" : campaign.partsCovered ? "Parts covered" : "Nothing covered"}
           </span>
         </div>
-        {campaign.defectDescription && <p className="mt-3 max-w-3xl text-sm text-slate-500">{campaign.defectDescription}</p>}
+        {campaign.description && (
+          <p className="mt-3 max-w-3xl text-sm text-slate-700">
+            {isFpc && <span className="font-semibold">Measures: </span>}
+            {campaign.description}
+          </p>
+        )}
+        {campaign.defectDescription && <p className="mt-2 max-w-3xl text-sm text-slate-500">{campaign.defectDescription}</p>}
+        <p className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600">
+          <Printer className="size-4" />
+          {campaign.printOnJobCard ? (
+            <>
+              Prints on job cards as <span className="font-mono font-semibold text-slate-800">{campaign.jobCardText || campaign.title}</span>
+            </>
+          ) : (
+            "Not printed on job cards"
+          )}
+        </p>
+      </div>
+
+      <div id="vin-ranges" className="scroll-mt-6">
+        {(isFpc || hasRanges || canUpdate) && <VinRangesCard campaign={campaign} canEdit={canUpdate} />}
       </div>
 
       {/* ── Progress ── */}

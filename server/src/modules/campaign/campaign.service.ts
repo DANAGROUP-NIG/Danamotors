@@ -374,12 +374,14 @@ export class CampaignService {
   }
 
   async activate(id: string) {
-    const affected = await prisma.campaignVehicle.count({
-      where: { campaignId: id },
-    });
-    if (affected === 0)
+    // VIN ranges count: their vehicles may not be registered yet.
+    const [affected, ranges] = await Promise.all([
+      prisma.campaignVehicle.count({ where: { campaignId: id } }),
+      prisma.campaignVinRange.count({ where: { campaignId: id } }),
+    ]);
+    if (affected === 0 && ranges === 0)
       throw new BadRequestError(
-        "Add the affected vehicles before activating the campaign",
+        "Add the affected vehicles or VIN ranges before activating the campaign",
       );
     const result = await prisma.campaign.updateMany({
       where: { id, status: { in: CAMPAIGN_TRANSITIONS.ACTIVATE } },
