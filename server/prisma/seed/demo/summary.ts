@@ -1,5 +1,5 @@
 import prisma from "../../../src/prisma/client";
-import { CAMPAIGNS, CUSTOMERS, CustomerFixture, PARTS, VEHICLES, jobKey, JOBS } from "./fixtures";
+import { CAMPAIGNS, CUSTOMERS, CustomerFixture, FPC_BULLETIN, FPC_JOBS, PARTS, VEHICLES, jobKey, JOBS } from "./fixtures";
 import { DemoContext } from "./context";
 import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.coverage";
 
@@ -7,7 +7,7 @@ import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.cov
 export async function printSummary(ctx: DemoContext) {
   const branchName = new Map(Object.values(ctx.branches).map((b) => [b.id, b.name]));
   const jobs = await prisma.jobCard.findMany({
-    where: { customField1: { in: JOBS.map((j) => jobKey(j.id)) } },
+    where: { customField1: { in: [...JOBS, ...FPC_JOBS].map((j) => jobKey(j.id)) } },
     include: {
       vehicle: { select: { registrationNumber: true } },
       estimates: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { status: true } },
@@ -39,12 +39,13 @@ export async function printSummary(ctx: DemoContext) {
   }
 
   console.log("\nCampaigns");
-  for (const c of Object.values(CAMPAIGNS)) {
-    const row = await prisma.campaign.findUnique({ where: { code: c.code }, include: { vehicles: { orderBy: { vin: "asc" }, include: { completedJobCard: { select: { jobNumber: true } } } } } });
+  for (const code of [...Object.values(CAMPAIGNS).map((c) => c.code), FPC_BULLETIN.code]) {
+    const row = await prisma.campaign.findUnique({ where: { code }, include: { vehicles: { orderBy: { vin: "asc" }, include: { completedJobCard: { select: { jobNumber: true } } } } } });
     if (!row) continue;
     const vins = row.vehicles.map((v) => `${v.vin} ${v.status}${v.vehicleId ? "" : " (no vehicle record)"}${v.completedJobCard ? ` via ${v.completedJobCard.jobNumber}` : ""}`);
     console.log(`  ${row.code} ${row.type} ${row.status}: ${vins.join(", ")}`);
   }
+  console.log(`  FPC: ${FPC_BULLETIN.notRegisteredVin} is inside the bulletin's VIN range but not registered; register it to see it added.`);
 
   console.log("\nCustomers and vehicles");
   for (const c of Object.values(CUSTOMERS) as CustomerFixture[]) {

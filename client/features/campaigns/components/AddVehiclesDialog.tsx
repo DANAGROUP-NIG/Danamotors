@@ -76,8 +76,6 @@ export function AddVehiclesDialog({ campaign, onClose }: { campaign: Campaign; o
   const [modelIds, setModelIds] = useState<string[]>(campaign.models.map((m) => m.vehicleModelId));
   const [yearFrom, setYearFrom] = useState("");
   const [yearTo, setYearTo] = useState("");
-  const [vinFrom, setVinFrom] = useState("");
-  const [vinTo, setVinTo] = useState("");
   const [showInvalid, setShowInvalid] = useState(false);
   const { data: models = [] } = useVehicleModels();
   const preview = usePreviewVehicles(campaign.id);
@@ -99,11 +97,9 @@ export function AddVehiclesDialog({ campaign, onClose }: { campaign: Campaign; o
         vehicleModelIds: modelIds,
         yearFrom: yearFrom ? Number(yearFrom) : null,
         yearTo: yearTo ? Number(yearTo) : null,
-        vinFrom: vinFrom.trim() || null,
-        vinTo: vinTo.trim() || null,
       },
     };
-  }, [tab, text, fileVins, modelIds, yearFrom, yearTo, vinFrom, vinTo]);
+  }, [tab, text, fileVins, modelIds, yearFrom, yearTo]);
 
   // Live validation against the server (duplicates, VINs not in the system) as the input settles.
   const debouncedPayload = useDebouncedValue(payload, 600);
@@ -201,14 +197,11 @@ export function AddVehiclesDialog({ campaign, onClose }: { campaign: Campaign; o
               <Field label="Model year to">
                 <input className={inputCls} inputMode="numeric" value={yearTo} onChange={(e) => setYearTo(e.target.value.replace(/\D/g, "").slice(0, 4))} />
               </Field>
-              <Field label="VIN from (optional)">
-                <input className={cn(inputCls, "font-mono uppercase")} value={vinFrom} onChange={(e) => setVinFrom(e.target.value)} />
-              </Field>
-              <Field label="VIN to (optional)">
-                <input className={cn(inputCls, "font-mono uppercase")} value={vinTo} onChange={(e) => setVinTo(e.target.value)} />
-              </Field>
             </div>
-            <p className="text-xs text-slate-500">Selects registered vehicles of these models. Vehicles not in the system can only be added by VIN.</p>
+            <p className="text-xs text-slate-500">
+              Selects registered vehicles of these models. Vehicles not in the system can only be added by VIN. To select by VIN range, use{" "}
+              <span className="font-medium text-slate-700">Vehicles to check</span> on the campaign page: ranges also catch vehicles registered later.
+            </p>
           </div>
         )}
 

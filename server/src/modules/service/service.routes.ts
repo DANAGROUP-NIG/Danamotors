@@ -10,6 +10,7 @@ import { defaultBranchSettings, getBranchSettings } from "../company-settings/co
 import { requireMaster } from "../workshop/workshop-master.service";
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
+import { campaignAttendanceSchema } from "../campaign/campaign.validation";
 import { validateRequest } from "../../middleware/requestValidator";
 import { authMiddleware } from "../../middleware/authMiddleware";
 import { requirePermission } from "../../middleware/authorize";
@@ -203,6 +204,56 @@ router.post(
       assertBranchOwnership(req, card.branchId);
       const result = await new JobCardWorkflowService().approveCredit(card.id, req.user!.userId, req.body.remarks);
       res.json({ status: "success", data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /service/job-cards/{id}/campaigns/{campaignId}/attendance:
+ *   put:
+ *     tags: [Service & Job Cards]
+ *     summary: Record whether a linked campaign's (FPC) work was done on this job
+ *     description: >-
+ *       Requires jobcard:update; branch scoped. Allowed until the job card is delivered or cancelled.
+ *       READY needs an answer for every linked campaign (409 CAMPAIGN_ATTENDANCE_REQUIRED), except a
+ *       campaign with a FREE line charged to it, which is recorded as done. Once the job is READY or
+ *       BILLED the campaign vehicle follows the answer (done completes it; not done returns it to
+ *       outstanding).
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: campaignId, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           examples:
+ *             done: { value: { attended: true } }
+ *             notDone: { value: { attended: false, reason: PARTS_NOT_AVAILABLE, note: 'Plate cover on back order' } }
+ *     responses:
+ *       200:
+ *         description: Attendance of every campaign on the job card
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 - { campaignId: 3f0c…, campaignCode: KC13-14-P010-XM, campaignTitle: 'Sorento (XM) fuel pump plate cover', attended: false, notAttendedReason: 'Parts not available: Plate cover on back order', hasFreeLine: false }
+ *       400: { description: Job card closed, or no reason given for "not done" }
+ *       404: { description: Job card not found, or the campaign is not linked to it }
+ */
+router.put(
+  "/job-cards/:id/campaigns/:campaignId/attendance",
+  requirePermission(PERMISSIONS.JOBCARD_UPDATE),
+  validateRequest(campaignAttendanceSchema),
+  async (req, res, next) => {
+    try {
+      const card = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      assertBranchOwnership(req, card?.branchId);
+      const data = await new JobCardWorkflowService().setCampaignAttendance(req.params.id, req.params.campaignId, req.body, req.user!.userId);
+      res.json({ status: "success", statusCode: 200, message: "Campaign work recorded", data });
     } catch (error) {
       next(error);
     }

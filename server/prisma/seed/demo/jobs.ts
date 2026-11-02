@@ -10,6 +10,7 @@ import { JobBillingService } from "../../../src/modules/finance/job-billing.serv
 import { ReceiptService } from "../../../src/modules/finance/receipt.service";
 import { WarrantyCaseService } from "../../../src/modules/warranty/warrantyCase.service";
 import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.coverage";
+import { estimateContentHash } from "../../../src/modules/service/estimate-signature";
 import { DemoContext, Reference, seedLedger } from "./context";
 import { Parties } from "./parties";
 import {
@@ -169,11 +170,26 @@ async function ensureEstimate(ref: Reference, jobCardId: string, customerId: str
         ],
       },
       actorId,
+      revisions[index - 1]?.id,
     );
     estimate = { ...created, approvals: [] };
   }
   if (fx.decision && estimate.approvals.length === 0) {
-    await services.service.addApproval(estimate.id, { customerId, approved: fx.decision.approved, comments: fx.decision.comments }, actorId);
+    // Decisions need the signed content's version and hash; demo data records them as an Admin override, not a fake signature.
+    const signed = await prisma.estimate.findUniqueOrThrow({ where: { id: estimate.id }, include: { lines: true } });
+    await services.service.addApproval(
+      estimate.id,
+      {
+        customerId,
+        approved: fx.decision.approved,
+        comments: fx.decision.comments,
+        expectedVersion: signed.version,
+        expectedHash: estimateContentHash(signed),
+        overrideReason: "Demo data: paper decision on file",
+      },
+      actorId,
+      { deviceOrIp: "demo-seed", allowOverride: true },
+    );
   }
 }
 
@@ -203,6 +219,11 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
       await services.workflow.update(id, { status: "QC", remarks: "Work complete, sent for quality check" }, staff.advisor.id);
     } else if (status === "QC") {
       if (job.qcStatus?.toUpperCase() !== "PASSED") await services.workshop.updateQC(id, "PASSED", "Road test passed");
+      // READY needs a done / not done answer for each linked campaign (FPC bulletins).
+      if (fx.campaignWork) {
+        const unanswered = await prisma.jobCardCampaign.findMany({ where: { jobCardId: id, attended: null }, select: { campaignId: true } });
+        for (const { campaignId } of unanswered) await services.workflow.setCampaignAttendance(id, campaignId, fx.campaignWork, staff.advisor.id);
+      }
       await services.workflow.update(id, { status: "READY", workDone: fx.workDone, remarks: "Ready for delivery" }, staff.advisor.id);
     } else if (status === "READY") {
       // A bill once created, even if a tester later cancelled it, is never created again.

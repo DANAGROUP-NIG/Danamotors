@@ -1,4 +1,4 @@
-import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
 import {
   CAMPAIGN_PERMISSIONS,
@@ -23,6 +23,7 @@ import {
   Settings,
   CalendarDays,
   ClipboardList,
+  ClipboardCheck,
   Shield,
   ReceiptText,
   Building2,
@@ -38,7 +39,6 @@ import {
   ShoppingCart,
   FileBarChart,
   Undo2,
-  ClipboardCheck,
   FileSearch,
   Database,
   Ban,
@@ -104,6 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
       ...MONTHLY_REPORT_PERMISSIONS,
+      ...FRAMEWORK_REPORT_PERMISSIONS,
       "corporate:manage",
       "financereport:read",
       "report:receipt-register",
@@ -140,11 +141,18 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [CAMPAIGN_PERMISSIONS.READ],
       },
       {
+        label: "FPC bulletins",
+        href: "/campaigns?type=FPC",
+        icon: ClipboardCheck,
+        permissions: [CAMPAIGN_PERMISSIONS.READ],
+      },
+      {
         label: "Reports",
         href: "/reports",
         icon: FileText,
         permissions: [
           ...MONTHLY_REPORT_PERMISSIONS,
+          ...FRAMEWORK_REPORT_PERMISSIONS,
           "corporate:manage",
           "financereport:read",
           "report:receipt-register",
