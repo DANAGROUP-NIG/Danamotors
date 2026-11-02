@@ -2,6 +2,8 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import path from 'path';
 import { serviceTransactionPaths, serviceTransactionSchemas } from '../modules/service/service-transactions.openapi';
 import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
+import { buildReportPaths } from '../modules/reports/framework.openapi';
+import { REPORTS } from '../modules/reports/reports.registry';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -87,6 +89,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
       {
         name: 'Finance',
         description: 'Invoices, payments, receipts, and financial reports.',
+      },
+      {
+        name: 'Reports',
+        description: 'Framework reports: one endpoint per report, branch-scoped, aggregated on the server.',
       },
       {
         name: 'Branches',
@@ -506,7 +512,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
 
 const swaggerSpec = swaggerJsdoc(options);
 const spec = swaggerSpec as { paths?: Record<string, unknown>; components?: { schemas?: Record<string, unknown> } };
-spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths};
+// Framework report endpoints are generated from the report registry, so their docs come from it too.
+spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS)};
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
   spec.paths[route] = { ...(spec.paths[route] as Record<string, unknown> | undefined), ...methods };
 }

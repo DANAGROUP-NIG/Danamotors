@@ -61,3 +61,99 @@ The audit uses a disposable localhost PostgreSQL database. See [audited progress
 Issue #79 is authoritative. The duplicate metric cards above report output are removed. Table footers, required subtotals/grand totals, M2's service-type summary and M4's selectable per-job/per-charge summary remain.
 
 M7 is the requested delivery-date by actual service-type grid, with every delivered job counted once. The additional free-service-sequence table, hard-coded service buckets and accidental-excluding total are removed. M5 groups by corporate membership with its required bill columns and one subtotal per corporate; extra customer/bill-type subdivisions are removed. M2, M4 and M9 expose the issue's full column sets, rather than photo-only columns that hid required fields. M1 uses the issue's category/VAT columns; the extra legacy-layout selector is removed. Historical report snapshots remain readable and invoice amounts are unchanged.
+
+# Framework reports (#75)
+
+Reports built on the report framework from PR #81 share one route (`/reports/<slug>`), one endpoint
+(`GET /api/reports/<slug>`) and one screen: filter bar, sortable table with group subtotals, browser
+print (80 column on A4 portrait, 132 column on A4 landscape) and Excel export. The monthly reports
+above keep their own screens; both are served from `/reports/[report]`.
+
+PR #81 was dropped from `main` by merge `70b7699`. Only the framework was restored. The 14 workshop
+daily reports and their schema (bookings, pre-job estimates, labour technicians, mileage bands) come
+back with #75 / #97.
+
+## Using a report
+
+1. Pick the period, if the report has one (a date range or a single date).
+2. Narrow with the filters. Each has an **All** tick, on by default. Variant options follow the
+   models picked.
+3. Set the options and select **Run report**. The filters are kept in the page address, so a run
+   can be bookmarked or shared.
+
+## Rules
+
+- **Branch:** a report covers the user's own branch. Admin and SuperAdmin may choose a branch or
+  *All branches*. Anyone else asking for another branch gets 403.
+- **Excluded:** cancelled job cards and bills, and PDI jobs (a pre-delivery service type, or the
+  legacy `PDI` category).
+- **Dates** are local calendar days (`Africa/Lagos`). A range is at most 366 days.
+- **Size:** at most 25,000 rows. Beyond that the page asks for narrower filters.
+- **Consistency:** each run reads one read-only, repeatable-read snapshot with a 30-second limit.
+
+## API
+
+`GET /api/reports/<slug>` needs the report's permission (`report:<slug>`). Filter ids go comma
+separated (`model`, `variant`, …); omitted means All. `branchId` (Admin / SuperAdmin) is a branch
+id or `ALL`. Unknown parameters are rejected (400). Swagger (`/api/docs`, tag *Reports*) is
+generated from the registry.
+
+`GET /api/reports/lookups/<source>` feeds the filter dropdowns (`model`, `variant`, `serviceType`,
+`team`, `complaint`, `labourOperation`, `serviceAdvisor`, `technician`). Any report permission is
+enough. Inactive entries are included and flagged.
+
+## Adding a report
+
+1. Server: write a report with `defineReport({ slug, title, width, permission, period, query,
+   filterKeys, run })` and list it in `server/src/modules/reports/reports.registry.ts`. The route,
+   permission check, validation and Swagger entry follow from the registry.
+2. Add `report:<slug>` to `PERMISSIONS` and `ROLE_PERMISSIONS` in `shared/constants/roles.ts`,
+   with an idempotent migration that inserts the permission and its default grants.
+3. Client: add a `ReportConfig` in `client/features/reports/configs` and list it in
+   `configs/index.ts`. The hub card, page, filter bar, table, print and Excel follow from it.
+
+## Service · FPC reports (#98)
+
+Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis
+(F2). Called, visited and attended are defined in `doc/warranty.md` (FPC bulletins).
+
+### F1. FPC vehicles (`/reports/fpc-vehicles`, 80 column, `report:fpc-vehicles`)
+
+- **Filters:** model, variant, FPC bulletin (each with All); campaign type (FPC by default; picking bulletins
+  overrides it); branch (the vehicle owner's branch) for Admin, SuperAdmin and `branch:all` users.
+- **Show:**
+
+  | Show | Campaign vehicles listed |
+  |---|---|
+  | To be called | not completed or not applicable, campaign active |
+  | Called but not visited | a contact logged, no job card |
+  | Visited but not attended | job cards, none recording the work as done. One row per visit |
+  | Attended | the job card that recorded the work as done |
+  | Attended but not called | attended, with no contact logged before that job card was opened |
+
+  The tiles above the table show the count of every list for the same filters.
+- **Order:** model, variant, registration or VIN. Not-registered VINs come last.
+- **Print as** (any combination): **List** (bulletin, VIN, registration, model, variant, customer, phone, branch,
+  status; job no, job date, bill date and not-attended reason on visit lists), **Letters** (one A4 page per vehicle,
+  template under *Letter template*, `report:settings`) and **Labels** (A4 sheet of 3 × 8). VINs not registered yet
+  appear in the list only.
+- **Record as called** (To be called only, needs `campaign:vehicle:update`): on Print the page asks for confirmation
+  with the count, then adds one contact per vehicle printed: `LETTER` for letters and labels, `PHONE` for the call
+  list, outcome `SENT`. Those vehicles then show under *Called but not visited*. Without the tick nothing is recorded.
+
+### F2. FPC analysis (`/reports/fpc-analysis`, 132 column, `report:fpc-analysis`)
+
+- **Filters:** bill date from / to (the period); model (All); FPC bulletin date from / to, or All; campaign type.
+- **Order:** model (one row per bulletin and model, totals per model) or bulletin date.
+- **Columns:** bulletin, bulletin date, subject, effective – close; vehicles affected (less not applicable); called;
+  visited in the period (job cards **billed** in the period); attended and not attended in the period, with the count
+  per reason (*Not answered* for visits from before the job card asked); attended % of visited; attended % of affected
+  (to date); still outstanding.
+- Totals per model and a grand total; percentages are worked out from the summed counts. For the same bulletin and
+  period, visited = attended + not attended, as in F1.
+
+### Settings
+
+`GET /api/reports/settings` (any report permission) returns the FPC letter template and its placeholders.
+`PUT /api/reports/settings` (`report:settings`) saves it; `{ "fpcLetterTemplate": null }` resets it to the default.
+Unknown `{{placeholders}}` are rejected. TODO(confirm): match the template to a printed legacy FPC letter (#98 question 5).

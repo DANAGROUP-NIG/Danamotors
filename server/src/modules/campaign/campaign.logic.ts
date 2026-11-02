@@ -52,6 +52,47 @@ export function parseVinList(input: string | string[]): ParsedVinList {
   return result;
 }
 
+// ── VIN ranges ───────────────────────────────────────────────────────────────
+
+/**
+ * Both bounds of a range share the first 11 characters: manufacturer, model, check digit,
+ * model year and plant. Only the serial number varies inside a range.
+ */
+export const VIN_RANGE_PREFIX_LENGTH = 11;
+
+export interface VinRange {
+  vinFrom: string;
+  vinTo: string;
+}
+
+/** Returns an error message for a range of normalized VINs, or null when it is valid. */
+export function vinRangeError(range: VinRange): string | null {
+  for (const [label, vin] of [["From VIN", range.vinFrom], ["To VIN", range.vinTo]] as const) {
+    const error = vinError(vin);
+    if (error) return `${label} ${vin || "(blank)"} ${error}`;
+  }
+  if (range.vinFrom.slice(0, VIN_RANGE_PREFIX_LENGTH) !== range.vinTo.slice(0, VIN_RANGE_PREFIX_LENGTH))
+    return `From and to VIN must share the first ${VIN_RANGE_PREFIX_LENGTH} characters (only the serial number can differ)`;
+  if (vinCompare(range.vinFrom, range.vinTo) > 0) return "From VIN must not come after To VIN";
+  return null;
+}
+
+/** Code-point order, the same in every database collation (VINs are A–Z and 0–9 only). */
+export function vinCompare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function vinInRange(vin: string, range: VinRange): boolean {
+  return vinCompare(vin, range.vinFrom) >= 0 && vinCompare(vin, range.vinTo) <= 0;
+}
+
+/** Number of serials a range covers when the varying part is numeric, else null. */
+export function vinRangeSize(range: VinRange): number | null {
+  const from = range.vinFrom.slice(VIN_RANGE_PREFIX_LENGTH);
+  const to = range.vinTo.slice(VIN_RANGE_PREFIX_LENGTH);
+  return /^\d+$/.test(from) && /^\d+$/.test(to) ? Number(to) - Number(from) + 1 : null;
+}
+
 // ── Campaign status ──────────────────────────────────────────────────────────
 
 export const CAMPAIGN_TRANSITIONS: Record<"ACTIVATE" | "CLOSE", CampaignStatus[]> = {
@@ -103,11 +144,63 @@ export function assertVehicleTransition(
   }
 }
 
+/** Outcomes where the customer was actually reached. A letter (SENT) or no answer is not. */
+export const REACHED_OUTCOMES: ContactOutcome[] = [ContactOutcome.REACHED, ContactOutcome.CALL_BACK, ContactOutcome.DECLINED];
+
 /** Status after recording a contact attempt. Reaching the customer marks a pending vehicle contacted. */
 export function statusAfterContact(current: CampaignVehicleStatus, outcome: ContactOutcome): CampaignVehicleStatus {
-  const reached = outcome === ContactOutcome.REACHED || outcome === ContactOutcome.CALL_BACK || outcome === ContactOutcome.DECLINED;
-  if (reached && (current === V.PENDING || current === V.NOT_REACHABLE)) return V.CONTACTED;
+  if (REACHED_OUTCOMES.includes(outcome) && (current === V.PENDING || current === V.NOT_REACHABLE)) return V.CONTACTED;
   return current;
+}
+
+// ── Attended on the job card ─────────────────────────────────────────────────
+
+/**
+ * Why campaign work was not done on a job. TODO(confirm): #98 open question 3 asks for a fixed
+ * list or free text; this is a fixed list plus "Other" with a note.
+ */
+export const NOT_ATTENDED_REASONS = {
+  PARTS_NOT_AVAILABLE: "Parts not available",
+  CUSTOMER_DECLINED: "Customer declined",
+  DONE_ELSEWHERE: "Done elsewhere",
+  NOT_APPLICABLE: "Not applicable to this vehicle",
+  NO_TIME: "No time on this visit",
+  OTHER: "Other",
+} as const;
+export type NotAttendedReason = keyof typeof NOT_ATTENDED_REASONS;
+
+/** The stored reason text: the label, or "Other: <note>". */
+export function notAttendedReasonText(reason: NotAttendedReason, note?: string | null): string {
+  const trimmed = note?.trim();
+  if (reason === "OTHER") return trimmed ? `Other: ${trimmed}` : NOT_ATTENDED_REASONS.OTHER;
+  return trimmed ? `${NOT_ATTENDED_REASONS[reason]}: ${trimmed}` : NOT_ATTENDED_REASONS[reason];
+}
+
+/** The reason label a stored text belongs to, for counting by reason ("Other" for unknown text). */
+export function notAttendedReasonLabel(text: string | null): string {
+  if (!text) return "Not given";
+  const labels: string[] = Object.values(NOT_ATTENDED_REASONS);
+  return labels.find((label) => text === label || text.startsWith(`${label}:`)) ?? NOT_ATTENDED_REASONS.OTHER;
+}
+
+/**
+ * The status a scheduled vehicle returns to when the job did not do the campaign work, so the
+ * next job card flags the campaign again.
+ */
+export function statusAfterNotAttended(hasReachedContact: boolean): CampaignVehicleStatus {
+  return hasReachedContact ? V.CONTACTED : V.PENDING;
+}
+
+export interface CampaignAttendanceLike {
+  campaignId: string;
+  attended: boolean | null;
+  /** The job has a FREE line charged to this campaign, which pre-sets the answer to yes. */
+  hasFreeLine: boolean;
+}
+
+/** Campaigns that still need an answer before the job card can be marked ready. */
+export function campaignsMissingAttendance<T extends CampaignAttendanceLike>(campaigns: T[]): T[] {
+  return campaigns.filter((c) => c.attended === null && !c.hasFreeLine);
 }
 
 export const VEHICLE_STATUS_TEXT: Record<CampaignVehicleStatus, string> = {

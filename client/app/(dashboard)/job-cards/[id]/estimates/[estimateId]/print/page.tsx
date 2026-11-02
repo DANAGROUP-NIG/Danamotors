@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from "react";
 // import { Check, Clock, CircleCheck, CircleAlert, Wrench } from "lucide-react";
 import Image from "next/image";

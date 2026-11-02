@@ -13,6 +13,11 @@ export const serviceIdParamSchema = z.object({
   }),
 });
 
+// The body is validated by jobOpeningBody in convertAppointment once booking fields are merged in.
+export const convertAppointmentSchema = serviceIdParamSchema.extend({
+  body: z.record(z.string(), z.unknown()),
+});
+
 export const jobCardIdParamSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid job card ID"),
