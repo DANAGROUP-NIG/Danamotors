@@ -9,6 +9,7 @@
  * go stale.
  */
 import { createHash } from "crypto";
+import type { NotAttendedReason } from "../../../src/modules/campaign/campaign.logic";
 
 export const DEMO_TAG = "DEMO-SEED";
 export const TEST_PREFIX = "TEST-";
@@ -113,6 +114,13 @@ export const VEHICLES = {
   sorento: { vin: "KNAPM81DMK7000301", registrationNumber: "LSR-303DM", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2400 },
   test1: { vin: "KNAPX81DMS7000901", registrationNumber: "TEST-WTY-01", customer: "test1", model: "SPORTAGE", saleDaysAgo: 150 },
   test2: { vin: "KNADN51DMS7000902", registrationNumber: "TEST-WTY-02", customer: "test2", model: "RIO", saleDaysAgo: 120 },
+  // FPC bulletin (#98): Sorentos in one VIN range, out of warranty so no warranty cases open.
+  fpcCall: { vin: "KNAKU81DMC5000401", registrationNumber: "LSR-401FP", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2300 },
+  fpcLetter: { vin: "KNAKU81DMC5000402", registrationNumber: "ABJ-402FP", customer: "garba", model: "SORENTO", saleDaysAgo: 2300 },
+  fpcSkipped: { vin: "KNAKU81DMC5000403", registrationNumber: "APP-403FP", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2300 },
+  fpcDone: { vin: "KNAKU81DMC5000404", registrationNumber: "LSR-404FP", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2300 },
+  fpcWalkIn: { vin: "KNAKU81DMC5000405", registrationNumber: "ABJ-405FP", customer: "garba", model: "SORENTO", saleDaysAgo: 2300 },
+  fpcAtQc: { vin: "KNAKU81DMC5000406", registrationNumber: "APP-406FP", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2300 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -236,6 +244,8 @@ export interface JobFixture {
   warrantyLabour?: LabourKey[];
   workDone?: string;
   target: "OPEN" | "IN_PROGRESS" | "READY" | "BILLED_PAID" | "BILLED_CREDIT";
+  /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
+  campaignWork?: { attended: true } | { attended: false; reason: NotAttendedReason; note?: string };
   claim?: ClaimFixture;
   /** The job is dated `startDaysAgo` days before the run and its events spread over `spanHours`. */
   startDaysAgo: number;
@@ -461,3 +471,54 @@ export const CAMPAIGNS = {
     ],
   },
 } satisfies Record<string, CampaignFixture>;
+
+// ── FPC bulletin (#98) ───────────────────────────────────────────────────────
+
+/**
+ * One FPC bulletin over the fpc* Sorentos, so every list of the FPC vehicles report has rows:
+ * 401 to be called; 402 called by letter, not visited; 403 visited, work not done (parts);
+ * 404 phoned, then attended; 405 attended without a call; 406 at work, answer not given yet.
+ * 407 is inside the range but not registered: registering it adds it to the bulletin.
+ */
+export const FPC_BULLETIN = {
+  code: "DEMO-KC26-P010-XM",
+  title: "Sorento (XM) fuel pump plate cover replacement (demo)",
+  description: "Countermeasure for all customers visiting the workshop: inspect the fuel pump plate cover and replace it if it is the early type.",
+  defectDescription: "The early fuel pump plate cover can crack and seep fuel odour into the cabin.",
+  jobCardText: "130005-SORENTO (XM) - check fuel pump plate cover",
+  bulletinDaysAgo: 40,
+  startDaysAgo: 35,
+  range: { vinFrom: "KNAKU81DMC5000401", vinTo: "KNAKU81DMC5000410" },
+  notRegisteredVin: "KNAKU81DMC5000407",
+  letterTo: "fpcLetter",
+  phoned: "fpcDone",
+  contactDaysAgo: 12,
+} as const satisfies { letterTo: VehicleKey; phoned: VehicleKey } & Record<string, unknown>;
+
+const fpcJob = (id: string, vehicle: VehicleKey, branch: BranchKey, work: JobFixture["campaignWork"], target: JobFixture["target"], startDaysAgo: number): JobFixture => ({
+  id,
+  vehicle,
+  branch,
+  serviceType: "RG",
+  description: "Periodic service; check the open FPC bulletin.",
+  complaints: ["Periodic service"],
+  mileage: 96_000 + startDaysAgo * 10,
+  withTechnician: true,
+  estimates: [{ description: "Periodic service", parts: [], labour: [["service", 1.5]], decision: { approved: true, comments: "Approved at the service desk" } }],
+  labour: [["service", 1.5]],
+  issues: [],
+  workDone: "Periodic service done",
+  campaignWork: work,
+  target,
+  startDaysAgo,
+  spanHours: 6,
+});
+
+/** Seeded after the bulletin is active, so each job card is linked to it at opening. */
+export const FPC_JOBS: JobFixture[] = [
+  fpcJob("JC-FPC-1", "fpcSkipped", "main", { attended: false, reason: "PARTS_NOT_AVAILABLE", note: "Plate cover on back order" }, "BILLED_PAID", 6),
+  fpcJob("JC-FPC-2", "fpcDone", "main", { attended: true }, "BILLED_PAID", 5),
+  fpcJob("JC-FPC-3", "fpcWalkIn", "second", { attended: true }, "BILLED_PAID", 4),
+  // Left at work: QC, then try "Mark vehicle ready" to see the attendance rule.
+  fpcJob("JC-FPC-4", "fpcAtQc", "main", undefined, "IN_PROGRESS", 1),
+];
