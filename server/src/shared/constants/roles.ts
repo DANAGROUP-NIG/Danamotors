@@ -256,6 +256,14 @@ export const PERMISSIONS = {
   CAMPAIGN_CREATE: "campaign:create",
   CAMPAIGN_UPDATE: "campaign:update",
   CAMPAIGN_VEHICLE_UPDATE: "campaign:vehicle:update",
+
+  // ── Reports — FPC bulletins and report settings ───────────────────────────
+  // TODO(confirm): #98 grants report:fpc-vehicles to Receptionist and ReceptionManager, which
+  // are not roles here; ServiceAdviser, ServiceManager, CCUManager and CCUOfficer get it instead.
+  FPC_VEHICLES_READ: "report:fpc-vehicles",
+  FPC_ANALYSIS_READ: "report:fpc-analysis",
+  // Report settings such as the FPC letter template.
+  REPORT_SETTINGS: "report:settings",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -393,6 +401,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
@@ -545,6 +556,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.ESTIMATE_PRINT,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
@@ -664,6 +678,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
     PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Manages service operations, oversees service advisors and technicians
@@ -706,6 +721,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
   ],
 
   // Executes repairs, updates job card progress
@@ -747,6 +764,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
     PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
@@ -782,6 +800,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
@@ -812,6 +831,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_CREATE,
     PERMISSIONS.CAMPAIGN_UPDATE,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
 

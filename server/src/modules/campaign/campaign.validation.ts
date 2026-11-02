@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CampaignStatus, CampaignType, CampaignVehicleStatus, ContactChannel, ContactOutcome, JobCardLineKind } from "@prisma/client";
+import { NOT_ATTENDED_REASONS, type NotAttendedReason } from "./campaign.logic";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const year = z.number().int().min(1980).max(2100);
@@ -32,13 +33,17 @@ const campaignFields = {
     .trim()
     .min(2, "Campaign code is required")
     .max(30)
-    .regex(/^[A-Za-z0-9][A-Za-z0-9-_/]*$/, "Use letters, digits and dashes"),
+    // Manufacturer bulletin numbers can contain a space (e.g. "Sorento XM11-15").
+    .regex(/^[A-Za-z0-9][A-Za-z0-9 \-_/]*$/, "Use letters, digits, spaces, dashes, underscores and slashes"),
   title: z.string().trim().min(3, "Title is required").max(150),
   type: z.nativeEnum(CampaignType),
   description: z.string().trim().max(2000).nullable().optional(),
   defectDescription: z.string().trim().max(2000).nullable().optional(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullable().optional(),
+  bulletinDate: z.coerce.date().nullable().optional(),
+  jobCardText: z.string().trim().max(100, "Keep the job card text to 100 characters").nullable().optional(),
+  printOnJobCard: z.boolean().optional(),
   labourCovered: z.boolean().optional(),
   partsCovered: z.boolean().optional(),
   models: modelsField.optional(),
@@ -75,6 +80,9 @@ export const updateCampaignSchema = z.object({
       defectDescription: campaignFields.defectDescription,
       startDate: campaignFields.startDate.optional(),
       endDate: campaignFields.endDate,
+      bulletinDate: campaignFields.bulletinDate,
+      jobCardText: campaignFields.jobCardText,
+      printOnJobCard: campaignFields.printOnJobCard,
       labourCovered: campaignFields.labourCovered,
       partsCovered: campaignFields.partsCovered,
       models: campaignFields.models,
@@ -95,12 +103,37 @@ export const addVehiclesSchema = z.object({
         vehicleModelIds: z.array(uuid("vehicle model")).min(1, "Choose at least one model").max(50),
         yearFrom: year.nullable().optional(),
         yearTo: year.nullable().optional(),
-        vinFrom: z.string().trim().max(20).nullable().optional(),
-        vinTo: z.string().trim().max(20).nullable().optional(),
       }),
       dryRun: z.boolean().optional(),
     }),
   ]),
+});
+
+export const addVinRangesSchema = z.object({
+  params: z.object({ id: uuid("campaign ID") }),
+  body: z
+    .object({
+      ranges: z
+        .array(z.object({ vinFrom: z.string().trim().min(1, "Enter the from VIN").max(30), vinTo: z.string().trim().min(1, "Enter the to VIN").max(30) }))
+        .min(1, "Add at least one VIN range")
+        .max(2_000),
+      dryRun: z.boolean().optional(),
+    })
+    .strict(),
+});
+
+export const vinRangeParamsSchema = z.object({
+  params: z.object({ id: uuid("campaign ID"), rangeId: uuid("VIN range ID") }),
+});
+
+export const printedContactsSchema = z.object({
+  body: z
+    .object({
+      campaignVehicleIds: z.array(uuid("campaign vehicle ID")).min(1).max(5_000),
+      channel: z.enum(["LETTER", "PHONE"]),
+      notes: z.string().trim().max(500).nullable().optional(),
+    })
+    .strict(),
 });
 
 export const listCampaignVehiclesSchema = z.object({
@@ -154,4 +187,17 @@ export const scheduleSchema = z.object({
     notes: z.string().trim().max(500).nullable().optional(),
     serviceId: uuid("service ID").nullable().optional(),
   }),
+});
+
+export const campaignAttendanceSchema = z.object({
+  params: z.object({ id: uuid("job card ID"), campaignId: uuid("campaign ID") }),
+  body: z
+    .object({
+      attended: z.boolean(),
+      reason: z.enum(Object.keys(NOT_ATTENDED_REASONS) as [NotAttendedReason, ...NotAttendedReason[]]).nullable().optional(),
+      note: z.string().trim().max(200).nullable().optional(),
+    })
+    .strict()
+    .refine((b) => b.attended || !!b.reason, { message: "Give the reason the campaign work was not done", path: ["reason"] })
+    .refine((b) => b.attended || b.reason !== "OTHER" || !!b.note, { message: "Describe the other reason", path: ["note"] }),
 });

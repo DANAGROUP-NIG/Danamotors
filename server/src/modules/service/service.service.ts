@@ -594,6 +594,18 @@ export class ServiceService {
             },
           })
         : [];
+    // A FREE line charged to a campaign pre-sets its "work done" answer to yes.
+    const freeLineCampaigns = new Set(
+      card.campaigns.length > 0
+        ? (
+            await prisma.jobCardLine.findMany({
+              where: { jobCardId: id, chargeType: "FREE", campaignId: { in: card.campaigns.map((c) => c.campaignId) } },
+              select: { campaignId: true },
+              distinct: ["campaignId"],
+            })
+          ).map((line) => line.campaignId)
+        : [],
+    );
     return scopeJobCard({
       ...card,
       estimates: card.estimates.map(estimate => ({ ...estimate, contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
@@ -602,6 +614,7 @@ export class ServiceService {
         vehicleStatus:
           campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
           null,
+        hasFreeLine: freeLineCampaigns.has(c.campaignId),
       })),
     }, permissions);
   }

@@ -64,6 +64,10 @@ export const CAMPAIGN_PERMISSIONS = {
 
 export const BRANCH_ALL = "branch:all";
 
+/** Framework reports (#75) and report settings. */
+export const FRAMEWORK_REPORT_PERMISSIONS = ["report:fpc-vehicles", "report:fpc-analysis"] as const;
+export const REPORT_SETTINGS_PERMISSION = "report:settings";
+
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
 
 // CPD part sale: customer purchase orders, counter sales and sale returns.

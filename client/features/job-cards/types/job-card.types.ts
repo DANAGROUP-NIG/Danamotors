@@ -248,7 +248,14 @@ export type JobCard = {
     campaignTitle: string;
     campaignType: CampaignType;
     vehicleStatus: CampaignVehicleStatus | null;
-    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED" };
+    /** Was the campaign work done on this job? null = not answered yet (READY needs an answer). */
+    attended: boolean | null;
+    attendedAt: string | null;
+    notAttendedReason: string | null;
+    attendedBy: { id: string; firstName: string; lastName: string } | null;
+    /** A FREE line is charged to this campaign, which pre-sets the answer to "done". */
+    hasFreeLine: boolean;
+    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED"; jobCardText: string | null; printOnJobCard: boolean };
   }[];
 };
 

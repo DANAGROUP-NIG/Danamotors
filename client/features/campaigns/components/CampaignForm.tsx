@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check, CheckCircle2, Circle, PlusCircle, Siren, Trash2, Wrench, X } from "lucide-react";
+import { CalendarCheck, Check, CheckCircle2, Circle, ClipboardCheck, PlusCircle, Printer, Siren, Trash2, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { DateInput } from "@/components/forms/DateInput";
@@ -21,7 +21,16 @@ const TYPES: { value: CampaignType; title: string; text: string; icon: ReactNode
   { value: "RECALL", title: "Recall", text: "Known defect — vehicles must be called back", icon: <Siren /> },
   { value: "FREE_FIX", title: "Free fix", text: "Repair at no cost to the customer", icon: <Wrench /> },
   { value: "SERVICE_CAMPAIGN", title: "Service campaign", text: "Free or discounted services", icon: <CalendarCheck /> },
+  { value: "FPC", title: "FPC bulletin", text: "Manufacturer field product check on a VIN range", icon: <ClipboardCheck /> },
 ];
+
+/** Field labels follow the legacy FPC bulletin master for the FPC type. */
+const LABELS = {
+  default: { code: "Campaign code", codeHint: "RC-2026-014", title: "Title", titleHint: "Engine wiring harness inspection", description: "Description", start: "Start date", end: "End date (optional)" },
+  FPC: { code: "FPC bulletin number", codeHint: "KC13-14-P010-XM", title: "Subject", titleHint: "Sorento (XM) fuel pump plate cover replacement", description: "Measures", start: "Effective date", end: "Close date (optional)" },
+};
+
+export const JOB_CARD_TEXT_MAX = 100;
 
 const textareaCls = "min-h-28 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
@@ -55,19 +64,22 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 }
 
 /** Screen 09 — create or edit a campaign. */
-export function CampaignForm({ campaign }: { campaign?: Campaign }) {
+export function CampaignForm({ campaign, defaultType = "RECALL" }: { campaign?: Campaign; defaultType?: CampaignType }) {
   const router = useRouter();
   const save = useSaveCampaign(campaign?.id);
   const { data: allModels = [] } = useVehicleModels();
   const isDraft = !campaign || campaign.status === "DRAFT";
 
-  const [type, setType] = useState<CampaignType>(campaign?.type ?? "RECALL");
+  const [type, setType] = useState<CampaignType>(campaign?.type ?? defaultType);
   const [code, setCode] = useState(campaign?.code ?? "");
   const [title, setTitle] = useState(campaign?.title ?? "");
   const [description, setDescription] = useState(campaign?.description ?? "");
   const [defect, setDefect] = useState(campaign?.defectDescription ?? "");
   const [startDate, setStartDate] = useState(toDateInput(campaign?.startDate) || new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(toDateInput(campaign?.endDate));
+  const [bulletinDate, setBulletinDate] = useState(toDateInput(campaign?.bulletinDate));
+  const [jobCardText, setJobCardText] = useState(campaign?.jobCardText ?? "");
+  const [printOnJobCard, setPrintOnJobCard] = useState(campaign?.printOnJobCard ?? true);
   const [labourCovered, setLabourCovered] = useState(campaign?.labourCovered ?? true);
   const [partsCovered, setPartsCovered] = useState(campaign?.partsCovered ?? true);
   const [models, setModels] = useState<ModelRow[]>(
@@ -83,12 +95,19 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
   );
   const [error, setError] = useState<string | null>(null);
 
+  const isFpc = type === "FPC";
+  const labels = isFpc ? LABELS.FPC : LABELS.default;
   const detailsComplete = code.trim().length >= 2 && title.trim().length >= 3 && Boolean(startDate);
   const affected = campaign?.progress.affected ?? 0;
+  const rangeCount = campaign?.vinRanges?.length ?? 0;
 
   function payload(): CampaignPayload | null {
     if (!detailsComplete) {
-      setError("Enter the campaign code, title and start date");
+      setError(isFpc ? "Enter the bulletin number, subject and effective date" : "Enter the campaign code, title and start date");
+      return null;
+    }
+    if (jobCardText.trim().length > JOB_CARD_TEXT_MAX) {
+      setError(`Keep the job card text to ${JOB_CARD_TEXT_MAX} characters`);
       return null;
     }
     if (endDate && endDate < startDate) {
@@ -108,6 +127,9 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
       defectDescription: defect.trim() || null,
       startDate,
       endDate: endDate || null,
+      bulletinDate: bulletinDate || null,
+      jobCardText: jobCardText.trim() || null,
+      printOnJobCard,
       labourCovered,
       partsCovered,
       models: models.map((m) => ({ vehicleModelId: m.vehicleModelId, yearFrom: m.yearFrom ? Number(m.yearFrom) : null, yearTo: m.yearTo ? Number(m.yearTo) : null })),
@@ -124,7 +146,9 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
   function submit(next: "stay" | "vehicles") {
     const body = payload();
     if (!body) return;
-    save.mutate(body, { onSuccess: (c) => router.push(next === "vehicles" ? `/campaigns/${c.id}?add=1` : `/campaigns/${c.id}`) });
+    // FPC bulletins are defined by VIN ranges; other campaigns open the add-vehicles dialog.
+    const vehicles = isFpc ? "ranges=1" : "add=1";
+    save.mutate(body, { onSuccess: (c) => router.push(next === "vehicles" ? `/campaigns/${c.id}?${vehicles}` : `/campaigns/${c.id}`) });
   }
 
   const available = allModels.filter((m) => !models.some((x) => x.vehicleModelId === m.id));
@@ -133,7 +157,7 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-6">
         <Section title="Type">
-          <div className="grid gap-3 md:grid-cols-3" role="radiogroup">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup">
             {TYPES.map((t) => {
               const selected = type === t.value;
               return (
@@ -165,26 +189,78 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
           </div>
         </Section>
 
-        <Section title="Details">
+        <Section title={isFpc ? "Bulletin" : "Details"}>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Campaign code">
-              <input className={cn(inputCls, "font-mono uppercase")} value={code} onChange={(e) => setCode(e.target.value)} placeholder="RC-2026-014" />
+            <Field label={labels.code}>
+              <input className={cn(inputCls, "font-mono uppercase")} value={code} maxLength={30} onChange={(e) => setCode(e.target.value)} placeholder={labels.codeHint} />
             </Field>
-            <Field label="Title">
-              <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Engine wiring harness inspection" />
-            </Field>
-            <Field label="Description">
-              <textarea className={textareaCls} value={description} onChange={(e) => setDescription(e.target.value)} />
+            {isFpc ? (
+              <Field label="FPC bulletin date">
+                <DateInput value={bulletinDate} onChange={setBulletinDate} />
+              </Field>
+            ) : (
+              <Field label={labels.title}>
+                <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={labels.titleHint} />
+              </Field>
+            )}
+            {isFpc && (
+              <div className="md:col-span-2">
+                <Field label={labels.title}>
+                  <input className={inputCls} value={title} maxLength={150} onChange={(e) => setTitle(e.target.value)} placeholder={labels.titleHint} />
+                </Field>
+              </div>
+            )}
+            <Field label={labels.description}>
+              <textarea className={textareaCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={isFpc ? "Countermeasure for all customers visiting the workshop" : undefined} />
             </Field>
             <Field label="Defect description">
               <textarea className={textareaCls} value={defect} onChange={(e) => setDefect(e.target.value)} />
             </Field>
-            <Field label="Start date">
+            <Field label={labels.start}>
               <DateInput value={startDate} onChange={setStartDate} />
             </Field>
-            <Field label="End date (optional)">
+            <Field label={labels.end}>
               <DateInput value={endDate} onChange={setEndDate} />
             </Field>
+          </div>
+        </Section>
+
+        <Section title="Job card">
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+            <div className="space-y-4">
+              <Field label="Display for job card">
+                <input
+                  className={cn(inputCls, "font-mono")}
+                  value={jobCardText}
+                  maxLength={JOB_CARD_TEXT_MAX}
+                  onChange={(e) => setJobCardText(e.target.value)}
+                  placeholder={isFpc ? "130005-SORENTO (XM)" : "Short text for the job card"}
+                  aria-describedby="job-card-text-help"
+                />
+              </Field>
+              <p id="job-card-text-help" className="-mt-2 flex justify-between gap-3 text-xs text-slate-500">
+                <span>Blank prints the {labels.title.toLowerCase()}.</span>
+                <span className={cn("tabular-nums", jobCardText.length > JOB_CARD_TEXT_MAX - 10 && "text-amber-600")}>
+                  {jobCardText.length}/{JOB_CARD_TEXT_MAX}
+                </span>
+              </p>
+              <Switch checked={printOnJobCard} onChange={setPrintOnJobCard} label={isFpc ? "FPC bulletin to be printed on the job card" : "Print on the job card"} />
+            </div>
+            <div aria-label="Job card print preview" className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-400">
+                <Printer className="size-3.5" /> Print preview
+              </p>
+              {printOnJobCard ? (
+                <div className="rounded border-2 border-slate-800 bg-white px-3 py-2 font-mono text-sm text-slate-900">
+                  <p className="text-[10px] font-bold uppercase tracking-widest">FPC / campaign</p>
+                  <p className="mt-0.5 break-words">
+                    {code.trim().toUpperCase() || labels.codeHint} · {jobCardText.trim() || title.trim() || labels.titleHint}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">Nothing is printed for this {isFpc ? "bulletin" : "campaign"}; it still shows on screen.</p>
+              )}
+            </div>
           </div>
         </Section>
 
@@ -229,7 +305,9 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-500">Used for criteria-based vehicle selection.</p>
+            <p className="text-xs text-slate-500">
+              {isFpc ? "Optional for FPC bulletins: the VIN ranges decide which vehicles are affected." : "Used for criteria-based vehicle selection."}
+            </p>
           </div>
         </Section>
 
@@ -326,10 +404,10 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
           <ul className="space-y-3 text-sm">
             {(
               [
-                [detailsComplete, "Details complete"],
-                [models.length > 0, "Models selected"],
+                [detailsComplete, isFpc ? "Bulletin details complete" : "Details complete"],
+                isFpc ? [rangeCount > 0, `VIN ranges added (${rangeCount})`] : [models.length > 0, "Models selected"],
                 [affected > 0, `Affected vehicles added (${affected.toLocaleString("en-NG")})`],
-              ] as const
+              ] satisfies [boolean, string][]
             ).map(([done, label]) => (
               <li key={label} className="flex items-center gap-2">
                 {done ? <CheckCircle2 className="size-5 text-emerald-500" /> : <Circle className="size-5 text-slate-300" />}
@@ -338,7 +416,7 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
             ))}
           </ul>
           <p className="mt-4 border-t border-slate-100 pt-4 text-sm text-slate-500">
-            Activate the campaign to notify service advisers and reception managers at affected branches.
+            Activate the {isFpc ? "bulletin" : "campaign"} to notify service advisers and reception managers at affected branches.
           </p>
         </div>
       </aside>
@@ -352,7 +430,7 @@ export function CampaignForm({ campaign }: { campaign?: Campaign }) {
           {campaign ? "Save changes" : "Save draft"}
         </Button>
         <Button size="lg" disabled={save.isPending} onClick={() => submit("vehicles")}>
-          Save & add vehicles
+          {isFpc ? "Save & add VIN ranges" : "Save & add vehicles"}
         </Button>
       </div>
     </div>

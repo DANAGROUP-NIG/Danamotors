@@ -184,6 +184,8 @@ model User {
   warrantyCaseStatusEvents     WarrantyCaseStatusHistory[] @relation("WarrantyCaseStatusActor")
   campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
+  campaignVinRangesCreated     CampaignVinRange[]          @relation("CampaignVinRangeCreatedBy")
+  jobCardCampaignsAttended     JobCardCampaign[]           @relation("JobCardCampaignAttendedBy")
 
   customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
   customerOrderLinesCancelled CustomerOrderLine[] @relation("CustomerOrderLineCancelledBy")
@@ -2800,6 +2802,8 @@ enum CampaignType {
   RECALL
   FREE_FIX
   SERVICE_CAMPAIGN
+  // Manufacturer field product check bulletin (legacy FPC). Behaves like RECALL.
+  FPC
 }
 
 enum CampaignStatus {
@@ -2823,6 +2827,7 @@ enum ContactChannel {
   WHATSAPP
   EMAIL
   VISIT
+  LETTER
 }
 
 enum ContactOutcome {
@@ -2831,6 +2836,8 @@ enum ContactOutcome {
   WRONG_NUMBER
   CALL_BACK
   DECLINED
+  // A letter or call list went out; counts as called but the customer was not reached.
+  SENT
 }
 
 // Vehicle model master with its warranty policy (legacy `model`: warrdays, warrMileage).
@@ -3104,6 +3111,12 @@ model Campaign {
   startDate DateTime
   endDate   DateTime?
 
+  // Field product check bulletin details (shown for every type, labelled for FPC).
+  bulletinDate   DateTime?
+  // Short text printed on the job card; the title is printed when empty.
+  jobCardText    String?   @db.VarChar(100)
+  printOnJobCard Boolean   @default(true)
+
   labourCovered Boolean @default(true)
   partsCovered  Boolean @default(true)
 
@@ -3119,10 +3132,31 @@ model Campaign {
   models       CampaignModel[]
   coveredItems CampaignCoveredItem[]
   vehicles     CampaignVehicle[]
+  vinRanges    CampaignVinRange[]
   jobCards     JobCardCampaign[]
   jobCardLines JobCardLine[]
 
   @@index([status, type])
+}
+
+/// Affected VIN range of a campaign (legacy FPCBulletinDetail). from = to for a single VIN.
+/// Both bounds share the first 11 characters. Vehicles registered later inside an active
+/// campaign's range are added to it.
+model CampaignVinRange {
+  id String @id @default(uuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vinFrom String
+  vinTo   String
+
+  createdById String?
+  createdBy   User?    @relation("CampaignVinRangeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, vinFrom, vinTo])
+  @@index([vinFrom, vinTo])
 }
 
 model CampaignModel {
@@ -3229,10 +3263,18 @@ model JobCardCampaign {
   campaignTitle String
   campaignType  CampaignType
 
+  // Was the campaign (FPC) work done on this job? null = not answered yet; READY needs an answer.
+  attended          Boolean?
+  attendedAt        DateTime?
+  attendedById      String?
+  attendedBy        User?     @relation("JobCardCampaignAttendedBy", fields: [attendedById], references: [id], onDelete: SetNull)
+  notAttendedReason String?
+
   createdAt DateTime @default(now())
 
   @@id([jobCardId, campaignId])
   @@index([campaignId])
+  @@index([campaignId, attended])
 }
 
 model FinanceSetting {
@@ -3982,4 +4024,12 @@ model LabourSlip {
   @@index([groupId])
   @@index([engineerId])
   @@index([branchId, slipDate])
+}
+
+/// Report settings as key/value pairs (e.g. the FPC letter template).
+model ReportSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
 }
