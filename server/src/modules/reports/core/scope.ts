@@ -1,4 +1,4 @@
-import { ROLES } from '../../../shared/constants/roles';
+import { PERMISSIONS, ROLES } from '../../../shared/constants/roles';
 import { BadRequestError, ForbiddenError } from '../../../shared/errors/appError';
 import type { JWTPayload } from '../../../shared/types';
 import { REPORT_TZ } from './dates';
@@ -6,13 +6,13 @@ import type { ReportBranch, ReportDb, ReportScope } from './types';
 
 const BRANCH_SELECT = { id: true, name: true, address: true, city: true, state: true, phoneNumber: true } as const;
 
-/** Admin and SuperAdmin may report on any branch, or all branches together. */
-export function canChooseBranch(user: Pick<JWTPayload, 'role'>): boolean {
-  return user.role === ROLES.SUPER_ADMIN || user.role === ROLES.ADMIN;
+/** Admin, SuperAdmin and cross-branch users (branch:all) may report on any branch, or all together. */
+export function canChooseBranch(user: Pick<JWTPayload, 'role' | 'permissions'>): boolean {
+  return user.role === ROLES.SUPER_ADMIN || user.role === ROLES.ADMIN || user.permissions.includes(PERMISSIONS.BRANCH_ALL);
 }
 
 /**
- * Every report is limited to the user's own branch. Admin and SuperAdmin may pass a branch id
+ * Every report is limited to the user's own branch. Admin, SuperAdmin and branch:all users may pass a branch id
  * or "ALL"; anyone else asking for another branch is refused rather than silently narrowed.
  */
 export async function resolveReportScope(db: ReportDb, user: JWTPayload, requested?: string): Promise<ReportScope> {
