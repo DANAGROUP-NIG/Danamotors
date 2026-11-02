@@ -157,7 +157,8 @@ export class EnquiryService {
       where: {
         customerId: customer.id,
         vehicleId: vehicle.id,
-        status: { notIn: ["Closed", "Cancelled", "Completed"] },
+        bookingStatus: "BOOKED",
+        status: { notIn: ["Closed", "Cancelled", "Completed", "No Show"] },
       },
     });
     if (activeAppt) {

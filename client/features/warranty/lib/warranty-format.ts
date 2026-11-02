@@ -111,12 +111,14 @@ export const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
   RECALL: "Recall",
   FREE_FIX: "Free fix",
   SERVICE_CAMPAIGN: "Service campaign",
+  FPC: "FPC bulletin",
 };
 
 export const CAMPAIGN_TYPE_TONES: Record<CampaignType, StatusTone> = {
   RECALL: "red",
   FREE_FIX: "blue",
   SERVICE_CAMPAIGN: "purple",
+  FPC: "orange",
 };
 
 export const CAMPAIGN_VEHICLE_LABELS: Record<CampaignVehicleStatus, string> = {

@@ -29,6 +29,8 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const billed = hasJobBill(jobCard);
   const canDeliver = (billed && !(jobCard.invoices ?? []).some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) || !!jobCard.creditApprovedById;
   const estimateApproved = jobCard.estimates?.[0]?.status === "Approved" && !jobCard.estimates[0].approvals?.some(approval => approval.signatureState === "invalid");
+  // READY needs a done / not done answer for every linked campaign (a FREE line pre-sets "done").
+  const unansweredCampaigns = (jobCard.campaigns ?? []).filter((c) => c.attended === null && !c.hasFreeLine);
   const [qcNotes, setQcNotes] = useState(jobCard.qcNotes ?? "");
   const late = !!jobCard.promisedAt && new Date() > new Date(jobCard.promisedAt);
   const [serviceCharge, setServiceCharge] = useState(String(jobCard.serviceCharge ?? 0));
@@ -160,10 +162,15 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
         >
           <option value="">{billed ? "Select an action" : "Save findings only"}</option>
           {(nextStatuses[billed ? "BILLED" : current] ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
-            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
+            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && (jobCard.qcStatus?.toUpperCase() !== "PASSED" || unansweredCampaigns.length > 0))}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
           ))}
         </select>
       </Field>
+      {current === "QC" && unansweredCampaigns.length > 0 && (
+        <p className="text-sm text-amber-700">
+          Record whether the campaign work was done for {unansweredCampaigns.map((c) => c.campaignCode).join(", ")} under Linked campaigns before marking the vehicle ready.
+        </p>
+      )}
       {["READY", "BILLED"].includes(current) && !canDeliver && <p className="text-sm text-muted-foreground">Create and settle the job bill or obtain delivery-on-credit approval before delivering this vehicle.</p>}
       <Field label="Remarks / cancellation reason">
         <textarea

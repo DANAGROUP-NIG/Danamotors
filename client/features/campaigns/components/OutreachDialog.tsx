@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, ChevronUp, Copy, Loader2, Mail, MessageSquare, Phone, Smartphone, Store } from "lucide-react";
+import { Calendar, ChevronUp, Copy, FileText, Loader2, Mail, MessageSquare, Phone, Smartphone, Store } from "lucide-react";
 import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { inputCls } from "@/components/forms/FormField";
@@ -21,6 +21,7 @@ const CHANNELS: { value: ContactChannel; label: string; icon: React.ReactNode }[
   { value: "WHATSAPP", label: "WhatsApp", icon: <Smartphone /> },
   { value: "EMAIL", label: "Email", icon: <Mail /> },
   { value: "VISIT", label: "Visit", icon: <Store /> },
+  { value: "LETTER", label: "Letter", icon: <FileText /> },
 ];
 
 export const OUTCOME_LABELS: Record<ContactOutcome, string> = {
@@ -29,6 +30,7 @@ export const OUTCOME_LABELS: Record<ContactOutcome, string> = {
   NO_ANSWER: "No answer",
   WRONG_NUMBER: "Wrong number",
   DECLINED: "Reached — customer declined",
+  SENT: "Sent — letter or call list, not reached yet",
 };
 
 export const OUTCOME_SHORT: Record<ContactOutcome, string> = {
@@ -37,6 +39,7 @@ export const OUTCOME_SHORT: Record<ContactOutcome, string> = {
   NO_ANSWER: "No answer",
   WRONG_NUMBER: "Wrong number",
   DECLINED: "Declined",
+  SENT: "Letter / list sent",
 };
 
 /** Screen 12 — log a contact attempt and book the campaign appointment. */

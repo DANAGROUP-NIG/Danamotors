@@ -17,6 +17,9 @@ export type PickerRecord = {
   registrationNumber?: string | null;
   vin?: string;
   jobNumber?: string;
+  requisitionNumber?: string;
+  slipNumber?: string;
+  partNumber?: string;
   scheduledAt?: string;
   customerId?: string | null;
   customer?: {
@@ -39,6 +42,10 @@ export type PickerRecord = {
   durationMins?: number | null;
   price?: number;
   serviceId?: string | null;
+  serviceTypeId?: string | null;
+  mileage?: number | null;
+  acFitted?: boolean | null;
+  requests?: { complaintCodeId?: string | null; defectCode?: string | null; description: string; estimatedParts: number | string; estimatedOil: number | string; estimatedLabour: number | string }[];
   parentId?: string | null;
   currency?: string;
   lines?: { type: string; description: string; amount: number }[];
@@ -58,6 +65,9 @@ export function recordLabel(row: PickerRecord) {
     row.registrationNumber ||
     row.vin ||
     row.jobNumber ||
+    row.requisitionNumber ||
+    row.slipNumber ||
+    row.partNumber ||
     row.companyName ||
     [row.firstName, row.lastName].filter(Boolean).join(" ") ||
     [row.code, row.description].filter(Boolean).join(" | ") ||
@@ -97,6 +107,7 @@ function recordHint(row: PickerRecord) {
 
 export function WorkshopPicker({
   label,
+  hideLabel = false,
   endpoint,
   collection,
   value,
@@ -121,6 +132,7 @@ export function WorkshopPicker({
   getOptionId = row => row.id,
 }: {
   label: string;
+  hideLabel?: boolean;
   endpoint: string;
   collection: string;
   value?: string;
@@ -215,7 +227,7 @@ export function WorkshopPicker({
         }
       }}
     >
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "text-sm font-medium"}>
         {label}
         {required && (
           <span className="ml-1 text-destructive" aria-hidden="true">
@@ -269,6 +281,7 @@ export function WorkshopPicker({
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
+
               setOpen(true);
               setActive((current) =>
                 Math.max(
@@ -281,7 +294,6 @@ export function WorkshopPicker({
               );
             } else if (event.key === "Enter" && open) {
               event.preventDefault();
-
               if (!loading && active >= 0 && rows[active]) choose(rows[active]);
             } else if (event.key === "Escape" && open) {
               event.preventDefault();

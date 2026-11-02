@@ -1,0 +1,18 @@
+"use client";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Field, inputCls } from '@/components/forms/FormField';
+import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import type { TransactionJob } from '../document.types';
+import { useServiceAction, useServiceData, type ServiceSlip } from '../hooks/use-service-transactions';
+import { canWriteTransactions, remainingReturn, moneyText } from '../transaction.logic';
+import { SlipList } from './SavedSlip';
+export function ReturnPanel({ job }: { job: TransactionJob }) {
+  const { hasPermission } = useAuth(); const save = useServiceAction(); const [requisition, setRequisition] = useState(''); const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const detail = useServiceData<{ requisition: ServiceSlip }>(`/inventory/requisitions/${requisition}`, !!requisition && hasPermission('requisition:read'));
+  const locked = !canWriteTransactions(job); const document = detail.data?.requisition;
+  const lines = (document?.lines ?? []).filter(line => (quantities[line.id] ?? 0) > 0).map(line => ({ requisitionLineId: line.id, quantity: quantities[line.id] }));
+  return <section className="space-y-5"><h3 className="font-semibold">Item return slip</h3>{hasPermission('requisition:create') && hasPermission('requisition:read') && <form className="space-y-4" onSubmit={event => { event.preventDefault(); save.mutate({ url: '/inventory/return-slips', body: { requisitionId: requisition, lines } }, { onSuccess: () => setQuantities({}) }); }}><fieldset disabled={locked || save.isPending} className="space-y-4"><WorkshopPicker label="Requisition" endpoint={`/inventory/requisitions?jobCardId=${job.id}`} collection="requisitions" value={requisition} onChange={id => { setRequisition(id); setQuantities({}); }} />{detail.isLoading && requisition && <p role="status">Loading issued parts?</p>}{detail.isError && <p role="alert">Could not load the requisition. Choose it again or retry later.</p>}{document && <><p className="text-sm">{document.requisitionNumber} ? {document.chargeType} ? {document.status}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{['Part', 'Flag', 'Required', 'Issued', 'Available to return', 'Rate', 'Return quantity'].map(label => <th key={label} className="border-b border-border p-2">{label}</th>)}</tr></thead><tbody>{document.lines.map(line => <tr key={line.id}><td className="p-2">{line.partNumber}<div>{line.description}</div></td><td className="p-2">{line.partSource}</td><td className="p-2">{line.quantityRequired}</td><td className="p-2">{line.quantityIssued}</td><td className="p-2">{remainingReturn(line)}</td><td className="p-2">{moneyText(line.rate)}</td><td className="p-2"><Field label={`Return ${line.partNumber ?? line.description}`}><input className={inputCls} type="number" step="1" min="0" max={remainingReturn(line)} disabled={!remainingReturn(line) || document.status !== 'ISSUED'} value={quantities[line.id] ?? 0} onChange={event => setQuantities(current => ({ ...current, [line.id]: Number(event.target.value) }))} /></Field></td></tr>)}</tbody></table></div></>}
+    <Button disabled={!lines.length || document?.status !== 'ISSUED'}>Save return slip</Button></fieldset></form>}{locked && <p className="text-sm text-muted-foreground">Returns are read-only after billing, delivery or cancellation.</p>}{hasPermission('requisition:read') && <SlipList kind="return-slips" jobId={job.id} locked={locked} />}</section>;
+}

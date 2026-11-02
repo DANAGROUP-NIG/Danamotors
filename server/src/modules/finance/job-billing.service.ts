@@ -38,8 +38,9 @@ export class JobBillingService {
         appointment: { select: { customerId: true } },
         vehicle: true,
         branch: true,
-        partIssuances: { include: { sparePart: true, returns: true, jobCardLine: { select: { id: true, chargeType: true } } } },
-        labourLines: { include: { chargeLine: { select: { chargeType: true } } } },
+        partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { select: { id: true } }, jobCardLine: { select: { id: true, chargeType: true } } } },
+        lines: { where: { quantity: { gt: 0 }, requisitionLine: { requisition: { status: 'ISSUED' } } }, include: { sparePart: true } },
+        labourLines: { include: { chargeLine: { select: { id: true, chargeType: true, quantity: true, rate: true, amount: true } } } },
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
         },
@@ -80,6 +81,7 @@ export class JobBillingService {
     const customerPays = (chargeLine: { chargeType: string } | null) =>
       !companyPaid && (chargeLine?.chargeType ?? "CUSTOMER") === "CUSTOMER";
     const partLines = jobCard.partIssuances.flatMap((issuance) => {
+      if (issuance.requisitionLine) return [];
       const quantity =
         issuance.quantity -
         issuance.returns.reduce(
@@ -115,21 +117,33 @@ export class JobBillingService {
         },
       ];
     });
-    const labourLines = jobCard.labourLines.map((line) => ({
+    const labourLines = jobCard.labourLines.map((line) => {
+      if (line.labourSlipId && !line.chargeLine) throw new BadRequestError('Labour slip charge is missing');
+      return {
       type: "LABOUR" as const,
       jobCardLabourId: line.id,
       referenceId: line.labourItemId,
       description: line.description,
-      quantity: line.hours,
-      rate: line.rate,
+      jobCardLineId: line.labourSlipId ? line.chargeLine?.id : undefined,
+      quantity: line.labourSlipId ? line.chargeLine!.quantity : line.hours,
+      rate: line.labourSlipId ? line.chargeLine!.rate : line.rate,
       amount: money(line.amount),
       customerPaid: customerPays(line.chargeLine),
-    }));
+    }; });
     const serviceLines = jobCard.serviceCharge == null ? [] : [{
       type: "SERVICE" as const, referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
       amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,
     }];
-    const lines = [...partLines, ...labourLines, ...serviceLines];
+    const requisitionLines = (jobCard.lines ?? []).map(line => {
+      if (!line.sparePart || !line.sparePartId) throw new BadRequestError('Requisition charge is missing its part');
+      return {
+        type: 'PART' as const, jobCardLineId: line.id, partId: line.sparePartId, referenceId: line.sparePartId,
+        taxCategory: categoryOf(line.sparePart), taxable: line.taxable, partSource: line.partSource,
+        description: line.description, quantity: line.quantity, rate: line.rate, amount: money(line.amount),
+        customerPaid: customerPays(line),
+      };
+    });
+    const lines = [...partLines, ...requisitionLines, ...labourLines, ...serviceLines];
     if (!lines.some((line) => line.customerPaid)) throw new BadRequestError("Record customer-paid parts, labour or a service charge before creating a job bill");
     if (lines.some((line) => line.amount < 0 || !Number.isFinite(line.amount))) throw new BadRequestError("Invalid job-card line amount");
     return lines;

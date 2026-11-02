@@ -1,5 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { BookingVehicleSummary } from "@/features/service-transactions/components/BookingVehicleSummary";
+import { BookingFields } from "@/features/service-transactions/components/BookingFields";
+import { lagosIso } from "@/features/service-transactions/transaction.logic";
+import type { BookingExtra } from "../types/appointment.types";
 import { useForm, Controller } from "react-hook-form";
 import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,9 +29,11 @@ interface AppointmentCreateFormProps {
 
 export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
+  const [extra, setExtra] = useState<BookingExtra>({ requests: [] });
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
-  const { isSuperAdmin } = useAuth();
+  const { hasPermission } = useAuth();
+  const isSuperAdmin = hasPermission("branch:all");
   const { data: services, isLoading: servicesLoading } = useServices({
     limit: 100,
   });
@@ -53,12 +60,15 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
   function onSubmit(values: CreateAppointmentFormValues) {
     const payload = {
       ...values,
+      ...extra,
+      serviceId: values.serviceId || undefined,
       serviceTypeId: values.serviceTypeId || undefined,
-      scheduledAt: new Date(values.scheduledAt).toISOString(),
+      scheduledAt: lagosIso(values.scheduledAt),
     };
     create.mutate(payload, {
       onSuccess: () => {
         reset();
+        setExtra({ requests: [] });
         onSuccess?.();
       },
     });
@@ -82,6 +92,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
             value={selectedVehicleId}
             customerId={selectedCustomerId}
             onChange={(vehicleId) => {
+              setExtra(current => ({ ...current, followUpJobId: null }));
               setValue("vehicleId", vehicleId, { shouldValidate: true });
             }}
             onVehicleSelect={(vehicle) => {
@@ -94,8 +105,10 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
+      {selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}
+      <BookingFields value={extra} onChange={setExtra} vehicleId={selectedVehicleId} />
       <Controller name="serviceTypeId" control={control} render={({field})=><WorkshopPicker label="Workshop service type (optional)" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={field.value??''} onChange={field.onChange} onBlur={field.onBlur}/>}/>
-      <Field label="Service" error={errors.serviceId?.message}>
+      <Field label="Appointment service (optional)" error={errors.serviceId?.message}>
         {servicesLoading ? (
           <p className="py-1 text-sm text-muted-foreground">Loading services…</p>
         ) : services && services.services.length > 0 ? (

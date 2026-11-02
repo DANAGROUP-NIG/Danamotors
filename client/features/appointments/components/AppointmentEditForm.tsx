@@ -1,5 +1,7 @@
 "use client";
 
+import { BookingPanel } from "@/features/service-transactions/components/BookingPanel";
+import { canEditBooking, lagosInput, lagosIso } from "@/features/service-transactions/transaction.logic";
 import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +24,6 @@ const STATUS_OPTIONS = [
   { value: "Quality Check", label: "Quality Check" },
   { value: "Ready", label: "Ready" },
   { value: "Completed", label: "Completed" },
-  { value: "Cancelled", label: "Cancelled" },
 ] as const;
 
 interface AppointmentEditFormProps {
@@ -30,7 +31,7 @@ interface AppointmentEditFormProps {
   onSuccess?: () => void;
 }
 
-export function AppointmentEditForm({
+function LegacyAppointmentEditForm({
   appointment,
   onSuccess,
 }: AppointmentEditFormProps) {
@@ -45,7 +46,7 @@ export function AppointmentEditForm({
   } = useForm<UpdateAppointmentFormValues>({
     resolver: zodResolver(updateAppointmentSchema),
     defaultValues: {
-      scheduledAt: appointment.scheduledAt.slice(0, 16),
+      scheduledAt: lagosInput(appointment.scheduledAt),
       status: appointment.status,
       notes: appointment.notes ?? "",
       durationMins: appointment.durationMins ?? undefined,
@@ -54,7 +55,7 @@ export function AppointmentEditForm({
 
   useEffect(() => {
     reset({
-      scheduledAt: appointment.scheduledAt.slice(0, 16),
+      scheduledAt: lagosInput(appointment.scheduledAt),
       status: appointment.status,
       notes: appointment.notes ?? "",
       durationMins: appointment.durationMins ?? undefined,
@@ -65,7 +66,7 @@ export function AppointmentEditForm({
     const payload = {
       ...values,
       scheduledAt: values.scheduledAt
-        ? new Date(values.scheduledAt).toISOString()
+        ? lagosIso(values.scheduledAt)
         : undefined,
     };
     update.mutate(payload, { onSuccess });
@@ -119,3 +120,4 @@ export function AppointmentEditForm({
     </form>
   );
 }
+export function AppointmentEditForm(props: AppointmentEditFormProps) { return props.appointment.bookingNumber || !canEditBooking(props.appointment) ? <BookingPanel key={props.appointment.updatedAt} appointment={props.appointment} /> : <LegacyAppointmentEditForm {...props} />; }

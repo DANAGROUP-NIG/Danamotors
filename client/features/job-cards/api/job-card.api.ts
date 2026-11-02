@@ -91,7 +91,7 @@ export async function createJobCardRequest(
   data: CreateJobCardPayload,
 ): Promise<CreatedJobCard> {
   const result = await apiPost<{ jobCard: CreatedJobCard }>(
-    API_ROUTES.service.jobCards.base,
+    data.appointmentId ? `/service/appointments/${data.appointmentId}/convert` : API_ROUTES.service.jobCards.base,
     {
       ...data,
       serviceId: data.serviceId || undefined,

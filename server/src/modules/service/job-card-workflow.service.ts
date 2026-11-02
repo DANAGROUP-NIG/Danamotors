@@ -1,3 +1,5 @@
+import { sumMoney } from '../finance/money';
+import { assertBookable, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
@@ -19,7 +21,8 @@ import { NOTIFICATION_TYPES, NotificationService } from "../notification/notific
 import { assertMileage } from "../warranty/warranty.logic";
 import { OpenCampaign, buildCheck, findOpenCampaigns, loadVehicleForWarranty } from "../warranty/warranty.coverage";
 import { WarrantyCaseService, notifyWarrantyOfficers } from "../warranty/warrantyCase.service";
-import { completeCampaignVehiclesForJobCard, markCampaignVehiclesInWorkshop } from "../campaign/campaign.hooks";
+import { assertCampaignAttendance, completeCampaignVehiclesForJobCard, jobCardCampaignAttendance, markCampaignVehiclesInWorkshop } from "../campaign/campaign.hooks";
+import { notAttendedReasonText, type NotAttendedReason } from "../campaign/campaign.logic";
 
 export const JOB_TRANSITIONS: Record<string, readonly string[]> = {
   OPEN: ["IN_PROGRESS", "CANCELLED"],
@@ -145,9 +148,10 @@ export class JobCardWorkflowService {
   async open(
     input: z.infer<typeof jobOpeningBody> & {
       createdById?: string;
+      bookingVersion?: string;
     },
   ) {
-    const { createdById, ...body } = input;
+    const { createdById, bookingVersion, ...body } = input;
 
     if (!createdById) throw new UnauthorizedError();
 
@@ -198,32 +202,37 @@ export class JobCardWorkflowService {
         ).withCode("WARRANTY_ACK_REQUIRED", check);
 
       if (data.appointmentId) {
+        await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${data.appointmentId} FOR UPDATE`;
         const appointment = await tx.serviceAppointment.findUnique({
           where: {
             id: data.appointmentId,
           },
+          include: { requests: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
         });
 
         if (
           !appointment ||
           appointment.branchId !== branch.id ||
-          appointment.vehicleId !== vehicle.id
+          appointment.vehicleId !== vehicle.id ||
+          appointment.customerId !== data.customerId
         )
           throw new BadRequestError(
             "Appointment must match the vehicle and branch",
           );
 
-        if (["Cancelled", "Completed", "Closed"].includes(appointment.status))
-          throw new BadRequestError("Appointment is no longer open");
+        assertBookable(appointment);
+        if (bookingVersion && appointment.updatedAt.toISOString() !== bookingVersion) throw new ConflictError("Booking changed; reload before converting");
+        if (appointment.serviceTypeId && appointment.serviceTypeId !== data.serviceTypeId) throw new ConflictError('Booking service changed; reload before converting');
+        data.serviceId = appointment.serviceId ?? undefined;
+        data.acFitted = appointment.acFitted ?? data.acFitted;
+        if (appointment.acFitted !== null) data.acType = undefined;
+        if (appointment.requests.length) data.complaints = bookingComplaints(appointment.requests);
 
         if (
           await tx.jobCard.count({
             where: {
               appointmentId: appointment.id,
 
-              status: {
-                notIn: ["CANCELLED", "Cancelled"],
-              },
             },
           })
         )
@@ -298,11 +307,7 @@ export class JobCardWorkflowService {
           row.oil !== undefined ||
           row.labour !== undefined,
       );
-      const sum = (key: "spare" | "oil" | "labour") =>
-        complaints.reduce(
-          (total, row) => total + Math.round(row[key] * 100),
-          0,
-        ) / 100;
+      const sum = (key: "spare" | "oil" | "labour") => sumMoney(complaints.map(row => row[key]));
       const estimatedParts = hasRequestAmounts
         ? sum("spare")
         : data.estimatedParts;
@@ -341,15 +346,7 @@ export class JobCardWorkflowService {
             estimatedLabour,
             serviceCharge,
           ].some((value) => value !== undefined)
-            ? [
-                estimatedParts,
-                estimatedOil,
-                estimatedLabour,
-                serviceCharge,
-              ].reduce<number>(
-                (total, value) => total + Math.round((value ?? 0) * 100),
-                0,
-              ) / 100
+            ? sumMoney([estimatedParts ?? 0, estimatedOil ?? 0, estimatedLabour ?? 0, serviceCharge ?? 0])
             : data.estimatedCost,
           branchId: branch.id,
           createdById,
@@ -385,6 +382,11 @@ export class JobCardWorkflowService {
           ...(check.requiresAcknowledgement && { warrantyAcknowledgedById: createdById, warrantyAcknowledgedAt: now }),
         },
       });
+
+      if (data.appointmentId) {
+        await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: 'CONVERTED' } });
+        await tx.auditLog.create({ data: { userId: createdById, action: 'BOOKING_CONVERTED', details: JSON.stringify({ bookingId: data.appointmentId, jobCardId: card.id, branchId: branch.id }) } });
+      }
 
       await tx.vehicle.update({
         where: {
@@ -540,7 +542,9 @@ export class JobCardWorkflowService {
 
         if (data.status === "READY") {
           update.readyAt = now;
-          // The campaign work this job card was opened for is done once the job is ready.
+          // Every linked campaign needs a done / not done answer. Campaigns marked done are
+          // completed for the vehicle; the others go back to outstanding.
+          await assertCampaignAttendance(tx, id, actorId);
           await completeCampaignVehiclesForJobCard(tx, id);
         }
 
@@ -581,6 +585,65 @@ export class JobCardWorkflowService {
     }
 
     return card;
+  }
+
+  /**
+   * Records whether the work of a linked campaign was done on this job. Allowed until the job
+   * card is closed; once the job is READY or BILLED the campaign vehicle follows the new answer.
+   */
+  async setCampaignAttendance(
+    id: string,
+    campaignId: string,
+    input: { attended: boolean; reason?: NotAttendedReason | null; note?: string | null },
+    actorId: string,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
+      const card = await tx.jobCard.findUnique({ where: { id }, select: { status: true } });
+      if (!card) throw new NotFoundError("Job card not found");
+      const status = canonicalJobStatus(card.status);
+      if (["DELIVERED", "CANCELLED"].includes(status)) throw new BadRequestError("This job card is closed");
+      const link = await tx.jobCardCampaign.findUnique({ where: { jobCardId_campaignId: { jobCardId: id, campaignId } }, select: { campaignId: true } });
+      if (!link) throw new NotFoundError("This campaign is not linked to the job card");
+      if (!input.attended && !input.reason) throw new BadRequestError("Give the reason the campaign work was not done");
+
+      await tx.jobCardCampaign.update({
+        where: { jobCardId_campaignId: { jobCardId: id, campaignId } },
+        data: {
+          attended: input.attended,
+          attendedAt: new Date(),
+          attendedById: actorId,
+          notAttendedReason: input.attended ? null : notAttendedReasonText(input.reason!, input.note),
+        },
+      });
+      if (["READY", "BILLED"].includes(status)) await completeCampaignVehiclesForJobCard(tx, id, [campaignId]);
+      return jobCardCampaignAttendance(tx, id);
+    });
+  }
+
+  /** Authorizes delivery before full payment. Allowed once, on a READY or BILLED job. */
+  async approveCredit(id: string, actorId: string, remarks: string) {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.jobCard.updateMany({
+        where: { id, OR: [{ status: jobStatusFilter("READY") }, { status: jobStatusFilter("BILLED") }], creditApprovedById: null },
+        data: { creditApprovedById: actorId },
+      });
+      if (!updated.count)
+        throw new ConflictError(
+          "Credit approval requires a READY or BILLED job without an existing approval",
+        );
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          action: "JOB_CREDIT_APPROVED",
+          details: JSON.stringify({
+            jobCardId: id,
+            remarks,
+          }),
+        },
+      });
+      return updated;
+    });
   }
 }
 

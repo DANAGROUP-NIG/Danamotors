@@ -10,6 +10,7 @@ const APPOINTMENT_STATUSES = [
   "Ready",
   "Completed",
   "Cancelled",
+  "No Show",
 ] as const;
 
 export const createAppointmentSchema = z.object({
@@ -17,7 +18,7 @@ export const createAppointmentSchema = z.object({
   vehicleId: z.string().min(1, "Vehicle is required"),
   branchName: z.string().min(1, "Branch is required"),
   serviceTypeId: z.string().uuid().optional().or(z.literal("")),
-  serviceId: z.string().min(1, "Service is required"),
+  serviceId: z.string().optional(),
   scheduledAt: z.string().min(1, "Scheduled date is required"),
   durationMins: z.coerce.number().int().positive().optional(),
   notes: z.string().optional(),

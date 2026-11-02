@@ -11,8 +11,9 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 import { NAV_GROUPS } from "@/constant";
 import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 
-import { MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
 import { MONTHLY_REPORTS } from "@/features/reports/monthly-config";
+import { REPORT_CONFIGS } from "@/features/reports/configs";
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/dashboard": ["dashboard:read"],
@@ -63,6 +64,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/reports/billing-settings": ["role:permission:update"],
   "/reports/corporate-groups": ["corporate:manage"],
   ...Object.fromEntries(MONTHLY_REPORTS.map(r=>["/reports/"+r.slug,["report:"+r.slug]])),
+  ...Object.fromEntries(REPORT_CONFIGS.map((r) => ["/reports/" + r.slug, [r.permission]])),
   "/reports/finance/receipt-register": ["report:receipt-register"],
   "/reports/finance/debit-note-register": ["report:debit-note-register"],
   "/reports/finance/credit-note-register": ["report:credit-note-register"],
@@ -70,7 +72,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
   "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
   "/reports/finance/party-outstanding": ["report:party-outstanding"],
-  "/reports": [...MONTHLY_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+  "/reports": [...MONTHLY_REPORT_PERMISSIONS, ...FRAMEWORK_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
