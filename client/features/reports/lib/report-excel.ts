@@ -12,10 +12,10 @@ type Cell = string | number | null;
  */
 export async function exportReportExcel<Row extends ReportRow>(config: ReportConfig<Row>, data: ReportResponse<Row>, options: Record<string, string>) {
   const XLSX = await import("xlsx");
-  const columns = visibleColumns(config, options);
+  const columns = visibleColumns(config, options, data);
   const mode = options.mode ?? "both";
   const showRows = mode !== "summary";
-  const showSubtotals = mode !== "detail" && data.groups.length > 0;
+  const showSubtotals = !config.hideSubtotals && mode !== "detail" && data.groups.length > 0;
   const groups: ReportGroup[] = data.groups.length ? data.groups : [{ key: "", label: "", count: data.rows.length, totals: data.totals }];
 
   const value = (column: (typeof columns)[number], row: Row): Cell => {
@@ -57,15 +57,21 @@ export async function exportReportExcel<Row extends ReportRow>(config: ReportCon
     if (showRows)
       for (const row of rows) {
         numericRows.push(sheet.length);
-        sheet.push(columns.map((column) => value(column, row)));
+        const indent = "  ".repeat(config.rowIndent?.(row) ?? 0);
+        sheet.push(columns.map((column, index) => {
+          const cell = value(column, row);
+          return index === 0 && indent && typeof cell === "string" ? `${indent}${cell}` : cell;
+        }));
       }
     if (showSubtotals && group.label) {
       numericRows.push(sheet.length);
       sheet.push(totalsRow(group.totals, config.subtotalLabel?.(group) ?? `Total ${group.label} · ${plural(group.count, config.noun)}`));
     }
   }
-  numericRows.push(sheet.length);
-  sheet.push(totalsRow(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`));
+  if (!config.hideGrandTotal) {
+    numericRows.push(sheet.length);
+    sheet.push(totalsRow(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`));
+  }
 
   const worksheet = XLSX.utils.aoa_to_sheet(sheet);
   // Number formats so amounts stay numeric (sum/filter in Excel) but read like the screen.
@@ -87,7 +93,7 @@ export async function exportReportExcel<Row extends ReportRow>(config: ReportCon
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, config.title.slice(0, 31).replace(/[\\/?*[\]:]/g, " "));
   const query = data.filters.query as Record<string, string>;
-  const stamp = config.period.kind === "date" ? query.date : `${query.from}_to_${query.to}`;
+  const stamp = config.period.kind === "date" ? query.date : config.period.kind === "range" ? `${query.from}_to_${query.to}` : data.report.generatedAt.slice(0, 10);
   const filename = `${config.slug}-${stamp}.xlsx`;
   XLSX.writeFile(workbook, filename);
   toast.success(`Downloaded ${filename}`);

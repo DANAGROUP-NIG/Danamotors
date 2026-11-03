@@ -181,7 +181,7 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
                 <p className="font-semibold text-slate-900">
                   {plural(rowCount, config.noun)} · Generated {fmtDateTime(data.report.generatedAt)} · {data.meta.branch === "ALL" ? "All branches" : data.meta.branch.name}
                 </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">Applied: {appliedText(data) || "No filters"}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{[config.subtitle?.(data), `Applied: ${appliedText(data) || "No filters"}`].filter(Boolean).join(" · ")}</p>
               </div>
               {report.isFetching && <span className="text-sm text-muted-foreground">Updating…</span>}
             </div>

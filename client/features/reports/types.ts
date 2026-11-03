@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { LookupSource } from "./api/reports.api";
 
 export type FilterKey =
   | "model"
@@ -11,11 +12,14 @@ export type FilterKey =
   | "technician"
   | "complaint"
   | "labourOperation"
-  | "campaign";
+  | "campaign"
+  | "engineer"
+  | "serviceGroup"
+  | "freeService";
 
 export type ReportMode = "both" | "summary" | "detail";
 export type ReportWidth = 80 | 132;
-export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC";
+export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS";
 
 export interface ReportBranch {
   id: string;
@@ -49,6 +53,8 @@ export interface ReportResponse<Row extends ReportRow = ReportRow> {
   totals: Record<string, number>;
   summary?: Record<string, number | string | null>;
   breakdown?: { key: string; label: string; count: number; amount?: number }[];
+  /** Columns that depend on the data (months, service types, branches) in matrix reports. */
+  columns?: { key: string; label: string; format?: ColumnFormat }[];
   meta: { rowCount: number; truncated: boolean; branch: ReportBranch | "ALL"; timeZone: string };
 }
 
@@ -103,6 +109,16 @@ export type OptionDef = (
     }
   /** A from/to filter with an "All" toggle (e.g. mileage, or dates). Shown with the filters. */
   | { kind: "range"; key: string; label: string; fromKey: string; toKey: string; unit?: string; valueType?: "number" | "date" }
+  /** A month (YYYY-MM). Shown with the filters; defaults to this month or January of this year. */
+  | { kind: "month"; key: string; label: string; default: "current" | "yearStart" }
+  /** Free text such as a registration number; blank = All. Shown with the filters. */
+  | { kind: "text"; key: string; label: string; placeholder?: string; maxLength: number }
+  /** One value from a lookup list, or All (blank). Shown with the filters. */
+  | { kind: "lookup"; key: string; label: string; source: LookupSource; all: string }
+  /** Any combination of choices, sent comma separated; none ticked = All. */
+  | { kind: "multi"; key: string; label: string; choices: { value: string; label: string }[] }
+  /** A day and month without a year (e.g. 08 Oct). Shown with the filters. */
+  | { kind: "dayMonth"; key: string; label: string; dayKey: string; monthKey: string; defaultDay: number; defaultMonth: number }
 ) & {
   /** Display-only option: kept in the URL but not sent to the server (e.g. print address). */
   local?: boolean;
@@ -113,6 +129,8 @@ export type OptionDef = (
 };
 
 export type PresetKey = "today" | "yesterday" | "tomorrow" | "thisWeek" | "thisMonth" | "lastMonth";
+
+export type RowStyle = "heading" | "subtotal" | "total" | "memo" | "note";
 
 export interface PeriodDef {
   /** "none": the report has no period (e.g. FPC vehicle lists). */
@@ -141,6 +159,8 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   title: string;
   description: string;
   category: ReportCategory;
+  /** Heading within the category on the reports hub. */
+  subgroup?: string;
   permission: string;
   width: ReportWidth;
   icon: LucideIcon;
@@ -150,7 +170,18 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   /** True when the report has the detail / summary choice. */
   hasMode?: boolean;
   defaultMode?: ReportMode;
+  /** Mode choices when not all three apply (e.g. detail or summary only). */
+  modeChoices?: { value: ReportMode; label: string }[];
   columns: ReportColumn<Row>[];
+  /** Columns once the data is in (matrix reports whose columns are months, service types or branches). */
+  columnsFor?: (data: ReportResponse<Row>, options: Record<string, string>) => ReportColumn<Row>[];
+  /** Emphasis of a row in matrix reports (heading, subtotal, total, memo or note lines). */
+  rowStyle?: (row: Row) => RowStyle | undefined;
+  /** Indent level of a row's first cell (0–2). */
+  rowIndent?: (row: Row) => number;
+  /** Matrix reports carry their own total lines, so the automatic subtotal and grand total rows are left out. */
+  hideSubtotals?: boolean;
+  hideGrandTotal?: boolean;
   /** Noun for the result count, e.g. ["job card", "job cards"]. */
   noun: [string, string];
   summaryCards?: (data: ReportResponse<Row>, options: Record<string, string>) => SummaryCard[];
@@ -162,6 +193,8 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   subtotalLabel?: (group: ReportGroup) => string;
   /** Text for the grand total row. */
   totalLabel?: (data: ReportResponse<Row>) => string;
+  /** Describes the selection when the period alone does not (e.g. the months of a monthly report); used in print and Excel headings. */
+  subtitle?: (data: ReportResponse) => string;
   /** Content between the summary strip and the table (charts, summary tables). */
   extra?: (data: ReportResponse<Row>) => ReactNode;
   /** Legend / footnote under the table. */

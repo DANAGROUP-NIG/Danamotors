@@ -9,6 +9,7 @@ const moneyFmt = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 2, maxi
 const numberFmt = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 2 });
 const integerFmt = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 });
 const hoursFmt = new Intl.NumberFormat("en-NG", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const percentFmt = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 1 });
 
 function toDate(value: unknown): Date | null {
   if (value === null || value === undefined || value === "") return null;
@@ -45,7 +46,7 @@ export function fmtNumber(value: unknown, format: ColumnFormat = "number"): stri
   if (typeof value !== "number" || !Number.isFinite(value)) return "";
   if (format === "integer") return integerFmt.format(value);
   if (format === "hours") return hoursFmt.format(value);
-  if (format === "percent") return `${integerFmt.format(value)}%`;
+  if (format === "percent") return `${percentFmt.format(value)}%`;
   return numberFmt.format(value);
 }
 

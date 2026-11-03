@@ -4,10 +4,12 @@ import { Fragment, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatValue, isNumericFormat, plural } from "../lib/report-format";
-import type { ReportColumn, ReportConfig, ReportGroup, ReportResponse, ReportRow } from "../types";
+import type { ReportColumn, ReportConfig, ReportGroup, ReportResponse, ReportRow, RowStyle } from "../types";
 
-export function visibleColumns<Row extends ReportRow>(config: ReportConfig<Row>, options: Record<string, string>): ReportColumn<Row>[] {
-  return config.columns.filter(
+/** The columns shown: the report's own, or the data-driven ones once the data is in. */
+export function visibleColumns<Row extends ReportRow>(config: ReportConfig<Row>, options: Record<string, string>, data?: ReportResponse<Row>): ReportColumn<Row>[] {
+  const columns = data && config.columnsFor ? config.columnsFor(data, options) : config.columns;
+  return columns.filter(
     (column) =>
       (!column.whenOption || options[column.whenOption] === "true") &&
       (!column.showWhen || column.showWhen.values.includes(options[column.showWhen.key] ?? "")),
@@ -31,6 +33,17 @@ export function totalText<Row extends ReportRow>(column: ReportColumn<Row>, tota
 function alignOf(column: ReportColumn<ReportRow>) {
   return column.align ?? (isNumericFormat(column.format) ? "right" : "left");
 }
+
+/** Screen classes for matrix rows (print and Excel make them bold). */
+export const ROW_STYLE: Record<RowStyle, string> = {
+  heading: "bg-slate-50/70 font-semibold text-slate-800",
+  subtotal: "bg-slate-50 font-semibold text-slate-900",
+  total: "bg-muted font-bold text-slate-900",
+  memo: "italic text-muted-foreground",
+  note: "italic text-muted-foreground",
+};
+
+export const INDENT = ["", "pl-7", "pl-12"] as const;
 
 const TONE: Record<string, string> = {
   red: "bg-red-50/60 shadow-[inset_3px_0_0_#ef4444]",
@@ -56,9 +69,9 @@ interface ReportTableProps<Row extends ReportRow> {
 
 export function ReportTable<Row extends ReportRow>({ config, data, options }: ReportTableProps<Row>) {
   const [sort, setSort] = useState<Sort>(null);
-  const columns = visibleColumns(config, options);
+  const columns = visibleColumns(config, options, data);
   const mode = options.mode ?? "both";
-  const showSubtotals = mode !== "detail" && data.groups.length > 0;
+  const showSubtotals = !config.hideSubtotals && mode !== "detail" && data.groups.length > 0;
   const showRows = mode !== "summary";
 
   const rowsByGroup = useMemo(() => {
@@ -156,12 +169,14 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
                 {showRows &&
                   rows.map((row, index) => {
                     const tone = config.rowTone?.(row);
+                    const style = config.rowStyle?.(row);
+                    const indent = INDENT[Math.min(config.rowIndent?.(row) ?? 0, 2)];
                     const detail = config.rowDetail?.(row, options);
                     return (
                       // Several rows can share a job (one per labour line or technician), so the index is part of the key.
                       <Fragment key={`${group.key}-${String(row.id ?? row.lineId ?? row.jobId ?? "")}-${index}`}>
-                        <tr className={cn("border-b border-border hover:bg-muted/30", tone && TONE[tone])}>
-                          {columns.map((column) => {
+                        <tr className={cn("border-b border-border hover:bg-muted/30", tone && TONE[tone], style && ROW_STYLE[style])}>
+                          {columns.map((column, columnIndex) => {
                             const align = alignOf(column as ReportColumn<ReportRow>);
                             return (
                               <td
@@ -170,6 +185,7 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
                                   "px-3 py-2.5 align-top",
                                   align === "right" && "whitespace-nowrap text-right tabular-nums",
                                   align === "center" && "text-center",
+                                  columnIndex === 0 && indent,
                                   column.className,
                                 )}
                               >
@@ -195,11 +211,13 @@ export function ReportTable<Row extends ReportRow>({ config, data, options }: Re
             );
           })}
         </tbody>
-        <tfoot>
-          <tr className="bg-primary font-semibold text-primary-foreground">
-            {totalCells(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`, "")}
-          </tr>
-        </tfoot>
+        {!config.hideGrandTotal && (
+          <tfoot>
+            <tr className="bg-primary font-semibold text-primary-foreground">
+              {totalCells(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`, "")}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
