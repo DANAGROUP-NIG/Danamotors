@@ -14,7 +14,10 @@ export type FilterKey =
   | 'technician'
   | 'complaint'
   | 'labourOperation'
-  | 'campaign';
+  | 'campaign'
+  | 'engineer'
+  | 'serviceGroup'
+  | 'freeService';
 
 export type DimensionFilters = Partial<Record<FilterKey, string[]>>;
 
@@ -35,6 +38,8 @@ export interface ReportScope {
   /** The single branch being reported on, or null for all branches. */
   branch: ReportBranch | null;
   timeZone: string;
+  /** The user's permissions, for reports whose sections follow other reports' permissions (MIS S15). */
+  permissions: string[];
 }
 
 export type ReportRow = Record<string, unknown>;
@@ -55,7 +60,15 @@ export interface ReportBody<Row extends ReportRow = ReportRow> {
   summary?: Record<string, number | string | null>;
   /** Labelled counts for summary chips (e.g. jobs by service type). */
   breakdown?: BreakdownItem[];
+  /** Columns that depend on the data (months, service types, branches) for matrix reports. */
+  columns?: ReportColumnDef[];
   truncated?: boolean;
+}
+
+export interface ReportColumnDef {
+  key: string;
+  label: string;
+  format?: 'text' | 'money' | 'integer' | 'number' | 'hours' | 'percent';
 }
 
 export interface BreakdownItem {
@@ -99,6 +112,8 @@ export interface ReportDefinition<Q extends BaseReportQuery = BaseReportQuery> {
   summary: string;
   /** 'range' takes from/to, 'date' takes a single date, 'none' has no period (e.g. FPC vehicle lists). */
   period: 'range' | 'date' | 'none';
+  /** Longest the report may run (ms), for reports that call other report services; default 35s. */
+  timeoutMs?: number;
   /** Zod schema for req.query. */
   query: z.ZodType<Q, z.ZodTypeDef, unknown>;
   filterKeys: FilterKey[];

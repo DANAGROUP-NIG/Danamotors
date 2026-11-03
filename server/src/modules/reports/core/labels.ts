@@ -4,17 +4,20 @@ export const FILTER_LABELS: Record<FilterKey, string> = {
   model: 'Model',
   variant: 'Variant',
   serviceType: 'Service type',
-  team: 'Service group',
+  team: 'Workshop team',
   receivedBy: 'Received by',
   deliveredBy: 'Delivered by',
   technician: 'Technician',
   complaint: 'Customer request',
   labourOperation: 'Labour operation',
   campaign: 'Campaign / FPC bulletin',
+  engineer: 'Engineer',
+  serviceGroup: 'Service group',
+  freeService: 'Free service',
 };
 
-const MASTER_KEYS: FilterKey[] = ['model', 'variant', 'serviceType', 'team', 'complaint'];
-const USER_KEYS: FilterKey[] = ['receivedBy', 'deliveredBy', 'technician'];
+const MASTER_KEYS: FilterKey[] = ['model', 'variant', 'serviceType', 'team', 'complaint', 'serviceGroup', 'freeService'];
+const USER_KEYS: FilterKey[] = ['receivedBy', 'deliveredBy', 'technician', 'engineer'];
 
 /** Names for the filters a report applied, for the screen and print header. Empty values = All. */
 export async function resolveFilterLabels(

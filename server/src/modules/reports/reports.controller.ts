@@ -10,7 +10,7 @@ import type { ReportDb, ReportDefinition, ReportMode, ReportResponse } from './c
 import { listLookup, type LookupSource } from './lookups';
 import { getReportSettings, saveReportSettings } from './settings';
 
-const STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '30s'";
+const DEFAULT_TIMEOUT_MS = 35_000;
 
 /** Runs a report inside an existing transaction (also used by the integration tests). */
 export async function executeReport(
@@ -30,6 +30,7 @@ export async function executeReport(
     totals: body.totals,
     summary: body.summary,
     breakdown: body.breakdown,
+    columns: body.columns,
     meta: {
       rowCount: body.rows.length,
       truncated: Boolean(body.truncated),
@@ -47,10 +48,11 @@ export function runReport(definition: ReportDefinition, user: JWTPayload, query:
   return prisma.$transaction(
     async (tx) => {
       await tx.$executeRawUnsafe('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
-      await tx.$executeRawUnsafe(STATEMENT_TIMEOUT);
+      const timeout = definition.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '${Math.round((timeout - 5_000) / 1000)}s'`);
       return executeReport(tx, definition, user, query);
     },
-    { maxWait: 5_000, timeout: 35_000 },
+    { maxWait: 5_000, timeout: definition.timeoutMs ?? DEFAULT_TIMEOUT_MS },
   );
 }
 
