@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { LEGACY_SERVICE_TYPES, rioServiceTypeCharge } from '../../src/modules/workshop/service-type.defaults';
+import { defaultServiceCategory, freeServiceDueLimits, LEGACY_SERVICE_TYPES, rioServiceTypeCharge } from '../../src/modules/workshop/service-type.defaults';
 
 export async function seedServiceTypes(db: Prisma.TransactionClient, modelId: string) {
   await db.workshopMaster.updateMany({
@@ -10,9 +10,12 @@ export async function seedServiceTypes(db: Prisma.TransactionClient, modelId: st
   await db.workshopMaster.createMany({
     data: LEGACY_SERVICE_TYPES.map(([code, description, chargedTo, freeService]) => ({
       id: randomUUID(), kind: 'SERVICE_TYPE', code, description, chargedTo, freeService,
-      preDelivery: code === 'PD' || code === 'BD',
+      preDelivery: code === 'PD' || code === 'BD', category: defaultServiceCategory(code, freeService),
     })), skipDuplicates: true,
   });
+  // Service types seeded before #97 have no MIS category.
+  for (const [code, , , freeService] of LEGACY_SERVICE_TYPES)
+    await db.workshopMaster.updateMany({ where: { kind: 'SERVICE_TYPE', code, category: null }, data: { category: defaultServiceCategory(code, freeService) } });
   await db.workshopMaster.updateMany({
     where: { kind: 'SERVICE_TYPE', code: 'RR', description: 'Running repair' },
     data: { description: 'RUNNING REPAIR', chargedTo: 'CUSTOMER' },
@@ -27,7 +30,11 @@ export async function seedServiceTypes(db: Prisma.TransactionClient, modelId: st
   });
   await db.serviceTypeModelSetting.createMany({
     data: serviceTypes.map(serviceType => ({
-      serviceTypeId: serviceType.id, modelId, ...rioServiceTypeCharge(serviceType.code),
+      serviceTypeId: serviceType.id, modelId, ...rioServiceTypeCharge(serviceType.code), ...freeServiceDueLimits(serviceType.code),
     })), skipDuplicates: true,
   });
+  for (const serviceType of serviceTypes) {
+    const limits = freeServiceDueLimits(serviceType.code);
+    if (limits) await db.serviceTypeModelSetting.updateMany({ where: { serviceTypeId: serviceType.id, modelId, daysLimit: null, mileageLimit: null }, data: limits });
+  }
 }

@@ -22,6 +22,20 @@ export function isOptionVisible(option: OptionDef, options: Record<string, strin
 }
 
 const RANGE_VALUE = { number: /^\d{1,9}$/, date: /^\d{4}-\d{2}-\d{2}$/ } as const;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const LOOKUP_VALUE = /^[A-Za-z0-9_-]{1,60}$/;
+
+/** URL / API keys an option writes (a range or a day-month writes two). */
+export function optionKeys(option: OptionDef): string[] {
+  if (option.kind === "range") return [option.fromKey, option.toKey];
+  if (option.kind === "dayMonth") return [option.dayKey, option.monthKey];
+  return [option.key];
+}
+
+function thisMonth(yearStart: boolean): string {
+  const today = presetRange("today").from;
+  return yearStart ? `${today.slice(0, 4)}-01` : today.slice(0, 7);
+}
 
 export function defaultParams(config: ReportConfig): ReportParams {
   const { from, to } = presetRange(config.period.defaultPreset);
@@ -30,7 +44,12 @@ export function defaultParams(config: ReportConfig): ReportParams {
     if (option.kind === "range") {
       options[option.fromKey] = "";
       options[option.toKey] = "";
-    } else options[option.key] = option.kind === "checkbox" ? String(Boolean(option.default)) : String(option.default);
+    } else if (option.kind === "dayMonth") {
+      options[option.dayKey] = String(option.defaultDay);
+      options[option.monthKey] = String(option.defaultMonth);
+    } else if (option.kind === "month") options[option.key] = thisMonth(option.default === "yearStart");
+    else if (option.kind === "text" || option.kind === "lookup" || option.kind === "multi") options[option.key] = "";
+    else options[option.key] = option.kind === "checkbox" ? String(Boolean(option.default)) : String(option.default);
   }
   if (config.hasMode) options.mode = config.defaultMode ?? "both";
   if (config.period.basis) options[config.period.basis.key] = config.period.basis.default;
@@ -64,9 +83,25 @@ export function parseParams(config: ReportConfig, search: URLSearchParams): Repo
       }
       continue;
     }
+    if (option.kind === "dayMonth") {
+      const day = Number(search.get(option.dayKey));
+      const month = Number(search.get(option.monthKey));
+      if (Number.isInteger(day) && day >= 1 && day <= 31) options[option.dayKey] = String(day);
+      if (Number.isInteger(month) && month >= 1 && month <= 12) options[option.monthKey] = String(month);
+      continue;
+    }
     const raw = search.get(option.key);
     if (raw === null) continue;
-    if (option.kind === "checkbox") options[option.key] = String(raw === "true");
+    if (option.kind === "month") {
+      if (MONTH.test(raw)) options[option.key] = raw;
+    } else if (option.kind === "text") options[option.key] = raw.trim().slice(0, option.maxLength);
+    else if (option.kind === "multi") {
+      const allowed = new Set(option.choices.map((choice) => choice.value));
+      options[option.key] = raw.split(",").filter((value) => allowed.has(value)).join(",");
+    }
+    else if (option.kind === "lookup") {
+      if (LOOKUP_VALUE.test(raw)) options[option.key] = raw;
+    } else if (option.kind === "checkbox") options[option.key] = String(raw === "true");
     else if (option.kind === "number") {
       const n = Number(raw);
       if (Number.isFinite(n) && n >= option.min && n <= option.max) options[option.key] = String(n);
@@ -105,7 +140,7 @@ export function toSearch(config: ReportConfig, params: ReportParams): string {
 /** Query sent to GET /reports/:slug — display-only options stay on the client. */
 export function toApiQuery(config: ReportConfig, params: ReportParams): Record<string, string> {
   const hidden = (config.options ?? []).filter((option) => option.local || !isOptionVisible(option, params.options));
-  const local = new Set(hidden.flatMap((option) => (option.kind === "range" ? [option.fromKey, option.toKey] : [option.key])));
+  const local = new Set(hidden.flatMap(optionKeys));
   const query: Record<string, string> = {};
   if (config.period.kind === "range") {
     query.from = params.from;
@@ -127,6 +162,7 @@ export function validateParams(config: ReportConfig, params: ReportParams): stri
     if (span + 1 > MAX_RANGE_DAYS) return `The period cannot be longer than ${MAX_RANGE_DAYS} days.`;
   }
   for (const option of config.options ?? []) {
+    if (option.kind === "month" && isOptionVisible(option, params.options) && !MONTH.test(params.options[option.key] ?? "")) return `${option.label}: choose a month.`;
     if (option.kind !== "range") continue;
     const from = params.options[option.fromKey];
     const to = params.options[option.toKey];

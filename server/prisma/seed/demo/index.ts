@@ -1,6 +1,6 @@
 /**
  * Demo data seed: a small, repeatable set of dummy job cards, estimates, bills, part issues,
- * warranty cases (including TEST- cases), campaigns and an FPC bulletin for the Dana Motors Demo account.
+ * warranty cases (including TEST- cases), campaigns, an FPC bulletin and MIS report history for the Dana Motors Demo account.
  *
  *   npm run prisma:seed:demo                      load the demo data (safe to run again)
  *   npm run prisma:seed:demo -- --reset-test         put the TEST- warranty cases back to OPEN
@@ -23,6 +23,7 @@ import { ensureParties } from "./parties";
 import { JobResult, seedJob } from "./jobs";
 import { seedCampaign } from "./campaigns";
 import { seedFpc } from "./fpc";
+import { seedMis } from "./mis";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS } from "./fixtures";
@@ -84,6 +85,9 @@ async function main() {
 
   // FPC bulletin (#98): VIN range, letter and call, and job cards for every FPC list.
   await seedFpc(ctx, ref, parties, done);
+
+  // Service MIS reports (#97): finished job history across every service category.
+  await seedMis(ctx, ref);
 
   await printSummary(ctx);
   console.log(`\n${DEMO_TAG}: done. Running it again changes nothing; use --reset-test to reopen the TEST- warranty cases.`);

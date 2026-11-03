@@ -46,6 +46,7 @@ export const J = {
   teamId: Prisma.raw('j."teamId"'),
   serviceAdvisorId: Prisma.raw('j."serviceAdvisorId"'),
   deliveryAdvisorId: Prisma.raw('j."deliveryAdvisorId"'),
+  engineerId: Prisma.raw('j."engineerId"'),
   modelId: Prisma.raw('mdl."id"'),
   variantId: Prisma.raw('v."catalogueId"'),
 };
@@ -53,7 +54,7 @@ export const J = {
 /**
  * Joins from job card j to the dimensions every workshop report shows. Aliases: b branch,
  * v vehicle, var/mdl variant and model masters, c customer, st service type, tm team,
- * sa service advisor (received by), da delivery advisor (delivered by).
+ * sa service advisor (received by), da delivery advisor (delivered by), en engineer.
  */
 export const jobJoinsSql = Prisma.sql`
   JOIN "Branch" b ON b."id" = j."branchId"
@@ -64,7 +65,8 @@ export const jobJoinsSql = Prisma.sql`
   LEFT JOIN "WorkshopMaster" st ON st."id" = j."serviceTypeId"
   LEFT JOIN "WorkshopMaster" tm ON tm."id" = j."teamId"
   LEFT JOIN "User" sa ON sa."id" = j."serviceAdvisorId"
-  LEFT JOIN "User" da ON da."id" = j."deliveryAdvisorId"`;
+  LEFT JOIN "User" da ON da."id" = j."deliveryAdvisorId"
+  LEFT JOIN "User" en ON en."id" = j."engineerId"`;
 
 export const jobFromSql = Prisma.sql`
   FROM "JobCard" j
@@ -91,15 +93,22 @@ export const jobColumnsSql = Prisma.sql`
   NULLIF(TRIM(CONCAT(sa."firstName", ' ', sa."lastName")), '') AS "receivedBy",
   NULLIF(TRIM(CONCAT(da."firstName", ' ', da."lastName")), '') AS "deliveredBy",
   tm."description" AS "team",
+  j."engineerId" AS "engineerId",
+  NULLIF(TRIM(CONCAT(en."firstName", ' ', en."lastName")), '') AS "engineer",
   ${canonicalStatusSql(J.status)} AS "status",
   j."promisedAt" AS "promisedAt",
   j."readyAt" AS "readyAt",
   j."billedAt" AS "billedAt",
   j."deliveredAt" AS "deliveredAt"`;
 
+/** Legacy job type: regular jobs, PDI jobs (pre-delivery service type), or both. */
+export type JobType = 'REGULAR' | 'PDI' | 'BOTH';
+
 export interface JobFilterOptions {
   /** PDI jobs appear only in the PDI bill register. */
   includePdi?: boolean;
+  /** Overrides includePdi: the report's job type choice. */
+  jobType?: JobType;
   includeCancelled?: boolean;
 }
 
@@ -112,6 +121,11 @@ export function jobFilterSql(scope: ReportScope, filters: DimensionFilters, opti
   const complaint = filters.complaint?.length
     ? Prisma.sql` AND EXISTS (SELECT 1 FROM "JobComplaint" fc WHERE fc."jobCardId" = j."id" AND fc."complaintCodeId" IN (${Prisma.join(filters.complaint)}))`
     : Prisma.empty;
+  const serviceGroup = filters.serviceGroup?.length
+    ? Prisma.sql` AND EXISTS (
+        SELECT 1 FROM "JobCardLabour" fg JOIN "LabourItem" fgi ON fgi."id" = fg."labourItemId"
+        WHERE fg."jobCardId" = j."id" AND fgi."serviceGroupId" IN (${Prisma.join(filters.serviceGroup)}))`
+    : Prisma.empty;
   const labourOperation = filters.labourOperation?.length
     ? Prisma.sql` AND EXISTS (SELECT 1 FROM "JobCardLabour" fo WHERE fo."jobCardId" = j."id" AND fo."labourItemId" IN (${Prisma.join(filters.labourOperation)}))`
     : Prisma.empty;
@@ -122,9 +136,17 @@ export function jobFilterSql(scope: ReportScope, filters: DimensionFilters, opti
   )}${inFilter(J.teamId, filters.team)}${inFilter(J.serviceAdvisorId, filters.receivedBy)}${inFilter(
     J.deliveryAdvisorId,
     filters.deliveredBy,
-  )}${technician}${complaint}${labourOperation}${
+  )}${inFilter(J.engineerId, filters.engineer)}${technician}${complaint}${labourOperation}${serviceGroup}${
     options.includeCancelled ? Prisma.empty : Prisma.sql` AND ${canonicalStatusSql(J.status)} <> 'CANCELLED'`
-  }${options.includePdi ? Prisma.empty : notPdiSql}`;
+  }${jobTypeSql(options.jobType ?? (options.includePdi ? 'BOTH' : 'REGULAR'))}`;
+}
+
+/** SQL true for a PDI job (service type st): pre-delivery, or the legacy PDI category. */
+export const isPdiSql = Prisma.sql`(COALESCE(st."preDelivery", false) OR UPPER(COALESCE(st."category", '')) = 'PDI')`;
+
+export function jobTypeSql(jobType: JobType): Prisma.Sql {
+  if (jobType === 'BOTH') return Prisma.empty;
+  return jobType === 'PDI' ? Prisma.sql` AND ${isPdiSql}` : notPdiSql;
 }
 
 /** Excludes PDI jobs: a pre-delivery service type, or the legacy PDI category. */

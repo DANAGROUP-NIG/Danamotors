@@ -70,8 +70,8 @@ print (80 column on A4 portrait, 132 column on A4 landscape) and Excel export. T
 above keep their own screens; both are served from `/reports/[report]`.
 
 PR #81 was dropped from `main` by merge `70b7699`. Only the framework was restored. The 14 workshop
-daily reports and their schema (bookings, pre-job estimates, labour technicians, mileage bands) come
-back with #75 / #97.
+daily reports and their schema (bookings, pre-job estimates, labour technicians) come back in a
+separate restore of PR #81. The `MileageBand` table is already created by the MIS migration (#97).
 
 ## Using a report
 
@@ -99,8 +99,12 @@ id or `ALL`. Unknown parameters are rejected (400). Swagger (`/api/docs`, tag *R
 generated from the registry.
 
 `GET /api/reports/lookups/<source>` feeds the filter dropdowns (`model`, `variant`, `serviceType`,
-`team`, `complaint`, `labourOperation`, `serviceAdvisor`, `technician`). Any report permission is
-enough. Inactive entries are included and flagged.
+`team`, `complaint`, `labourOperation`, `serviceAdvisor`, `technician`, `campaign`, `engineer`,
+`serviceGroup`, `partCategory`, `freeService`). Any report permission is enough. Inactive entries are
+included and flagged.
+
+Matrix reports (S1, S3, S15 below) also return `columns`: the months, service types or branches that
+the data columns stand for.
 
 ## Adding a report
 
@@ -157,3 +161,97 @@ Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) wi
 `GET /api/reports/settings` (any report permission) returns the FPC letter template and its placeholders.
 `PUT /api/reports/settings` (`report:settings`) saves it; `{ "fpcLetterTemplate": null }` resets it to the default.
 Unknown `{{placeholders}}` are rejected. TODO(confirm): match the template to a printed legacy FPC letter (#98 question 5).
+
+## Service MIS reports (#97)
+
+Legacy *Service → MIS Reports*. The hub lists them under **Service MIS**. All 15 are framework reports:
+`/reports/<slug>`, `GET /api/reports/<slug>`, permission `report:<slug>`. Plan and decisions:
+`doc/plans/mis-reports-plan.md`; manual test steps: `doc/mis-reports-testing-guide.md`.
+
+### Shared rules
+
+- **Jobs and money (S1, S2, S3, S5, S15)** come from one aggregation (`server/src/modules/reports/mis/mis.data.ts`),
+  so the reports agree. A job's value covers **every charge type** (customer, warranty, goodwill, free): labour lines,
+  requisitioned parts net of returns, parts issued directly net of returns that were not rejected (at the retail rate,
+  as the job bill prices them), and the service charge. Job bills hold only the customer-paid lines, so bills alone
+  would show no labour or parts on free services. **Discounts** come from the job's active bill. The parts discount is
+  shared between spares and oil in proportion.
+- **Oil** = parts of type `O`, **accessories** = type `A` (as in the parts reports). Spares include accessories.
+- **Service category** is the `category` of the job's service type: `FREE`, `PAID`, `RUNNING_REPAIR`, `ACCIDENTAL`,
+  `PDI` or `OTHER` (masters, see `doc/workshop.md`). **Body** figures are labour in a service group flagged *Body
+  repair*, not a category.
+- **Job type:** regular or PDI (a pre-delivery service type). Reports with a job type choice default as listed below.
+- **Engineer** is `JobCard.engineerId` (a user with the Engineer role), set on job opening and editing.
+- Cancelled jobs and bills are excluded.
+
+### The reports
+
+| # | Report (slug) | Width | Period | Filters and options |
+|---|---|---|---|---|
+| S1 | Monthly information report (`mis-monthly`) | 132 | from month – to month (≤ 12), or all months of the previous year | from day – to day of each month; annexure by service type |
+| S2 | Business product mix (`business-product-mix`) | 132 | delivered | model, variant, service type, service group, engineer; job type (default both); group by service type or model (model adds vehicles per mileage band) |
+| S3 | Analysis of jobs (`job-analysis`) | 132 | delivered | model-wise or variant-wise |
+| S4 | Group-wise productivity (`group-productivity`) | 80 | as on date | model, variant, service group |
+| S5 | Engineer performance (`engineer-performance`) | 132 | billed | std filters; job type (default regular); jobs with summary, or only summary |
+| S6 | Engineer-wise part consumption (`engineer-part-consumption`) | 80 | issued | engineer; spares / oil / both; detail, summary or both |
+| S7 | Requisition return register (`requisition-return-register`) | 132 | returned | based on job / requisition / return; job type (default both); requisition types; billed / unbilled; purchase source, part category, part number |
+| S8 | List of major problems (`major-problems`) | 132 | job opened | std filters; job type; major or all defects; from / to defect code; defect-wise or job-wise |
+| S9 | List of new customers (`new-customers`) | 80 | first job | model |
+| S10 | List of regular customers (`regular-customers`) | 80 | visits from | from / to registration; mileage difference; minimum visits; print address |
+| S11 | Birthday / anniversary (`birthday-anniversary`) | 80 | — | from / to day and month; birthday, anniversary or both; date-wise or name-wise; print address |
+| S12 | Vehicle resale history (`vehicle-resale`) | 80 | resale | one vehicle (registration or VIN) or all |
+| S13 | Vehicles that skipped free service (`skipped-free-service`) | 80 | sold | model, variant, free services; order by model, variant or sale date; detail or summary |
+| S14 | Vehicle list by model and variant (`vehicle-list`) | 80 | sold | model, variant; include stock vehicles; order; print customer address |
+| S15 | Management information report (`management-information`) | 80 | period | branch or all branches; stock / profit at dealer rate |
+
+"Std filters" = model, variant, service type, service group, engineer.
+
+### Report rules
+
+- **S1** counts jobs in the month they were **delivered**, only on days *from day*–*to day* of each month (clamped to
+  the month's length). Labour, spares and oil show the categories, then gross, less discount, net, PDI and total.
+  Running jobs = running repair + other services. Body repair labour is a memo line. The annexure adds each
+  category's service types, which add up to the category.
+- **S2** row % are shares of the row's category (they add up to 100 in each category); category subtotals are shares
+  of the whole. Labour is net of discount; spares and oil are before discount. Per vehicle = amount ÷ vehicles. The
+  model option gives the same totals.
+- **S3** only shows service types with a job in the period. The second grid is each row as % of its total.
+- **S4** counts labour lines this month and this calendar year up to the date: billed jobs on the bill date, others on
+  the job date. Hours = standard hours where recorded, otherwise charged hours. Labour is net of the bill's labour
+  discount, shared over the job's lines.
+- **S5** total = labour net + spares and oil net + service charge. Late = delivered after the promised time.
+- **S6** amount = (issued − returned) × rate, by the job's engineer (the requisition's engineer when the job has none).
+  Charge types: non-warranty (customer), warranty, FOC (free), goodwill.
+- **S7** lists completed (or approved) returns. *Billed* = the job has an active bill when the report runs.
+- **S8** groups by complaint code with its service group (the code's VEHICLE_GROUP parent); free-text complaints go
+  under *Uncoded (free text)*. *Major defects* keeps codes flagged major and leaves out uncoded ones.
+- **S9** a new customer's first ever job (any branch, not PDI, not cancelled) is in the period; the branch is that job's.
+- **S10** a visit counts when its mileage is at least the mileage difference above the last counted visit.
+- **S11** needs no year; a range such as 01 Dec – 31 Jan wraps. The cards show how many customers have no date.
+- **S12** a resale is every ownership record after the vehicle's first, dated by its purchase date. *Recorded by* is
+  kept for owner changes recorded after #97.
+- **S13** a free service (service type in the `FREE` category) is skipped when it was not done and its due limit has
+  passed by today: `daysLimit` from the sale date or `mileageLimit` km (the service charge per model screen). With no
+  limit, it is skipped once a later free service has been done.
+- **S14** stock vehicles have no sale date or no owner; those without an owner appear in every branch's list.
+- **S15** reads each section from the report that owns it: workshop (A) from the MIS job aggregation, counter sale (B)
+  from the counter sales summary, closing stock (C) and parts profit (D) from the parts reports (FIFO, or dealer rate
+  if ticked), total billing (E) from job bills and counter sales, transfers (F, G) from the STN register, purchases from
+  vendor MRNs, and outstanding from the age-wise party outstanding as on the end date in the legacy eight bands.
+  C and D need `stock:read`, outstanding needs `report:party-outstanding-age`; a section the user may not see is left
+  out. *All branches* needs `inventory:cross-branch` (or `branch:all`) and gives one column per branch plus a total.
+  A6 (PSF satisfaction) shows *not recorded* until a follow-up module exists.
+
+### Legacy screens merged or left out
+
+- *Model Wise Business Product Mix* is S2's **model** option.
+- *Downloading Vehicle History* is the vehicle history card search (#79 M10).
+- *Upload Vehicle History*, *Management Data Uploading / Downloading* are left out: every branch is in one database.
+- *Customer-wise Handling / Discount* is left out: the percentages were set up but never applied (issue #97, open
+  question 5).
+
+### Default grants
+
+WorkshopManager and ServiceManager: all but S15. ServiceAdviser: S9–S14. StoreOfficer and GeneralStoreManager: S6 and
+S7. Admin and SuperAdmin: all. TODO(confirm): #97 names WorkshopManager; ServiceManager gets the same set.
+

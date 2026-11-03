@@ -18,13 +18,13 @@ export function canChooseBranch(user: Pick<JWTPayload, 'role' | 'permissions'>):
 export async function resolveReportScope(db: ReportDb, user: JWTPayload, requested?: string): Promise<ReportScope> {
   if (canChooseBranch(user)) {
     const target = requested ?? user.branchId ?? 'ALL';
-    if (target === 'ALL') return { branchIds: null, branch: null, timeZone: REPORT_TZ };
-    return { branchIds: [target], branch: await loadBranch(db, target), timeZone: REPORT_TZ };
+    if (target === 'ALL') return { branchIds: null, branch: null, timeZone: REPORT_TZ, permissions: user.permissions };
+    return { branchIds: [target], branch: await loadBranch(db, target), timeZone: REPORT_TZ, permissions: user.permissions };
   }
 
   if (!user.branchId) throw new ForbiddenError('Your account must be assigned to a branch to run reports');
   if (requested && requested !== user.branchId) throw new ForbiddenError('You can only run reports for your own branch');
-  return { branchIds: [user.branchId], branch: await loadBranch(db, user.branchId), timeZone: REPORT_TZ };
+  return { branchIds: [user.branchId], branch: await loadBranch(db, user.branchId), timeZone: REPORT_TZ, permissions: user.permissions };
 }
 
 async function loadBranch(db: ReportDb, id: string): Promise<ReportBranch> {

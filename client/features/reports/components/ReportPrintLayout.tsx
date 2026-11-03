@@ -23,8 +23,9 @@ export function periodLabel(period: ReportConfig["period"], options: Record<stri
   return period.kind === "date" ? period.dateLabel ?? period.label : period.label;
 }
 
-export function periodText(config: Pick<ReportConfig, "period">, data: Pick<ReportResponse, "filters">): string {
+export function periodText(config: Pick<ReportConfig, "period" | "subtitle">, data: ReportResponse): string {
   const query = data.filters.query as Record<string, string>;
+  if (config.subtitle) return config.subtitle(data);
   if (config.period.kind === "none") return "";
   const label = periodLabel(config.period, query);
   if (config.period.kind === "date") return `${label} ${fmtDate(`${query.date}T12:00:00Z`)}`;
@@ -47,10 +48,10 @@ interface ReportPrintLayoutProps<Row extends ReportRow> {
  * company and branch header, filters applied, page numbers and totals.
  */
 export function ReportPrintLayout<Row extends ReportRow>({ config, data, options, printedBy }: ReportPrintLayoutProps<Row>) {
-  const columns = visibleColumns(config, options).filter((column) => !column.printHidden);
+  const columns = visibleColumns(config, options, data).filter((column) => !column.printHidden);
   const mode = options.mode ?? "both";
   const showRows = mode !== "summary";
-  const showSubtotals = mode !== "detail" && data.groups.length > 0;
+  const showSubtotals = !config.hideSubtotals && mode !== "detail" && data.groups.length > 0;
   const groups: ReportGroup[] = data.groups.length ? data.groups : [{ key: "", label: "", count: data.rows.length, totals: data.totals }];
   const printed = `Printed ${fmtDateTime(new Date())} by ${printedBy}`;
   const landscape = config.width === 132;
@@ -84,7 +85,7 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
         </div>
         <div className="text-center">
           <p className="text-base font-bold uppercase">{config.title}</p>
-          {config.period.kind !== "none" && <p className="text-[9pt] font-semibold">{periodText(config, data)}</p>}
+          {(config.period.kind !== "none" || config.subtitle) && <p className="text-[9pt] font-semibold">{periodText(config, data)}</p>}
           {branch !== "ALL" && <p className="text-[9pt]">{branch.name}</p>}
         </div>
         <div className="w-24" aria-hidden />
@@ -112,20 +113,24 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
                   </tr>
                 )}
                 {showRows &&
-                  rows.map((row, index) => (
-                    <tr key={index} className="break-inside-avoid border-b border-slate-300">
-                      {columns.map((column) => (
-                        <td key={column.key} className={cn("px-1 py-0.5 align-top", isNumericFormat(column.format) && "whitespace-nowrap text-right")}>
-                          {cellText(column, row)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  rows.map((row, index) => {
+                    const style = config.rowStyle?.(row);
+                    const indent = config.rowIndent?.(row) ?? 0;
+                    return (
+                      <tr key={index} className={cn("break-inside-avoid border-b border-slate-300", (style === "subtotal" || style === "total" || style === "heading") && "font-bold", style === "total" && "border-t border-black", (style === "memo" || style === "note") && "italic")}>
+                        {columns.map((column, columnIndex) => (
+                          <td key={column.key} className={cn("px-1 py-0.5 align-top", isNumericFormat(column.format) && "whitespace-nowrap text-right")} style={columnIndex === 0 && indent ? { paddingLeft: `${indent * 1.2}em` } : undefined}>
+                            {cellText(column, row)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 {showSubtotals && group.label && totalRow(group.totals, config.subtotalLabel?.(group) ?? `Total ${group.label} · ${plural(group.count, config.noun)}`, "border-t border-black")}
               </Fragment>
             );
           })}
-          {totalRow(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`, "border-y-[3px] border-double border-black")}
+          {!config.hideGrandTotal && totalRow(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`, "border-y-[3px] border-double border-black")}
         </tbody>
       </table>
       {config.footnote && <p className="mt-2 text-[8pt] text-slate-600">{config.footnote}</p>}

@@ -11,7 +11,7 @@ import type { ReportDb, ReportScope } from './types';
 const BRANCH = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const MODEL = '33333333-3333-4333-8333-333333333333';
-const scope: ReportScope = { branchIds: [BRANCH], branch: null, timeZone: 'Africa/Lagos' };
+const scope: ReportScope = { branchIds: [BRANCH], branch: null, timeZone: 'Africa/Lagos', permissions: [] };
 
 describe('report dates (Africa/Lagos, UTC+1)', () => {
   it('starts a local day at 23:00 UTC the previous evening', () => {
