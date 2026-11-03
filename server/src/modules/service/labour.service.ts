@@ -10,20 +10,45 @@ import { labourSlipPricing } from './labour-slip.logic';
 export const LABOUR_FLAGS = ['majorLabour', 'insured', 'approvalRequired', 'externalLabour', 'underAmc', 'followUpAnalysis', 'amountEditable', 'includeInTopN'] as const;
 type LabourFlags = Partial<Record<typeof LABOUR_FLAGS[number], boolean>>;
 
+// The MIS service group of a labour item is a VEHICLE_GROUP master (legacy vehiclegroup).
+async function requireServiceGroup(id: string) {
+  const group = await prisma.workshopMaster.findFirst({ where: { id, kind: 'VEHICLE_GROUP', active: true }, select: { id: true } });
+  if (!group) throw new BadRequestError('Select an active service group');
+}
+
+// The catalogue screen picks the group by its code (kept in the legacy `group` text); the
+// service group follows it, or is cleared when the text names no group.
+async function serviceGroupFor(input: { group?: string; serviceGroupId?: string | null }): Promise<string | null | undefined> {
+  if (input.serviceGroupId !== undefined) {
+    if (input.serviceGroupId) await requireServiceGroup(input.serviceGroupId);
+    return input.serviceGroupId;
+  }
+  if (input.group === undefined) return undefined;
+  const text = input.group.trim();
+  if (!text) return null;
+  const group = await prisma.workshopMaster.findFirst({
+    where: { kind: 'VEHICLE_GROUP', OR: [{ code: { equals: text, mode: 'insensitive' } }, { description: { equals: text, mode: 'insensitive' } }] },
+    select: { id: true },
+  });
+  return group?.id ?? null;
+}
+
 export class LabourService {
   async listItems(search?: string, includeInactive = false) {
     return prisma.labourItem.findMany({ where: { ...(includeInactive ? {} : { active: true }), ...(search ? { OR: [{ code: { contains: search, mode: 'insensitive' as const } }, { description: { contains: search, mode: 'insensitive' as const } }] } : {}) }, orderBy: [{ code: 'asc' }], take: 100 });
   }
 
-  async createItem(input: { code: string; description: string; vehicleSystem?: string; group?: string; defaultHours: number; rate: number } & LabourFlags) {
+  async createItem(input: { code: string; description: string; vehicleSystem?: string; group?: string; serviceGroupId?: string | null; defaultHours: number; rate: number } & LabourFlags) {
+    const serviceGroupId = await serviceGroupFor(input);
     return prisma.labourItem.create({
-      data: { ...input, code: input.code.trim(), description: input.description.trim() },
+      data: { ...input, serviceGroupId, code: input.code.trim(), description: input.description.trim() },
     });
   }
 
-  async updateItem(id: string, input: { code?: string; description?: string; vehicleSystem?: string; group?: string; defaultHours?: number; rate?: number; active?: boolean } & LabourFlags) {
+  async updateItem(id: string, input: { code?: string; description?: string; vehicleSystem?: string; group?: string; serviceGroupId?: string | null; defaultHours?: number; rate?: number; active?: boolean } & LabourFlags) {
     const existing = await prisma.labourItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundError('Labour item not found');
+    const serviceGroupId = await serviceGroupFor(input);
     // Legacy inactivedate: when the labour was switched off.
     const inactiveDate = input.active === undefined || input.active === existing.active ? undefined : input.active ? null : new Date();
     return prisma.labourItem.update({
@@ -35,6 +60,7 @@ export class LabourService {
         description: input.description?.trim(),
         vehicleSystem: input.vehicleSystem,
         group: input.group,
+        serviceGroupId,
       },
     });
   }
