@@ -481,9 +481,12 @@ export class JobCardWorkflowService {
           data.description !== undefined ||
           data.observations !== undefined ||
           data.workDone !== undefined ||
-          data.serviceCharge !== undefined)
+          data.serviceCharge !== undefined ||
+          data.engineerId !== undefined)
       )
         throw new BadRequestError("Billed job cards can only be delivered");
+
+      if (data.engineerId) await requireStaff(tx, data.engineerId, current.branchId, ROLES.ENGINEER);
 
       const now = new Date();
 
@@ -492,6 +495,7 @@ export class JobCardWorkflowService {
         observations: data.observations,
         workDone: data.workDone,
         serviceCharge: data.serviceCharge,
+        engineerId: data.engineerId,
         ...(data.serviceCharge !== undefined ? { estimatedCost: [current.estimatedParts, current.estimatedOil, current.estimatedLabour, data.serviceCharge].reduce<number>((sum, value) => sum + Math.round((value ?? 0) * 100), 0) / 100 } : {}),
       };
 

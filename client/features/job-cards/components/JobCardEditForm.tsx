@@ -39,6 +39,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const [observations, setObservations] = useState(jobCard.observations ?? "");
   const [workDone, setWorkDone] = useState(jobCard.workDone ?? "");
   const [advisor, setAdvisor] = useState(jobCard.serviceAdvisorId ?? "");
+  const [engineer, setEngineer] = useState(jobCard.engineerId ?? "");
   const [reasons, setReasons] = useState<string[]>([]);
 
   const lateReasons = useQuery({
@@ -71,6 +72,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           ? {}
           : {
               ...(Number(serviceCharge) !== (jobCard.serviceCharge ?? 0) ? { serviceCharge: Number(serviceCharge) } : {}),
+              ...(engineer !== (jobCard.engineerId ?? "") ? { engineerId: engineer || null } : {}),
               observations,
               workDone,
             }),
@@ -136,6 +138,13 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       {!billed && (
         <>
           <Field label="Service charge (NGN)"><input type="number" min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
+          <WorkshopPicker
+            label="Engineer (optional)"
+            endpoint={`/service/staff?role=Engineer&branchId=${jobCard.branchId}`}
+            collection="users"
+            value={engineer}
+            onChange={setEngineer}
+          />
           <Field label="Observations">
             <textarea
               className={inputCls}
