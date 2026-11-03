@@ -10,7 +10,11 @@ export type LookupSource =
   | "labourOperation"
   | "serviceAdvisor"
   | "technician"
-  | "campaign";
+  | "campaign"
+  | "engineer"
+  | "serviceGroup"
+  | "partCategory"
+  | "freeService";
 
 export function runReportRequest(slug: string, query: Record<string, string>) {
   const search = new URLSearchParams(query).toString();

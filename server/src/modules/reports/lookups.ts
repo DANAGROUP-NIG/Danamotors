@@ -13,6 +13,10 @@ export const LOOKUP_SOURCES = [
   'serviceAdvisor',
   'technician',
   'campaign',
+  'engineer',
+  'serviceGroup',
+  'partCategory',
+  'freeService',
 ] as const;
 export type LookupSource = (typeof LOOKUP_SOURCES)[number];
 
@@ -36,11 +40,13 @@ const MASTER_KIND: Partial<Record<LookupSource, string>> = {
   serviceType: 'SERVICE_TYPE',
   team: 'TEAM',
   complaint: 'COMPLAINT',
+  serviceGroup: 'VEHICLE_GROUP',
 };
 
 const STAFF_ROLE: Partial<Record<LookupSource, string>> = {
   serviceAdvisor: ROLES.SERVICE_ADVISOR,
   technician: ROLES.TECHNICIAN,
+  engineer: ROLES.ENGINEER,
 };
 
 /**
@@ -65,6 +71,22 @@ export async function listLookup(db: ReportDb, scope: ReportScope, source: Looku
       orderBy: [{ status: 'asc' }, { code: 'asc' }],
     });
     return campaigns.map((c) => ({ id: c.id, label: `${c.code} · ${c.title}`, code: c.code, parentId: c.type, active: c.status !== 'CLOSED' }));
+  }
+
+  if (source === 'freeService') {
+    // Service types in the FREE category, in their service order (1F, 2F, 3F…).
+    const types = await db.workshopMaster.findMany({
+      where: { kind: 'SERVICE_TYPE', category: 'FREE' },
+      select: { id: true, code: true, description: true, active: true },
+      orderBy: [{ active: 'desc' }, { displayOrder: { sort: 'asc', nulls: 'last' } }, { code: 'asc' }],
+    });
+    return types.map((t) => ({ id: t.id, label: t.description, code: t.code, active: t.active }));
+  }
+
+  if (source === 'partCategory') {
+    // Price categories are keyed by their code (e.g. O for oil).
+    const categories = await db.partCategory.findMany({ select: { code: true, description: true, isActive: true }, orderBy: [{ isActive: 'desc' }, { code: 'asc' }] });
+    return categories.map((c) => ({ id: c.code, label: c.description, code: c.code, active: c.isActive }));
   }
 
   const role = STAFF_ROLE[source];

@@ -77,6 +77,8 @@ export default async function seedWorkshop(prisma: PrismaClient) {
     parentId: model.id,
   });
 
+  // Service group (VEHICLE_GROUP) for the MIS reports; the migration creates the groups.
+  const maintenance = await prisma.workshopMaster.findFirst({ where: { kind: 'VEHICLE_GROUP', description: 'MAINTENANCE' }, select: { id: true } });
   const labour = await prisma.labourItem.upsert({
     where: {
       code: 'SG',
@@ -89,6 +91,7 @@ export default async function seedWorkshop(prisma: PrismaClient) {
       description: 'Service and general check-up',
       vehicleSystem: 'General',
       group: 'Maintenance',
+      serviceGroupId: maintenance?.id,
       defaultHours: 1,
       rate: 15000,
     },

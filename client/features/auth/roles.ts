@@ -65,7 +65,26 @@ export const CAMPAIGN_PERMISSIONS = {
 export const BRANCH_ALL = "branch:all";
 
 /** Framework reports (#75) and report settings. */
-export const FRAMEWORK_REPORT_PERMISSIONS = ["report:fpc-vehicles", "report:fpc-analysis"] as const;
+export const FRAMEWORK_REPORT_PERMISSIONS = [
+  "report:fpc-vehicles",
+  "report:fpc-analysis",
+  // Service MIS (#97)
+  "report:mis-monthly",
+  "report:business-product-mix",
+  "report:job-analysis",
+  "report:group-productivity",
+  "report:engineer-performance",
+  "report:engineer-part-consumption",
+  "report:requisition-return-register",
+  "report:major-problems",
+  "report:new-customers",
+  "report:regular-customers",
+  "report:birthday-anniversary",
+  "report:vehicle-resale",
+  "report:skipped-free-service",
+  "report:vehicle-list",
+  "report:management-information",
+] as const;
 export const REPORT_SETTINGS_PERMISSION = "report:settings";
 
 export const JOBCARD_LINE_UPDATE = "jobcard:line:update";
