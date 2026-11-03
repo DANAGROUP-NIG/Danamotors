@@ -326,6 +326,7 @@ export class VehicleService {
       ownershipType?: string;
       purchaseDate: string;
     },
+    actorId?: string,
   ) {
     return prisma.$transaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${vehicleId} FOR UPDATE`);
@@ -402,6 +403,7 @@ export class VehicleService {
           purchaseDate: effectiveAt,
           ownershipType: data.ownershipType,
           status: 'Current',
+          createdById: actorId,
         },
       });
 

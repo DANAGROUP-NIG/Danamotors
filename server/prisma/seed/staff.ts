@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { ROLES } from "../../src/shared/constants/roles";
 import { hash } from "./helpers";
@@ -137,6 +138,32 @@ export default async function seedStaffUsers(
       lastName: "Chukwu",
       role: ROLES.TECHNICIAN,
       branchId: phBranch.id,
+    },
+    // Floor engineers (legacy designation M) are named on job cards but do not log in, so their
+    // password is random and never shown.
+    {
+      email: "engineer1@kiamotors.com",
+      password: randomUUID(),
+      firstName: "Bola",
+      lastName: "Adewale",
+      role: ROLES.ENGINEER,
+      branchId: mainBranch.id,
+    },
+    {
+      email: "engineer2@kiamotors.com",
+      password: randomUUID(),
+      firstName: "Chika",
+      lastName: "Obi",
+      role: ROLES.ENGINEER,
+      branchId: mainBranch.id,
+    },
+    {
+      email: "engineer3@kiamotors.com",
+      password: randomUUID(),
+      firstName: "Sani",
+      lastName: "Lawal",
+      role: ROLES.ENGINEER,
+      branchId: abujaBranch.id,
     },
     {
       email: "ccuofficer1@kiamotors.com",

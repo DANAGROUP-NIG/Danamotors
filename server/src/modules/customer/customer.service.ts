@@ -7,6 +7,12 @@ import prisma from '../../prisma/client';
 import { CustomerRepository } from './customer.repository';
 import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
 
+/** The anniversary (YYYY-MM-DD text on the API) as a date for the birthday / anniversary report (#97). */
+export function anniversaryOn(text: string | null | undefined): Date | null | undefined {
+  if (text === undefined) return undefined;
+  return text ? new Date(`${text}T00:00:00Z`) : null;
+}
+
 export class CustomerService {
   private customerRepository: CustomerRepository;
 
@@ -232,6 +238,7 @@ export class CustomerService {
           email: data.email ?? null,
           salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
           dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+          anniversaryOn: anniversaryOn(data.anniversaryDate),
         },
       });
     });
@@ -334,6 +341,7 @@ export class CustomerService {
         ...data,
         salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        anniversaryOn: anniversaryOn(data.anniversaryDate),
       },
     });
   }

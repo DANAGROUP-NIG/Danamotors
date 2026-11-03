@@ -20,7 +20,7 @@ const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSou
   model: { label: "Model", all: "All models", source: "model" },
   variant: { label: "Variant", all: "All variants", source: "variant" },
   serviceType: { label: "Service type", all: "All service types", source: "serviceType" },
-  team: { label: "Service group", all: "All teams", source: "team" },
+  team: { label: "Workshop team", all: "All teams", source: "team" },
   receivedBy: { label: "Received by", all: "All advisors", source: "serviceAdvisor" },
   deliveredBy: { label: "Delivered by", all: "All advisors", source: "serviceAdvisor" },
   technician: { label: "Technician", all: "All technicians", source: "technician" },
@@ -28,7 +28,53 @@ const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSou
   labourOperation: { label: "Labour operation", all: "All operations", source: "labourOperation" },
   // Campaign options carry their type as parentId, so the list follows the campaign type option.
   campaign: { label: "FPC bulletin", all: "All bulletins", source: "campaign", followsOption: "campaignType" },
+  engineer: { label: "Engineer", all: "All engineers", source: "engineer" },
+  serviceGroup: { label: "Service group", all: "All service groups", source: "serviceGroup" },
+  freeService: { label: "Service skipped", all: "All free services", source: "freeService" },
 };
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** One value from a lookup list, or All. */
+function LookupSelect({ label, source, all, value, onChange, branchId }: { label: string; source: LookupSource; all: string; value: string; onChange: (value: string) => void; branchId?: string }) {
+  const lookup = useReportLookup(source, branchId);
+  return (
+    <label className="grid min-w-0 gap-1.5">
+      <span className="text-sm font-semibold">{label}</span>
+      <select className={inputCls} value={value} onChange={(event) => onChange(event.target.value)} disabled={lookup.isLoading}>
+        <option value="">{lookup.isLoading ? "Loading…" : all}</option>
+        {(lookup.data ?? []).map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.code && option.code !== option.label ? `${option.code} · ${option.label}` : option.label}
+            {option.active ? "" : " (inactive)"}
+          </option>
+        ))}
+      </select>
+      {lookup.isError && <span className="text-xs text-destructive">Could not load the list.</span>}
+    </label>
+  );
+}
+
+/** A day and month without a year. */
+function DayMonthField({ label, day, month, onChange }: { label: string; day: string; month: string; onChange: (day: string, month: string) => void }) {
+  return (
+    <div className="grid min-w-0 gap-1.5" role="group" aria-label={label}>
+      <span className="text-sm font-semibold">{label}</span>
+      <div className="grid grid-cols-[5rem_1fr] gap-2">
+        <select className={inputCls} aria-label={`${label} day`} value={day} onChange={(event) => onChange(event.target.value, month)}>
+          {Array.from({ length: 31 }, (_, index) => String(index + 1)).map((value) => (
+            <option key={value} value={value}>{value.padStart(2, "0")}</option>
+          ))}
+        </select>
+        <select className={inputCls} aria-label={`${label} month`} value={month} onChange={(event) => onChange(day, event.target.value)}>
+          {MONTHS.map((name, index) => (
+            <option key={name} value={String(index + 1)}>{name}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
 
 export const MODE_CHOICES = [
   { value: "both", label: "Detail + summary" },
@@ -142,6 +188,10 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
   const { period } = config;
   const lookupBranch = canChooseBranch ? draft.branchId : undefined;
   const rangeOptions = (config.options ?? []).flatMap((option) => (option.kind === "range" ? [option] : []));
+  // Criteria options (months, text, single lookups, day-months) sit with the filters.
+  const criteria = (config.options ?? []).filter(
+    (option) => (option.kind === "month" || option.kind === "text" || option.kind === "lookup" || option.kind === "dayMonth") && isOptionVisible(option, draft.options),
+  );
 
   const setOption = (key: string, value: string) => onChange({ ...draft, options: { ...draft.options, [key]: value } });
   const setFilter = (key: FilterKey, value: string[] | undefined) => {
@@ -219,7 +269,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
       </Section>
       )}
 
-      {(config.filters.length > 0 || rangeOptions.length > 0 || canChooseBranch) && (
+      {(config.filters.length > 0 || rangeOptions.length > 0 || criteria.length > 0 || canChooseBranch) && (
         <Section label="Filters">
           <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
             {canChooseBranch && (
@@ -233,6 +283,42 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
                 </select>
               </label>
             )}
+            {criteria.map((option) => {
+              if (option.kind === "month")
+                return (
+                  <label key={option.key} className="grid min-w-0 gap-1.5">
+                    <span className="text-sm font-semibold">{option.label}</span>
+                    <input type="month" className={inputCls} value={draft.options[option.key] ?? ""} onChange={(event) => setOption(option.key, event.target.value)} />
+                  </label>
+                );
+              if (option.kind === "text")
+                return (
+                  <label key={option.key} className="grid min-w-0 gap-1.5">
+                    <span className="text-sm font-semibold">{option.label}</span>
+                    <input
+                      type="search"
+                      className={inputCls}
+                      maxLength={option.maxLength}
+                      placeholder={option.placeholder ?? "All"}
+                      value={draft.options[option.key] ?? ""}
+                      onChange={(event) => setOption(option.key, event.target.value)}
+                    />
+                  </label>
+                );
+              if (option.kind === "lookup")
+                return <LookupSelect key={option.key} label={option.label} source={option.source} all={option.all} value={draft.options[option.key] ?? ""} onChange={(value) => setOption(option.key, value)} branchId={lookupBranch} />;
+              if (option.kind === "dayMonth")
+                return (
+                  <DayMonthField
+                    key={option.key}
+                    label={option.label}
+                    day={draft.options[option.dayKey] ?? ""}
+                    month={draft.options[option.monthKey] ?? ""}
+                    onChange={(day, month) => onChange({ ...draft, options: { ...draft.options, [option.dayKey]: day, [option.monthKey]: month } })}
+                  />
+                );
+              return null;
+            })}
             {rangeOptions.map((option) => (
               <RangeField
                 key={option.key}
@@ -260,9 +346,10 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
       )}
 
       <Section label="Options">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           {(config.options ?? []).map((option) => {
-            if (option.kind === "range" || !isOptionVisible(option, draft.options)) return null;
+            if (option.kind === "range" || option.kind === "month" || option.kind === "text" || option.kind === "lookup" || option.kind === "dayMonth" || !isOptionVisible(option, draft.options))
+              return null;
             if (option.kind === "checkbox")
               return (
                 <label key={option.key} className="inline-flex cursor-pointer items-center gap-2 text-sm">
@@ -275,8 +362,39 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
                   {option.label}
                 </label>
               );
-            if (option.kind === "segmented")
-              return <SegmentedControl key={option.key} label={option.label ?? option.key} value={draft.options[option.key]} choices={option.choices} onChange={(value) => setOption(option.key, value)} />;
+            if (option.kind === "segmented") {
+              const control = <SegmentedControl label={option.label ?? option.key} value={draft.options[option.key]} choices={option.choices} onChange={(value) => setOption(option.key, value)} />;
+              return option.label ? (
+                <div key={option.key} className="grid gap-1.5">
+                  <span className="text-sm font-semibold">{option.label}</span>
+                  {control}
+                </div>
+              ) : (
+                <div key={option.key}>{control}</div>
+              );
+            }
+            if (option.kind === "multi") {
+              const picked = new Set((draft.options[option.key] ?? "").split(",").filter(Boolean));
+              const toggle = (value: string) => {
+                const next = new Set(picked);
+                if (next.has(value)) next.delete(value);
+                else next.add(value);
+                setOption(option.key, option.choices.map((choice) => choice.value).filter((choice) => next.has(choice)).join(","));
+              };
+              return (
+                <fieldset key={option.key} className="grid gap-1.5">
+                  <legend className="mb-1.5 text-sm font-semibold">{option.label} <span className="font-normal text-muted-foreground">{picked.size ? "" : "· All"}</span></legend>
+                  <div className="flex flex-wrap gap-2">
+                    {option.choices.map((choice) => (
+                      <label key={choice.value} className={cn("inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm", picked.has(choice.value) ? "border-primary bg-primary/5 font-medium" : "border-border")}>
+                        <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={picked.has(choice.value)} onChange={() => toggle(choice.value)} />
+                        {choice.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              );
+            }
             if (option.kind === "select")
               return (
                 <label key={option.key} className="inline-flex items-center gap-2 text-sm">
@@ -303,7 +421,12 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
               </label>
             );
           })}
-          {config.hasMode && <SegmentedControl label="Print" value={draft.options.mode ?? "both"} choices={MODE_CHOICES} onChange={(value) => setOption("mode", value)} />}
+          {config.hasMode && (
+            <div className="grid gap-1.5">
+              <span className="text-sm font-semibold">Show</span>
+              <SegmentedControl label="Show" value={draft.options.mode ?? "both"} choices={config.modeChoices ?? MODE_CHOICES} onChange={(value) => setOption("mode", value)} />
+            </div>
+          )}
           {(config.options ?? [])
             .filter((option) => option.hint && isOptionVisible(option, draft.options))
             .map((option) => (
