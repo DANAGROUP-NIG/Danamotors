@@ -126,6 +126,32 @@ Every estimate has parts (genuine and local) and labour: coded operations, plus 
 | FF-DM-2602 | Free fix, ACTIVE | Sorento; ECU update labour and part | Sorento **completed by job card JC-01**; one **scheduled**; one pending |
 | SC-DM-2603 | Service campaign, DRAFT | Rio; air-conditioning check labour and part | Three pending (no vehicle records) |
 
+**Service MIS history (#97)** (`prisma/seed/demo/mis.ts`)
+
+Finished job history for the MIS reports, at fixed days before the run. These job cards are written directly as
+closed records (labour, requisitions with their stock movements, a return slip, complaints and bills), because
+estimates and signatures do not matter to the reports; the live workflows are the jobs above.
+
+| Job | Vehicle / branch | Service | Opened | Points to check |
+|---|---|---|---|---|
+| DM-MIS-01 | LSR-501MS Rio / Main | 1F free service | 35 days ago | free service done within 30 days of sale; oil; no customer bill |
+| DM-MIS-02 | LSR-503MS Sportage / Main | RG paid service | 30 days ago | 10% labour discount; delivered **late** |
+| DM-MIS-03 | LSR-502MS Rio / Main | RR running repair | 20 days ago | body-repair labour; 2 brake pads, **1 returned**; coded **major** complaint and a free-text one |
+| DM-MIS-04 | LSR-501MS Rio / Main | AC accidental | 12 days ago | 3 panels body work; bumper; mud flaps (accessory) |
+| DM-MIS-05 | LSR-502MS Rio / Main | RR running repair | 8 days ago | **repeat** of DM-MIS-03; **warranty** requisition; non-major complaint code |
+| DM-MIS-06 | KNAPM81DMT7000504 Sorento (stock) / Main | PD PDI | 5 days ago | PDI job on an unsold vehicle |
+| DM-MIS-07 | ABJ-505MS Sportage / second branch | RG paid service | 15 days ago | second branch column of the MIR |
+| DM-MIS-08 | LSR-503MS Sportage / Main | RG paid service | 2 days ago | **still open**: in productivity and problems, not in delivered reports |
+
+Engineers: the first two active users with the **Engineer** role at each branch (the base staff seed adds
+`engineer1`–`engineer3`; they cannot log in). Without one, the technician is named as engineer.
+
+Also loaded: customers DEMO-C21 (Ngozi Eze, birthday and anniversary this month), DEMO-C22 (Tunde Bakare, birthday
+24 Dec, anniversary 5 Jan), DEMO-C23 (Halima Sule, bought LSR-503MS **10 days ago**: the resale) and DEMO-C24 (second
+branch); LSR-501MS sold 60 days ago (1F done) and LSR-502MS sold 75 days ago (**1F skipped**); service groups on the demo
+labour items, labour `DM-BODY-PNT` (body repair), complaint codes `DM-EN01` (major) and `DM-BR02`, and five parts
+(`26300-DM035`, `LOC-EO5W30-MIS` oil, `58101-DM100`, `86511-DM200`, `ACC-MUDFLAP-DM` accessory) with opening stock.
+
 ## Design notes
 
 - **The app's own services do the work.** Job opening runs the warranty check and campaign acknowledgement. Estimates and decisions, labour, part issues, quality check, billing, receipts, credit approval, delivery, claim lines and decisions, and campaigns all go through the services the API uses. Document numbers come from the sequence table, and the bill totals come from the billing calculator.
