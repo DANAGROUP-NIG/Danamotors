@@ -17,6 +17,8 @@ export type Inspection = {
 };
 
 export type Estimate = {
+  upfrontPaymentPercent?: number | string;
+  upfrontAmount?: number;
   version: number;
   estimateNumber?: string | null;
   estimateDate?: string | null;
@@ -89,6 +91,8 @@ export type JobCardVehicle = {
 };
 
 export type PartIssuance = {
+  receivedById?: string | null;
+  receivedAt?: string | null;
   id: string;
   quantity: number;
   /** Part source code (internal; not shown to customers). */
@@ -134,6 +138,8 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  allowedTransitions?: string[];
+  depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;

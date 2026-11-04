@@ -37,6 +37,7 @@ export type BillableJobCard = {
 };
 
 export type JobBillPreview = {
+  jobCards?: { id: string; jobNumber: string }[];
   vatBreakdown?: {category:string;rate:number;saleAmount:number;discount:number;taxableAmount:number;vat:number}[];
   review: { estimateId: string | null; status: string; canBill: boolean; issues: string[]; approvedSubtotal: number; actualSubtotal: number; rows: { type: string; referenceId?: string | null; description: string; approvedQuantity: number; actualQuantity: number; approvedAmount: number; actualAmount: number; difference: number; included: boolean; reason: string | null }[] };
   jobCard: BillableJobCard;
@@ -93,6 +94,7 @@ export type ReceiptRegisterResponse = {
 };
 export type CreateJobBillPayload = {
   jobCardId: string;
+  consolidateVehicle?: boolean;
   partsDiscountPercent: number;
   labourDiscountPercent: number;
   serviceAdvisorId: string;
@@ -109,6 +111,7 @@ export async function getServiceAdvisorsRequest(branchId?: string): Promise<{ ad
 
 export async function previewJobBillRequest(input: {
   jobCardId: string;
+  consolidateVehicle?: boolean;
   partsDiscountPercent: number;
   labourDiscountPercent: number;
 }): Promise<{ preview: JobBillPreview }> {

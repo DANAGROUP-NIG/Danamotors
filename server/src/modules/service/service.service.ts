@@ -1,5 +1,7 @@
 import { BookingFields, bookingRelations } from './booking.persistence';
 import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
+import { allowedJobTransitions } from "./job-transitions";
+import { upfrontAmount } from "./job-deposit.service";
 import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
@@ -570,7 +572,7 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string, permissions: readonly string[] = []) {
+  async getJobCard(id: string, permissions: readonly string[] = [], role?: string) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
@@ -608,7 +610,9 @@ export class ServiceService {
     );
     return scopeJobCard({
       ...card,
-      estimates: card.estimates.map(estimate => ({ ...estimate, contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
+      invoices: [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
+      allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
+      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: (estimate.upfrontPaymentPercent?.toNumber() ?? 60), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent ?? 60), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
       campaigns: card.campaigns.map((c) => ({
         ...c,
         vehicleStatus:
@@ -834,6 +838,7 @@ export class ServiceService {
           data: {
             createdAt,
             estimateDate: createdAt,
+            upfrontPaymentPercent: data.upfrontPaymentPercent ?? 60,
             estimateNumber: await nextDocumentNumber(tx, "ESTIMATE"),
             version: revision.version,
             supersedesId: revision.supersedesId,
@@ -856,6 +861,7 @@ export class ServiceService {
     data: {
       customerId: string;
       approved?: boolean;
+      consentAccepted?: boolean;
       decisionDate?: string;
       comments?: string;
       status?: string;
@@ -917,6 +923,7 @@ export class ServiceService {
         if (!override) {
           if (!data.signatureImage || !data.signerName?.trim() || !actorId) throw new BadRequestError("A customer signature and signer name are required; portal capture is not yet available");
           assertSignaturePng(data.signatureImage);
+          if (data.approved && !data.consentAccepted) throw new BadRequestError("Accept the job card terms before approving");
           const customer = await tx.customer.findUniqueOrThrow({ where: { id: card.customerId! } });
           const customerName = `${customer.firstName} ${customer.lastName}`.trim();
           if (data.signerName.trim().toLowerCase() !== customerName.toLowerCase() && !data.relationship?.trim()) throw new BadRequestError("Relationship is required when signing for the customer");
@@ -974,7 +981,9 @@ export class ServiceService {
             status,
           },
         });
+        const terms = data.approved && !override ? await tx.documentTerms.findFirst({ where: { type: 'JOB_ESTIMATE', OR: [{ branchId: card.branchId }, { branchId: null }] }, orderBy: { branchId: { sort: 'asc', nulls: 'last' } } }) : null;
         if (!override) await tx.estimateSignature.create({ data: {
+          consentStatement: data.approved ? ['I approve this job card and estimate and accept the terms and conditions.', ...(terms?.terms ?? [])].join('\n') : null,
           estimateId, approvalId: approval.id, imageReference: data.signatureImage!, signerName: data.signerName!.trim(),
           relationship: data.relationship?.trim(), capturedByUserId: actorId, deviceOrIp: capture?.deviceOrIp ?? 'unknown',
           estimateVersion: estimate.version, totalSigned: estimate.amount, contentHash: hash,

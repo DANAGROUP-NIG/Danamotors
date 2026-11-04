@@ -47,7 +47,7 @@ export const jobCardListQuerySchema = z.object({
 });
 
 export const createPortalVehicleSchema = z.object({ body: z.object({
-  vin: z.string().trim().toUpperCase().min(1), registrationNumber: z.string().trim().toUpperCase().optional(), catalogueId: z.string().uuid(), colourId: z.string().uuid(), year: z.number().int().optional(),
+  vin: z.string().trim().toUpperCase().min(1), registrationNumber: z.string().trim().toUpperCase().min(1, 'Registration number is required').max(50), catalogueId: z.string().uuid(), colourId: z.string().uuid(), year: z.number().int().optional(),
 }).strict() });
 
 export const createPortalAppointmentSchema = z.object({
@@ -56,7 +56,7 @@ export const createPortalAppointmentSchema = z.object({
     serviceId: z.string().min(1, "Service is required"),
     scheduledAt: z.string().datetime("Invalid scheduled date"),
     durationMins: z.number().int().positive().optional(),
-    notes: z.string().optional(),
+    notes: z.string().trim().min(1, "Customer request is required").max(2000),
   }),
 });
 

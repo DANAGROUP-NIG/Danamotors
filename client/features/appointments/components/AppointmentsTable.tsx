@@ -20,7 +20,10 @@ import ModalFame from "@/components/modals/ModalFame";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { DataTable, type Column } from "@/components/ui/table-components/DataTable";
+import {
+  DataTable,
+  type Column,
+} from "@/components/ui/table-components/DataTable";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DataTableToolbar } from "@/components/ui/table-components/DataTableToolbar";
 import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTableBulkToolbar";
@@ -39,7 +42,11 @@ import { DateInput } from "@/components/forms/DateInput";
 import { useAppointments } from "../hooks/use-appointments";
 import { useBulkDeleteAppointments } from "../hooks/use-bulk-delete-appointments";
 import { AppointmentEditForm } from "./AppointmentEditForm";
-import type { Appointment, AppointmentStatus, AppointmentSource } from "../types/appointment.types";
+import type {
+  Appointment,
+  AppointmentStatus,
+  AppointmentSource,
+} from "../types/appointment.types";
 
 const PAGE_SIZE = 10;
 
@@ -87,7 +94,14 @@ const SOURCE_OPTIONS = [
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as AppointmentStatus[];
 
-const STATUS_OPTIONS = [{ label: "All", value: "" }, ...["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].map(value => ({ label: value.replace("_", " "), value })), ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s }))];
+const STATUS_OPTIONS = [
+  { label: "All", value: "" },
+  ...["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].map((value) => ({
+    label: value.replace("_", " "),
+    value,
+  })),
+  ...ALL_STATUSES.map((s) => ({ label: STATUS_LABELS[s], value: s })),
+];
 
 function customerName(a: Appointment) {
   return a.customer ? `${a.customer.firstName} ${a.customer.lastName}` : "—";
@@ -100,7 +114,7 @@ function vehicleReg(a: Appointment) {
 
 function scheduledLabel(a: Appointment) {
   return new Date(a.scheduledAt).toLocaleString("en-GB", {
-      timeZone: "Africa/Lagos",
+    timeZone: "Africa/Lagos",
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -110,7 +124,9 @@ function formatAppointmentText(a: Appointment) {
   return `*Appointment: ${customerName(a)}*\nVehicle: ${vehicleReg(a)}\nBranch: ${a.branch?.name ?? "—"}\nScheduled: ${scheduledLabel(a)}\nStatus: ${STATUS_LABELS[a.status]}\nSource: ${SOURCE_LABELS[a.source]}\nNotes: ${a.notes ?? "—"}`;
 }
 
-function toExportRow(a: Appointment): Record<string, string | number | boolean | null | undefined> {
+function toExportRow(
+  a: Appointment,
+): Record<string, string | number | boolean | null | undefined> {
   return {
     customer: customerName(a),
     vehicleRegNo: vehicleReg(a),
@@ -119,7 +135,9 @@ function toExportRow(a: Appointment): Record<string, string | number | boolean |
     status: STATUS_LABELS[a.status],
     source: SOURCE_LABELS[a.source],
     notes: a.notes ?? "",
-    agent: a.createdBy ? `${a.createdBy.firstName} ${a.createdBy.lastName}` : "",
+    agent: a.createdBy
+      ? `${a.createdBy.firstName} ${a.createdBy.lastName}`
+      : "",
   };
 }
 
@@ -145,7 +163,9 @@ export function AppointmentsTable() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [deleteCandidates, setDeleteCandidates] = useState<Appointment[] | null>(null);
+  const [deleteCandidates, setDeleteCandidates] = useState<
+    Appointment[] | null
+  >(null);
 
   const router = useRouter();
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -193,8 +213,15 @@ export function AppointmentsTable() {
     setPage(1);
   }
 
-  function commitSearch() { setDebouncedSearch(search); setPage(1); }
-  function clearSearch() { setSearch(""); setDebouncedSearch(""); setPage(1); }
+  function commitSearch() {
+    setDebouncedSearch(search);
+    setPage(1);
+  }
+  function clearSearch() {
+    setSearch("");
+    setDebouncedSearch("");
+    setPage(1);
+  }
 
   function exportSelected(items: Appointment[]) {
     downloadCsv(
@@ -234,8 +261,13 @@ export function AppointmentsTable() {
   }
 
   function confirmDeleteSelected(items: Appointment[]) {
-    const candidates = items.filter(item => !item.bookingNumber && !item.jobCards?.length);
-    if (!candidates.length) { toast.info("Numbered or linked bookings must be cancelled with a reason"); return; }
+    const candidates = items.filter(
+      (item) => !item.bookingNumber && !item.jobCards?.length,
+    );
+    if (!candidates.length) {
+      toast.info("Numbered or linked bookings must be cancelled with a reason");
+      return;
+    }
     setDeleteCandidates(candidates);
   }
 
@@ -252,13 +284,20 @@ export function AppointmentsTable() {
   const columns: Column<Appointment>[] = [
     {
       header: "Booking",
-      render: (appointment) => <span className="text-sm"><span className="block max-w-48 break-all">{appointment.bookingNumber ?? "Legacy booking"}</span><span className="text-xs text-muted-foreground">{appointment.bookingStatus ?? appointment.status}</span></span>,
+      render: (appointment) => (
+        <span className="text-sm">
+          <span className="block max-w-48 break-all">
+            {appointment.bookingNumber ?? "Legacy booking"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {appointment.bookingStatus ?? appointment.status}
+          </span>
+        </span>
+      ),
     },
     {
       header: "Customer",
-      render: (a) => (
-        <span className="font-medium">{customerName(a)}</span>
-      ),
+      render: (a) => <span className="font-medium">{customerName(a)}</span>,
     },
     {
       header: "Vehicle Reg No",
@@ -319,7 +358,11 @@ export function AppointmentsTable() {
       header: "Agent",
       render: (a) => (
         <span className="text-muted-foreground">
-          {a.createdBy ? a.createdBy.firstName : <span className="text-border">—</span>}
+          {a.createdBy ? (
+            a.createdBy.firstName
+          ) : (
+            <span className="text-border">—</span>
+          )}
         </span>
       ),
     },
@@ -375,7 +418,8 @@ export function AppointmentsTable() {
               id: "whatsapp",
               label: "WhatsApp",
               icon: <MessageCircle className="size-4" />,
-              onClick: () => openWhatsApp({ message: formatAppointmentText(a) }),
+              onClick: () =>
+                openWhatsApp({ message: formatAppointmentText(a) }),
             },
             {
               id: "copy-link",
@@ -388,13 +432,15 @@ export function AppointmentsTable() {
                   "Appointment link copied",
                 ),
             },
-            canDelete && !a.bookingNumber && !a.jobCards?.length && {
-              id: "delete",
-              label: "Delete",
-              icon: <Trash2 className="size-4" />,
-              destructive: true,
-              onClick: () => setDeleteCandidates([a]),
-            },
+            canDelete &&
+              !a.bookingNumber &&
+              !a.jobCards?.length && {
+                id: "delete",
+                label: "Delete",
+                icon: <Trash2 className="size-4" />,
+                destructive: true,
+                onClick: () => setDeleteCandidates([a]),
+              },
           ]}
         />
       ),
@@ -459,8 +505,16 @@ export function AppointmentsTable() {
                     }}
                   />
                 </div>
-                <DataTableFilterChips options={STATUS_OPTIONS} selected={statusFilter} onChange={changeFilter} />
-                <DataTableFilterChips options={SOURCE_OPTIONS} selected={sourceFilter} onChange={changeSourceFilter} />
+                <DataTableFilterChips
+                  options={STATUS_OPTIONS}
+                  selected={statusFilter}
+                  onChange={changeFilter}
+                />
+                <DataTableFilterChips
+                  options={SOURCE_OPTIONS}
+                  selected={sourceFilter}
+                  onChange={changeSourceFilter}
+                />
               </>
             }
           />
@@ -519,6 +573,7 @@ export function AppointmentsTable() {
       </DataTable>
 
       <ModalFame
+        preventAccidentalClose
         isOpen={!!editingId}
         onClose={() => setEditingId(null)}
         title="Edit appointment"
