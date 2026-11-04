@@ -239,7 +239,7 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
 
     // A vehicle registered later links to its campaign row by VIN.
     const { VehicleService } = require("../vehicle/vehicle.service");
-    const registered = await new VehicleService().createVehicle({ customerId: customer.id, vin: later.toLowerCase(), customMake: "Kia", customModel: "Sportage" });
+    const registered = await new VehicleService().createVehicle({ registrationNumber: `WARRANTY-${later}`, customerId: customer.id, vin: later.toLowerCase(), customMake: "Kia", customModel: "Sportage" });
     const linked = await prisma.campaignVehicle.findUniqueOrThrow({ where: { campaignId_vin: { campaignId: created.id, vin: later } } });
     expect(linked.vehicleId).toBe(registered.id);
 

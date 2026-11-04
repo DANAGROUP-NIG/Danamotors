@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from "react";
 // import { Check, Clock, CircleCheck, CircleAlert, Wrench } from "lucide-react";
 import Image from "next/image";
@@ -27,6 +29,7 @@ type PrintData = {
     signature: {
       imageReference: string;
       signerName: string;
+      consentStatement?: string | null;
       relationship: string | null;
       signedAt: string;
       estimateVersion: number;
@@ -208,6 +211,7 @@ export default function EstimatePrintPage() {
                 ? ` for ${customer?.name} (${estimate.signature.relationship})`
                 : ""}
             </p>
+            {estimate.signature.consentStatement && <p className="whitespace-pre-line">{estimate.signature.consentStatement}</p>}
             <p>{date(estimate.signature.signedAt)} · Africa/Lagos</p>
             <p>
               Revision {estimate.signature.estimateVersion} · Total signed{" "}

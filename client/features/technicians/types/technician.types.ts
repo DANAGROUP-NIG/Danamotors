@@ -1,4 +1,6 @@
 export type Technician = {
+  openJobs?: number;
+  closedJobs?: number;
   id: string;
   firstName: string;
   lastName: string;

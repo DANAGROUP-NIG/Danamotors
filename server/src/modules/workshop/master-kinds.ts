@@ -35,6 +35,10 @@ export const MASTER_KINDS = [
 
 export type MasterKind = typeof MASTER_KINDS[number];
 
+// Service categories the MIS reports group service types by (#97); stored in WorkshopMaster.category.
+export const SERVICE_CATEGORIES = ['FREE', 'PAID', 'RUNNING_REPAIR', 'ACCIDENTAL', 'PDI', 'OTHER'] as const;
+export type ServiceCategory = typeof SERVICE_CATEGORIES[number];
+
 type ParentRule = { kind: MasterKind; required: boolean };
 
 export const MASTER_PARENTS: Partial<Record<MasterKind, ParentRule>> = {
@@ -75,6 +79,10 @@ export const MASTER_ATTRIBUTES: Partial<Record<MasterKind, z.ZodTypeAny>> = {
   }).strict(),
   BAY: z.object({
     bayCategory: z.enum(['PDI', 'SERVICE', 'ACCIDENTAL']).nullable().optional(),
+  }).strict(),
+  VEHICLE_GROUP: z.object({
+    // Labour in this group is "body" in the MIS reports.
+    bodyRepair: z.boolean().optional(),
   }).strict(),
   COMPLAINT: z.object({
     majorDefect: z.boolean().optional(),

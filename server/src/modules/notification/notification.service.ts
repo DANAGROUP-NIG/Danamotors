@@ -1,3 +1,4 @@
+import { EVENT_CHANNELS, workshopNotification, type WorkshopEvent, type WorkshopNotificationPayload } from './notification.events';
 import prisma from '../../prisma/client';
 import { NotificationRepository, CreateNotificationData } from './notification.repository';
 import { NotFoundError } from '../../shared/errors/appError';
@@ -38,8 +39,29 @@ export class NotificationService {
     this.notificationRepository = new NotificationRepository();
   }
 
+  async notify(event: WorkshopEvent, recipients: { userIds: string[]; customerIds?: string[] }, payload: WorkshopNotificationPayload) {
+    if (!EVENT_CHANNELS[event]?.includes('in-app')) return;
+    const notification = workshopNotification(event, payload);
+    const rows = [
+      ...[...new Set(recipients.userIds.filter(Boolean))].map(userId => ({ ...notification, userId })),
+      ...[...new Set(recipients.customerIds ?? [])].map(customerId => ({ ...notification, customerId, link: `/portal/job-cards/${payload.jobCardId}` })),
+    ];
+    if (!rows.length) return;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try { await this.notificationRepository.createMany(rows); return; }
+      catch { if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1))); }
+    }
+    process.emitWarning('Workshop notification persistence failed after retries', { code: 'NOTIFICATION_WRITE_FAILED' });
+  }
+  async listCustomer(customerId: string, page: number, limit: number) {
+    const result = await this.notificationRepository.listByCustomer(customerId, (page - 1) * limit, limit);
+    return { notifications: result.notifications, unread: result.unread, meta: { total: result.total, page, limit, totalPages: Math.ceil(result.total / limit) } };
+  }
+  async markCustomerRead(id: string, customerId: string) {
+    await this.notificationRepository.markCustomerRead(id, customerId);
+  }
   async create(inputs: CreateNotificationData[]) {
-    const validInputs = inputs.filter((input) => input.userId);
+    const validInputs = inputs.filter((input) => input.userId || input.customerId);
     if (validInputs.length === 0) return;
     try {
       await this.notificationRepository.createMany(validInputs);

@@ -26,7 +26,10 @@ import {
   normalizeVin,
   parseVinList,
   statusAfterContact,
-  vinError,
+  VIN_RANGE_PREFIX_LENGTH,
+  vinInRange,
+  vinRangeError,
+  type VinRange,
 } from "./campaign.logic";
 
 /** Upper bound on vehicles added in one request, to keep the transaction short. */
@@ -36,6 +39,7 @@ const TYPE_LABEL: Record<CampaignType, string> = {
   RECALL: "Recall",
   FREE_FIX: "Free fix",
   SERVICE_CAMPAIGN: "Service campaign",
+  FPC: "FPC bulletin",
 };
 
 export interface CampaignInput {
@@ -46,6 +50,9 @@ export interface CampaignInput {
   defectDescription?: string | null;
   startDate: Date;
   endDate?: Date | null;
+  bulletinDate?: Date | null;
+  jobCardText?: string | null;
+  printOnJobCard?: boolean;
   labourCovered?: boolean;
   partsCovered?: boolean;
   models?: {
@@ -69,11 +76,16 @@ export type AddVehiclesInput =
         vehicleModelIds: string[];
         yearFrom?: number | null;
         yearTo?: number | null;
-        vinFrom?: string | null;
-        vinTo?: string | null;
       };
       dryRun?: boolean;
     };
+
+/** Contacts recorded when a call list or letters are printed ("record as called"). */
+export interface PrintedContactsInput {
+  campaignVehicleIds: string[];
+  channel: "LETTER" | "PHONE";
+  notes?: string | null;
+}
 
 async function statusCounts(where: Prisma.CampaignVehicleWhereInput) {
   const rows = await prisma.campaignVehicle.groupBy({
@@ -167,6 +179,10 @@ export class CampaignService {
           },
         },
         coveredItems: { orderBy: { createdAt: "asc" } },
+        vinRanges: {
+          orderBy: [{ vinFrom: "asc" }, { vinTo: "asc" }],
+          select: { id: true, vinFrom: true, vinTo: true, createdAt: true },
+        },
         createdBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
@@ -256,6 +272,9 @@ export class CampaignService {
         defectDescription: input.defectDescription ?? null,
         startDate: input.startDate,
         endDate: input.endDate ?? null,
+        bulletinDate: input.bulletinDate ?? null,
+        jobCardText: input.jobCardText?.trim() || null,
+        printOnJobCard: input.printOnJobCard ?? true,
         labourCovered: input.labourCovered ?? true,
         partsCovered: input.partsCovered ?? true,
         createdById: actorId,
@@ -319,6 +338,9 @@ export class CampaignService {
           }),
           ...(input.startDate && { startDate: input.startDate }),
           ...(input.endDate !== undefined && { endDate: input.endDate }),
+          ...(input.bulletinDate !== undefined && { bulletinDate: input.bulletinDate }),
+          ...(input.jobCardText !== undefined && { jobCardText: input.jobCardText?.trim() || null }),
+          ...(input.printOnJobCard !== undefined && { printOnJobCard: input.printOnJobCard }),
           ...(input.labourCovered !== undefined && {
             labourCovered: input.labourCovered,
           }),
@@ -352,12 +374,14 @@ export class CampaignService {
   }
 
   async activate(id: string) {
-    const affected = await prisma.campaignVehicle.count({
-      where: { campaignId: id },
-    });
-    if (affected === 0)
+    // VIN ranges count: their vehicles may not be registered yet.
+    const [affected, ranges] = await Promise.all([
+      prisma.campaignVehicle.count({ where: { campaignId: id } }),
+      prisma.campaignVinRange.count({ where: { campaignId: id } }),
+    ]);
+    if (affected === 0 && ranges === 0)
       throw new BadRequestError(
-        "Add the affected vehicles before activating the campaign",
+        "Add the affected vehicles or VIN ranges before activating the campaign",
       );
     const result = await prisma.campaign.updateMany({
       where: { id, status: { in: CAMPAIGN_TRANSITIONS.ACTIVATE } },
@@ -365,6 +389,8 @@ export class CampaignService {
     });
     if (result.count !== 1)
       throw new ConflictError("Only a draft campaign can be activated");
+    // Vehicles registered while the campaign was a draft are not linked by registration.
+    await this.addRangeVehicles(id);
     await this.notifyActivated(id);
     return this.get(id);
   }
@@ -487,15 +513,7 @@ export class CampaignService {
     vehicleModelIds: string[];
     yearFrom?: number | null;
     yearTo?: number | null;
-    vinFrom?: string | null;
-    vinTo?: string | null;
   }) {
-    const vinFrom = c.vinFrom ? normalizeVin(c.vinFrom) : null;
-    const vinTo = c.vinTo ? normalizeVin(c.vinTo) : null;
-    for (const v of [vinFrom, vinTo]) {
-      if (v && vinError(v))
-        throw new BadRequestError(`VIN range bound ${v} ${vinError(v)}`);
-    }
     const vehicles = await prisma.vehicle.findMany({
       where: {
         vehicleModelId: { in: c.vehicleModelIds },
@@ -505,17 +523,80 @@ export class CampaignService {
             ...(c.yearTo && { lte: c.yearTo }),
           },
         }),
-        ...((vinFrom || vinTo) && {
-          vin: {
-            ...(vinFrom && { gte: vinFrom }),
-            ...(vinTo && { lte: vinTo }),
-          },
-        }),
       },
       select: { vin: true },
       take: MAX_VEHICLES_PER_REQUEST + 1,
     });
     return [...new Set(vehicles.map((v) => normalizeVin(v.vin)))];
+  }
+
+  // ── VIN ranges (FPC bulletin "vehicles to be checked") ─────────────────────
+
+  /** VINs of vehicles in the system inside any of the ranges. */
+  private async vinsInRanges(ranges: VinRange[]): Promise<string[]> {
+    const prefixes = [...new Set(ranges.map((r) => r.vinFrom.slice(0, VIN_RANGE_PREFIX_LENGTH)))];
+    if (prefixes.length === 0) return [];
+    const vehicles = await prisma.vehicle.findMany({
+      where: { OR: prefixes.map((prefix) => ({ vin: { startsWith: prefix, mode: "insensitive" as const } })) },
+      select: { vin: true },
+    });
+    const vins = vehicles.map((v) => normalizeVin(v.vin));
+    return [...new Set(vins.filter((vin) => ranges.some((range) => vinInRange(vin, range))))];
+  }
+
+  /**
+   * Saves VIN ranges and adds every vehicle in the system inside them (the legacy "S" button).
+   * With `dryRun` nothing is saved and the response is the summary shown before confirming.
+   * Vehicles registered later inside an active campaign's range are added on registration.
+   */
+  async addVinRanges(id: string, input: { ranges: VinRange[]; dryRun?: boolean }, actorId: string) {
+    const campaign = await prisma.campaign.findUnique({ where: { id }, select: { status: true } });
+    if (!campaign) throw new NotFoundError("Campaign not found");
+    if (campaign.status === CampaignStatus.CLOSED) throw new BadRequestError("VIN ranges cannot be added to a closed campaign");
+
+    const ranges = input.ranges.map((r) => ({ vinFrom: normalizeVin(r.vinFrom), vinTo: normalizeVin(r.vinTo) }));
+    ranges.forEach((range, index) => {
+      const error = vinRangeError(range);
+      if (error) throw new BadRequestError(`Range ${index + 1}: ${error}`);
+    });
+    const existing = await prisma.campaignVinRange.findMany({ where: { campaignId: id }, select: { vinFrom: true, vinTo: true } });
+    const key = (r: VinRange) => `${r.vinFrom}:${r.vinTo}`;
+    const known = new Set(existing.map(key));
+    const unique = [...new Map(ranges.map((r) => [key(r), r])).values()];
+    const newRanges = unique.filter((r) => !known.has(key(r)));
+
+    const vins = await this.vinsInRanges(newRanges);
+    const vehicles = await this.addVehicles(id, { vins, dryRun: input.dryRun });
+    const summary = {
+      ranges: ranges.length,
+      newRanges: newRanges.length,
+      alreadySaved: unique.length - newRanges.length,
+      vehiclesInRanges: vins.length,
+      alreadyInCampaign: vehicles.alreadyInCampaign,
+      toAdd: vehicles.toAdd,
+      added: vehicles.added,
+      saved: 0,
+    };
+    if (input.dryRun || newRanges.length === 0) return summary;
+    const saved = await prisma.campaignVinRange.createMany({
+      data: newRanges.map((r) => ({ campaignId: id, ...r, createdById: actorId })),
+      skipDuplicates: true,
+    });
+    return { ...summary, saved: saved.count };
+  }
+
+  /** Removes a range. Vehicles it added stay in the campaign (mark them not applicable by hand). */
+  async removeVinRange(id: string, rangeId: string) {
+    const result = await prisma.campaignVinRange.deleteMany({ where: { id: rangeId, campaignId: id } });
+    if (result.count === 0) throw new NotFoundError("VIN range not found");
+    return this.get(id);
+  }
+
+  /** Adds vehicles in the system inside the campaign's saved ranges that are not in it yet. */
+  private async addRangeVehicles(id: string) {
+    const ranges = await prisma.campaignVinRange.findMany({ where: { campaignId: id }, select: { vinFrom: true, vinTo: true } });
+    const vins = await this.vinsInRanges(ranges);
+    if (vins.length > 0) await this.addVehicles(id, { vins });
   }
 
   async listVehicles(
@@ -717,6 +798,42 @@ export class CampaignService {
       });
     });
     return this.getVehicle(id, campaignVehicleId);
+  }
+
+  /**
+   * "Record as called" from the FPC vehicles report: one contact per vehicle printed, with
+   * outcome SENT (counts as called, the customer was not reached, so the status is unchanged).
+   * Completed and not-applicable vehicles are skipped.
+   */
+  async recordPrintedContacts(input: PrintedContactsInput, actorId: string) {
+    const now = new Date();
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.campaignVehicle.findMany({
+        where: {
+          id: { in: input.campaignVehicleIds },
+          status: { notIn: [CampaignVehicleStatus.COMPLETED, CampaignVehicleStatus.NOT_APPLICABLE] },
+          campaign: { status: CampaignStatus.ACTIVE },
+        },
+        select: { id: true },
+      });
+      const ids = rows.map((r) => r.id);
+      if (ids.length === 0) return { recorded: 0, skipped: input.campaignVehicleIds.length };
+      await tx.campaignContactLog.createMany({
+        data: ids.map((campaignVehicleId) => ({
+          campaignVehicleId,
+          channel: input.channel as ContactChannel,
+          outcome: ContactOutcome.SENT,
+          notes: input.notes ?? (input.channel === "LETTER" ? "FPC letter printed" : "On a printed FPC call list"),
+          actorId,
+          createdAt: now,
+        })),
+      });
+      await tx.campaignVehicle.updateMany({
+        where: { id: { in: ids } },
+        data: { contactAttempts: { increment: 1 }, lastContactAt: now, lastContactOutcome: ContactOutcome.SENT },
+      });
+      return { recorded: ids.length, skipped: input.campaignVehicleIds.length - ids.length };
+    });
   }
 
   /** Books a service appointment for the campaign work and marks the vehicle scheduled. */

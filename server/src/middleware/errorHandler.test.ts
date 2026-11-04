@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Request, Response } from "express";
 import { errorHandler } from "./errorHandler";
 
@@ -20,4 +21,12 @@ describe("errorHandler", () => {
       message: "Part 1244106207B is under annual stock taking (batch 2026000006). Its stock cannot move at this branch until the count is completed.",
     });
   });
+});
+
+it('returns structured fields for service validation and registration duplicates', () => {
+  const parsed = z.object({ registrationNumber: z.string().min(1) }).safeParse({ registrationNumber: '' });
+  if (parsed.success) throw new Error('Expected invalid fixture');
+  expect(respond(parsed.error)).toMatchObject({ status: 400, body: { errors: [{ field: 'registrationNumber', message: expect.any(String) }] } });
+  const duplicate = Object.assign(new Error('duplicate'), { code: 'P2002', meta: { target: ['registrationNumber'] } });
+  expect(respond(duplicate)).toMatchObject({ status: 409, body: { errors: [{ field: 'registrationNumber', message: expect.any(String) }] } });
 });

@@ -52,6 +52,8 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
     label: "Vehicle group",
     group: "Workshop",
     parent: { kind: "VEHICLE_SYSTEM", label: "Vehicle system", required: true },
+    // Labour in this group is the "body" figure of the MIS reports (#97).
+    attributes: [{ key: "bodyRepair", label: "Body repair group (MIS body figures)", type: "checkbox" }],
   },
   SERVICE_TYPE: {
     label: "Service",
@@ -135,3 +137,13 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
 };
 
 export const MASTER_KIND_GROUPS = Array.from(new Set(Object.values(MASTER_KINDS).map(kind => kind.group)));
+
+// Service categories the MIS reports group service types by (#97); mirrors SERVICE_CATEGORIES on the server.
+export const SERVICE_CATEGORY_LABELS: Record<string, string> = {
+  FREE: "Free service",
+  PAID: "Paid service",
+  RUNNING_REPAIR: "Running repair",
+  ACCIDENTAL: "Accidental",
+  PDI: "PDI",
+  OTHER: "Other",
+};

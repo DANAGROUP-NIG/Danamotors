@@ -263,6 +263,7 @@ export class PortalService {
       scheduledAt: data.scheduledAt,
       durationMins: data.durationMins,
       notes: data.notes,
+      requests: [{ description: data.notes?.trim() ?? "" }],
     });
 
     return prisma.serviceAppointment.findUnique({
@@ -391,7 +392,7 @@ export class PortalService {
       vehicle: jobCard.vehicle,
       branch: jobCard.branch,
       estimates: jobCard.estimates,
-      invoices: jobCard.invoices,
+      invoices: [...new Map([...jobCard.invoices, ...(jobCard.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
       inspections: jobCard.inspections,
     };
   }

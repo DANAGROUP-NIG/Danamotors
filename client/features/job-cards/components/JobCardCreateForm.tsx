@@ -118,6 +118,7 @@ export function JobCardCreateForm({
     register,
     control,
     setValue,
+    setError,
     watch,
     reset,
     handleSubmit,
@@ -410,7 +411,7 @@ export function JobCardCreateForm({
             .map((row) => row.description)
             .join("; ")
             .slice(0, 5000),
-          promisedAt: new Date(`${promisedDate}T${promisedTime}`).toISOString(),
+          promisedAt: new Date(`${promisedDate}T${promisedTime}:00+01:00`).toISOString(),
           engineerId: values.engineerId || undefined,
           technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
@@ -441,6 +442,15 @@ export function JobCardCreateForm({
           },
 
           onError: (error) => {
+            if (isAxiosError(error)) {
+              const response = error.response?.data;
+              const fields: { field: string; message: string }[] = response?.errors ?? (response?.details?.field ? [{ field: response.details.field, message: response.message }] : []);
+              for (const issue of fields) {
+                const field = issue.field === "promisedAt" ? "promisedDate" : issue.field;
+                setError(field as keyof CreateJobCardFormValues, { type: "server", message: issue.message });
+              }
+              if (fields.length) setTab(fields[0].field.startsWith("complaints") ? "Customer Requests" : fields[0].field === "promisedAt" || otherErrors.includes(fields[0].field) ? "Other Details" : "Vehicle Details");
+            }
             const latest = ackRequiredCheck(error);
             if (latest) {
               // Coverage or campaigns changed since the check ran: show the server's view and ask again.
@@ -470,11 +480,15 @@ export function JobCardCreateForm({
             : "Vehicle Details",
       );
 
-      requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        content.current?.querySelectorAll<HTMLElement>('[aria-invalid="true"]').forEach((field) => {
+          const card = field.closest("details");
+          if (card) card.open = true;
+        });
         content.current
           ?.querySelector<HTMLElement>('[aria-invalid="true"]')
-          ?.focus(),
-      );
+          ?.focus();
+      });
     },
   );
 
@@ -689,7 +703,8 @@ export function JobCardCreateForm({
               className="space-y-5"
             >
               <OpeningCard
-                title="Vehicle"
+                title="Vehicle Details"
+                collapsible
                 description="Search registration or VIN. Saved vehicle details load automatically."
                 action={
                   vehicle && (
@@ -938,7 +953,7 @@ export function JobCardCreateForm({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           invalid={!!errors.promisedDate}
-                          min={localDate(openedAt)}
+                          min={(() => { const date = new Date(bookingQuery.data?.appointment.scheduledAt ?? openedAt); date.setUTCDate(date.getUTCDate() + 1); return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(date); })()}
                         />
                       </OpeningField>
                     )}
@@ -1043,6 +1058,7 @@ export function JobCardCreateForm({
               </OpeningCard>
               <OpeningCard
                 title="Delivery & closing"
+                collapsible
                 description="Available after quality check and billing or credit approval on the saved job card."
               >
                 <div className={openingGrid}>

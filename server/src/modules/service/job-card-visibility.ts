@@ -1,5 +1,5 @@
 import { PERMISSIONS } from '../../shared/constants/roles';
-const monetaryFields = new Set(['amount','rate','price','unitPrice','retailRate','costPrice','cost','margin','total','subtotal','estimatedCost','estimatedParts','estimatedOil','estimatedLabour','serviceCharge','spare','oil','labour','defaultRate','sellingPrice','purchasePrice']);
+const monetaryFields = new Set(['upfrontAmount','amount','rate','price','unitPrice','retailRate','costPrice','cost','margin','total','subtotal','estimatedCost','estimatedParts','estimatedOil','estimatedLabour','serviceCharge','spare','oil','labour','defaultRate','sellingPrice','purchasePrice']);
 /** Retain operational structure while removing nested monetary values at the service boundary. */
 export function scopeJobCard<T extends object>(card: T, permissions: readonly string[]): T {
  const estimateRead = permissions.includes(PERMISSIONS.ESTIMATE_READ);
@@ -8,7 +8,7 @@ export function scopeJobCard<T extends object>(card: T, permissions: readonly st
   if (value instanceof Date || value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(scope);
   return Object.fromEntries(Object.entries(value).filter(([key]) =>
-   (key !== 'estimates' || estimateRead) && (key !== 'invoices' || invoiceRead) &&
+   (key !== 'estimates' || estimateRead) && (!['invoices', 'consolidatedInvoices'].includes(key) || invoiceRead) &&
    (estimateRead || invoiceRead || !monetaryFields.has(key))
   ).map(([key, item]) => [key, scope(item)]));
  }

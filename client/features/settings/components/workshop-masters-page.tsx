@@ -13,7 +13,7 @@ import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ServiceTypeModelSettings } from "./service-type-model-settings";
 import { DefectModelEstimates } from "./defect-model-estimates";
-import { MASTER_KIND_GROUPS, MASTER_KINDS, type AttributeField } from "./master-kinds";
+import { MASTER_KIND_GROUPS, MASTER_KINDS, SERVICE_CATEGORY_LABELS, type AttributeField } from "./master-kinds";
 
 type Master = {
   id: string;
@@ -191,7 +191,10 @@ export function WorkshopMastersPage() {
         }, {
           header: "Description",
           render: row => row.description,
-        }, ...(config.parent ? [{
+        }, ...(kind === "SERVICE_TYPE" ? [{
+          header: "MIS category",
+          render: (row: Master) => SERVICE_CATEGORY_LABELS[row.category ?? ""] ?? "—",
+        }] : []), ...(config.parent ? [{
           header: config.parent.label,
           render: (row: Master) => row.parent ? `${row.parent.code} | ${row.parent.description}` : "",
         }] : []), {
@@ -265,7 +268,14 @@ export function WorkshopMastersPage() {
                 onChange={e => setForm({
                   ...form,
                   freeService: e.target.checked,
-                })} />Free service</label></>}
+                })} />Free service</label>
+            <Field label="MIS category"><select
+                className={inputCls}
+                value={form.category ?? ""}
+                onChange={e => setForm({
+                  ...form,
+                  category: e.target.value || null,
+                })}><option value="">Set from the service flags</option>{Object.entries(SERVICE_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field></>}
           {kind === "SERVICE_TYPE" && <>
             <Field label="Display order"><input className={inputCls} type="number" min="0" max="100000" step="1"
               value={form.displayOrder ?? ""} onChange={event => setForm({ ...form, displayOrder: event.target.value === "" ? null : Number(event.target.value) })} /></Field>

@@ -41,6 +41,21 @@ export class CampaignController {
     ok(res, result, message, req.body.dryRun ? 200 : 201);
   });
 
+  addVinRanges = handle(async (req, res) => {
+    const result = await this.service.addVinRanges(req.params.id, req.body, req.user!.userId);
+    const message = req.body.dryRun ? undefined : `Saved ${result.saved} range(s) and added ${result.added} vehicle(s)`;
+    ok(res, result, message, req.body.dryRun ? 200 : 201);
+  });
+
+  removeVinRange = handle(async (req, res) =>
+    ok(res, { campaign: await this.service.removeVinRange(req.params.id, req.params.rangeId) }, "VIN range removed"),
+  );
+
+  recordPrintedContacts = handle(async (req, res) => {
+    const result = await this.service.recordPrintedContacts(req.body, req.user!.userId);
+    ok(res, result, `Recorded ${result.recorded} contact(s)`, 201);
+  });
+
   listVehicles = handle(async (req, res) => ok(res, await this.service.listVehicles(req.params.id, req.query as never)));
 
   getVehicle = handle(async (req, res) => ok(res, { vehicle: await this.service.getVehicle(req.params.id, req.params.vehicleId) }));

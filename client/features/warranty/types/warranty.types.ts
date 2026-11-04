@@ -2,7 +2,7 @@
 
 export type CoverageStatus = "ACTIVE" | "EXPIRED_DATE" | "EXPIRED_MILEAGE" | "NOT_COVERED" | "UNKNOWN";
 export type CoverageSource = "MODEL" | "EXTENDED" | "GOODWILL";
-export type CampaignType = "RECALL" | "FREE_FIX" | "SERVICE_CAMPAIGN";
+export type CampaignType = "RECALL" | "FREE_FIX" | "SERVICE_CAMPAIGN" | "FPC";
 export type CampaignVehicleStatus = "PENDING" | "CONTACTED" | "SCHEDULED" | "COMPLETED" | "NOT_REACHABLE" | "NOT_APPLICABLE";
 
 export type Person = { id: string; firstName: string; lastName: string };

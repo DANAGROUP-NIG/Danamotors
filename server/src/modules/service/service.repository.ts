@@ -346,6 +346,7 @@ export class ServiceRepository {
             receipts: true,
           },
         },
+        consolidatedInvoices: { include: { payments: true, receipts: true } },
         warrantyAcknowledgedBy: {
           select: { id: true, firstName: true, lastName: true },
         },
@@ -358,8 +359,13 @@ export class ServiceRepository {
             campaignCode: true,
             campaignTitle: true,
             campaignType: true,
-            campaign: { select: { status: true } },
+            attended: true,
+            attendedAt: true,
+            notAttendedReason: true,
+            attendedBy: { select: { id: true, firstName: true, lastName: true } },
+            campaign: { select: { status: true, jobCardText: true, printOnJobCard: true } },
           },
+          orderBy: { createdAt: "asc" },
         },
       },
     });

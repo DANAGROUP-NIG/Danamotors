@@ -38,7 +38,7 @@ export function InvoiceDetailPage() {
 
       <section className="grid gap-5 border-y py-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-sm font-medium uppercase text-muted-foreground">Job bill</p><h1 className="mt-1 text-xl font-semibold">{invoice.invoiceNumber}</h1><p className="mt-1 text-sm text-muted-foreground">{invoice.jobCard?.jobNumber ?? "Job card"} · {invoice.customer.companyName || `${invoice.customer.firstName} ${invoice.customer.lastName}`}</p></div>
+          <div><p className="text-sm font-medium uppercase text-muted-foreground">{invoice.billType === "WARRANTY" ? "Warranty job bill" : "Job bill"}</p><h1 className="mt-1 text-xl font-semibold">{invoice.invoiceNumber}</h1><p className="mt-1 text-sm text-muted-foreground">{invoice.jobCards?.map(card => card.jobNumber).join(", ") || invoice.jobCard?.jobNumber || "Job card"} · {invoice.customer.companyName || `${invoice.customer.firstName} ${invoice.customer.lastName}`}</p></div>
           <div className="text-right"><span className="inline-flex border px-2 py-1 text-sm font-medium">{invoice.status}</span><p className="mt-2 text-sm">Issued {new Date(invoice.issuedDate).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })}</p>{invoice.dueDate && <p className="text-sm">Due {new Date(invoice.dueDate).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })}</p>}</div>
         </div>
         <dl className="grid gap-4 sm:grid-cols-3">

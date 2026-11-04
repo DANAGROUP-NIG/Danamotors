@@ -1,8 +1,9 @@
-import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
 import { qs } from "@/features/warranty/api/warranty.api";
 import type {
   AddVehiclesPayload,
   AddVehiclesResult,
+  AddVinRangesResult,
   Campaign,
   CampaignList,
   CampaignPayload,
@@ -51,3 +52,11 @@ export const addContactRequest = async (
 ) => (await apiPost<{ vehicle: CampaignVehicleDetail }>(`/campaigns/${id}/vehicles/${vehicleId}/contacts`, body)).vehicle;
 export const scheduleCampaignVehicleRequest = (id: string, vehicleId: string, body: { scheduledAt: string; branchId: string; notes?: string | null }) =>
   apiPost<{ appointment: { id: string }; vehicle: CampaignVehicleDetail }>(`/campaigns/${id}/vehicles/${vehicleId}/appointment`, body);
+
+export const addVinRangesRequest = (id: string, body: { ranges: { vinFrom: string; vinTo: string }[]; dryRun?: boolean }) =>
+  apiPost<AddVinRangesResult>(`/campaigns/${id}/vin-ranges`, body);
+export const removeVinRangeRequest = async (id: string, rangeId: string) =>
+  (await apiDelete<{ campaign: Campaign }>(`/campaigns/${id}/vin-ranges/${rangeId}`)).campaign;
+/** "Record as called": one SENT contact per printed vehicle. */
+export const recordPrintedContactsRequest = (body: { campaignVehicleIds: string[]; channel: "LETTER" | "PHONE" }) =>
+  apiPost<{ recorded: number; skipped: number }>("/campaigns/contacts/printed", body);

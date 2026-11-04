@@ -3,6 +3,10 @@ import { WorkshopController } from './workshop.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission } from '../../middleware/authorize';
+import { z } from 'zod';
+import prisma from '../../prisma/client';
+import { assertBranchOwnership } from '../../middleware/authorize';
+import { WorkshopService } from './workshop.service';
 import { PERMISSIONS } from '../../shared/constants/roles';
 import {
   assignTechnicianSchema,
@@ -132,7 +136,14 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.get('/technicians', requirePermission(PERMISSIONS.WORKSHOP_READ), controller.listTechnicians);
+router.post('/parts/:id/receive', requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ confirmed: z.literal(true) }).strict() })), async (req, res, next) => {
+  try {
+    const issue = await prisma.partIssuance.findUniqueOrThrow({ where: { id: req.params.id } });
+    assertBranchOwnership(req, issue.branchId);
+    res.json({ status: 'success', data: await new WorkshopService().receiveParts(issue.id, req.user!.userId) });
+  } catch (error) { next(error); }
+});
+router.get('/technicians' , requirePermission(PERMISSIONS.WORKSHOP_READ), controller.listTechnicians);
 router.post('/assign/:id', requirePermission(PERMISSIONS.ASSIGNMENT_CREATE), validateRequest(assignTechnicianSchema), controller.assignTechnician);
 router.patch('/progress/:id', requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE), validateRequest(updateJobProgressSchema), controller.updateProgress);
 router.patch('/qc/:id', requirePermission(PERMISSIONS.QCSTATUS_UPDATE), validateRequest(qcUpdateSchema), controller.updateQC);

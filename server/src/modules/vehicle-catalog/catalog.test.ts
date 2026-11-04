@@ -47,10 +47,10 @@ describe('Kia source and search', () => {
 });
 describe('Vehicle model validation', () => {
   it('rejects an empty model and accepts catalog or normalized custom models', () => {
-    expect(createVehicleSchema.safeParse({ body: { vin: 'TEST', customModel: '   ' } }).success).toBe(false);
-    expect(createVehicleSchema.safeParse({ body: { vin: 'TEST', modelId } }).success).toBe(true);
-    expect(createVehicleSchema.parse({ body: { vin: 'TEST', customModel: '  My   model  ' } }).body.customModel).toBe('My model');
-    expect(createVehicleSchema.safeParse({ body: { vin: 'TEST', customModel: 'x'.repeat(81) } }).success).toBe(false);
+    expect(createVehicleSchema.safeParse({ body: { registrationNumber: 'TEST-140', vin: 'TEST', customModel: '   ' } }).success).toBe(false);
+    expect(createVehicleSchema.safeParse({ body: { registrationNumber: 'TEST-140', vin: 'TEST', modelId } }).success).toBe(true);
+    expect(createVehicleSchema.parse({ body: { registrationNumber: 'TEST-140', vin: 'TEST', customModel: '  My   model  ' } }).body.customModel).toBe('My model');
+    expect(createVehicleSchema.safeParse({ body: { registrationNumber: 'TEST-140', vin: 'TEST', customModel: 'x'.repeat(81) } }).success).toBe(false);
   });
   it('resolves a valid catalog hierarchy from the database', async () => {
     const tx = database();

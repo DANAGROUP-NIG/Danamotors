@@ -17,6 +17,8 @@ export type Inspection = {
 };
 
 export type Estimate = {
+  upfrontPaymentPercent?: number | string;
+  upfrontAmount?: number;
   version: number;
   estimateNumber?: string | null;
   estimateDate?: string | null;
@@ -89,6 +91,8 @@ export type JobCardVehicle = {
 };
 
 export type PartIssuance = {
+  receivedById?: string | null;
+  receivedAt?: string | null;
   id: string;
   quantity: number;
   /** Part source code (internal; not shown to customers). */
@@ -134,6 +138,8 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  allowedTransitions?: string[];
+  depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;
@@ -248,7 +254,14 @@ export type JobCard = {
     campaignTitle: string;
     campaignType: CampaignType;
     vehicleStatus: CampaignVehicleStatus | null;
-    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED" };
+    /** Was the campaign work done on this job? null = not answered yet (READY needs an answer). */
+    attended: boolean | null;
+    attendedAt: string | null;
+    notAttendedReason: string | null;
+    attendedBy: { id: string; firstName: string; lastName: string } | null;
+    /** A FREE line is charged to this campaign, which pre-sets the answer to "done". */
+    hasFreeLine: boolean;
+    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED"; jobCardText: string | null; printOnJobCard: boolean };
   }[];
 };
 

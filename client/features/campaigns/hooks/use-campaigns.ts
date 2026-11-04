@@ -6,6 +6,7 @@ import {
   activateCampaignRequest,
   addCampaignVehiclesRequest,
   addContactRequest,
+  addVinRangesRequest,
   bulkUpdateCampaignVehiclesRequest,
   campaignKeys,
   closeCampaignRequest,
@@ -15,6 +16,7 @@ import {
   getCampaignVehicleRequest,
   getCampaignVehiclesRequest,
   getCampaignsRequest,
+  removeVinRangeRequest,
   scheduleCampaignVehicleRequest,
   updateCampaignRequest,
   type CampaignListParams,
@@ -127,5 +129,36 @@ export function useScheduleCampaignVehicle(id: string, vehicleId: string) {
       toast.success("Appointment booked");
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not book the appointment")),
+  });
+}
+
+type VinRangeInput = { vinFrom: string; vinTo: string };
+
+/** Dry-run summary for VIN ranges (no toast, no cache change). */
+export function usePreviewVinRanges(id: string) {
+  return useMutation({ mutationFn: (ranges: VinRangeInput[]) => addVinRangesRequest(id, { ranges, dryRun: true }) });
+}
+
+export function useAddVinRanges(id: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (ranges: VinRangeInput[]) => addVinRangesRequest(id, { ranges, dryRun: false }),
+    onSuccess: (r) => {
+      invalidate();
+      toast.success(`Saved ${r.saved} range(s) and added ${r.added.toLocaleString("en-NG")} vehicle(s)`);
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not save the VIN ranges")),
+  });
+}
+
+export function useRemoveVinRange(id: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (rangeId: string) => removeVinRangeRequest(id, rangeId),
+    onSuccess: () => {
+      invalidate();
+      toast.success("VIN range removed. Vehicles it added stay in the campaign.");
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not remove the VIN range")),
   });
 }

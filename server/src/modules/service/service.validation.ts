@@ -13,6 +13,11 @@ export const serviceIdParamSchema = z.object({
   }),
 });
 
+// The body is validated by jobOpeningBody in convertAppointment once booking fields are merged in.
+export const convertAppointmentSchema = serviceIdParamSchema.extend({
+  body: z.record(z.string(), z.unknown()),
+});
+
 export const jobCardIdParamSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid job card ID"),
@@ -42,12 +47,13 @@ const bookingFields = {
   mileage: mileageField.optional(),
   acFitted: z.boolean().optional(),
   followUpJobId: z.string().uuid().nullable().optional(),
-  requests: z.array(bookingRequestBody).max(100).optional(),
+  requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100).optional(),
 };
 
 export const createAppointmentSchema = z.object({
   body: z.object({
     ...bookingFields,
+    requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100),
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),
@@ -217,10 +223,12 @@ export const jobUpdateBody = z
     observations: z.string().trim().max(10000).optional(),
     workDone: z.string().trim().max(10000).optional(),
     status: z
-      .enum(["IN_PROGRESS", "QC", "READY", "DELIVERED", "CANCELLED"])
+      .enum(["IN_PROGRESS", "WAITING_PARTS", "QC", "READY", "DELIVERED", "CANCELLED"])
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
     deliveryAdvisorId: z.string().uuid().optional(),
+    /** The floor engineer (#97); null clears it. */
+    engineerId: z.string().uuid().nullable().optional(),
     lateReasonIds: z
       .array(z.string().uuid())
       .max(6)
@@ -257,6 +265,7 @@ export const createInspectionSchema = z.object({
 export const estimateBody = z
   .object({
     description: z.string().trim().min(1).max(2000),
+    upfrontPaymentPercent: z.number().finite().min(0).max(100).multipleOf(0.01).optional(),
 
     lines: z
       .array(
@@ -287,6 +296,7 @@ export const createApprovalSchema = z.object({
   body: z.object({
     customerId: z.string().uuid("Invalid customer ID"),
     approved: z.boolean(),
+    consentAccepted: z.boolean().optional(),
     expectedVersion: z.number().int().positive(),
     expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
     signerName: z.string().trim().min(1).max(200).optional(),
@@ -316,6 +326,7 @@ export const createLabourItemSchema = z.object({
       description: z.string().trim().min(1).max(300),
       vehicleSystem: z.string().trim().max(100).optional(),
       group: z.string().trim().max(100).optional(),
+      serviceGroupId: z.string().uuid().nullable().optional(),
       defaultHours: z.number().positive(),
       rate: z.number().nonnegative(),
       majorLabour: z.boolean().optional(),
@@ -337,6 +348,7 @@ export const updateLabourItemSchema = z.object({
       description: z.string().trim().min(1).max(300).optional(),
       vehicleSystem: z.string().trim().max(100).optional(),
       group: z.string().trim().max(100).optional(),
+      serviceGroupId: z.string().uuid().nullable().optional(),
       defaultHours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       active: z.boolean().optional(),

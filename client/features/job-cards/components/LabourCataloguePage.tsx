@@ -168,7 +168,7 @@ export function LabourCataloguePage() {
             onChange={(code) => setForm({ ...form, vehicleSystem: code })}
           />
           <WorkshopPicker
-            label="Group"
+            label="Service group"
             endpoint="/workshop-masters?kind=VEHICLE_GROUP"
             collection="items"
             value={form.group ?? ""}

@@ -86,3 +86,21 @@ Customer and vehicle identity fields remain sourced from their existing records,
 Migration `20260929180000_job_opening_requests` stores request defect codes and spare/oil/labour amounts, five tyre snapshots, battery details, A/C type and `customField1`. Tyre and battery makes use new `TYRE_MAKE` and `BATTERY_MAKE` master kinds managed in Settings. Request totals are recalculated on the server, overriding client-supplied breakdown totals. Loading an existing NGN estimate copies its priced lines into editable opening requests; it does not transfer invoice or approval status.
 
 The legacy extra name lines map to contact person and registered name. The custom-field label is configurable in `opening/opening-ui.tsx`. Bay occupancy and colour swatches are not fabricated where the backend does not provide them. The customer checklist displays an empty placeholder until a source is configured.
+
+## Service MIS masters (#97)
+
+The MIS reports (`doc/reports.md`, *Service MIS reports*) read these master fields. All are on **Settings → Workshop
+Masters** unless stated.
+
+| Field | Where | Use |
+|---|---|---|
+| **MIS category** | Service type (`WorkshopMaster.category`): `FREE`, `PAID`, `RUNNING_REPAIR`, `ACCIDENTAL`, `PDI`, `OTHER` | Groups jobs in S1, S2, S3, S5 and S15. A new service type gets one from its code and flags; blank falls back to the flags. Migration `20261103100000_mis_reports` filled existing types: 1F, 2F, 3F, DI, P2 free; RG, SC, KS, 1P–4P and km-based codes paid; RR, RU running repair; AC accidental; PD, BD PDI; the rest other. |
+| **Service group** | Vehicle group (`VEHICLE_GROUP`, the legacy `vehiclegroup`) | Labour items carry `serviceGroupId`; the labour catalogue's *Service group* picker sets it (and the legacy `group` text). The migration filled it where the text matched a group code or name, and created *MAINTENANCE*, *SERVICES* and *BODY REPAIR* under system *GENERAL* when a database had no groups. Complaint codes already hang from a group. |
+| **Body repair group** | Vehicle group attribute `bodyRepair` | Labour in these groups is the "body" figure (S1 memo line, MIR A2 and A9). |
+| **Major defect** | Complaint attribute `majorDefect` (existing) | *Major defects only* in S8. |
+| **Free service due limits** | *Days limit* and *Mileage limit* on the service charge per model (`ServiceTypeModelSetting.daysLimit` / `mileageLimit`) | S13. The migration set 1F = 30 days / 1,000 km and 2F = 90 days / 5,000 km on existing rows with no limit; no rows are added, because a row makes the service type available for that model at job opening. |
+| **Engineer** | Job opening and job editing (user with the Engineer role at the branch) | S5, S6, S15 A9 and the engineer filter. |
+| **Anniversary** | Customer form (unchanged); stored also as `Customer.anniversaryOn` (date) | S11. The migration copied dates that parse from the old text. |
+| **Recorded by** | `VehicleOwnership.createdById`, set when an owner change is saved | S12. |
+| **Mileage bands** | `MileageBand` (same table as PR #81) | S2 by model. Eight default bands; edited with the report settings once PR #81's settings screen is restored. |
+

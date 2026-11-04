@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ChevronDown, Clock, Download, Eye, FileSpreadsheet, Megaphone, PlusCircle, Search, Car, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
@@ -38,7 +38,12 @@ export function CampaignsPage() {
   const { hasPermission, isSuperAdmin } = useAuth();
   const canCreate = isSuperAdmin || hasPermission(CAMPAIGN_PERMISSIONS.CREATE);
   const canUpdate = isSuperAdmin || hasPermission(CAMPAIGN_PERMISSIONS.UPDATE);
-  const [type, setType] = useState<CampaignType | "">("");
+  // The type filter lives in the URL so /campaigns?type=FPC ("FPC bulletins") opens filtered.
+  const searchParams = useSearchParams();
+  const urlType = searchParams.get("type");
+  const type: CampaignType | "" = urlType && urlType in CAMPAIGN_TYPE_LABELS ? (urlType as CampaignType) : "";
+  const setType = (value: CampaignType | "") => router.replace(value ? `/campaigns?type=${value}` : "/campaigns", { scroll: false });
+  const isFpc = type === "FPC";
   const [status, setStatus] = useState<CampaignStatus | "">("");
   const [search, setSearch] = useState("");
   const [committed, setCommitted] = useState("");
@@ -133,8 +138,8 @@ export function CampaignsPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
-        title="Campaigns"
-        description="Recalls, free fixes and service campaigns targeted by VIN."
+        title={isFpc ? "FPC bulletins" : "Campaigns"}
+        description={isFpc ? "Manufacturer field product check bulletins and the VIN ranges they cover." : "Recalls, free fixes, service campaigns and FPC bulletins targeted by VIN."}
         actions={
           <div className="flex gap-2">
             <ActionMenu
@@ -154,8 +159,8 @@ export function CampaignsPage() {
             </ActionMenu>
             {canCreate && (
               <Button asChild size="sm" className="gap-1.5">
-                <Link href="/campaigns/new">
-                  <PlusCircle className="size-4" /> New campaign
+                <Link href={isFpc ? "/campaigns/new?type=FPC" : "/campaigns/new"}>
+                  <PlusCircle className="size-4" /> {isFpc ? "New FPC bulletin" : "New campaign"}
                 </Link>
               </Button>
             )}
@@ -189,6 +194,7 @@ export function CampaignsPage() {
             { label: "Recall", value: "RECALL" },
             { label: "Free fix", value: "FREE_FIX" },
             { label: "Service campaign", value: "SERVICE_CAMPAIGN" },
+            { label: "FPC bulletin", value: "FPC" },
           ]}
         />
         <span className="hidden h-6 w-px bg-slate-200 md:block" />

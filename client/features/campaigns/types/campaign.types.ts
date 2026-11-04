@@ -2,8 +2,12 @@ import type { CampaignType, CampaignVehicleStatus, Person } from "@/features/war
 
 export type { CampaignType, CampaignVehicleStatus };
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "CLOSED";
-export type ContactChannel = "PHONE" | "SMS" | "WHATSAPP" | "EMAIL" | "VISIT";
-export type ContactOutcome = "REACHED" | "NO_ANSWER" | "WRONG_NUMBER" | "CALL_BACK" | "DECLINED";
+export type ContactChannel = "PHONE" | "SMS" | "WHATSAPP" | "EMAIL" | "VISIT" | "LETTER";
+/** SENT: a letter or call list went out; counts as called but the customer was not reached. */
+export type ContactOutcome = "REACHED" | "NO_ANSWER" | "WRONG_NUMBER" | "CALL_BACK" | "DECLINED" | "SENT";
+
+/** A saved VIN range of a campaign (FPC bulletin "vehicles to be checked"). */
+export type VinRange = { id: string; vinFrom: string; vinTo: string; createdAt: string };
 
 export type Progress = {
   affected: number;
@@ -43,12 +47,16 @@ export type Campaign = {
   defectDescription: string | null;
   startDate: string;
   endDate: string | null;
+  bulletinDate: string | null;
+  jobCardText: string | null;
+  printOnJobCard: boolean;
   labourCovered: boolean;
   partsCovered: boolean;
   activatedAt: string | null;
   closedAt: string | null;
   models: CampaignModelLink[];
   coveredItems?: CoveredItem[];
+  vinRanges?: VinRange[];
   progress: Progress;
   byBranch?: (Progress & { branchId: string | null; branchName: string })[];
   unmatchedVins?: number;
@@ -66,6 +74,9 @@ export type CampaignPayload = {
   defectDescription?: string | null;
   startDate: string;
   endDate?: string | null;
+  bulletinDate?: string | null;
+  jobCardText?: string | null;
+  printOnJobCard?: boolean;
   labourCovered?: boolean;
   partsCovered?: boolean;
   models?: { vehicleModelId: string; yearFrom?: number | null; yearTo?: number | null }[];
@@ -134,6 +145,17 @@ export type AddVehiclesResult = {
 export type AddVehiclesPayload =
   | { vins: string[]; dryRun?: boolean }
   | {
-      criteria: { vehicleModelIds: string[]; yearFrom?: number | null; yearTo?: number | null; vinFrom?: string | null; vinTo?: string | null };
+      criteria: { vehicleModelIds: string[]; yearFrom?: number | null; yearTo?: number | null };
       dryRun?: boolean;
     };
+
+export type AddVinRangesResult = {
+  ranges: number;
+  newRanges: number;
+  alreadySaved: number;
+  vehiclesInRanges: number;
+  alreadyInCampaign: number;
+  toAdd: number;
+  added: number;
+  saved: number;
+};

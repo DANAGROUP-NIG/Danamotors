@@ -52,6 +52,8 @@ export type InvoiceReceiptAllocation = {
 };
 
 export type Invoice = {
+  jobCards?: { id: string; jobNumber: string }[];
+  billType?: string | null;
   vatBreakdown?: {category:string;rate:string|number;saleAmount:string|number;discount:string|number;taxableAmount:string|number;vat:string|number}[];
   id: string;
   customerId: string;

@@ -135,13 +135,17 @@ card's **Who pays** card shows totals by payer; the bill adds the service charge
 
 **Campaigns** in the sidebar (`/campaigns`).
 
-- **Types:** `RECALL`, `FREE_FIX`, `SERVICE_CAMPAIGN`.
-- **Status:** `DRAFT → ACTIVE → CLOSED`. Activation needs at least one vehicle, and notifies service advisers and
-  reception managers at the branches with affected vehicles.
+- **Types:** `RECALL`, `FREE_FIX`, `SERVICE_CAMPAIGN` and `FPC` (manufacturer field product check bulletin, #98).
+  `FPC` behaves like `RECALL`; see [FPC bulletins](#fpc-bulletins).
+- **Status:** `DRAFT → ACTIVE → CLOSED`. Activation needs at least one vehicle or VIN range, and notifies service
+  advisers and reception managers at the branches with affected vehicles. Activation also adds vehicles registered
+  while the campaign was a draft inside its VIN ranges.
 - **Affected vehicles are stored by VIN.** Manufacturer lists often include vehicles never serviced here; they are
   tracked by VIN and link automatically when the vehicle is registered.
 - **Adding vehicles:** paste VINs, upload an `.xlsx`/`.csv` file (a column headed VIN or Chassis), or select by criteria
-  (model, model years, VIN range). The dialog validates live with `dryRun`: invalid, duplicate and not-in-system counts.
+  (model and model years). The dialog validates live with `dryRun`: invalid, duplicate and not-in-system counts.
+- **VIN ranges** ("Vehicles to check" on the campaign page): see [FPC bulletins](#fpc-bulletins). They work for every
+  campaign type.
 - **Vehicle status:**
   ```
   PENDING → CONTACTED → SCHEDULED → COMPLETED   (or NOT_REACHABLE / NOT_APPLICABLE)
@@ -149,9 +153,46 @@ card's **Who pays** card shows totals by payer; the bill adds the service charge
   - A contact attempt that reaches the customer moves the vehicle to `CONTACTED`.
   - **Schedule** books a service appointment.
   - Opening a job card for the vehicle marks it `SCHEDULED`.
-  - **When that job card reaches `READY`** (quality check passed), the vehicle is marked `COMPLETED` in the same
-    transaction. This works from the job card or the workshop screen.
+  - **The job card records whether the campaign work was done** (Linked campaigns card: Done / Not done with a
+    reason). `READY` is refused with `409 CAMPAIGN_ATTENDANCE_REQUIRED` until every linked campaign is answered. A
+    campaign with a `FREE` line charged to it counts as done unless changed.
+  - **At `READY`** only campaigns marked done are `COMPLETED` for the vehicle, in the same transaction. For a
+    campaign marked not done, the vehicle goes back from `SCHEDULED` to `CONTACTED` (customer reached by phone, SMS,
+    WhatsApp, e-mail or visit) or `PENDING`, so the next job card flags it again. An answer changed after `READY`
+    (until delivery) is applied to the vehicle straight away.
 - **Progress** is shown overall and by branch; the branch is the vehicle owner's branch.
+- **Contacts:** phone, SMS, WhatsApp, e-mail, visit and letter. Outcome `SENT` (a letter or call list went out) counts
+  as called but does not change the status, because the customer was not reached.
+
+### FPC bulletins
+
+The legacy *Service → FPC Bulletin* menu. A bulletin is a campaign of type `FPC`; there is no separate bulletin
+table, screen or API. **FPC bulletins** in the sidebar opens `/campaigns?type=FPC`.
+
+| Legacy bulletin master | Campaign form |
+|---|---|
+| FPC bulletin number | `code` (letters, digits, spaces, `-`, `_`, `/`) |
+| FPC bulletin date | `bulletinDate` |
+| Subject | `title` |
+| Measures | `description` |
+| Display for job card | `jobCardText` (max 100 characters; blank prints the title) |
+| From VIN / to VIN grid, **S** / **C** | VIN ranges: **Save** / **Clear** |
+| Effective date / close date | `startDate` / `endDate` |
+| FPC bulletin to be printed on job card | `printOnJobCard` (default on) |
+
+- **VIN ranges** (`CampaignVinRange`): both VINs are 17 characters and share the first 11 (manufacturer, model, check
+  digit, year, plant; only the serial differs). `from <= to`; a single VIN is from = to. **Check** shows how many
+  vehicles in the system the new ranges hold; **Save** stores them and adds those vehicles.
+- **A vehicle registered later** with a VIN inside an **active** campaign's range is added to it at registration, so the
+  job opening check flags the campaign. The VIN cannot change after registration.
+- **Removing a range** keeps the vehicles it added; mark them not applicable by hand.
+- **Job card print:** each linked campaign with "print on job card" prints in an **FPC / campaign** box (its job card
+  text, or the title), whatever the viewer's warranty permission.
+- **Called / visited / attended** (used by the FPC reports, `doc/reports.md`):
+  - called: the campaign vehicle has at least one contact (any channel or outcome);
+  - visited: a job card that is not cancelled is linked to the campaign for that vehicle;
+  - attended: that job card recorded the work as done.
+- The variant on the legacy bulletin is not kept: the VIN ranges decide which vehicles are affected.
 
 ## Permissions
 
@@ -163,7 +204,8 @@ card's **Who pays** card shows totals by payer; the bill adds the service charge
 | `warranty:settings` | Model policies, claim codes, extended warranty or goodwill overrides | WarrantyOfficer, Admin |
 | `campaign:read` | See campaigns | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager, Receptionist, ReceptionManager |
 | `campaign:create` / `campaign:update` | Create, edit, activate or close campaigns; add vehicles | WarrantyOfficer, Admin |
-| `campaign:vehicle:update` | Outreach: contacts, scheduling, status | WarrantyOfficer, Admin, Receptionist, ReceptionManager |
+| `campaign:vehicle:update` | Outreach: contacts, scheduling, status; "record as called" in the FPC vehicles report | WarrantyOfficer, Admin, Receptionist, ReceptionManager |
+| `jobcard:update` | Record whether a linked campaign's work was done on the job card | ServiceAdviser, WorkshopManager, Admin, … |
 | `jobcard:line:update` | Change who pays for a line | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager |
 
 SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migration
@@ -179,6 +221,9 @@ SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migrat
 - The old free-text `Vehicle.warrantyProvider/Status/ExpiresAt` columns, `Vehicle.warrantyStartDate`, and the
   warranty-era `InvoiceLine.kind/taxable/jobCardLineId` columns are kept but no longer used. The customer
   portal shows the calculated coverage in their place. Drop them in a follow-up migration once no deployed build reads them.
+- `20261102100000_fpc_bulletins` adds the `FPC` type, the bulletin fields, `CampaignVinRange`, the attended columns on
+  `JobCardCampaign`, `LETTER` / `SENT`, `ReportSetting` and the FPC report permissions. Additive and idempotent.
+- `npm run prisma:seed:demo` includes an FPC bulletin with vehicles in every FPC list (see `doc/fpc-testing-guide.md`).
 - `npm run prisma:seed:warranty` seeds Kia model policies, sample claim codes, a demo Kia Sportage under warranty, and
   a draft recall `RC-2026-014` that includes it. Activate it to see the banners.
 

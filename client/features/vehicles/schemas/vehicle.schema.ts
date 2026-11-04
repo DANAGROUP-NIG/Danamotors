@@ -6,9 +6,9 @@ const vehicleFields = z.object({
   registrationNumber: z
     .string()
     .trim()
+    .min(1, "Registration number is required")
     .max(50, "Max 50 characters")
-    .transform((v) => v.toUpperCase())
-    .optional(),
+    .transform((v) => v.toUpperCase()).optional(),
   catalogueId: z.string().uuid().nullable().optional(),
   colourId: z.string().uuid().nullable().optional(),
   modelId: z.string().uuid().nullable().optional(),
@@ -51,6 +51,7 @@ export const vehicleProfileSchema = vehicleFields.superRefine((values, ctx) => {
 });
 // Existing stock vehicles remain editable; every new frontend vehicle requires a customer.
 export const createVehicleSchema = vehicleProfileSchema.superRefine((values, ctx) => {
+  if (!values.registrationNumber) ctx.addIssue({ code: "custom", path: ["registrationNumber"], message: "Registration number is required" });
   if (!z.string().uuid().safeParse(values.customerId).success) {
     ctx.addIssue({ code: "custom", path: ["customerId"], message: "Select a customer to link this vehicle" });
   }

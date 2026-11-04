@@ -173,6 +173,7 @@ export class FinanceController {
       }
       const result = await this.receiptService.listReceipts({
         branchId,
+        customerId: req.query.customerId as string | undefined,
         from: req.query.from as string | undefined,
         to: req.query.to as string | undefined,
         category: req.query.category as 'ALL' | 'SERVICE_PARTS' | 'SALES_ENQUIRY' | undefined,

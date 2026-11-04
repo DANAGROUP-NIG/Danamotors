@@ -2,7 +2,7 @@
  * Loads what coverage needs from the database and answers "is this vehicle
  * under warranty, and which campaigns are open for it?".
  */
-import { CampaignVehicleStatus, Prisma, PrismaClient, WarrantyCoverageStatus } from "@prisma/client";
+import { CampaignType, CampaignVehicleStatus, Prisma, PrismaClient, WarrantyCoverageStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { NotFoundError } from "../../shared/errors/appError";
 import { isCampaignOpen } from "../campaign/campaign.logic";
@@ -60,7 +60,7 @@ export interface OpenCampaign {
   campaignVehicleId: string;
   code: string;
   title: string;
-  type: "RECALL" | "FREE_FIX" | "SERVICE_CAMPAIGN";
+  type: CampaignType;
   description: string | null;
   defectDescription: string | null;
   startDate: Date;

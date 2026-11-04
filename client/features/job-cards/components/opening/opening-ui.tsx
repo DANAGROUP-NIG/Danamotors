@@ -1,6 +1,6 @@
 "use client";
 import { useId, useState, type ReactNode } from "react";
-import { LockKeyhole } from "lucide-react";
+import { ChevronDown, LockKeyhole } from "lucide-react";
 import { DateInput } from "@/components/forms/DateInput";
 export const openingInput = "h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
 export const openingGrid = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
@@ -53,13 +53,16 @@ export function OpeningCard(
     description,
     children,
     action,
+    collapsible = false,
   }: {
     title: string;
     description?: string;
     children: ReactNode;
     action?: ReactNode;
+    collapsible?: boolean;
   },
 ) {
+  if (collapsible) return <details className="group min-w-0 rounded-xl border border-border bg-background shadow-sm"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-6 [&::-webkit-details-marker]:hidden"><div><h3 className="text-sm font-semibold">{title}</h3>{description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div><ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" /></summary><div className="border-t border-border p-4 md:p-6">{action && <div className="mb-4 flex justify-end">{action}</div>}{children}</div></details>;
   return <section className="min-w-0 rounded-xl border border-border bg-background p-4 shadow-sm md:p-6"><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold">{title}</h3>{description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>{action}</div>{children}</section>;
 }
 

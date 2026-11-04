@@ -1,4 +1,4 @@
-import { ChargeType, Prisma } from "@prisma/client";
+import { CampaignType, ChargeType, Prisma } from "@prisma/client";
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
@@ -39,7 +39,7 @@ interface JobContext {
     id: string;
     code: string;
     title: string;
-    type: "RECALL" | "FREE_FIX" | "SERVICE_CAMPAIGN";
+    type: CampaignType;
     partsCovered: boolean;
     labourCovered: boolean;
     coveredItems: { kind: "PART" | "LABOUR"; partNumber: string | null; operationCode: string | null; description: string }[];

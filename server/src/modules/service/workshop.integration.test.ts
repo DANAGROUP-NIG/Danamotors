@@ -182,7 +182,7 @@ integration("Workshop database flow", () => {
               teamId: team.id,
               serviceAdvisorId: user.id,
               mileage: 150,
-              promisedAt: new Date(Date.now() - 60000).toISOString(),
+              promisedAt: new Date(Date.now() + 172800000).toISOString(),
 
               complaints: [
                 {
@@ -253,6 +253,7 @@ integration("Workshop database flow", () => {
               actorId: user.id,
             });
 
+            await tx.jobCard.update({ where: { id: job.id }, data: { promisedAt: new Date(Date.now() - 60000) } });
             expect(bill.lines).toHaveLength(3);
             await new ReceiptService().createReceipt({ customerId: customer.id, branchId: branch.id, issuedById: user.id, mode: 'CASH', category: 'SERVICE_PARTS', amount: bill.total, allocations: [{ invoiceId: bill.id, amount: bill.total }] });
 

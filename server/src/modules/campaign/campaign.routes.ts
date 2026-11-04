@@ -7,15 +7,18 @@ import { CampaignController } from "./campaign.controller";
 import {
   addContactSchema,
   addVehiclesSchema,
+  addVinRangesSchema,
   bulkUpdateCampaignVehiclesSchema,
   campaignIdSchema,
   campaignVehicleParamsSchema,
   createCampaignSchema,
   listCampaignVehiclesSchema,
   listCampaignsSchema,
+  printedContactsSchema,
   scheduleSchema,
   updateCampaignSchema,
   updateCampaignVehicleSchema,
+  vinRangeParamsSchema,
 } from "./campaign.validation";
 
 const router = Router();
@@ -29,7 +32,7 @@ router.use(authMiddleware);
  * tags:
  *   - name: Campaigns
  *     description: |
- *       Recall (`RECALL`), free fix (`FREE_FIX`) and service (`SERVICE_CAMPAIGN`) campaigns targeted by VIN.
+ *       Recall (`RECALL`), free fix (`FREE_FIX`), service (`SERVICE_CAMPAIGN`) campaigns and FPC bulletins (`FPC`) targeted by VIN.
  *
  *       Campaign status: `DRAFT → ACTIVE → CLOSED` (a draft can also be closed). Affected vehicles are kept
  *       by VIN, so manufacturer lists may include vehicles that are not in the system yet; they link
@@ -73,7 +76,7 @@ router.use(authMiddleware);
  *     tags: [Campaigns]
  *     summary: List campaigns with progress
  *     parameters:
- *       - { in: query, name: type, schema: { type: string, enum: [RECALL, FREE_FIX, SERVICE_CAMPAIGN] } }
+ *       - { in: query, name: type, schema: { type: string, enum: [RECALL, FREE_FIX, SERVICE_CAMPAIGN, FPC] } }
  *       - { in: query, name: status, schema: { type: string, enum: [DRAFT, ACTIVE, CLOSED] } }
  *       - { in: query, name: search, schema: { type: string } }
  *       - { in: query, name: page, schema: { type: integer } }
@@ -143,6 +146,29 @@ router.post("/", requirePermission(P.CAMPAIGN_CREATE), validateRequest(createCam
  *     responses:
  *       200: { description: Closed }
  */
+/**
+ * @openapi
+ * /campaigns/contacts/printed:
+ *   post:
+ *     tags: [Campaigns]
+ *     summary: Record printed letters or a printed call list as contacts ("record as called")
+ *     description: |
+ *       Requires campaign:vehicle:update. One contact per vehicle with outcome SENT: it counts as called, but the
+ *       customer was not reached, so the vehicle status does not change. Vehicles that are completed, not
+ *       applicable or in a campaign that is not active are skipped.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { campaignVehicleIds: ["…", "…"], channel: LETTER }
+ *     responses:
+ *       201:
+ *         description: Contacts recorded
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { recorded: 2, skipped: 0 } }
+ */
+router.post("/contacts/printed", requirePermission(P.CAMPAIGN_VEHICLE_UPDATE), validateRequest(printedContactsSchema), controller.recordPrintedContacts);
+
 router.get("/:id", requirePermission(P.CAMPAIGN_READ), validateRequest(campaignIdSchema), controller.get);
 router.put("/:id", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(updateCampaignSchema), controller.update);
 router.post("/:id/activate", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(campaignIdSchema), controller.activate);
@@ -187,7 +213,7 @@ router.post("/:id/close", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(
  *             vins:
  *               value: { vins: ["KNAPU81BDP7123456", "KNDEU2A20P7654321"], dryRun: true }
  *             criteria:
- *               value: { criteria: { vehicleModelIds: ["…"], yearFrom: 2021, yearTo: 2023, vinFrom: KNAPU81BDP7000000, vinTo: KNAPU81BDP7999999 } }
+ *               value: { criteria: { vehicleModelIds: ["…"], yearFrom: 2021, yearTo: 2023 } }
  *     responses:
  *       200:
  *         description: Dry-run summary
@@ -207,6 +233,45 @@ router.post("/:id/close", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(
  *     responses:
  *       200: { description: Updated }
  */
+/**
+ * @openapi
+ * /campaigns/{id}/vin-ranges:
+ *   post:
+ *     tags: [Campaigns]
+ *     summary: Save VIN ranges and add every vehicle in the system inside them (campaign:update)
+ *     description: |
+ *       The FPC bulletin's "vehicles to be checked". Both VINs are 17 characters, from <= to, and share the
+ *       first 11 characters (only the serial differs); a single VIN is from = to. Vehicles in the system inside
+ *       a new range are added like `POST /campaigns/{id}/vehicles`. A vehicle registered later with a VIN inside
+ *       an ACTIVE campaign's range is added to it at registration. Send `dryRun: true` for the summary only.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { ranges: [{ vinFrom: KNAKU813DC5214595, vinTo: KNAKU813DC5214616 }, { vinFrom: KNAKU813DC5215053, vinTo: KNAKU813DC5215053 }], dryRun: true }
+ *     responses:
+ *       200:
+ *         description: Dry-run summary
+ *         content:
+ *           application/json:
+ *             example: { status: success, data: { ranges: 2, newRanges: 2, alreadySaved: 0, vehiclesInRanges: 9, alreadyInCampaign: 1, toAdd: 8, added: 0, saved: 0 } }
+ *       201: { description: Ranges saved and vehicles added }
+ *       400: { description: Invalid range (length, order or a different first 11 characters), or the campaign is closed }
+ * /campaigns/{id}/vin-ranges/{rangeId}:
+ *   delete:
+ *     tags: [Campaigns]
+ *     summary: Remove a VIN range (campaign:update). Vehicles it added stay in the campaign.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: rangeId, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: The campaign with its remaining ranges }
+ *       404: { description: Range not found }
+ */
+router.post("/:id/vin-ranges", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(addVinRangesSchema), controller.addVinRanges);
+router.delete("/:id/vin-ranges/:rangeId", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(vinRangeParamsSchema), controller.removeVinRange);
+
 router.get("/:id/vehicles", requirePermission(P.CAMPAIGN_READ), validateRequest(listCampaignVehiclesSchema), controller.listVehicles);
 router.post("/:id/vehicles", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(addVehiclesSchema), controller.addVehicles);
 router.patch("/:id/vehicles", requirePermission(P.CAMPAIGN_VEHICLE_UPDATE), validateRequest(bulkUpdateCampaignVehiclesSchema), controller.bulkUpdateVehicles);

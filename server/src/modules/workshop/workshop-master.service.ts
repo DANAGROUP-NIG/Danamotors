@@ -2,9 +2,16 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../../prisma/client';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
-import { FIXED_PARENT_KINDS, MASTER_PARENTS, MasterKind, parseAttributes } from './master-kinds';
+import { FIXED_PARENT_KINDS, MASTER_PARENTS, MasterKind, parseAttributes, SERVICE_CATEGORIES } from './master-kinds';
+import { defaultServiceCategory } from './service-type.defaults';
 import { masterBody, listMasterSchema } from './workshop-master.validation';
 type MasterInput = z.infer<typeof masterBody>;
+
+// Service types carry one of the fixed MIS categories; other kinds (e.g. bay group) keep free text.
+function assertServiceCategory(kind: string, category: string | null | undefined) {
+  if (kind === 'SERVICE_TYPE' && category && !(SERVICE_CATEGORIES as readonly string[]).includes(category))
+    throw new BadRequestError(`Service category must be one of ${SERVICE_CATEGORIES.join(', ')}`);
+}
 
 const parentSelect = {
   select: {
@@ -98,12 +105,14 @@ export class WorkshopMasterService {
   async create(data: MasterInput) {
     if (data.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
       throw new BadRequestError('Display order and pre-delivery apply only to service types');
+    assertServiceCategory(data.kind, data.category);
     await this.validateParent(data.kind, data.parentId);
     const { attributes, ...rest } = data;
 
     return prisma.workshopMaster.create({
       data: {
         ...rest,
+        category: data.kind === 'SERVICE_TYPE' && rest.category === undefined ? defaultServiceCategory(rest.code, rest.freeService, rest.preDelivery) : rest.category,
         attributes: (parseAttributes(data.kind, attributes) ?? undefined) as Prisma.InputJsonValue | undefined,
       },
 
@@ -126,6 +135,7 @@ export class WorkshopMasterService {
       throw new BadRequestError('Display order and pre-delivery apply only to service types');
 
     const kind = existing.kind as MasterKind;
+    assertServiceCategory(kind, data.category);
 
     if (data.parentId !== undefined && data.parentId !== existing.parentId) {
       // Reparenting would silently change the meaning of existing vehicles and rates.

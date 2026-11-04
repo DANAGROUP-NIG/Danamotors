@@ -21,6 +21,7 @@ export function CustomerDetailsCard(
 ) {
   return (
     <OpeningCard
+      collapsible
       title="Customer"
       description="Selecting an existing customer fills their saved details."
       action={customer && <Link

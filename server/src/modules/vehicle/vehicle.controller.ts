@@ -136,7 +136,7 @@ export class VehicleController {
   addVehicleOwnership = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.vehicleService.addVehicleOwnership(id, req.body);
+      const result = await this.vehicleService.addVehicleOwnership(id, req.body, req.user?.userId);
 
       res.status(201).json({
         status: 'success',

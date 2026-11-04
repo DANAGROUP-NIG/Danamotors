@@ -41,7 +41,7 @@ function technicianName(t: Technician) {
 }
 
 function formatTechnicianText(t: Technician) {
-  return `*${technicianName(t)}*\nEmail: ${t.email}\nPhone: ${t.phoneNumber ?? "—"}\nBranch: ${t.branch?.name ?? "—"}\nActive jobs: ${t._count.technicianAssignments}\nStatus: ${t.isActive ? "Active" : "Inactive"}`;
+  return `*${technicianName(t)}*\nEmail: ${t.email}\nPhone: ${t.phoneNumber ?? "—"}\nBranch: ${t.branch?.name ?? "—"}\nActive jobs: ${t.openJobs ?? t._count.technicianAssignments} open / {t.closedJobs ?? 0} closed\nStatus: ${t.isActive ? "Active" : "Inactive"}`;
 }
 
 function exportColumns() {
@@ -197,7 +197,7 @@ export function TechniciansPage() {
       header: "Active Jobs",
       render: (t) => (
         <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-sm font-medium text-blue-700">
-          {t._count.technicianAssignments}
+          {t.openJobs ?? t._count.technicianAssignments} open / {t.closedJobs ?? 0} closed
         </span>
       ),
     },

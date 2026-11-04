@@ -406,7 +406,7 @@ export class ServiceController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.serviceService.getJobCard(id, req.user?.permissions ?? []);
+      const result = await this.serviceService.getJobCard(id, req.user?.permissions ?? [], req.user?.role);
       assertBranchOwnership(req, result.branchId);
       res.status(200).json({
         status: "success",

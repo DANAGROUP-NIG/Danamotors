@@ -39,10 +39,9 @@ export const registerPortalVehicleSchema = z.object({
   registrationNumber: z
     .string()
     .trim()
+    .min(1, "Registration number is required")
     .max(50, "Max 50 characters")
-    .transform((v) => v.toUpperCase())
-    .optional()
-    .or(z.literal("")),
+    .transform((v) => v.toUpperCase()),
   make: z.string().optional().or(z.literal("")),
   model: z.string().optional().or(z.literal("")),
   year: z
@@ -68,7 +67,7 @@ export const bookPortalAppointmentSchema = z.object({
     .optional()
     .or(z.literal(""))
     .refine((v) => !v || (Number.isInteger(Number(v)) && Number(v) > 0), "Enter a positive number"),
-  notes: z.string().optional().or(z.literal("")),
+  notes: z.string().trim().min(1, "Customer request is required").max(2000),
 });
 
 export type BookPortalAppointmentFormValues = z.infer<typeof bookPortalAppointmentSchema>;

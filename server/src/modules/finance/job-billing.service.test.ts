@@ -49,6 +49,33 @@ describe('Job billing after delivery on credit', () => {
     expect(data.statusHistory.create).toEqual(expect.objectContaining({ toStatus: 'DELIVERED', actorId: 'actor', remarks: expect.stringContaining('Job bill') }));
   });
 
+  it('consolidates every ready vehicle job into one Warranty invoice under shared locks', async () => {
+    const first = { ...card, id: 'job', jobNumber: 'J1', vehicleId: 'vehicle', status: 'READY', deliveredAt: null };
+    const second = { ...first, id: 'job2', jobNumber: 'J2' };
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(first);
+    (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([first, second]);
+    await new JobBillingService().createJobBill({ ...input, consolidateVehicle: true });
+    expect(prisma.invoice.create).toHaveBeenCalledTimes(1);
+    expect(prisma.invoice.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ billType: 'WARRANTY', labourTotal: 200, total: 210, jobCards: { connect: [{ id: 'job' }, { id: 'job2' }] } }) }));
+    expect(prisma.jobCard.update).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+  });
+  it('refuses mixed customers or unfinished work instead of partially billing a vehicle', async () => {
+    const first = { ...card, id: 'job', jobNumber: 'J1', vehicleId: 'vehicle', status: 'READY', deliveredAt: null };
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(first);
+    (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([first, { ...first, id: 'job2', customerId: 'other' }]);
+    await expect(new JobBillingService().createJobBill({ ...input, consolidateVehicle: true })).rejects.toThrow('same branch and bill-to customer');
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+    (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([first, { ...first, id: 'job2', status: 'IN_PROGRESS' }]);
+    await expect(new JobBillingService().createJobBill({ ...input, consolidateVehicle: true })).rejects.toThrow('Only ready');
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+  });
+  it('rejects repeat billing of the selected job', async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card, billedAt: new Date() });
+    await expect(new JobBillingService().createJobBill({ ...input, consolidateVehicle: true })).rejects.toThrow('active bill');
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+  });
+
   it('persists the enabled customer parts VAT breakdown on a newly created invoice', async () => {
     (prisma.financeSetting.findUnique as jest.Mock).mockImplementation(({ where }: { where: { key: string } }) => Promise.resolve({ value: where.key === 'JOB_BILL_PARTS_VAT_ENABLED' ? true : where.key === 'partsVatRates' ? { SPARES: 7.5, OIL: 7.5, ACCESSORIES: 7.5 } : 30 }));
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...card,

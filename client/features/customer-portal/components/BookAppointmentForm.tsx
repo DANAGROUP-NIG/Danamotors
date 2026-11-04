@@ -117,7 +117,7 @@ export function BookAppointmentForm({ onSuccess }: BookAppointmentFormProps) {
             {...register("durationMins")}
           />
         </Field>
-        <Field label="Notes" error={errors.notes?.message}>
+        <Field label="Customer request" error={errors.notes?.message}>
           <input className={inputCls} placeholder="Describe the service needed" {...register("notes")} />
         </Field>
       </div>

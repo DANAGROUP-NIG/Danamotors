@@ -1,7 +1,11 @@
 "use client";
 
 import { BookingPanel } from "@/features/service-transactions/components/BookingPanel";
-import { canEditBooking, lagosInput, lagosIso } from "@/features/service-transactions/transaction.logic";
+import {
+  canEditBooking,
+  lagosInput,
+  lagosIso,
+} from "@/features/service-transactions/transaction.logic";
 import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -88,7 +92,11 @@ function LegacyAppointmentEditForm({
           <select className={inputCls} {...register("status")}>
             {STATUS_OPTIONS
               // Checking in records the odometer and runs the warranty check, so it has its own dialog.
-              .filter((s) => s.value !== "Checked In" || appointment.status === "Checked In")
+              .filter(
+                (s) =>
+                  s.value !== "Checked In" ||
+                  appointment.status === "Checked In",
+              )
               .map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
@@ -96,7 +104,9 @@ function LegacyAppointmentEditForm({
               ))}
           </select>
           {appointment.status === "Pending" && (
-            <span className="text-xs text-muted-foreground">Use “Mark as Checked In” to check the vehicle in.</span>
+            <span className="text-xs text-muted-foreground">
+              Use “Mark as Checked In” to check the vehicle in.
+            </span>
           )}
         </Field>
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
@@ -120,4 +130,14 @@ function LegacyAppointmentEditForm({
     </form>
   );
 }
-export function AppointmentEditForm(props: AppointmentEditFormProps) { return props.appointment.bookingNumber || !canEditBooking(props.appointment) ? <BookingPanel key={props.appointment.updatedAt} appointment={props.appointment} /> : <LegacyAppointmentEditForm {...props} />; }
+export function AppointmentEditForm(props: AppointmentEditFormProps) {
+  return props.appointment.bookingNumber ||
+    !canEditBooking(props.appointment) ? (
+    <BookingPanel
+      key={props.appointment.updatedAt}
+      appointment={props.appointment}
+    />
+  ) : (
+    <LegacyAppointmentEditForm {...props} />
+  );
+}

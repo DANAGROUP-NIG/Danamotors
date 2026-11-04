@@ -36,7 +36,7 @@ suite('booking transactions on disposable localhost', () => {
   afterAll(async () => { await db?.$disconnect(); });
   async function input(extra: Partial<BookingCreate> = {}): Promise<BookingCreate> {
     const vehicleId = (await db.vehicle.create({ data: { vin: `BOOKING-${run}-${++sequence}`, customerId, catalogueId: modelId } })).id;
-    return { customerId, vehicleId, branchId, serviceTypeId: typeId, mileage: 100, scheduledAt: new Date(Date.now() + 86400000), createdById: advisorId, ...extra };
+    return { requests: [{ description: 'Synthetic request' }], customerId, vehicleId, branchId, serviceTypeId: typeId, mileage: 100, scheduledAt: new Date(Date.now() + 86400000), createdById: advisorId, ...extra };
   }
   const jobInput = () => ({ bayId, serviceAdvisorId: advisorId, teamId, promisedAt: new Date(Date.now() + 172800000).toISOString(), description: 'Synthetic job', complaints: [{ description: 'Caller complaint' }] });
 
@@ -64,14 +64,32 @@ suite('booking transactions on disposable localhost', () => {
     await expect(createBooking(await input({ requests: [{ complaintCodeId: '00000000-0000-4000-8000-000000000001' }] }))).rejects.toThrow();
     expect((await db.documentSequence.findUniqueOrThrow({ where: { key } })).value).toBe(before.value);
   });
+  it('rolls back booking, requests and numbering if the audit write fails', async () => {
+    const data = await input();
+    const key = `BOOKING_${branchId}_${new Date().getFullYear()}`;
+    const before = await db.documentSequence.findUnique({ where: { key } });
+    const originalTransaction = db.$transaction.bind(db);
+    const transaction = jest.spyOn(db, '$transaction').mockImplementation(async (callback, options) => {
+      if (typeof callback !== 'function') throw new Error('Expected interactive transaction');
+      return originalTransaction(async tx => {
+        const audit = jest.spyOn(tx.auditLog, 'create').mockRejectedValue(new Error('Synthetic audit failure'));
+        try { return await callback(tx); } finally { audit.mockRestore(); }
+      }, options);
+    });
+    try {
+      await expect(createBooking(data)).rejects.toThrow('Synthetic audit failure');
+    } finally { transaction.mockRestore(); }
+    expect(await db.serviceAppointment.count({ where: { vehicleId: data.vehicleId } })).toBe(0);
+    expect(await db.appointmentRequest.count({ where: { appointment: { vehicleId: data.vehicleId } } })).toBe(0);
+    expect(await db.documentSequence.findUnique({ where: { key } })).toEqual(before);
+  });
   it('edits requests with derived totals and does not record booking mileage as actual mileage', async () => {
     const booking = await createBooking(await input());
     const edited = await service.updateAppointment(booking.id, { actorId: advisorId, mileage: 120, acFitted: true, requests: [{ description: 'New request', spare: 10.11, oil: 20.22 }] });
     expect(edited.totals.estimatedTotal).toBe(30.33);
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: booking.vehicleId } })).lastRecordedMileage).toBeNull();
-    const cleared = await service.updateAppointment(booking.id, { requests: [], actorId: advisorId });
-    expect(cleared.totals.estimatedTotal).toBe(0);
-    expect(await db.auditLog.count({ where: { action: 'BOOKING_UPDATED', details: { contains: booking.id } } })).toBe(2);
+    await expect(service.updateAppointment(booking.id, { requests: [], actorId: advisorId })).rejects.toThrow();
+    expect(await db.auditLog.count({ where: { action: 'BOOKING_UPDATED', details: { contains: booking.id } } })).toBe(1);
   });
   it('requires cancellation reason, prevents reopening and allows a new booking after cancellation or no-show', async () => {
     const data = await input();

@@ -17,6 +17,7 @@ export type PickerRecord = {
   registrationNumber?: string | null;
   vin?: string;
   jobNumber?: string;
+  receiptNumber?: string;
   requisitionNumber?: string;
   slipNumber?: string;
   partNumber?: string;
@@ -65,6 +66,7 @@ export function recordLabel(row: PickerRecord) {
     row.registrationNumber ||
     row.vin ||
     row.jobNumber ||
+    row.receiptNumber ||
     row.requisitionNumber ||
     row.slipNumber ||
     row.partNumber ||
@@ -107,6 +109,7 @@ function recordHint(row: PickerRecord) {
 
 export function WorkshopPicker({
   label,
+  hideLabel = false,
   endpoint,
   collection,
   value,
@@ -131,6 +134,7 @@ export function WorkshopPicker({
   getOptionId = row => row.id,
 }: {
   label: string;
+  hideLabel?: boolean;
   endpoint: string;
   collection: string;
   value?: string;
@@ -225,7 +229,7 @@ export function WorkshopPicker({
         }
       }}
     >
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "text-sm font-medium"}>
         {label}
         {required && (
           <span className="ml-1 text-destructive" aria-hidden="true">

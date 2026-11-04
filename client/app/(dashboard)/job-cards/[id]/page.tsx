@@ -11,6 +11,7 @@ import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useJobCard } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
@@ -41,6 +42,7 @@ import { JobCardLabourSection } from "@/features/job-cards/components/JobCardLab
 import { JobCardLinesCard } from "@/features/job-cards/components/JobCardLinesCard";
 import { partSourceLabel } from "@/features/inventory/lib/part-codes";
 import {
+  CampaignPrintBox,
   LinkedCampaignsCard,
   WarrantySnapshotCard,
 } from "@/features/job-cards/components/JobCardWarrantyCards";
@@ -104,6 +106,7 @@ export default function JobCardDetailPage() {
     );
 
   const tone = STATUS_TONES[jobCard.status as JobCardStatus] ?? "gray";
+  const hasCampaigns = (jobCard.campaigns?.length ?? 0) > 0;
   const vehicleLabel = jobCard.vehicle
     ? `${jobCard.vehicle.year ?? ""} ${jobCard.vehicle.make ?? ""} ${jobCard.vehicle.model ?? ""}`.trim() ||
       "—"
@@ -273,11 +276,13 @@ export default function JobCardDetailPage() {
           </div>
         </div>
 
-        {/* ── Warranty snapshot & campaigns ── */}
-        {canSeeWarranty && jobCard.vehicleId && (
-          <div className="grid gap-5 md:grid-cols-2">
-            <WarrantySnapshotCard jobCard={jobCard} />
-            <LinkedCampaignsCard jobCard={jobCard} />
+        <CampaignPrintBox jobCard={jobCard} />
+
+        {/* ── Warranty snapshot (warranty:read) & campaigns (every job card user; answering needs jobcard:update) ── */}
+        {jobCard.vehicleId && (canSeeWarranty || hasCampaigns) && (
+          <div className={cn("grid gap-5", canSeeWarranty && "md:grid-cols-2")}>
+            {canSeeWarranty && <WarrantySnapshotCard jobCard={jobCard} />}
+            <LinkedCampaignsCard jobCard={jobCard} canEdit={canManage && !["DELIVERED", "CANCELLED"].includes(canonicalJobStatus(jobCard.status))} />
           </div>
         )}
 
