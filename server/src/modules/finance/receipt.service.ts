@@ -179,11 +179,13 @@ export class ReceiptService {
 
   async listReceipts(params: {
     branchId?: string;
+    customerId?: string;
     from?: string;
     to?: string;
     category?: 'ALL' | 'SERVICE_PARTS' | 'SALES_ENQUIRY';
   }) {
     const where: Prisma.ReceiptWhereInput = { status: { not: 'CANCELLED' } };
+    if (params.customerId) where.customerId = params.customerId;
     if (params.branchId) where.branchId = params.branchId;
     if (params.from || params.to) {
       where.issuedAt = {};

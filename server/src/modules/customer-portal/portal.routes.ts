@@ -1,3 +1,5 @@
+import { NotificationService } from '../notification/notification.service';
+import { listNotificationsQuerySchema, notificationIdParamSchema } from '../notification/notification.validation';
 import { z } from 'zod';
 import { WorkshopMasterService } from '../workshop/workshop-master.service';
 import { Router } from 'express';
@@ -19,6 +21,12 @@ const router = Router();
 const controller = new PortalController();
 
 router.use(customerAuthMiddleware);
+router.get('/notifications', validateRequest(listNotificationsQuerySchema), async (req, res, next) => {
+  try { res.json({ status: 'success', data: await new NotificationService().listCustomer(req.customer!.customerId, Number(req.query.page) || 1, Number(req.query.limit) || 20) }); } catch (error) { next(error); }
+});
+router.patch('/notifications/:id/read', validateRequest(notificationIdParamSchema), async (req, res, next) => {
+  try { await new NotificationService().markCustomerRead(req.params.id, req.customer!.customerId); res.json({ status: 'success', data: null }); } catch (error) { next(error); }
+});
 router.get('/catalogue', validateRequest(z.object({ query: z.object({ kind: z.enum(['MAKE', 'PRODUCT', 'MODEL', 'VARIANT', 'COLOUR']), search: z.string().optional() }) })), async (req, res, next) => {
   try { res.json({ status: 'success', data: await new WorkshopMasterService().list({ kind: req.query.kind as 'VARIANT', search: req.query.search as string | undefined, page: 1, limit: 50 }) }); } catch (error) { next(error); }
 });

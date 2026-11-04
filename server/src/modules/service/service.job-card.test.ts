@@ -27,6 +27,7 @@ jest.mock("../../prisma/client", () => ({
     },
 
     user: {
+      findUnique: jest.fn().mockResolvedValue({ isActive: true, role: { name: "ServiceAdviser" } }),
       findFirst: jest.fn(),
     },
 
@@ -98,7 +99,7 @@ const input = {
   serviceAdvisorId: id,
   technicianId: id,
   mileage: 100,
-  promisedAt: "2026-10-01T12:00:00.000Z",
+  promisedAt: "2099-10-01T12:00:00.000Z",
 
   complaints: [
     {
@@ -577,6 +578,12 @@ describe("JobCard workflow", () => {
   it("treats a legacy billed status as locked even without billedAt", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ status: "Billed", billedAt: null, invoices: [] });
     await expect(new ServiceService().updateJobCard(id, { observations: "changed" }, id)).rejects.toThrow("Billed");
+    expect(prisma.jobCard.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks delivery when a consolidated vehicle invoice still has a balance", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, status: "BILLED", billedAt: new Date(), invoices: [], consolidatedInvoices: [{ id: "vehicle-bill", status: "Unpaid", outstandingAmount: 100 }], creditApprovedById: null, promisedAt: new Date("2099-01-01T00:00:00Z") });
+    await expect(new ServiceService().updateJobCard(id, { status: "DELIVERED", deliveryAdvisorId: id }, id)).rejects.toThrow("fully paid");
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 

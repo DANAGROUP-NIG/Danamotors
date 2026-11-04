@@ -49,6 +49,10 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
   const [returnReason, setReturnReason] = useState("");
   const [returnQuantity, setReturnQuantity] = useState(1);
 
+  const receive = useMutation({
+    mutationFn: (id: string) => apiPost(`/workshop/parts/${id}/receive`, { confirmed: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobCardKeys.all }),
+  });
   const canIssue = hasPermission("partissuance:create");
   const canReturn = hasPermission("partreturn:create");
   const closed =
@@ -316,6 +320,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         </div>
       )}
 
+      {user?.id === jobCard.technicianId && hasPermission("jobprogress:update") && !!jobCard.partIssuances?.length && <div className="space-y-2 rounded-xl border border-border p-4"><h3 className="font-semibold">Parts collection</h3>{jobCard.partIssuances.map(issue => <div key={issue.id} className="flex items-center justify-between gap-2 text-sm"><span>{issue.sparePart.name} ? {issue.quantity}</span>{issue.receivedAt ? <span>Received {new Date(issue.receivedAt).toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</span> : <Button type="button" disabled={receive.isPending} onClick={() => receive.mutate(issue.id)}>Confirm part received</Button>}</div>)}{receive.isError && <p role="alert" className="text-destructive">{messageFrom(receive.error, "Could not confirm collection")}</p>}</div>}
       {canReturn && !!jobCard.partIssuances?.length && (
         <div className="grid gap-2 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)_auto] sm:items-end">
           <Field label="Return issued part">

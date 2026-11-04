@@ -27,6 +27,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
   const searchParams = useSearchParams();
   const branchId = useBranchStore((state) => state.activeBranch?.id);
   const create = useCreateInvoice();
+  const [consolidateVehicle, setConsolidateVehicle] = useState(false);
   const [jobCardId, setJobCardId] = useState(searchParams.get("jobCardId") ?? "");
   const [partsDiscountPercent, setPartsDiscountPercent] = useState(0);
   const [labourDiscountPercent, setLabourDiscountPercent] = useState(0);
@@ -42,8 +43,8 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
     queryFn: () => getServiceAdvisorsRequest(jobCards.data?.jobCards.find((card) => card.id === jobCardId)?.branch.id ?? branchId),
   });
   const preview = useQuery({
-    queryKey: invoiceKeys.jobBillPreview(jobCardId, partsDiscountPercent, labourDiscountPercent),
-    queryFn: () => previewJobBillRequest({ jobCardId, partsDiscountPercent, labourDiscountPercent }),
+    queryKey: [...invoiceKeys.jobBillPreview(jobCardId, partsDiscountPercent, labourDiscountPercent), consolidateVehicle],
+    queryFn: () => previewJobBillRequest({ jobCardId, partsDiscountPercent, labourDiscountPercent, consolidateVehicle }),
     enabled: Boolean(jobCardId) && [partsDiscountPercent, labourDiscountPercent].every((value) => Number.isFinite(value) && value >= 0 && value <= 100),
     retry: false,
   });
@@ -66,6 +67,7 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
     if (!bill?.review.canBill || !jobCardId || !effectiveAdvisorId || !bill || preview.isFetching || preview.isError || !validDiscounts || create.isPending) return;
     create.mutate({
       jobCardId,
+      consolidateVehicle,
       partsDiscountPercent,
       labourDiscountPercent,
       serviceAdvisorId: effectiveAdvisorId,
@@ -91,10 +93,11 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
         )}
       </Field>
 
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consolidateVehicle} onChange={event => setConsolidateVehicle(event.target.checked)} />Bill all open job cards for this vehicle on one Warranty invoice. Every job must be ready and belong to this customer and branch.</label>
       {bill && (
         <section className="grid gap-4 border-y py-4" aria-label="Job bill details">
           <div>
-            <p className="font-semibold">{bill.jobCard.jobNumber}</p>
+            <p className="font-semibold">{bill.jobCards?.map(card => card.jobNumber).join(", ") || bill.jobCard.jobNumber}</p>
             <p className="text-sm text-muted-foreground">
               {bill.jobCard.customer ? bill.jobCard.customer.companyName || `${bill.jobCard.customer.firstName} ${bill.jobCard.customer.lastName}` : "Customer"}
               {bill.jobCard.vehicle?.registrationNumber ? ` - ${bill.jobCard.vehicle.registrationNumber}` : ""}

@@ -1,3 +1,4 @@
+import { ZodError } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../shared/errors/appError';
 import { config } from '../config';
@@ -17,6 +18,7 @@ export const errorHandler = (
   let message = 'Internal Server Error';
   let code: string | undefined;
   let details: unknown;
+  let fieldErrors: { field: string; message: string }[] | undefined;
   // Raised by the InventoryStock trigger while an annual stock taking is active.
   const freeze = /STOCK_TAKE_FREEZE: (.+? until the count is completed\.)/.exec(err.message ?? '');
 
@@ -26,6 +28,10 @@ export const errorHandler = (
     message = err.message;
     code = err.code;
     details = err.details;
+  } else if (err instanceof ZodError) {
+    statusCode = 400;
+    message = 'Validation failed';
+    fieldErrors = err.issues.map(issue => ({ field: issue.path.join('.'), message: issue.message }));
   } else if (freeze) {
     statusCode = 409;
     message = freeze[1];
@@ -38,6 +44,7 @@ export const errorHandler = (
         statusCode = 409;
         const target = (err.meta?.target as string[]) || [];
         message = `Duplicate field value: ${target.join(', ')}`;
+        fieldErrors = target.map(field => ({ field, message: "This value is already in use" }));
         break;
       }
       case 'P2025':
@@ -70,6 +77,7 @@ export const errorHandler = (
     statusCode,
     message,
     ...(code && { code }),
+    ...(fieldErrors && { errors: fieldErrors }),
     ...(details !== undefined && { details }),
   };
 

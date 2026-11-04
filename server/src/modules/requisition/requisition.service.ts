@@ -1,3 +1,4 @@
+import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { ChargeType, PartStatus, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../shared/errors/appError';
@@ -47,7 +48,7 @@ export class RequisitionService {
       if (!actor.goodwill) throw new ForbiddenError('Goodwill requires requisition:goodwill');
       if (!input.goodwillReason?.trim()) throw new BadRequestError('Goodwill requires a reason');
     }
-    return prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${input.jobCardId} FOR UPDATE`;
       const job = await tx.jobCard.findUnique({ where: { id: input.jobCardId }, include: { invoices: { select: { status: true } }, warrantyCase: { select: { id: true } }, campaigns: { select: { campaignId: true } } } });
       if (!job) throw new NotFoundError('Job card not found');
@@ -103,6 +104,10 @@ export class RequisitionService {
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'REQUISITION_CREATED', details: JSON.stringify({ requisitionId: document.id, requisitionNumber, branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, goodwillReason: input.goodwillReason }) } });
       return this.get(document.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
+    await notifyWorkshopEvent('PART_REQUESTED', input.jobCardId, result.id);
+    if (input.lines.some(line => line.quantityIssued > 0)) await notifyWorkshopEvent('PARTS_ISSUED', input.jobCardId, result.id);
+    if (input.lines.some(line => line.quantityIssued < line.quantityRequired)) await notifyWorkshopEvent('PARTS_UNAVAILABLE', input.jobCardId, result.id);
+    return result;
   }
 
   async cancel(id: string, reason: string, actor: RequisitionActor) {

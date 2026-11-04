@@ -88,6 +88,7 @@ export const createReceiptSchema = z.object({
 export const jobBillPreviewSchema = z.object({
   body: z.object({
     jobCardId: z.string().uuid('Invalid job card ID'),
+    consolidateVehicle: z.boolean().optional(),
     partsDiscountPercent: z.number().min(0).max(100).default(0),
     labourDiscountPercent: z.number().min(0).max(100).default(0),
   }).strict(),
@@ -96,6 +97,7 @@ export const jobBillPreviewSchema = z.object({
 export const createJobBillSchema = z.object({
   body: z.object({
     jobCardId: z.string().uuid('Invalid job card ID'),
+    consolidateVehicle: z.boolean().optional(),
     partsDiscountPercent: z.number().min(0).max(100).default(0),
     labourDiscountPercent: z.number().min(0).max(100).default(0),
     serviceAdvisorId: z.string().uuid('Invalid service advisor ID'),
@@ -122,6 +124,7 @@ export const receiptRegisterQuerySchema = z.object({
     to: z.string().date().optional(),
     category: z.enum(['ALL', 'SERVICE_PARTS', 'SALES_ENQUIRY']).default('ALL'),
     branchId: z.string().uuid().optional(),
+    customerId: z.string().uuid().optional(),
   }).refine((query) => !query.from || !query.to || query.from <= query.to, {
     path: ['to'], message: 'The end date must be on or after the start date',
   }),

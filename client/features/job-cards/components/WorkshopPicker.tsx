@@ -17,6 +17,7 @@ export type PickerRecord = {
   registrationNumber?: string | null;
   vin?: string;
   jobNumber?: string;
+  receiptNumber?: string;
   requisitionNumber?: string;
   slipNumber?: string;
   partNumber?: string;
@@ -65,6 +66,7 @@ export function recordLabel(row: PickerRecord) {
     row.registrationNumber ||
     row.vin ||
     row.jobNumber ||
+    row.receiptNumber ||
     row.requisitionNumber ||
     row.slipNumber ||
     row.partNumber ||
