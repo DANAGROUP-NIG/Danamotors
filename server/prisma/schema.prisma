@@ -83,6 +83,7 @@ model Branch {
 // ============================================================
 
 model User {
+  recordedOwnerships VehicleOwnership[] @relation("OwnershipRecorder")
   createdRequisitions PartRequisition[] @relation("RequisitionCreator")
   cancelledRequisitions PartRequisition[] @relation("RequisitionCanceller")
   engineeredRequisitions PartRequisition[] @relation("RequisitionEngineer")
@@ -184,6 +185,8 @@ model User {
   warrantyCaseStatusEvents     WarrantyCaseStatusHistory[] @relation("WarrantyCaseStatusActor")
   campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
+  campaignVinRangesCreated     CampaignVinRange[]          @relation("CampaignVinRangeCreatedBy")
+  jobCardCampaignsAttended     JobCardCampaign[]           @relation("JobCardCampaignAttendedBy")
 
   customerOrdersCreated CustomerOrder[]     @relation("CustomerOrderCreatedBy")
   customerOrderLinesCancelled CustomerOrderLine[] @relation("CustomerOrderLineCancelledBy")
@@ -280,6 +283,8 @@ model Customer {
   stdCode                String?
   vip                    Boolean @default(false)
   anniversaryDate        String?
+  /// anniversaryDate as a date, for the birthday / anniversary report (#97). Kept in step by the customer service.
+  anniversaryOn          DateTime? @db.Date
   preferredFollowupDay   String?
   preferredFollowupTime  String?
   preferredContactMethod String?
@@ -593,6 +598,8 @@ model JobCard {
   @@index([technicianId, status])
   @@index([status, promisedAt])
   @@index([deliveredAt])
+  @@index([branchId, deliveredAt])
+  @@index([engineerId])
   @@index([appointmentId])
   @@index([createdAt, id])
   @@index([branchId, createdAt, id])
@@ -792,6 +799,7 @@ model Vehicle {
   @@index([engineId])
 
   @@index([vehicleModelId])
+  @@index([saleDate])
 }
 
 model VehicleImage {
@@ -1277,10 +1285,15 @@ model VehicleOwnership {
 
   status String?
 
+  /// Who recorded the owner change (null for records made before #97).
+  createdById String?
+  createdBy   User?   @relation("OwnershipRecorder", fields: [createdById], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([vehicleId])
   @@index([customerId])
+  @@index([purchaseDate])
 }
 
 // ============================================================
@@ -1424,9 +1437,14 @@ model LabourItem {
   amountEditable   Boolean   @default(true)
   includeInTopN    Boolean   @default(true)
   inactiveDate     DateTime?
+  /// Service group (VEHICLE_GROUP master) for the MIS reports (#97). `group` is the legacy text.
+  serviceGroupId String?
+  serviceGroup   WorkshopMaster? @relation("LabourServiceGroup", fields: [serviceGroupId], references: [id], onDelete: SetNull)
   modelRates    LabourRate[]
   jobCardLines  JobCardLabour[]
   checklistLines ServiceChecklistLine[]
+
+  @@index([serviceGroupId])
 }
 
 model JobCardLabour {
@@ -1954,6 +1972,8 @@ model WorkshopMaster {
   modelChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageModel")
   variantChecklistMileages ServiceChecklistMileage[] @relation("ChecklistMileageVariant")
   modelServiceSettings ServiceTypeModelSetting[] @relation("ModelServiceSettings")
+
+  labourServiceGroupItems LabourItem[] @relation("LabourServiceGroup")
 
   @@unique([kind, code])
   @@index([kind, active])
@@ -2817,6 +2837,8 @@ enum CampaignType {
   RECALL
   FREE_FIX
   SERVICE_CAMPAIGN
+  // Manufacturer field product check bulletin (legacy FPC). Behaves like RECALL.
+  FPC
 }
 
 enum CampaignStatus {
@@ -2840,6 +2862,7 @@ enum ContactChannel {
   WHATSAPP
   EMAIL
   VISIT
+  LETTER
 }
 
 enum ContactOutcome {
@@ -2848,6 +2871,8 @@ enum ContactOutcome {
   WRONG_NUMBER
   CALL_BACK
   DECLINED
+  // A letter or call list went out; counts as called but the customer was not reached.
+  SENT
 }
 
 // Vehicle model master with its warranty policy (legacy `model`: warrdays, warrMileage).
@@ -3121,6 +3146,12 @@ model Campaign {
   startDate DateTime
   endDate   DateTime?
 
+  // Field product check bulletin details (shown for every type, labelled for FPC).
+  bulletinDate   DateTime?
+  // Short text printed on the job card; the title is printed when empty.
+  jobCardText    String?   @db.VarChar(100)
+  printOnJobCard Boolean   @default(true)
+
   labourCovered Boolean @default(true)
   partsCovered  Boolean @default(true)
 
@@ -3136,10 +3167,31 @@ model Campaign {
   models       CampaignModel[]
   coveredItems CampaignCoveredItem[]
   vehicles     CampaignVehicle[]
+  vinRanges    CampaignVinRange[]
   jobCards     JobCardCampaign[]
   jobCardLines JobCardLine[]
 
   @@index([status, type])
+}
+
+/// Affected VIN range of a campaign (legacy FPCBulletinDetail). from = to for a single VIN.
+/// Both bounds share the first 11 characters. Vehicles registered later inside an active
+/// campaign's range are added to it.
+model CampaignVinRange {
+  id String @id @default(uuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  vinFrom String
+  vinTo   String
+
+  createdById String?
+  createdBy   User?    @relation("CampaignVinRangeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, vinFrom, vinTo])
+  @@index([vinFrom, vinTo])
 }
 
 model CampaignModel {
@@ -3246,10 +3298,18 @@ model JobCardCampaign {
   campaignTitle String
   campaignType  CampaignType
 
+  // Was the campaign (FPC) work done on this job? null = not answered yet; READY needs an answer.
+  attended          Boolean?
+  attendedAt        DateTime?
+  attendedById      String?
+  attendedBy        User?     @relation("JobCardCampaignAttendedBy", fields: [attendedById], references: [id], onDelete: SetNull)
+  notAttendedReason String?
+
   createdAt DateTime @default(now())
 
   @@id([jobCardId, campaignId])
   @@index([campaignId])
+  @@index([campaignId, attended])
 }
 
 model FinanceSetting {
@@ -3999,4 +4059,27 @@ model LabourSlip {
   @@index([groupId])
   @@index([engineerId])
   @@index([branchId, slipDate])
+}
+
+/// Report settings as key/value pairs (e.g. the FPC letter template).
+model ReportSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
+/// Mileage bands for the vehicles-serviced columns (#75, #97). Same table as PR #81's migration.
+model MileageBand {
+  id        String   @id @default(uuid())
+  fromKm    Int
+  /// null = and above.
+  toKm      Int?
+  label     String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
 }

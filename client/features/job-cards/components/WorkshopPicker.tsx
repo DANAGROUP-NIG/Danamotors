@@ -109,6 +109,7 @@ function recordHint(row: PickerRecord) {
 
 export function WorkshopPicker({
   label,
+  hideLabel = false,
   endpoint,
   collection,
   value,
@@ -133,6 +134,7 @@ export function WorkshopPicker({
   getOptionId = row => row.id,
 }: {
   label: string;
+  hideLabel?: boolean;
   endpoint: string;
   collection: string;
   value?: string;
@@ -227,7 +229,7 @@ export function WorkshopPicker({
         }
       }}
     >
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "text-sm font-medium"}>
         {label}
         {required && (
           <span className="ml-1 text-destructive" aria-hidden="true">

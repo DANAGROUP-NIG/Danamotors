@@ -256,9 +256,59 @@ export const PERMISSIONS = {
   CAMPAIGN_CREATE: "campaign:create",
   CAMPAIGN_UPDATE: "campaign:update",
   CAMPAIGN_VEHICLE_UPDATE: "campaign:vehicle:update",
+
+  // ── Reports — FPC bulletins and report settings ───────────────────────────
+  // TODO(confirm): #98 grants report:fpc-vehicles to Receptionist and ReceptionManager, which
+  // are not roles here; ServiceAdviser, ServiceManager, CCUManager and CCUOfficer get it instead.
+  FPC_VEHICLES_READ: "report:fpc-vehicles",
+  FPC_ANALYSIS_READ: "report:fpc-analysis",
+  // Report settings such as the FPC letter template.
+  REPORT_SETTINGS: "report:settings",
+
+  // ── Reports — Service MIS (#97) ───────────────────────────────────────────
+  MIS_MONTHLY_READ: "report:mis-monthly",
+  BUSINESS_PRODUCT_MIX_READ: "report:business-product-mix",
+  JOB_ANALYSIS_READ: "report:job-analysis",
+  GROUP_PRODUCTIVITY_READ: "report:group-productivity",
+  ENGINEER_PERFORMANCE_READ: "report:engineer-performance",
+  ENGINEER_PART_CONSUMPTION_READ: "report:engineer-part-consumption",
+  REQUISITION_RETURN_REGISTER_READ: "report:requisition-return-register",
+  MAJOR_PROBLEMS_READ: "report:major-problems",
+  NEW_CUSTOMERS_READ: "report:new-customers",
+  REGULAR_CUSTOMERS_READ: "report:regular-customers",
+  BIRTHDAY_ANNIVERSARY_READ: "report:birthday-anniversary",
+  VEHICLE_RESALE_READ: "report:vehicle-resale",
+  SKIPPED_FREE_SERVICE_READ: "report:skipped-free-service",
+  VEHICLE_LIST_READ: "report:vehicle-list",
+  MANAGEMENT_INFORMATION_READ: "report:management-information",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+/** Customer and vehicle MIS lists for the front office. */
+const MIS_FRONT_OFFICE_REPORTS: PermissionType[] = [
+  PERMISSIONS.NEW_CUSTOMERS_READ,
+  PERMISSIONS.REGULAR_CUSTOMERS_READ,
+  PERMISSIONS.BIRTHDAY_ANNIVERSARY_READ,
+  PERMISSIONS.SKIPPED_FREE_SERVICE_READ,
+  PERMISSIONS.VEHICLE_LIST_READ,
+  PERMISSIONS.VEHICLE_RESALE_READ,
+];
+
+/** MIS reports that read part issues and returns, for the stores. */
+const MIS_STORE_REPORTS: PermissionType[] = [PERMISSIONS.REQUISITION_RETURN_REGISTER_READ, PERMISSIONS.ENGINEER_PART_CONSUMPTION_READ];
+
+/** Every MIS report except the management information report. */
+const MIS_WORKSHOP_REPORTS: PermissionType[] = [
+  PERMISSIONS.MIS_MONTHLY_READ,
+  PERMISSIONS.BUSINESS_PRODUCT_MIX_READ,
+  PERMISSIONS.JOB_ANALYSIS_READ,
+  PERMISSIONS.GROUP_PRODUCTIVITY_READ,
+  PERMISSIONS.ENGINEER_PERFORMANCE_READ,
+  PERMISSIONS.MAJOR_PROBLEMS_READ,
+  ...MIS_STORE_REPORTS,
+  ...MIS_FRONT_OFFICE_REPORTS,
+];
 
 // Mapping roles to their default initial permissions for seeding
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
@@ -268,6 +318,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    ...MIS_WORKSHOP_REPORTS,
+    PERMISSIONS.MANAGEMENT_INFORMATION_READ,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
     PERMISSIONS.REQUISITION_READ,
@@ -393,10 +445,14 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.REQUISITION_CREATE,
@@ -445,6 +501,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
+    ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.REQUISITION_CREATE,
@@ -483,6 +540,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
+    ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
     PERMISSIONS.REQUISITION_READ,
@@ -545,6 +603,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.ESTIMATE_PRINT,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
   // Oversees accounting: finance, invoices, payments, receipts
@@ -623,6 +684,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    ...MIS_FRONT_OFFICE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
     PERMISSIONS.REQUISITION_READ,
@@ -664,10 +726,13 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
     PERMISSIONS.JOBCARD_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    // TODO(confirm): #97 names WorkshopManager; the service manager also runs the MIS.
+    ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
     PERMISSIONS.REQUISITION_READ,
@@ -706,6 +771,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.ESTIMATE_REVISE,
     PERMISSIONS.ESTIMATE_PRINT,
     PERMISSIONS.ESTIMATE_SIGN,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
   ],
 
   // Executes repairs, updates job card progress
@@ -747,6 +814,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
     PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
@@ -782,6 +850,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.WARRANTY_READ,
     PERMISSIONS.CAMPAIGN_READ,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
   // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
@@ -801,6 +870,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.SPAREPART_READ,
+    PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.INVOICE_READ,
     PERMISSIONS.SERVICES_READ,
     PERMISSIONS.WARRANTY_READ,
@@ -811,6 +881,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.CAMPAIGN_CREATE,
     PERMISSIONS.CAMPAIGN_UPDATE,
     PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE,
+    PERMISSIONS.FPC_VEHICLES_READ,
+    PERMISSIONS.FPC_ANALYSIS_READ,
+    PERMISSIONS.REPORT_SETTINGS,
   ],
 
 

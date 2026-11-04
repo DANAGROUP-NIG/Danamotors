@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { VehicleRepository } from './vehicle.repository';
 import { NotFoundError, BadRequestError } from '../../shared/errors/appError';
-import { linkCampaignVehiclesByVin } from '../campaign/campaign.hooks';
+import { addVehicleToRangeCampaigns, linkCampaignVehiclesByVin } from '../campaign/campaign.hooks';
 import { requireMaster } from '../workshop/workshop-master.service';
 
 type FitmentInput = { tyres?: { makeId?: string; number?: string }[]; batteryMakeId?: string | null };
@@ -203,6 +203,9 @@ export class VehicleService {
 
       // Campaign rows added by VIN before the vehicle was registered now point to it.
       await linkCampaignVehiclesByVin(tx, vehicle);
+      // Active campaigns (FPC bulletins) whose VIN ranges contain this VIN now include it.
+      // The VIN cannot change after registration, so this is the only place it is needed.
+      await addVehicleToRangeCampaigns(tx, vehicle);
 
       return vehicle;
     });
@@ -324,6 +327,7 @@ export class VehicleService {
       ownershipType?: string;
       purchaseDate: string;
     },
+    actorId?: string,
   ) {
     return prisma.$transaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${vehicleId} FOR UPDATE`);
@@ -400,6 +404,7 @@ export class VehicleService {
           purchaseDate: effectiveAt,
           ownershipType: data.ownershipType,
           status: 'Current',
+          createdById: actorId,
         },
       });
 

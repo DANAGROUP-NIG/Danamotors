@@ -23,6 +23,8 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const canDeliver = (billed && !(jobCard.invoices ?? []).some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) || !!jobCard.creditApprovedById;
   const estimateApproved = jobCard.estimates?.[0]?.status === "Approved" && !jobCard.estimates[0].approvals?.some(approval => approval.signatureState === "invalid");
   const [technicianId, setTechnicianId] = useState(jobCard.technicianId ?? "");
+  // READY needs a done / not done answer for every linked campaign (a FREE line pre-sets "done").
+  const unansweredCampaigns = (jobCard.campaigns ?? []).filter((c) => c.attended === null && !c.hasFreeLine);
   const [qcNotes, setQcNotes] = useState(jobCard.qcNotes ?? "");
   const late = !!jobCard.promisedAt && new Date() > new Date(jobCard.promisedAt);
   const [serviceCharge, setServiceCharge] = useState(String(jobCard.serviceCharge ?? 0));
@@ -31,6 +33,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const [observations, setObservations] = useState(jobCard.observations ?? "");
   const [workDone, setWorkDone] = useState(jobCard.workDone ?? "");
   const [advisor, setAdvisor] = useState(jobCard.serviceAdvisorId ?? "");
+  const [engineer, setEngineer] = useState(jobCard.engineerId ?? "");
   const [reasons, setReasons] = useState<string[]>([]);
 
   const lateReasons = useQuery({
@@ -64,6 +67,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           ? {}
           : {
               ...(Number(serviceCharge) !== (jobCard.serviceCharge ?? 0) ? { serviceCharge: Number(serviceCharge) } : {}),
+              ...(engineer !== (jobCard.engineerId ?? "") ? { engineerId: engineer || null } : {}),
               observations,
               workDone,
             }),
@@ -130,6 +134,13 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       {!billed && (
         <>
           <Field label="Service charge (NGN)"><input type="number" min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
+          <WorkshopPicker
+            label="Engineer (optional)"
+            endpoint={`/service/staff?role=Engineer&branchId=${jobCard.branchId}`}
+            collection="users"
+            value={engineer}
+            onChange={setEngineer}
+          />
           <Field label="Observations">
             <textarea
               className={inputCls}
@@ -160,6 +171,11 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           ))}
         </select>
       </Field>
+      {current === "QC" && unansweredCampaigns.length > 0 && (
+        <p className="text-sm text-amber-700">
+          Record whether the campaign work was done for {unansweredCampaigns.map((c) => c.campaignCode).join(", ")} under Linked campaigns before marking the vehicle ready.
+        </p>
+      )}
       {["READY", "BILLED"].includes(current) && !canDeliver && <p className="text-sm text-muted-foreground">Create and settle the job bill or obtain delivery-on-credit approval before delivering this vehicle.</p>}
       <Field label="Remarks / cancellation reason">
         <textarea

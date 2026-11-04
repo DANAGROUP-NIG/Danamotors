@@ -13,6 +13,11 @@ export const serviceIdParamSchema = z.object({
   }),
 });
 
+// The body is validated by jobOpeningBody in convertAppointment once booking fields are merged in.
+export const convertAppointmentSchema = serviceIdParamSchema.extend({
+  body: z.record(z.string(), z.unknown()),
+});
+
 export const jobCardIdParamSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid job card ID"),
@@ -222,6 +227,8 @@ export const jobUpdateBody = z
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
     deliveryAdvisorId: z.string().uuid().optional(),
+    /** The floor engineer (#97); null clears it. */
+    engineerId: z.string().uuid().nullable().optional(),
     lateReasonIds: z
       .array(z.string().uuid())
       .max(6)
@@ -319,6 +326,7 @@ export const createLabourItemSchema = z.object({
       description: z.string().trim().min(1).max(300),
       vehicleSystem: z.string().trim().max(100).optional(),
       group: z.string().trim().max(100).optional(),
+      serviceGroupId: z.string().uuid().nullable().optional(),
       defaultHours: z.number().positive(),
       rate: z.number().nonnegative(),
       majorLabour: z.boolean().optional(),
@@ -340,6 +348,7 @@ export const updateLabourItemSchema = z.object({
       description: z.string().trim().min(1).max(300).optional(),
       vehicleSystem: z.string().trim().max(100).optional(),
       group: z.string().trim().max(100).optional(),
+      serviceGroupId: z.string().uuid().nullable().optional(),
       defaultHours: z.number().positive().optional(),
       rate: z.number().nonnegative().optional(),
       active: z.boolean().optional(),
