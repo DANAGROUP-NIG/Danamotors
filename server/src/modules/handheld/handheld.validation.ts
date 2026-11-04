@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { HandheldDocumentStatus, HandheldDocumentType, HandheldShortReason } from "@prisma/client";
 import { countEntrySchema } from "../stock-take/stockTake.validation";
+import { printerSchema } from "../labels/labels.validation";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
@@ -94,6 +95,8 @@ export const heartbeatSchema = z.object({
   body: z.object({
     linkVersion: shortText(40),
     error: shortText(500),
+    // The USB label printer; null = none attached, absent = an HHDC Link without printing (left as it was).
+    printer: printerSchema.nullable().optional(),
     docked: z
       .object({
         deviceId: deviceId.optional(),

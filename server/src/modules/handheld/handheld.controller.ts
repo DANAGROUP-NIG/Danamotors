@@ -6,6 +6,7 @@ import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { permissionsOf } from "./handheld.logic";
 import { HandheldService } from "./handheld.service";
 import { AuthedStation, HandheldStationService } from "./handheld.station.service";
+import { LabelService } from "../labels/labels.service";
 
 const handle =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
@@ -159,6 +160,7 @@ export class HandheldController {
 /** Station endpoints: the station set by `stationAuth` is the only identity. */
 export class HandheldStationController {
   private stations = new HandheldStationService();
+  private labels = new LabelService();
 
   private station(res: Response): AuthedStation {
     return res.locals.station as AuthedStation;
@@ -179,4 +181,6 @@ export class HandheldStationController {
   release = handle(async (req, res) => ok(res, await this.stations.release(this.station(res), req.params.id, req.body.reason)));
   result = handle(async (req, res) => ok(res, await this.stations.submitResult(this.station(res), req.body)));
   cleared = handle(async (req, res) => ok(res, await this.stations.cleared(this.station(res), req.params.deviceId, req.body)));
+  claimPrints = handle(async (req, res) => ok(res, await this.labels.claim(this.station(res), req.body.printer)));
+  printDone = handle(async (req, res) => ok(res, await this.labels.done(this.station(res), req.params.id, req.body)));
 }

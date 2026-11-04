@@ -25,6 +25,7 @@ danamotors/
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
+| [barcode-labels.md](./barcode-labels.md) | Part barcode labels on the Zebra at a handheld station PC: the page, the 2" × 2" label, how the station prints |
 | [handheld.md](./handheld.md) | Handheld picking for indents and CPOs, and checking Mobis MITs on the handheld before the MRN |
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving purchases: Mobis MIT file upload and MRN to CPD stock; vendor receipts for local, used and repaired parts |
 | [part-sale.md](./part-sale.md) | CPD part sale: customer purchase order, picking, counter-sale bill, sale return |

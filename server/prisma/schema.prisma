@@ -11,6 +11,7 @@ model Branch {
   requisitions           PartRequisition[]
   handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
   handheldStations       HandheldStation[]      @relation("HandheldStationBranch")
+  labelPrintJobs         LabelPrintJob[]        @relation("LabelPrintJobBranch")
   handheldDevices        HandheldDevice[]       @relation("HandheldDeviceBranch")
   returnSlips            PartReturnSlip[]
   labourSlips            LabourSlip[]
@@ -91,6 +92,7 @@ model User {
   handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
   handheldDocumentsCancelled     HandheldDocument[]     @relation("HandheldDocumentCancelledBy")
   handheldStationsCreated        HandheldStation[]      @relation("HandheldStationCreatedBy")
+  labelPrintJobsRequested        LabelPrintJob[]        @relation("LabelPrintJobRequestedBy")
   cancelledRequisitions          PartRequisition[]      @relation("RequisitionCanceller")
   engineeredRequisitions         PartRequisition[]      @relation("RequisitionEngineer")
   createdReturnSlips             PartReturnSlip[]       @relation("ReturnSlipCreator")
@@ -3743,9 +3745,16 @@ model HandheldStation {
   lastError         String?
   offlineNotifiedAt DateTime?
 
-  delivered   HandheldDocument[] @relation("HandheldDocumentDeliveredStation")
-  received    HandheldDocument[] @relation("HandheldDocumentReceivedStation")
-  devicesSeen HandheldDevice[]   @relation("HandheldDeviceLastStation")
+  // The barcode label printer on the PC's USB (Zebra), from the heartbeat; null model = none attached.
+  printerModel  String?
+  // READY, PAUSED, PAPER_OUT, HEAD_OPEN or ERROR.
+  printerStatus String?
+  printerDetail String?
+
+  delivered     HandheldDocument[] @relation("HandheldDocumentDeliveredStation")
+  received      HandheldDocument[] @relation("HandheldDocumentReceivedStation")
+  devicesSeen   HandheldDevice[]   @relation("HandheldDeviceLastStation")
+  labelsPrinted LabelPrintJob[]    @relation("LabelPrintJobPrintedStation")
 
   @@index([branchId])
 }
@@ -3818,6 +3827,39 @@ enum HandheldDocumentType {
   CPO_PICK
   MIT_RECEIVE
   COUNT_SHEET
+}
+
+// Barcode labels printed on a station's label printer. The ZPL is rendered when the job is made, so a
+// station prints exactly what the web showed; any station of the branch with a ready printer takes it.
+model LabelPrintJob {
+  id               String           @id @default(uuid())
+  branchId         String
+  branch           Branch           @relation("LabelPrintJobBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  // [{ partId, partNumber, description, bin, copies }]
+  labels           Json
+  labelCount       Int
+  zpl              String
+  status           LabelPrintStatus @default(QUEUED)
+  requestedById    String?
+  requestedBy      User?            @relation("LabelPrintJobRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime         @default(now())
+  claimStationId   String?
+  claimExpiresAt   DateTime?
+  printedAt        DateTime?
+  printedStationId String?
+  printedStation   HandheldStation? @relation("LabelPrintJobPrintedStation", fields: [printedStationId], references: [id], onDelete: SetNull)
+  error            String?
+
+  @@index([branchId, status])
+  @@index([branchId, createdAt])
+}
+
+// QUEUED (waiting for a printer) -> PRINTED, or FAILED (retry queues it again); CANCELLED while waiting.
+enum LabelPrintStatus {
+  QUEUED
+  PRINTED
+  FAILED
+  CANCELLED
 }
 
 // QUEUED (waiting for a handheld) -> SENT (on a handheld) -> RECEIVED (result stored) -> UPLOADED (posted).

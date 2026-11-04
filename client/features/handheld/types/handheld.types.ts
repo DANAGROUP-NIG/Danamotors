@@ -147,6 +147,10 @@ export interface HandheldStation {
   lastError: string | null;
   online: boolean;
   createdBy: PersonRef | null;
+  // The label printer on the PC's USB (null: none attached).
+  printerModel: string | null;
+  printerStatus: "READY" | "PAUSED" | "PAPER_OUT" | "HEAD_OPEN" | "ERROR" | null;
+  printerDetail: string | null;
   dockedDevice: { id: string; name: string; appVersion: string | null; appStatus: string | null } | null;
 }
 

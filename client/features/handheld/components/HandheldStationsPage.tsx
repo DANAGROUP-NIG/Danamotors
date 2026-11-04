@@ -217,6 +217,16 @@ export function HandheldStationsPage() {
       </td>
       <td className={cn(tdCls, "text-slate-500")}>{fmtDateTime(s.lastSeenAt)}</td>
       <td className={tdCls}>{s.online && s.dockedDevice ? s.dockedDevice.name : <span className="text-slate-400">—</span>}</td>
+      <td className={tdCls}>
+        {s.online && s.printerModel ? (
+          <span title={s.printerDetail ?? undefined}>
+            <StatusBadge status={s.printerStatus === "READY" ? "Ready" : (s.printerStatus ?? "Error").replace("_", " ").toLowerCase()} tone={s.printerStatus === "READY" ? "emerald" : "amber"} />
+            <span className="ml-2 text-slate-500">{s.printerModel}</span>
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
       <td className={cn(tdCls, "font-mono text-sm text-slate-500")}>{s.linkVersion ?? "—"}</td>
       <td className="max-w-72 truncate px-3 py-2 text-sm text-red-600" title={s.lastError ?? undefined}>
         {s.lastError}
@@ -293,6 +303,7 @@ export function HandheldStationsPage() {
                   <th className={thCls}>State</th>
                   <th className={thCls}>Last seen</th>
                   <th className={thCls}>Docked handheld</th>
+                  <th className={thCls}>Label printer</th>
                   <th className={thCls}>HHDC Link</th>
                   <th className={thCls}>Last problem</th>
                   {data.canManage && <th className={thCls} />}

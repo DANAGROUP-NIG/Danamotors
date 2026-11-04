@@ -2,6 +2,7 @@ import { Router } from "express";
 import { validateRequest } from "../../middleware/requestValidator";
 import { HandheldStationController } from "./handheld.controller";
 import { claimSchema, clearedSchema, confirmSchema, heartbeatSchema, releaseSchema, resultSchema } from "./handheld.validation";
+import { claimPrintsSchema, printDoneSchema } from "../labels/labels.validation";
 
 /**
  * Station endpoints (HHDC Link in station mode on a store PC). Authenticated by the station's own key,
@@ -27,6 +28,10 @@ router.use(controller.authenticate);
  *       4. Results: a finished file. Stored (RECEIVED), not applied. The same result again changes nothing; a different
  *          one for a received job is refused (409). `clear: true` means the device file may be deleted.
  *       5. Cleared: what was removed from the device after a cancel, or kept because it had entries.
+ *
+ *       Label printer (Zebra on the PC's USB): the heartbeat carries `printer` (null = none attached); while it is
+ *       READY the station claims the branch's waiting label jobs every few seconds, prints the ZPL as it comes, and
+ *       reports each one done (PRINTED) or failed.
  *
  * /handheld/station/heartbeat:
  *   post:
@@ -85,6 +90,19 @@ router.use(controller.authenticate);
  *     parameters: [{ in: path, name: deviceId, required: true, schema: { type: string, format: uuid } }]
  *     requestBody: { content: { application/json: { example: { removed: [0f1e2d3c-4b5a-4968-8776-655443322110], kept: [] } } } }
  *     responses: { 200: { description: Recorded } }
+ * /handheld/station/prints/claim:
+ *   post:
+ *     tags: [Handheld Station]
+ *     summary: Take the branch's waiting label jobs (only while the printer is READY; 2-minute lease)
+ *     requestBody: { content: { application/json: { example: { printer: { model: "ZTC S4M-200dpi ZPL", status: READY } } } } }
+ *     responses: { 200: { description: "{ jobs: [{ id, labelCount, zpl }] }" } }
+ * /handheld/station/prints/{id}/done:
+ *   post:
+ *     tags: [Handheld Station]
+ *     summary: The labels went to the printer (ok), or could not (error)
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+ *     requestBody: { content: { application/json: { example: { ok: false, error: "Printer paper out" } } } }
+ *     responses: { 200: { description: "{ status }: PRINTED or FAILED" }, 409: { description: Claimed by another station } }
  */
 router.post("/heartbeat", validateRequest(heartbeatSchema), controller.heartbeat);
 router.post("/deliveries/claim", validateRequest(claimSchema), controller.claim);
@@ -92,5 +110,7 @@ router.post("/deliveries/:id/confirm", validateRequest(confirmSchema), controlle
 router.post("/deliveries/:id/release", validateRequest(releaseSchema), controller.release);
 router.post("/results", validateRequest(resultSchema), controller.result);
 router.post("/devices/:deviceId/cleared", validateRequest(clearedSchema), controller.cleared);
+router.post("/prints/claim", validateRequest(claimPrintsSchema), controller.claimPrints);
+router.post("/prints/:id/done", validateRequest(printDoneSchema), controller.printDone);
 
 export default router;

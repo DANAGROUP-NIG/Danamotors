@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Ban,
+  Barcode,
   Boxes,
   CheckCircle,
   GitBranch,
@@ -28,7 +29,8 @@ import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
+import { INVENTORY_PERMISSIONS, LABEL_PERMISSIONS } from "@/features/auth/roles";
+import { PrintLabelDialog } from "@/features/labels";
 import { usePart, usePartAlternates, usePartStock, usePriceCategories } from "../hooks/use-parts";
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
@@ -146,6 +148,8 @@ export function PartDetail({ id }: { id: string }) {
   const canCreate = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_CREATE);
   const canReadStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_READ);
   const canUpdateStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
+  const canPrintLabel = hasPermission(LABEL_PERMISSIONS.PRINT);
+  const crossBranch = hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const { user } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const [editingStock, setEditingStock] = useState<
@@ -154,6 +158,7 @@ export function PartDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [addingAlt, setAddingAlt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [printingLabel, setPrintingLabel] = useState(false);
   const setStatus = useSetPartStatus();
   const { data: priceCategories } = usePriceCategories();
   const del = useDeletePart();
@@ -198,6 +203,11 @@ export function PartDetail({ id }: { id: string }) {
               <Link href={`/inventory/part-query?part=${encodeURIComponent(part.partNumber)}`}>
                 <Search className="size-4" /> Part query
               </Link>
+            </Button>
+          )}
+          {canPrintLabel && part.partStatus === "ACTIVE" && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPrintingLabel(true)}>
+              <Barcode className="size-4" /> Print label
             </Button>
           )}
           {canEdit &&
@@ -487,6 +497,14 @@ export function PartDetail({ id }: { id: string }) {
       <ModalFame isOpen={addingAlt} onClose={() => setAddingAlt(false)} title={`Add alternate for ${part.partNumber}`}>
         {addingAlt && <AlternateForm mainPartId={part.id} onDone={() => setAddingAlt(false)} />}
       </ModalFame>
+
+      {printingLabel && (
+        <PrintLabelDialog
+          part={part}
+          branchId={crossBranch ? (activeBranch?.id ?? user?.branchId ?? undefined) : undefined}
+          onClose={() => setPrintingLabel(false)}
+        />
+      )}
 
       <ConfirmDeleteModal
         isOpen={confirmDelete}

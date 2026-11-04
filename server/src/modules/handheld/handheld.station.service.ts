@@ -33,6 +33,7 @@ import {
 } from "./handheld.logic";
 import { HandheldNotifier, jobRefSelect } from "./handheld.notifications";
 import { HandheldService, SheetResult, UploadInput } from "./handheld.service";
+import type { PrinterReport } from "../labels/labels.service";
 
 const { QUEUED, SENT, RECEIVED, UPLOADED, CANCELLED } = HandheldDocumentStatus;
 const { COUNT_SHEET, MIT_RECEIVE } = HandheldDocumentType;
@@ -54,6 +55,7 @@ export interface DeviceFile {
 export interface HeartbeatInput {
   linkVersion?: string;
   error?: string;
+  printer?: PrinterReport | null;
   docked?: {
     deviceId?: string;
     appVersion?: string;
@@ -82,6 +84,9 @@ const stationSelect = {
   lastSeenAt: true,
   linkVersion: true,
   lastError: true,
+  printerModel: true,
+  printerStatus: true,
+  printerDetail: true,
   branch: { select: { id: true, name: true } },
   createdBy: { select: { firstName: true, lastName: true } },
   dockedDevice: { select: { id: true, name: true, appVersion: true, appStatus: true } },
@@ -192,6 +197,11 @@ export class HandheldStationService {
         lastError: input.error?.slice(0, 500) ?? null,
         offlineNotifiedAt: null,
         dockedDeviceId: device?.id ?? null,
+        ...(input.printer !== undefined && {
+          printerModel: input.printer?.model.slice(0, 80) ?? null,
+          printerStatus: input.printer?.status ?? null,
+          printerDetail: input.printer?.detail?.slice(0, 200) ?? null,
+        }),
       },
     });
     if (!device) return { device: null, deliver: 0, files: [] };
