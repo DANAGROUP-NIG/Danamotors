@@ -17,20 +17,7 @@ import { getBranchSettings } from '../company-settings/company-settings.service'
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 
-const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
-
-function isActiveBillStatus(status: string) {
-  return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
-}
-
-export class JobBillingService {
-  private async loadJobCard(
-    jobCardId: string,
-    transaction: Prisma.TransactionClient | typeof prisma = prisma,
-  ) {
-    const jobCard = await transaction.jobCard.findUnique({
-      where: { id: jobCardId },
-      include: {
+const JOB_BILL_INCLUDE = {
         estimates: latestEstimateQuery,
         customer: true,
         serviceType: true,
@@ -44,10 +31,44 @@ export class JobBillingService {
         invoices: {
           where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
         },
-      },
+      } satisfies Prisma.JobCardInclude;
+
+const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
+
+function isActiveBillStatus(status: string) {
+  return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
+}
+
+export class JobBillingService {
+  private async loadJobCard(
+    jobCardId: string,
+    transaction: Prisma.TransactionClient | typeof prisma = prisma,
+  ) {
+    const jobCard = await transaction.jobCard.findUnique({
+      where: { id: jobCardId },
+      include: JOB_BILL_INCLUDE,
     });
     if (!jobCard) throw new NotFoundError("Job card not found");
     return jobCard;
+  }
+
+  private async billScope(input: { jobCardId: string; consolidateVehicle?: boolean }, transaction: Prisma.TransactionClient | typeof prisma = prisma) {
+    const jobCard = await this.loadJobCard(input.jobCardId, transaction);
+    this.assertBillable(jobCard);
+    if (input.consolidateVehicle && !jobCard.vehicleId) throw new BadRequestError('Choose a job card with a vehicle');
+    const jobCards = input.consolidateVehicle ? await transaction.jobCard.findMany({
+      where: { vehicleId: jobCard.vehicleId, billedAt: null, status: { notIn: ['BILLED', 'Billed', 'DELIVERED', 'Closed', 'CANCELLED', 'Cancelled'] } },
+      orderBy: { id: 'asc' }, include: JOB_BILL_INCLUDE,
+    }) : [jobCard];
+    if (!jobCards.length || !jobCards.some(card => card.id === jobCard.id)) throw new ConflictError('The selected job is no longer open');
+    for (const card of jobCards) {
+      if (card.branchId !== jobCard.branchId || card.customerId !== jobCard.customerId) throw new BadRequestError('Consolidated job cards must have the same branch and bill-to customer');
+      this.assertBillable(card);
+    }
+    const scopes = jobCards.map(card => ({ card, ...this.pricedScope(card) }));
+    const lines = scopes.flatMap(scope => scope.lines.map(line => ({ ...line, description: input.consolidateVehicle ? `${scope.card.jobNumber}: ${line.description}` : line.description })));
+    const review = { ...scopes[0].review, canBill: scopes.every(scope => scope.review.canBill), issues: scopes.flatMap(scope => scope.review.issues.map(issue => `${scope.card.jobNumber}: ${issue}`)), rows: scopes.flatMap(scope => scope.review.rows) };
+    return { jobCard, jobCards, lines, review };
   }
 
   private assertBillable(
@@ -218,18 +239,18 @@ export class JobBillingService {
 
   async previewJobBill(input: {
     jobCardId: string;
+    consolidateVehicle?: boolean;
     partsDiscountPercent: number;
     labourDiscountPercent: number;
   }) {
-    const jobCard = await this.loadJobCard(input.jobCardId);
-    this.assertBillable(jobCard);
-    const { lines, review } = this.pricedScope(jobCard);
+    const { jobCard, jobCards, lines, review } = await this.billScope(input);
     const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
       partsDiscountPercent: input.partsDiscountPercent,
       labourDiscountPercent: input.labourDiscountPercent,
     });
     return {
       jobCard,
+      jobCards: jobCards.map(card => ({ id: card.id, jobNumber: card.jobNumber })),
       review,
       lines,
       vatBreakdown: breakdown,
@@ -239,6 +260,7 @@ export class JobBillingService {
 
   async createJobBill(input: {
     jobCardId: string;
+    consolidateVehicle?: boolean;
     partsDiscountPercent: number;
     labourDiscountPercent: number;
     serviceAdvisorId: string;
@@ -249,11 +271,14 @@ export class JobBillingService {
       try {
         return await prisma.$transaction(
           async (transaction) => {
+            if (input.consolidateVehicle) {
+              await transaction.$queryRaw`SELECT v.id FROM "Vehicle" v JOIN "JobCard" j ON j."vehicleId" = v.id WHERE j.id = ${input.jobCardId} FOR UPDATE OF v`;
+              await transaction.$queryRaw`SELECT id FROM "JobCard" WHERE "vehicleId" = (SELECT "vehicleId" FROM "JobCard" WHERE id = ${input.jobCardId}) ORDER BY id FOR UPDATE`;
+            }
             await transaction.$queryRaw<Array<{ id: string }>>(
               Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${input.jobCardId} FOR UPDATE`,
             );
-            const jobCard = await this.loadJobCard(input.jobCardId, transaction);
-            this.assertBillable(jobCard);
+            const { jobCard, jobCards, lines, review } = await this.billScope(input, transaction);
             const customerId =
               jobCard.customerId ?? jobCard.appointment?.customerId;
             if (!customerId)
@@ -275,7 +300,6 @@ export class JobBillingService {
                 "The service advisor must belong to the job card branch",
               );
 
-            const { lines, review } = this.pricedScope(jobCard);
             if (!review.canBill) throw new BadRequestError(review.issues.join(' '));
             const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
               partsDiscountPercent: input.partsDiscountPercent,
@@ -293,7 +317,8 @@ export class JobBillingService {
                 customerId,
                 jobCardId: jobCard.id,
                 invoiceNumber,
-                billType: jobCard.creditApprovedById ? "CREDIT" : "CASH",
+                billType: input.consolidateVehicle ? "WARRANTY" : jobCard.creditApprovedById ? "CREDIT" : "CASH",
+                ...(input.consolidateVehicle ? { jobCards: { connect: jobCards.map(card => ({ id: card.id })) } } : {}),
                 vatBreakdown: {create:breakdown},
                 taxRegisterSnapshot: { version: 1, source: 'BILLING', values: taxRegisterValues({ ...totals, vatBreakdown: breakdown }).values },
                 issuedDate,
@@ -325,17 +350,18 @@ export class JobBillingService {
                 serviceAdvisor: true,
               },
             });
+            for (const billedCard of jobCards) {
             await transaction.jobCard.update({
-              where: { id: jobCard.id },
+              where: { id: billedCard.id },
               data: {
                 billedAt: new Date(),
-                status: ["DELIVERED", "Closed"].includes(jobCard.status)
+                status: ["DELIVERED", "Closed"].includes(billedCard.status)
                   ? "DELIVERED"
                   : "BILLED",
                 statusHistory: {
                   create: {
-                    fromStatus: jobCard.status,
-                    toStatus: ["DELIVERED", "Closed"].includes(jobCard.status)
+                    fromStatus: billedCard.status,
+                    toStatus: ["DELIVERED", "Closed"].includes(billedCard.status)
                       ? "DELIVERED"
                       : "BILLED",
                     actorId: input.actorId ?? input.serviceAdvisorId,
@@ -344,6 +370,7 @@ export class JobBillingService {
                 },
               },
             });
+            }
             return invoice;
           },
           {
@@ -381,7 +408,7 @@ export class JobBillingService {
         await transaction.$queryRaw<Array<{ id: string }>>(
           Prisma.sql`SELECT id FROM "Invoice" WHERE id = ${id} FOR UPDATE`,
         );
-        const invoice = await transaction.invoice.findUnique({ where: { id } });
+        const invoice = await transaction.invoice.findUnique({ where: { id }, include: { jobCards: { select: { id: true } } } });
         if (!invoice) throw new NotFoundError("Invoice not found");
         if (!invoice.jobCardId) throw new BadRequestError("Only job bills can be cancelled through this action");
         if (!remark.trim()) throw new BadRequestError("A cancellation remark is required");
@@ -436,18 +463,18 @@ export class JobBillingService {
             cancelRemark: remark,
           },
         });
-        if (invoice.jobCardId) {
+        for (const linkedCard of (invoice.jobCards?.length ? invoice.jobCards : [{ id: invoice.jobCardId }])) {
           await transaction.$queryRaw(
-            Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${invoice.jobCardId} FOR UPDATE`,
+            Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${linkedCard.id} FOR UPDATE`,
           );
           const card = await transaction.jobCard.findUnique({
-            where: { id: invoice.jobCardId },
+            where: { id: linkedCard.id },
           });
           if (card?.deliveredAt || (card && ["DELIVERED", "Closed"].includes(card.status)))
             throw new ConflictError("A delivered job bill cannot be cancelled");
           await transaction.jobCardStatusHistory.create({
             data: {
-              jobCardId: invoice.jobCardId,
+              jobCardId: linkedCard.id,
               fromStatus: "BILLED",
               toStatus: "READY",
               actorId: cancelledById,
@@ -455,7 +482,7 @@ export class JobBillingService {
             },
           });
           await transaction.jobCard.updateMany({
-            where: { id: invoice.jobCardId, billedAt: { not: null } },
+            where: { id: linkedCard.id, billedAt: { not: null } },
             data: { billedAt: null, status: "READY" },
           });
         }

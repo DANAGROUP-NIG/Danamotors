@@ -1,10 +1,10 @@
 import { createHash } from 'crypto';
 import { BadRequestError } from '../../shared/errors/appError';
-export type SignedContent = { version?: number; currency?: string; amount: number; lines: {type:string;referenceId?:string|null;description:string;quantity:number;rate:number;amount:number}[] };
+export type SignedContent = { version?: number; upfrontPaymentPercent?: { toString(): string } | number; currency?: string; amount: number; lines: {type:string;referenceId?:string|null;description:string;quantity:number;rate:number;amount:number}[] };
 export function estimateContentHash(estimate: SignedContent): string {
  const lines = estimate.lines.map(line => [line.type,line.referenceId ?? null,line.description,line.quantity,line.rate,line.amount]);
  lines.sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b), 'en'));
- return createHash('sha256').update(JSON.stringify({version:estimate.version ?? 1,currency:estimate.currency ?? 'NGN',total:estimate.amount,lines})).digest('hex');
+ return createHash('sha256').update(JSON.stringify({version:estimate.version ?? 1,currency:estimate.currency ?? 'NGN',total:estimate.amount,...(estimate.upfrontPaymentPercent != null && String(estimate.upfrontPaymentPercent) !== "60" ? {upfrontPaymentPercent:String(estimate.upfrontPaymentPercent)} : {}),lines})).digest('hex');
 }
 export function assertSignaturePng(image: string) {
  if (!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) throw new BadRequestError('A PNG signature is required');

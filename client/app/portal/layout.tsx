@@ -1,5 +1,6 @@
 "use client";
 
+import { PortalNotificationBell } from "@/features/notification/components/PortalNotificationBell";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import {
@@ -90,6 +91,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 Your vehicles, service and invoices in one place
               </p>
             </div>
+            <PortalNotificationBell />
           </header>
 
           <main className="flex-1 overflow-y-auto" id="portal-main-content">

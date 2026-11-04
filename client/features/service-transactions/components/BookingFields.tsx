@@ -6,10 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Field, inputCls } from '@/components/forms/FormField';
 import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
 import type { BookingExtra, BookingRequest } from '@/features/appointments/types/appointment.types';
-export function BookingFields({ value, onChange, vehicleId, disabled = false }: { value: BookingExtra; onChange: (value: BookingExtra) => void; vehicleId?: string; disabled?: boolean }) {
+export function BookingFields({ value, onChange, vehicleId, disabled = false, compact = false }: { value: BookingExtra; onChange: (value: BookingExtra) => void; vehicleId?: string; disabled?: boolean; compact?: boolean }) {
   const rows = value.requests ?? [];
   const totals = requestTotals(rows.map(row => ({ ...row, complaintCodeId: row.complaintCodeId ?? "", spare: row.spare ?? 0, oil: row.oil ?? 0, labour: row.labour ?? 0 })));
   const edit = (index: number, patch: Partial<BookingRequest>) => onChange({ ...value, requests: rows.map((row, position) => index === position ? { ...row, ...patch } : row) });
+  if (compact) return <fieldset disabled={disabled} className="space-y-3 rounded-xl border border-border p-4"><legend className="px-2 font-semibold">Customer request</legend>
+    {rows.map((row, index) => <Field key={index} label={`Customer request ${index + 1}`}><textarea className={inputCls} required maxLength={2000} value={row.description} onChange={event => edit(index, { description: event.target.value })} />{rows.length > 1 && <Button type="button" variant="outline" onClick={() => onChange({ ...value, requests: rows.filter((_, position) => position !== index) })}>Remove request</Button>}</Field>)}
+    <Button type="button" variant="outline" disabled={rows.length >= 100} onClick={() => onChange({ ...value, requests: [...rows, { description: '' }] })}>Add customer request</Button>
+  </fieldset>;
   return <fieldset disabled={disabled} className="min-w-0 space-y-4 rounded-xl border border-border p-4">
     <legend className="px-2 font-semibold">Vehicle details and customer requests</legend>
     <div className="grid gap-4 sm:grid-cols-2">

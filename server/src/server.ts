@@ -1,3 +1,4 @@
+import { startPromisedReminders } from './modules/notification/promised-reminders';
 import { startOverdueSweep } from './modules/finance/credit-terms';
 import app from './app';
 import { config } from './config';
@@ -8,6 +9,7 @@ async function start(): Promise<void> {
   await prisma.$connect();
   await checkDatabaseSchema();
   const stopOverdueSweep = startOverdueSweep();
+  const stopPromisedReminders = startPromisedReminders();
   const server = app.listen(config.PORT, () => {
     console.log(`Dana Motors backend running on port ${config.PORT} in ${config.NODE_ENV} mode`);
   });
@@ -21,6 +23,7 @@ async function start(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     stopOverdueSweep();
+    stopPromisedReminders();
     const deadline = setTimeout(() => process.exit(1), 30_000);
     deadline.unref();
     server.close(async () => {

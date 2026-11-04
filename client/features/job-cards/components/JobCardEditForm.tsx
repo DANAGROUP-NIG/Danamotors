@@ -1,4 +1,5 @@
 "use client";
+import { WORKSPACE_COPY } from "./repair-workspace-copy";
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
@@ -12,14 +13,6 @@ import { jobCardKeys } from "../api/job-card.keys";
 import { WorkshopPicker } from "./WorkshopPicker";
 import type { JobCard } from "../types/job-card.types";
 
-const nextStatuses: Record<string, string[]> = {
-  OPEN: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["QC", "CANCELLED"],
-  QC: ["READY", "CANCELLED"],
-  READY: ["DELIVERED", "CANCELLED"],
-  BILLED: ["DELIVERED"],
-};
-
 export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const queryClient = useQueryClient();
 
@@ -29,6 +22,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const billed = hasJobBill(jobCard);
   const canDeliver = (billed && !(jobCard.invoices ?? []).some(invoice => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()) && invoice.outstandingAmount > 0)) || !!jobCard.creditApprovedById;
   const estimateApproved = jobCard.estimates?.[0]?.status === "Approved" && !jobCard.estimates[0].approvals?.some(approval => approval.signatureState === "invalid");
+  const [technicianId, setTechnicianId] = useState(jobCard.technicianId ?? "");
   // READY needs a done / not done answer for every linked campaign (a FREE line pre-sets "done").
   const unansweredCampaigns = (jobCard.campaigns ?? []).filter((c) => c.attended === null && !c.hasFreeLine);
   const [qcNotes, setQcNotes] = useState(jobCard.qcNotes ?? "");
@@ -61,6 +55,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       queryKey: jobCardKeys.all,
     });
 
+  const assign = useMutation({ mutationFn: () => apiPost(`/workshop/assign/${jobCard.id}`, { technicianId }), onSuccess: refresh });
   const qc = useMutation({
     mutationFn: (qcStatus: "PASSED" | "FAILED") => apiPatch(`/workshop/qc/${jobCard.id}`, { qcStatus, qcNotes }),
     onSuccess: async () => { toast.success("Quality check recorded"); await refresh(); },
@@ -119,6 +114,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       }}
     >
       <h2 className="font-semibold">Workshop actions</h2>
+      {!billed && hasPermission("assignment:create") && <div className="grid gap-2"><WorkshopPicker label="Assigned technician" endpoint={`/workshop/technicians?branchId=${jobCard.branchId}`} collection="technicians" value={technicianId} onChange={setTechnicianId} /><Button type="button" disabled={!technicianId || assign.isPending} onClick={() => assign.mutate()}>Assign technician</Button>{assign.isError && <p role="alert" className="text-sm text-destructive">{isAxiosError(assign.error) ? assign.error.response?.data?.message : "Could not assign technician"}</p>}</div>}
       {!estimateApproved && !billed && <p className="text-sm text-amber-700">Approve the latest estimate before starting or completing work. <a className="underline" href="#estimate-approval">Revise estimate and obtain customer signature</a></p>}
       {current === "QC" && hasPermission("qcstatus:update") && <div className="grid gap-2 border-b pb-3"><Field label="Quality-check findings"><textarea className={inputCls} value={qcNotes} onChange={event => setQcNotes(event.target.value)} /></Field><p className="text-sm">QC: {jobCard.qcStatus || "Pending"}</p><div className="flex gap-2"><Button type="button" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("PASSED")}>Record QC pass</Button><Button type="button" variant="outline" disabled={qc.isPending || update.isPending} onClick={() => qc.mutate("FAILED")}>Record QC failure</Button></div></div>}
       <ol className="flex flex-wrap gap-3 text-sm">
@@ -169,9 +165,9 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="">{billed ? "Select an action" : "Save findings only"}</option>
-          {(nextStatuses[billed ? "BILLED" : current] ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
-            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && (jobCard.qcStatus?.toUpperCase() !== "PASSED" || unansweredCampaigns.length > 0))}>{({ IN_PROGRESS: "Start work", QC: "Send for quality check", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
+          <option value="">{billed ? "Select an action" : WORKSPACE_COPY.saveFindings}</option>
+          {(jobCard.allowedTransitions ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
+            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: "Start work", QC: "Job done ? send for QC", WAITING_PARTS: "Wait for unavailable parts", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
           ))}
         </select>
       </Field>
@@ -232,7 +228,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
         </Button>
       )}
       <Button disabled={update.isPending || credit.isPending || reasons.length > 6 || (billed && !status) || (status === "CANCELLED" && !remarks.trim()) || (status === "DELIVERED" && (!advisor || !canDeliver || !jobCard.promisedAt || (late && !reasons.length)))}>
-        {update.isPending ? "Saving..." : status === "DELIVERED" ? "Deliver and issue gate pass" : "Save / apply action"}
+        {update.isPending ? "Saving..." : status === "DELIVERED" ? "Deliver and issue gate pass" : WORKSPACE_COPY.saveFindings}
       </Button>
     </form>
   );
