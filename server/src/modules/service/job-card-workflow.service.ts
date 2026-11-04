@@ -1,11 +1,15 @@
+import { notifyWorkshopEvent } from '../notification/workshop-notifications';
+import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
+import { assertDepositPaid } from "./job-deposit.service";
 import { sumMoney } from '../finance/money';
-import { assertBookable, bookingComplaints } from './booking.logic';
+import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
+  AppError,
   BadRequestError,
   ConflictError,
   NotFoundError,
@@ -24,15 +28,7 @@ import { WarrantyCaseService, notifyWarrantyOfficers } from "../warranty/warrant
 import { assertCampaignAttendance, completeCampaignVehiclesForJobCard, jobCardCampaignAttendance, markCampaignVehiclesInWorkshop } from "../campaign/campaign.hooks";
 import { notAttendedReasonText, type NotAttendedReason } from "../campaign/campaign.logic";
 
-export const JOB_TRANSITIONS: Record<string, readonly string[]> = {
-  OPEN: ["IN_PROGRESS", "CANCELLED"],
-  IN_PROGRESS: ["QC", "CANCELLED"],
-  QC: ["READY", "CANCELLED"],
-  READY: ["BILLED", "DELIVERED", "CANCELLED"],
-  BILLED: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
-};
+export const JOB_TRANSITIONS: Record<string, readonly string[]> = Object.fromEntries(Object.entries(JOB_TRANSITION_ROLES).map(([from, next]) => [from, Object.keys(next)]));
 
 // Legacy rows remain readable; new writes always use the canonical lifecycle.
 export function canonicalJobStatus(status: string) {
@@ -54,7 +50,7 @@ export function canonicalJobStatus(status: string) {
 
 export function jobStatusFilter(status: string) {
   const canonical = canonicalJobStatus(status);
-  return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
+  return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "WAITING_PARTS", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
 }
 
 export function repeatWindowStart(
@@ -114,6 +110,14 @@ export function assertTransition(
   }
 }
 
+async function openingField<T>(field: string, action: () => T | Promise<T>): Promise<T> {
+  try { return await action(); }
+  catch (error) {
+    if (error instanceof AppError && !error.details) error.withCode(error.code ?? 'FIELD_VALIDATION', { field });
+    throw error;
+  }
+}
+
 async function requireStaff(
   tx: Prisma.TransactionClient,
   id: string,
@@ -139,7 +143,7 @@ async function requireStaff(
   if (!user)
     throw new BadRequestError(
       "Select an active staff member with the required role in this branch",
-    );
+    ).withCode("FIELD_VALIDATION", { field: role === ROLES.TECHNICIAN ? "technicianId" : role === ROLES.ENGINEER ? "engineerId" : "serviceAdvisorId" });
 
   return user;
 }
@@ -156,6 +160,7 @@ export class JobCardWorkflowService {
     if (!createdById) throw new UnauthorizedError();
 
     const data = jobOpeningBody.parse(body);
+    if (!data.appointmentId) assertPromisedDate(data.promisedAt, new Date());
 
     const result = await prisma.$transaction(async (tx) => {
       const branch = await tx.branch.findFirst({
@@ -165,13 +170,13 @@ export class JobCardWorkflowService {
         },
       });
 
-      if (!branch) throw new NotFoundError("Active branch not found");
+      if (!branch) throw new NotFoundError("Active branch not found").withCode("FIELD_VALIDATION", { field: "branchName" });
 
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`,
       );
 
-      const vehicle = await loadVehicleForWarranty(tx, data.vehicleId);
+      const vehicle = await openingField("vehicleId", () => loadVehicleForWarranty(tx, data.vehicleId));
 
       if (
         !(await tx.customer.findFirst({
@@ -181,10 +186,10 @@ export class JobCardWorkflowService {
           },
         }))
       )
-        throw new NotFoundError("Customer not found");
+        throw new NotFoundError("Customer not found").withCode("FIELD_VALIDATION", { field: "customerId" });
 
       // Odometer only moves forward, except for an audited replacement.
-      assertMileage(data.mileage, vehicle.lastRecordedMileage, data.odometerReplaced);
+      await openingField("mileage", () => assertMileage(data.mileage, vehicle.lastRecordedMileage, data.odometerReplaced));
 
       // Warranty & campaign check: the server recomputes coverage from today's mileage and
       // refuses the job card (409 WARRANTY_ACK_REQUIRED) unless the adviser acknowledged a
@@ -218,9 +223,11 @@ export class JobCardWorkflowService {
         )
           throw new BadRequestError(
             "Appointment must match the vehicle and branch",
-          );
+          ).withCode("FIELD_VALIDATION", { field: "appointmentId" });
 
         assertBookable(appointment);
+        assertPromisedDate(data.promisedAt, appointment.scheduledAt);
+        data.remarks = [appointment.notes, data.remarks].filter(Boolean).join("\n") || undefined;
         if (bookingVersion && appointment.updatedAt.toISOString() !== bookingVersion) throw new ConflictError("Booking changed; reload before converting");
         if (appointment.serviceTypeId && appointment.serviceTypeId !== data.serviceTypeId) throw new ConflictError('Booking service changed; reload before converting');
         data.serviceId = appointment.serviceId ?? undefined;
@@ -236,21 +243,21 @@ export class JobCardWorkflowService {
             },
           })
         )
-          throw new BadRequestError("Appointment already has a job card");
+          throw new BadRequestError("Appointment already has a job card").withCode("FIELD_VALIDATION", { field: "appointmentId" });
       }
 
-      await requireMaster(tx, data.bayId, "BAY");
+      await openingField("bayId", () => requireMaster(tx, data.bayId, "BAY"));
 
-      const serviceType = await new ServiceTypeService().requireAvailable(
+      const serviceType = await openingField("serviceTypeId", () => new ServiceTypeService().requireAvailable(
         tx, vehicle.id, data.serviceTypeId, new Date(),
-      );
+      ));
       // Appointment services remain a separate catalogue and are never used
       // to determine the opening dropdown or its model-specific charge.
       if (data.serviceId && !(await tx.service.findFirst({
         where: { id: data.serviceId, isActive: true }, select: { id: true },
       }))) throw new BadRequestError("Select an active appointment service");
 
-      if (data.teamId) await requireMaster(tx, data.teamId, "TEAM");
+      if (data.teamId) await openingField("teamId", () => requireMaster(tx, data.teamId!, "TEAM"));
 
       await requireStaff(
         tx,
@@ -431,6 +438,7 @@ export class JobCardWorkflowService {
     }, { maxWait: 5000, timeout: 15000 });
 
     await notifyWarrantyJob(result);
+    if (result.card.technicianId) await notifyWorkshopEvent('TECHNICIAN_ASSIGNED', result.card.id, result.card.technicianId);
     return { ...result.card, warrantyCase: result.warrantyCase, warrantyCheck: result.check };
   }
 
@@ -443,6 +451,7 @@ export class JobCardWorkflowService {
 
     const data = jobUpdateBody.parse(input);
 
+    let transitionId: string | undefined;
     const card = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
@@ -455,10 +464,12 @@ export class JobCardWorkflowService {
 
         include: {
           invoices: true,
+          consolidatedInvoices: true,
         },
       });
 
       if (!current) throw new NotFoundError("Job card not found");
+      current.invoices.push(...(current.consolidatedInvoices ?? []));
 
       const from = canonicalJobStatus(current.status);
 
@@ -502,9 +513,15 @@ export class JobCardWorkflowService {
       if (data.status && data.status !== from && ['IN_PROGRESS', 'QC', 'READY'].includes(data.status)) {
         await assertApprovedOperation(tx, id, current.customerId, []);
       }
+      if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' && current.qcStatus?.toUpperCase() !== 'PASSED') throw new BadRequestError('Record a passed quality check before marking the job Ready');
+      if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' || (data.status === 'DELIVERED' && !billed)) await assertRecordedScope(tx, id);
       if (data.status && data.status !== from) {
+        const actor = await tx.user.findUnique({ where: { id: actorId }, include: { role: true } });
+        if (!actor?.isActive) throw new UnauthorizedError();
+        assertTransitionRole(from, data.status, actor.role.name, actorId, current.technicianId);
+        if (from === 'QC' && data.status === 'IN_PROGRESS' && current.qcStatus?.toUpperCase() !== 'FAILED') throw new BadRequestError('QC must fail before returning the job for rework');
         assertTransition(
           from,
           data.status,
@@ -554,7 +571,7 @@ export class JobCardWorkflowService {
 
         update.status = data.status;
 
-        await tx.jobCardStatusHistory.create({
+        const history = await tx.jobCardStatusHistory.create({
           data: {
             jobCardId: id,
             fromStatus: from,
@@ -563,6 +580,7 @@ export class JobCardWorkflowService {
             remarks: data.remarks,
           },
         });
+        transitionId = history?.id;
       }
 
       return tx.jobCard.update({
@@ -574,7 +592,10 @@ export class JobCardWorkflowService {
       });
     }, { maxWait: 5000, timeout: 15000 });
 
-    if (card.status === "READY" && data.status === "READY") {
+    if (transitionId && data.status === 'QC') await notifyWorkshopEvent('JOB_SENT_FOR_QC', id, transitionId);
+    if (transitionId && data.status === 'WAITING_PARTS') await notifyWorkshopEvent('PARTS_UNAVAILABLE', id, transitionId);
+    if (transitionId && data.status === 'READY') await notifyWorkshopEvent('JOB_READY', id, transitionId);
+    if (transitionId && card.status === "READY" && data.status === "READY") {
       await new NotificationService().notifyRole(
         ROLES.BILLING_OFFICER,
         card.branchId,

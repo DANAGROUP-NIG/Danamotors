@@ -18,7 +18,9 @@ const STATUS_FLOW: readonly string[] = [
   "Completed",
 ];
 
-export function AppointmentStatusStepper({ currentStatus }: AppointmentStatusStepperProps) {
+export function AppointmentStatusStepper({
+  currentStatus,
+}: AppointmentStatusStepperProps) {
   // Handle cancelled status
   if (currentStatus === "Cancelled") {
     return (
@@ -55,7 +57,8 @@ export function AppointmentStatusStepper({ currentStatus }: AppointmentStatusSte
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-medium transition-all",
                     completed && "border-green-600 bg-green-600 text-white",
-                    active && "border-blue-500 bg-white text-blue-600 ring-4 ring-blue-100",
+                    active &&
+                      "border-blue-500 bg-white text-blue-600 ring-4 ring-blue-100",
                     future && "border-slate-200 bg-white text-slate-400",
                   )}
                 >

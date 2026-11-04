@@ -132,7 +132,7 @@ describeDb("Part source records (database)", () => {
       serviceTypeId: serviceType.id,
       bayId: bay.id,
       teamId: team.id,
-      promisedAt: new Date(Date.now() + 3600000).toISOString(),
+      promisedAt: new Date(Date.now() + 172800000).toISOString(),
       description: "Knocking from the rear",
       serviceAdvisorId: user.id,
       mileage: 150,

@@ -6,7 +6,7 @@ import { BookingFields } from "@/features/service-transactions/components/Bookin
 import { lagosIso } from "@/features/service-transactions/transaction.logic";
 import type { BookingExtra } from "../types/appointment.types";
 import { useForm, Controller } from "react-hook-form";
-import { WorkshopPicker } from '@/features/job-cards/components/WorkshopPicker';
+import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -27,9 +27,15 @@ interface AppointmentCreateFormProps {
   initialValues?: Partial<CreateAppointmentFormValues>;
 }
 
-export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentCreateFormProps) {
+export function AppointmentCreateForm({
+  onSuccess,
+  initialValues,
+}: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
-  const [extra, setExtra] = useState<BookingExtra>({ requests: [] });
+  const [extra, setExtra] = useState<BookingExtra>({
+    requests: [{ description: "" }],
+  });
+  const [requestError, setRequestError] = useState("");
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
   const { hasPermission } = useAuth();
@@ -58,6 +64,16 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
   const selectedVehicleId = watch("vehicleId");
 
   function onSubmit(values: CreateAppointmentFormValues) {
+    if (
+      !extra.requests?.some(
+        (row) =>
+          row.description.trim() || row.complaintCodeId || row.defectCode,
+      )
+    ) {
+      setRequestError("Add the customer request");
+      return;
+    }
+    setRequestError("");
     const payload = {
       ...values,
       ...extra,
@@ -68,7 +84,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
     create.mutate(payload, {
       onSuccess: () => {
         reset();
-        setExtra({ requests: [] });
+        setExtra({ requests: [{ description: "" }] });
         onSuccess?.();
       },
     });
@@ -92,7 +108,7 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
             value={selectedVehicleId}
             customerId={selectedCustomerId}
             onChange={(vehicleId) => {
-              setExtra(current => ({ ...current, followUpJobId: null }));
+              setExtra((current) => ({ ...current, followUpJobId: null }));
               setValue("vehicleId", vehicleId, { shouldValidate: true });
             }}
             onVehicleSelect={(vehicle) => {
@@ -105,17 +121,47 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
-      {selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}
-      <BookingFields value={extra} onChange={setExtra} vehicleId={selectedVehicleId} />
-      <Controller name="serviceTypeId" control={control} render={({field})=><WorkshopPicker label="Workshop service type (optional)" endpoint="/workshop-masters?kind=SERVICE_TYPE" collection="items" value={field.value??''} onChange={field.onChange} onBlur={field.onBlur}/>}/>
-      <Field label="Appointment service (optional)" error={errors.serviceId?.message}>
+      <details>
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          Vehicle summary
+        </summary>
+        {selectedVehicleId && <BookingVehicleSummary id={selectedVehicleId} />}
+      </details>
+      {requestError && (
+        <p role="alert" className="text-sm text-destructive">
+          {requestError}
+        </p>
+      )}
+      <BookingFields
+        compact
+        value={extra}
+        onChange={setExtra}
+        vehicleId={selectedVehicleId}
+      />
+      <Controller
+        name="serviceTypeId"
+        control={control}
+        render={({ field }) => (
+          <WorkshopPicker
+            label="Workshop service type (optional)"
+            endpoint="/workshop-masters?kind=SERVICE_TYPE"
+            collection="items"
+            value={field.value ?? ""}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
+          />
+        )}
+      />
+      <Field
+        label="Appointment service (optional)"
+        error={errors.serviceId?.message}
+      >
         {servicesLoading ? (
-          <p className="py-1 text-sm text-muted-foreground">Loading services…</p>
+          <p className="py-1 text-sm text-muted-foreground">
+            Loading services…
+          </p>
         ) : services && services.services.length > 0 ? (
-          <select
-            className={inputCls}
-            {...register("serviceId")}
-          >
+          <select className={inputCls} {...register("serviceId")}>
             <option value="">Select a service</option>
             {services.services.map((s) => (
               <option key={s.id} value={s.id}>
@@ -149,7 +195,10 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
             />
           )}
         </Field>
-        <Field label="Scheduled date & time" error={errors.scheduledAt?.message}>
+        <Field
+          label="Scheduled date & time"
+          error={errors.scheduledAt?.message}
+        >
           <Controller
             control={control}
             name="scheduledAt"
@@ -159,25 +208,32 @@ export function AppointmentCreateForm({ onSuccess, initialValues }: AppointmentC
           />
         </Field>
       </div>
-      <Field label="Duration (minutes, optional)" error={errors.durationMins?.message}>
-        <input
-          type="number"
-          className={inputCls}
-          placeholder="e.g. 60"
-          {...register("durationMins")}
-        />
-      </Field>
-      <Field label="Notes (optional)" error={errors.notes?.message}>
-        <textarea
-          className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
-          placeholder="Any relevant details for the technician…"
-          {...register("notes")}
-        />
-      </Field>
+      <details>
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          Additional booking details
+        </summary>
+        <Field
+          label="Duration (minutes, optional)"
+          error={errors.durationMins?.message}
+        >
+          <input
+            type="number"
+            className={inputCls}
+            placeholder="e.g. 60"
+            {...register("durationMins")}
+          />
+        </Field>
+        <Field label="Notes (optional)" error={errors.notes?.message}>
+          <textarea
+            className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+            placeholder="Any relevant details for the technician…"
+            {...register("notes")}
+          />
+        </Field>
+      </details>
       <Button type="submit" disabled={create.isPending} className="mt-1">
         {create.isPending ? "Booking…" : "Book appointment"}
       </Button>
     </form>
   );
 }
-
