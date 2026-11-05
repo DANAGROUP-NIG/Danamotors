@@ -50,7 +50,7 @@ export function holdsPermission(name: string): Prisma.UserWhereInput {
 
 /**
  * Admin-level permissions: managing users, roles and rights, reading the audit trail, all-branch access,
- * and managing branches. Only a super admin may grant them to a user as an override. For roles see
+ * managing branches, and closing the books. Only a super admin may grant them to a user as an override. For roles see
  * `assertCanChangeUser`: a role that manages access counts as admin-level, while the built-in operational
  * roles that carry `branch:all` stay assignable, because only a super admin edits role permissions.
  */
@@ -60,6 +60,7 @@ const ADMIN_LEVEL_NAMES: string[] = [
   PERMISSIONS.BRANCH_CREATE,
   PERMISSIONS.BRANCH_UPDATE,
   PERMISSIONS.BRANCH_DELETE,
+  PERMISSIONS.BOOKS_CLOSE,
 ];
 
 /** Managing users, roles and rights, or reading the audit trail. */

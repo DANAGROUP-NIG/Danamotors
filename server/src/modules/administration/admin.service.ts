@@ -631,6 +631,7 @@ export class AdminService {
       corporate: 'Corporate Groups',
       credit: 'Credit Management',
       audit: 'Audit Management',
+      books: 'Books Closed (Year End)',
       warranty: 'Warranty',
       campaign: 'Campaigns (Recall / Free Fix)',
     };

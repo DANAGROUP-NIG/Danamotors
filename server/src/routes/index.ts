@@ -43,6 +43,7 @@ import employeeRoutes from '../modules/employee/employee.routes';
 import serviceChecklistRoutes from '../modules/workshop/service-checklist.routes';
 import documentTermsRoutes from '../modules/document-terms/document-terms.routes';
 import companySettingsRoutes from '../modules/company-settings/company-settings.routes';
+import booksClosedRoutes from '../modules/books-closed/books-closed.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
@@ -53,6 +54,7 @@ router.use('/employees', employeeRoutes);
 router.use('/service-checklists', serviceChecklistRoutes);
 router.use('/document-terms', documentTermsRoutes);
 router.use('/company-settings', companySettingsRoutes);
+router.use('/books-closed', booksClosedRoutes);
 router.use('/job-cards', serviceTypeOptionsRouter);
 router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 

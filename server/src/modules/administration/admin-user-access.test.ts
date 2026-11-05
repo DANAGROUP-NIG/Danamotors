@@ -44,7 +44,7 @@ describe('Effective permissions', () => {
 });
 
 describe('Admin-level access', () => {
-  it.each(['user:read', 'user:update', 'role:permission:update', 'audit:read', 'branch:all', 'branch:create', 'branch:delete'])(
+  it.each(['user:read', 'user:update', 'role:permission:update', 'audit:read', 'branch:all', 'branch:create', 'branch:delete', 'books:close'])(
     '%s is admin-level', (name) => expect(isAdminLevelPermission(name)).toBe(true));
 
   it.each(['branch:read', 'customer:delete', 'invoice:cancel', 'inventory:cross-branch', 'report:management-information'])(

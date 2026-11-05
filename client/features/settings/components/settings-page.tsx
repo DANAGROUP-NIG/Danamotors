@@ -26,6 +26,11 @@ const SETTINGS_CARDS = [
     href: "/settings/workshop-masters",
   },
   {
+    title: "Books Closed",
+    description: "Year end: the date up to which finance and stock entries are locked, per company or branch.",
+    href: "/settings/books-closed",
+  },
+  {
     title: "Model Labour Rates",
     description: "Hours and rate per labour and model, with bulk changes, add-to-models and copy-model.",
     href: "/settings/labour-rates",

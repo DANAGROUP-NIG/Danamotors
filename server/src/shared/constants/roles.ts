@@ -250,6 +250,9 @@ export const PERMISSIONS = {
   // ── Audit ─────────────────────────────────────────────────────────────────
   AUDIT_READ: "audit:read",
 
+  // ── Books closed (period lock; legacy Year End freeze). SuperAdmin only. ──
+  BOOKS_CLOSE: "books:close",
+
   // ── Service — Job card lines (parts/labour and who pays) ──────────────────
   JOBCARD_LINE_UPDATE: "jobcard:line:update",
 

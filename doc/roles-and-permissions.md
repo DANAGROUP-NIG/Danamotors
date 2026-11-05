@@ -40,6 +40,7 @@ permissions are seeded into the database; API routes enforce access with
 | Transfers | `transfer:read`, `transfer:create`, `transfer:update`, `transfer:approve`, `transfer:dispatch`, `transfer:receive` |
 | Finance | `finance:read`, `finance:create`, `finance:update` |
 | Model labour rates | `labour-rate:update` (Admin): inline and bulk edit, see [labour-rates.md](./labour-rates.md) |
+| Books closed | `books:close` (SuperAdmin only, admin-level): close and reopen the books, see [books-closed.md](./books-closed.md) |
 
 ## Dealer rates, shortage approval and user changes
 
@@ -95,7 +96,7 @@ permission it lacks); the effective permissions do not change.
 Only a SuperAdmin may give admin-level access:
 
 - **Admin-level permissions** (`isAdminLevelPermission`): every `user:*`, `role:*` and `audit:*`
-  permission, `branch:all`, `branch:create`, `branch:update` and `branch:delete`. An Admin cannot grant
+  permission, `branch:all`, `branch:create`, `branch:update`, `branch:delete` and `books:close`. An Admin cannot grant
   them; the Access editor shows them locked.
 - **Admin-level roles**: Admin, SuperAdmin, and any role holding a `user:*`, `role:*` or `audit:*`
   permission, such as Auditor. An Admin cannot give them, on create, edit or copy.

@@ -4235,6 +4235,10 @@ model BranchSettings {
   branchId String @id
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
+  /// A later books-closed date for this branch only; the company-wide date is FinanceSetting
+  /// 'booksClosedUpTo'. The branch is closed up to the later of the two (books_closed_up_to()).
+  booksClosedUpTo DateTime? @db.Date
+
   // Billing
   labourVatPercent Float @default(7.5)
   // Job bills are rounded down to a multiple of this (legacy RoundOffValue).
