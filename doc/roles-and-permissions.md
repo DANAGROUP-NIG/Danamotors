@@ -39,13 +39,29 @@ permissions are seeded into the database; API routes enforce access with
 | Transfers | `transfer:read`, `transfer:create`, `transfer:update`, `transfer:approve`, `transfer:dispatch`, `transfer:receive` |
 | Finance | `finance:read`, `finance:create`, `finance:update` |
 
-## Changing users
+## Dealer rates, shortage approval and user changes
 
-A SuperAdmin may change any other user, including their role and branch
+| Permission | What it allows | Default roles |
+| --- | --- | --- |
+| `sparepart:cost:read` | See dealer rates, purchase prices, transfer values, stock values, cost and profit (legacy "Can View Dealer Rate") | Admin, General Store Manager, Store Officer, Accountant |
+| `stock:discrepancy:approve` | Approve the shortage/damage on an MIT or STN receipt (legacy "Can Approve Shortage/Excess in MIT/BIT") | Admin, General Store Manager |
+
+**Dealer rates.** Without `sparepart:cost:read`, `costVisibility` (`server/src/middleware/costVisibility.ts`)
+removes `unitPrice`, `unitRate`, `dealerRate`, `basicRate`, `unitCost` and old/new dealer rates from every
+API response. On stock documents (indents, STNs, MIT/MRN, vendor receipts, transfers, picking and packing
+lists) it also removes `amount`, `totalValue` and `totalAmount`, which are valued at those rates. Selling
+prices (retail rate, invoice and CPO amounts) are untouched. Parts reports drop their cost columns (marked
+`cost` in `partsReport.definitions.ts`). Such users cannot set a part's dealer or base rate either: those
+fields are ignored on part writes. The part screens hide the dealer rate.
+
+**Changing users.** A SuperAdmin may change any other user, including their role and branch
 (`PUT /api/admin/users/:id` takes `branchId`; the edit form shows Branch to SuperAdmins only). Anyone else
 (an Admin, within their branch) may not change an Admin or SuperAdmin, give the Admin or SuperAdmin role,
 or move a user to another branch. Nobody may deactivate, delete or change the role of their own account.
 Changes are audited as `USER_UPDATED` with old → new values; deletes as `USER_DELETED`.
+
+After deploying, run the role seed so the built-in roles get the two permissions. Until then only
+SuperAdmins see dealer rates and approve shortages.
 
 ## Operational branch access (issue #96)
 

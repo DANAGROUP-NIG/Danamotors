@@ -1,3 +1,5 @@
+import type { DiscrepancyFields } from "@/features/stock-discrepancy/types";
+
 export type ReceivedMode = "AIR" | "SEA" | "ROAD";
 export type MitStatus = "IN_TRANSIT" | "VERIFIED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
 
@@ -35,9 +37,10 @@ export type Mrn = {
   totalReceived: number;
   totalDamaged: number;
   totalShort: number;
+  /** Absent for users without sparepart:cost:read. */
   totalValue: number;
   receivedBy: PersonRef | null;
-};
+} & DiscrepancyFields;
 
 export type MobisMit = {
   id: string;

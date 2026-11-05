@@ -158,7 +158,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
                   )}
                 </td>
                 <td className="px-3 py-2 text-slate-600">{record.stock ? record.stock.quantity : "—"}</td>
-                <td className="px-3 py-2 text-slate-600">{fmtNaira(record.dealerRate)}</td>
+                <td className="px-3 py-2 text-slate-600">{(record.dealerRate != null ? fmtNaira(record.dealerRate) : "—")}</td>
                 <td className="px-3 py-2 text-slate-600">{record.retailRate != null ? fmtNaira(record.retailRate) : "Not set"}</td>
                 <td className="px-3 py-2">
                   <PartStatusBadge status={record.partStatus} />

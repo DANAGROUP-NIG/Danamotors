@@ -27,7 +27,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
     partCategory: stock.part.priceCategoryCode ?? "",
-    unitPrice: stock.part.unitPrice,
+    unitPrice: stock.part.unitPrice ?? "",
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
     maximumStock: stock.maximumStock ?? "",
@@ -36,7 +36,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   };
 }
 
-function exportColumns() {
+function exportColumns(canSeeCost = true) {
   return [
     { key: "partName", label: "Part Name" },
     { key: "partNumber", label: "Part Number" },
@@ -47,7 +47,7 @@ function exportColumns() {
     { key: "maximumStock", label: "Maximum Stock" },
     { key: "rackLocation", label: "Rack Location" },
     { key: "reservedQuantity", label: "Reserved Quantity" },
-  ];
+  ].filter((column) => canSeeCost || column.key !== "unitPrice");
 }
 
 function ExportInventoryButton() {
@@ -55,6 +55,7 @@ function ExportInventoryButton() {
   const { data: stockData } = useBranchStock(activeBranch?.id ?? null);
   const stock = stockData ?? [];
   const disabled = stock.length === 0;
+  const canSeeCost = useAuth().hasPermission(INVENTORY_PERMISSIONS.SPAREPART_COST_READ);
 
   function filename() {
     const branchSuffix = activeBranch?.name ? `${activeBranch.name}-` : "";
@@ -82,7 +83,7 @@ function ExportInventoryButton() {
           downloadCsv(
             filename(),
             stock.map(flattenStock),
-            exportColumns(),
+            exportColumns(canSeeCost),
           )
         }
       >
@@ -94,7 +95,7 @@ function ExportInventoryButton() {
           downloadExcel(
             filename(),
             stock.map(flattenStock),
-            exportColumns(),
+            exportColumns(canSeeCost),
           )
         }
       >

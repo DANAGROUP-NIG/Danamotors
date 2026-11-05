@@ -21,6 +21,7 @@
  * UPDATE, so a double click or two users acting at once can never deduct or
  * post stock twice. Notifications are sent after the transaction commits.
  */
+import { discrepancyStatusFor, notifyDiscrepancyPending } from "../inventory/stockDiscrepancy";
 import {
   IndentStatus,
   MobisOrderMode,
@@ -131,7 +132,7 @@ const indentDetailInclude = {
       packingList: true,
       mrns: {
         orderBy: { createdAt: "asc" },
-        include: { receivedBy: userSelect, lines: { include: { part: partSelect } } },
+        include: { receivedBy: userSelect, discrepancyApprovedBy: userSelect, lines: { include: { part: partSelect } } },
       },
     },
   },
@@ -1675,6 +1676,8 @@ export class StockTransferService {
           totalDamaged: plan.totals.damaged,
           totalShort: plan.totals.short,
           totalValue: roundMoney(mrnLines.reduce((sum, l) => sum + l.amount, 0)),
+          // Damaged or short units wait for S/E approval (stockDiscrepancy.ts).
+          discrepancyStatus: discrepancyStatusFor(plan.totals),
           receivedById: actorId,
           lines: { create: mrnLines },
         },
@@ -1820,7 +1823,7 @@ export class StockTransferService {
         packingList: true,
         mrns: {
           orderBy: { createdAt: "asc" },
-          include: { receivedBy: userSelect, lines: { include: { part: partSelect } } },
+          include: { receivedBy: userSelect, discrepancyApprovedBy: userSelect, lines: { include: { part: partSelect } } },
         },
       },
     });
@@ -2082,11 +2085,14 @@ export class StockTransferService {
       },
     );
 
-    if (result.totals.damaged > 0 || result.totals.short > 0) {
-      await this.notifications.notifyRole(ROLES.GENERAL_STORE_MANAGER, undefined, {
-        type: TRANSFER_NOTIFICATION_TYPES.TRANSFER_DISCREPANCY,
-        title: "Transfer discrepancy",
-        message: `MRN ${result.mrnNumber} for STN ${result.stnNumber} recorded ${result.totals.damaged} damaged and ${result.totals.short} short unit(s).`,
+    // Damaged or short units: the users who may approve the shortage (general store managers by default) are told.
+    if (discrepancyStatusFor(result.totals)) {
+      await notifyDiscrepancyPending({
+        mrnNumber: result.mrnNumber,
+        receivingBranchId: result.receivingBranchId,
+        totalDamaged: result.totals.damaged,
+        totalShort: result.totals.short,
+        document: `STN ${result.stnNumber}`,
         link,
       });
     }

@@ -52,6 +52,8 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
   recorded as short.
 - **Value.** The MRN value is received quantity × unit price × conversion rate.
 - **Cancelling.** An MIT can be cancelled only before its MRN.
+- **Shortage approval.** An MRN with damaged or short units waits for approval by a user with
+  `stock:discrepancy:approve`. See [stock-transfers.md](./stock-transfers.md#shortage--damage-approval-legacy-se-approval).
 - **Permissions.** Uploading and generating the MRN need `stock:update` and access to the
   receiving branch. Viewing needs `stock:read`.
 

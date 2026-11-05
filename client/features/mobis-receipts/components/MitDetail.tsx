@@ -22,6 +22,7 @@ import {
 } from "../lib/mobis-labels";
 import type { MobisMit } from "../types/mobis.types";
 import { HandheldCard, useHandheldDocuments, type HandheldDocument } from "@/features/handheld";
+import { DiscrepancyPanel } from "@/features/stock-discrepancy/components/DiscrepancyPanel";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -307,8 +308,10 @@ export function MitDetail({ id }: { id: string }) {
             <p className="mt-2 text-sm text-emerald-900">
               {mit.mrn.totalReceived} received into {mit.destinationBranch.name} stock
               {mit.mrn.totalDamaged ? `, ${mit.mrn.totalDamaged} damaged` : ""}
-              {mit.mrn.totalShort ? `, ${mit.mrn.totalShort} short` : ""} · value {fmtNaira(mit.mrn.totalValue)}
+              {mit.mrn.totalShort ? `, ${mit.mrn.totalShort} short` : ""}
+              {mit.mrn.totalValue != null ? ` · value ${fmtNaira(mit.mrn.totalValue)}` : ""}
             </p>
+            <DiscrepancyPanel mrn={mit.mrn} />
           </div>
         )}
 

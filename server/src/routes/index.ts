@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import stockDiscrepancyRoutes from '../modules/inventory/stockDiscrepancy.routes';
 import reportRoutes from '../modules/reports/reports.routes';
 import reportFrameworkRoutes from '../modules/reports/framework.routes';
 import authRoutes from '../modules/auth/auth.routes';
@@ -112,6 +113,7 @@ router.use('/stock-takes', stockTakeRoutes);
 router.use('/handheld/station', handheldStationRoutes);
 router.use('/handheld', handheldRoutes);
 router.use('/labels', labelRoutes);
+router.use('/inventory', stockDiscrepancyRoutes);
 router.use('/inventory', mobisPurchaseRoutes);
 router.use('/inventory', vendorReceiptRoutes);
 router.use('/inventory', stockTransferRoutes);

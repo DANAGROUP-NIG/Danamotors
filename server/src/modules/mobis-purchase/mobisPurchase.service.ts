@@ -8,6 +8,7 @@
  * (and, if asked, any parts missing from Part Master). Generating the MRN
  * records what physically arrived and posts accepted stock exactly once.
  */
+import { discrepancyStatusFor, notifyDiscrepancyPending } from '../inventory/stockDiscrepancy';
 import { MitStatus, MrnSource, TransportMode } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
@@ -190,7 +191,7 @@ export class MobisPurchaseService {
             part: { select: { id: true, partNumber: true, name: true, partStatus: true, unitPrice: true, uom: true } },
           },
         },
-        mrn: { include: { receivedBy: userSelect, lines: true } },
+        mrn: { include: { receivedBy: userSelect, discrepancyApprovedBy: userSelect, lines: true } },
       },
     });
     if (!mit) throw new NotFoundError("Mobis MIT not found");
@@ -300,6 +301,8 @@ export class MobisPurchaseService {
           totalDamaged: plan.totals.damaged,
           totalShort: plan.totals.short,
           totalValue,
+          // Damaged or short units wait for S/E approval (stockDiscrepancy.ts).
+          discrepancyStatus: discrepancyStatusFor(plan.totals),
           receivedById: actorId,
           lines: { create: mrnLines },
         },
@@ -351,6 +354,16 @@ export class MobisPurchaseService {
         ".",
       link: `/inventory/mobis-receipts/${mit.id}`,
     });
+    if (discrepancyStatusFor(totals)) {
+      await notifyDiscrepancyPending({
+        mrnNumber: result.mrnNumber,
+        receivingBranchId: mit.destinationBranchId,
+        totalDamaged: totals.damaged,
+        totalShort: totals.short,
+        document: `Mobis invoice ${mit.invoiceNumber}, MIT ${mit.mitNumber}`,
+        link: `/inventory/mobis-receipts/${mit.id}`,
+      });
+    }
     // Mobis stock is what usually fills the branch back orders CPD is holding.
     await new StockTransferService().notifyBackOrdersPickable(
       mit.destinationBranchId,

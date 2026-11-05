@@ -53,7 +53,7 @@ function StockCells({ r }: { r: PartQueryRow }) {
       </td>
       <td className={cn(tdCls, "text-slate-600")}>{r.location ?? ""}</td>
       <td className={cn(tdCls, "text-slate-600")}>{r.binCard ?? ""}</td>
-      <td className={cn(tdCls, "text-right")}>{fmtNaira(r.dealerRate)}</td>
+      <td className={cn(tdCls, "text-right")}>{(r.dealerRate != null ? fmtNaira(r.dealerRate) : "—")}</td>
       <td className={cn(tdCls, "text-right")}>{r.retailRate != null ? fmtNaira(r.retailRate) : "—"}</td>
       <td className={cn(tdCls, "text-right", r.qtyBlocked > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
         {r.qtyBlocked}
@@ -154,7 +154,7 @@ function CatalogueResult({ item, canCreate }: { item: PartCatalogueItem; canCrea
           ["Type", PART_TYPE_LABELS[item.partType] ?? item.partType],
           ["Part category", item.priceCategoryCode ?? "—"],
           ["UOM", item.uom],
-          ["Dealer rate", fmtNaira(item.dealerRate)],
+          ["Dealer rate", (item.dealerRate != null ? fmtNaira(item.dealerRate) : "—")],
           ["Retail rate", item.retailRate != null ? fmtNaira(item.retailRate) : "—"],
         ].map(([label, value]) => (
           <div key={label}>
@@ -305,7 +305,7 @@ export function PartQueryPage() {
                 ["Part category", data.part.priceCategoryCode ?? "—"],
                 ["Taxable", data.part.taxable ? "Yes" : "No"],
                 ["UOM", data.part.uom],
-                ["Dealer rate", fmtNaira(data.part.dealerRate)],
+                ["Dealer rate", (data.part.dealerRate != null ? fmtNaira(data.part.dealerRate) : "—")],
                 ["Retail rate", data.part.retailRate != null ? fmtNaira(data.part.retailRate) : "—"],
               ].map(([label, value]) => (
                 <div key={label}>

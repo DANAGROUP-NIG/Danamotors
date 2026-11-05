@@ -27,6 +27,10 @@ export const INVENTORY_PERMISSIONS = {
   SPAREPART_CREATE: "sparepart:create",
   SPAREPART_UPDATE: "sparepart:update",
   SPAREPART_DELETE: "sparepart:delete",
+  /** Dealer rates, purchase prices and stock values. */
+  SPAREPART_COST_READ: "sparepart:cost:read",
+  /** Approve the shortage/excess on an MIT or STN receipt. */
+  STOCK_DISCREPANCY_APPROVE: "stock:discrepancy:approve",
   STOCK_READ: "stock:read",
   STOCK_UPDATE: "stock:update",
   INVENTORY_CROSS_BRANCH: "inventory:cross-branch",

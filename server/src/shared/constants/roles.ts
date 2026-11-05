@@ -152,6 +152,10 @@ export const PERMISSIONS = {
   SPAREPART_CREATE: "sparepart:create",
   SPAREPART_UPDATE: "sparepart:update",
   SPAREPART_DELETE: "sparepart:delete",
+  /** See dealer rates, purchase prices and stock values (legacy "Can View Dealer Rate"). */
+  SPAREPART_COST_READ: "sparepart:cost:read",
+  /** Approve the shortage/excess on an MIT or STN receipt (legacy "Can Approve Shortage/Excess in MIT/BIT"). */
+  STOCK_DISCREPANCY_APPROVE: "stock:discrepancy:approve",
 
   // ── Inventory — Stock ─────────────────────────────────────────────────────
   STOCK_READ: "stock:read",
@@ -321,6 +325,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.MANAGEMENT_INFORMATION_READ,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
@@ -457,6 +463,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
@@ -507,6 +515,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
+    PERMISSIONS.SPAREPART_COST_READ,
     ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
@@ -617,6 +626,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.SPAREPART_COST_READ,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ,

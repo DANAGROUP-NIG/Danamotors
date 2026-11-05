@@ -131,7 +131,7 @@ function FamilyRow({ part, current }: { part: PartMaster; current?: boolean }) {
       <td className="px-3 py-2">
         <PartRoleBadge role={part.role} />
       </td>
-      <td className="px-3 py-2 text-slate-600">{fmtNaira(part.unitRate)}</td>
+      <td className="px-3 py-2 text-slate-600">{(part.unitRate != null ? fmtNaira(part.unitRate) : "—")}</td>
       <td className="px-3 py-2">
         <PartStatusBadge status={part.partStatus} />
       </td>
@@ -295,7 +295,7 @@ export function PartDetail({ id }: { id: string }) {
                   : null
               }
             />
-            <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
+            {part.unitRate != null && <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />}
             <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
             <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />
             <DetailField

@@ -86,6 +86,7 @@ export function PartMasterTable() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_UPDATE);
   const canDelete = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_DELETE);
+  const canSeeCost = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_COST_READ);
   const setPartStatus = useSetPartStatus();
   const bulkDelete = useBulkDeleteParts();
 
@@ -153,12 +154,13 @@ export function PartMasterTable() {
           <span className="text-muted-foreground">—</span>
         ),
     },
-    {
+    // Hidden from users without sparepart:cost:read; the API leaves the rate out for them too.
+    ...(canSeeCost ? [{
       header: "Dealer rate",
       headerClassName: "whitespace-nowrap text-right",
       className: "whitespace-nowrap text-right tabular-nums text-muted-foreground",
-      render: (p) => fmtNaira(p.unitRate),
-    },
+      render: (p: PartMaster) => (p.unitRate != null ? fmtNaira(p.unitRate) : "—"),
+    }] : []),
     {
       header: "Retail rate",
       headerClassName: "whitespace-nowrap text-right",

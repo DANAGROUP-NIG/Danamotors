@@ -59,6 +59,15 @@ describeDb("Stock transfer workflow (database)", () => {
       prisma.role.upsert({ where: { name }, update: {}, create: { name } });
     const gsmRole = await role("GeneralStoreManager");
     const bsmRole = await role("BranchStoreManager");
+    // General store managers approve shortages on any branch's receipts (seeded role grants).
+    for (const name of ["stock:discrepancy:approve", "inventory:cross-branch"]) {
+      const permission = await prisma.permission.upsert({ where: { name }, update: {}, create: { name } });
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: gsmRole.id, permissionId: permission.id } },
+        update: {},
+        create: { roleId: gsmRole.id, permissionId: permission.id },
+      });
+    }
 
     cpd = await prisma.branch.create({ data: { name: `CPD ${run}` } });
     branch = await prisma.branch.create({ data: { name: `Kia Plaza ${run}` } });
@@ -530,7 +539,8 @@ describeDb("Stock transfer workflow (database)", () => {
     expect(await stockOf(branch.id, filter.id)).toMatchObject({ quantity: 4 });
 
     const discrepancy = await prisma.notification.findFirst({
-      where: { userId: gsm.id, type: "TRANSFER_DISCREPANCY", message: { contains: second.stns[0].stnNumber } },
+      // Damaged or short units wait for S/E approval; the general store manager may approve them.
+      where: { userId: gsm.id, type: "STOCK_DISCREPANCY_PENDING", message: { contains: second.stns[0].stnNumber } },
     });
     expect(discrepancy).not.toBeNull();
   });

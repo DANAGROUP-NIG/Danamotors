@@ -30,6 +30,20 @@ export interface ReportResult {
   truncated: boolean;
 }
 
+/** The report without its cost columns (dealer rates, stock and purchase values, cost and profit). */
+export function withoutCostColumns(report: ReportResult): ReportResult {
+  const hidden = new Set(report.columns.filter(column => column.cost).map(column => column.key));
+  if (!hidden.size) return report;
+  const keep = <T extends Record<string, unknown>>(record: T) =>
+    Object.fromEntries(Object.entries(record).filter(([key]) => !hidden.has(key))) as T;
+  return {
+    ...report,
+    columns: report.columns.filter(column => !column.cost),
+    rows: report.rows.map(keep),
+    totals: keep(report.totals),
+  };
+}
+
 const MAX_ROWS = 5000;
 /** The Excel file asks for every line; this only guards against a runaway query. */
 const MAX_EXPORT_ROWS = 200_000;

@@ -35,6 +35,7 @@ import {
   PackageSearch,
   Ship,
   Truck,
+  ShieldAlert,
   Landmark,
   Megaphone,
   ShoppingCart,
@@ -218,6 +219,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/inventory/vendor-receipts",
         icon: Truck,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Shortage Approvals",
+        href: "/inventory/discrepancies",
+        icon: ShieldAlert,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_DISCREPANCY_APPROVE],
       },
       {
         label: "Stock Taking",

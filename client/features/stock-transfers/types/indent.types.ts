@@ -1,3 +1,5 @@
+import type { DiscrepancyFields } from "@/features/stock-discrepancy/types";
+
 export type IndentStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -202,10 +204,11 @@ export type Mrn = {
   totalReceived: number;
   totalDamaged: number;
   totalShort: number;
+  /** Absent for users without sparepart:cost:read. */
   totalValue: number;
   receivedBy?: PersonRef | null;
   lines: MrnLine[];
-};
+} & DiscrepancyFields;
 
 export type Stn = {
   id: string;

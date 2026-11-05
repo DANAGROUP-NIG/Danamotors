@@ -55,8 +55,9 @@ function formatInventoryText(stock: BranchStockItem) {
     `Part category: ${stock.part.priceCategoryCode ?? "—"}`,
     `Quantity: ${stock.quantity}`,
     `Minimum Stock: ${stock.minimumStock}`,
-    `Unit Rate: ${formatCurrency(stock.part.unitPrice)}`,
   ];
+  // The dealer rate is absent for users without sparepart:cost:read.
+  if (stock.part.unitPrice != null) lines.push(`Unit Rate: ${formatCurrency(stock.part.unitPrice)}`);
   if (stock.rackLocation) lines.push(`Rack Location: ${stock.rackLocation}`);
   return lines.join("\n");
 }
@@ -66,7 +67,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
     partCategory: stock.part.priceCategoryCode ?? "",
-    unitPrice: stock.part.unitPrice,
+    unitPrice: stock.part.unitPrice ?? "",
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
     maximumStock: stock.maximumStock ?? "",
@@ -75,7 +76,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   };
 }
 
-function exportColumns() {
+function exportColumns(canSeeCost = true) {
   return [
     { key: "partName", label: "Part Name" },
     { key: "partNumber", label: "Part Number" },
@@ -86,7 +87,7 @@ function exportColumns() {
     { key: "maximumStock", label: "Maximum Stock" },
     { key: "rackLocation", label: "Rack Location" },
     { key: "reservedQuantity", label: "Reserved Quantity" },
-  ];
+  ].filter((column) => canSeeCost || column.key !== "unitPrice");
 }
 
 export function InventoryTable() {
@@ -100,6 +101,7 @@ export function InventoryTable() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_UPDATE);
   const canDelete = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_DELETE);
+  const canSeeCost = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_COST_READ);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   const { data: stockData, isLoading, isError, isFetching } = useBranchStock(activeBranch?.id ?? null);
@@ -146,7 +148,7 @@ export function InventoryTable() {
     downloadCsv(
       `inventory-${new Date().toISOString().split("T")[0]}`,
       items.map(flattenStock),
-      exportColumns(),
+      exportColumns(canSeeCost),
     );
   }
 
@@ -154,7 +156,7 @@ export function InventoryTable() {
     downloadExcel(
       `inventory-${new Date().toISOString().split("T")[0]}`,
       items.map(flattenStock),
-      exportColumns(),
+      exportColumns(canSeeCost),
     );
   }
 
@@ -246,10 +248,10 @@ export function InventoryTable() {
       header: "Rack location",
       render: (stock) => <span className="text-muted-foreground">{stock.rackLocation ?? "—"}</span>,
     },
-    {
+    ...(canSeeCost ? [{
       header: "Unit price",
-      render: (stock) => <span className="text-muted-foreground">{formatCurrency(stock.part.unitPrice)}</span>,
-    },
+      render: (stock: BranchStockItem) => <span className="text-muted-foreground">{formatCurrency(stock.part.unitPrice)}</span>,
+    }] : []),
     {
       header: "Actions",
       headerClassName: "text-right",

@@ -238,7 +238,7 @@ export function PartCataloguePage() {
                         <td className={cn(tdCls, "max-w-64 truncate")}>{r.name}</td>
                         <td className={tdCls}>{r.partFlag ?? "O"}</td>
                         <td className={tdCls}>{r.priceCategoryCode ?? "—"}</td>
-                        <td className={cn(tdCls, "text-right")}>{fmtNaira(r.dealerRate)}</td>
+                        <td className={cn(tdCls, "text-right")}>{(r.dealerRate != null ? fmtNaira(r.dealerRate) : "—")}</td>
                         <td className={cn(tdCls, "text-right text-slate-500")}>
                           {r.retailRate != null ? fmtNaira(r.retailRate) : r.priceCategoryCode ? "From category" : "—"}
                         </td>

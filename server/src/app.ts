@@ -6,6 +6,7 @@ import swaggerSpec from "./config/swagger";
 import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
 import { auditMiddleware } from "./middleware/auditMiddleware";
+import { costVisibility } from "./middleware/costVisibility";
 import { NotFoundError } from "./shared/errors/appError";
 
 const app = express();
@@ -79,7 +80,9 @@ app.get("/api/docs.json", (_req, res) => {
 // listener on each request. The listener fires after the response is fully sent,
 // regardless of middleware ordering — but the listener must be attached before
 // the route handler runs and calls res.json() / res.send().
-app.use("/api", auditMiddleware, routes);
+// costVisibility removes dealer rates and stock values from responses for users without
+// sparepart:cost:read (see the middleware).
+app.use("/api", costVisibility, auditMiddleware, routes);
 
 // ── Handle 404/Not Found Routes ─────────────────────────────────────────────
 app.use((req, _res, next) => {

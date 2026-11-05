@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ignoreCostInput } from '../../middleware/costVisibility';
 import partCategoryRoutes from './part-category.routes';
 import { InventoryController } from './inventory.controller';
 import { validateRequest } from '../../middleware/requestValidator';
@@ -38,6 +39,8 @@ const router = Router();
 const controller = new InventoryController();
 
 router.use(authMiddleware);
+// Users who cannot see dealer rates cannot set them either.
+router.use(ignoreCostInput);
 
 /**
  * @openapi
