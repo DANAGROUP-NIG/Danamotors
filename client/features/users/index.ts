@@ -3,6 +3,8 @@ export { useUsers } from "./hooks/use-users";
 export { useUser } from "./hooks/use-user";
 export { useCreateUser } from "./hooks/use-create-user";
 export { useUpdateUser } from "./hooks/use-update-user";
+export { useResetUserPassword } from "./hooks/use-reset-user-password";
+export { ResetPasswordCard, canResetPassword } from "./components/reset-password-card";
 export { useDeleteUser } from "./hooks/use-delete-user";
 export { useRoles } from "./hooks/use-roles";
 export { userKeys, roleKeys } from "./api/user.keys";
@@ -11,6 +13,7 @@ export {
   getUserRequest,
   createUserRequest,
   updateUserRequest,
+  resetUserPasswordRequest,
   getRolesRequest,
 } from "./api/user.api";
 export { getUserFullName, getUserInitials } from "./services/user.service";

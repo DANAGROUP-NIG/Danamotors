@@ -144,6 +144,7 @@ export const API_ROUTES = {
     users: {
       base: "/admin/users",
       detail: (id: string) => `/admin/users/${id}`,
+      resetPassword: (id: string) => `/admin/users/${id}/reset-password`,
     },
     roles: {
       base: "/admin/roles",

@@ -3,7 +3,7 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useUser } from "@/features/users";
+import { useUser, ResetPasswordCard } from "@/features/users";
 import { ArrowLeft } from "lucide-react";
 
 export default function UserDetailPage() {
@@ -51,6 +51,8 @@ export default function UserDetailPage() {
           <DetailField label="Status" value={user.isActive ? "Active" : "Inactive"} />
         </div>
       </div>
+
+      <ResetPasswordCard user={user} />
     </div>
   );
 }

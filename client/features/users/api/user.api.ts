@@ -59,3 +59,8 @@ export async function getRolesRequest(): Promise<{ roles: Role[] }> {
 export async function deleteUserRequest(id: string): Promise<void> {
   return apiDelete<void>(API_ROUTES.administration.users.detail(id));
 }
+
+/** Sets a new password for another user. The user is signed out of all sessions. */
+export async function resetUserPasswordRequest(id: string, newPassword: string): Promise<void> {
+  await apiPost<void, { newPassword: string }>(API_ROUTES.administration.users.resetPassword(id), { newPassword });
+}

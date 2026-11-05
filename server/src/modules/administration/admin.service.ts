@@ -2,6 +2,35 @@ import bcrypt from 'bcryptjs';
 import { AdminRepository } from './admin.repository';
 import { BadRequestError, NotFoundError, ConflictError, ForbiddenError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
+import prisma from '../../prisma/client';
+
+/**
+ * Who may set another user's password. A super admin may reset every other user's password. An Admin may
+ * reset the staff of their own branch, but not another Admin's or a super admin's. Nobody resets their own
+ * password here: that is Profile → Change password, which asks for the current one.
+ */
+export function assertCanResetPassword(
+  actor: { userId: string; role: string; branchId?: string | null },
+  target: { id: string; branchId: string | null; role: { name: string } },
+): void {
+  if (actor.userId === target.id)
+    throw new BadRequestError('Change your own password from your profile');
+  if (actor.role === ROLES.SUPER_ADMIN)
+    return;
+  if (actor.role !== ROLES.ADMIN)
+    throw new ForbiddenError('Only an administrator can reset passwords');
+  if (target.role.name === ROLES.SUPER_ADMIN || target.role.name === ROLES.ADMIN)
+    throw new ForbiddenError("Only a super admin can reset an administrator's password");
+  if (!actor.branchId || target.branchId !== actor.branchId)
+    throw new ForbiddenError('You can only reset passwords of users in your branch');
+}
+
+/** A user as sent to the browser: never the password hash or a pending reset token. */
+function withoutCredentials<T extends { passwordHash: string; resetTokenHash: string | null; resetTokenExpiry: Date | null }>(user: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { passwordHash, resetTokenHash, resetTokenExpiry, ...rest } = user;
+  return rest;
+}
 
 export class AdminService {
   private adminRepository: AdminRepository;
@@ -27,11 +56,7 @@ export class AdminService {
     });
 
     return {
-      users: users.map((u) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { passwordHash, ...rest } = u as any;
-        return rest;
-      }),
+      users: users.map(withoutCredentials),
       meta: {
         total,
         page: params.page,
@@ -46,9 +71,8 @@ export class AdminService {
     if (!user) {
       throw new NotFoundError('User not found');
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, ...rest } = user as any;
-    
+    const rest = withoutCredentials(user);
+
     // Map permissions cleanly
     const permissions = user.role.permissions.map((p) => p.permission.name);
     return {
@@ -96,9 +120,7 @@ export class AdminService {
       branchId: branch.id,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _, ...rest } = user as any;
-    return rest;
+    return withoutCredentials(user);
   }
 
   async updateUser(
@@ -124,9 +146,39 @@ export class AdminService {
     }
 
     const updated = await this.adminRepository.updateUser(id, data);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, ...rest } = updated as any;
-    return rest;
+    return withoutCredentials(updated);
+  }
+
+  /**
+   * Sets a new password for another user. Their sessions are signed out and any pending reset token is
+   * cleared. The audit entry names both users but never holds the password.
+   */
+  async resetUserPassword(
+    actor: { userId: string; role: string; branchId?: string | null },
+    id: string,
+    newPassword: string,
+  ) {
+    const user = await this.adminRepository.findUserById(id);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    assertCanResetPassword(actor, user);
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: { passwordHash, resetTokenHash: null, resetTokenExpiry: null },
+      }),
+      prisma.refreshToken.deleteMany({ where: { userId: id } }),
+      prisma.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'USER_PASSWORD_RESET',
+          details: JSON.stringify({ targetUserId: id, targetEmail: user.email, sessionsSignedOut: true }),
+        },
+      }),
+    ]);
   }
 
   async deleteUser(id: string) {

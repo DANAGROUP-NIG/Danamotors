@@ -11,6 +11,7 @@ import {
 } from "../../shared/errors/appError";
 import { LoginResponse } from "./auth.types";
 import { ROLES } from "../../shared/constants/roles";
+import { NotificationService } from "../notification/notification.service";
 
 // Roles users are allowed to request during public self-registration.
 // Privileged roles (admins, managers, accountants) must be assigned by an
@@ -569,52 +570,36 @@ export class AuthService {
     };
   }
 
-  // Request a password reset for either a staff user or a customer account.
-  async forgotPassword(email: string): Promise<{ resetLink: string } | null> {
+  /**
+   * A staff member who forgot their password asks for a reset. No reset link is created or returned: the
+   * system sends no email, and handing the link to whoever typed the address let anyone take over any
+   * account. Instead the administrators who may reset this user's password are told, and reset it from
+   * the user's page. Customers are told on the page to contact the dealership, whose staff set a new
+   * portal password from the customer record.
+   *
+   * Resolves the same way whether or not the email exists, so the endpoint cannot be used to probe emails.
+   */
+  async forgotPassword(email: string): Promise<void> {
     const user = await this.authRepository.findByEmail(email);
-    if (user && user.isActive) {
-      const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          resetTokenHash: hashToken(token),
-          resetTokenExpiry: expiresAt,
-        },
-      });
+    if (!user || !user.isActive) return;
 
-      await this.authRepository.createAuditLog({
-        action: "PASSWORD_RESET_REQUESTED",
-        details: "Password reset link requested",
-        userId: user.id,
-      });
+    await this.authRepository.createAuditLog({
+      action: "PASSWORD_RESET_REQUESTED",
+      details: "Password reset requested from the sign-in page; administrators notified",
+      userId: user.id,
+    });
 
-      const baseUrl =
-        (process.env.CLIENT_URL as string | undefined) ??
-        "http://localhost:3000";
-      return { resetLink: `${baseUrl}/reset-password?token=${token}` };
-    }
-
-    const customer = await this.authRepository.findCustomerByEmail(email);
-    if (customer && customer.account && customer.account.isActive) {
-      const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-      await prisma.customerAccount.update({
-        where: { id: customer.account.id },
-        data: {
-          resetTokenHash: hashToken(token),
-          resetTokenExpiry: expiresAt,
-        },
-      });
-
-      const baseUrl =
-        (process.env.CLIENT_URL as string | undefined) ??
-        "http://localhost:3000";
-      return { resetLink: `${baseUrl}/reset-password?token=${token}` };
-    }
-
-    // Always resolve successfully so the endpoint cannot be used to probe emails.
-    return null;
+    const payload = {
+      type: "PASSWORD_RESET_REQUESTED",
+      title: "Password reset requested",
+      message: `${user.firstName} ${user.lastName} (${user.email}) cannot sign in and asked for a password reset.`,
+      link: `/users/${user.id}`,
+    };
+    const notifications = new NotificationService();
+    // Only a super admin may reset an administrator's password; an Admin resets their own branch's staff.
+    await notifications.notifyRole(ROLES.SUPER_ADMIN, undefined, payload);
+    if (user.branchId && user.role.name !== ROLES.SUPER_ADMIN && user.role.name !== ROLES.ADMIN)
+      await notifications.notifyRole(ROLES.ADMIN, user.branchId, payload);
   }
 
   // Complete a password reset using a valid, unexpired one-time token.

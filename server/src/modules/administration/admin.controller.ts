@@ -122,6 +122,21 @@ export class AdminController {
     }
   };
 
+  resetUserPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // The branch and role rules live in assertCanResetPassword (admin.service.ts).
+      await this.adminService.resetUserPassword(req.user!, req.params.id, req.body.newPassword);
+
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'Password reset. The user has been signed out of all sessions.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   deleteUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;

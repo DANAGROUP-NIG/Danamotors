@@ -59,6 +59,7 @@ export class AdminRepository {
     return prisma.user.findUnique({
       where: { id },
       include: {
+        branch: { select: { id: true, name: true } },
         role: {
           include: {
             permissions: {

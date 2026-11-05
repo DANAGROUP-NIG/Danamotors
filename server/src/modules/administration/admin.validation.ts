@@ -25,6 +25,15 @@ export const updateUserSchema = z.object({
   }),
 });
 
+export const resetUserPasswordSchema = z.object({
+  body: z.object({
+    newPassword: z.string().min(6, 'Password must be at least 6 characters long'),
+  }).strict(),
+  params: z.object({
+    id: z.string().uuid('Invalid user ID'),
+  }),
+});
+
 export const createRoleSchema = z.object({
   body: z.object({
     name: z.string().min(1, 'Role name is required'),
