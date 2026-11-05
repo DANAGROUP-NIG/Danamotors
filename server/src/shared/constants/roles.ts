@@ -114,6 +114,8 @@ export const PERMISSIONS = {
   LABOUR_ITEM_READ: "labour-item:read",
   LABOUR_ITEM_CREATE: "labour-item:create",
   LABOUR_ITEM_UPDATE: "labour-item:update",
+  /** Edit model labour rates, one at a time or in bulk (legacy Labour Rate Update Utility). */
+  LABOUR_RATE_UPDATE: "labour-rate:update",
 
   // ── Employee Master ───────────────────────────────────────────────────────
   EMPLOYEE_READ: "employee:read",
@@ -395,6 +397,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.LABOUR_ITEM_CREATE,
     PERMISSIONS.LABOUR_ITEM_UPDATE,
+    PERMISSIONS.LABOUR_RATE_UPDATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.INSPECTION_CREATE,
     PERMISSIONS.ESTIMATE_READ,

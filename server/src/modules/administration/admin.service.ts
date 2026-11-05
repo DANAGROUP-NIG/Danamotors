@@ -602,6 +602,8 @@ export class AdminService {
       appointment: 'Service — Appointments',
       enquiry: 'Enquiries',
       jobcard: 'Service — Job Cards',
+      'labour-item': 'Labour Catalogue',
+      'labour-rate': 'Model Labour Rates',
       inspection: 'Service — Inspections',
       estimate: 'Service — Estimates',
       services: 'Services Catalog',

@@ -26,6 +26,11 @@ const SETTINGS_CARDS = [
     href: "/settings/workshop-masters",
   },
   {
+    title: "Model Labour Rates",
+    description: "Hours and rate per labour and model, with bulk changes, add-to-models and copy-model.",
+    href: "/settings/labour-rates",
+  },
+  {
     title: "Service Checklists",
     description: "Parts and labour per checklist and model, and the checklist due at each mileage.",
     href: "/settings/service-checklists",

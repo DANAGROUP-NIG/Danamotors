@@ -39,6 +39,7 @@ permissions are seeded into the database; API routes enforce access with
 | Inventory | `inventory:read`, `inventory:create`, `inventory:update`, `inventory:delete` |
 | Transfers | `transfer:read`, `transfer:create`, `transfer:update`, `transfer:approve`, `transfer:dispatch`, `transfer:receive` |
 | Finance | `finance:read`, `finance:create`, `finance:update` |
+| Model labour rates | `labour-rate:update` (Admin): inline and bulk edit, see [labour-rates.md](./labour-rates.md) |
 
 ## Dealer rates, shortage approval and user changes
 

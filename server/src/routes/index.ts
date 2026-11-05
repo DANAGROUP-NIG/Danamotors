@@ -8,6 +8,7 @@ import customerRoutes from '../modules/customer/customer.routes';
 import vehicleRoutes from '../modules/vehicle/vehicle.routes';
 import vehicleCatalogRoutes from '../modules/vehicle-catalog/vehicle-catalog.routes';
 import serviceRoutes from '../modules/service/service.routes';
+import labourRateRoutes from '../modules/service/labourRate.routes';
 import serviceDocumentRoutes from '../modules/service/service-document.routes';
 import labourSlipRoutes from '../modules/service/labour-slip.routes';
 import servicesRoutes from '../modules/services/services.routes';
@@ -100,6 +101,8 @@ router.use('/vehicles', vehicleWarrantyRouter);
 router.use('/vehicles', vehicleRoutes);
 router.use('/vehicle-catalog', vehicleCatalogRoutes);
 router.use('/vehicle-models', vehicleModelRouter);
+// Before /service: its sub-paths (/grid, /bulk, …) are matched here; GET/POST /service/labour-rates fall through.
+router.use('/service/labour-rates', labourRateRoutes);
 router.use('/service', jobCardLineRouter);
 router.use('/service', serviceRoutes);
 router.use('/service', labourSlipRoutes);
