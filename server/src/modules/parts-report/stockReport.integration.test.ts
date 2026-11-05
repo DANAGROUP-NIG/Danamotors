@@ -40,18 +40,18 @@ describeDb("Stock reports (database)", () => {
     });
     const customer = await prisma.customer.create({ data: { firstName: "Cavem", lastName: "Ltd", companyName: `CAVEM ${run}`, code: `S${run}`, branchId: cpd.id } });
     await prisma.partCategory.upsert({ where: { code: "A" }, update: {}, create: { code: "A", description: "Co-op parts", markupMultiplier: 2.07 } });
-    const part = (suffix: string, name: string, unitPrice: number, binLocation?: string) =>
+    const part = (suffix: string, name: string, unitPrice: number) =>
       prisma.sparePart.create({
-        data: { partCode: `STK-${suffix}-${run}`, partNumber: `STK-${suffix}-${run}`, name, unitPrice, retailRate: unitPrice * 2.07, priceCategoryCode: "A", binLocation },
+        data: { partCode: `STK-${suffix}-${run}`, partNumber: `STK-${suffix}-${run}`, name, unitPrice, retailRate: unitPrice * 2.07, priceCategoryCode: "A" },
       });
-    joint = await part("J", "BALL JOINT ASSY-LWR ARM", 39258, "53B3");
+    joint = await part("J", "BALL JOINT ASSY-LWR ARM", 39258);
     const bolt = await part("B", "BOLT-FLANGE", 500);
     const filter = await part("F", "FILTER ASSY-ENGINE OIL", 8829);
     const oil = await part("O", "ENGINE OIL 4L", 4700);
     // Stock with no movement behind it, as migrated stock: one ball joint and five bolts.
     await prisma.inventoryStock.createMany({
       data: [
-        { branchId: cpd.id, partId: joint.id, quantity: 1 },
+        { branchId: cpd.id, partId: joint.id, quantity: 1, rackLocation: "53B3" },
         { branchId: cpd.id, partId: bolt.id, quantity: 5 },
         { branchId: cpd.id, partId: filter.id, quantity: 0 },
       ],

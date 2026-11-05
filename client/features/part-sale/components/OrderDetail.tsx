@@ -23,6 +23,7 @@ import {
 } from "../lib/part-sale-format";
 import type { CustomerOrder } from "../types/part-sale.types";
 import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
+import { HandheldCard } from "@/features/handheld";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -225,7 +226,7 @@ export function OrderDetail({ id }: { id: string }) {
                         </Link>
                       </td>
                       <td className={cn(tdCls, "max-w-64 truncate")}>{l.part.name}</td>
-                      <td className={cn(tdCls, "font-mono text-slate-500")}>{l.part.binLocation ?? ""}</td>
+                      <td className={cn(tdCls, "font-mono text-slate-500")}>{l.bin ?? ""}</td>
                       <td className={cn(tdCls, "text-right")}>{l.orderedQuantity}</td>
                       <td className={cn(tdCls, "text-right", l.pickedQuantity ? "font-medium text-blue-700" : "text-slate-300")}>{l.pickedQuantity}</td>
                       <td className={cn(tdCls, "text-right", l.billedQuantity ? "font-medium text-emerald-700" : "text-slate-300")}>{l.billedQuantity}</td>
@@ -248,6 +249,11 @@ export function OrderDetail({ id }: { id: string }) {
             </p>
           )}
         </div>
+        <HandheldCard
+          filter={{ sourceId: order.id }}
+          canWrite={hasPermission(PART_SALE_PERMISSIONS.ORDER)}
+          send={active && picked > 0 ? { type: "CPO_PICK", sourceId: order.id, branchId: order.branchId, label: `CPO ${order.cpoNumber}` } : null}
+        />
         <DocumentTermsBlock documentType="PARTS_QUOTATION" branchId={order.branchId} />
       </div>
 

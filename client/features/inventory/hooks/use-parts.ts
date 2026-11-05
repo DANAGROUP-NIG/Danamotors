@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { inventoryKeys } from "../api/inventory.keys";
 import {
   getAlternatesRequest,
+  getCatalogueSummaryRequest,
   getPartRequest,
   getPartSourcesRequest,
   getPartStockRequest,
@@ -60,6 +61,13 @@ export function usePartQuery(partNumber: string, branchId?: string) {
     queryFn: () => partQueryRequest(partNumber, branchId),
     enabled: partNumber.trim().length > 0,
     retry: false,
+  });
+}
+
+export function useCatalogueSummary() {
+  return useQuery({
+    queryKey: inventoryKeys.catalogueSummary(),
+    queryFn: getCatalogueSummaryRequest,
   });
 }
 

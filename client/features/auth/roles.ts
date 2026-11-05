@@ -110,6 +110,16 @@ export const STOCK_AUDIT_PERMISSIONS = {
   MANAGE: "stockaudit:manage",
 } as const;
 
+// Handheld stations (store PCs that move jobs to the handhelds): register them and issue their keys.
+export const HANDHELD_PERMISSIONS = {
+  STATIONS: "handheld:stations",
+} as const;
+
+// Barcode labels on the branch's label printer (a Zebra on a handheld station PC).
+export const LABEL_PERMISSIONS = {
+  PRINT: "labels:print",
+} as const;
+
 // ─── Role groups ──────────────────────────────────────────────────────────────
 // Single source of truth for every role combination used in access control.
 // Import these instead of hard-coding arrays in individual files.

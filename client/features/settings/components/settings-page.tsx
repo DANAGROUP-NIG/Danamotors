@@ -32,7 +32,7 @@ const SETTINGS_CARDS = [
   },
   {
     title: "Part Categories",
-    description: "Retail multiplier per price category and each branch's discount, handling and cost %.",
+    description: "Retail multiplier per part category and each branch's discount, handling and cost %.",
     href: "/settings/part-categories",
   },
   {
@@ -44,6 +44,11 @@ const SETTINGS_CARDS = [
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",
+  },
+  {
+    title: "HHDC",
+    description: "Handheld stations (store PCs with the cradle), the handhelds, jobs not yet posted, and what is ready to send.",
+    href: "/settings/hhdc",
   },
   {
     title: "Warranty",

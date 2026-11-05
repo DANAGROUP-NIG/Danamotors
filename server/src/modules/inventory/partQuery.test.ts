@@ -5,7 +5,6 @@ const part = (over: Partial<QueryPart>): QueryPart => ({
   partNumber: '2630035505',
   partCode: 'KIA-2630035505',
   name: 'FILTER ASSY-ENGINE OIL',
-  description: null,
   uom: 'NOS',
   partFlag: 'O',
   taxable: true,

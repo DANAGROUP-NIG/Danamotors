@@ -12,4 +12,5 @@ export const inventoryKeys = {
   partQuery: (partNumber: string, branchId?: string) =>
     [...inventoryKeys.all, "partQuery", partNumber, branchId ?? ""] as const,
   branchStock: (branchId: string) => [...inventoryKeys.all, "branchStock", branchId] as const,
+  catalogueSummary: () => [...inventoryKeys.all, "catalogueSummary"] as const,
 };

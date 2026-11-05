@@ -13,6 +13,7 @@ import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
+import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
 import {
@@ -224,16 +225,18 @@ export class MobisPurchaseService {
   async cancelMit(id: string, actorId: string, reason?: string) {
     const mit = await this.getMobisMit(id);
     if (mit.mrn) throw new ConflictError(`MIT ${mit.mitNumber} already has MRN ${mit.mrn.mrnNumber} and cannot be cancelled`);
-    const result = await prisma.materialInTransit.updateMany({
-      where: { id, status: { in: [MitStatus.IN_TRANSIT, MitStatus.VERIFIED] } },
-      data: {
-        status: MitStatus.CANCELLED,
-        cancelledAt: new Date(),
-        remarks: reason ? `${mit.remarks ? `${mit.remarks}\n` : ""}Cancelled: ${reason}` : mit.remarks,
-      },
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.materialInTransit.updateMany({
+        where: { id, status: { in: [MitStatus.IN_TRANSIT, MitStatus.VERIFIED] } },
+        data: {
+          status: MitStatus.CANCELLED,
+          cancelledAt: new Date(),
+          remarks: reason ? `${mit.remarks ? `${mit.remarks}\n` : ""}Cancelled: ${reason}` : mit.remarks,
+        },
+      });
+      if (result.count !== 1) throw new ConflictError("This MIT can no longer be cancelled");
+      await cancelSentHandheldDocuments(tx, { mitId: id }, "MIT cancelled", actorId);
     });
-    if (result.count !== 1) throw new ConflictError("This MIT can no longer be cancelled");
-    void actorId;
     return this.getMobisMit(id);
   }
 
@@ -333,6 +336,7 @@ export class MobisPurchaseService {
       }
 
       await tx.materialInTransit.update({ where: { id: mit.id }, data: { status: MitStatus.RECEIVED } });
+      await cancelSentHandheldDocuments(tx, { mitId: mit.id }, `Received on MRN ${mrnNumber} before the handheld result was uploaded`, actorId);
       return { mrnNumber, mit, totals: plan.totals, totalValue };
     }, TX_OPTIONS);
 

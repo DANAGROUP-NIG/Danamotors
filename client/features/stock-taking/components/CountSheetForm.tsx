@@ -11,6 +11,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { HandheldCard, isActiveJob, useHandheldDocuments } from "@/features/handheld";
 import { DetailField } from "@/features/part-sale/components/OrderDetail";
 import { PartPicker, type PartSearchQuery } from "@/features/stock-transfers/components/PartPicker";
 import { searchStockTakePartsRequest, stockTakeKeys } from "../api/stock-taking.api";
@@ -28,13 +29,16 @@ type Extra = Entry & { key: string; partId?: string; partNumber: string; name: s
 const blank = (e?: Partial<Entry>) => !e || (!e.qty?.trim() && !e.damaged?.trim());
 
 /**
- * Count entry for one sheet: the stand-in for the handheld (HHDC) until it is integrated. The device
- * will upload the same entries: one per part per bin.
+ * One count sheet: send it to the handheld and post what comes back (the usual way), or enter the
+ * counts here by hand. The handheld posts the same entries: one per part per bin. While the sheet is
+ * with a handheld, entry here is closed so the two cannot overwrite each other.
  */
 export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sheetId: string; kind?: Kind }) {
   const router = useRouter();
   const { data: sheet, isLoading, error } = useCountSheet(id, sheetId);
   const upload = useUploadSheet(id, sheetId);
+  const { data: handheldJobs } = useHandheldDocuments({ sourceId: sheetId });
+  const onHandheld = (handheldJobs ?? []).some(isActiveJob);
   const { hasPermission } = useAuth();
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const [extras, setExtras] = useState<Extra[]>([]);
@@ -65,7 +69,9 @@ export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sh
   }
 
   const k = KINDS[kindOf(sheet.stockTake.type)];
-  const editable = sheetIsOpen(sheet) && sheet.stockTake.status === "ACTIVE" && hasPermission(k.permissions.MANAGE);
+  const open = sheetIsOpen(sheet) && sheet.stockTake.status === "ACTIVE";
+  const canManage = hasPermission(k.permissions.MANAGE);
+  const editable = open && canManage && !onHandheld;
   const status = sheetStatus(sheet);
   const entryFor = (lineId: string, bin: string | null): Entry => entries[lineId] ?? { qty: "", damaged: "", bin: bin ?? "", remarks: "" };
   const setEntry = (lineId: string, bin: string | null, patch: Partial<Entry>) =>
@@ -155,11 +161,26 @@ export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sh
           </div>
           {editable && (
             <p className="mt-4 text-sm text-muted-foreground print:hidden">
-              Enter what is on the shelf: good and damaged quantities, and the bin the part was found in. Leave a part blank if it was not
-              counted. Add any part found that is not on the sheet.
+              Send the sheet to the handheld, or enter what is on the shelf here: good and damaged quantities, and the bin the part was
+              found in. Leave a part blank if it was not counted. Add any part found that is not on the sheet.
+            </p>
+          )}
+          {open && canManage && onHandheld && (
+            <p className="mt-4 text-sm text-muted-foreground print:hidden">
+              This sheet is with a handheld: post or cancel the handheld job below before entering counts here.
             </p>
           )}
         </div>
+
+        <HandheldCard
+          filter={{ sourceId: sheet.id }}
+          canWrite={canManage}
+          send={
+            open
+              ? { type: "COUNT_SHEET", sourceId: sheet.id, branchId: sheet.stockTake.branchId, label: `sheet ${sheet.sheetNumber}`, checkerId: sheet.checker?.id ?? null }
+              : null
+          }
+        />
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">

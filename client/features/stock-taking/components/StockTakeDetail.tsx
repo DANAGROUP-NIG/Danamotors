@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { STOCK_TAKE_PERMISSIONS } from "@/features/auth/roles";
 import { DetailField } from "@/features/part-sale/components/OrderDetail";
+import { HANDHELD_STATUS, isActiveJob, useHandheldDocuments } from "@/features/handheld";
 import { useCancelSheet, useCancelStockTake, useSetNotRequired, useStockTake, useStockTakeLines, useStockTakeMovements } from "../hooks/use-stock-taking";
 import {
   AUDIT_LEVEL_LABELS,
@@ -73,6 +74,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNo
 export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kind }) {
   const router = useRouter();
   const { data: take, isLoading, error } = useStockTake(id);
+  const { data: handheldJobs } = useHandheldDocuments({ stockTakeId: id });
   const { hasPermission } = useAuth();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [correcting, setCorrecting] = useState<StockTakeLine | null>(null);
@@ -311,6 +313,8 @@ export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kin
                 <tbody>
                   {take.sheets.map((sheet) => {
                     const status = sheetStatus(sheet);
+                    // Newest first: the sheet's current handheld job, if one is waiting, out or back.
+                    const job = handheldJobs?.find((j) => j.stockTakeSheetId === sheet.id);
                     return (
                       <tr key={sheet.id} className="border-t border-slate-100">
                         <td className={cn(tdCls, "font-mono font-medium")}>
@@ -325,13 +329,20 @@ export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kin
                         <td className={cn(tdCls, "text-right")}>{sheet.countedCount ?? "—"}</td>
                         <td className={cn(tdCls, "text-slate-500")}>{sheet.uploadedAt ? `${fmtDateTime(sheet.uploadedAt)} · ${userName(sheet.uploadedBy)}` : "—"}</td>
                         <td className={tdCls}>
-                          <StatusBadge status={status.label} tone={status.tone} />
+                          {job && isActiveJob(job) && sheetIsOpen(sheet) ? (
+                            <StatusBadge
+                              status={job.status === "SENT" && job.deliveredDevice ? `On handheld (${job.deliveredDevice.name})` : HANDHELD_STATUS[job.status].label}
+                              tone={HANDHELD_STATUS[job.status].tone}
+                            />
+                          ) : (
+                            <StatusBadge status={status.label} tone={status.tone} />
+                          )}
                         </td>
                         <td className={cn(tdCls, "text-right")}>
                           {active && canManage && sheetIsOpen(sheet) && (
                             <div className="flex justify-end gap-1">
                               <Button asChild size="sm" variant="outline">
-                                <Link href={`${k.base}/${take.id}/sheets/${sheet.id}`}>Enter counts</Link>
+                                <Link href={`${k.base}/${take.id}/sheets/${sheet.id}`}>{job && isActiveJob(job) ? "Open" : "Send / enter counts"}</Link>
                               </Button>
                               <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setCancellingSheet(sheet)}>
                                 Cancel

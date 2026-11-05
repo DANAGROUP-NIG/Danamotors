@@ -12,7 +12,6 @@ export type ReceivablePart = {
   uom: string;
   partFlag: string;
   sourceLabel: string;
-  binLocation: string | null;
   unitPrice: number;
   retailRate: number | null;
   sourceOfPart: { id: string; partNumber: string } | null;
@@ -30,7 +29,7 @@ export type VendorReceiptLine = {
   remarks: string | null;
   sourceLabel: string;
   bin: string | null;
-  part: Pick<ReceivablePart, "id" | "partNumber" | "name" | "uom" | "partFlag" | "binLocation" | "unitPrice" | "retailRate" | "sourceOfPart">;
+  part: Pick<ReceivablePart, "id" | "partNumber" | "name" | "uom" | "partFlag" | "unitPrice" | "retailRate" | "sourceOfPart">;
 };
 
 export type VendorReceipt = {

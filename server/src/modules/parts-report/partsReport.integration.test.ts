@@ -49,14 +49,14 @@ describeDb("Parts reports (database)", () => {
     await prisma.partCategory.upsert({ where: { code: "A" }, update: {}, create: { code: "A", description: "Co-op parts", markupMultiplier: 2.07 } });
     await prisma.partCategory.upsert({ where: { code: "O" }, update: {}, create: { code: "O", description: "Oil & lubricants", markupMultiplier: 1.5 } });
     mirror = await prisma.sparePart.create({
-      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A", binLocation: "53B3" },
+      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A" },
     });
     oil = await prisma.sparePart.create({
       data: { partCode: `RPT-O-${run}`, partNumber: `RPT-O-${run}`, name: "ENGINE OIL 4L", unitPrice: 4700, retailRate: 7050, taxable: false, priceCategoryCode: "O", partType: "O" },
     });
     await prisma.inventoryStock.createMany({
       data: [
-        { branchId: cpd.id, partId: mirror.id, quantity: 10 },
+        { branchId: cpd.id, partId: mirror.id, quantity: 10, rackLocation: "53B3" },
         { branchId: cpd.id, partId: oil.id, quantity: 50 },
       ],
     });
@@ -118,8 +118,14 @@ describeDb("Parts reports (database)", () => {
   });
 
   it("summarises bills, splits taxable and exempt value by day, and lists cancellations", async () => {
-    // Defaults to the legacy executive-wise layout: value by part type before the cash discount.
-    const summary = await report("counter-sales-summary");
+    // Defaults to the legacy Register Summary: the period's bills in one credit line.
+    const total = await report("counter-sales-summary");
+    expect(total.rows).toEqual([
+      expect.objectContaining({ section: "Credit", bills: 1, sparesTaxable: 273313.81, oilExempt: 28200, handling: 0, tradeDiscount: 0, discount: 67840.61, net: 249550 }),
+    ]);
+
+    // The legacy executive-wise layout: value by part type before the cash discount.
+    const summary = await report("counter-sales-summary", { option: "EXECUTIVE" });
     expect(summary.rows).toEqual([expect.objectContaining({ spares: 273313.81, accessories: 0, oil: 28200, net: 249550, roundOff: -9.57 })]);
 
     const datewise = await report("counter-sales-summary", { option: "DAY" });

@@ -117,8 +117,22 @@ Per-model time / amount (legacy `labour`: model, time required, amount or time) 
 ## Part master
 
 **Inventory → Parts**. On top of the fields the part already had (number, name, UOM, purchase source / part flag,
-part type, dealer and retail rate, price category, tax category / form, min / max / reorder, warranty), the form's
+part type, dealer and retail rate, part category, tax category / form, min / max / reorder, warranty), the form's
 **Classification and ordering** section keeps the remaining legacy `partmast` fields:
+
+**Part category** is legacy `partmast.partcategory` (A, C, E…, from the Part Category master); its multiplier
+derives the retail rate. In the code it is `priceCategoryCode`. The free-text "Category" (Engine, Brakes…) the
+first version of Part Master had is removed: no legacy database has such a field and nothing used it. The stock
+taking **Part type** filter, which wrongly used it, now uses the legacy part type (S spare part, O oil, A accessory).
+
+**Part description** is legacy `partmast.partdesc`, the part's only text (in the code `name`). The separate free-text
+description is removed, for the same reason.
+
+**Location** is not on the part. Legacy `partmast` has no bin or store; legacy keeps each part's location per store
+(`PARTBAL.location` and `bincard`), and every legacy bin change (`PartBinHistory`) belongs to a store. Here that is the
+branch stock record's **rack location** and **bin card**, shown in Part Query and the branch stock, and set from
+**Inventory → stock location** or a stock taking's **Update bins**. The part-level bin and store location are removed,
+so pickings, CPOs, vendor receipts, reports and stock taking always show the branch's own bin.
 
 | Legacy field | New field |
 | --- | --- |
@@ -133,6 +147,35 @@ UOM, tax category and tax form inputs suggest the codes from their master lists.
 parts and not on the Part screen) is not carried over. The Part screen's Labours and Defects tabs are not carried
 over: `partlabour` and `troublepart` are empty in all three databases.
 
+### Mobis catalogue and Part Enquiry
+
+Legacy CPD had two part tables. `partmast` is Part Master, the parts the business uses. `FullpartList` is the
+Mobis catalogue, every part Mobis supplies, loaded in bulk from the Mobis price list (over 500,000 parts in 2019,
+45,000 more in 2025). Legacy **Part Query** searched `partmast` only, so a part missing from it was "not found".
+Legacy **Part Enquiry** searched `partmast`, then `FullpartList`, showed the catalogue's type, unit and rates,
+and its **Create Part** button copied the catalogue row into `partmast`. Example: 473004G350 (TRANSFER ASSY) was
+in `FullpartList` only.
+
+The new system has one screen for both. **Inventory → Part Query** answers from Part Master as before. A part
+not in Part Master is looked up in the catalogue (`PartCatalogueItem`) and shown with its flag, type, part
+category, unit and rates. A user with `sparepart:create` clicks **Create part**, as in legacy, with nothing to fill in.
+The name, flag, type, unit, tax status, part category, dealer rate and retail rate are copied, and the query then
+shows the new part with its (empty) stock grids. Parts are never created from an MIT, so this is how a new Mobis
+part gets into Part Master.
+
+**Inventory → Mobis Catalogue** shows how many parts the catalogue holds and when it was last loaded. A user with
+`sparepart:create` and `sparepart:update` loads the Mobis price list there (.xls, .xlsx, .csv or tab-separated
+text). Columns are found by header: part no., part name and dealer rate (`DR` / `FINALDR`) are required; flag,
+part category and retail rate (`RR` / `NEW RR (NAIRA)`) are optional, matching the legacy price list layout.
+
+- New part numbers are added; known ones take the list's name, flag, category and rates. Part Master is not
+  changed: re-rating Part Master parts is a separate job.
+- Retail rate is the list's own, else dealer rate × the part category multiplier, as on `FullpartList`.
+- Rows with an unknown or inactive part category, an unreadable rate or a part number already listed in the file
+  are left out and listed before loading.
+- The browser sends the list in batches of 2,000 parts, each saved whole or not at all. If a batch fails, the
+  batches before it are kept, and loading the file again is safe.
+
 ### Part sources and source records
 
 The part flag codes double as **part sources**: O Mobis (original part), A authorised source, F FOC item,
@@ -145,10 +188,10 @@ its source is its part flag. This link is separate from alternates (supersession
 
 - **Sources card.** The part page lists the main part and its source records with the stock at the current branch,
   the dealer rate and the retail rate. **Add source record** (`sparepart:create`) takes the source, the part number
-  (suggested as main part number + `-` + code, e.g. `54651-U`), the dealer rate and a price category, and copies the
+  (suggested as main part number + `-` + code, e.g. `54651-U`), the dealer rate and a part category, and copies the
   name, UOM, tax and classification from the main part. A source record's page shows the part it is a source of.
   API: `GET`/`POST /api/inventory/parts/:id/sources`.
-- **Price.** Retail = dealer rate × price category multiplier, as for Mobis parts. New local, used and repaired
+- **Price.** Retail = dealer rate × part category multiplier, as for Mobis parts. New local, used and repaired
   records default to category **L** (local consumable, 1.5×), which is how legacy prices local purchases; the
   Mobis general category C is 3.33×. Other sources default to the main part's category. A vendor receipt sets the
   dealer rate to the received cost and recalculates retail the same way (see

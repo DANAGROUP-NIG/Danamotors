@@ -125,6 +125,12 @@ const CONSUMPTION_COLUMNS: ReportColumn[] = [
   qty("quantity", "Total issues qty"),
   money("value", "Total issues amount"),
 ];
+/**
+ * Legacy counter-sale charges: handling (CPD in 2011 and 2013; Lagos to 2025) and a trade discount
+ * (csissue.discountper; Lagos to 2024, ABJ to 2026). Our bills cannot carry them yet, so both are zero.
+ */
+const SALE_HANDLING = money("handling", "Handling");
+const SALE_TRADE_DISCOUNT = money("tradeDiscount", "Discount");
 /** Sales Executive Wise Counter Sales Register: each executive's bills, value by part type as on legacy. */
 const SALE_EXECUTIVE_COLUMNS: ReportColumn[] = [
   date("date", "Delivery date"),
@@ -133,6 +139,8 @@ const SALE_EXECUTIVE_COLUMNS: ReportColumn[] = [
   money("spares", "Spares amount"),
   money("accessories", "Accessories"),
   money("oil", "Oil amount"),
+  SALE_HANDLING,
+  SALE_TRADE_DISCOUNT,
   money("discount", "Cash discount"),
   money("vat", "VAT"),
   money("roundOff", "Round off"),
@@ -399,8 +407,10 @@ export const REPORTS: ReportDefinition[] = [
         text("customer", "Customer"),
         money("sparesTaxable", "Spares/Kit taxable"),
         money("sparesExempt", "Spares/Kit non-taxable"),
+        SALE_HANDLING,
         money("oilTaxable", "Oil taxable"),
         money("oilExempt", "Oil non-taxable"),
+        SALE_TRADE_DISCOUNT,
         money("discount", "Cash discount"),
         money("vat", "VAT"),
         money("roundOff", "Round off"),
@@ -428,21 +438,40 @@ export const REPORTS: ReportDefinition[] = [
     title: "Counter Sales Register Summary",
     group: "Part sales",
     description:
-      "Bills grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)).",
+      "The period's bills in one total line (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)).",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", "executive"],
     labels: { option: "Group by" },
     options: [
+      { value: "TOTAL", label: "Total (summary)" },
       { value: "EXECUTIVE", label: "Sales executive" },
       { value: "DAY", label: "Day" },
     ],
     grouped: true,
     columns: {
+      // Legacy Counter Sale Register Summary: one line per CASH / CREDIT section; every bill since 2018 is credit.
+      TOTAL: [
+        text("section", "Bills"),
+        qty("bills", "Count"),
+        money("sparesTaxable", "Spares/Kit taxable"),
+        money("sparesExempt", "Spares/Kit non-taxable"),
+        SALE_HANDLING,
+        money("oilTaxable", "Oil taxable"),
+        money("oilExempt", "Oil non-taxable"),
+        SALE_TRADE_DISCOUNT,
+        money("discount", "Cash discount"),
+        money("vat", "VAT"),
+        money("accessories", "Accessories amount"),
+        money("roundOff", "Round off"),
+        money("net", "Total amount"),
+      ],
       EXECUTIVE: SALE_EXECUTIVE_COLUMNS,
       DAY: [
         date(),
         qty("bills", "Bills"),
         money("gross", "Spare total"),
+        SALE_HANDLING,
+        SALE_TRADE_DISCOUNT,
         money("discount", "Cash discount"),
         money("taxable", "Taxable amount"),
         money("exempt", "Non-taxable"),
@@ -466,7 +495,9 @@ export const REPORTS: ReportDefinition[] = [
       text("customer", "Customer"),
       text("address", "Address"),
       money("gross", "Spares total"),
+      SALE_TRADE_DISCOUNT,
       money("discount", "Cash discount"),
+      SALE_HANDLING,
       money("taxable", "Taxable amount"),
       money("exempt", "Non-taxable"),
       money("vat", "VAT"),
@@ -525,7 +556,7 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales-revenue",
     title: "Counter Sale Revenue",
     group: "Part sales",
-    description: "Sales less returns by price category, against dealer cost, with the margin.",
+    description: "Sales less returns by part category, against dealer cost, with the margin.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option"],
     options: [
@@ -1327,15 +1358,9 @@ export const REPORTS: ReportDefinition[] = [
     kind: "part-bin-history",
     title: "Part Bin Location History",
     group: "MIS",
-    description: "Every change of a part's bin: the branch's rack location, or the default bin in Part Master.",
+    description: "Every change of a part's bin (rack location) at a branch.",
     permission: PERMISSIONS.STOCK_READ,
-    filters: [...PART_FILTERS, "option"],
-    labels: { option: "Show" },
-    options: [
-      { value: "ALL", label: "All" },
-      { value: "BRANCH", label: "Branch bin changes" },
-      { value: "PART_MASTER", label: "Part Master bin changes" },
-    ],
+    filters: PART_FILTERS,
     columns: [
       datetime("changedAt", "Changed on"),
       ...PART_COLUMNS,

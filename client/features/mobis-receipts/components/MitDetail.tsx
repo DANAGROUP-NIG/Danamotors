@@ -21,6 +21,7 @@ import {
   fmtPrice,
 } from "../lib/mobis-labels";
 import type { MobisMit } from "../types/mobis.types";
+import { HandheldCard, useHandheldDocuments, type HandheldDocument } from "@/features/handheld";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -39,14 +40,21 @@ function DetailField({ label, value, wide }: { label: string; value?: ReactNode;
   );
 }
 
-function MrnDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) {
+function MrnDialog({ mit, verified, onClose }: { mit: MobisMit; verified?: HandheldDocument; onClose: () => void }) {
   const createMrn = useCreateMrn(mit.id);
   const [taxForm, setTaxForm] = useState("P");
   const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState("");
   const [rows, setRows] = useState<Record<string, { received: string; damaged: string }>>(() =>
-    Object.fromEntries(mit.lines.map((l) => [l.id, { received: String(l.quantity), damaged: "0" }])),
+    Object.fromEntries(
+      mit.lines.map((l) => {
+        // Prefill from the handheld check; a line the checker never reached starts at the invoice quantity.
+        const counted = verified?.lines?.find((h) => h.mitLineId === l.id && h.quantity !== null);
+        return [l.id, counted ? { received: String(counted.quantity), damaged: String(counted.damagedQuantity) } : { received: String(l.quantity), damaged: "0" }];
+      }),
+    ),
   );
+  const unchecked = verified ? (verified.lines ?? []).filter((h) => !h.extra && h.quantity === null).length : 0;
 
   const values = mit.lines.map((l) => {
     const r = toInt(rows[l.id]?.received ?? "0");
@@ -88,6 +96,12 @@ function MrnDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) {
           Confirm what physically arrived. Good units are added to {mit.destinationBranch.name} stock. Damaged units are
           recorded but not added, and anything not entered as received or damaged is recorded as short.
         </p>
+        {verified && (
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Filled in from handheld document {verified.documentNumber} ({verified.pickerName}).
+            {unchecked > 0 && ` ${unchecked} line(s) were not checked on the handheld and show the invoice quantity.`}
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Tax form">
             <input className={inputCls} maxLength={2} value={taxForm} onChange={(e) => setTaxForm(e.target.value.toUpperCase())} />
@@ -186,6 +200,10 @@ function CancelDialog({ mit, onClose }: { mit: MobisMit; onClose: () => void }) 
 
 export function MitDetail({ id }: { id: string }) {
   const { data: mit, isLoading, error } = useMobisMit(id);
+  const { data: handheld } = useHandheldDocuments({ sourceId: id });
+  // The job just posted on this page, until the list catches up (Generate MRN is filled in from it).
+  const [posted, setPosted] = useState<HandheldDocument | null>(null);
+  const verified = posted ?? handheld?.find((d) => d.status === "UPLOADED");
   const { hasPermission } = useAuth();
   const canPost = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
   const [dialog, setDialog] = useState<"mrn" | "cancel" | null>(null);
@@ -269,7 +287,7 @@ export function MitDetail({ id }: { id: string }) {
                   </Link>
                 </span>
               ))}
-              . Complete their category, price category and location there.
+              . Complete their part category and location there.
             </p>
           )}
         </div>
@@ -293,6 +311,17 @@ export function MitDetail({ id }: { id: string }) {
             </p>
           </div>
         )}
+
+        <HandheldCard
+          filter={{ sourceId: mit.id }}
+          canWrite={canPost}
+          send={mit.status === "IN_TRANSIT" ? { type: "MIT_RECEIVE", sourceId: mit.id, branchId: mit.destinationBranchId, label: `MIT ${mit.mitNumber}` } : null}
+          // Posting verifies the MIT; the store then posts the MRN, filled in from the handheld counts.
+          onPosted={(doc) => {
+            setPosted(doc);
+            setDialog("mrn");
+          }}
+        />
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <p className="mb-4 text-sm font-semibold text-slate-700">Invoice lines</p>
@@ -344,7 +373,7 @@ export function MitDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {dialog === "mrn" && <MrnDialog mit={mit} onClose={() => setDialog(null)} />}
+      {dialog === "mrn" && <MrnDialog mit={mit} verified={open ? verified : undefined} onClose={() => setDialog(null)} />}
       {dialog === "cancel" && <CancelDialog mit={mit} onClose={() => setDialog(null)} />}
     </div>
   );

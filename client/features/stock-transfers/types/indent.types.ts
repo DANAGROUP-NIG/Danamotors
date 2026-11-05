@@ -26,11 +26,8 @@ export type PartRef = {
   id: string;
   partNumber: string;
   name: string;
-  description?: string | null;
   uom: string;
   unitPrice: number;
-  binLocation?: string | null;
-  storeLocation?: string | null;
   role: "MAIN" | "ALTERNATE";
   mainPartId?: string | null;
   partStatus: "ACTIVE" | "BLOCKED";

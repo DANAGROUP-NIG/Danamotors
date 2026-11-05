@@ -24,6 +24,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
+import { HandheldCard } from "@/features/handheld";
 import { useIndent } from "../hooks/use-indents";
 import { usePickIndent, useSubmitIndent } from "../hooks/use-indent-mutations";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
@@ -92,6 +95,7 @@ export function IndentDetail({ id }: { id: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { abilities } = useIndentAbilities();
+  const { hasPermission } = useAuth();
   const submit = useSubmitIndent();
   const pick = usePickIndent();
   const [dialog, setDialog] = useState<DialogKind>(null);
@@ -358,6 +362,16 @@ export function IndentDetail({ id }: { id: string }) {
             </table>
           </div>
         </SectionCard>
+
+        <HandheldCard
+          filter={{ indentId: indent.id }}
+          canWrite={hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH)}
+          send={
+            indent.openPickingList?.status === "OPEN" && indent.openPickingList.lines.some((l) => l.pickedQuantity > 0)
+              ? { type: "INDENT_PICK", sourceId: indent.openPickingList.id, branchId: indent.sourceBranchId, label: `indent ${indent.indentNumber}` }
+              : null
+          }
+        />
 
         {/* ── Documents ── */}
         <Documents indent={indent} />

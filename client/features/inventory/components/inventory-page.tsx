@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Download, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
+import { Plus, Download, FileSpreadsheet, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import ModalFame from "@/components/modals/ModalFame";
@@ -25,7 +26,7 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   return {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
-    category: stock.part.category ?? "",
+    partCategory: stock.part.priceCategoryCode ?? "",
     unitPrice: stock.part.unitPrice,
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
@@ -39,7 +40,7 @@ function exportColumns() {
   return [
     { key: "partName", label: "Part Name" },
     { key: "partNumber", label: "Part Number" },
-    { key: "category", label: "Category" },
+    { key: "partCategory", label: "Part Category" },
     { key: "unitPrice", label: "Unit Rate" },
     { key: "quantity", label: "Quantity" },
     { key: "minimumStock", label: "Minimum Stock" },
@@ -147,6 +148,14 @@ export function InventoryPage() {
               </div>
             )}
             {tab === "stock" && <ExportInventoryButton />}
+            {tab === "parts" && (
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+                <Link href="/inventory/part-catalogue">
+                  <BookOpen className="size-4" />
+                  Mobis catalogue
+                </Link>
+              </Button>
+            )}
             {canCreate && (
               <Button onClick={() => setShowForm(true)} size="sm">
                 <Plus className="size-4" />

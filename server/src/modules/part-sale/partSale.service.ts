@@ -21,6 +21,7 @@ import { creditDueDate, defaultCreditDays } from "../finance/credit-terms";
 import { lockParty, PartyAccountService, withPartyTransaction } from "../finance/party-account.service";
 import { money, sumMoney } from "../finance/money";
 import { reportEnd, reportStart } from "../finance/party-report";
+import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import {
   addMonths,
   billableQuantity,
@@ -91,7 +92,7 @@ const customerSelect = {
   },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, binLocation: true, partFlag: true, taxable: true, unitPrice: true },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, taxable: true, unitPrice: true },
 } as const;
 
 const customerName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
@@ -243,13 +244,14 @@ export class PartSaleService {
     if (!order) throw new NotFoundError("Customer purchase order not found");
     const stocks = await prisma.inventoryStock.findMany({
       where: { branchId: order.branchId, partId: { in: order.lines.map((l) => l.partId) } },
-      select: { partId: true, quantity: true, reservedQuantity: true },
+      select: { partId: true, quantity: true, reservedQuantity: true, rackLocation: true },
     });
     return {
       ...order,
       lines: order.lines.map((line) => {
         const stock = stocks.find((s) => s.partId === line.partId);
-        return { ...line, freeStock: stock ? stock.quantity - stock.reservedQuantity : 0 };
+        // The bin is where the order's branch keeps the part (legacy PARTBAL.location).
+        return { ...line, freeStock: stock ? stock.quantity - stock.reservedQuantity : 0, bin: stock?.rackLocation ?? null };
       }),
     };
   }
@@ -288,6 +290,32 @@ export class PartSaleService {
       if (unknown.length) throw new BadRequestError("A pick line does not belong to this order");
     }
     return { picked, short };
+  }
+
+  /**
+   * Applies a handheld pick (legacy HHDC CPO upload): each line's reservation drops to what was
+   * physically picked and the short goes back to free stock. Runs inside the caller's transaction.
+   */
+  async applyHandheldPickInTx(tx: Tx, orderId: string, picked: { lineId: string; quantity: number }[]) {
+    const order = await this.lockOrder(tx, orderId);
+    let short = 0;
+    for (const line of [...order.lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
+      const entry = picked.find((p) => p.lineId === line.id);
+      if (!entry) continue;
+      if (entry.quantity > line.pickedQuantity) {
+        throw new ConflictError(`${line.part.partNumber}: ${entry.quantity} picked but only ${line.pickedQuantity} reserved now`);
+      }
+      const released = line.pickedQuantity - entry.quantity;
+      if (released === 0) continue;
+      const stock = await lockStock(tx, order.branchId, line.partId);
+      if (!stock || stock.reservedQuantity < released) {
+        throw new ConflictError(`Reserved stock for ${line.part.partNumber} no longer matches the pick; nothing was released`);
+      }
+      await tx.inventoryStock.update({ where: { id: stock.id }, data: { reservedQuantity: { decrement: released } } });
+      await tx.customerOrderLine.update({ where: { id: line.id }, data: { pickedQuantity: entry.quantity } });
+      short += released;
+    }
+    return { short };
   }
 
   /** Give back everything picked on the order to free stock. */
@@ -417,6 +445,9 @@ export class PartSaleService {
   }
 
   private async releasePicked(tx: Tx, order: LockedOrder, lines = order.lines) {
+    if (lines.some((l) => l.pickedQuantity > 0)) {
+      await cancelSentHandheldDocuments(tx, { customerOrderId: order.id }, "Picked stock released on the web");
+    }
     for (const line of [...lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
       if (line.pickedQuantity <= 0) continue;
       const stock = await lockStock(tx, order.branchId, line.partId);
@@ -494,6 +525,13 @@ export class PartSaleService {
       const priced = priceSale(
         orderLines.map((l) => ({ quantity: quantityOf(l.id), rate: l.retailRate, vatPercent: l.part.taxable ? VAT_RATE : 0 })),
         discountPercent,
+      );
+
+      await cancelSentHandheldDocuments(
+        tx,
+        orderIds.map((customerOrderId) => ({ customerOrderId })),
+        "Billed before the handheld result was uploaded",
+        actorId,
       );
 
       // Issue stock: picked (reserved) units first, then free stock.
