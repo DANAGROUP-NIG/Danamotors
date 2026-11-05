@@ -27,7 +27,8 @@ export function assertCanResetPassword(
     throw new ForbiddenError('You can only reset passwords of users in your branch');
 }
 
-type Actor = { userId: string; role: string; branchId?: string | null };
+/** The signed-in user; `permissions` are their effective permissions (req.user). */
+type Actor = { userId: string; role: string; branchId?: string | null; permissions?: string[] };
 const isAdminRole = (name?: string | null) => name === ROLES.SUPER_ADMIN || name === ROLES.ADMIN;
 
 type PermissionLinks = { permission: { name: string } }[];
@@ -53,7 +54,8 @@ export function hasAdminLevelAccess(user: AccessTarget): boolean {
  * Only a super admin may give admin-level access: a role that is admin-level (see `hasAdminLevelAccess`), or
  * a grant of an admin-level permission (`user:*`, `role:*`, `audit:*`, `branch:all`, branch management).
  * Built-in operational roles that carry `branch:all` stay assignable: only a super admin edits a role's
- * permissions, so the role is already approved. A per-user grant is not, so it is checked here.
+ * permissions, so the role is already approved. A per-user grant is not, so it is checked here. Anyone
+ * but a super admin may also grant only permissions they hold themselves.
  */
 export function assertCanGiveAccess(
   actor: Actor,
@@ -66,6 +68,10 @@ export function assertCanGiveAccess(
   const adminLevel = (give.grants ?? []).filter(isAdminLevelPermission);
   if (adminLevel.length)
     throw new ForbiddenError(`Only a super admin can grant admin-level permissions: ${adminLevel.join(', ')}`);
+  const held = new Set(actor.permissions ?? []);
+  const notHeld = (give.grants ?? []).filter((name) => !held.has(name));
+  if (notHeld.length)
+    throw new ForbiddenError(`You can only grant permissions you have yourself: ${notHeld.join(', ')}`);
 }
 
 /**

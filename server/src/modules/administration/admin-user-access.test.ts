@@ -23,7 +23,7 @@ import { AUDITOR_PERMISSIONS, PERMISSIONS, ROLES, ROLE_PERMISSIONS } from '../..
 import { effectivePermissions, isAdminLevelPermission } from '../../shared/effectivePermissions';
 
 const superAdmin = { userId: 'sa', role: ROLES.SUPER_ADMIN, branchId: 'branch-a' };
-const admin = { userId: 'ad', role: ROLES.ADMIN, branchId: 'branch-a' };
+const admin = { userId: 'ad', role: ROLES.ADMIN, branchId: 'branch-a', permissions: ['invoice:cancel', 'customer:read'] };
 const links = (...names: string[]) => names.map((name) => ({ permission: { name } }));
 type Override = { effect: PermissionEffect; permission: { name: string } };
 const grant = (name: string): Override => ({ effect: PermissionEffect.GRANT, permission: { name } });
@@ -71,6 +71,10 @@ describe('Who may give access', () => {
 
   it.each(['user:update', 'role:update', 'audit:read', 'branch:all'])('an admin may not grant %s', (name) => {
     expect(() => assertCanChangeUser(admin, target(), { access: true, grants: [name] })).toThrow('Only a super admin can grant admin-level permissions');
+  });
+
+  it('an admin may grant only permissions they hold', () => {
+    expect(() => assertCanChangeUser(admin, target(), { access: true, grants: ['tally:post'] })).toThrow('only grant permissions you have yourself: tally:post');
   });
 
   it('a super admin may grant admin-level permissions', () => {

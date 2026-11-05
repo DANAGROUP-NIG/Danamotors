@@ -210,12 +210,16 @@ export function UserAccessCard({ user }: { user: UserWithRole }) {
                     {group.permissions.map((p) => {
                       const state = stateOf(p.name);
                       const tag = STATE_TAG[state];
-                      // Only a super admin may grant an admin-level permission; anyone may deny one in the role.
-                      const locked = !isSuperAdmin && state === "none" && isAdminLevelPermission(p.name);
+                      // Anyone but a super admin may grant only non-admin-level permissions they hold themselves;
+                      // anyone may deny one the role has.
+                      const lockReason = isSuperAdmin || state !== "none" ? null
+                        : isAdminLevelPermission(p.name) ? "Only a super admin can grant this"
+                        : !hasPermission(p.name) ? "You can only grant permissions you have yourself" : null;
+                      const locked = !!lockReason;
                       return (
                         <label
                           key={p.name}
-                          title={locked ? "Only a super admin can grant this" : (p.description ?? p.name)}
+                          title={lockReason ?? p.description ?? p.name}
                           className={cn(
                             "flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
                             isEffective(state) ? "border-primary/20 bg-primary/5" : "border-slate-200 bg-white text-slate-600",
@@ -235,7 +239,7 @@ export function UserAccessCard({ user }: { user: UserWithRole }) {
                             <span className="block truncate">{humanize(p.name)}</span>
                             <span className="block truncate text-[11px] text-muted-foreground">{p.name}</span>
                           </span>
-                          {locked && <Lock className="size-3.5 text-slate-400" aria-label="Super admin only" />}
+                          {locked && <Lock className="size-3.5 text-slate-400" aria-label={lockReason ?? undefined} />}
                           {tag && <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", tag.cls)}>{tag.label}</span>}
                         </label>
                       );

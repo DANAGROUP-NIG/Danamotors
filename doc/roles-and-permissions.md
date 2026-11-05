@@ -103,6 +103,8 @@ Only a SuperAdmin may give admin-level access:
   by an Admin. Only a SuperAdmin edits role permissions, so those roles are already approved; a per-user
   grant is not, so it is checked.
 - An Admin cannot change a user who has admin-level access by role or by grant.
+- Anyone but a SuperAdmin may grant only permissions they hold themselves, so an Admin cannot hand out,
+  say, `tally:post` or `books:close`. The Access editor locks those too.
 
 ## Rights changes are logged
 
