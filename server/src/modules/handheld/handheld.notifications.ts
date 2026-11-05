@@ -6,6 +6,7 @@
 import { HandheldDocumentType, Prisma, StockTakeType } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { ROLES } from "../../shared/constants/roles";
+import { holdsPermission } from "../../shared/effectivePermissions";
 import { NotificationPayload, NotificationService } from "../notification/notification.service";
 import { permissionsOf } from "./handheld.logic";
 
@@ -86,7 +87,7 @@ export class HandheldNotifier {
   private async postersOf(job: JobRef): Promise<string[]> {
     const permission = permissionsOf(job.type, job.stockTakeSheet?.stockTake.type === StockTakeType.AUDIT).write;
     const users = await prisma.user.findMany({
-      where: { isActive: true, branchId: job.branchId, role: { permissions: { some: { permission: { name: permission } } } } },
+      where: { isActive: true, branchId: job.branchId, AND: [holdsPermission(permission)] },
       select: { id: true },
     });
     return users.map((u) => u.id);

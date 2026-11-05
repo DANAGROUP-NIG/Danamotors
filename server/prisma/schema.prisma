@@ -213,6 +213,9 @@ model User {
   stockTakeCounts         StockTakeCount[] @relation("StockTakeCountRecordedBy")
 
   employee Employee?
+
+  /** Per-user changes to the role's permissions: extra grants and denied role permissions. */
+  permissionOverrides UserPermission[]
 }
 
 model Role {
@@ -235,6 +238,7 @@ model Permission {
   createdAt DateTime @default(now())
 
   roles RolePermission[]
+  users UserPermission[]
 }
 
 model RolePermission {
@@ -245,6 +249,26 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+}
+
+enum PermissionEffect {
+  GRANT
+  DENY
+}
+
+/// A per-user change to the role's permissions. The role stays the template: effective permissions are
+/// role + GRANT − DENY (legacy rights were per user, and few users shared a profile).
+model UserPermission {
+  userId       String
+  permissionId String
+  effect       PermissionEffect
+  createdAt    DateTime         @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@index([permissionId])
 }
 
 model RefreshToken {

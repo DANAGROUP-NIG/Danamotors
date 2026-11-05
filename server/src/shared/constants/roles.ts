@@ -13,6 +13,8 @@ export const ROLES = {
   CCU_MANAGER: "CCUManager",
   CCU_OFFICER: "CCUOfficer",
   SERVICE_MANAGER: "ServiceManager",
+  /** Read-only: every module and report, no writes (legacy Auditormast). */
+  AUDITOR: "Auditor",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
@@ -317,11 +319,18 @@ const MIS_WORKSHOP_REPORTS: PermissionType[] = [
   ...MIS_FRONT_OFFICE_REPORTS,
 ];
 
+/** The Auditor role: every read permission and every report, never a write (report settings are a write). */
+export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(PERMISSIONS).filter(
+  (name) => (name.endsWith(":read") || name.startsWith("report:")) && name !== PERMISSIONS.REPORT_SETTINGS,
+);
+
 // Mapping roles to their default initial permissions for seeding
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   [ROLES.ENGINEER]: [PERMISSIONS.JOBCARD_READ, PERMISSIONS.WORKSHOP_READ],
   // Full access
   [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
+
+  [ROLES.AUDITOR]: AUDITOR_PERMISSIONS,
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [

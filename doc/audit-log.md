@@ -33,6 +33,9 @@ service can forget to log a change, and a change made outside the app is logged 
   stored as `{field, masked: true}`: the log shows that the password or reset token changed, never the value.
 - **Role permissions** are logged on the role: granting or revoking a permission is a Modify of the Role with
   field `permission` (old = revoked name, new = granted name).
+- **Per-user grants and denials** (`UserPermission`) are logged on the user the same way: a Modify of the
+  User with field `permission`, values such as `GRANT invoice:cancel` or `DENY customer:delete`
+  (migration `20261105140000_user_permission_overrides`, function `change_log_user_permission()`).
 - `txId` groups the rows written by one database transaction, for example everything a customer merge touched.
 
 ### Changes with no user
@@ -46,7 +49,7 @@ service can forget to log a change, and a change made outside the app is logged 
 
 | Record type | Tables |
 | --- | --- |
-| Master | User, Role (and RolePermission), Customer, Vehicle, SparePart, LabourItem, LabourRate, WorkshopMaster, VehicleModel, Branch, BranchSettings, Employee, FinanceSetting, ReportSetting, DocumentTerms, MileageBand, Bank, PartCategory, PartCategoryBranchSetting, PartTaxCategory, CorporateGroup, TallyAccountMapping, ServiceTypeModelSetting, Campaign |
+| Master | User (and UserPermission), Role (and RolePermission), Customer, Vehicle, SparePart, LabourItem, LabourRate, WorkshopMaster, VehicleModel, Branch, BranchSettings, Employee, FinanceSetting, ReportSetting, DocumentTerms, MileageBand, Bank, PartCategory, PartCategoryBranchSetting, PartTaxCategory, CorporateGroup, TallyAccountMapping, ServiceTypeModelSetting, Campaign |
 | Transaction (heads) | JobCard, Estimate, Invoice, Receipt, PartyNote, CustomerOrder, CounterSaleReturn, BranchIndent, StockTransferNote, MaterialInTransit, MaterialReceiptNote, PartRequisition, PartReturnSlip, StockTake, WarrantyCase |
 
 **To log another table:** add a trigger in a new migration and add the table to `CHANGE_LOG_ENTITIES` in

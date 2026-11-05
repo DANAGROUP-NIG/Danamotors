@@ -15,6 +15,7 @@ export type AppRole =
   | "receptionist"
   | "receptionmanager"
   | "warrantyofficer"
+  | "auditor"
   | "customer";
 
 // Inventory permissions mirror server/src/shared/constants/roles.ts.
@@ -67,6 +68,16 @@ export const CAMPAIGN_PERMISSIONS = {
 } as const;
 
 export const BRANCH_ALL = "branch:all";
+
+/**
+ * Admin-level permissions (mirrors isAdminLevelPermission in server/src/shared/effectivePermissions.ts):
+ * managing users, roles and rights, the audit log, all-branch access and branch management. Only a super
+ * admin may grant them to a user.
+ */
+export function isAdminLevelPermission(name: string): boolean {
+  return ["branch:all", "branch:create", "branch:update", "branch:delete"].includes(name)
+    || ["user:", "role:", "audit:"].some((prefix) => name.startsWith(prefix));
+}
 
 /** Framework reports (#75) and report settings. */
 export const FRAMEWORK_REPORT_PERMISSIONS = [

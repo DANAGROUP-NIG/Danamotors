@@ -10,6 +10,7 @@ import {
   resetUserPasswordSchema,
   createRoleSchema,
   updateRolePermissionsSchema,
+  setUserPermissionsSchema,
   updateRoleSchema,
   deleteRoleParamSchema,
   userIdParamSchema,
@@ -202,6 +203,41 @@ router.post('/users', requirePermission(PERMISSIONS.USER_CREATE), validateReques
 // Only admins and superadmins can update users — enforced by role, not just DB permissions
 router.put('/users/:id', requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN), requirePermission(PERMISSIONS.USER_UPDATE), validateRequest(updateUserSchema), controller.updateUser);
 router.delete('/users/:id', requirePermission(PERMISSIONS.USER_DELETE), validateRequest(userIdParamSchema), controller.deleteUser);
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/permissions:
+ *   put:
+ *     summary: Set a user's own grants and denials
+ *     description: >
+ *       Replaces the user's overrides of their role. Effective permissions are role + grants - denies.
+ *       A grant must be missing from the role and a denial must be in it. Only a super admin may grant
+ *       admin-level permissions (user:*, role:*, audit:*, branch:all, branch management) or change a user
+ *       with admin-level access. Nobody changes their own access. Every change is in the change log.
+ *     tags: [Administration]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [grants, denies]
+ *             properties:
+ *               grants: { type: array, items: { type: string }, example: ["invoice:cancel"] }
+ *               denies: { type: array, items: { type: string }, example: ["customer:delete"] }
+ *     responses:
+ *       200: { description: The user with role permissions, overrides and effective permissions }
+ *       400: { description: Unknown, redundant or self change }
+ *       403: { description: Admin-level grant or admin-level user, not a super admin }
+ */
+router.put('/users/:id/permissions', requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN), requirePermission(PERMISSIONS.USER_UPDATE), validateRequest(setUserPermissionsSchema), controller.setUserPermissions);
 
 /**
  * @openapi

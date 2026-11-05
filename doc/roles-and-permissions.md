@@ -22,6 +22,7 @@ permissions are seeded into the database; API routes enforce access with
 | `CCUManager` | Cross-branch operations | Manages CCU staff and reception operations. |
 | `ServiceManager` | Cross-branch operations; own-branch inventory | Manages service operations. |
 | `WarrantyOfficer` | Cross-branch operations; own-branch inventory | Warranty claims and campaigns. |
+| `Auditor` | Own branch | Read-only: every `…:read` permission and every report, no writes (legacy Auditormast). Seeded by migration `20261105140000_user_permission_overrides`. |
 
 ## Permissions
 
@@ -56,17 +57,59 @@ fields are ignored on part writes. The part screens hide the dealer rate.
 
 **Changing users.** A SuperAdmin may change any other user, including their role and branch
 (`PUT /api/admin/users/:id` takes `branchId`; the edit form shows Branch to SuperAdmins only). Anyone else
-(an Admin, within their branch) may not change an Admin or SuperAdmin, give the Admin or SuperAdmin role,
-or move a user to another branch. Nobody may deactivate, delete or change the role of their own account.
-Changes are audited as `USER_UPDATED` with old → new values; deletes as `USER_DELETED`.
+(an Admin, within their branch) may not change a user with admin-level access, give admin-level access, or
+move a user to another branch (see [Admin-level access](#admin-level-access)). Nobody may deactivate,
+delete, re-role or change the access of their own account. The rules are `assertCanChangeUser` and
+`assertCanGiveAccess` in `admin.service.ts`; creating a user goes through the same check. Changes are
+audited as `USER_UPDATED` with old → new values; deletes as `USER_DELETED`.
 
 After deploying, run the role seed so the built-in roles get the two permissions. Until then only
 SuperAdmins see dealer rates and approve shortages.
 
+## Per-user access (overrides)
+
+Legacy rights were per user: at the branch, 93 users with rights had 79 distinct profiles. Here the role
+is the template and each user may have their own changes on top of it (`UserPermission`):
+
+- **Granted**: a permission the role lacks.
+- **Denied**: a permission the role has.
+
+**Effective permissions = role + granted − denied.** `effectivePermissions()` and `holdsPermission()` in
+`server/src/shared/effectivePermissions.ts` are the only places that combine them. The API check
+(`loadStaffUser`), login, `/auth/me` and every "users who hold permission X" query (shortage approvers,
+QC notifications, handheld posters) use them. A SuperAdmin has no overrides: they hold everything.
+
+| Where | What |
+| --- | --- |
+| User page → **Access** | Role, effective count, the user's grants (+) and denials (−). **Change access** opens the permission list: ticking a permission the role lacks grants it, unticking one the role has denies it. Filters: All / Has / Changed, and search. |
+| Users list | "+N own" next to the role when the user has overrides. |
+| Add user / Edit user → **Copy access from user** | Copies that user's role and overrides (legacy "Assign Right Same As Other One"). Replaces the role and overrides on edit. An Admin may copy only from users of their own branch. |
+| `PUT /api/admin/users/:id/permissions` `{ grants, denies }` | Replaces the overrides. A grant already in the role or a denial not in it is refused (400). |
+
+Changing a user's role drops the overrides the new role makes pointless (a grant it now has, a denial of a
+permission it lacks); the effective permissions do not change.
+
+### Admin-level access
+
+Only a SuperAdmin may give admin-level access:
+
+- **Admin-level permissions** (`isAdminLevelPermission`): every `user:*`, `role:*` and `audit:*`
+  permission, `branch:all`, `branch:create`, `branch:update` and `branch:delete`. An Admin cannot grant
+  them; the Access editor shows them locked.
+- **Admin-level roles**: Admin, SuperAdmin, and any role holding a `user:*`, `role:*` or `audit:*`
+  permission, such as Auditor. An Admin cannot give them, on create, edit or copy.
+- The built-in operational roles that carry `branch:all` (Service Manager, CCU Manager, …) stay assignable
+  by an Admin. Only a SuperAdmin edits role permissions, so those roles are already approved; a per-user
+  grant is not, so it is checked.
+- An Admin cannot change a user who has admin-level access by role or by grant.
+
 ## Rights changes are logged
 
-Every grant or revoke of a role permission, and every change to a user (role, branch, active), is in the
-change log (Settings → Audit log → Changes, record type "Role and permissions" or "User"). See
+Every grant or revoke of a role permission, every per-user grant or denial, and every change to a user
+(role, branch, active) is in the change log (Settings → Audit log → Changes, record type "Role and
+permissions" or "User"). A per-user change shows as a Modify of the User, field `permission`, old/new
+such as `GRANT invoice:cancel`. Saving overrides also writes one `USER_PERMISSIONS_UPDATED` event
+(granted / ungranted / denied / undenied); copying access on create writes `USER_ACCESS_COPIED`. See
 [audit-log.md](./audit-log.md).
 
 ## Operational branch access (issue #96)
@@ -98,6 +141,8 @@ are deferred per the user's instruction; a TODO is recorded in `client/constant.
 ## Seed mapping (`ROLE_PERMISSIONS`)
 
 - **SuperAdmin** → every permission.
+- **Auditor** → `AUDITOR_PERMISSIONS`: every permission ending in `:read` and every `report:*` except
+  `report:settings`.
 - **Admin** → user/role/customer/vehicle/service/workshop/inventory management +
   finance create/read.
 - **GeneralStoreManager** → full inventory + full transfer lifecycle + service/vehicle/customer reads.

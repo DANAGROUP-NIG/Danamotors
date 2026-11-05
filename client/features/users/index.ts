@@ -5,6 +5,7 @@ export { useCreateUser } from "./hooks/use-create-user";
 export { useUpdateUser } from "./hooks/use-update-user";
 export { useResetUserPassword } from "./hooks/use-reset-user-password";
 export { ResetPasswordCard, canResetPassword } from "./components/reset-password-card";
+export { UserAccessCard } from "./components/user-access-card";
 export { useDeleteUser } from "./hooks/use-delete-user";
 export { useRoles } from "./hooks/use-roles";
 export { userKeys, roleKeys } from "./api/user.keys";
@@ -14,6 +15,7 @@ export {
   createUserRequest,
   updateUserRequest,
   resetUserPasswordRequest,
+  setUserPermissionsRequest,
   getRolesRequest,
 } from "./api/user.api";
 export { getUserFullName, getUserInitials } from "./services/user.service";
@@ -26,6 +28,7 @@ export {
 export type {
   User,
   UserWithRole,
+  PermissionOverride,
   Role,
   CreateUserPayload,
   UpdateUserPayload,

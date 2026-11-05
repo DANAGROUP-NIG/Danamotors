@@ -3,6 +3,7 @@ import prisma from '../../prisma/client';
 import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { NotificationService } from '../notification/notification.service';
+import { holdsPermission } from '../../shared/effectivePermissions';
 
 /**
  * Legacy S/E approval ("Can Approve Shortage/Excess in MIT/BIT"). A Mobis (MIT) or branch transfer (STN)
@@ -20,15 +21,15 @@ export function discrepancyStatusFor(totals: { damaged: number; short: number })
 /** Active users who may approve a discrepancy at this branch: holders of the permission there, holders
  *  with cross-branch inventory access, and super admins. */
 export async function discrepancyApproverIds(branchId: string): Promise<string[]> {
-  const holders = { permissions: { some: { permission: { name: PERMISSIONS.STOCK_DISCREPANCY_APPROVE } } } };
-  const crossBranch = { permissions: { some: { permission: { name: PERMISSIONS.INVENTORY_CROSS_BRANCH } } } };
+  const holders = holdsPermission(PERMISSIONS.STOCK_DISCREPANCY_APPROVE);
+  const crossBranch = holdsPermission(PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const users = await prisma.user.findMany({
     where: {
       isActive: true,
       OR: [
         { role: { name: ROLES.SUPER_ADMIN } },
-        { role: holders, branchId },
-        { role: { AND: [holders, crossBranch] } },
+        { AND: [holders], branchId },
+        { AND: [holders, crossBranch] },
       ],
     },
     select: { id: true },

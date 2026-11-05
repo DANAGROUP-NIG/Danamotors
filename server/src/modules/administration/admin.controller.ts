@@ -61,7 +61,7 @@ export class AdminController {
 
   createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { email, password, firstName, lastName, phoneNumber, roleId, branchName } = req.body;
+      const { email, password, firstName, lastName, phoneNumber, roleId, copyFromUserId, branchName } = req.body;
 
       // Admin can only create users in their own branch — override branchName with their branch
       let enforcedBranchName = branchName;
@@ -70,13 +70,15 @@ export class AdminController {
         enforcedBranchName = userBranch?.name ?? branchName;
       }
 
-      const result = await this.adminService.createUser({
+      // Admin-level access rules: assertCanGiveAccess (admin.service.ts).
+      const result = await this.adminService.createUser(req.user!, {
         email,
         passwordHash: password,
         firstName,
         lastName,
         phoneNumber,
         roleId,
+        copyFromUserId,
         branchName: enforcedBranchName,
       });
 
@@ -96,7 +98,7 @@ export class AdminController {
   updateUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { firstName, lastName, phoneNumber, roleId, branchId, isActive } = req.body;
+      const { firstName, lastName, phoneNumber, roleId, branchId, isActive, copyFromUserId } = req.body;
 
       const existingUser = await this.adminService.getUser(id);
       assertBranchOwnership(req, (existingUser as any).branchId);
@@ -109,6 +111,7 @@ export class AdminController {
         roleId,
         branchId,
         isActive,
+        copyFromUserId,
       });
 
       res.status(200).json({
@@ -118,6 +121,25 @@ export class AdminController {
         data: {
           user: result,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /** Replaces the user's own grants and denials on top of their role. */
+  setUserPermissions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const existingUser = await this.adminService.getUser(id);
+      assertBranchOwnership(req, existingUser.branchId);
+
+      const result = await this.adminService.setUserPermissions(req.user!, id, req.body);
+      res.status(200).json({
+        status: 'success',
+        statusCode: 200,
+        message: 'Access updated',
+        data: { user: result },
       });
     } catch (error) {
       next(error);

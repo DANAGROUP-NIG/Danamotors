@@ -8,6 +8,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreateUser } from "../hooks/use-create-user";
 import { useRoles } from "../hooks/use-roles";
+import { CopyAccessSelect } from "./copy-access-select";
 import {
   createUserSchema,
   type CreateUserFormValues,
@@ -29,6 +30,8 @@ export function UserCreateForm({ onSuccess }: UserCreateFormProps) {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
@@ -37,8 +40,12 @@ export function UserCreateForm({ onSuccess }: UserCreateFormProps) {
     },
   });
 
+  const copyFrom = watch("copyFromUserId") ?? "";
+
   function onSubmit(values: CreateUserFormValues) {
-    create.mutate(values, {
+    // Copying takes the source user's role, so the role field is not sent.
+    const payload = values.copyFromUserId ? { ...values, roleId: undefined } : { ...values, copyFromUserId: undefined };
+    create.mutate(payload, {
       onSuccess: () => {
         reset();
         onSuccess?.();
@@ -92,7 +99,7 @@ export function UserCreateForm({ onSuccess }: UserCreateFormProps) {
           />
         </Field>
         <Field label="Role" error={errors.roleId?.message}>
-          <select className={inputCls} {...register("roleId")}>
+          <select className={inputCls} disabled={!!copyFrom} {...register("roleId")}>
             <option value="">Select role</option>
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
@@ -102,6 +109,18 @@ export function UserCreateForm({ onSuccess }: UserCreateFormProps) {
           </select>
         </Field>
       </div>
+
+      <Field label="Copy access from user (optional)">
+        <CopyAccessSelect
+          value={copyFrom}
+          onChange={(id) => setValue("copyFromUserId", id, { shouldValidate: true })}
+        />
+        {copyFrom && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            The new user gets this user&apos;s role and any permissions granted or denied to them.
+          </p>
+        )}
+      </Field>
 
       {isSuperAdmin ? (
         <Field label="Branch" error={errors.branchName?.message}>

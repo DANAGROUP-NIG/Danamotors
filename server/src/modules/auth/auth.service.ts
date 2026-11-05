@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { effectivePermissions } from "../../shared/effectivePermissions";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { config } from "../../config";
@@ -144,7 +145,7 @@ export class AuthService {
       branchId,
     });
 
-    const permissions = newUser.role.permissions.map((p) => p.permission.name);
+    const permissions = effectivePermissions(newUser);
 
     const jwtPayload = {
       userId: newUser.id,
@@ -209,7 +210,7 @@ export class AuthService {
         throw new UnauthorizedError("Invalid email or password");
       }
 
-      const permissions = user.role.permissions.map((p) => p.permission.name);
+      const permissions = effectivePermissions(user);
 
       const jwtPayload = {
         userId: user.id,
@@ -666,7 +667,7 @@ export class AuthService {
       lastName: user.lastName,
       phoneNumber: user.phoneNumber,
       role: user.role.name,
-      permissions: user.role.permissions.map((p) => p.permission.name),
+      permissions: effectivePermissions(user),
       branchId: user.branchId,
     };
   }
@@ -727,7 +728,7 @@ export class AuthService {
       lastName: updated.lastName,
       phoneNumber: updated.phoneNumber,
       role: user.role.name,
-      permissions: user.role.permissions.map((p) => p.permission.name),
+      permissions: effectivePermissions(user),
       branchId: updated.branchId,
     };
   }

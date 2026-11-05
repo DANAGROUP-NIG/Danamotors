@@ -59,6 +59,7 @@ describe('Moving a user to another branch', () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'target', email: 'tech@example.test', firstName: 'Ada', lastName: 'Obi', phoneNumber: null, isActive: true,
       roleId: 'role-tech', branchId: 'branch-a', branch: { id: 'branch-a', name: 'Main Branch' }, role: { name: ROLES.TECHNICIAN, permissions: [] },
+      permissionOverrides: [],
     });
   });
 

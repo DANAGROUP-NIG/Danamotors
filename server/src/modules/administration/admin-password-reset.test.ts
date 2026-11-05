@@ -87,7 +87,7 @@ describe('Viewing a user', () => {
   it('includes the branch and never the password hash or a reset token', async () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'target', email: 'tech@example.test', passwordHash: 'hash', resetTokenHash: 'token-hash', resetTokenExpiry: new Date(),
-      branchId: BRANCH, branch: { id: BRANCH, name: 'Main Branch' }, role: { id: 'r', name: ROLES.TECHNICIAN, permissions: [] },
+      branchId: BRANCH, branch: { id: BRANCH, name: 'Main Branch' }, role: { id: 'r', name: ROLES.TECHNICIAN, permissions: [] }, permissionOverrides: [],
     });
     const user = await new AdminService().getUser('target');
     expect((prisma.user.findUnique as jest.Mock).mock.calls[0][0].include.branch).toBeTruthy();
@@ -95,5 +95,7 @@ describe('Viewing a user', () => {
     expect(user).not.toHaveProperty('passwordHash');
     expect(user).not.toHaveProperty('resetTokenHash');
     expect(user).not.toHaveProperty('resetTokenExpiry');
+    expect(user).not.toHaveProperty('permissionOverrides');
+    expect(user.overrides).toEqual([]);
   });
 });

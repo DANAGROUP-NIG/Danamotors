@@ -46,6 +46,7 @@ export class AdminRepository {
               name: true,
             },
           },
+          _count: { select: { permissionOverrides: true } },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -69,6 +70,7 @@ export class AdminRepository {
             },
           },
         },
+        permissionOverrides: { include: { permission: { select: { name: true } } } },
       },
     });
   }

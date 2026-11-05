@@ -5,12 +5,14 @@ import prisma from '../prisma/client';
 import { UnauthorizedError } from '../shared/errors/appError';
 import { JWTPayload } from '../shared/types';
 import { setRequestUser } from '../shared/requestContext';
+import { effectivePermissions, PERMISSION_SOURCES_SELECT } from '../shared/effectivePermissions';
 
 // Permissions are deliberately not embedded in the access token: a role with
 // many permissions (e.g. super_admin) pushes the JWT past the browser's 4KB
 // cookie limit, the cookie is silently dropped and login loops back to /login.
 // Role, branch and permissions are loaded fresh here instead, which also means
-// role changes take effect without waiting for the token to be refreshed.
+// role changes take effect without waiting for the token to be refreshed. Permissions are the role's
+// plus the user's own grants minus their denials (effectivePermissions.ts).
 export async function loadStaffUser(userId: string): Promise<JWTPayload | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -19,12 +21,7 @@ export async function loadStaffUser(userId: string): Promise<JWTPayload | null> 
       email: true,
       isActive: true,
       branchId: true,
-      role: {
-        select: {
-          name: true,
-          permissions: { select: { permission: { select: { name: true } } } },
-        },
-      },
+      ...PERMISSION_SOURCES_SELECT,
     },
   });
 
@@ -34,7 +31,7 @@ export async function loadStaffUser(userId: string): Promise<JWTPayload | null> 
     userId: user.id,
     email: user.email,
     role: user.role.name,
-    permissions: user.role.permissions.map((p) => p.permission.name),
+    permissions: effectivePermissions(user),
     branchId: user.branchId ?? null,
   };
 }
