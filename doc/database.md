@@ -47,6 +47,7 @@ Branch ─┬─ User ── Role ──┬─ Permission
 | `RolePermission` | Many-to-many join between `Role` and `Permission`. |
 | `RefreshToken` | Hashed refresh tokens (SHA-256), `token` unique, with `expiresAt`. |
 | `AuditLog` | User actions (login, register, profile updates, password resets, etc.). |
+| `ChangeLog` | Field-level change trail written by Postgres triggers on masters and document heads: record, add/modify/delete, `[{field, old, new}]`, user, and whether the change was made in the app or directly in the database. Append-only. See [audit-log.md](./audit-log.md). |
 
 ### Master data
 

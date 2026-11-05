@@ -158,6 +158,12 @@ export const API_ROUTES = {
     logs: "/audit/logs",
     detail: (id: string) => `/audit/logs/${id}`,
     stats: "/audit/stats",
+    changes: "/audit/changes",
+    change: (id: string) => `/audit/changes/${id}`,
+    changeSummary: "/audit/changes/summary",
+    changeEntities: "/audit/changes/entities",
+    recordHistory: (entity: string, recordId: string) =>
+      `/audit/changes/${encodeURIComponent(entity)}/${encodeURIComponent(recordId)}`,
   },
   search: {
     base: "/search",

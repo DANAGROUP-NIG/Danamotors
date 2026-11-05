@@ -63,6 +63,12 @@ Changes are audited as `USER_UPDATED` with old → new values; deletes as `USER_
 After deploying, run the role seed so the built-in roles get the two permissions. Until then only
 SuperAdmins see dealer rates and approve shortages.
 
+## Rights changes are logged
+
+Every grant or revoke of a role permission, and every change to a user (role, branch, active), is in the
+change log (Settings → Audit log → Changes, record type "Role and permissions" or "User"). See
+[audit-log.md](./audit-log.md).
+
 ## Operational branch access (issue #96)
 
 `canAccessAllBranches(user)` allows SuperAdmin or a user with `branch:all`.

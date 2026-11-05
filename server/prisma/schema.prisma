@@ -269,6 +269,31 @@ model AuditLog {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
+/// Field-level change log, written only by Postgres triggers (migration 20261105130000_change_log), never
+/// by the API. One row per inserted, updated or deleted master record or document head. `changes` is
+/// [{field, old, new}] or {field, masked: true} for secrets. source = DB: made outside the app.
+/// userId has no foreign key on purpose: the log outlives deleted users. Append-only (see doc/audit-log.md).
+model ChangeLog {
+  id          BigInt   @id @default(autoincrement())
+  at          DateTime @default(now())
+  entity      String
+  recordId    String
+  recordLabel String?
+  action      String
+  changes     Json     @default("[]")
+  userId      String?
+  source      String
+  txId        BigInt   @default(dbgenerated("txid_current()"))
+  dbUser      String?
+  appName     String?
+  clientAddr  String?
+
+  @@index([at])
+  @@index([entity, recordId])
+  @@index([userId, at])
+  @@index([txId])
+}
+
 // ============================================================
 // CUSTOMER
 // ============================================================

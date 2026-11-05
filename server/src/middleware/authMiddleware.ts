@@ -4,6 +4,7 @@ import { config } from '../config';
 import prisma from '../prisma/client';
 import { UnauthorizedError } from '../shared/errors/appError';
 import { JWTPayload } from '../shared/types';
+import { setRequestUser } from '../shared/requestContext';
 
 // Permissions are deliberately not embedded in the access token: a role with
 // many permissions (e.g. super_admin) pushes the JWT past the browser's 4KB
@@ -71,6 +72,7 @@ export const authMiddleware = async (
     }
 
     req.user = user;
+    setRequestUser(user.userId);
     next();
   } catch (error) {
     next(error);

@@ -7,6 +7,7 @@ import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
 import { auditMiddleware } from "./middleware/auditMiddleware";
 import { costVisibility } from "./middleware/costVisibility";
+import { requestContextMiddleware } from "./shared/requestContext";
 import { NotFoundError } from "./shared/errors/appError";
 
 const app = express();
@@ -82,7 +83,9 @@ app.get("/api/docs.json", (_req, res) => {
 // the route handler runs and calls res.json() / res.send().
 // costVisibility removes dealer rates and stock values from responses for users without
 // sparepart:cost:read (see the middleware).
-app.use("/api", costVisibility, auditMiddleware, routes);
+// requestContextMiddleware gives each request the context the change-log triggers read the user from.
+// It sits after the body parsers, which can lose an async context.
+app.use("/api", requestContextMiddleware, costVisibility, auditMiddleware, routes);
 
 // ── Handle 404/Not Found Routes ─────────────────────────────────────────────
 app.use((req, _res, next) => {
