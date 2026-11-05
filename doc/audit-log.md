@@ -87,7 +87,7 @@ million rows a year across all branches is expected. The indexes on `at`, `(enti
 `(userId, at)` and `txId` keep the report fast at that size.
 
 Keep at least **7 years**. This is a suggestion; confirm the period with finance before the first purge. After that, archive and delete once a year, run by
-whoever runs the backups:
+whoever runs the backups (schedule in [backup-and-restore.md](./backup-and-restore.md)):
 
 ```sql
 -- 1. Archive the year to a file kept with the backups.

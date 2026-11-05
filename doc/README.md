@@ -25,6 +25,9 @@ danamotors/
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
 | [audit-log.md](./audit-log.md) | Audit log: field-level change log filled by database triggers (who changed what, in or outside the app), summary, retention |
+| [labour-rates.md](./labour-rates.md) | Model labour rates: grid, inline edit, bulk change, add a labour to models, copy a model's rates (replaces the legacy XLS utility) |
+| [books-closed.md](./books-closed.md) | Books closed (year end): company and branch closed dates, the database lock on finance and stock entries, reopening |
+| [backup-and-restore.md](./backup-and-restore.md) | Nightly backup script, point-in-time recovery, off-site copies, retention, the tested restore runbook; why there is no restore button |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
 | [barcode-labels.md](./barcode-labels.md) | Part barcode labels on the Zebra at a handheld station PC: the page, the 2" × 2" label, how the station prints |
 | [handheld.md](./handheld.md) | Handheld picking for indents and CPOs, and checking Mobis MITs on the handheld before the MRN |
