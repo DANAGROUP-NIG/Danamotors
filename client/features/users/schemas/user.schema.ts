@@ -16,6 +16,7 @@ export const updateUserSchema = z.object({
   email: z.string().email("Enter a valid email").optional(),
   phoneNumber: z.string().optional(),
   roleId: z.string().optional(),
+  branchId: z.string().optional(),
   isActive: z.boolean().optional(),
 });
 

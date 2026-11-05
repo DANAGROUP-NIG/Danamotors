@@ -8,6 +8,8 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useUpdateUser } from "../hooks/use-update-user";
 import { useRoles } from "../hooks/use-roles";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useBranches } from "@/features/branches/hooks/use-branches";
 import {
   updateUserSchema,
   type UpdateUserFormValues,
@@ -23,6 +25,10 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
   const update = useUpdateUser(user.id);
   const { data: rolesData } = useRoles();
   const roles = rolesData?.roles ?? [];
+  // Only a super admin may move a user to another branch (the server enforces it too).
+  const { isSuperAdmin } = useAuth();
+  const { data: branchesData } = useBranches({ page: 1, limit: 100 });
+  const branches = (branchesData?.branches ?? []).filter((b) => b.isActive || b.id === user.branchId);
 
   const {
     register,
@@ -38,6 +44,7 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
       lastName: user.lastName,
       phoneNumber: user.phoneNumber ?? "",
       roleId: user.roleId,
+      branchId: user.branchId ?? "",
       isActive: user.isActive,
     },
   });
@@ -48,12 +55,16 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
       lastName: user.lastName,
       phoneNumber: user.phoneNumber ?? "",
       roleId: user.roleId,
+      branchId: user.branchId ?? "",
       isActive: user.isActive,
     });
   }, [user, reset]);
 
   function onSubmit(values: UpdateUserFormValues) {
-    update.mutate(values, { onSuccess });
+    // Send the branch only when a super admin actually changed it.
+    const { branchId, ...rest } = values;
+    const payload = isSuperAdmin && branchId && branchId !== user.branchId ? { ...rest, branchId } : rest;
+    update.mutate(payload, { onSuccess });
   }
 
   const isActive = watch("isActive");
@@ -72,6 +83,19 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
       <Field label="Phone (optional)" error={errors.phoneNumber?.message}>
         <input className={inputCls} {...register("phoneNumber")} />
       </Field>
+
+      {isSuperAdmin && (
+        <Field label="Branch" error={errors.branchId?.message}>
+          <select className={inputCls} {...register("branchId")}>
+            {!user.branchId && <option value="">No branch</option>}
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Role" error={errors.roleId?.message}>

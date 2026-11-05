@@ -18,6 +18,7 @@ export const updateUserSchema = z.object({
     lastName: z.string().optional(),
     phoneNumber: z.string().optional(),
     roleId: z.string().uuid('Invalid role ID').optional(),
+    branchId: z.string().uuid('Invalid branch ID').optional(),
     isActive: z.boolean().optional(),
   }),
   params: z.object({

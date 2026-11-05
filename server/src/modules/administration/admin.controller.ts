@@ -96,16 +96,18 @@ export class AdminController {
   updateUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const { firstName, lastName, phoneNumber, roleId, isActive } = req.body;
+      const { firstName, lastName, phoneNumber, roleId, branchId, isActive } = req.body;
 
       const existingUser = await this.adminService.getUser(id);
       assertBranchOwnership(req, (existingUser as any).branchId);
 
-      const result = await this.adminService.updateUser(id, {
+      // Role, branch and self-change rules: assertCanChangeUser (admin.service.ts).
+      const result = await this.adminService.updateUser(req.user!, id, {
         firstName,
         lastName,
         phoneNumber,
         roleId,
+        branchId,
         isActive,
       });
 
@@ -144,7 +146,7 @@ export class AdminController {
       const existingUser = await this.adminService.getUser(id);
       assertBranchOwnership(req, (existingUser as any).branchId);
 
-      await this.adminService.deleteUser(id);
+      await this.adminService.deleteUser(req.user!, id);
 
       res.status(200).json({
         status: 'success',

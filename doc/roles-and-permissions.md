@@ -39,6 +39,14 @@ permissions are seeded into the database; API routes enforce access with
 | Transfers | `transfer:read`, `transfer:create`, `transfer:update`, `transfer:approve`, `transfer:dispatch`, `transfer:receive` |
 | Finance | `finance:read`, `finance:create`, `finance:update` |
 
+## Changing users
+
+A SuperAdmin may change any other user, including their role and branch
+(`PUT /api/admin/users/:id` takes `branchId`; the edit form shows Branch to SuperAdmins only). Anyone else
+(an Admin, within their branch) may not change an Admin or SuperAdmin, give the Admin or SuperAdmin role,
+or move a user to another branch. Nobody may deactivate, delete or change the role of their own account.
+Changes are audited as `USER_UPDATED` with old → new values; deletes as `USER_DELETED`.
+
 ## Operational branch access (issue #96)
 
 `canAccessAllBranches(user)` allows SuperAdmin or a user with `branch:all`.

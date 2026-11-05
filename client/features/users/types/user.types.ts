@@ -39,6 +39,8 @@ export type UpdateUserPayload = {
   lastName?: string;
   phoneNumber?: string;
   roleId?: string;
+  /** Super admin only: moves the user to another branch. */
+  branchId?: string;
   isActive?: boolean;
 };
 

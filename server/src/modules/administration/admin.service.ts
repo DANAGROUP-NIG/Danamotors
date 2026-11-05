@@ -25,6 +25,36 @@ export function assertCanResetPassword(
     throw new ForbiddenError('You can only reset passwords of users in your branch');
 }
 
+type Actor = { userId: string; role: string; branchId?: string | null };
+const isAdminRole = (name?: string | null) => name === ROLES.SUPER_ADMIN || name === ROLES.ADMIN;
+
+/**
+ * Who may change or delete a user. A super admin may change anyone. Anyone else (an Admin, in their own
+ * branch: the controller checks the branch) may not change an Admin or a super admin, give someone the
+ * Admin or SuperAdmin role, or move a user to another branch. Nobody deactivates, deletes or re-roles
+ * their own account, so a super admin cannot lock themselves out.
+ */
+export function assertCanChangeUser(
+  actor: Actor,
+  target: { id: string; branchId: string | null; role: { name: string } },
+  change: { roleName?: string; branchId?: string; isActive?: boolean; delete?: boolean },
+): void {
+  if (actor.userId === target.id) {
+    if (change.delete || change.isActive === false)
+      throw new BadRequestError('You cannot deactivate or delete your own account');
+    if (change.roleName && change.roleName !== target.role.name)
+      throw new BadRequestError('You cannot change your own role');
+  }
+  if (actor.role === ROLES.SUPER_ADMIN)
+    return;
+  if (isAdminRole(target.role.name))
+    throw new ForbiddenError('Only a super admin can change an administrator');
+  if (isAdminRole(change.roleName))
+    throw new ForbiddenError('Only a super admin can give the Admin or SuperAdmin role');
+  if (change.branchId !== undefined && change.branchId !== target.branchId)
+    throw new ForbiddenError('Only a super admin can move a user to another branch');
+}
+
 /** A user as sent to the browser: never the password hash or a pending reset token. */
 function withoutCredentials<T extends { passwordHash: string; resetTokenHash: string | null; resetTokenExpiry: Date | null }>(user: T) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -124,12 +154,14 @@ export class AdminService {
   }
 
   async updateUser(
+    actor: Actor,
     id: string,
     data: {
       firstName?: string;
       lastName?: string;
       phoneNumber?: string;
       roleId?: string;
+      branchId?: string;
       isActive?: boolean;
     }
   ) {
@@ -138,14 +170,37 @@ export class AdminService {
       throw new NotFoundError('User not found');
     }
 
-    if (data.roleId) {
-      const role = await this.adminRepository.findRoleById(data.roleId);
-      if (!role) {
-        throw new NotFoundError('The specified role does not exist');
-      }
+    const role = data.roleId && data.roleId !== user.roleId ? await this.adminRepository.findRoleById(data.roleId) : null;
+    if (data.roleId && data.roleId !== user.roleId && !role) {
+      throw new NotFoundError('The specified role does not exist');
     }
 
-    const updated = await this.adminRepository.updateUser(id, data);
+    const branch = data.branchId && data.branchId !== user.branchId
+      ? await prisma.branch.findUnique({ where: { id: data.branchId }, select: { id: true, name: true, isActive: true } })
+      : null;
+    if (data.branchId && data.branchId !== user.branchId && (!branch || !branch.isActive)) {
+      throw new NotFoundError('The specified branch does not exist or is inactive');
+    }
+
+    assertCanChangeUser(actor, user, { roleName: role?.name, branchId: data.branchId, isActive: data.isActive });
+
+    // What changed, for the audit log: old → new.
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of ['firstName', 'lastName', 'phoneNumber', 'isActive'] as const) {
+      if (data[key] !== undefined && data[key] !== user[key]) changes[key] = { from: user[key], to: data[key] };
+    }
+    if (role) changes.role = { from: user.role.name, to: role.name };
+    if (branch) changes.branch = { from: user.branch?.name ?? null, to: branch.name };
+
+    const updated = await prisma.$transaction(async tx => {
+      const saved = await tx.user.update({ where: { id }, data });
+      if (Object.keys(changes).length) {
+        await tx.auditLog.create({
+          data: { userId: actor.userId, action: 'USER_UPDATED', details: JSON.stringify({ targetUserId: id, targetEmail: user.email, changes }) },
+        });
+      }
+      return saved;
+    });
     return withoutCredentials(updated);
   }
 
@@ -154,7 +209,7 @@ export class AdminService {
    * cleared. The audit entry names both users but never holds the password.
    */
   async resetUserPassword(
-    actor: { userId: string; role: string; branchId?: string | null },
+    actor: Actor,
     id: string,
     newPassword: string,
   ) {
@@ -181,12 +236,16 @@ export class AdminService {
     ]);
   }
 
-  async deleteUser(id: string) {
+  async deleteUser(actor: Actor, id: string) {
     const user = await this.adminRepository.findUserById(id);
     if (!user) {
       throw new NotFoundError('User not found');
     }
+    assertCanChangeUser(actor, user, { delete: true });
     await this.adminRepository.deleteUser(id);
+    await prisma.auditLog.create({
+      data: { userId: actor.userId, action: 'USER_DELETED', details: JSON.stringify({ targetUserId: id, targetEmail: user.email, role: user.role.name }) },
+    });
   }
 
   async getRoles() {
