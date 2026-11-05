@@ -233,6 +233,31 @@ The customer type (individual, corporate, government, vendor) already covers leg
 Zone, state and city inputs suggest values from the geography masters. The consignee address (`reg*` columns) is
 filled on a handful of rows and maps to the registered name and address already on the customer.
 
+### Customer merge (legacy Customer Correction Utility)
+
+Admins merge a duplicate customer into the one to keep (`POST /api/customers/:id/merge`, body `{ targetId }`). In
+one serializable transaction, every record that points at the duplicate moves to the survivor:
+
+- Vehicles and ownerships, appointments, job cards, estimates, customer approvals and warranty cases.
+- Invoices, receipts, CPOs, counter-sale returns, and vendor receipts (MRNs) where the customer was the vendor.
+- Party notes, adjustment batches, credit transactions and applications, outstanding letters, documents and service
+  history.
+- Members of a corporate group (`organizationId`).
+- Customers merged into the duplicate earlier: their `mergedIntoId` now points at the survivor.
+
+**Corporate group.** The survivor keeps its own group. If it has none, it joins the duplicate's group, so the group
+does not lose a member. If both had different groups, the duplicate's group is dropped, and the audit entry records
+it (`droppedOrganizationId`, or `joinedOrganizationId` when the survivor joined). If the survivor was a member of
+the duplicate, it takes the duplicate's own group, because a customer cannot belong to itself.
+
+Two things stay with the duplicate on purpose. Its portal login is disabled and its sessions are revoked, so the
+login is not transferred. Its portal notifications stay with that disabled login. The duplicate is kept with
+`mergedIntoId` set, and it drops out of lists and searches.
+
+The `CUSTOMER_MERGE` audit entry records both ids and how many records of each kind moved.
+`customer-merge.test.ts` reads `schema.prisma` and fails if a relation to Customer is neither moved nor listed as
+kept. So a new customer-linked table cannot be forgotten.
+
 ## Defect master
 
 Legacy defects (`troublehead`) are the COMPLAINT list: code, description, vehicle group (which implies the vehicle

@@ -397,16 +397,6 @@ export class CustomerService {
         });
       }
 
-      await tx.vehicle.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
       await tx.customer.updateMany({
         where: {
           organizationId: sourceId,
@@ -432,109 +422,34 @@ export class CustomerService {
         },
       });
 
-      await tx.vehicleOwnership.updateMany({
-        where: {
-          customerId: sourceId,
-        },
+      // Every relation to Customer moves to the survivor. customer-merge.test.ts checks this list against
+      // the schema, so a new relation fails the test until it is added here (or listed as deliberately kept).
+      const where = { customerId: sourceId };
+      const data = { customerId: targetId };
 
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.jobCard.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.invoice.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.receipt.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.serviceAppointment.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.customerApproval.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.customerDocument.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.serviceHistory.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.outstandingLetter.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
-      await tx.partyNote.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
-      await tx.partyAdjustmentBatch.updateMany({ where: { customerId: sourceId }, data: { customerId: targetId } });
-
-      await tx.customerCreditTransaction.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
-
-      await tx.customerCreditApplication.updateMany({
-        where: {
-          customerId: sourceId,
-        },
-
-        data: {
-          customerId: targetId,
-        },
-      });
+      const moved = {
+        vehicles: (await tx.vehicle.updateMany({ where, data })).count,
+        vehicleOwnerships: (await tx.vehicleOwnership.updateMany({ where, data })).count,
+        appointments: (await tx.serviceAppointment.updateMany({ where, data })).count,
+        jobCards: (await tx.jobCard.updateMany({ where, data })).count,
+        estimates: (await tx.estimate.updateMany({ where, data })).count,
+        customerApprovals: (await tx.customerApproval.updateMany({ where, data })).count,
+        warrantyCases: (await tx.warrantyCase.updateMany({ where, data })).count,
+        invoices: (await tx.invoice.updateMany({ where, data })).count,
+        receipts: (await tx.receipt.updateMany({ where, data })).count,
+        customerOrders: (await tx.customerOrder.updateMany({ where, data })).count,
+        counterSaleReturns: (await tx.counterSaleReturn.updateMany({ where, data })).count,
+        vendorReceipts: (await tx.materialReceiptNote.updateMany({ where: { vendorId: sourceId }, data: { vendorId: targetId } })).count,
+        partyNotes: (await tx.partyNote.updateMany({ where, data })).count,
+        partyAdjustments: (await tx.partyAdjustmentBatch.updateMany({ where, data })).count,
+        creditTransactions: (await tx.customerCreditTransaction.updateMany({ where, data })).count,
+        creditApplications: (await tx.customerCreditApplication.updateMany({ where, data })).count,
+        outstandingLetters: (await tx.outstandingLetter.updateMany({ where, data })).count,
+        documents: (await tx.customerDocument.updateMany({ where, data })).count,
+        serviceHistory: (await tx.serviceHistory.updateMany({ where, data })).count,
+        // Customers merged into the duplicate earlier now point at the survivor, so no chain is left behind.
+        earlierMerges: (await tx.customer.updateMany({ where: { mergedIntoId: sourceId }, data: { mergedIntoId: targetId } })).count,
+      };
 
       await tx.customer.update({
         where: {
@@ -546,6 +461,12 @@ export class CustomerService {
         },
       });
 
+      // Corporate group: the survivor keeps its own group, or joins the duplicate's when it has none, so the
+      // group does not lose a member. A survivor that belonged to the duplicate has just left it (above).
+      const survivorGroup = target.organizationId === sourceId ? null : target.organizationId;
+      const duplicateGroup = source.organizationId === targetId ? null : source.organizationId;
+      const organizationId = survivorGroup ?? duplicateGroup;
+
       await tx.auditLog.create({
         data: {
           userId: actorId,
@@ -554,6 +475,9 @@ export class CustomerService {
           details: JSON.stringify({
             sourceId,
             targetId,
+            moved,
+            ...(!survivorGroup && duplicateGroup ? { joinedOrganizationId: duplicateGroup } : {}),
+            ...(survivorGroup && duplicateGroup && duplicateGroup !== survivorGroup ? { droppedOrganizationId: duplicateGroup } : {}),
           }),
         },
       });
@@ -566,6 +490,7 @@ export class CustomerService {
         data: {
           tallyLedgerId: target.tallyLedgerId ?? source.tallyLedgerId,
           tallyPartyCode: target.tallyPartyCode ?? source.tallyPartyCode,
+          organizationId,
         },
       });
     });
