@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -9,6 +10,10 @@ import { useVehicleModels } from "@/features/warranty/hooks/use-warranty";
 import { createVehicleSchema, vehicleProfileSchema, type CreateVehicleFormValues } from "../schemas/vehicle.schema";
 import type { Vehicle } from "../types/vehicle.types";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+
+/** Identity fields: changing one needs vehicle:identity:update and a reason (server: vehicle-identity.ts). */
+const IDENTITY_KEYS = ["vin", "registrationNumber", "engineNumber", "year", "saleDate", "vehicleModelId", "catalogueId", "modelId", "generationId", "engineId", "customMake", "customModel"] as const;
 
 const money = [["purchaseAmount", "Purchase amount"], ["saleAmount", "Sale invoice amount"]] as const;
 const numberOrUndefined = (value: string) => value === "" ? undefined : Number(value);
@@ -29,6 +34,12 @@ export function VehicleProfileForm(
   },
 ) {
   const { data: warrantyModels = [] } = useVehicleModels();
+  const { hasPermission } = useAuth();
+  // Creating a vehicle sets its identity under vehicle:create; editing it needs the identity permission.
+  const canIdentity = !vehicle || hasPermission("vehicle:identity:update");
+  const lockIdentity = !!vehicle && !canIdentity;
+  const [identityReason, setIdentityReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
   const {
     register,
     control,
@@ -80,6 +91,14 @@ export function VehicleProfileForm(
   });
 
   const catalogueId = watch("catalogueId");
+  // Whether the form now differs from the vehicle in an identity field (the server decides for certain).
+  const sameText = (a: unknown, b: unknown) => String(a ?? "").trim().toUpperCase() === String(b ?? "").trim().toUpperCase();
+  const identityDirty = !!vehicle && canIdentity && (
+    !sameText(watch("vin"), vehicle.vin) || !sameText(watch("registrationNumber"), vehicle.registrationNumber)
+    || !sameText(watch("engineNumber"), vehicle.engineNumber) || !sameText(watch("year"), vehicle.year)
+    || !sameText(watch("saleDate"), vehicle.saleDate?.slice(0, 10)) || !sameText(watch("vehicleModelId"), vehicle.vehicleModelId)
+    || !sameText(catalogueId, vehicle.catalogueId) || !sameText(watch("modelId"), vehicle.modelId)
+    || !sameText(watch("generationId"), vehicle.generationId) || !sameText(watch("engineId"), vehicle.engineId));
   function updateIdentity(next: VehicleIdentitySelection) {
     for (const key of ["catalogueId", "colourId", "modelId", "generationId", "engineId", "customModel", "customMake"] as const) {
       setValue(key, next[key], { shouldDirty: true, shouldValidate: true });
@@ -109,6 +128,18 @@ export function VehicleProfileForm(
       if (unchangedCatalogue) { delete payload.catalogueId; delete payload.colourId; }
       if (values.catalogueId) delete payload.color;
       if (vehicle && (values.vehicleModelId || null) === (vehicle.vehicleModelId ?? null)) delete payload.vehicleModelId;
+      if (vehicle && sameText(values.vin, vehicle.vin)) delete (payload as Partial<CreateVehicleFormValues>).vin;
+      if (lockIdentity) {
+        for (const key of IDENTITY_KEYS) delete (payload as Partial<CreateVehicleFormValues>)[key];
+      } else if (identityDirty) {
+        if (identityReason.trim().length < 5) {
+          setReasonError("Give a reason (at least 5 characters) for changing the vehicle's identity");
+          return;
+        }
+        setReasonError(null);
+        onSubmit({ ...payload, identityReason: identityReason.trim() } as CreateVehicleFormValues);
+        return;
+      }
       onSubmit(payload);
     })}>
       {vehicle ? (
@@ -128,17 +159,22 @@ export function VehicleProfileForm(
           )}
         />
       )}
-      <Field label="VIN"><input className={inputCls} readOnly={!!vehicle} {...register("vin")} /></Field>
-      <Field label="Registration (optional)"><input className={inputCls} {...register("registrationNumber")} /></Field>
+      {lockIdentity && (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          VIN, registration, engine number, model, year, warranty model and sale date are locked: changing them needs the vehicle identity permission.
+        </p>
+      )}
+      <Field label="VIN"><input className={inputCls} readOnly={lockIdentity} {...register("vin")} /></Field>
+      <Field label="Registration (optional)"><input className={inputCls} readOnly={lockIdentity} {...register("registrationNumber")} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2"><VehicleIdentityFields value={{ catalogueId, colourId: watch('colourId'), modelId: watch('modelId'), generationId: watch('generationId'), engineId: watch('engineId'), customModel: watch('customModel'), customMake: watch('customMake') }}
-          selectedName={vehicle?.model} disabled={pending} onChange={updateIdentity}
+          selectedName={vehicle?.model} disabled={pending || lockIdentity} onChange={updateIdentity}
           modelError={errors.modelId?.message || errors.customModel?.message} catalogueError={errors.catalogueId?.message} colourError={errors.colourId?.message} />
           {vehicle && !catalogueId && <p className="mt-2 text-sm text-muted-foreground">Current vehicle: {[vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" / ")}. Choose a model above to update its specifications.</p>}
         </div>
         {!catalogueId && <Field label="Colour (optional)"><input className={inputCls} {...register('color')} /></Field>}
         <Field label="Warranty policy model">
-          <select className={inputCls} {...register("vehicleModelId")}>
+          <select className={inputCls} disabled={lockIdentity} {...register("vehicleModelId")}>
             <option value="">Not linked</option>
             {warrantyModels.map(model => <option key={model.id} value={model.id}>{model.make} {model.name} ({model.code})</option>)}
           </select>
@@ -149,14 +185,15 @@ export function VehicleProfileForm(
             engineNumber: "Engine number",
             keyNumber: "Key number",
             sellingDealer: "Selling dealer",
-          }[key]}><input className={inputCls} {...register(key)} /></Field>)}
+          }[key]}><input className={inputCls} readOnly={lockIdentity && key === "engineNumber"} {...register(key)} /></Field>)}
         <Field label="Year"><input
             type="number"
             className={inputCls}
+            readOnly={lockIdentity}
             {...register("year", {
               setValueAs: (value: string) => value === "" ? undefined : Number(value),
             })} /></Field>
-        <Field label="Sale date (warranty start)"><input type="date" className={inputCls} {...register("saleDate")} /></Field>
+        <Field label="Sale date (warranty start)"><input type="date" className={inputCls} readOnly={lockIdentity} {...register("saleDate")} /></Field>
         <Field label="PDI date"><input type="date" className={inputCls} {...register("pdiDate")} /></Field>
         <label><input type="checkbox" {...register("pdiDone")} />PDI done</label>
       </div>
@@ -194,6 +231,12 @@ export function VehicleProfileForm(
           </div>
         </div>
       </details>
+      {identityDirty && (
+        <Field label="Reason for changing the vehicle's identity (required)" error={reasonError ?? undefined}>
+          <textarea className={inputCls} rows={2} value={identityReason} onChange={(e) => setIdentityReason(e.target.value)}
+            placeholder="e.g. VIN mistyped at registration; corrected from the chassis plate" />
+        </Field>
+      )}
       {Object.entries(errors).map(([key, error]) => <p key={key} role="alert" className="text-sm text-red-600">{error.message}</p>)}
       {failed && <p role="alert" className="text-sm text-red-600">Could not save vehicle. Check the customer, VIN, registration and catalogue selections.</p>}
       <Button disabled={pending}>{pending ? "Saving..." : "Save vehicle"}</Button>

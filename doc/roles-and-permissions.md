@@ -34,6 +34,7 @@ permissions are seeded into the database; API routes enforce access with
 | All-branch operational access | `branch:all` (module permissions are still required) |
 | Customers | `customer:read`, `customer:create`, `customer:update`, `customer:delete` |
 | Vehicles | `vehicle:read`, `vehicle:create`, `vehicle:update`, `vehicle:delete` |
+| Vehicle identity | `vehicle:identity:update` (Admin): VIN, registration, engine number, model, year, sale date, with a reason; see [vehicle-identity.md](./vehicle-identity.md) |
 | Service | `service:read`, `service:create`, `service:update`, `service:delete` |
 | Workshop | `workshop:read`, `workshop:update` |
 | Inventory | `inventory:read`, `inventory:create`, `inventory:update`, `inventory:delete` |

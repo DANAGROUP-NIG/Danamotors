@@ -278,8 +278,9 @@ filled on a handful of rows and maps to the registered name and address already 
 
 ### Customer merge (legacy Customer Correction Utility)
 
-Admins merge a duplicate customer into the one to keep (`POST /api/customers/:id/merge`, body `{ targetId }`). In
-one serializable transaction, every record that points at the duplicate moves to the survivor:
+Admins merge a duplicate customer into the one to keep (`POST /api/customers/:id/merge`, body
+`{ targetId, keep? }`). In one serializable transaction, every record that points at the duplicate moves to the
+survivor:
 
 - Vehicles and ownerships, appointments, job cards, estimates, customer approvals and warranty cases.
 - Invoices, receipts, CPOs, counter-sale returns, and vendor receipts (MRNs) where the customer was the vendor.
@@ -300,6 +301,36 @@ login is not transferred. Its portal notifications stay with that disabled login
 The `CUSTOMER_MERGE` audit entry records both ids and how many records of each kind moved.
 `customer-merge.test.ts` reads `schema.prisma` and fails if a relation to Customer is neither moved nor listed as
 kept. So a new customer-linked table cannot be forgotten.
+
+**Which details survive** (`keep`, from the duplicate's page). Per group of fields, the survivor keeps its own
+(`TARGET`, the default) or takes the duplicate's (`SOURCE`). The merge card shows the two values side by side for
+each group that differs. Groups (`MERGE_FIELD_GROUPS` in `customer-merge-extras.ts`):
+
+| Group | Fields |
+| --- | --- |
+| name | type, salutation, first and last name, company name, registered name, contact person |
+| phone | phone, mobile 2, office 1 and 2, residence phone, STD code, fax |
+| email | email (the duplicate gives it up first: email is unique) |
+| address | address, house, street, zone, city, district, state, postal code, country |
+
+The audit entry also stores `kept` and both records as they were (`before.source`, `before.target`: code, name,
+phones, email, address).
+
+**Merge history.** The surviving customer's page lists every customer merged into it, newest first: the
+duplicate as it was, who merged it and when, what moved, and the details taken from it
+(`GET /api/customers/:id/merge-history`, `customer:read`). Merges into a record that was later merged here are
+included and marked. Merges made before 5 Nov 2026 have no "before" details; the duplicate is shown as it is now.
+
+**Duplicate customers** (Customers → Duplicates, `/customers/duplicates`). Replaces the legacy utility's Bulk (XLS)
+mode. Active customers are grouped by the same phone (last 10 digits, at least 7), the same name, or the same
+company (`GET /api/customers/duplicate-groups?by=phone|name|company`), largest groups first, each member with its
+vehicles, jobs and bills. In each group the record with the most history is proposed as the one to keep. Tick the
+duplicates in as many groups as needed and merge them in one go (`POST /api/customers/merge-batch`, up to 100
+pairs, Admin/SuperAdmin). Each pair is its own transaction: one failure (e.g. different Tally accounts) does not
+stop the rest, and the result lists each failure. Bulk merges keep the survivor's own details; to take a
+duplicate's details, merge that pair from the duplicate's page.
+
+The legacy PDI correction mode (used once, in 2011) has no screen.
 
 ## Defect master
 

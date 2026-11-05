@@ -27,6 +27,7 @@ danamotors/
 | [audit-log.md](./audit-log.md) | Audit log: field-level change log filled by database triggers (who changed what, in or outside the app), summary, retention |
 | [labour-rates.md](./labour-rates.md) | Model labour rates: grid, inline edit, bulk change, add a labour to models, copy a model's rates (replaces the legacy XLS utility) |
 | [books-closed.md](./books-closed.md) | Books closed (year end): company and branch closed dates, the database lock on finance and stock entries, reopening |
+| [vehicle-identity.md](./vehicle-identity.md) | Vehicle identity: VIN, registration, engine, model and sale date changes need `vehicle:identity:update` and a reason; identity history |
 | [backup-and-restore.md](./backup-and-restore.md) | Nightly backup script, point-in-time recovery, off-site copies, retention, the tested restore runbook; why there is no restore button |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
 | [barcode-labels.md](./barcode-labels.md) | Part barcode labels on the Zebra at a handheld station PC: the page, the 2" × 2" label, how the station prints |

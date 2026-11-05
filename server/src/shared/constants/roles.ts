@@ -91,6 +91,8 @@ export const PERMISSIONS = {
   VEHICLE_DELETE: "vehicle:delete",
   VEHICLE_IMAGE_CREATE: "vehicle:image:create",
   VEHICLE_OWNERSHIP_CREATE: "vehicle:ownership:create",
+  /** Change VIN, registration, engine number, model or sale date (replaces legacy VehicleUpdatePassword). */
+  VEHICLE_IDENTITY_UPDATE: "vehicle:identity:update",
 
   // ── Service — Appointments ────────────────────────────────────────────────
   APPOINTMENT_READ: "appointment:read",
@@ -384,6 +386,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.VEHICLE_UPDATE,
+    PERMISSIONS.VEHICLE_IDENTITY_UPDATE,
     PERMISSIONS.VEHICLE_IMAGE_CREATE,
     PERMISSIONS.VEHICLE_OWNERSHIP_CREATE,
     PERMISSIONS.APPOINTMENT_READ,

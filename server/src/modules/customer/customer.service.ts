@@ -1,4 +1,5 @@
 import { withPartyTransaction } from "../finance/party-account.service";
+import { keptFields, mergeSnapshot, type MergeKeep } from './customer-merge-extras';
 import { z } from 'zod';
 import { customerBody, validateCustomerIdentity } from './customer.validation';
 import { Prisma } from '@prisma/client';
@@ -346,7 +347,12 @@ export class CustomerService {
     });
   }
 
-  async merge(sourceId: string, targetId: string, actorId: string) {
+  /**
+   * Merges the duplicate (source) into the survivor (target). `keep` chooses, per group of fields (name,
+   * phone, email, address), whether the survivor keeps its own details or takes the duplicate's
+   * (customer-merge-extras.ts). The audit event records what moved and both records as they were.
+   */
+  async merge(sourceId: string, targetId: string, actorId: string, keep: MergeKeep = {}) {
     if (sourceId === targetId)
       throw new ConflictError('Select two different customers');
 
@@ -476,11 +482,17 @@ export class CustomerService {
             sourceId,
             targetId,
             moved,
+            kept: keep,
+            before: { source: mergeSnapshot(source), target: mergeSnapshot(target) },
             ...(!survivorGroup && duplicateGroup ? { joinedOrganizationId: duplicateGroup } : {}),
             ...(survivorGroup && duplicateGroup && duplicateGroup !== survivorGroup ? { droppedOrganizationId: duplicateGroup } : {}),
           }),
         },
       });
+
+      // The email is unique: the duplicate gives it up before the survivor takes it.
+      if (keep.email === 'SOURCE' && source.email)
+        await tx.customer.update({ where: { id: sourceId }, data: { email: null } });
 
       return tx.customer.update({
         where: {
@@ -488,6 +500,7 @@ export class CustomerService {
         },
 
         data: {
+          ...(keptFields(source, keep) as Prisma.CustomerUncheckedUpdateInput),
           tallyLedgerId: target.tallyLedgerId ?? source.tallyLedgerId,
           tallyPartyCode: target.tallyPartyCode ?? source.tallyPartyCode,
           organizationId,

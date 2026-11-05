@@ -276,6 +276,8 @@ router.get('/', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(lis
 router.get('/:id', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(vehicleIdParamSchema), controller.getVehicle);
 router.post('/', requirePermission(PERMISSIONS.VEHICLE_CREATE), validateRequest(createVehicleSchema), controller.createVehicle);
 router.put('/:id', requirePermission(PERMISSIONS.VEHICLE_UPDATE), validateRequest(updateVehicleSchema), controller.updateVehicle);
+/** Changes to VIN, registration, engine number, model and sale date, with reasons (doc/vehicle-identity.md). */
+router.get('/:id/identity-history', requirePermission(PERMISSIONS.VEHICLE_READ), validateRequest(vehicleIdParamSchema), controller.getIdentityHistory);
 router.delete('/:id', requirePermission(PERMISSIONS.VEHICLE_DELETE), validateRequest(vehicleIdParamSchema), controller.deleteVehicle);
 
 router.post('/:id/images', requirePermission(PERMISSIONS.VEHICLE_IMAGE_CREATE), validateRequest(createVehicleImageSchema), controller.addVehicleImage);
