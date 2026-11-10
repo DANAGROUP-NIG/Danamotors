@@ -19,6 +19,7 @@ import { CustomerSelectWithCreate } from "@/features/customers/components/Custom
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
 import {
   createAppointmentSchema,
+  type CreateAppointmentFormInput,
   type CreateAppointmentFormValues,
 } from "../schemas/appointment.schema";
 
@@ -33,7 +34,7 @@ export function AppointmentCreateForm({
 }: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
   const [extra, setExtra] = useState<BookingExtra>({
-    requests: [{ description: "" }],
+    requests: "",
   });
   const [requestError, setRequestError] = useState("");
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -52,7 +53,7 @@ export function AppointmentCreateForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateAppointmentFormValues>({
+  } = useForm<CreateAppointmentFormInput, unknown, CreateAppointmentFormValues>({
     resolver: zodResolver(createAppointmentSchema),
     defaultValues: {
       branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
@@ -64,12 +65,7 @@ export function AppointmentCreateForm({
   const selectedVehicleId = watch("vehicleId");
 
   function onSubmit(values: CreateAppointmentFormValues) {
-    if (
-      !extra.requests?.some(
-        (row) =>
-          row.description.trim() || row.complaintCodeId || row.defectCode,
-      )
-    ) {
+    if (!extra.requests?.trim()) {
       setRequestError("Add the customer request");
       return;
     }
@@ -84,11 +80,19 @@ export function AppointmentCreateForm({
     create.mutate(payload, {
       onSuccess: () => {
         reset();
-        setExtra({ requests: [{ description: "" }] });
+        setExtra({ requests: "" });
         onSuccess?.();
       },
     });
   }
+
+  const getLocalDateTimePickerString = (date = new Date()) => {
+    const tzOffset = date.getTimezoneOffset() * 60000; // Offset in milliseconds
+    const localISOTime = new Date(date.getTime() - tzOffset).toISOString();
+    return localISOTime.slice(0, 16); // Extracts "YYYY-MM-DDTHH:mm"
+  };
+
+  const currentLocalTime = getLocalDateTimePickerString();
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
@@ -203,7 +207,11 @@ export function AppointmentCreateForm({
             control={control}
             name="scheduledAt"
             render={({ field }) => (
-              <DateTimeInput value={field.value} onChange={field.onChange} />
+              <DateTimeInput
+                value={field.value}
+                onChange={field.onChange}
+                min={currentLocalTime}
+              />
             )}
           />
         </Field>
@@ -212,10 +220,7 @@ export function AppointmentCreateForm({
         <summary className="cursor-pointer text-sm text-muted-foreground">
           Additional booking details
         </summary>
-        <Field
-          label="Duration (minutes, optional)"
-          error={errors.durationMins?.message}
-        >
+        <Field label="Duration (mins, optional)" error={errors.durationMins?.message}>
           <input
             type="number"
             className={inputCls}

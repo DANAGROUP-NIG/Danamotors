@@ -67,6 +67,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
           event.preventDefault();
           update.mutate({
             ...extra,
+            requests: extra.requests === bookingExtras(appointment).requests ? undefined : extra.requests,
             serviceTypeId: serviceTypeId || undefined,
             scheduledAt: lagosIso(scheduled),
           });

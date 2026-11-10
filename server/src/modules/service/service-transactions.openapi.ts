@@ -15,8 +15,8 @@ const serviceTypeId = '77777777-7777-4777-8777-777777777777';
 const bayId = '88888888-8888-4888-8888-888888888888';
 const advisorId = '99999999-9999-4999-8999-999999999999';
 export const transactionExamples = {
-  minimalBooking: { requests: [{ description: 'Inspect engine noise' }], customerId: id, vehicleId, branchName: 'Example branch', scheduledAt: '2026-10-22T09:00:00.000Z' },
-  booking: { customerId: id, vehicleId, branchName: 'Example branch', serviceTypeId, scheduledAt: '2026-10-22T09:00:00.000Z', mileage: 12000, acFitted: true, requests: [{ description: 'Inspect engine noise', spare: 100.01, oil: 0, labour: 250 }] },
+  minimalBooking: { requests: 'Inspect engine noise', customerId: id, vehicleId, branchName: 'Example branch', scheduledAt: '2026-10-22T09:00:00.000Z' },
+  booking: { customerId: id, vehicleId, branchName: 'Example branch', serviceTypeId, scheduledAt: '2026-10-22T09:00:00.000Z', mileage: 12000, acFitted: true, requests: 'Inspect engine noise' },
   reschedule: { scheduledAt: '2026-10-23T09:00:00.000Z' },
   cancelBooking: { bookingStatus: 'CANCELLED', cancelReason: 'Customer requested another date' },
   noShow: { bookingStatus: 'NO_SHOW' },
@@ -35,7 +35,7 @@ export const transactionExamples = {
   ready: { status: 'READY' },
 };
 const requestProperties = { complaintCodeId: uuid(), defectCode: text(50), description: text(), spare: amount, oil: amount, labour: amount };
-const bookingProperties = { customerId: uuid(), vehicleId: uuid(), branchName: { type: 'string', minLength: 1 }, serviceTypeId: uuid(), serviceId: uuid('Optional appointment catalogue service; distinct from workshop service type'), scheduledAt: { type: 'string', format: 'date-time' }, mileage: integer, acFitted: { type: 'boolean' }, followUpJobId: { ...uuid(), nullable: true }, durationMins: { type: 'integer' }, notes: { type: 'string' }, requests: { type: 'array', minItems: 1, maxItems: 100, items: ref('ServiceBookingRequest') } };
+const bookingProperties = { customerId: uuid(), vehicleId: uuid(), branchName: { type: 'string', minLength: 1 }, serviceTypeId: uuid(), serviceId: uuid('Optional appointment catalogue service; distinct from workshop service type'), scheduledAt: { type: 'string', format: 'date-time' }, mileage: integer, acFitted: { type: 'boolean' }, followUpJobId: { ...uuid(), nullable: true }, durationMins: { type: 'integer' }, notes: { type: 'string' }, requests: { type: 'string', minLength: 1, maxLength: 2000, description: 'Customer request as plain text' } };
 export const serviceTransactionSchemas = {
   ServiceBookingRequest: { type: 'object', additionalProperties: false, properties: requestProperties, anyOf: [{ required: ['description'] }, { required: ['complaintCodeId'] }, { required: ['defectCode'] }], description: 'Enter a nonempty description or an active complaint/defect code. Estimates are optional; totals are calculated from these rows.' },
   ServiceBookingCreate: { type: 'object', required: ['customerId', 'vehicleId', 'branchName', 'scheduledAt', 'requests'], properties: bookingProperties },
@@ -57,7 +57,7 @@ function operation(summary: string, permission: string, description: string, sch
 }
 export const serviceTransactionPaths: Record<string, Record<string, unknown>> = {
   '/service/appointments': {
-    post: operation('Create a numbered service booking', 'appointment:create', 'Returns data.appointment with automatic bookingNumber, createdAt, BOOKED bookingStatus, optional requests and calculated totals. Duplicate active customer/vehicle bookings are rejected; serviceId and requests are optional.', 'ServiceBookingCreate', { minimal: transactionExamples.minimalBooking, withRequests: transactionExamples.booking }, true),
+    post: operation('Create a numbered service booking', 'appointment:create', 'Returns data.appointment with automatic bookingNumber, createdAt, BOOKED bookingStatus, saved request and calculated totals. Duplicate active customer/vehicle bookings are rejected; serviceId is optional; requests must be a nonempty string.', 'ServiceBookingCreate', { minimal: transactionExamples.minimalBooking, withRequests: transactionExamples.booking }, true),
     get: { ...operation('List service bookings', 'appointment:read', 'Returns data.appointments and data.meta. Search includes booking number; booked-for date filters use Lagos days. Legacy lifecycle status filters remain supported.'), parameters: [query('page', { type: 'integer', minimum: 1, default: 1 }), query('limit', { type: 'integer', minimum: 1, default: 10 }), query('branchId', uuid()), query('customerId', uuid()), query('search', { type: 'string' }), query('status', { type: 'string', description: 'BOOKED, CONVERTED, CANCELLED, NO_SHOW or a legacy appointment status' }), query('dateFrom', { type: 'string', format: 'date' }), query('dateTo', { type: 'string', format: 'date' })] },
   },
   '/service/appointments/{id}': { parameters: [pathId()],
@@ -91,7 +91,7 @@ serviceTransactionPaths['/service/job-cards/{id}'] = { parameters: [pathId()], p
 
 // Synthetic response examples are deliberately partial; no real customer/account data.
 const bookingPost = serviceTransactionPaths['/service/appointments'].post as ReturnType<typeof operation>;
-bookingPost.responses['201'] = response('Booking created', { appointment: { id, bookingNumber: `${branchId}/2026000001`, bookingStatus: 'BOOKED', status: 'Pending', createdAt: '2026-10-21T09:00:00.000Z', scheduledAt: transactionExamples.booking.scheduledAt, requests: [{ description: 'Inspect engine noise', estimatedParts: '100.01', estimatedOil: '0', estimatedLabour: '250' }], totals: { estimatedParts: 100.01, estimatedOil: 0, estimatedLabour: 250, estimatedTotal: 350.01 } } });
+bookingPost.responses['201'] = response('Booking created', { appointment: { id, bookingNumber: `${branchId}/2026000001`, bookingStatus: 'BOOKED', status: 'Pending', createdAt: '2026-10-21T09:00:00.000Z', scheduledAt: transactionExamples.booking.scheduledAt, requests: [{ description: 'Inspect engine noise', estimatedParts: '0', estimatedOil: '0', estimatedLabour: '0' }], totals: { estimatedParts: 0, estimatedOil: 0, estimatedLabour: 0, estimatedTotal: 0 } } });
 const requisitionRead = serviceTransactionPaths['/inventory/requisitions/{id}'].get as ReturnType<typeof operation>;
 requisitionRead.responses['200'] = response('Requisition detail (partial example)', { requisition: { id, requisitionNumber: '2026000001', status: 'ISSUED', chargeType: 'CUSTOMER', lines: [{ id: lineId, sparePartId: partId, partNumber: 'PART-EXAMPLE', partSource: 'O', description: 'Example filter', uom: 'UNIT', quantityRequired: 3, quantityIssued: 2, rate: '100.01', amount: '200.02' }], totals: { numberOfItems: 1, netQuantityIssued: 2, totalAmount: 200.02 } } });
 const remarksPut = serviceTransactionPaths['/service/job-cards/{id}/remarks'].put as ReturnType<typeof operation>;

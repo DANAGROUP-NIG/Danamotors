@@ -1,5 +1,4 @@
-export type BookingRequest = { complaintCodeId?: string; defectCode?: string; description: string; spare?: number; oil?: number; labour?: number };
-export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: BookingRequest[] };
+export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: string };
 export type AppointmentStatus =
   | "Pending"
   | "Checked In"

@@ -15,6 +15,7 @@ import { DateTimeInput } from "@/components/forms/DateTimeInput";
 import { useUpdateAppointment } from "../hooks/use-update-appointment";
 import {
   updateAppointmentSchema,
+  type UpdateAppointmentFormInput,
   type UpdateAppointmentFormValues,
 } from "../schemas/appointment.schema";
 import type { Appointment } from "../types/appointment.types";
@@ -47,7 +48,7 @@ function LegacyAppointmentEditForm({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<UpdateAppointmentFormValues>({
+  } = useForm<UpdateAppointmentFormInput, unknown, UpdateAppointmentFormValues>({
     resolver: zodResolver(updateAppointmentSchema),
     defaultValues: {
       scheduledAt: lagosInput(appointment.scheduledAt),

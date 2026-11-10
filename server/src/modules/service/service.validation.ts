@@ -42,18 +42,23 @@ export const bookingRequestBody = z.object({
   "Enter a complaint code or description",
 );
 
+// The API accepts one text request; persistence stores it in the existing
+// description column so saved bookings still convert to job-card complaints.
+const bookingRequestText = z.string().trim().min(1, "Add a customer request").max(2000)
+  .transform(description => [{ description }]);
+
 const bookingFields = {
   serviceTypeId: z.string().uuid().optional(),
   mileage: mileageField.optional(),
   acFitted: z.boolean().optional(),
   followUpJobId: z.string().uuid().nullable().optional(),
-  requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100).optional(),
+  requests: bookingRequestText.optional(),
 };
 
 export const createAppointmentSchema = z.object({
   body: z.object({
     ...bookingFields,
-    requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100),
+    requests: bookingRequestText,
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),

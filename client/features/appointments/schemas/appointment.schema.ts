@@ -13,6 +13,11 @@ const APPOINTMENT_STATUSES = [
   "No Show",
 ] as const;
 
+const optionalDurationMins = z.union([
+  z.literal("").transform(() => undefined),
+  z.coerce.number().int().positive(),
+]).optional();
+
 export const createAppointmentSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   vehicleId: z.string().min(1, "Vehicle is required"),
@@ -20,13 +25,13 @@ export const createAppointmentSchema = z.object({
   serviceTypeId: z.string().uuid().optional().or(z.literal("")),
   serviceId: z.string().optional(),
   scheduledAt: z.string().min(1, "Scheduled date is required"),
-  durationMins: z.coerce.number().int().positive().optional(),
+  durationMins: optionalDurationMins,
   notes: z.string().optional(),
 });
 
 export const updateAppointmentSchema = z.object({
   scheduledAt: z.string().optional(),
-  durationMins: z.coerce.number().int().positive().optional(),
+  durationMins: optionalDurationMins,
   notes: z.string().optional(),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
 });
@@ -34,6 +39,8 @@ export const updateAppointmentSchema = z.object({
 export type CreateAppointmentFormValues = z.infer<
   typeof createAppointmentSchema
 >;
+export type CreateAppointmentFormInput = z.input<typeof createAppointmentSchema>;
 export type UpdateAppointmentFormValues = z.infer<
   typeof updateAppointmentSchema
 >;
+export type UpdateAppointmentFormInput = z.input<typeof updateAppointmentSchema>;

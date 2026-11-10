@@ -24,7 +24,10 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 import { useVehicleWarranty } from "@/features/warranty/hooks/use-warranty";
-import { WarrantyCheckPanel, ackRequiredCheck } from "@/features/warranty/components/WarrantyCheckPanel";
+import {
+  WarrantyCheckPanel,
+  ackRequiredCheck,
+} from "@/features/warranty/components/WarrantyCheckPanel";
 import type { WarrantyCheck } from "@/features/warranty/types/warranty.types";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { apiGet } from "@/lib/api/apiClient";
@@ -35,7 +38,12 @@ import {
   createJobCardSchema,
   type CreateJobCardFormValues,
 } from "../schemas/job-card.schema";
-import { WorkshopPicker, customerLabel, customerOption, type PickerRecord } from "./WorkshopPicker";
+import {
+  WorkshopPicker,
+  customerLabel,
+  customerOption,
+  type PickerRecord,
+} from "./WorkshopPicker";
 import { ServiceTypePicker } from "./ServiceTypePicker";
 import { CustomerDetailsCard } from "./opening/CustomerDetailsCard";
 import {
@@ -101,7 +109,8 @@ export function JobCardCreateForm({
   const create = useCreateJobCard();
 
   const { hasPermission, isSuperAdmin, isAdminOrAbove, user } = useAuth();
-  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
+  const canSeeWarranty =
+    isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branches = useBranchStore((s) => s.branches);
@@ -184,9 +193,16 @@ export function JobCardCreateForm({
   // vehicle or an open campaign must be acknowledged before the job card is saved.
   const mileageValue = watch("mileage");
   const odometerReplaced = watch("odometerReplaced");
-  const mileageNumber = Number.isInteger(mileageValue) && mileageValue >= 0 ? mileageValue : undefined;
+  const mileageNumber =
+    Number.isInteger(mileageValue) && mileageValue >= 0
+      ? mileageValue
+      : undefined;
   const debouncedMileage = useDebouncedValue(mileageNumber, 450);
-  const warranty = useVehicleWarranty(vehicleId, debouncedMileage, canSeeWarranty && !!vehicleId && debouncedMileage !== undefined);
+  const warranty = useVehicleWarranty(
+    vehicleId,
+    debouncedMileage,
+    canSeeWarranty && !!vehicleId && debouncedMileage !== undefined,
+  );
   const [serverCheck, setServerCheck] = useState<WarrantyCheck | null>(null);
   const check = serverCheck ?? warranty.data;
   const [acknowledged, setAcknowledged] = useState(false);
@@ -195,14 +211,28 @@ export function JobCardCreateForm({
     setAcknowledged(false);
     setServerCheck(null);
   }, [vehicleId, debouncedMileage]);
-  const needsAck = canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
+  const needsAck =
+    canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
   const lastJob = vehicle?.jobCards?.[0];
   const recentJobs = useQuery({
     // Previous jobs within the branch's repeat window: its days, or its km of this reading.
-    queryKey: ["job-opening-recent-jobs", vehicleId, branchId, debouncedMileage],
-    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(
-      `/service/vehicles/${vehicleId}/recent-jobs?${new URLSearchParams({ ...(branchId ? { branchId } : {}), ...(Number.isFinite(debouncedMileage) ? { mileage: String(debouncedMileage) } : {}) })}`,
-    ),
+    queryKey: [
+      "job-opening-recent-jobs",
+      vehicleId,
+      branchId,
+      debouncedMileage,
+    ],
+    queryFn: () =>
+      apiGet<{
+        jobs: {
+          id: string;
+          jobNumber: string;
+          createdAt: string;
+          technician?: { firstName: string; lastName: string } | null;
+        }[];
+      }>(
+        `/service/vehicles/${vehicleId}/recent-jobs?${new URLSearchParams({ ...(branchId ? { branchId } : {}), ...(Number.isFinite(debouncedMileage) ? { mileage: String(debouncedMileage) } : {}) })}`,
+      ),
     enabled: !!vehicleId && hasPermission("jobcard:read"),
   });
 
@@ -259,10 +289,21 @@ export function JobCardCreateForm({
   const applyBooking = (record: PickerRecord) => {
     resetVehicle();
 
-    if (record.serviceTypeId) setValue('serviceTypeId', record.serviceTypeId);
-    if (record.mileage != null) setValue('mileage', record.mileage);
-    if (record.acFitted != null) setValue('acFitted', record.acFitted);
-    if (record.requests?.length) setValue('complaints', record.requests.map(row => ({ complaintCodeId: row.complaintCodeId ?? '', defectCode: row.defectCode ?? undefined, description: row.description, spare: Number(row.estimatedParts), oil: Number(row.estimatedOil), labour: Number(row.estimatedLabour) })));
+    if (record.serviceTypeId) setValue("serviceTypeId", record.serviceTypeId);
+    if (record.mileage != null) setValue("mileage", record.mileage);
+    if (record.acFitted != null) setValue("acFitted", record.acFitted);
+    if (record.requests?.length)
+      setValue(
+        "complaints",
+        record.requests.map((row) => ({
+          complaintCodeId: row.complaintCodeId ?? "",
+          defectCode: row.defectCode ?? undefined,
+          description: row.description,
+          spare: Number(row.estimatedParts),
+          oil: Number(row.estimatedOil),
+          labour: Number(row.estimatedLabour),
+        })),
+      );
     setValue("customerId", record.customerId ?? "", {
       shouldDirty: true,
       shouldValidate: true,
@@ -280,7 +321,7 @@ export function JobCardCreateForm({
 
       setValue("serviceAdvisorId", "");
       setValue("technicianId", "");
-    setValue("engineerId", "");
+      setValue("engineerId", "");
     }
 
     if (record.serviceId) {
@@ -331,9 +372,17 @@ export function JobCardCreateForm({
       },
     );
 
-    setValue("serviceCharge", estimate.lines.reduce((total, line) => total + (line.type === "SERVICE" ? Math.round(line.amount * 100) : 0), 0) / 100, {
-      shouldDirty: true,
-    });
+    setValue(
+      "serviceCharge",
+      estimate.lines.reduce(
+        (total, line) =>
+          total + (line.type === "SERVICE" ? Math.round(line.amount * 100) : 0),
+        0,
+      ) / 100,
+      {
+        shouldDirty: true,
+      },
+    );
 
     setTab("Customer Requests");
     toast.success("Estimate lines loaded for review");
@@ -398,24 +447,39 @@ export function JobCardCreateForm({
         toast.error("Acknowledge the warranty and campaign check first");
         return;
       }
-      const { promisedDate, promisedTime, odometerReplaced: replaced, odometerReplacedReason, ...data } = values;
+      const {
+        promisedDate,
+        promisedTime,
+        odometerReplaced: replaced,
+        odometerReplacedReason,
+        ...data
+      } = values;
 
       create.mutate(
         {
           ...data,
           odometerReplaced: replaced || undefined,
-          odometerReplacedReason: replaced ? odometerReplacedReason?.trim() : undefined,
-          warrantyAcknowledged: acknowledged && check?.coverage.status === "ACTIVE",
-          acknowledgedCampaignIds: acknowledged ? (check?.openCampaigns ?? []).map((c) => c.campaignId) : [],
+          odometerReplacedReason: replaced
+            ? odometerReplacedReason?.trim()
+            : undefined,
+          warrantyAcknowledged:
+            acknowledged && check?.coverage.status === "ACTIVE",
+          acknowledgedCampaignIds: acknowledged
+            ? (check?.openCampaigns ?? []).map((c) => c.campaignId)
+            : [],
           description: values.complaints
             .map((row) => row.description)
             .join("; ")
             .slice(0, 5000),
-          promisedAt: new Date(`${promisedDate}T${promisedTime}:00+01:00`).toISOString(),
+          promisedAt: new Date(
+            `${promisedDate}T${promisedTime}:00+01:00`,
+          ).toISOString(),
           engineerId: values.engineerId || undefined,
           technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
-          repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
+          repeatReason: values.isRepeat
+            ? values.repeatReason?.trim()
+            : undefined,
           teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
@@ -437,19 +501,43 @@ export function JobCardCreateForm({
             reset(values);
             onDirtyChange?.(false);
             toast.success("Job card opened");
-            if (card.warrantyCase) toast.success(`Warranty case ${card.warrantyCase.caseNumber} opened`);
+            if (card.warrantyCase)
+              toast.success(
+                `Warranty case ${card.warrantyCase.caseNumber} opened`,
+              );
             onSuccess?.(card.id);
           },
 
           onError: (error) => {
             if (isAxiosError(error)) {
               const response = error.response?.data;
-              const fields: { field: string; message: string }[] = response?.errors ?? (response?.details?.field ? [{ field: response.details.field, message: response.message }] : []);
+              const fields: { field: string; message: string }[] =
+                response?.errors ??
+                (response?.details?.field
+                  ? [
+                      {
+                        field: response.details.field,
+                        message: response.message,
+                      },
+                    ]
+                  : []);
               for (const issue of fields) {
-                const field = issue.field === "promisedAt" ? "promisedDate" : issue.field;
-                setError(field as keyof CreateJobCardFormValues, { type: "server", message: issue.message });
+                const field =
+                  issue.field === "promisedAt" ? "promisedDate" : issue.field;
+                setError(field as keyof CreateJobCardFormValues, {
+                  type: "server",
+                  message: issue.message,
+                });
               }
-              if (fields.length) setTab(fields[0].field.startsWith("complaints") ? "Customer Requests" : fields[0].field === "promisedAt" || otherErrors.includes(fields[0].field) ? "Other Details" : "Vehicle Details");
+              if (fields.length)
+                setTab(
+                  fields[0].field.startsWith("complaints")
+                    ? "Customer Requests"
+                    : fields[0].field === "promisedAt" ||
+                        otherErrors.includes(fields[0].field)
+                      ? "Other Details"
+                      : "Vehicle Details",
+                );
             }
             const latest = ackRequiredCheck(error);
             if (latest) {
@@ -457,7 +545,9 @@ export function JobCardCreateForm({
               setServerCheck(latest);
               setAcknowledged(false);
               setTab("Vehicle Details");
-              toast.error("The warranty check changed. Review it and acknowledge again.");
+              toast.error(
+                "The warranty check changed. Review it and acknowledge again.",
+              );
               return;
             }
             toast.error(
@@ -481,10 +571,12 @@ export function JobCardCreateForm({
       );
 
       requestAnimationFrame(() => {
-        content.current?.querySelectorAll<HTMLElement>('[aria-invalid="true"]').forEach((field) => {
-          const card = field.closest("details");
-          if (card) card.open = true;
-        });
+        content.current
+          ?.querySelectorAll<HTMLElement>('[aria-invalid="true"]')
+          .forEach((field) => {
+            const card = field.closest("details");
+            if (card) card.open = true;
+          });
         content.current
           ?.querySelector<HTMLElement>('[aria-invalid="true"]')
           ?.focus();
@@ -536,7 +628,10 @@ export function JobCardCreateForm({
           }
         }}
       >
-        <div className="contents" inert={!!(confirmation || find) || create.isPending}>
+        <div
+          className="contents"
+          inert={!!(confirmation || find) || create.isPending}
+        >
           <header className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -812,7 +907,12 @@ export function JobCardCreateForm({
                       serviceCharge={watch("serviceCharge")}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
-                      onCharge={charge => setValue("serviceCharge", charge, { shouldDirty: true, shouldValidate: true })}
+                      onCharge={(charge) =>
+                        setValue("serviceCharge", charge, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
                       error={errors.serviceTypeId?.message}
                     />
                   )}
@@ -822,16 +922,25 @@ export function JobCardCreateForm({
                     Previous odometer:{" "}
                     {vehicle.lastRecordedMileage?.toLocaleString() ??
                       "Not recorded"}
-                    km. The recorded mileage cannot decrease unless the odometer was replaced.
+                    km. The recorded mileage cannot decrease unless the odometer
+                    was replaced.
                   </p>
                 )}
                 {vehicle && (
                   <div className="mt-3 space-y-3">
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" {...register("odometerReplaced")} /> Odometer was replaced
+                      <input
+                        type="checkbox"
+                        {...register("odometerReplaced")}
+                      />{" "}
+                      Odometer was replaced
                     </label>
                     {odometerReplaced && (
-                      <OpeningField label="Reason for the odometer replacement" required error={errors.odometerReplacedReason?.message}>
+                      <OpeningField
+                        label="Reason for the odometer replacement"
+                        required
+                        error={errors.odometerReplacedReason?.message}
+                      >
                         <input
                           className={openingInput}
                           maxLength={300}
@@ -868,7 +977,11 @@ export function JobCardCreateForm({
                 <OpeningCard
                   title="Warranty & campaign check"
                   description="Runs before the job card is saved. A covered vehicle or an open campaign must be acknowledged."
-                  action={warranty.isFetching ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : undefined}
+                  action={
+                    warranty.isFetching ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : undefined
+                  }
                 >
                   {canSeeWarranty ? (
                     <WarrantyCheckPanel
@@ -877,10 +990,14 @@ export function JobCardCreateForm({
                       isError={warranty.isError}
                       acknowledged={acknowledged}
                       onAcknowledgedChange={setAcknowledged}
-                      acknowledgedBy={user ? `${user.firstName} ${user.lastName}` : undefined}
+                      acknowledgedBy={
+                        user ? `${user.firstName} ${user.lastName}` : undefined
+                      }
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground">You do not have access to warranty information.</p>
+                    <p className="text-sm text-muted-foreground">
+                      You do not have access to warranty information.
+                    </p>
                   )}
                 </OpeningCard>
               )}
@@ -916,25 +1033,89 @@ export function JobCardCreateForm({
                 }
               />
               {vehicleId && (
-                <OpeningCard title="Repeat visit" description="Review recent jobs for this vehicle before opening a new one.">
-                  {recentJobs.isLoading && <p role="status" className="text-sm">Loading recent jobs...</p>}
-                  {recentJobs.isError && <p role="alert" className="text-sm text-destructive">Could not load recent jobs. <button type="button" className="underline" onClick={() => recentJobs.refetch()}>Retry</button></p>}
-                  {recentJobs.data?.jobs.length === 0 && <p className="text-sm text-muted-foreground">No jobs within the configured repeat window.</p>}
-                  {!!recentJobs.data?.jobs.length && <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">{recentJobs.data.jobs.length} recent job(s). Latest: <Link href={`/job-cards/${recentJobs.data.jobs[0].id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">{recentJobs.data.jobs[0].jobNumber}</Link> ({formatDate(recentJobs.data.jobs[0].createdAt)}).</p>
-                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("isRepeat")} /> This is a repeat job</label>
-                    {watch("isRepeat") && <>
-                      <OpeningField label="Previous job" required error={errors.previousJobId?.message}>
-                        <select className={openingInput} aria-invalid={!!errors.previousJobId} {...register("previousJobId")}>
-                          <option value="">Select previous job</option>
-                          {recentJobs.data.jobs.map((job) => <option key={job.id} value={job.id}>{job.jobNumber} — {formatDate(job.createdAt)}{job.technician ? ` — ${job.technician.firstName} ${job.technician.lastName}` : ""}</option>)}
-                        </select>
-                      </OpeningField>
-                      <OpeningField label="Repeat reason" required error={errors.repeatReason?.message}>
-                        <textarea className={`${openingInput} h-24 py-2`} maxLength={2000} aria-invalid={!!errors.repeatReason} {...register("repeatReason")} />
-                      </OpeningField>
-                    </>}
-                  </div>}
+                <OpeningCard
+                  title="Repeat visit"
+                  description="Review recent jobs for this vehicle before opening a new one."
+                >
+                  {recentJobs.isLoading && (
+                    <p role="status" className="text-sm">
+                      Loading recent jobs...
+                    </p>
+                  )}
+                  {recentJobs.isError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      Could not load recent jobs.{" "}
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={() => recentJobs.refetch()}
+                      >
+                        Retry
+                      </button>
+                    </p>
+                  )}
+                  {recentJobs.data?.jobs.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No jobs within the configured repeat window.
+                    </p>
+                  )}
+                  {!!recentJobs.data?.jobs.length && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        {recentJobs.data.jobs.length} recent job(s). Latest:{" "}
+                        <Link
+                          href={`/job-cards/${recentJobs.data.jobs[0].id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          {recentJobs.data.jobs[0].jobNumber}
+                        </Link>{" "}
+                        ({formatDate(recentJobs.data.jobs[0].createdAt)}).
+                      </p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" {...register("isRepeat")} /> This
+                        is a repeat job
+                      </label>
+                      {watch("isRepeat") && (
+                        <>
+                          <OpeningField
+                            label="Previous job"
+                            required
+                            error={errors.previousJobId?.message}
+                          >
+                            <select
+                              className={openingInput}
+                              aria-invalid={!!errors.previousJobId}
+                              {...register("previousJobId")}
+                            >
+                              <option value="">Select previous job</option>
+                              {recentJobs.data.jobs.map((job) => (
+                                <option key={job.id} value={job.id}>
+                                  {job.jobNumber} — {formatDate(job.createdAt)}
+                                  {job.technician
+                                    ? ` — ${job.technician.firstName} ${job.technician.lastName}`
+                                    : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </OpeningField>
+                          <OpeningField
+                            label="Repeat reason"
+                            required
+                            error={errors.repeatReason?.message}
+                          >
+                            <textarea
+                              className={`${openingInput} h-24 py-2`}
+                              maxLength={2000}
+                              aria-invalid={!!errors.repeatReason}
+                              {...register("repeatReason")}
+                            />
+                          </OpeningField>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </OpeningCard>
               )}
               <OpeningCard title="Job scheduling & estimate">
@@ -953,7 +1134,19 @@ export function JobCardCreateForm({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           invalid={!!errors.promisedDate}
-                          min={(() => { const date = new Date(bookingQuery.data?.appointment.scheduledAt ?? openedAt); date.setUTCDate(date.getUTCDate() + 1); return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(date); })()}
+                          min={(() => {
+                            const date = new Date(
+                              bookingQuery.data?.appointment.scheduledAt ??
+                                openedAt,
+                            );
+                            date.setUTCDate(date.getUTCDate() + 1);
+                            return new Intl.DateTimeFormat("en-CA", {
+                              timeZone: "Africa/Lagos",
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                            }).format(date);
+                          })()}
                         />
                       </OpeningField>
                     )}
@@ -970,7 +1163,22 @@ export function JobCardCreateForm({
                     />
                   </OpeningField>
                   {masterPicker("teamId", "Group", "TEAM")}
-                  <Controller name="engineerId" control={control} render={({field})=><WorkshopPicker label="Engineer (optional)" endpoint={`/service/staff?role=Engineer&branchId=${branchId ?? ""}`} collection="users" disabled={!branchId} value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} error={errors.engineerId?.message}/>}/>
+                  <Controller
+                    name="engineerId"
+                    control={control}
+                    render={({ field }) => (
+                      <WorkshopPicker
+                        label="Engineer (optional)"
+                        endpoint={`/service/staff?role=Engineer&branchId=${branchId ?? ""}`}
+                        collection="users"
+                        disabled={!branchId}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        error={errors.engineerId?.message}
+                      />
+                    )}
+                  />
 
                   <Controller
                     name="technicianId"
@@ -1023,7 +1231,11 @@ export function JobCardCreateForm({
                   />
                   <div className="space-y-1.5">
                     <p className="text-sm font-medium">Service charge</p>
-                    <p className="text-xs text-muted-foreground">Defaults to the selected service price. This amount becomes a separate bill line; enter 0 only for a waived charge.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Defaults to the selected service price. This amount
+                      becomes a separate bill line; enter 0 only for a waived
+                      charge.
+                    </p>
                     <Controller
                       name="serviceCharge"
                       control={control}
@@ -1054,7 +1266,10 @@ export function JobCardCreateForm({
                   Assign an engineer or group. Parts, oil and labour totals come
                   from Customer Requests.
                 </p>
-                <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" {...register("inHouse")} /> In-house job</label>
+                <label className="mt-3 flex items-center gap-2 text-sm">
+                  <input type="checkbox" {...register("inHouse")} /> In-house
+                  job
+                </label>
               </OpeningCard>
               <OpeningCard
                 title="Delivery & closing"

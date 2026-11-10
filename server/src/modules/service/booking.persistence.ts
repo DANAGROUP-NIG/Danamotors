@@ -106,73 +106,77 @@ export async function createBooking(data: BookingCreate) {
     }).format(new Date()),
   );
   const sequenceDate = new Date(year, 6, 1);
-  const booking = await prisma.$transaction(async (tx) => {
-    // The locking read also establishes existence; keep duplicate detection under this lock.
-    const vehicles = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`;
-    if (vehicles.length === 0)
-      throw new NotFoundError("Vehicle not found");
-    if (
-      !(await tx.customer.findFirst({
-        where: { id: data.customerId, mergedIntoId: null },
-        select: { id: true },
-      }))
-    )
-      throw new NotFoundError("Customer not found");
-    if (
-      !(await tx.branch.findFirst({
-        where: { id: data.branchId, isActive: true },
-        select: { id: true },
-      }))
-    )
-      throw new NotFoundError("Active branch not found");
-    if (
-      await tx.serviceAppointment.findFirst({
-        where: {
-          customerId: data.customerId,
-          vehicleId: data.vehicleId,
+  const booking = await prisma.$transaction(
+    async (tx) => {
+      // The locking read also establishes existence; keep duplicate detection under this lock.
+      const vehicles = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`;
+      if (vehicles.length === 0) throw new NotFoundError("Vehicle not found");
+      if (
+        !(await tx.customer.findFirst({
+          where: { id: data.customerId, mergedIntoId: null },
+          select: { id: true },
+        }))
+      )
+        throw new NotFoundError("Customer not found");
+      if (
+        !(await tx.branch.findFirst({
+          where: { id: data.branchId, isActive: true },
+          select: { id: true },
+        }))
+      )
+        throw new NotFoundError("Active branch not found");
+      if (
+        await tx.serviceAppointment.findFirst({
+          where: {
+            customerId: data.customerId,
+            vehicleId: data.vehicleId,
+            bookingStatus: "BOOKED",
+            status: { notIn: ["Closed", "Cancelled", "Completed", "No Show"] },
+          },
+          select: { id: true },
+        })
+      )
+        throw new ConflictError(
+          "This vehicle already has an active booking for this customer",
+        ).withCode("FIELD_VALIDATION", { field: "vehicleId" });
+      const requests = await bookingRelations(
+        tx,
+        data,
+        data.vehicleId,
+        data.branchId,
+      );
+      // Allocate late so the shared branch/year counter is locked only during writes.
+      const number = await nextSequenceNumber(
+        tx,
+        `BOOKING_${data.branchId}`,
+        sequenceDate,
+      );
+      const booking = await tx.serviceAppointment.create({
+        data: {
+          ...fields,
+          source: data.source ?? "WalkIn",
+          bookingNumber: `${data.branchId}/${number}`,
           bookingStatus: "BOOKED",
-          status: { notIn: ["Closed", "Cancelled", "Completed", "No Show"] },
+          requests: { create: requests },
         },
-        select: { id: true },
-      })
-    )
-      throw new ConflictError(
-        "This vehicle already has an active booking for this customer",
-      ).withCode("FIELD_VALIDATION", { field: "vehicleId" });
-    const requests = await bookingRelations(
-      tx,
-      data,
-      data.vehicleId,
-      data.branchId,
-    );
-    // Allocate late so the shared branch/year counter is locked only during writes.
-    const number = await nextSequenceNumber(
-      tx,
-      `BOOKING_${data.branchId}`,
-      sequenceDate,
-    );
-    const booking = await tx.serviceAppointment.create({
-      data: {
-        ...fields,
-        source: data.source ?? "WalkIn",
-        bookingNumber: `${data.branchId}/${number}`,
-        bookingStatus: "BOOKED",
-        requests: { create: requests },
-      },
-      include: { requests: true, service: true },
-    });
-    await tx.auditLog.create({
-      data: {
-        userId: data.createdById,
-        action: "BOOKING_CREATED",
-        details: JSON.stringify({
-          bookingId: booking.id,
-          branchId: data.branchId,
-          bookingNumber: booking.bookingNumber,
-        }),
-      },
-    });
-    return booking;
-  }, { timeout: 10000 });
+        include: { requests: true, service: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: data.createdById,
+          action: "BOOKING_CREATED",
+          details: JSON.stringify({
+            bookingId: booking.id,
+            branchId: data.branchId,
+            bookingNumber: booking.bookingNumber,
+          }),
+        },
+      });
+      return booking;
+    },
+    { timeout: 10000 },
+  );
   return bookingView(booking);
 }

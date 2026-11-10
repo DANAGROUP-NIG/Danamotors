@@ -17,12 +17,25 @@ it('requires a reason on both cancellation paths and prevents reopening terminal
 });
 it('requires customer requests and allows an optional service catalogue while rejecting invalid request amounts', () => {
   const id = '00000000-0000-4000-8000-000000000001';
-  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z', requests: [{ description: 'Noise' }] } }).success).toBe(true);
+  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z', requests: 'Noise' } }).success).toBe(true);
   for (const spare of [-1, NaN, Infinity, 0.001, 1e13]) expect(bookingRequestBody.safeParse({ description: 'Noise', spare }).success).toBe(false);
   expect(bookingRequestBody.safeParse({}).success).toBe(false);
   expect(updateAppointmentSchema.safeParse({ params: { id }, body: { bookingStatus: 'CONVERTED' } }).success).toBe(false);
   expect(updateAppointmentSchema.safeParse({ params: { id }, body: { requests: [] } }).success).toBe(false);
   expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z' } }).success).toBe(false);
+});
+
+it('accepts trimmed request text for create and update and rejects arrays, blank and oversized text', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const body = { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z' };
+  expect(createAppointmentSchema.parse({ body: { ...body, requests: '  Engine noise\nCheck brakes  ' } }).body.requests)
+    .toEqual([{ description: 'Engine noise\nCheck brakes' }]);
+  expect(updateAppointmentSchema.parse({ params: { id }, body: { requests: '  Check brakes  ' } }).body.requests)
+    .toEqual([{ description: 'Check brakes' }]);
+  for (const requests of ['', '   ', 'x'.repeat(2001), ['Noise'], [{ description: 'Noise' }]]) {
+    expect(createAppointmentSchema.safeParse({ body: { ...body, requests } }).success).toBe(false);
+    expect(updateAppointmentSchema.safeParse({ params: { id }, body: { requests } }).success).toBe(false);
+  }
 });
 
 it('rejects the booked day in Lagos and accepts the following day', () => {
