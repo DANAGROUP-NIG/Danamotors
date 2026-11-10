@@ -259,6 +259,10 @@ namespace Danamotors.Hhdc.Link
         /// <summary>The bundled device app to install when the handheld's copy differs; null = do not check.</summary>
         public byte[] BundledApp;
 
+        /// <summary>Send the label printer in the heartbeat (Printer null = none attached).</summary>
+        public bool ReportsPrinter;
+        public PrinterState Printer;
+
         public StationReport Run(string linkVersion)
         {
             StationReport report = new StationReport();
@@ -287,6 +291,7 @@ namespace Danamotors.Hhdc.Link
             Dictionary<string, object> body = new Dictionary<string, object>();
             body["linkVersion"] = linkVersion;
             body["docked"] = docked;
+            if (ReportsPrinter) body["printer"] = Printer == null ? null : Printer.ToJson();
             HeartbeatReply reply = api.Heartbeat(body);
             if (reply.DeviceId.Length == 0) throw new LinkException("The server did not identify the handheld.");
             if (reply.DeviceId != identity[0] || reply.DeviceName != identity[1])
@@ -517,7 +522,17 @@ namespace Danamotors.Hhdc.Link
             this.bundledApp = bundledApp;
         }
 
-        public string Status { get { lock (stop) return status; } }
+        /// <summary>Label printing on this PC (null: none). Runs every tick, docked or not.</summary>
+        public LabelStation Labels;
+
+        public string Status
+        {
+            get
+            {
+                string printer = Labels == null || Labels.Last == null ? "" : "; label printer " + Labels.Last.Status.Replace('_', ' ').ToLowerInvariant();
+                lock (stop) return status + printer;
+            }
+        }
         public string LastProblem { get { lock (stop) return lastProblem; } }
 
         void Set(string s, string problem)
@@ -548,6 +563,16 @@ namespace Danamotors.Hhdc.Link
         public void Tick()
         {
             DateTime now = clock().ToUniversalTime();
+            if (Labels != null)
+            {
+                // Its own try: a printer or print problem never stops the handheld work, and the other way round.
+                try { Labels.Run(); }
+                catch (LinkException e)
+                {
+                    if (e.Message != LastProblem) log.Write("Label printing: " + e.Message);
+                    lock (stop) lastProblem = e.Message;
+                }
+            }
             try
             {
                 using (IDeviceStorage dev = openDevice())
@@ -568,6 +593,8 @@ namespace Danamotors.Hhdc.Link
                         // The app is checked once per dock (a locked exe is tried again at the next dock).
                         cycle.BundledApp = installTried ? null : bundledApp;
                         installTried = true;
+                        cycle.ReportsPrinter = Labels != null;
+                        cycle.Printer = Labels != null ? Labels.Last : null;
                         StationReport r = cycle.Run(linkVersion);
                         Set(r.Describe(), r.Problems.Count > 0 ? r.Problems[0] : null);
                         return;
@@ -576,6 +603,7 @@ namespace Danamotors.Hhdc.Link
                     Dictionary<string, object> body = new Dictionary<string, object>();
                     body["linkVersion"] = linkVersion;
                     body["docked"] = null;
+                    if (Labels != null) body["printer"] = Labels.Last == null ? null : Labels.Last.ToJson();
                     api.Heartbeat(body);
                     Set("Online, no handheld docked", null);
                 }

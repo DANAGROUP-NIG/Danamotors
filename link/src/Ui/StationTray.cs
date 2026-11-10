@@ -68,8 +68,11 @@ namespace Danamotors.Hhdc.Link
                 return;
             }
             LinkSettings s = settings;
-            runner = new StationRunner(ApiClient.ForStation(s.Server, s.StationKey), delegate { return s.OpenDevice(); },
+            ApiClient api = ApiClient.ForStation(s.Server, s.StationKey);
+            runner = new StationRunner(api, delegate { return s.OpenDevice(); },
                                        delegate { return DateTime.UtcNow; }, log, LinkVersion(), BundledApp());
+            // A Zebra on this PC's USB prints the branch's barcode labels sent from the web.
+            runner.Labels = new LabelStation(api, new ZebraUsbPrinter(), log);
             thread = new Thread(runner.Run);
             thread.IsBackground = true;
             thread.Name = "HHDC station";

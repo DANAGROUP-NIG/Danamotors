@@ -8,14 +8,15 @@ using Danamotors.Hhdc.Link;
 /// HHDC Link on a command line: the same logic as the window, for scripts and the end-to-end test.
 ///   HhdcLinkCli [options] list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE
 ///                         sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER
-///                         station key KEY | station once | station run
+///                         station key KEY | station once | station run | printer status | printer test
 /// TYPE is INDENT_PICK, CPO_PICK or MIT_RECEIVE; NUMBER is the indent, CPO or MIT number.
 /// Options: --server URL  --email E  --password P (or HHDC_PASSWORD)  --folder DIR (stand-in device)
 ///          --data DIR (settings and upload record)  --all-branches
 /// SHEET is a sheet number such as SHT-000012.
 /// station: the PC's handheld station (no user sign-in): "key" saves the key issued on the web, "once" makes one
 /// pass (heartbeat, deliver, collect), "run" loops as the tray station does until Ctrl+C. --app EXE installs that
-/// device app on a handheld that differs.
+/// device app on a handheld that differs. The station also prints barcode labels on a Zebra on USB; --printer-file DIR
+/// writes them to files there instead. printer: "status" shows the USB Zebra's state, "test" prints one test label.
 /// </summary>
 public static class Cli
 {
@@ -32,7 +33,7 @@ public static class Cli
             }
             else words.Add(args[i]);
         }
-        if (words.Count == 0) { Console.Error.WriteLine("Commands: list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE | sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER | station key KEY|once|run"); return 1; }
+        if (words.Count == 0) { Console.Error.WriteLine("Commands: list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE | sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER | station key KEY|once|run | printer status|test"); return 1; }
 
         try
         {
@@ -42,6 +43,7 @@ public static class Cli
             if (opt.ContainsKey("folder")) settings.DeviceFolder = opt["folder"];
             Clock clock = delegate { return DateTime.UtcNow; };
             if (words[0].ToLowerInvariant() == "station") return Station(words, opt, dataDir, settings, clock);
+            if (words[0].ToLowerInvariant() == "printer") return Printer(words);
 
             using (IDeviceStorage device = settings.OpenDevice())
             {
@@ -144,7 +146,10 @@ public static class Cli
         StationLog log = new StationLog(opt.ContainsKey("no-log") ? "" : LinkSettings.LogDir(dataDir), clock);
         byte[] app = opt.ContainsKey("app") ? File.ReadAllBytes(opt["app"]) : null;
         LinkSettings s = settings;
-        StationRunner runner = new StationRunner(ApiClient.ForStation(s.Server, s.StationKey), delegate { return s.OpenDevice(); }, clock, log, "cli", app);
+        ApiClient api = ApiClient.ForStation(s.Server, s.StationKey);
+        StationRunner runner = new StationRunner(api, delegate { return s.OpenDevice(); }, clock, log, "cli", app);
+        ILabelPrinter printer = opt.ContainsKey("printer-file") ? (ILabelPrinter)new FolderPrinter(opt["printer-file"]) : new ZebraUsbPrinter();
+        runner.Labels = new LabelStation(api, printer, log);
         if (sub == "once")
         {
             runner.Tick();
@@ -160,6 +165,25 @@ public static class Cli
             return 0;
         }
         throw new LinkException("station key KEY | station once | station run");
+    }
+
+    static int Printer(List<string> words)
+    {
+        string sub = words.Count > 1 ? words[1].ToLowerInvariant() : "";
+        ZebraUsbPrinter zebra = new ZebraUsbPrinter();
+        PrinterState state = zebra.Check();
+        Console.WriteLine(state == null ? "No Zebra label printer on USB." : state.Describe());
+        if (sub == "status") return state != null && state.Ready ? 0 : 2;
+        if (sub == "test")
+        {
+            if (state == null || !state.Ready) return 2;
+            zebra.Print(System.Text.Encoding.ASCII.GetBytes(
+                "^XA^CI28^PW406^LL402^LH0,0^FO0,40^FB406,1,0,C^A0N,40,36^FDHHDC LINK TEST^FS^FO14,100^GB378,0,2^FS" +
+                "^FO0,130^FB406,1,0,C^A0N,30,28^FD" + Environment.MachineName + "^FS^BY2,3,110^FO100,200^BCN,110,N,N,N^FD>:TEST-1^FS^PQ1^XZ"));
+            Console.WriteLine("Test label sent.");
+            return 0;
+        }
+        throw new LinkException("printer status | printer test");
     }
 
     static WorkItem Find(List<WorkItem> items, string number)
