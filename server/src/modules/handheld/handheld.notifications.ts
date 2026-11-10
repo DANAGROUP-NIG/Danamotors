@@ -169,7 +169,7 @@ export class HandheldNotifier {
       {
         type: HANDHELD_NOTIFICATION_TYPES.INSTALL_FAILED,
         title: "Handheld app not updated",
-        message: `The Danamotors app could not be installed on handheld ${device.name} at ${stationName}: ${error}`,
+        message: `The Kia Motors Handheld app could not be installed on handheld ${device.name} at ${stationName}: ${error}`,
         link: "/settings/hhdc",
         branchId: device.branchId,
       },

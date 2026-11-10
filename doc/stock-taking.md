@@ -59,7 +59,7 @@ files, the device app and the IT tool, which are unchanged. The calls behind the
 
 | Program | Where it runs | What it does |
 | --- | --- | --- |
-| **Danamotors Count** (`hhdc/device`) | The handheld, offline | The checker picks a sheet, scans or types bin then part, enters quantity, damaged and remark. Each entry is saved at once to an append-only file. Review (edit, delete) and **Finish sheet** (locks it). |
+| **Kia Motors Handheld** (`hhdc/device`, `KMHH.exe`) | The handheld, offline | The checker picks a sheet, scans or types bin then part, enters quantity, damaged and remark. Each entry is saved at once to an append-only file. Review (edit, delete) and **Finish sheet** (locks it). |
 | **HHDC Link** (`hhdc/link`) | The store PC with Windows Mobile Device Center | **Station** (`--station`, tray, started at sign-in): delivers waiting jobs to a docked handheld, collects finished ones, installs the app when it differs. **IT window**: register the station, and for fault finding sign in, **Send to device**, **Receive from device** (summary, ZERO or RELEASE, upload once, clear the device), **Install / update app**. `HhdcLinkCli.exe` does the same on a command line. |
 
 How it works:
@@ -111,7 +111,7 @@ cd ..\hhdc             # dana_projects\hhdc, next to this repo (not inside it)
 
 The device app is compiled against the device's own .NET CF 3.5 libraries, which are not in the repo
 (`dana_projects/hhdc_integration/tools/probe/refs`; pass `-CfRefs` if they are elsewhere). The same exe
-runs on a PC: `DanamotorsCount.exe --data <folder>` shows the 318x269 screen. HHDC Link can use a folder
+runs on a PC: `KMHH.exe --data <folder>` shows the 318x269 screen. HHDC Link can use a folder
 in place of a device (`--folder <dir>`, or the "Test folder" box). See `hhdc/README.md`. What cannot be
 proven without the device is in `dana_projects/hhdc_integration/device_checklist.md`.
 

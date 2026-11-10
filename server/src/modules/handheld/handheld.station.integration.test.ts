@@ -360,10 +360,10 @@ describeDb("Handheld stations (database)", () => {
   });
 
   it("reports a handheld the app could not be installed on", async () => {
-    await stations.heartbeat(pc1, { docked: { deviceId: device1, appStatus: "INSTALL_FAILED", appError: "DanamotorsCount.exe is in use", files: [] } });
-    await stations.heartbeat(pc1, { docked: { deviceId: device1, appStatus: "INSTALL_FAILED", appError: "DanamotorsCount.exe is in use", files: [] } });
+    await stations.heartbeat(pc1, { docked: { deviceId: device1, appStatus: "INSTALL_FAILED", appError: "KMHH.exe is in use", files: [] } });
+    await stations.heartbeat(pc1, { docked: { deviceId: device1, appStatus: "INSTALL_FAILED", appError: "KMHH.exe is in use", files: [] } });
     const failed = await notices(storeOfficer.id, "HANDHELD_INSTALL_FAILED");
-    expect(failed.map((n) => n.message)).toEqual(["The Danamotors app could not be installed on handheld MC3190-1 at STORE-PC1: DanamotorsCount.exe is in use"]);
+    expect(failed.map((n) => n.message)).toEqual(["The Kia Motors Handheld app could not be installed on handheld MC3190-1 at STORE-PC1: KMHH.exe is in use"]);
     expect(pc1Key).toBeTruthy();
   });
 });
