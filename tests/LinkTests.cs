@@ -328,13 +328,13 @@ public static class LinkTests
         byte[] exe = new byte[] { 1, 2, 3, 4, 5 };
         string msg = r.Sheets.InstallApp(exe);
         Check.True(msg.Contains("Installed"), "message");
-        Check.Equal(5, r.Device.ReadFile("\\Application\\Danamotors\\DanamotorsCount.exe").Length, "exe copied");
+        Check.Equal(5, r.Device.ReadFile("\\Application\\Danamotors\\KMHH.exe").Length, "exe copied");
         foreach (string folder in new string[] { "\\Windows\\Programs", "\\Windows\\Desktop" })
         {
-            string lnk = Encoding.ASCII.GetString(r.Device.ReadFile(folder + "\\Danamotors Count.lnk"));
-            Check.True(lnk.EndsWith("DanamotorsCount.exe\""), "shortcut in " + folder + " points at the exe: " + lnk);
+            string lnk = Encoding.ASCII.GetString(r.Device.ReadFile(folder + "\\Kia Motors Handheld.lnk"));
+            Check.True(lnk.EndsWith("KMHH.exe\""), "shortcut in " + folder + " points at the exe: " + lnk);
         }
-        Check.True(!r.Device.FileExists("\\Application\\StartUpCtl\\OnReset\\OnReset_Danamotors.txt"), "no restore script on a device without StartUpCtl");
+        Check.True(!r.Device.FileExists("\\Application\\StartUpCtl\\OnReset\\OnReset_KMHH.txt"), "no restore script on a device without StartUpCtl");
     }
 
     public static void TestInstallLeavesAColdBootRestoreScriptWhereStartUpCtlExists()
@@ -343,10 +343,26 @@ public static class LinkTests
         r.Device.WriteFile("\\Application\\StartUpCtl\\StartUpCtlConfig.txt", new byte[] { 1 });
         string msg = r.Sheets.InstallApp(new byte[] { 1, 2, 3 });
         Check.True(msg.Contains("after a cold boot"), "message: " + msg);
-        Check.True(r.Device.FileExists("\\Application\\Danamotors\\Danamotors Count.lnk"), "a copy of the shortcut in flash");
-        string script = Encoding.ASCII.GetString(r.Device.ReadFile("\\Application\\StartUpCtl\\OnReset\\OnReset_Danamotors.txt"));
-        Check.True(script.Contains("copy \"\\Application\\Danamotors\\Danamotors Count.lnk\" \\Windows\\Desktop"), "copies to the desktop: " + script);
-        Check.True(script.Contains("copy \"\\Application\\Danamotors\\Danamotors Count.lnk\" \\Windows\\Programs"), "copies to Start > Programs");
+        Check.True(r.Device.FileExists("\\Application\\Danamotors\\Kia Motors Handheld.lnk"), "a copy of the shortcut in flash");
+        string script = Encoding.ASCII.GetString(r.Device.ReadFile("\\Application\\StartUpCtl\\OnReset\\OnReset_KMHH.txt"));
+        Check.True(script.Contains("copy \"\\Application\\Danamotors\\Kia Motors Handheld.lnk\" \\Windows\\Desktop"), "copies to the desktop: " + script);
+        Check.True(script.Contains("copy \"\\Application\\Danamotors\\Kia Motors Handheld.lnk\" \\Windows\\Programs"), "copies to Start > Programs");
+    }
+
+    public static void TestInstallRemovesTheOldDanamotorsCountApp()
+    {
+        Rig r = new Rig();
+        string[] old = {
+            "\\Application\\Danamotors\\DanamotorsCount.exe", "\\Windows\\Programs\\Danamotors Count.lnk",
+            "\\Windows\\Desktop\\Danamotors Count.lnk", "\\Application\\Danamotors\\Danamotors Count.lnk",
+            "\\Application\\StartUpCtl\\OnReset\\OnReset_Danamotors.txt" };
+        foreach (string f in old) r.Device.WriteFile(f, new byte[] { 1 });
+        r.Device.WriteFile("\\Application\\Danamotors\\sheets\\S1.sheet", new byte[] { 7 });
+        string msg = r.Sheets.InstallApp(new byte[] { 1, 2, 3 });
+        Check.True(msg.Contains("Removed the old Danamotors Count app (5 file(s))"), "message: " + msg);
+        foreach (string f in old) Check.True(!r.Device.FileExists(f), f + " removed");
+        Check.True(r.Device.FileExists("\\Application\\Danamotors\\sheets\\S1.sheet"), "the sheets in the data folder are kept");
+        Check.Equal("", r.Sheets.RemoveOldNames(), "nothing left to remove the second time");
     }
 
     public static void TestServerAddressNormalising()

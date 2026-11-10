@@ -236,7 +236,7 @@ namespace Danamotors.Hhdc.Link
             MakeFolders(path.Substring(0, path.LastIndexOf('\\')));
             IntPtr h = CeCreateFile(path, GENERIC_WRITE, 0, IntPtr.Zero, CREATE_ALWAYS, 0x80, IntPtr.Zero);
             if (h == Invalid)
-                throw new LinkException("Cannot write " + path + " on the handheld (error " + CeGetLastError() + "). If Danamotors Count is open on it, close the app first.");
+                throw new LinkException("Cannot write " + path + " on the handheld (error " + CeGetLastError() + "). If Kia Motors Handheld is open on it, close the app first.");
             try
             {
                 int off = 0;

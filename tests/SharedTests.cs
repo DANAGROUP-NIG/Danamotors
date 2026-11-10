@@ -138,7 +138,7 @@ public static class SharedTests
     {
         Check.Equal(DeviceLayout.PrimaryRoot, DeviceLayout.ResolveRoot(delegate(string p) { return true; }), "persistent folder present");
         Check.Equal(DeviceLayout.FallbackRoot, DeviceLayout.ResolveRoot(delegate(string p) { return false; }), "no persistent folder");
-        string exe = "\\Application\\Danamotors\\DanamotorsCount.exe";
+        string exe = "\\Application\\Danamotors\\KMHH.exe";
         Check.Equal((exe.Length + 2) + "#\"" + exe + "\"", DeviceLayout.ShortcutText(exe), "shortcut text");
     }
 }

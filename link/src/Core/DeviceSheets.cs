@@ -115,7 +115,34 @@ namespace Danamotors.Hhdc.Link
                 dev.WriteFile(DeviceLayout.OnResetScript, Encoding.ASCII.GetBytes(DeviceLayout.OnResetText(root)));
                 msg += " The shortcuts come back by themselves after a cold boot.";
             }
-            return msg;
+            string old = RemoveOldNames();
+            return old.Length > 0 ? msg + " " + old : msg;
+        }
+
+        /// <summary>
+        /// Removes the app's files from before it was renamed Kia Motors Handheld (2026-11-10): the old exe, its shortcuts
+        /// and its cold-boot script, so the handheld does not show two apps. The old exe is locked while it is open; it is
+        /// tried again at the next install or dock. Returns what was done ("" if there was nothing to remove).
+        /// </summary>
+        public string RemoveOldNames()
+        {
+            string[] files = {
+                DeviceLayout.ProgramsFolder + "\\" + DeviceLayout.OldShortcutName,
+                DeviceLayout.DesktopFolder + "\\" + DeviceLayout.OldShortcutName,
+                root + "\\" + DeviceLayout.OldShortcutName,
+                DeviceLayout.OldOnResetScript,
+                root + "\\" + DeviceLayout.OldAppFileName };
+            int removed = 0;
+            string locked = "";
+            foreach (string f in files)
+            {
+                if (!dev.FileExists(f)) continue;
+                try { dev.DeleteFile(f); removed++; }
+                catch (LinkException) { locked = f; }
+            }
+            if (removed == 0 && locked.Length == 0) return "";
+            return "Removed the old Danamotors Count app (" + removed + " file(s))." +
+                   (locked.Length > 0 ? " " + locked + " is still open on the handheld; it is removed next time." : "");
         }
 
         static string Utf8(byte[] b)

@@ -10,11 +10,11 @@ using System.Windows.Forms;
 using Danamotors.Hhdc;
 
 /// <summary>
-/// Drives the real DanamotorsCount.exe (the same binary that runs on the handheld) on this PC through a
+/// Drives the real KMHH.exe (the same binary that runs on the handheld) on this PC through a
 /// counting session, then checks what it saved. Key messages are posted straight to the app's own
 /// controls, so nothing depends on which window has the focus and nothing is typed into other programs.
 /// The app's windows are kept off screen; screenshots are taken with DrawToBitmap.
-///   UiDriver.exe DanamotorsCount.exe DATA_FOLDER SHOTS_FOLDER
+///   UiDriver.exe KMHH.exe DATA_FOLDER SHOTS_FOLDER
 /// DATA_FOLDER must hold sheets\*.sheet with the sheet from tests\ui\sample.sheet.
 /// </summary>
 public static class UiDriver
@@ -77,8 +77,8 @@ public static class UiDriver
     // Plain text is typed; {ENTER} {ESC} {F2} {F3} {F4} {DOWN} {UP} {DEL} are keys; {WAIT:ms} pauses;
     // {SHOT:name} saves a screenshot; {EXPECT:field~text} checks that a label contains text.
     const string Scenario = @"
-# open the first sheet
-{ENTER}{WAIT:300}
+# home: the count kind is chosen; its one sheet opens straight away
+{SHOT:01_home}{ENTER}{WAIT:300}{SHOT:02_count_empty}
 Aisle 1 Rack 1{ENTER}
 BELT-SERP-002{ENTER}{WAIT:100}{SHOT:03_part_found}
 {EXPECT:lblInfo~Serpentine Belt}{EXPECT:lblInfo~System stock: 46}
@@ -142,7 +142,7 @@ BELT-SERP-002{ENTER}{WAIT:100}{EXPECT:lblBig~BELT-SERP-002  -1  =  2 in AISLE 1 
     // An indent pick: two lines in bin order. Scans add 1 and move on when a line is done; a typed short asks a reason;
     // an unknown part is recorded as found instead; Finish asks first. Labels on the document screen are DocForm's.
     const string DocScenario = @"
-{ENTER}{WAIT:400}{SHOT:30_doc_open}{EXPECT:lblBig~PICKED 0 of 2}{EXPECT:lblWhere~Bin AISLE 1 RACK 1}
+{SHOT:29_home}{ENTER}{WAIT:400}{SHOT:30_doc_open}{EXPECT:lblBig~PICKED 0 of 2}{EXPECT:lblWhere~Bin AISLE 1 RACK 1}
 belt-serp-002{ENTER}{WAIT:100}{EXPECT:lblBig~PICKED 1 of 2}
 belt-serp-002{ENTER}{WAIT:150}{EXPECT:lblPart~AC-GAS-R134A}{EXPECT:lblStatus~Line done}{SHOT:31_next_line}
 # one too many of the first part is refused
@@ -256,7 +256,8 @@ zz-other{ENTER}{WAIT:400}{SHOT:33_not_on_doc}1{WAIT:300}{EXPECT:lblNote~Found in
     {
         Form top = main;
         foreach (Form f in Application.OpenForms) if (f != main && f.Visible) top = f;
-        using (Bitmap bmp = new Bitmap(top.ClientSize.Width, top.ClientSize.Height))
+        // The whole window, title bar included, as the handheld shows it (the client area alone would be cut at the bottom).
+        using (Bitmap bmp = new Bitmap(top.Width, top.Height))
         {
             top.DrawToBitmap(bmp, new Rectangle(Point.Empty, bmp.Size));
             bmp.Save(Path.Combine(shots, name + ".png"), ImageFormat.Png);

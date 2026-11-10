@@ -15,8 +15,13 @@ namespace Danamotors.Hhdc
         public const string PrimaryRoot = "\\Application\\Danamotors";
         public const string FallbackRoot = "\\Danamotors";
         public const string SheetsFolder = "sheets";
-        public const string AppFileName = "DanamotorsCount.exe";
-        public const string ShortcutName = "Danamotors Count.lnk";
+        /// <summary>Kia Motors Handheld (KMHH). The data folder keeps its old name so sheets on a device are not lost.</summary>
+        public const string AppFileName = "KMHH.exe";
+        public const string ShortcutName = "Kia Motors Handheld.lnk";
+        /// <summary>The app's names before 2026-11-10 ("Danamotors Count"); an install removes them.</summary>
+        public const string OldAppFileName = "DanamotorsCount.exe";
+        public const string OldShortcutName = "Danamotors Count.lnk";
+        public const string OldOnResetScript = "\\Application\\StartUpCtl\\OnReset\\OnReset_Danamotors.txt";
         /// <summary>Start > Programs on CE 6 (the MC3190 has no \Windows\Start Menu\Programs).</summary>
         public const string ProgramsFolder = "\\Windows\\Programs";
         /// <summary>The desktop, where the legacy AEHHDC.lnk sits.</summary>
@@ -26,13 +31,13 @@ namespace Danamotors.Hhdc
         /// folder at each restart, warm or cold (seen in its log on the MC3190), so the shortcuts are put back from here.
         /// </summary>
         public const string StartUpCtlFolder = "\\Application\\StartUpCtl";
-        public const string OnResetScript = "\\Application\\StartUpCtl\\OnReset\\OnReset_Danamotors.txt";
+        public const string OnResetScript = "\\Application\\StartUpCtl\\OnReset\\OnReset_KMHH.txt";
 
         /// <summary>The StartUpCtl script that copies the shortcut kept in the app folder back to the desktop and Start > Programs.</summary>
         public static string OnResetText(string root)
         {
             string lnk = "\"" + root + "\\" + ShortcutName + "\"";
-            return "# Danamotors Count: put the shortcuts back after a cold boot (\\Windows is rebuilt).\r\n" +
+            return "# Kia Motors Handheld: put the shortcuts back after a cold boot (\\Windows is rebuilt).\r\n" +
                    "copy " + lnk + " " + DesktopFolder + "\r\n" +
                    "copy " + lnk + " " + ProgramsFolder + "\r\n";
         }

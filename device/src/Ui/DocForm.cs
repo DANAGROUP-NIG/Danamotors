@@ -7,7 +7,7 @@ using System.Windows.Forms;
 namespace Danamotors.Hhdc.Device
 {
     /// <summary>
-    /// Picking an indent or CPO, or checking an MIT, on the MC3190's 318x269 screen with the keypad. One line at a
+    /// Picking an indent or CPO, or checking an MIT, on the MC3190's 318x269 screen with the keypad or the stylus. One line at a
     /// time, in bin order (MIT: case order). A scan of the line's part adds 1; a scan of another line's part or bin
     /// moves there. All rules live in DocSession; this class only shows state and passes keys.
     /// </summary>
@@ -17,31 +17,35 @@ namespace Danamotors.Hhdc.Device
         // The Compact Framework has no MethodInvoker or Action.
         delegate void Change();
 
-        static readonly Color Warn = Color.FromArgb(190, 0, 0);
-        static readonly Color Good = Color.FromArgb(0, 110, 0);
-        static readonly Color Blue = Color.FromArgb(0, 0, 150);
+        static readonly Color Warn = Theme.Warn;
+        static readonly Color Good = Theme.Good;
+        static readonly Color Blue = Theme.Info;
 
         readonly DocSession session;
         readonly Timer scanTimer = new Timer();
         readonly ScanDetector scan = new ScanDetector();
 
+        readonly HeaderBar header = new HeaderBar();
+        readonly KeyBar keys = new KeyBar();
+
         readonly Panel workPanel = new Panel();
-        readonly Label lblTitle = new Label();
         readonly Label lblProgress = new Label();
         readonly Label lblWhere = new Label();
+        readonly Panel whereBand;
         readonly Label lblPart = new Label();
         readonly Label lblDesc = new Label();
         readonly Label lblBig = new Label();
+        readonly Panel bigBand;
         readonly Label lblNote = new Label();
+        readonly Panel noteBand;
         readonly Label lblBox = new Label();
         readonly TextBox txtScan = new TextBox();
         readonly Label lblStatus = new Label();
-        readonly Label lblKeys = new Label();
+        readonly Panel statusBand;
 
         readonly Panel linesPanel = new Panel();
         readonly Label linesTitle = new Label();
-        readonly ListBox linesList = new ListBox();
-        readonly Label linesKeys = new Label();
+        readonly ItemList linesList = new ItemList();
 
         int current;
         bool damagedMode;   // MIT: scans count damaged units
@@ -51,24 +55,18 @@ namespace Danamotors.Hhdc.Device
         public DocForm(DocSession session)
         {
             this.session = session;
-            Text = DocTypes.Short(session.Doc.Type) + " " + session.Doc.Reference;
-            MinimizeBox = false;
-            MaximizeBox = false;
-            KeyPreview = true;
-            BackColor = Color.White;
-            if (Environment.OSVersion.Platform != PlatformID.WinCE)
-            {
-                FormBorderStyle = FormBorderStyle.FixedSingle;
-                ClientSize = new Size(318, 269);
-            }
-            BuildWork();
-            BuildLines();
+            Theme.SetUp(this, DocTypes.Short(session.Doc.Type) + " " + session.Doc.Reference);
+            Controls.Add(header);
+            keys.Tapped = delegate(Keys k) { if (k == Keys.None) return; if (showingLines) LinesKey(k); else WorkKey(k); };
+            Controls.Add(keys);
             foreach (Panel p in new Panel[] { workPanel, linesPanel })
             {
-                p.Bounds = new Rectangle(0, 0, 318, 269);
-                p.BackColor = Color.White;
+                p.Bounds = new Rectangle(0, Theme.BodyTop, Theme.Width, Theme.BodyHeight);
+                p.BackColor = Theme.Paper;
                 Controls.Add(p);
             }
+            BuildWork(out whereBand, out bigBand, out noteBand, out statusBand);
+            BuildLines();
             txtScan.KeyPress += OnScanKeyPress;
             scanTimer.Interval = 40;
             scanTimer.Tick += OnScanTick;
@@ -84,48 +82,42 @@ namespace Danamotors.Hhdc.Device
         /// <summary>The line being worked on (for tests).</summary>
         public int CurrentLine { get { return current; } }
 
-        // ── Layout ────────────────────────────────────────────────────────────────
+        // -- Layout --
 
-        static Font Bold(float size) { return new Font(FontFamily.GenericSansSerif, size, FontStyle.Bold); }
-        static Font Plain(float size) { return new Font(FontFamily.GenericSansSerif, size, FontStyle.Regular); }
-
-        static void Put(Panel on, Label l, int x, int y, int w, int h, Font f)
+        static void Put(Panel on, Label l, int x, int y, int w, int h, Font f, Color c)
         {
             l.Font = f;
+            l.ForeColor = c;
             l.Bounds = new Rectangle(x, y, w, h);
             on.Controls.Add(l);
         }
 
-        void BuildWork()
+        void BuildWork(out Panel where, out Panel big, out Panel note, out Panel status)
         {
-            Put(workPanel, lblTitle, 4, 2, 310, 18, Bold(9f));
-            Put(workPanel, lblProgress, 4, 20, 310, 16, Plain(8f));
-            Put(workPanel, lblWhere, 4, 38, 310, 24, Bold(13f));
-            lblWhere.ForeColor = Blue;
-            Put(workPanel, lblPart, 4, 64, 310, 22, Bold(12f));
-            Put(workPanel, lblDesc, 4, 86, 310, 18, Plain(9f));
-            Put(workPanel, lblBig, 4, 106, 310, 30, Bold(15f));
-            Put(workPanel, lblNote, 4, 138, 310, 30, Bold(9f));
-            lblNote.ForeColor = Warn;
-            Put(workPanel, lblBox, 4, 174, 44, 22, Bold(10f));
-            txtScan.Font = Bold(12f);
-            txtScan.Bounds = new Rectangle(50, 172, 262, 26);
+            Put(workPanel, lblProgress, 6, 3, 306, 15, Theme.Bold(8f), Theme.Muted);
+            where = Theme.Band(workPanel, lblWhere, new Rectangle(6, 20, 306, 24), Theme.Bold(11f));
+            Theme.Colour(where, lblWhere, Color.White, Theme.Midnight);
+            Put(workPanel, lblPart, 6, 48, 306, 22, Theme.Bold(13f), Theme.Ink);
+            Put(workPanel, lblDesc, 6, 70, 306, 16, Theme.Plain(9f), Theme.Muted);
+            big = Theme.Band(workPanel, lblBig, new Rectangle(6, 88, 306, 32), Theme.Bold(14f));
+            note = Theme.Band(workPanel, lblNote, new Rectangle(6, 123, 306, 31), Theme.Bold(8f));
+            Put(workPanel, lblBox, 6, 164, 48, 16, Theme.Bold(8f), Theme.Muted);
+            txtScan.Font = Theme.Bold(12f);
+            txtScan.Bounds = new Rectangle(56, 159, 256, 26);
             txtScan.MaxLength = CountSession.MaxCodeLength;
             workPanel.Controls.Add(txtScan);
-            Put(workPanel, lblStatus, 4, 202, 310, 20, Bold(9f));
-            Put(workPanel, lblKeys, 4, 224, 310, 42, Plain(8f));
+            status = Theme.Band(workPanel, lblStatus, new Rectangle(0, 199, Theme.Width, 22), Theme.Bold(9f));
         }
 
         void BuildLines()
         {
-            Put(linesPanel, linesTitle, 4, 2, 310, 22, Bold(10f));
-            linesList.Font = Plain(10f);
-            linesList.Bounds = new Rectangle(4, 26, 310, 206);
+            Put(linesPanel, linesTitle, 6, 4, 306, 16, Theme.Bold(8f), Theme.Muted);
+            linesList.Bounds = new Rectangle(0, 22, Theme.Width, Theme.BodyHeight - 22);
+            linesList.Activated = delegate { LinesKey(Keys.Enter); };
             linesPanel.Controls.Add(linesList);
-            Put(linesPanel, linesKeys, 4, 236, 310, 30, Plain(8f));
         }
 
-        // ── Screens ───────────────────────────────────────────────────────────────
+        // -- Screens --
 
         void ShowWork()
         {
@@ -143,39 +135,47 @@ namespace Danamotors.Hhdc.Device
             HandheldDoc d = session.Doc;
             DocLine l = session.Line(current);
             int n = session.LineCount;
-            lblTitle.Text = DocTypes.Short(d.Type) + " " + d.Reference + "  " + d.Party;
-            lblProgress.Text = "Line " + (current + 1) + "/" + n + "   done " + session.DoneLines + "/" + n + "   " +
-                               (session.TotalQuantity + session.TotalDamaged) + "/" + d.TotalExpected + " pcs" + (session.Finished ? "  FINISHED" : "");
+            header.Set(DocTypes.Short(d.Type) + " " + d.Reference, d.Party, false, session.DoneLines, n);
+            lblProgress.Text = (session.Finished ? "FINISHED  ·  " : "") + "Line " + (current + 1) + " of " + n + "  ·  " + session.DoneLines + " done  ·  " +
+                               (session.TotalQuantity + session.TotalDamaged) + "/" + d.TotalExpected + " pcs";
+            lblProgress.ForeColor = session.Finished ? Good : Theme.Muted;
             lblWhere.Text = session.Picking ? (l.Bin.Length > 0 ? "Bin " + l.Bin : "No bin")
                                             : "Case " + (l.Case.Length > 0 ? l.Case : "-") + (l.Bin.Length > 0 ? "  bin " + l.Bin : "");
             lblPart.Text = l.PartNumber;
             lblDesc.Text = l.Description;
             int q = session.Quantity(current), dm = session.Damaged(current);
             lblBig.Text = (session.Picking ? "PICKED " : "RECEIVED ") + q + " of " + l.Expected + (dm > 0 ? "  DMG " + dm : "");
-            lblBig.ForeColor = session.Done(current) ? Good : Color.Black;
+            Color bigFore = session.Done(current) ? Good : q + dm > 0 ? Theme.Busy : Theme.Ink;
+            Theme.Colour(bigBand, lblBig, bigFore, bigFore == Theme.Ink ? Theme.Shade : Theme.BackFor(bigFore));
             LineResult r = session.Result(current);
             string note = "";
             if (r != null && r.Reason.Length > 0) note = "Short: " + ShortReasons.Label(r.Reason);
             if (r != null && r.Scanned.Length > 0) note += (note.Length > 0 ? "\r\n" : "") + "Found instead: " + r.Scanned;
             if (r != null && r.Note.Length > 0) note += (note.Length > 0 ? "  " : "") + r.Note;
             lblNote.Text = note;
+            Theme.Colour(noteBand, lblNote, Warn, note.Length > 0 ? Theme.WarnBack : Theme.Paper);
             if (typing == Typing.None)
             {
-                lblBox.Text = damagedMode ? "DMG" : "Scan";
-                lblBox.ForeColor = damagedMode ? Warn : Color.Black;
+                lblBox.Text = damagedMode ? "DAMAGED" : "SCAN";
+                lblBox.ForeColor = damagedMode ? Warn : Theme.Muted;
             }
-            lblKeys.Text = session.Finished
-                ? "Finished and locked. Dock the handheld and use HHDC Link: Receive.  Esc=back"
-                : session.Picking
-                    ? "Scan part=+1  Up/Down=line  F1=lines  F2=type qty\r\nF3=short reason  F4=finish  Esc=menu"
-                    : "Scan part=+1  Up/Down=line  F1=lines  F2=type qty\r\nF3=" + (damagedMode ? "scans count GOOD" : "scans count DAMAGED") + "  F4=finish  Esc=menu";
+            WorkKeys();
             if (!keepStatus) SetStatus("", Good);
+        }
+
+        void WorkKeys()
+        {
+            keys.Clear();
+            if (session.Finished) keys.Add("F1", "Lines", Keys.F1).Add("Esc", "Back", Keys.Escape);
+            else if (typing != Typing.None) keys.Add("Ent", "Save", Keys.Enter).Add("Esc", "Cancel", Keys.Escape);
+            else keys.Add("F1", "Lines", Keys.F1).Add("F2", "Qty", Keys.F2).Add("F3", session.Picking ? "Short" : damagedMode ? "Good" : "Dmg", Keys.F3)
+                     .Add("F4", "Finish", Keys.F4).Add("Esc", "Menu", Keys.Escape);
         }
 
         void SetStatus(string text, Color color)
         {
             lblStatus.Text = text;
-            lblStatus.ForeColor = color;
+            Theme.Colour(statusBand, lblStatus, Color.White, text.Length == 0 ? Theme.Paper : color == Warn ? Warn : color == Good ? Good : Theme.Midnight);
             if (color == Warn && text.Length > 0) Beeper.Error();
         }
 
@@ -183,22 +183,36 @@ namespace Danamotors.Hhdc.Device
         {
             showingLines = true;
             EndTyping();
-            linesList.Items.Clear();
+            linesList.Clear();
             for (int i = 0; i < session.LineCount; i++)
             {
                 DocLine l = session.Line(i);
                 string where = session.Picking ? l.Bin : l.Case;
-                linesList.Items.Add((session.Done(i) ? "OK " : "-- ") + (where.Length > 0 ? where : "-") + "  " + l.PartNumber + "  " +
-                                    (session.Quantity(i) + session.Damaged(i)) + "/" + l.Expected);
+                int got = session.Quantity(i) + session.Damaged(i);
+                LineResult res = session.Result(i);
+                ListItem row = new ListItem(l.PartNumber);
+                row.Detail = (session.Picking ? "Bin " : "Case ") + (where.Length > 0 ? where : "-") +
+                             (res != null && res.Reason.Length > 0 ? "  ·  short: " + ShortReasons.Label(res.Reason) : "  ·  " + l.Description);
+                row.Badge = got + "/" + l.Expected;
+                row.BadgeColor = session.Done(i) ? Good : got > 0 ? Theme.Busy : Theme.Info;
+                row.Progress = l.Expected > 0 ? (float)got / l.Expected : -1f;
+                linesList.Add(row);
             }
             foreach (ExtraPart e in session.Extras)
-                linesList.Items.Add("+  EXTRA " + e.PartNumber + "  " + e.Quantity + (e.Damaged > 0 ? "+" + e.Damaged + "d" : ""));
+            {
+                ListItem row = new ListItem(e.PartNumber);
+                row.Detail = "EXTRA: not on this MIT";
+                row.Alert = true;
+                row.Badge = e.Quantity + (e.Damaged > 0 ? " +" + e.Damaged + " dmg" : "");
+                row.BadgeColor = Warn;
+                linesList.Add(row);
+            }
             linesTitle.Text = session.DoneLines + " of " + session.LineCount + " lines done" + (session.Extras.Count > 0 ? ", " + session.Extras.Count + " extra" : "");
-            linesKeys.Text = "Enter=go to line (extra: delete)  Esc=back";
-            linesList.SelectedIndex = Math.Min(current, linesList.Items.Count - 1);
+            keys.Clear().Add("Ent", "Go to line", Keys.Enter).Add("Esc", "Back", Keys.Escape);
+            linesList.SelectedIndex = Math.Min(current, linesList.Count - 1);
             workPanel.Visible = false;
             linesPanel.Visible = true;
-            linesList.Focus();
+            linesList.Sink.Focus();
         }
 
         // ── Keys ──────────────────────────────────────────────────────────────────
@@ -225,8 +239,8 @@ namespace Danamotors.Hhdc.Device
                         ShowLines();
                     }
                     return true;
-                case Keys.Up: if (linesList.SelectedIndex > 0) linesList.SelectedIndex--; return true;
-                case Keys.Down: if (linesList.SelectedIndex < linesList.Items.Count - 1) linesList.SelectedIndex++; return true;
+                case Keys.Up: linesList.Move(-1); return true;
+                case Keys.Down: linesList.Move(1); return true;
             }
             return false;
         }
@@ -293,7 +307,8 @@ namespace Danamotors.Hhdc.Device
         {
             if (what == Typing.Damaged && session.Picking) return;
             typing = what;
-            lblBox.Text = what == Typing.Quantity ? "Qty" : what == Typing.Damaged ? "Dmg" : "Note";
+            WorkKeys();
+            lblBox.Text = what == Typing.Quantity ? "QTY" : what == Typing.Damaged ? "DAMAGED" : "NOTE";
             lblBox.ForeColor = Blue;
             LineResult r = session.Result(current);
             txtScan.MaxLength = what == Typing.Note ? DocSession.MaxNoteLength : 7;
@@ -450,7 +465,7 @@ namespace Danamotors.Hhdc.Device
                   (session.Extras.Count > 0 ? "\r\n" + session.Extras.Count + " extra part(s)." : "") + "\r\nAfter finishing, it is locked.";
             if (ChoiceDialog.Ask(this, "Finish", msg, "Finish") != 0) { Redraw(true); return; }
             if (!Try(delegate { session.Finish(); })) return;
-            ChoiceDialog.Tell(this, "Finished", "Locked. Dock the handheld and use HHDC Link: Receive from device.");
+            ChoiceDialog.Tell(this, "Finished", "Locked. Put the handheld in its cradle: the results go to the web by themselves.");
             Close();
         }
 

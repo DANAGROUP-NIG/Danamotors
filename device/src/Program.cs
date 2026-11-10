@@ -7,7 +7,7 @@ namespace Danamotors.Hhdc.Device
     public static class Program
     {
         /// <summary>
-        /// Usage: DanamotorsCount.exe [--data FOLDER]
+        /// Usage: KMHH.exe [--data FOLDER]
         /// Without --data the device uses \Application\Danamotors (or \Danamotors if \Application is missing).
         /// On a PC, --data points at the folder that stands in for the device's data folder.
         /// </summary>
@@ -26,7 +26,7 @@ namespace Danamotors.Hhdc.Device
             catch (Exception ex)
             {
                 try { using (StreamWriter w = new StreamWriter(Path.Combine(root, "error.log"), true)) w.WriteLine(DateTime.UtcNow.ToString("s") + " " + ex); } catch { }
-                MessageBox.Show(ex.Message, "Danamotors Count", MessageBoxButtons.OK, MessageBoxIcon.Hand, MessageBoxDefaultButton.Button1);
+                MessageBox.Show(ex.Message, Theme.AppName, MessageBoxButtons.OK, MessageBoxIcon.Hand, MessageBoxDefaultButton.Button1);
             }
         }
     }

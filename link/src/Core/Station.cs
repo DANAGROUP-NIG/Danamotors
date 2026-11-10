@@ -454,7 +454,13 @@ namespace Danamotors.Hhdc.Link
         {
             error = "";
             string target = root + "\\" + DeviceLayout.AppFileName;
-            if (dev.FileExists(target) && Hash(dev.ReadFile(target)) == Hash(BundledApp)) return "OK";
+            if (dev.FileExists(target) && Hash(dev.ReadFile(target)) == Hash(BundledApp))
+            {
+                // The old app was open at the install: try its leftovers again.
+                try { string old = new DeviceSheets(dev).RemoveOldNames(); if (old.Length > 0) log.Write(old); }
+                catch (IOException) { }
+                return "OK";
+            }
             try
             {
                 log.Write(new DeviceSheets(dev).InstallApp(BundledApp));

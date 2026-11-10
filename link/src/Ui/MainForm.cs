@@ -423,7 +423,7 @@ namespace Danamotors.Hhdc.Link
             {
                 using (OpenFileDialog dlg = new OpenFileDialog())
                 {
-                    dlg.Title = "Find DanamotorsCount.exe"; dlg.Filter = "DanamotorsCount.exe|DanamotorsCount.exe";
+                    dlg.Title = "Find " + DeviceLayout.AppFileName; dlg.Filter = DeviceLayout.AppFileName + "|" + DeviceLayout.AppFileName;
                     if (dlg.ShowDialog(this) != DialogResult.OK) return;
                     exe = dlg.FileName;
                 }
@@ -434,7 +434,7 @@ namespace Danamotors.Hhdc.Link
                 using (IDeviceStorage dev = OpenDevice())
                 {
                     Say(new DeviceSheets(dev).InstallApp(File.ReadAllBytes(path)));
-                    MessageBox.Show(this, "Installed. On the handheld open Start > Programs > Danamotors Count.", "HHDC Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, "Installed. On the handheld open Start > Programs > Kia Motors Handheld.", "HHDC Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             });
         }
