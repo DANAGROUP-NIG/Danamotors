@@ -169,9 +169,12 @@ integration("Workshop database flow", () => {
 
           try {
             const jobs = new ServiceService();
+            const { loadOpeningConsent } = await import('./job-opening-consent.js');
+            const openingConsent = await loadOpeningConsent(tx, appointment);
 
             const job = await jobs.createJobCard({
               appointmentId: appointment.id,
+              openingConsent: { accepted: true, termsHash: openingConsent.termsHash },
               customerId: customer.id,
               vehicleId: vehicle.id,
               serviceId: catalogService.id,

@@ -28,7 +28,8 @@ it('validates returns, cancellation, both mechanic types, remarks and existing j
   for (const body of [examples.workDone, examples.ready]) expect(() => jobUpdateBody.parse(body)).not.toThrow();
 });
 it('assembles every transaction path and preserves unrelated methods on shared job routes', () => {
-  expect(Object.keys(serviceTransactionPaths)).toHaveLength(21);
+  expect(Object.keys(serviceTransactionPaths)).toHaveLength(22);
+  expect(spec.paths['/service/appointments/{id}/opening-consent'].get).toBeDefined();
   for (const [path, methods] of Object.entries(serviceTransactionPaths)) {
     for (const method of Object.keys(methods).filter(method => method !== 'parameters')) expect(spec.paths[path][method as 'get']).toBeDefined();
   }

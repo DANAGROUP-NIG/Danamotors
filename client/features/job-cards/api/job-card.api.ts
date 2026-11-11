@@ -58,6 +58,7 @@ export interface CreateJobCardPayload {
   repeatReason?: string;
   description: string;
   appointmentId?: string;
+  openingConsent?: { accepted: true; termsHash: string };
   customerId?: string;
   vehicleId?: string;
   tyres?: { makeId?: string; number?: string }[];

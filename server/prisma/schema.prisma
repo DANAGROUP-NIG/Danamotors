@@ -473,6 +473,7 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  openingConsent Json?
   advanceReceipts Receipt[] @relation("JobAdvances")
   consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
   depositReceiptId String? @unique

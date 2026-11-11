@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_MILEAGE } from "../warranty/warranty.logic";
+import { openingConsentProof } from "./job-opening-consent";
 
 const mileageField = z.number().int("Mileage must be a whole number").min(0, "Mileage cannot be negative").max(MAX_MILEAGE);
 const acknowledgementFields = {
@@ -136,6 +137,7 @@ export const listJobCardsSchema = z.object({
 
 export const jobOpeningBody = z
   .object({
+    openingConsent: openingConsentProof.optional(),
     appointmentId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
     serviceTypeId: z.string().uuid(),
@@ -188,6 +190,7 @@ export const jobOpeningBody = z
   })
   .strict()
   .superRefine((data, ctx) => {
+    if (data.appointmentId && !data.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Accept the job opening terms before converting this appointment' });
     if (!data.technicianId && !data.teamId)
       ctx.addIssue({
         code: "custom",

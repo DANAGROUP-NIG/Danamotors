@@ -456,6 +456,7 @@ describe("JobCard workflow", () => {
       new ServiceService().createJobCard({
         ...input,
         appointmentId: id,
+        openingConsent: { accepted: true, termsHash: 'a'.repeat(64) },
         createdById: id,
       }),
     ).rejects.toThrow("branch");

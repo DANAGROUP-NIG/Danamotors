@@ -933,7 +933,7 @@ export class ServiceService {
         if (!override) {
           if (!data.signatureImage || !data.signerName?.trim() || !actorId) throw new BadRequestError("A customer signature and signer name are required; portal capture is not yet available");
           assertSignaturePng(data.signatureImage);
-          if (data.approved && !data.consentAccepted) throw new BadRequestError("Accept the job card terms before approving");
+          if (data.approved && !data.consentAccepted) throw new BadRequestError("Accept the estimate terms before approving");
           const customer = await tx.customer.findUniqueOrThrow({ where: { id: card.customerId! } });
           const customerName = `${customer.firstName} ${customer.lastName}`.trim();
           if (data.signerName.trim().toLowerCase() !== customerName.toLowerCase() && !data.relationship?.trim()) throw new BadRequestError("Relationship is required when signing for the customer");
@@ -993,7 +993,7 @@ export class ServiceService {
         });
         const terms = data.approved && !override ? await tx.documentTerms.findFirst({ where: { type: 'JOB_ESTIMATE', OR: [{ branchId: card.branchId }, { branchId: null }] }, orderBy: { branchId: { sort: 'asc', nulls: 'last' } } }) : null;
         if (!override) await tx.estimateSignature.create({ data: {
-          consentStatement: data.approved ? ['I approve this job card and estimate and accept the terms and conditions.', ...(terms?.terms ?? [])].join('\n') : null,
+          consentStatement: data.approved ? ['I approve this estimate and accept its terms and conditions.', ...(terms?.terms ?? [])].join('\n') : null,
           estimateId, approvalId: approval.id, imageReference: data.signatureImage!, signerName: data.signerName!.trim(),
           relationship: data.relationship?.trim(), capturedByUserId: actorId, deviceOrIp: capture?.deviceOrIp ?? 'unknown',
           estimateVersion: estimate.version, totalSigned: estimate.amount, contentHash: hash,

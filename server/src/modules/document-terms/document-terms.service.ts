@@ -50,10 +50,10 @@ export class DocumentTermsService {
   }
 
   // What prints: the branch's own terms and footer where set, otherwise the company-wide ones.
-  async effective(type: DocumentTermType, branchId?: string) {
+  async effective(type: DocumentTermType, branchId?: string, db: Prisma.TransactionClient = prisma) {
     const [company, branch] = await Promise.all([
-      this.find(prisma, type, null),
-      branchId ? this.find(prisma, type, branchId) : null,
+      this.find(db, type, null),
+      branchId ? this.find(db, type, branchId) : null,
     ]);
 
     return {

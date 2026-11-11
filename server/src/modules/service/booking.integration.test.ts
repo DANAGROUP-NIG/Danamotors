@@ -38,7 +38,12 @@ suite('booking transactions on disposable localhost', () => {
     const vehicleId = (await db.vehicle.create({ data: { vin: `BOOKING-${run}-${++sequence}`, customerId, catalogueId: modelId } })).id;
     return { requests: [{ description: 'Synthetic request' }], customerId, vehicleId, branchId, serviceTypeId: typeId, mileage: 100, scheduledAt: new Date(Date.now() + 86400000), createdById: advisorId, ...extra };
   }
-  const jobInput = () => ({ bayId, serviceAdvisorId: advisorId, teamId, promisedAt: new Date(Date.now() + 172800000).toISOString(), description: 'Synthetic job', complaints: [{ description: 'Caller complaint' }] });
+  const jobInput = async (bookingId: string) => {
+    const { loadOpeningConsent } = await import('./job-opening-consent.js');
+    const booking = await db.serviceAppointment.findUniqueOrThrow({ where: { id: bookingId } });
+    const consent = await loadOpeningConsent(db, booking);
+    return { bayId, serviceAdvisorId: advisorId, teamId, promisedAt: new Date(Date.now() + 172800000).toISOString(), description: 'Synthetic job', complaints: [{ description: 'Caller complaint' }], openingConsent: { accepted: true as const, termsHash: consent.termsHash } };
+  };
 
   it('numbers all creation paths by branch, uses automatic creation time and keeps linked vehicle data', async () => {
     const data = await input();
@@ -97,7 +102,7 @@ suite('booking transactions on disposable localhost', () => {
     await expect(service.updateAppointment(booking.id, { status: 'Cancelled' })).rejects.toThrow('reason');
     await service.updateAppointment(booking.id, { bookingStatus: 'CANCELLED', cancelReason: 'Customer requested', actorId: advisorId });
     await expect(service.updateAppointment(booking.id, { bookingStatus: 'BOOKED' })).rejects.toThrow('no longer open');
-    await expect(service.convertAppointment(booking.id, jobInput(), advisorId)).rejects.toThrow('no longer open');
+    await expect(service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).rejects.toThrow('no longer open');
     const next = await createBooking(data);
     await service.updateAppointment(next.id, { bookingStatus: 'NO_SHOW', actorId: advisorId });
     expect((await createBooking(data)).bookingStatus).toBe('BOOKED');
@@ -113,29 +118,33 @@ suite('booking transactions on disposable localhost', () => {
   });
   it('copies customer, vehicle, service and every request; concurrent conversion creates exactly one linked job', async () => {
     const booking = await createBooking(await input({ acFitted: true, requests: [{ description: 'Booking noise', spare: 0.1, oil: 0.2, labour: 12.35 }] }));
-    const results = await Promise.allSettled([service.convertAppointment(booking.id, jobInput(), advisorId), service.convertAppointment(booking.id, jobInput(), advisorId)]);
+    const consentedOpening = await jobInput(booking.id);
+    await expect(service.convertAppointment(booking.id, { ...consentedOpening, openingConsent: undefined }, advisorId)).rejects.toThrow('job opening terms');
+    const results = await Promise.allSettled([service.convertAppointment(booking.id, consentedOpening, advisorId), service.convertAppointment(booking.id, consentedOpening, advisorId)]);
     expect(results.filter(row => row.status === 'fulfilled')).toHaveLength(1);
     const linked = await db.jobCard.findMany({ where: { appointmentId: booking.id }, include: { complaints: true } });
     expect(linked).toHaveLength(1);
     expect(linked[0]).toMatchObject({ customerId, vehicleId: booking.vehicleId, serviceTypeId: typeId, acFitted: true, estimatedParts: 0.1, estimatedOil: 0.2, estimatedLabour: 12.35 });
     expect(linked[0].complaints.map(row => row.description)).toEqual(['Booking noise']);
+    expect(linked[0].openingConsent).toMatchObject({ accepted: true, source: 'BOOKING_CONVERSION', documentType: 'JOB_CARD', appointmentId: booking.id, capturedById: advisorId });
+    expect(await db.estimateSignature.count({ where: { estimate: { jobCardId: linked[0].id } } })).toBe(0);
     const detail = await service.getAppointment(booking.id);
     expect(detail.bookingStatus).toBe('CONVERTED');
     expect(detail.jobCards[0].id).toBe(linked[0].id);
     await expect(service.updateAppointment(booking.id, { requests: [] })).rejects.toThrow('no longer open');
     await db.jobCard.update({ where: { id: linked[0].id }, data: { status: 'CANCELLED' } });
-    await expect(service.convertAppointment(booking.id, jobInput(), advisorId)).rejects.toThrow('no longer open');
+    await expect(service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).rejects.toThrow('no longer open');
   });
   it('keeps requests optional but requires a complaint before opening a job', async () => {
     const booking = await createBooking(await input());
-    const { complaints: _complaints, ...empty } = jobInput();
+    const { complaints: _complaints, ...empty } = (await jobInput(booking.id));
     await expect(service.convertAppointment(booking.id, empty, advisorId)).rejects.toThrow();
     expect((await service.getAppointment(booking.id)).bookingStatus).toBe('BOOKED');
-    expect((await service.convertAppointment(booking.id, jobInput(), advisorId)).appointmentId).toBe(booking.id);
+    expect((await service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).appointmentId).toBe(booking.id);
   });
   it('uses the same single conversion guard on the legacy job-opening endpoint and rejects mismatched customer', async () => {
     const booking = await createBooking(await input({ requests: [{ description: 'Saved request', spare: 25 }] }));
-    const data = { ...jobInput(), appointmentId: booking.id, branchName: `Booking fixture ${run}`, serviceTypeId: typeId, customerId, vehicleId: booking.vehicleId, mileage: 100, createdById: advisorId };
+    const data = { ...(await jobInput(booking.id)), appointmentId: booking.id, branchName: `Booking fixture ${run}`, serviceTypeId: typeId, customerId, vehicleId: booking.vehicleId, mileage: 100, createdById: advisorId };
     const other = await db.customer.create({ data: { firstName: 'Synthetic', lastName: 'Other', branchId } });
     await expect(workflow.open({ ...data, customerId: other.id })).rejects.toThrow('match');
     const card = await workflow.open(data);
@@ -145,7 +154,7 @@ suite('booking transactions on disposable localhost', () => {
   });
   it('rolls conversion back when job validation fails, preserving requests and mileage', async () => {
     const booking = await createBooking(await input({ requests: [{ description: 'Retained request' }] }));
-    await expect(service.convertAppointment(booking.id, { ...jobInput(), bayId: teamId }, advisorId)).rejects.toThrow();
+    await expect(service.convertAppointment(booking.id, { ...(await jobInput(booking.id)), bayId: teamId }, advisorId)).rejects.toThrow();
     expect(await db.jobCard.count({ where: { appointmentId: booking.id } })).toBe(0);
     expect((await service.getAppointment(booking.id)).bookingStatus).toBe('BOOKED');
     expect((await service.getAppointment(booking.id)).requests).toHaveLength(1);
@@ -155,7 +164,7 @@ suite('booking transactions on disposable localhost', () => {
     const booking = await createBooking(await input());
     await db.vehicle.update({ where: { id: booking.vehicleId }, data: { lastRecordedMileage: 200 } });
     await expect(service.updateAppointment(booking.id, { status: 'Checked In', mileage: 100 })).rejects.toThrow();
-    await expect(service.convertAppointment(booking.id, jobInput(), advisorId)).rejects.toThrow();
+    await expect(service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).rejects.toThrow();
     expect((await service.getAppointment(booking.id)).bookingStatus).toBe('BOOKED');
     await service.updateAppointment(booking.id, { status: 'Checked In', mileage: 220 });
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: booking.vehicleId } })).lastRecordedMileage).toBe(220);
@@ -167,10 +176,10 @@ suite('booking transactions on disposable localhost', () => {
     const campaign = await db.campaign.create({ data: { code: `BC-${run}`, title: 'Synthetic recall', type: 'RECALL', status: 'ACTIVE', startDate: new Date(Date.now() - 86400000) } });
     await db.campaignVehicle.create({ data: { campaignId: campaign.id, vehicleId: vehicle.id, vin: vehicle.vin } });
     await expect(service.updateAppointment(booking.id, { status: 'Checked In', mileage: 100 })).rejects.toMatchObject({ code: 'WARRANTY_ACK_REQUIRED' });
-    await expect(service.convertAppointment(booking.id, jobInput(), advisorId)).rejects.toMatchObject({ code: 'WARRANTY_ACK_REQUIRED' });
-    await expect(service.convertAppointment(booking.id, { ...jobInput(), warrantyAcknowledged: true }, advisorId)).rejects.toMatchObject({ code: 'WARRANTY_ACK_REQUIRED' });
+    await expect(service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).rejects.toMatchObject({ code: 'WARRANTY_ACK_REQUIRED' });
+    await expect(service.convertAppointment(booking.id, { ...(await jobInput(booking.id)), warrantyAcknowledged: true }, advisorId)).rejects.toMatchObject({ code: 'WARRANTY_ACK_REQUIRED' });
     expect((await service.getAppointment(booking.id)).bookingStatus).toBe('BOOKED');
-    const card = await service.convertAppointment(booking.id, { ...jobInput(), warrantyAcknowledged: true, acknowledgedCampaignIds: [campaign.id] }, advisorId);
+    const card = await service.convertAppointment(booking.id, { ...(await jobInput(booking.id)), warrantyAcknowledged: true, acknowledgedCampaignIds: [campaign.id] }, advisorId);
     expect(card.warrantyStatusAtCreation).toBe('ACTIVE');
     expect(card.warrantyAcknowledgedById).toBe(advisorId);
     expect(await db.jobCardCampaign.count({ where: { jobCardId: card.id, campaignId: campaign.id } })).toBe(1);
@@ -181,7 +190,7 @@ suite('booking transactions on disposable localhost', () => {
     await db.$executeRawUnsafe(`CREATE FUNCTION booking_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'BOOKING_CONVERTED' THEN RAISE EXCEPTION 'Synthetic audit failure'; END IF; RETURN NEW; END $$`);
     await db.$executeRawUnsafe('CREATE TRIGGER booking_test_failure BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION booking_test_failure()');
     try {
-      await expect(service.convertAppointment(booking.id, jobInput(), advisorId)).rejects.toThrow('Synthetic audit failure');
+      await expect(service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).rejects.toThrow('Synthetic audit failure');
     } finally {
       await db.$executeRawUnsafe('DROP TRIGGER booking_test_failure ON "AuditLog"');
       await db.$executeRawUnsafe('DROP FUNCTION booking_test_failure()');
@@ -189,7 +198,7 @@ suite('booking transactions on disposable localhost', () => {
     expect(await db.jobCard.count({ where: { appointmentId: booking.id } })).toBe(0);
     expect((await service.getAppointment(booking.id)).bookingStatus).toBe('BOOKED');
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: booking.vehicleId } })).lastRecordedMileage).toBeNull();
-    expect((await service.convertAppointment(booking.id, jobInput(), advisorId)).appointmentId).toBe(booking.id);
+    expect((await service.convertAppointment(booking.id, (await jobInput(booking.id)), advisorId)).appointmentId).toBe(booking.id);
   });
 
 });

@@ -191,7 +191,7 @@ export function EstimateSignatureDialog({
           />
         </label>
         <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={branchId} />
-        {approved && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} />I approve the job card and estimate and accept the terms and conditions above.</label>}
+        {approved && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} />I approve this estimate and accept its terms and conditions above.</label>}
         {error && <p role="alert">{error}</p>}
         <div className="flex gap-2">
           <Button disabled={!valid || busy} onClick={save}>

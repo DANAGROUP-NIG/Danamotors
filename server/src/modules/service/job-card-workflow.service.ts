@@ -1,6 +1,7 @@
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertDepositPaid } from "./job-deposit.service";
+import { loadOpeningConsent, recordOpeningConsent } from "./job-opening-consent";
 import { sumMoney } from '../finance/money';
 import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
@@ -206,6 +207,7 @@ export class JobCardWorkflowService {
             : `This vehicle has open campaigns (${unacknowledgedCampaigns.map((c) => c.code).join(", ")}). Acknowledge them before creating the job card.`,
         ).withCode("WARRANTY_ACK_REQUIRED", check);
 
+      let openingConsent: Prisma.InputJsonObject | undefined;
       if (data.appointmentId) {
         await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${data.appointmentId} FOR UPDATE`;
         const appointment = await tx.serviceAppointment.findUnique({
@@ -226,6 +228,7 @@ export class JobCardWorkflowService {
           ).withCode("FIELD_VALIDATION", { field: "appointmentId" });
 
         assertBookable(appointment);
+        openingConsent = recordOpeningConsent(await loadOpeningConsent(tx, appointment), data.openingConsent, createdById);
         assertPromisedDate(data.promisedAt, appointment.scheduledAt);
         data.remarks = [appointment.notes, data.remarks].filter(Boolean).join("\n") || undefined;
         if (bookingVersion && appointment.updatedAt.toISOString() !== bookingVersion) throw new ConflictError("Booking changed; reload before converting");
@@ -332,6 +335,7 @@ export class JobCardWorkflowService {
         warrantyAcknowledged: _warrantyAcknowledged,
         acknowledgedCampaignIds: _acknowledgedCampaignIds,
         promisedAt,
+        openingConsent: _openingConsentProof,
         ...fields
       } = data;
       const now = new Date();
@@ -340,6 +344,7 @@ export class JobCardWorkflowService {
       const card = await tx.jobCard.create({
         data: {
           ...fields,
+          openingConsent,
           serviceCharge,
           tyres,
           batteryMake,
@@ -393,6 +398,7 @@ export class JobCardWorkflowService {
       if (data.appointmentId) {
         await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: 'CONVERTED' } });
         await tx.auditLog.create({ data: { userId: createdById, action: 'BOOKING_CONVERTED', details: JSON.stringify({ bookingId: data.appointmentId, jobCardId: card.id, branchId: branch.id }) } });
+        await tx.auditLog.create({ data: { userId: createdById, action: 'JOB_OPENING_CONSENT_ACCEPTED', details: JSON.stringify({ bookingId: data.appointmentId, jobCardId: card.id, termsHash: openingConsent?.termsHash }) } });
       }
 
       await tx.vehicle.update({

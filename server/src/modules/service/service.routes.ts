@@ -1,4 +1,6 @@
 import { recordJobDeposit } from "./job-deposit.service";
+import { loadOpeningConsent } from "./job-opening-consent";
+import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
@@ -818,6 +820,14 @@ router.post(
   validateRequest(convertAppointmentSchema),
   controller.convertAppointment,
 );
+router.get('/appointments/:id/opening-consent', requirePermission(PERMISSIONS.APPOINTMENT_UPDATE), requirePermission(PERMISSIONS.JOBCARD_CREATE), validateRequest(serviceIdParamSchema), async (req, res, next) => {
+  try {
+    const booking = await prisma.serviceAppointment.findUniqueOrThrow({ where: { id: req.params.id } });
+    assertBranchOwnership(req, booking.branchId);
+    assertBookable(booking);
+    res.json({ status: 'success', data: { consent: await loadOpeningConsent(prisma, booking) } });
+  } catch (error) { next(error); }
+});
 router.delete(
   "/appointments/:id",
   requirePermission(PERMISSIONS.APPOINTMENT_DELETE),

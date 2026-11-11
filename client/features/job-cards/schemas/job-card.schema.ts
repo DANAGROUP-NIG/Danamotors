@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const createJobCardSchema = z
   .object({
+    openingConsent: z.object({ accepted: z.literal(true), termsHash: z.string().regex(/^[a-f0-9]{64}$/) }).optional(),
     branchName: z.string().min(1, "Branch is required"),
     appointmentId: z.union([z.string().uuid(), z.literal("")]).optional(),
     customerId: z.string().uuid("Select a customer"),
@@ -90,6 +91,7 @@ export const createJobCardSchema = z
     estimatedCost: z.coerce.number().nonnegative().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.appointmentId && !v.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Review and accept the job opening terms first' });
     const promised = new Date(`${v.promisedDate}T${v.promisedTime}`);
     if (!Number.isFinite(promised.getTime()) || promised <= new Date())
       ctx.addIssue({
