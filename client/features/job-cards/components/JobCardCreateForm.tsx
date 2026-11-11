@@ -668,7 +668,7 @@ export function JobCardCreateForm({
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="flex items-end gap-2">
+              {/* <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
                   <WorkshopPicker
                     label="Estimate"
@@ -696,7 +696,7 @@ export function JobCardCreateForm({
                 >
                   <Download className="h-4 w-4" />
                 </Button>
-              </div>
+              </div> */}
               <Controller
                 name="appointmentId"
                 control={control}
@@ -1180,7 +1180,7 @@ export function JobCardCreateForm({
                     )}
                   />
 
-                  <Controller
+                  {/* <Controller
                     name="technicianId"
                     control={control}
                     render={({ field }) => (
@@ -1195,7 +1195,7 @@ export function JobCardCreateForm({
                         error={errors.technicianId?.message}
                       />
                     )}
-                  />
+                  /> */}
                   <Controller
                     name="serviceAdvisorId"
                     control={control}
