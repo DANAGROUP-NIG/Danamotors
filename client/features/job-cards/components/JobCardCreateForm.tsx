@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
-  Download,
   Loader2,
   LockKeyhole,
   MoreHorizontal,
@@ -59,6 +58,7 @@ import {
   ReadOnlyField,
   CurrencyInput,
   OpeningDatePicker,
+  OpeningTimePicker,
   localDate,
   openingInput,
   openingGrid,
@@ -68,6 +68,22 @@ import {
 
 const tabs = ["Vehicle Details", "Customer Requests", "Other Details"] as const;
 type Tab = (typeof tabs)[number];
+
+//Format the promised date
+const getMinDate = (scheduledAt?: string | Date, openedAt?: string | Date): string => {
+  const baseDate = new Date(scheduledAt ?? openedAt ?? Date.now());
+  const nextDay = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(nextDay);
+
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
 
 function defaults(
   branchName: string,
@@ -440,8 +456,18 @@ export function JobCardCreateForm({
     });
   };
 
+  const minimumPromisedDate = getMinDate(
+    bookingQuery.data?.appointment.scheduledAt,
+    openedAt,
+  );
+
   const submit = handleSubmit(
     (values) => {
+      if (values.promisedDate < minimumPromisedDate) {
+        setError("promisedDate", { type: "min", message: `Promised date must be on or after ${minimumPromisedDate}` });
+        setTab("Vehicle Details");
+        return;
+      }
       if (needsAck) {
         setTab("Vehicle Details");
         toast.error("Acknowledge the warranty and campaign check first");
@@ -1134,34 +1160,20 @@ export function JobCardCreateForm({
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           invalid={!!errors.promisedDate}
-                          min={(() => {
-                            const date = new Date(
-                              bookingQuery.data?.appointment.scheduledAt ??
-                                openedAt,
-                            );
-                            date.setUTCDate(date.getUTCDate() + 1);
-                            return new Intl.DateTimeFormat("en-CA", {
-                              timeZone: "Africa/Lagos",
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                            }).format(date);
-                          })()}
+                          min={minimumPromisedDate}
                         />
                       </OpeningField>
                     )}
                   />
-                  <OpeningField
-                    label="Promised time"
-                    required
-                    error={errors.promisedTime?.message}
-                  >
-                    <input
-                      type="time"
-                      className={openingInput}
-                      {...register("promisedTime")}
-                    />
-                  </OpeningField>
+                  <Controller
+                    name="promisedTime"
+                    control={control}
+                    render={({ field }) => (
+                      <OpeningField label="Promised time" required error={errors.promisedTime?.message}>
+                        <OpeningTimePicker value={field.value} onChange={field.onChange} onBlur={field.onBlur} invalid={!!errors.promisedTime} />
+                      </OpeningField>
+                    )}
+                  />
                   {masterPicker("teamId", "Group", "TEAM")}
                   <Controller
                     name="engineerId"
