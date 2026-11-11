@@ -1,5 +1,6 @@
 import { reportStart,reportEnd } from './party-report';
 import { money, sumMoney } from './money';
+import { advanceBillReferences, usesAdvanceReference } from './job-advance';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -209,7 +210,7 @@ export class TallyService {
         if (selected.type === 'JOB_BILL') {
           const invoice = await transaction.invoice.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } } },
+            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } }, allocations: { where: { reversedAt: null } } },
           });
           if (!invoice || (!invoice.jobCardId && !invoice.counterSale) || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             skipped.push({ ...selected, reason: 'Job bill is missing or cancelled' });
@@ -227,13 +228,13 @@ export class TallyService {
             continue;
           }
           const entries: LedgerEntry[] = [
-            { name: invoice.customer.tallyLedger.name, amount: invoice.total, bills: [{ name: invoice.invoiceNumber, type: 'New Ref', amount: invoice.total }] },
+            { name: invoice.customer.tallyLedger.name, amount: invoice.total, bills: advanceBillReferences(invoice.invoiceNumber, invoice.total, invoice.allocations ?? []) },
             ...values.filter(([, amount]) => amount !== 0).map(([key, amount]) => ({ name: mappings.get(key)!, amount })),
           ];
           if (sumMoney(entries.map((entry) => entry.amount)) !== 0) { skipped.push({ ...selected, documentNumber, reason: 'Invoice ledger totals do not balance; review the bill snapshot' }); continue; }
           payload = generateTallyVoucherXml({ type: selected.type, number: invoice.invoiceNumber, id: invoice.id, date: invoice.issuedDate, party: invoice.customer.tallyLedger.name, entries });
         } else if (selected.type === 'DEBIT_NOTE' || selected.type === 'CREDIT_NOTE') {
-          const note=await transaction.partyNote.findUnique({where:{id:selected.id},include:{customer:{include:{tallyLedger:true}},accountLines:{orderBy:{position:'asc'}},creditAdjustments:{where:{reversedAt:null},include:{invoice:{select:{invoiceNumber:true}},debitNote:{select:{number:true}}}}}});
+          const note=await transaction.partyNote.findUnique({where:{id:selected.id},include:{customer:{include:{tallyLedger:true}},accountLines:{orderBy:{position:'asc'}},debitAdjustments:{where:{reversedAt:null}},creditAdjustments:{where:{reversedAt:null},include:{invoice:{select:{invoiceNumber:true}},debitNote:{select:{number:true}}}}}});
           if(!note||note.direction!==(selected.type==='DEBIT_NOTE'?'DEBIT':'CREDIT')||note.type==='OPENING'||note.tallyExcluded||note.status!=='ACTIVE'||note.tallyPostedAt){skipped.push({...selected,reason:'Note is missing, cancelled or excluded from Tally'});continue;}
           documentNumber=note.number;
           if(!note.customer.tallyLedger?.active){skipped.push({...selected,documentNumber,reason:'Customer has no active Tally ledger mapping'});continue;}
@@ -242,7 +243,7 @@ export class TallyService {
           if(selected.type==='DEBIT_NOTE'){
             const account=mappings.get(note.type);
             if(!account){skipped.push({...selected,documentNumber,reason:'Missing Tally account mapping: '+note.type});continue;}
-            entries=[{name:party,amount,bills:[{name:note.number,type:'New Ref',amount}]},{name:account,amount:-amount}];
+            entries=[{name:party,amount,bills:advanceBillReferences(note.number,amount,note.debitAdjustments??[])},{name:account,amount:-amount}];
           }else{
             const active=await transaction.tallyLedger.findMany({where:{id:{in:note.accountLines.map(l=>l.ledgerId)},active:true}});
             const byId=new Map(active.map(l=>[l.id,l.name]));
@@ -275,7 +276,7 @@ export class TallyService {
           }
           const entries: LedgerEntry[] = [
             { name: accountName, amount: receipt.amount },
-            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount, bills: [...receipt.allocations.map((allocation) => ({ name: allocation.invoice?.invoiceNumber ?? allocation.debitNote?.number ?? receipt.receiptNumber, type: 'Agst Ref' as const, amount: -money(allocation.amount) })), ...(receipt.advanceAmount > 0 ? [{ name: receipt.receiptNumber, type: 'Advance' as const, amount: -receipt.advanceAmount }] : [])] },
+            { name: receipt.customer.tallyLedger.name, amount: -receipt.amount, bills: usesAdvanceReference(receipt) ? [{ name: receipt.receiptNumber, type: 'Advance', amount: -receipt.amount }] : [...receipt.allocations.map((allocation) => ({ name: allocation.invoice?.invoiceNumber ?? allocation.debitNote?.number ?? receipt.receiptNumber, type: 'Agst Ref' as const, amount: -money(allocation.amount) })), ...(receipt.advanceAmount > 0 ? [{ name: receipt.receiptNumber, type: 'Advance' as const, amount: -receipt.advanceAmount }] : [])] },
           ];
           payload = generateTallyVoucherXml({ type: selected.type, number: receipt.receiptNumber, id: receipt.id, date: receipt.issuedAt, party: receipt.customer.tallyLedger.name, entries });
         }

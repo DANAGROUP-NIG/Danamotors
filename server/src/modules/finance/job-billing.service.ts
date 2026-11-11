@@ -1,6 +1,12 @@
-import { creditDueDate, defaultCreditDays } from './credit-terms';
-import { latestEstimateQuery, reviewApprovedScope } from '../service/estimate-approval';
-import { serviceChargeDescription, serviceChargeReference } from '../service/job-service-charge';
+import { creditDueDate, defaultCreditDays } from "./credit-terms";
+import {
+  latestEstimateQuery,
+  reviewApprovedScope,
+} from "../service/estimate-approval";
+import {
+  serviceChargeDescription,
+  serviceChargeReference,
+} from "../service/job-service-charge";
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import {
@@ -12,26 +18,64 @@ import {
 import { ROLES } from "../../shared/constants/roles";
 import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
 import { categoryOf } from "../reports/report.logic";
-import { taxRegisterValues } from '../reports/tax-register-layout';
-import { getBranchSettings } from '../company-settings/company-settings.service';
+import { taxRegisterValues } from "../reports/tax-register-layout";
+import { getBranchSettings } from "../company-settings/company-settings.service";
 import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
+import { applyJobAdvances } from "./job-advance";
+import { lockParty } from "./party-account.service";
 
 const JOB_BILL_INCLUDE = {
-        estimates: latestEstimateQuery,
-        customer: true,
-        serviceType: true,
-        service: { select: { name: true } },
-        appointment: { select: { customerId: true } },
-        vehicle: true,
-        branch: true,
-        partIssuances: { include: { sparePart: true, returns: true, requisitionLine: { select: { id: true } }, jobCardLine: { select: { id: true, chargeType: true } } } },
-        lines: { where: { quantity: { gt: 0 }, requisitionLine: { requisition: { status: 'ISSUED' } } }, include: { sparePart: true } },
-        labourLines: { include: { chargeLine: { select: { id: true, chargeType: true, quantity: true, rate: true, amount: true } } } },
-        invoices: {
-          where: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
+  estimates: latestEstimateQuery,
+  customer: true,
+  serviceType: true,
+  service: { select: { name: true } },
+  appointment: { select: { customerId: true } },
+  vehicle: true,
+  branch: true,
+  partIssuances: {
+    include: {
+      sparePart: true,
+      returns: true,
+      requisitionLine: { select: { id: true } },
+      jobCardLine: { select: { id: true, chargeType: true } },
+    },
+  },
+  lines: {
+    where: {
+      quantity: { gt: 0 },
+      requisitionLine: { requisition: { status: "ISSUED" } },
+    },
+    include: { sparePart: true },
+  },
+  labourLines: {
+    include: {
+      chargeLine: {
+        select: {
+          id: true,
+          chargeType: true,
+          quantity: true,
+          rate: true,
+          amount: true,
         },
-      } satisfies Prisma.JobCardInclude;
+      },
+    },
+  },
+  invoices: {
+    where: {
+      status: {
+        notIn: [
+          "Cancelled",
+          "CANCELLED",
+          "Canceled",
+          "CANCELED",
+          "VOID",
+          "Void",
+        ],
+      },
+    },
+  },
+} satisfies Prisma.JobCardInclude;
 
 const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
 
@@ -52,22 +96,66 @@ export class JobBillingService {
     return jobCard;
   }
 
-  private async billScope(input: { jobCardId: string; consolidateVehicle?: boolean }, transaction: Prisma.TransactionClient | typeof prisma = prisma) {
+  private async billScope(
+    input: { jobCardId: string; consolidateVehicle?: boolean },
+    transaction: Prisma.TransactionClient | typeof prisma = prisma,
+  ) {
     const jobCard = await this.loadJobCard(input.jobCardId, transaction);
     this.assertBillable(jobCard);
-    if (input.consolidateVehicle && !jobCard.vehicleId) throw new BadRequestError('Choose a job card with a vehicle');
-    const jobCards = input.consolidateVehicle ? await transaction.jobCard.findMany({
-      where: { vehicleId: jobCard.vehicleId, billedAt: null, status: { notIn: ['BILLED', 'Billed', 'DELIVERED', 'Closed', 'CANCELLED', 'Cancelled'] } },
-      orderBy: { id: 'asc' }, include: JOB_BILL_INCLUDE,
-    }) : [jobCard];
-    if (!jobCards.length || !jobCards.some(card => card.id === jobCard.id)) throw new ConflictError('The selected job is no longer open');
+    if (input.consolidateVehicle && !jobCard.vehicleId)
+      throw new BadRequestError("Choose a job card with a vehicle");
+    const jobCards = input.consolidateVehicle
+      ? await transaction.jobCard.findMany({
+          where: {
+            vehicleId: jobCard.vehicleId,
+            billedAt: null,
+            status: {
+              notIn: [
+                "BILLED",
+                "Billed",
+                "DELIVERED",
+                "Closed",
+                "CANCELLED",
+                "Cancelled",
+              ],
+            },
+          },
+          orderBy: { id: "asc" },
+          include: JOB_BILL_INCLUDE,
+        })
+      : [jobCard];
+    if (!jobCards.length || !jobCards.some((card) => card.id === jobCard.id))
+      throw new ConflictError("The selected job is no longer open");
     for (const card of jobCards) {
-      if (card.branchId !== jobCard.branchId || card.customerId !== jobCard.customerId) throw new BadRequestError('Consolidated job cards must have the same branch and bill-to customer');
+      if (
+        card.branchId !== jobCard.branchId ||
+        card.customerId !== jobCard.customerId
+      )
+        throw new BadRequestError(
+          "Consolidated job cards must have the same branch and bill-to customer",
+        );
       this.assertBillable(card);
     }
-    const scopes = jobCards.map(card => ({ card, ...this.pricedScope(card) }));
-    const lines = scopes.flatMap(scope => scope.lines.map(line => ({ ...line, description: input.consolidateVehicle ? `${scope.card.jobNumber}: ${line.description}` : line.description })));
-    const review = { ...scopes[0].review, canBill: scopes.every(scope => scope.review.canBill), issues: scopes.flatMap(scope => scope.review.issues.map(issue => `${scope.card.jobNumber}: ${issue}`)), rows: scopes.flatMap(scope => scope.review.rows) };
+    const scopes = jobCards.map((card) => ({
+      card,
+      ...this.pricedScope(card),
+    }));
+    const lines = scopes.flatMap((scope) =>
+      scope.lines.map((line) => ({
+        ...line,
+        description: input.consolidateVehicle
+          ? `${scope.card.jobNumber}: ${line.description}`
+          : line.description,
+      })),
+    );
+    const review = {
+      ...scopes[0].review,
+      canBill: scopes.every((scope) => scope.review.canBill),
+      issues: scopes.flatMap((scope) =>
+        scope.review.issues.map((issue) => `${scope.card.jobNumber}: ${issue}`),
+      ),
+      rows: scopes.flatMap((scope) => scope.review.rows),
+    };
     return { jobCard, jobCards, lines, review };
   }
 
@@ -139,43 +227,92 @@ export class JobBillingService {
       ];
     });
     const labourLines = jobCard.labourLines.map((line) => {
-      if (line.labourSlipId && !line.chargeLine) throw new BadRequestError('Labour slip charge is missing');
+      if (line.labourSlipId && !line.chargeLine)
+        throw new BadRequestError("Labour slip charge is missing");
       return {
-      type: "LABOUR" as const,
-      jobCardLabourId: line.id,
-      referenceId: line.labourItemId,
-      description: line.description,
-      jobCardLineId: line.labourSlipId ? line.chargeLine?.id : undefined,
-      quantity: line.labourSlipId ? line.chargeLine!.quantity : line.hours,
-      rate: line.labourSlipId ? line.chargeLine!.rate : line.rate,
-      amount: money(line.amount),
-      customerPaid: customerPays(line.chargeLine),
-    }; });
-    const serviceLines = jobCard.serviceCharge == null ? [] : [{
-      type: "SERVICE" as const, referenceId: serviceChargeReference(jobCard), description: jobCard.service?.name ? `${jobCard.service.name} ? service charge` : serviceChargeDescription(jobCard), quantity: 1, rate: money(jobCard.serviceCharge),
-      amount: money(jobCard.serviceCharge), customerPaid: !companyPaid,
-    }];
-    const requisitionLines = (jobCard.lines ?? []).map(line => {
-      if (!line.sparePart || !line.sparePartId) throw new BadRequestError('Requisition charge is missing its part');
+        type: "LABOUR" as const,
+        jobCardLabourId: line.id,
+        referenceId: line.labourItemId,
+        description: line.description,
+        jobCardLineId: line.labourSlipId ? line.chargeLine?.id : undefined,
+        quantity: line.labourSlipId ? line.chargeLine!.quantity : line.hours,
+        rate: line.labourSlipId ? line.chargeLine!.rate : line.rate,
+        amount: money(line.amount),
+        customerPaid: customerPays(line.chargeLine),
+      };
+    });
+    const serviceLines =
+      jobCard.serviceCharge == null
+        ? []
+        : [
+            {
+              type: "SERVICE" as const,
+              referenceId: serviceChargeReference(jobCard),
+              description: jobCard.service?.name
+                ? `${jobCard.service.name} ? service charge`
+                : serviceChargeDescription(jobCard),
+              quantity: 1,
+              rate: money(jobCard.serviceCharge),
+              amount: money(jobCard.serviceCharge),
+              customerPaid: !companyPaid,
+            },
+          ];
+    const requisitionLines = (jobCard.lines ?? []).map((line) => {
+      if (!line.sparePart || !line.sparePartId)
+        throw new BadRequestError("Requisition charge is missing its part");
       return {
-        type: 'PART' as const, jobCardLineId: line.id, partId: line.sparePartId, referenceId: line.sparePartId,
-        taxCategory: categoryOf(line.sparePart), taxable: line.taxable, partSource: line.partSource,
-        description: line.description, quantity: line.quantity, rate: line.rate, amount: money(line.amount),
+        type: "PART" as const,
+        jobCardLineId: line.id,
+        partId: line.sparePartId,
+        referenceId: line.sparePartId,
+        taxCategory: categoryOf(line.sparePart),
+        taxable: line.taxable,
+        partSource: line.partSource,
+        description: line.description,
+        quantity: line.quantity,
+        rate: line.rate,
+        amount: money(line.amount),
         customerPaid: customerPays(line),
       };
     });
-    const lines = [...partLines, ...requisitionLines, ...labourLines, ...serviceLines];
-    if (!lines.some((line) => line.customerPaid)) throw new BadRequestError("Record customer-paid parts, labour or a service charge before creating a job bill");
-    if (lines.some((line) => line.amount < 0 || !Number.isFinite(line.amount))) throw new BadRequestError("Invalid job-card line amount");
+    const lines = [
+      ...partLines,
+      ...requisitionLines,
+      ...labourLines,
+      ...serviceLines,
+    ];
+    if (!lines.some((line) => line.customerPaid))
+      throw new BadRequestError(
+        "Record customer-paid parts, labour or a service charge before creating a job bill",
+      );
+    if (lines.some((line) => line.amount < 0 || !Number.isFinite(line.amount)))
+      throw new BadRequestError("Invalid job-card line amount");
     return lines;
   }
 
-  private pricedScope(jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>) {
-    const rawLines = this.getBillLines(jobCard).filter(line => line.customerPaid);
-    const review = reviewApprovedScope(jobCard.estimates?.[0], rawLines, jobCard.customerId ?? jobCard.appointment?.customerId);
-    const lines = rawLines.map(line => {
-      const row = review.rows.find(row => row.type === line.type && row.referenceId === line.referenceId);
-      return row?.included ? { ...line, rate: 0, amount: 0, description: `${line.description} (included in service charge)` } : line;
+  private pricedScope(
+    jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
+  ) {
+    const rawLines = this.getBillLines(jobCard).filter(
+      (line) => line.customerPaid,
+    );
+    const review = reviewApprovedScope(
+      jobCard.estimates?.[0],
+      rawLines,
+      jobCard.customerId ?? jobCard.appointment?.customerId,
+    );
+    const lines = rawLines.map((line) => {
+      const row = review.rows.find(
+        (row) => row.type === line.type && row.referenceId === line.referenceId,
+      );
+      return row?.included
+        ? {
+            ...line,
+            rate: 0,
+            amount: 0,
+            description: `${line.description} (included in service charge)`,
+          }
+        : line;
     });
     return { lines, review };
   }
@@ -193,11 +330,29 @@ export class JobBillingService {
         billedAt: null,
         ...(branchId ? { branchId } : {}),
         invoices: {
-          none: { status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
+          none: {
+            status: {
+              notIn: [
+                "Cancelled",
+                "CANCELLED",
+                "Canceled",
+                "CANCELED",
+                "VOID",
+                "Void",
+              ],
+            },
+          },
         },
       },
       include: {
-        customer: { select: { id: true, firstName: true, lastName: true, companyName: true } },
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            companyName: true,
+          },
+        },
         vehicle: {
           select: {
             id: true,
@@ -222,19 +377,42 @@ export class JobBillingService {
       getBranchSettings(jobCard.branchId, transaction),
       partsVatSettings(transaction),
     ]);
-    return calculateBillWithPartsVat({
-      partsTotal: sumMoney(lines.filter(line => line.type === 'PART').map(line => line.amount)),
-      labourTotal: sumMoney(lines.filter(line => line.type === 'LABOUR').map(line => line.amount)),
-      serviceTotal: sumMoney(lines.filter(line => line.type === 'SERVICE').map(line => line.amount)),
-      ...discounts,
-      vatRate: settings.labourVatPercent,
-      roundOffValue: settings.roundOffValue,
-    }, lines.flatMap(line => line.type === 'PART' ? [{
-      amount: line.amount,
-      category: line.taxCategory,
-      taxable: line.taxable,
-      customerPaid: line.customerPaid,
-    }] : []), taxSettings.enabled, taxSettings.rates);
+    return calculateBillWithPartsVat(
+      {
+        partsTotal: sumMoney(
+          lines
+            .filter((line) => line.type === "PART")
+            .map((line) => line.amount),
+        ),
+        labourTotal: sumMoney(
+          lines
+            .filter((line) => line.type === "LABOUR")
+            .map((line) => line.amount),
+        ),
+        serviceTotal: sumMoney(
+          lines
+            .filter((line) => line.type === "SERVICE")
+            .map((line) => line.amount),
+        ),
+        ...discounts,
+        vatRate: settings.labourVatPercent,
+        roundOffValue: settings.roundOffValue,
+      },
+      lines.flatMap((line) =>
+        line.type === "PART"
+          ? [
+              {
+                amount: line.amount,
+                category: line.taxCategory,
+                taxable: line.taxable,
+                customerPaid: line.customerPaid,
+              },
+            ]
+          : [],
+      ),
+      taxSettings.enabled,
+      taxSettings.rates,
+    );
   }
 
   async previewJobBill(input: {
@@ -250,11 +428,21 @@ export class JobBillingService {
     });
     return {
       jobCard,
-      jobCards: jobCards.map(card => ({ id: card.id, jobNumber: card.jobNumber })),
+      jobCards: jobCards.map((card) => ({
+        id: card.id,
+        jobNumber: card.jobNumber,
+      })),
       review,
       lines,
       vatBreakdown: breakdown,
-      totals: { ...totals, subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]) },
+      totals: {
+        ...totals,
+        subtotal: sumMoney([
+          totals.partsTotal,
+          totals.labourTotal,
+          totals.serviceTotal,
+        ]),
+      },
     };
   }
 
@@ -271,6 +459,11 @@ export class JobBillingService {
       try {
         return await prisma.$transaction(
           async (transaction) => {
+            // Use the same customer -> job -> receipt lock order as advance receipt creation.
+            const owner = await transaction.jobCard.findUnique({ where: { id: input.jobCardId }, select: { customerId: true, appointment: { select: { customerId: true } } } });
+            const ownerId = owner?.customerId ?? owner?.appointment?.customerId;
+            if (!ownerId) throw new BadRequestError("The job card does not have a customer");
+            await lockParty(transaction, ownerId);
             if (input.consolidateVehicle) {
               await transaction.$queryRaw`SELECT v.id FROM "Vehicle" v JOIN "JobCard" j ON j."vehicleId" = v.id WHERE j.id = ${input.jobCardId} FOR UPDATE OF v`;
               await transaction.$queryRaw`SELECT id FROM "JobCard" WHERE "vehicleId" = (SELECT "vehicleId" FROM "JobCard" WHERE id = ${input.jobCardId}) ORDER BY id FOR UPDATE`;
@@ -278,11 +471,17 @@ export class JobBillingService {
             await transaction.$queryRaw<Array<{ id: string }>>(
               Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${input.jobCardId} FOR UPDATE`,
             );
-            const { jobCard, jobCards, lines, review } = await this.billScope(input, transaction);
+            const { jobCard, jobCards, lines, review } = await this.billScope(
+              input,
+              transaction,
+            );
             const customerId =
               jobCard.customerId ?? jobCard.appointment?.customerId;
             if (!customerId)
-              throw new BadRequestError("The job card does not have a customer");
+              throw new BadRequestError(
+                "The job card does not have a customer",
+              );
+            if (customerId !== ownerId) throw new ConflictError("The billing customer changed; refresh the job and retry");
 
             const advisor = await transaction.user.findUnique({
               where: { id: input.serviceAdvisorId },
@@ -300,30 +499,64 @@ export class JobBillingService {
                 "The service advisor must belong to the job card branch",
               );
 
-            if (!review.canBill) throw new BadRequestError(review.issues.join(' '));
-            const { totals, breakdown } = await this.calculateTotals(jobCard, lines, {
-              partsDiscountPercent: input.partsDiscountPercent,
-              labourDiscountPercent: input.labourDiscountPercent,
-            }, transaction);
+            if (!review.canBill)
+              throw new BadRequestError(review.issues.join(" "));
+            const { totals, breakdown } = await this.calculateTotals(
+              jobCard,
+              lines,
+              {
+                partsDiscountPercent: input.partsDiscountPercent,
+                labourDiscountPercent: input.labourDiscountPercent,
+              },
+              transaction,
+            );
             const invoiceNumber = await nextDocumentNumber(
               transaction,
               "JOB_BILL",
             );
             const issuedDate = new Date();
-            const customerTerms = await transaction.customer.findUniqueOrThrow({ where: { id: customerId }, select: { creditDays: true } });
-            const dueDate = creditDueDate(issuedDate, customerTerms.creditDays ?? await defaultCreditDays(transaction));
+            const customerTerms = await transaction.customer.findUniqueOrThrow({
+              where: { id: customerId },
+              select: { creditDays: true },
+            });
+            const dueDate = creditDueDate(
+              issuedDate,
+              customerTerms.creditDays ??
+                (await defaultCreditDays(transaction)),
+            );
             const invoice = await transaction.invoice.create({
               data: {
                 customerId,
                 jobCardId: jobCard.id,
                 invoiceNumber,
-                billType: input.consolidateVehicle ? "WARRANTY" : jobCard.creditApprovedById ? "CREDIT" : "CASH",
-                ...(input.consolidateVehicle ? { jobCards: { connect: jobCards.map(card => ({ id: card.id })) } } : {}),
-                vatBreakdown: {create:breakdown},
-                taxRegisterSnapshot: { version: 1, source: 'BILLING', values: taxRegisterValues({ ...totals, vatBreakdown: breakdown }).values },
+                billType: input.consolidateVehicle
+                  ? "WARRANTY"
+                  : jobCard.creditApprovedById
+                    ? "CREDIT"
+                    : "CASH",
+                ...(input.consolidateVehicle
+                  ? {
+                      jobCards: {
+                        connect: jobCards.map((card) => ({ id: card.id })),
+                      },
+                    }
+                  : {}),
+                vatBreakdown: { create: breakdown },
+                taxRegisterSnapshot: {
+                  version: 1,
+                  source: "BILLING",
+                  values: taxRegisterValues({
+                    ...totals,
+                    vatBreakdown: breakdown,
+                  }).values,
+                },
                 issuedDate,
                 dueDate,
-                subtotal: sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal]),
+                subtotal: sumMoney([
+                  totals.partsTotal,
+                  totals.labourTotal,
+                  totals.serviceTotal,
+                ]),
                 tax: totals.vatAmount,
                 total: totals.total,
                 outstandingAmount: totals.total,
@@ -341,7 +574,22 @@ export class JobBillingService {
                 notes: input.notes,
                 status: totals.total === 0 ? "Paid" : "Unpaid",
                 // Batch line snapshots to avoid one insert round trip per line.
-                lines: { createMany: { data: lines.map(line => { const {referenceId: _referenceId, ...snapshot}=line; const {taxCategory: _taxCategory, taxable: _taxable, ...stored}=snapshot as typeof snapshot & {taxCategory?:string;taxable?:boolean};return stored;}) } },
+                lines: {
+                  createMany: {
+                    data: lines.map((line) => {
+                      const { referenceId: _referenceId, ...snapshot } = line;
+                      const {
+                        taxCategory: _taxCategory,
+                        taxable: _taxable,
+                        ...stored
+                      } = snapshot as typeof snapshot & {
+                        taxCategory?: string;
+                        taxable?: boolean;
+                      };
+                      return stored;
+                    }),
+                  },
+                },
               },
               include: {
                 lines: true,
@@ -351,27 +599,34 @@ export class JobBillingService {
               },
             });
             for (const billedCard of jobCards) {
-            await transaction.jobCard.update({
-              where: { id: billedCard.id },
-              data: {
-                billedAt: new Date(),
-                status: ["DELIVERED", "Closed"].includes(billedCard.status)
-                  ? "DELIVERED"
-                  : "BILLED",
-                statusHistory: {
-                  create: {
-                    fromStatus: billedCard.status,
-                    toStatus: ["DELIVERED", "Closed"].includes(billedCard.status)
-                      ? "DELIVERED"
-                      : "BILLED",
-                    actorId: input.actorId ?? input.serviceAdvisorId,
-                    remarks: `Job bill ${invoiceNumber} created against approved estimate ${review.estimateId}`,
+              await transaction.jobCard.update({
+                where: { id: billedCard.id },
+                data: {
+                  billedAt: new Date(),
+                  status: ["DELIVERED", "Closed"].includes(billedCard.status)
+                    ? "DELIVERED"
+                    : "BILLED",
+                  statusHistory: {
+                    create: {
+                      fromStatus: billedCard.status,
+                      toStatus: ["DELIVERED", "Closed"].includes(
+                        billedCard.status,
+                      )
+                        ? "DELIVERED"
+                        : "BILLED",
+                      actorId: input.actorId ?? input.serviceAdvisorId,
+                      remarks: `Job bill ${invoiceNumber} created against approved estimate ${review.estimateId}`,
+                    },
                   },
                 },
-              },
-            });
+              });
             }
-            return invoice;
+            const settled = await applyJobAdvances(transaction, jobCards.map(card => card.id), invoice, jobCard.branchId);
+            await transaction.auditLog.create({ data: {
+              userId: input.actorId ?? input.serviceAdvisorId, action: "JOB_ADVANCES_APPLIED",
+              details: JSON.stringify({ invoiceId: invoice.id, jobCardIds: jobCards.map(card => card.id), appliedAmount: sumMoney([invoice.total, -settled.outstandingAmount]) }),
+            } });
+            return settled;
           },
           {
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -382,19 +637,36 @@ export class JobBillingService {
       } catch (error) {
         // P2034 guarantees an aborted transaction. Re-read and revalidate on retry;
         // never replay timeouts/connection errors with an uncertain outcome.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt + Math.floor(Math.random() * 100)));
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2034" &&
+          attempt < 2
+        ) {
+          await new Promise((resolve) =>
+            setTimeout(
+              resolve,
+              100 * 2 ** attempt + Math.floor(Math.random() * 100),
+            ),
+          );
           continue;
         }
-        if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2028", "P2024"].includes(error.code)) {
-          throw new AppError("Billing could not finish while the database was busy. Refresh the job card to check whether a bill exists before trying again.", 503);
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          ["P2028", "P2024"].includes(error.code)
+        ) {
+          throw new AppError(
+            "Billing could not finish while the database was busy. Refresh the job card to check whether a bill exists before trying again.",
+            503,
+          );
         }
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
           ["P2002", "P2034"].includes(error.code)
         ) {
           throw new ConflictError(
-            error.code === "P2034" ? "The job card changed during billing. Refresh the preview and retry." : "This job card has already been billed. Refresh the billable job list.",
+            error.code === "P2034"
+              ? "The job card changed during billing. Refresh the preview and retry."
+              : "This job card has already been billed. Refresh the billable job list.",
           );
         }
         throw error;
@@ -408,10 +680,17 @@ export class JobBillingService {
         await transaction.$queryRaw<Array<{ id: string }>>(
           Prisma.sql`SELECT id FROM "Invoice" WHERE id = ${id} FOR UPDATE`,
         );
-        const invoice = await transaction.invoice.findUnique({ where: { id }, include: { jobCards: { select: { id: true } } } });
+        const invoice = await transaction.invoice.findUnique({
+          where: { id },
+          include: { jobCards: { select: { id: true } } },
+        });
         if (!invoice) throw new NotFoundError("Invoice not found");
-        if (!invoice.jobCardId) throw new BadRequestError("Only job bills can be cancelled through this action");
-        if (!remark.trim()) throw new BadRequestError("A cancellation remark is required");
+        if (!invoice.jobCardId)
+          throw new BadRequestError(
+            "Only job bills can be cancelled through this action",
+          );
+        if (!remark.trim())
+          throw new BadRequestError("A cancellation remark is required");
         if (!isActiveBillStatus(invoice.status))
           throw new BadRequestError("This bill is already cancelled");
         if (
@@ -463,14 +742,19 @@ export class JobBillingService {
             cancelRemark: remark,
           },
         });
-        for (const linkedCard of (invoice.jobCards?.length ? invoice.jobCards : [{ id: invoice.jobCardId }])) {
+        for (const linkedCard of invoice.jobCards?.length
+          ? invoice.jobCards
+          : [{ id: invoice.jobCardId }]) {
           await transaction.$queryRaw(
             Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${linkedCard.id} FOR UPDATE`,
           );
           const card = await transaction.jobCard.findUnique({
             where: { id: linkedCard.id },
           });
-          if (card?.deliveredAt || (card && ["DELIVERED", "Closed"].includes(card.status)))
+          if (
+            card?.deliveredAt ||
+            (card && ["DELIVERED", "Closed"].includes(card.status))
+          )
             throw new ConflictError("A delivered job bill cannot be cancelled");
           await transaction.jobCardStatusHistory.create({
             data: {

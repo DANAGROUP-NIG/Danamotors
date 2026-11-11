@@ -225,6 +225,8 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *             required: [customerId, mode, amount]
  *             properties:
  *               customerId: { type: string, format: uuid }
+ *               advanceJobCardId: { type: string, format: uuid, description: 'Optional job advance. Any positive amount; service receipt without invoice allocations. Cheques require a separate clearance workflow and are not accepted as job advances.' }
+ *               idempotencyKey: { type: string, format: uuid, description: 'Required for a job advance. Reuse the same key and details when retrying a payment request.' }
  *               mode: { type: string, enum: [POS, BANK_TRANSFER, CASH] }
  *               category: { type: string, enum: [SERVICE_PARTS, SALES_ENQUIRY] }
  *               bankId: { type: string, format: uuid, description: Required for POS and bank transfer }

@@ -4,8 +4,11 @@ jest.mock('../../prisma/client', () => ({
     $transaction: jest.fn(), $queryRaw: jest.fn(),
     jobCard: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn() },
-    invoice: { create: jest.fn() },
-    customer: { findUniqueOrThrow: jest.fn() },
+    invoice: { create: jest.fn(), update: jest.fn() },
+    receipt: { findMany: jest.fn(), update: jest.fn() },
+    receiptAllocation: { create: jest.fn() },
+    auditLog: { create: jest.fn() },
+    customer: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn() },
     financeSetting: { findUnique: jest.fn() },
     branchSettings: { findUnique: jest.fn() },
     documentSequence: { upsert: jest.fn() },
@@ -35,7 +38,10 @@ describe('Job billing after delivery on credit', () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(card);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'advisor', role: { name: ROLES.SERVICE_ADVISOR }, isActive: true, branchId: 'branch' });
     (prisma.documentSequence.upsert as jest.Mock).mockResolvedValue({ value: 1 });
-    (prisma.invoice.create as jest.Mock).mockResolvedValue({ id: 'invoice' });
+    (prisma.customer.findUnique as jest.Mock).mockResolvedValue({ id: 'customer' });
+    (prisma.receipt.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.invoice.create as jest.Mock).mockImplementation(({ data }) => Promise.resolve({ id: 'invoice', ...data }));
+    (prisma.invoice.update as jest.Mock).mockImplementation(({ data }) => Promise.resolve({ id: 'invoice', ...data }));
   });
 
   it('creates a bill while preserving delivery and gate-pass details', async () => {
@@ -58,7 +64,7 @@ describe('Job billing after delivery on credit', () => {
     expect(prisma.invoice.create).toHaveBeenCalledTimes(1);
     expect(prisma.invoice.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ billType: 'WARRANTY', labourTotal: 200, total: 210, jobCards: { connect: [{ id: 'job' }, { id: 'job2' }] } }) }));
     expect(prisma.jobCard.update).toHaveBeenCalledTimes(2);
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(5);
   });
   it('refuses mixed customers or unfinished work instead of partially billing a vehicle', async () => {
     const first = { ...card, id: 'job', jobNumber: 'J1', vehicleId: 'vehicle', status: 'READY', deliveredAt: null };
@@ -174,7 +180,10 @@ describe('Job-bill transaction resilience', () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(card);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'advisor', role: { name: ROLES.SERVICE_ADVISOR }, isActive: true, branchId: 'branch' });
     (prisma.documentSequence.upsert as jest.Mock).mockResolvedValue({ value: 1 });
-    (prisma.invoice.create as jest.Mock).mockResolvedValue({ id: 'invoice' });
+    (prisma.customer.findUnique as jest.Mock).mockResolvedValue({ id: 'customer' });
+    (prisma.receipt.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.invoice.create as jest.Mock).mockImplementation(({ data }) => Promise.resolve({ id: 'invoice', ...data }));
+    (prisma.invoice.update as jest.Mock).mockImplementation(({ data }) => Promise.resolve({ id: 'invoice', ...data }));
   });
 
   it('uses customer terms before the company default', async () => {
@@ -189,12 +198,12 @@ describe('Job-bill transaction resilience', () => {
     await new JobBillingService().createJobBill(input);
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', maxWait: 5000, timeout: 15000 });
     expect((prisma.invoice.create as jest.Mock).mock.calls[0][0].data.lines).toEqual({ createMany: { data: [expect.objectContaining({ type: 'LABOUR', amount: 100 })] } });
-    expect((prisma.jobCard.findUnique as jest.Mock).mock.calls[0][0].include.labourLines).toEqual({ include: { chargeLine: { select: { id: true, chargeType: true, quantity: true, rate: true, amount: true } } } });
+    expect((prisma.jobCard.findUnique as jest.Mock).mock.calls[1][0].include.labourLines).toEqual({ include: { chargeLine: { select: { id: true, chargeType: true, quantity: true, rate: true, amount: true } } } });
   });
 
   it('retries an aborted serialization conflict', async () => {
     (prisma.$transaction as jest.Mock).mockRejectedValueOnce(prismaFailure('P2034'));
-    await expect(new JobBillingService().createJobBill(input)).resolves.toEqual({ id: 'invoice' });
+    await expect(new JobBillingService().createJobBill(input)).resolves.toMatchObject({ id: 'invoice' });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
   });
 

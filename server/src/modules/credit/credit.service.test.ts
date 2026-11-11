@@ -1,7 +1,7 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   $transaction: jest.fn(), $queryRaw: jest.fn(),
   branch: { findFirst: jest.fn() },
-  receipt: { update: jest.fn() }, partyNote: { update: jest.fn() },
+  receipt: { update: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() }, partyNote: { update: jest.fn() },
   receiptAllocation: { createMany: jest.fn() }, partyAdjustmentBatch: { findUnique: jest.fn(), create: jest.fn() },
   customerCreditApplication: { findUnique: jest.fn(), findFirst: jest.fn(), findUniqueOrThrow: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   customer: { findUnique: jest.fn(), update: jest.fn() },
@@ -22,6 +22,8 @@ const customer = { id: customerId, creditBalance: 100, branchId: 'branch' };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(prisma.receipt.findFirst).mockResolvedValue(null);
+  jest.mocked(prisma.receipt.findMany).mockResolvedValue([]);
   (prisma.$transaction as jest.Mock).mockReset().mockImplementation(cb => cb(prisma));
   (prisma.customerCreditApplication.findUnique as jest.Mock).mockReset().mockResolvedValue(application);
   (prisma.customerCreditApplication.update as jest.Mock).mockResolvedValue({ ...application, status: 'Approved' });

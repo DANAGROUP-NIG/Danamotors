@@ -50,6 +50,7 @@ export const createPaymentSchema = z.object({
 
 export const createReceiptSchema = z.object({
   body: z.object({
+    advanceJobCardId: z.string().uuid('Invalid job card ID').optional(),
     customerId: z.string().uuid('Invalid customer ID'),
     branchId: z.string().uuid().optional(),
     idempotencyKey: z.string().uuid().optional(),
@@ -76,6 +77,13 @@ export const createReceiptSchema = z.object({
     const invoiceIds = body.allocations.map((allocation) => allocation.invoiceId);
     if (new Set(invoiceIds).size !== invoiceIds.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ['allocations'], message: 'Each invoice can only appear once' });
+    }
+    // TODO(confirm): support cheque advances after an explicit bank-clearance workflow exists.
+    if (body.advanceJobCardId && !body.idempotencyKey) {
+      context.addIssue({ code: 'custom', path: ['idempotencyKey'], message: 'A request key is required to prevent duplicate job advance receipts' });
+    }
+    if (body.advanceJobCardId && (body.mode === 'CHEQUE' || body.category !== 'SERVICE_PARTS' || body.allocations.length)) {
+      context.addIssue({ code: 'custom', path: ['advanceJobCardId'], message: 'A job advance requires a confirmed cash, POS or bank-transfer service receipt without invoice allocations' });
     }
     if (body.mode === 'CHEQUE' && (!body.chequeNumber || !body.chequeDate)) context.addIssue({ code: 'custom', path: ['chequeNumber'], message: 'Cheque number and date are required' });
     if (body.mode !== 'CHEQUE' && (body.chequeNumber || body.chequeDate)) context.addIssue({ code: 'custom', path: ['mode'], message: 'Cheque details are only allowed for cheque receipts' });

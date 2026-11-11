@@ -2,6 +2,9 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { money } from '../finance/money';
+import { lockParty, withPartyTransaction } from '../finance/party-account.service';
+import { advanceReceiptDateLimit, lockAdvanceJob, prepareJobAdvance } from '../finance/job-advance';
+import { lagosDay } from '../finance/credit-terms';
 
 export function upfrontAmount(amount: number, percent: Prisma.Decimal | number) {
   const rate = new Prisma.Decimal(percent);
@@ -10,31 +13,34 @@ export function upfrontAmount(amount: number, percent: Prisma.Decimal | number) 
 }
 
 export async function assertDepositPaid(tx: Prisma.TransactionClient, jobCardId: string) {
-  const estimate = await tx.estimate.findFirst({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
-  if (!estimate) throw new BadRequestError('Prepare an estimate before starting work');
-  const required = upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent);
-  if (required === 0) return;
-  const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, include: { depositReceipt: true } });
-  const receipt = card.depositReceipt;
-  if (!receipt || receipt.status === 'CANCELLED' || money(receipt.advanceAmount) < required) throw new BadRequestError('Record the required upfront deposit before starting work');
+  // Every entry into work, including rework, requires money received. The estimate's
+  // percentage is a suggestion and even a zero-percent target cannot bypass this gate.
+  const receipt = await tx.receipt.findFirst({ where: {
+    advanceJobCardId: jobCardId, status: 'ACTIVE', category: 'SERVICE_PARTS',
+    mode: { not: 'CHEQUE' }, advanceAmount: { gte: 0.01 },
+    issuedAt: { lte: advanceReceiptDateLimit() },
+  }, select: { id: true } });
+  if (!receipt) throw new BadRequestError('Record a positive advance payment before starting work');
 }
 
 export async function recordJobDeposit(jobCardId: string, receiptId: string, actorId: string) {
-  return prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`;
-    const card = await tx.jobCard.findUnique({ where: { id: jobCardId } });
-    if (!card) throw new NotFoundError('Job card not found');
-    if (card.billedAt || ['BILLED', 'DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'].includes(card.status)) throw new BadRequestError('This job card is closed');
-    await tx.$queryRaw`SELECT id FROM "Receipt" WHERE id = ${receiptId} FOR UPDATE`;
-    const receipt = await tx.receipt.findUnique({ where: { id: receiptId }, include: { depositJobCard: true } });
-    if (!receipt || receipt.status === 'CANCELLED' || receipt.customerId !== card.customerId || receipt.branchId !== card.branchId || receipt.category !== 'SERVICE_PARTS') throw new BadRequestError('Choose an active service receipt for this customer and branch');
-    if (receipt.depositJobCard && receipt.depositJobCard.id !== jobCardId) throw new ConflictError('Receipt is already the deposit for another job card');
-    if (card.depositReceiptId && card.depositReceiptId !== receiptId) throw new ConflictError('A deposit is already recorded');
-    const estimate = await tx.estimate.findFirst({ where: { jobCardId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
-    if (!estimate) throw new BadRequestError('Prepare the estimate first');
-    if (money(receipt.advanceAmount) < upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent)) throw new BadRequestError('Receipt has insufficient unallocated funds for the required deposit');
-    await tx.jobCard.update({ where: { id: jobCardId }, data: { depositReceiptId: receiptId } });
-    await tx.auditLog.create({ data: { userId: actorId, action: 'JOB_DEPOSIT_RECORDED', details: JSON.stringify({ jobCardId, receiptId }) } });
+  const owner = await prisma.jobCard.findUnique({ where: { id: jobCardId }, select: { customerId: true } });
+  if (!owner?.customerId) throw new NotFoundError('Job customer not found');
+  return withPartyTransaction(async tx => {
+    await lockParty(tx, owner.customerId!);
+    await lockAdvanceJob(tx, jobCardId);
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${receiptId} FOR UPDATE`);
+    const receipt = await tx.receipt.findUnique({ where: { id: receiptId } });
+    const card = await tx.jobCard.findUniqueOrThrow({ where: { id: jobCardId } });
+    if (!receipt || receipt.status !== 'ACTIVE' || receipt.customerId !== card.customerId || receipt.branchId !== card.branchId || receipt.category !== 'SERVICE_PARTS') throw new BadRequestError('Choose an active service receipt for this customer and branch');
+    if (receipt.mode === 'CHEQUE') throw new BadRequestError('Uncleared cheques cannot be used as job advances');
+    if (receipt.issuedAt && lagosDay(receipt.issuedAt) > lagosDay(new Date())) throw new BadRequestError('A future-dated receipt cannot be used as an advance');
+    if (receipt.advanceJobCardId && receipt.advanceJobCardId !== jobCardId) throw new ConflictError('Receipt is reserved for another job');
+    if (receipt.advanceJobCardId === jobCardId) return { receiptId };
+    if (money(receipt.advanceAmount) <= 0 || money(receipt.advanceAmount) !== money(receipt.amount)) throw new BadRequestError('Choose a positive, fully unallocated receipt');
+    const advanceSnapshot = await prepareJobAdvance(tx, jobCardId, receipt.customerId, card.branchId, receipt.advanceAmount);
+    await tx.receipt.update({ where: { id: receiptId }, data: { advanceJobCardId: jobCardId, advanceSnapshot } });
+    await tx.auditLog.create({ data: { userId: actorId, action: 'JOB_DEPOSIT_RECORDED', details: JSON.stringify({ jobCardId, receiptId, amount: receipt.amount }) } });
     return { receiptId };
   });
 }

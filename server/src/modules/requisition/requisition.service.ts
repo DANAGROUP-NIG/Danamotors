@@ -1,3 +1,4 @@
+import { jobWorkUpdate } from './requisition-work';
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { ChargeType, PartStatus, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -6,7 +7,7 @@ import { nextSequenceNumber } from '../../shared/db/documentSequence';
 import { assertChargeChange } from '../job-card-line/jobCardLine.logic';
 import { assertApprovedOperation } from '../service/estimate-approval';
 import { lineAmount, money } from '../finance/money';
-import { assertRequisitionBranch, assertRequisitionJob, RequisitionActor, requisitionAmounts, requisitionFooter, requisitionWorkUpdate } from './requisition.logic';
+import { assertRequisitionBranch, assertRequisitionJob, RequisitionActor, requisitionAmounts, requisitionFooter } from './requisition.logic';
 import { RequisitionInput, RequisitionQuery, requisitionBody } from './requisition.validation';
 
 const include = {
@@ -100,7 +101,7 @@ export class RequisitionService {
           }
         }
       }
-      if (issued.length) await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId) });
+      if (issued.length) await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId) });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'REQUISITION_CREATED', details: JSON.stringify({ requisitionId: document.id, requisitionNumber, branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, goodwillReason: input.goodwillReason }) } });
       return this.get(document.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
@@ -131,7 +132,7 @@ export class RequisitionService {
       }
       await tx.jobCardLine.deleteMany({ where: { requisitionLine: { requisitionId: id } } });
       await tx.partRequisition.update({ where: { id }, data: { status: 'CANCELLED', cancelReason: reason.trim(), cancelledById: actor.userId, cancelledAt: new Date() } });
-      if (document.lines.some(line => line.quantityIssued > 0)) await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId) });
+      if (document.lines.some(line => line.quantityIssued > 0)) await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId) });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'REQUISITION_CANCELLED', details: JSON.stringify({ requisitionId: id, branchId: document.branchId, jobCardId: job.id, oldStatus: document.status, reason: reason.trim(), lines: document.lines.map(line => ({ id: line.id, quantity: line.quantityIssued, amount: line.amount.toString() })) }) } });
       return this.get(id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });

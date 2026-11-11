@@ -167,7 +167,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
         >
           <option value="">{billed ? "Select an action" : WORKSPACE_COPY.saveFindings}</option>
           {(jobCard.allowedTransitions ?? []).filter((value) => value !== "DELIVERED" || canDeliver).map((value) => (
-            <option key={value} value={value} disabled={(["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: "Start work", QC: "Job done ? send for QC", WAITING_PARTS: "Wait for unavailable parts", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
+            <option key={value} value={value} disabled={(value === "IN_PROGRESS" && !jobCard.canStartWork) || (["IN_PROGRESS", "QC", "READY"].includes(value) && !estimateApproved) || (value === "READY" && jobCard.qcStatus?.toUpperCase() !== "PASSED")}>{({ IN_PROGRESS: jobCard.canStartWork ? "Start work" : "Start work (advance required)", QC: "Job done ? send for QC", WAITING_PARTS: "Wait for unavailable parts", READY: "Mark vehicle ready", DELIVERED: "Deliver vehicle and issue gate pass", CANCELLED: "Cancel job card" } as Record<string, string>)[value]}</option>
           ))}
         </select>
       </Field>

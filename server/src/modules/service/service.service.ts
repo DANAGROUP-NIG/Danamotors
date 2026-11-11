@@ -2,6 +2,7 @@ import { BookingFields, bookingRelations } from './booking.persistence';
 import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
 import { allowedJobTransitions } from "./job-transitions";
 import { upfrontAmount } from "./job-deposit.service";
+import { advanceCoverage, advanceReceiptDateLimit } from "../finance/job-advance";
 import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
@@ -610,6 +611,15 @@ export class ServiceService {
     );
     return scopeJobCard({
       ...card,
+      canStartWork: card.advanceReceipts.some(receipt => receipt.status === 'ACTIVE' && receipt.mode !== 'CHEQUE' && receipt.advanceAmount >= 0.01 && receipt.issuedAt <= advanceReceiptDateLimit()),
+      advanceSummary: (() => {
+        const advances = card.advanceReceipts.filter(receipt => receipt.status === 'ACTIVE' && receipt.mode !== 'CHEQUE' && receipt.issuedAt <= advanceReceiptDateLimit());
+        const bills = [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()].filter(invoice => !['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase()));
+        const total = bills.length ? sumMoney(bills.map(invoice => invoice.total)) : card.estimates[0]?.amount ?? 0;
+        const received = bills.length ? sumMoney(bills.map(invoice => sumMoney([invoice.total, -invoice.outstandingAmount]))) : sumMoney(advances.map(receipt => receipt.advanceAmount));
+        const coverage = advanceCoverage(total, received);
+        return { basis: bills.length ? 'INVOICE' : 'ESTIMATE', hasEstimate: card.estimates.length > 0, total, ...coverage, excessAmount: bills.length ? sumMoney(advances.map(receipt => receipt.advanceAmount)) : coverage.excessAmount, suggestedPercent: card.estimates[0]?.upfrontPaymentPercent.toNumber() ?? 60 };
+      })(),
       invoices: [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
       allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
       estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: (estimate.upfrontPaymentPercent?.toNumber() ?? 60), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent ?? 60), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),

@@ -12,3 +12,12 @@ test('estimate and invoice data require their independent permissions',()=>{
  expect(scopeJobCard(card,['estimate:read'])).toHaveProperty('estimates');
  expect(scopeJobCard(card,['invoice:read'])).toHaveProperty('invoices');
 });
+
+test('advance amounts and receipt references require financial permissions while the work gate stays visible', () => {
+ const job = { canStartWork: true, advanceSummary: { receivedAmount: 100, total: 500 }, advanceReceipts: [{ amount: 100, receiptNumber: 'R1' }] };
+ const operational = scopeJobCard(job, ['jobcard:read']);
+ expect(operational).toEqual({ canStartWork: true });
+ expect(scopeJobCard(job, ['receipt:read']).advanceReceipts).toEqual(job.advanceReceipts);
+ expect(scopeJobCard(job, ['estimate:read']).advanceSummary).toEqual(job.advanceSummary);
+ expect(scopeJobCard(job, ['estimate:read'])).not.toHaveProperty('advanceReceipts');
+});

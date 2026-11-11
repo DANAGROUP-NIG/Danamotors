@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { money, sumMoney } from './money';
+import { assertNoReservedAdvances, usesAdvanceReference } from './job-advance';
 import { nextDocumentNumber } from './document-number';
 import { fifoAdjustments, pairAdjustments, validateAdjustmentSelections, type PartyDocument, type AdjustmentSelection } from './party-adjustment';
 import { createAdjustmentSchema, openingBalanceSchema, type CreateAdjustmentInput, type OpeningBalanceInput } from './party-account.validation';
@@ -34,7 +35,7 @@ export async function lockParty(transaction: Prisma.TransactionClient, customerI
 
 export async function availablePartyCredit(transaction: Prisma.TransactionClient, customerId: string, branchId?: string) {
   const totals = await transaction.$queryRaw<Array<{ amount: Prisma.Decimal }>>(Prisma.sql`SELECT (
-    COALESCE((SELECT SUM(ROUND(r."advanceAmount"::numeric,2)) FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' ${branchClause('r',branchId)}),0) +
+    COALESCE((SELECT SUM(ROUND(r."advanceAmount"::numeric,2)) FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "JobCard" reserved WHERE reserved.id=r."advanceJobCardId" AND reserved."billedAt" IS NULL AND reserved.status NOT IN ('CANCELLED','Cancelled','DELIVERED','Closed')) ${branchClause('r',branchId)}),0) +
     COALESCE((SELECT SUM(n."remainingAmount") FROM "PartyNote" n WHERE n."customerId" = ${customerId} AND n.direction = 'CREDIT' AND n.status = 'ACTIVE' ${branchClause('n',branchId)}),0)
   ) AS amount`);
   return money(Number(totals[0].amount));
@@ -48,7 +49,7 @@ function documentQuery(customerId: string, branchId: string | undefined, side: '
     n."remainingAmount"::double precision AS balance, NULL::timestamp AS "dueDate" FROM "PartyNote" n
     WHERE n."customerId" = ${customerId} AND n.direction = ${side} AND n.status = 'ACTIVE' ${branchClause('n', branchId)}`;
   if (side === 'CREDIT') return Prisma.sql`SELECT r.id, 'RECEIPT'::text AS kind, r."receiptNumber" AS number, r."issuedAt" AS date,
-    r.amount, r."advanceAmount" AS balance, NULL::timestamp AS "dueDate" FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' ${branchClause('r', branchId)} UNION ALL ${notes}`;
+    r.amount, r."advanceAmount" AS balance, NULL::timestamp AS "dueDate" FROM "Receipt" r WHERE r."customerId" = ${customerId} AND r.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM "JobCard" reserved WHERE reserved.id=r."advanceJobCardId" AND reserved."billedAt" IS NULL AND reserved.status NOT IN ('CANCELLED','Cancelled','DELIVERED','Closed')) ${branchClause('r', branchId)} UNION ALL ${notes}`;
   return Prisma.sql`SELECT i.id, 'INVOICE'::text AS kind, i."invoiceNumber" AS number, i."issuedDate" AS date,
     i.total AS amount, i."outstandingAmount" AS balance, i."dueDate" FROM "Invoice" i LEFT JOIN "JobCard" j ON j.id=i."jobCardId"
     JOIN "Customer" c ON c.id=i."customerId" WHERE i."customerId" = ${customerId}
@@ -152,6 +153,7 @@ export class PartyAccountService {
     if (customer.type?.toUpperCase() === 'VENDOR') throw new BadRequestError('Vendor party adjustments are not enabled');
     if (!await transaction.branch.findFirst({ where: { id: input.branchId, isActive: true } })) throw new BadRequestError('Select an active branch');
     await lockSelectedDocuments(transaction, [...input.debits,...input.credits]);
+    await assertNoReservedAdvances(transaction, input.credits.filter(line => line.kind === 'RECEIPT').map(line => line.id));
     const [debits, credits] = await Promise.all([
       selectedDocuments(transaction,input.customerId,input.branchId,'DEBIT',input.debits),
       selectedDocuments(transaction,input.customerId,input.branchId,'CREDIT',input.credits),
@@ -185,12 +187,31 @@ export class PartyAccountService {
       throw new BadRequestError('Adjustment date cannot precede the latest balance change on a selected document');
     }
     const pairs = pairAdjustments(input.debits,input.credits);
+    const receiptIds = input.credits.filter(line => line.kind === 'RECEIPT').map(line => line.id);
+    const referenceReceipts = receiptIds.length ? await transaction.receipt.findMany({ where: { id: { in: receiptIds } }, select: { id: true, receiptNumber: true, advanceSnapshot: true } }) : [];
+    const references = new Map(referenceReceipts.filter(usesAdvanceReference).map(receipt => [receipt.id, receipt.receiptNumber]));
+    if (references.size) {
+      // TODO(confirm): a dedicated Tally adjustment voucher is needed to change
+      // bill references after export. Until then, require allocation before export.
+      const invoiceIds = input.debits.filter(line => line.kind === 'INVOICE').map(line => line.id);
+      const noteIds = input.debits.filter(line => line.kind === 'NOTE').map(line => line.id);
+      const posted = await transaction.tallyPostingLog.findFirst({ where: { status: { in: ['EXPORTED', 'POSTED'] }, OR: [
+        { documentType: 'JOB_BILL', documentId: { in: invoiceIds } },
+        { documentType: 'DEBIT_NOTE', documentId: { in: noteIds } },
+      ] } });
+      const [postedBills, postedNotes] = await Promise.all([
+        invoiceIds.length ? transaction.invoice.count({ where: { id: { in: invoiceIds }, tallyPostedAt: { not: null } } }) : 0,
+        noteIds.length ? transaction.partyNote.count({ where: { id: { in: noteIds }, tallyPostedAt: { not: null } } }) : 0,
+      ]);
+      if (posted || postedBills || postedNotes) throw new ConflictError('Apply job advance credits before exporting the target bill or note to Tally');
+    }
     const batch = await transaction.partyAdjustmentBatch.create({ data: { customerId: input.customerId, branchId: input.branchId, date, source: input.source, amount: new Prisma.Decimal(sumMoney(input.debits.map(line => line.amount))), actorId, idempotencyKey: input.idempotencyKey, requestHash } });
     await transaction.receiptAllocation.createMany({ data: pairs.map(pair => ({
       batchId: batch.id, amount: pair.amount, adjustedAt: date,
       invoiceId: pair.debit.kind === 'INVOICE' ? pair.debit.id : undefined,
       debitNoteId: pair.debit.kind === 'NOTE' ? pair.debit.id : undefined,
       receiptId: pair.credit.kind === 'RECEIPT' ? pair.credit.id : undefined,
+      advanceReference: pair.credit.kind === 'RECEIPT' ? references.get(pair.credit.id) : undefined,
       creditNoteId: pair.credit.kind === 'NOTE' ? pair.credit.id : undefined,
     })) });
     for (const debit of input.debits) await changeBalance(transaction,debit,debits);

@@ -1,6 +1,7 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   $transaction: jest.fn(), $queryRaw: jest.fn(), auditLog: { create: jest.fn() },
-  receipt: { findUnique: jest.fn(), create: jest.fn() },
+  receipt: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+  jobCard: { findUnique: jest.fn() }, estimate: { findFirst: jest.fn() },
   customer: { findUnique: jest.fn() }, branch: { findFirst: jest.fn() },
   invoice: { findMany: jest.fn(), update: jest.fn() }, documentSequence: { upsert: jest.fn() },
 } }));
@@ -56,4 +57,22 @@ it('retries a confirmed serialization rollback', async () => {
   await new ReceiptService().createReceipt(input);
   expect(prisma.$transaction).toHaveBeenCalledTimes(2);
   expect(prisma.invoice.update).toHaveBeenCalledTimes(1);
+});
+
+it('creates and reserves a below-target advance with a stable receipt snapshot and idempotent retry', async () => {
+  const jobId = '55555555-5555-4555-8555-555555555555';
+  (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id: jobId, jobNumber: 'J1', customerId, branchId, status: 'OPEN', branch: { name: 'Test branch' }, customer: { firstName: 'Test', lastName: 'Customer' } });
+  (prisma.estimate.findFirst as jest.Mock).mockResolvedValue({ id: 'estimate', estimateNumber: 'E1', version: 1, amount: 500, upfrontPaymentPercent: new Prisma.Decimal(60) });
+  (prisma.receipt.findMany as jest.Mock).mockResolvedValue([]);
+  (prisma.invoice.findMany as jest.Mock).mockResolvedValue([]);
+  const service = new ReceiptService();
+  const advance = { ...input, advanceJobCardId: jobId, amount: 200, allocations: [] };
+  const created = await service.createReceipt(advance);
+  expect(prisma.receipt.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+    advanceJobCardId: jobId, advanceAmount: 200, advanceSnapshot: expect.objectContaining({ paidPercent: 40, balanceAmount: 300, tallyAsAdvance: true }),
+  }) }));
+  (prisma.receipt.findUnique as jest.Mock).mockResolvedValue(created);
+  await expect(service.createReceipt(advance)).resolves.toEqual(created);
+  expect(prisma.receipt.create).toHaveBeenCalledTimes(1);
+  expect(prisma.invoice.update).not.toHaveBeenCalled();
 });

@@ -473,6 +473,7 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  advanceReceipts Receipt[] @relation("JobAdvances")
   consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
   depositReceiptId String? @unique
   depositReceipt Receipt? @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
@@ -1562,6 +1563,10 @@ model Payment {
 // ============================================================
 
 model Receipt {
+  advanceJobCardId String?
+  advanceJobCard JobCard? @relation("JobAdvances", fields: [advanceJobCardId], references: [id], onDelete: Restrict)
+  advanceSnapshot Json?
+  @@index([advanceJobCardId, status])
   depositJobCard JobCard? @relation("JobDeposit")
   id String @id @default(uuid())
   branchId String?
@@ -1628,6 +1633,7 @@ model Bank {
 }
 
 model ReceiptAllocation {
+  advanceReference String?
   id           String                @id @default(uuid())
   receiptId    String?
   receipt      Receipt?              @relation(fields: [receiptId], references: [id], onDelete: Restrict)

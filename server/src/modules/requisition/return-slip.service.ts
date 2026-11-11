@@ -1,8 +1,9 @@
+import { jobWorkUpdate } from './requisition-work';
 import { ChargeType, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { nextSequenceNumber } from '../../shared/db/documentSequence';
-import { assertRequisitionBranch, assertRequisitionJob, RequisitionActor, requisitionWorkUpdate } from './requisition.logic';
+import { assertRequisitionBranch, assertRequisitionJob, RequisitionActor } from './requisition.logic';
 import { assertReturnQuantity, effectiveReturnedQuantity, remainingReturnCharges, returnSlipFooter, returnSnapshot } from './return-slip.logic';
 import { ReturnSlipInput, ReturnSlipQuery, returnSlipBody } from './return-slip.validation';
 
@@ -99,7 +100,7 @@ export class ReturnSlipService {
         await tx.stockTransaction.create({ data: { branchId: requisition.branchId, partId: line.sparePartId, type: 'RETURNED', quantity: request.quantity, referenceId: returnedLine.id, recordedById: actor.userId, notes: `Return slip ${returnNumber}` } });
         await this.updateCharges(tx, line, requisition.chargeType, returned + request.quantity);
       }
-      await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId) });
+      await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId) });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'RETURN_SLIP_CREATED', details: JSON.stringify({ returnSlipId: slip.id, returnNumber, branchId: requisition.branchId, requisitionId: requisition.id, jobCardId: job.id, lines: rows.map(({ line, request, returned }) => ({ requisitionLineId: line.id, quantity: request.quantity, oldReturnedQuantity: returned, oldCharges: line.jobCardLines.map(charge => ({ id: charge.id, amount: charge.amount, quantity: charge.quantity })) })) }) } });
       return this.get(slip.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
@@ -135,7 +136,7 @@ export class ReturnSlipService {
       }
       await tx.partReturn.updateMany({ where: { returnSlipId: id }, data: { status: 'CANCELLED' } });
       await tx.partReturnSlip.update({ where: { id }, data: { status: 'CANCELLED', cancelledById: actor.userId, cancelledAt: new Date(), cancelReason: reason.trim() } });
-      await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId) });
+      await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId) });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'RETURN_SLIP_CANCELLED', details: JSON.stringify({ returnSlipId: id, branchId: slip.branchId, jobCardId: job.id, oldStatus: slip.status, reason: reason.trim(), lines: rows.map(row => ({ id: row.id, quantity: row.quantity, amount: row.amount?.toString() })) }) } });
       return this.get(id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });

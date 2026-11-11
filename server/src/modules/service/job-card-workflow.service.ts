@@ -515,7 +515,7 @@ export class JobCardWorkflowService {
       }
       if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
       if (data.status === 'READY' && current.qcStatus?.toUpperCase() !== 'PASSED') throw new BadRequestError('Record a passed quality check before marking the job Ready');
-      if (data.status === 'IN_PROGRESS' && data.status !== from) await assertDepositPaid(tx, id);
+
       if (data.status === 'READY' || (data.status === 'DELIVERED' && !billed)) await assertRecordedScope(tx, id);
       if (data.status && data.status !== from) {
         const actor = await tx.user.findUnique({ where: { id: actorId }, include: { role: true } });

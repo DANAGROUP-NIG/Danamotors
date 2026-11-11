@@ -138,6 +138,9 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  canStartWork?: boolean;
+  advanceSummary?: { basis: 'ESTIMATE' | 'INVOICE'; hasEstimate: boolean; total: number; receivedAmount: number; paidPercent: number | null; balanceAmount: number; excessAmount: number; suggestedPercent: number };
+  advanceReceipts?: { id: string; receiptNumber: string; amount: number; advanceAmount: number; status: string; mode: string; issuedAt: string }[];
   allowedTransitions?: string[];
   depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];

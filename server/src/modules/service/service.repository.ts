@@ -288,6 +288,7 @@ export class ServiceRepository {
     return prisma.jobCard.findUnique({
       where: { id },
       include: {
+        advanceReceipts: { orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }], select: { id: true, receiptNumber: true, amount: true, advanceAmount: true, status: true, mode: true, issuedAt: true } },
         labourLines: { include: { labourItem: true } },
         previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
