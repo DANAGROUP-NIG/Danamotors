@@ -1853,6 +1853,43 @@ model CustomerCreditApplication {
 // NOTIFICATIONS
 // ============================================================
 
+model JobcardNotificationEvent {
+  id String @id @default(uuid())
+  jobCardId String
+  actorId String?
+  before Json?
+  after Json
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+  @@index([processedAt, createdAt], map: "jobcard_notification_events_pending")
+  @@index([jobCardId, createdAt], map: "jobcard_notification_events_job")
+  @@map("jobcard_notification_events")
+}
+
+model JobcardNotificationAudit {
+  id String @id @default(uuid())
+  jobCardId String
+  eventId String
+  eventType String
+  recipientId String
+  channel String @default("in-app")
+  status String
+  createdAt DateTime @default(now())
+  @@unique([eventId, eventType, recipientId, channel], map: "jobcard_notification_audit_eventId_eventType_recipientId_ch_key")
+  @@index([jobCardId, createdAt], map: "jobcard_notification_audit_job")
+  @@map("jobcard_notification_audit")
+}
+
+model NotificationFailure {
+  id String @id @default(uuid())
+  jobCardId String
+  eventId String @unique
+  reason String
+  attempts Int
+  createdAt DateTime @default(now())
+  @@map("notification_failures")
+}
+
 model Notification {
   id String @id @default(uuid())
 

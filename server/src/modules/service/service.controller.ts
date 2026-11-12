@@ -110,6 +110,7 @@ export class ServiceController {
       const labourLine = await this.labourService.addJobCardLine(
         req.params.id,
         req.body,
+        req.user?.userId,
       );
       res
         .status(201)
@@ -140,6 +141,7 @@ export class ServiceController {
       const labourLine = await this.labourService.updateJobCardLine(
         req.params.lineId,
         req.body,
+        req.user?.userId,
       );
       res
         .status(200)
@@ -160,7 +162,7 @@ export class ServiceController {
         select: { jobCard: { select: { branchId: true } } },
       });
       assertBranchOwnership(req, existing?.jobCard.branchId);
-      await this.labourService.removeJobCardLine(req.params.lineId);
+      await this.labourService.removeJobCardLine(req.params.lineId, req.user?.userId);
       res.status(200).json({
         status: "success",
         statusCode: 200,

@@ -1,4 +1,5 @@
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
+import { setNotificationActor } from '../notification/jobcard-notification-router';
 import { assertApprovedOperation } from '../service/estimate-approval';
 import { defaultSourceCategory, sourceLabel, sourceRecordProblem } from './partSource';
 import prisma from "../../prisma/client";
@@ -1063,6 +1064,7 @@ export class InventoryService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await setNotificationActor(tx, data.issuedById);
       if (data.jobCardId) {
         await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
         const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });

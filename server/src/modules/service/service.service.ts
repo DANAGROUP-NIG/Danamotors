@@ -27,6 +27,7 @@ import {
 } from "./service.validation";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
 import prisma from "../../prisma/client";
+import { setNotificationActor } from '../notification/jobcard-notification-router';
 import { ServiceRepository } from "./service.repository";
 import {
   NotFoundError,
@@ -675,6 +676,7 @@ export class ServiceService {
     const data = estimateBody.parse(input);
     return prisma.$transaction(
       async (tx) => {
+        await setNotificationActor(tx, actorId);
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`,
         );

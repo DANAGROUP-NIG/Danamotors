@@ -69,6 +69,7 @@ export class WorkshopController {
         id,
         technicianId,
         qualityInspectorId,
+        req.user?.userId,
       );
       res
         .status(200)
@@ -120,7 +121,7 @@ export class WorkshopController {
       const { id } = req.params;
       const { qcStatus, qcNotes } = req.body;
       await assertJobAccess(req);
-      const result = await this.workshopService.updateQC(id, qcStatus, qcNotes);
+      const result = await this.workshopService.updateQC(id, qcStatus, qcNotes, req.user?.userId);
       res
         .status(200)
         .json({
