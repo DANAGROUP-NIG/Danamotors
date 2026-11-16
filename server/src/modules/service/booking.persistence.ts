@@ -99,13 +99,6 @@ export async function createBooking(data: BookingCreate) {
   if (data.status && data.status !== "Pending")
     throw new BadRequestError("New bookings must start as booked");
   const { requests: _requests, ...fields } = data;
-  const year = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: "Africa/Lagos",
-      year: "numeric",
-    }).format(new Date()),
-  );
-  const sequenceDate = new Date(year, 6, 1);
   const booking = await prisma.$transaction(
     async (tx) => {
       // The locking read also establishes existence; keep duplicate detection under this lock.
@@ -151,7 +144,6 @@ export async function createBooking(data: BookingCreate) {
       const number = await nextSequenceNumber(
         tx,
         `BOOKING_${data.branchId}`,
-        sequenceDate,
       );
       const booking = await tx.serviceAppointment.create({
         data: {

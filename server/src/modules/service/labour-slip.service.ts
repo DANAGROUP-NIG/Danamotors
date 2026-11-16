@@ -96,8 +96,7 @@ export class LabourSlipService {
       if (job.branchId !== input.branchId) throw new BadRequestError('Job card must belong to the labour slip branch');
       await this.validateGroup(tx, input.groupId);
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
-      const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(new Date()));
-      const slipNumber = await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, new Date(year, 6, 1));
+      const slipNumber = await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`);
       const slip = await tx.labourSlip.create({ data: { branchId: input.branchId, jobCardId: job.id, groupId: input.groupId, engineerId: input.engineerId, createdById: actor.userId, slipNumber } });
       for (const line of input.lines) await this.saveLine(tx, slip, job, line, actor);
       await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId, 'Labour slip') });

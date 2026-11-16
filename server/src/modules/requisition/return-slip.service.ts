@@ -91,8 +91,7 @@ export class ReturnSlipService {
       }).sort((a, b) => a.line.sparePartId.localeCompare(b.line.sparePartId));
       for (const { line } of rows) await tx.$queryRaw`SELECT id FROM "InventoryStock" WHERE "branchId" = ${requisition.branchId} AND "partId" = ${line.sparePartId} FOR UPDATE`;
       const now = new Date();
-      const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(now));
-      const returnNumber = await nextSequenceNumber(tx, `RETURN_${requisition.branchId}`, new Date(year, 6, 1));
+      const returnNumber = await nextSequenceNumber(tx, `RETURN_${requisition.branchId}`, now);
       const slip = await tx.partReturnSlip.create({ data: { returnNumber, returnDate: now, branchId: requisition.branchId, jobCardId: job.id, requisitionId: requisition.id, createdById: actor.userId } });
       for (const { line, request, returned } of rows) {
         const returnedLine = await tx.partReturn.create({ data: { returnSlipId: slip.id, requisitionLineId: line.id, partIssuanceId: line.partIssuanceId!, returnedById: actor.userId, quantity: request.quantity, status: 'Completed', ...returnSnapshot(request.quantity, line.rate) } });

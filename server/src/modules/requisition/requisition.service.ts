@@ -85,8 +85,7 @@ export class RequisitionService {
         ]);
       }
       const now = new Date();
-      const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(now));
-      const requisitionNumber = await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, new Date(year, 6, 1));
+      const requisitionNumber = await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, now);
       const document = await tx.partRequisition.create({ data: { branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, groupId: input.groupId, engineerId: input.engineerId, goodwillReason: input.goodwillReason, createdById: actor.userId, requisitionNumber, requisitionDate: now } });
       for (const { line, part, rate, amounts, campaignId } of resolved) {
         const stock = await tx.inventoryStock.findUnique({ where: { branchId_partId: { branchId: input.branchId, partId: part.id } } });
