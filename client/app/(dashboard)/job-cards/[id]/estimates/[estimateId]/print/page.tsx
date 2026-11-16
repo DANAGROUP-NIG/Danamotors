@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from "react";
+import { CustomerExplanation } from "@/components/CustomerExplanation";
 // import { Check, Clock, CircleCheck, CircleAlert, Wrench } from "lucide-react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -13,6 +13,7 @@ type PrintData = {
   estimate: {
     version: number;
     estimateNumber: string | null;
+    customerRemarks?: string | null;
     estimateDate: string;
     currency: string;
     total: number;
@@ -181,6 +182,7 @@ export default function EstimatePrintPage() {
       <p className="text-right text-lg font-bold">
         Total: {money(estimate.total)}
       </p>
+      <CustomerExplanation text={estimate.customerRemarks} />
       {data.terms.length > 0 && (
         <section>
           <h3 className="font-semibold">Terms</h3>

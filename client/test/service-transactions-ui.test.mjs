@@ -402,3 +402,14 @@ test('legacy uppercase cancelled bookings hide editing and conversion actions', 
   assert.equal(html.includes('Save booking details'), false);
   assert.equal(html.includes('Convert to job card'), false);
 });
+
+
+test('remarks show document context and separate internal text from customer explanations', () => {
+  const context = { documentNumber: 'EST-001', documentDate: '2026-11-16T09:00:00Z', status: 'Approved', jobNumber: 'JOB-001', jobDate: '2026-11-15T09:00:00Z', customerName: 'Synthetic customer', mileage: 1234, vehicle: { vin: 'SYNTHETICVIN', registrationNumber: 'REG-001', model: 'Model A', trim: 'Variant A' }, service: { code: 'SERVICE-A', description: 'Service A' } };
+  const { html } = render('RemarksPanel', { permissions: ['jobcard:read', 'jobcard:remarks:update'], data: { document: { id: 'job', remarks: 'Internal only', customerRemarks: 'Customer explanation', context } } });
+  for (const text of ['EST-001', 'JOB-001', 'Synthetic customer', 'SYNTHETICVIN', 'Model A', 'Variant A', 'SERVICE-A', 'Internal remarks', 'Customer explanation (prints)']) assert.ok(html.includes(text));
+  const print = render('CustomerExplanation', { source: '../../../components/CustomerExplanation', props: { text: 'Public <explanation>', remarks: 'Internal secret' } }).html;
+  assert.ok(print.includes('Public &lt;explanation&gt;'));
+  assert.equal(print.includes('Internal secret'), false);
+  assert.equal(render('CustomerExplanation', { source: '../../../components/CustomerExplanation', props: { text: null } }).html, '');
+});

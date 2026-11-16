@@ -150,6 +150,7 @@ export type JobCard = {
   customField1?: string | null;
   checklist?: string | null;
   remarks?: string | null;
+  customerRemarks?: string | null;
   serviceAdvisor?: { firstName: string; lastName: string } | null;
   deliveryAdvisor?: { firstName: string; lastName: string } | null;
   estimatedParts?: number | null;

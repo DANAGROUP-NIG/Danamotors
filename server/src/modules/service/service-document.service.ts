@@ -6,7 +6,10 @@ import { ServiceDocumentActor, assertDocumentBranch, projectPickingLines, remark
 import { serviceRemarksSchema } from './service-document.validation';
 
 export type ServiceDocumentKind = 'job' | 'estimate';
-const jobSelect = { id: true, jobNumber: true, createdAt: true, branchId: true, remarks: true, mileage: true, vehicle: { select: { registrationNumber: true, vin: true, model: true, trim: true } }, serviceType: { select: { code: true, description: true } } } satisfies Prisma.JobCardSelect;
+const vehicleSelect = { registrationNumber: true, vin: true, model: true, trim: true } satisfies Prisma.VehicleSelect;
+const customerSelect = { companyName: true, firstName: true, lastName: true } satisfies Prisma.CustomerSelect;
+const jobSelect = { id: true, jobNumber: true, createdAt: true, status: true, branchId: true, remarks: true, customerRemarks: true, mileage: true, vehicle: { select: vehicleSelect }, customer: { select: customerSelect }, serviceType: { select: { code: true, description: true } } } satisfies Prisma.JobCardSelect;
+const customerName = (customer: { companyName: string | null; firstName: string; lastName: string } | null) => customer ? customer.companyName || `${customer.firstName} ${customer.lastName}`.trim() : null;
 
 export class ServiceDocumentService {
   private async document(db: Prisma.TransactionClient, kind: ServiceDocumentKind, id: string, actor: ServiceDocumentActor) {
@@ -14,22 +17,24 @@ export class ServiceDocumentService {
       const job = await db.jobCard.findUnique({ where: { id }, select: jobSelect });
       if (!job) throw new NotFoundError('Job card not found');
       assertDocumentBranch(actor, job.branchId);
-      return { id: job.id, branchId: job.branchId, remarks: job.remarks };
+      return { id: job.id, branchId: job.branchId, remarks: job.remarks, customerRemarks: job.customerRemarks, context: { documentNumber: job.jobNumber, documentDate: job.createdAt, status: job.status, jobNumber: job.jobNumber, jobDate: job.createdAt, vehicle: job.vehicle, mileage: job.mileage, service: job.serviceType, customerName: customerName(job.customer) } };
     }
-    const estimate = await db.estimate.findUnique({ where: { id }, select: { id: true, remarks: true, branchId: true, jobCard: { select: { branchId: true } } } });
+    const estimate = await db.estimate.findUnique({ where: { id }, select: { id: true, estimateNumber: true, estimateDate: true, createdAt: true, status: true, remarks: true, customerRemarks: true, branchId: true, jobCard: { select: jobSelect }, vehicle: { select: vehicleSelect }, customer: { select: customerSelect } } });
     if (!estimate) throw new NotFoundError('Estimate not found');
     const branchId = estimate.jobCard?.branchId ?? estimate.branchId;
     assertDocumentBranch(actor, branchId);
     if (estimate.branchId && estimate.branchId !== branchId) throw new BadRequestError('Estimate and job branches disagree');
-    return { id: estimate.id, branchId, remarks: estimate.remarks };
+    return { id: estimate.id, branchId, remarks: estimate.remarks, customerRemarks: estimate.customerRemarks, context: { documentNumber: estimate.estimateNumber, documentDate: estimate.estimateDate ?? estimate.createdAt, status: estimate.status, jobNumber: estimate.jobCard?.jobNumber ?? null, jobDate: estimate.jobCard?.createdAt ?? null, vehicle: estimate.jobCard?.vehicle ?? estimate.vehicle, mileage: estimate.jobCard?.mileage ?? null, service: estimate.jobCard?.serviceType ?? null, customerName: customerName(estimate.customer ?? estimate.jobCard?.customer ?? null) } };
   }
 
+  /** Read branch-scoped remarks with minimal document context. */
   async getRemarks(kind: ServiceDocumentKind, id: string, actor: ServiceDocumentActor) {
     return this.document(prisma, kind, id, actor);
   }
 
-  async updateRemarks(kind: ServiceDocumentKind, id: string, input: { remarks: string | null }, actor: ServiceDocumentActor) {
-    const { remarks } = serviceRemarksSchema.shape.body.parse(input);
+  /** Amend internal notes and explicit customer explanations with old-value audit. */
+  async updateRemarks(kind: ServiceDocumentKind, id: string, input: { remarks: string | null; customerRemarks?: string | null }, actor: ServiceDocumentActor) {
+    const { remarks, customerRemarks } = serviceRemarksSchema.shape.body.parse(input);
     return prisma.$transaction(async tx => {
       // Match normal estimate writes: lock the job first, then its estimate.
       if (kind === 'job') await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`;
@@ -40,11 +45,13 @@ export class ServiceDocumentService {
       }
       const document = await this.document(tx, kind, id, actor);
       const change = remarksChange(document.remarks, remarks);
-      if (!change.changed) return document;
-      if (kind === 'job') await tx.jobCard.update({ where: { id }, data: { remarks: change.newValue } });
-      else await tx.estimate.update({ where: { id }, data: { remarks: change.newValue } });
-      await tx.auditLog.create({ data: { userId: actor.userId, action: kind === 'job' ? 'JOB_REMARKS_UPDATED' : 'ESTIMATE_REMARKS_UPDATED', details: JSON.stringify({ documentId: id, branchId: document.branchId, ...change }) } });
-      return { ...document, remarks: change.newValue };
+      const customerChange = customerRemarks === undefined ? null : remarksChange(document.customerRemarks, customerRemarks);
+      if (!change.changed && !customerChange?.changed) return document;
+      const data = { remarks: change.newValue, ...(customerChange ? { customerRemarks: customerChange.newValue } : {}) };
+      if (kind === 'job') await tx.jobCard.update({ where: { id }, data });
+      else await tx.estimate.update({ where: { id }, data });
+      await tx.auditLog.create({ data: { userId: actor.userId, action: kind === 'job' ? 'JOB_REMARKS_UPDATED' : 'ESTIMATE_REMARKS_UPDATED', details: JSON.stringify({ documentId: id, branchId: document.branchId, ...change, ...(customerChange?.changed ? { customerRemarks: customerChange } : {}) }) } });
+      return { ...document, ...data };
     });
   }
 

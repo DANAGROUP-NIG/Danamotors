@@ -1,4 +1,5 @@
 "use client";
+import { CustomerExplanation } from "@/components/CustomerExplanation";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { VatBreakdownTable } from './VatBreakdownTable';
 
@@ -75,6 +76,7 @@ export function InvoiceDetailPage() {
 
       {invoice.tallyPostedAt && <p className="border-t pt-4 text-sm text-muted-foreground">Posted to Tally as {invoice.tallyVoucherNo ?? "voucher"} on {new Date(invoice.tallyPostedAt).toLocaleString("en-NG")}.</p>}
       {cancelled && <p className="border-t pt-4 text-sm text-destructive">Cancelled: {invoice.cancelRemark || "No remark recorded"}</p>}
+      {(invoice.jobCards?.length ? invoice.jobCards : invoice.jobCard ? [invoice.jobCard] : []).map(card => <CustomerExplanation key={card.id} text={card.customerRemarks} title={`Additional explanation (${card.jobNumber})`} />)}
       {invoice.notes && <section className="border-t pt-4"><h2 className="font-semibold">Notes</h2><p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{invoice.notes}</p></section>}
       <DocumentTermsBlock documentType={invoice.jobCardId ? "JOB_BILL" : "COUNTER_SALE"} branchId={invoice.reportBranchId ?? invoice.counterSale?.branchId} />
       <PaymentReceiptModal isOpen={receiptOpen} onClose={() => setReceiptOpen(false)} invoiceId={invoice.id} />

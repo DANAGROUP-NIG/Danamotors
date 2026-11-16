@@ -516,6 +516,7 @@ model JobCard {
   acFitted           Boolean                @default(false)
   inHouse            Boolean                @default(true)
   remarks            String?
+  customerRemarks    String?
   observations       String?
   workDone           String?
   isRepeat           Boolean                @default(false)
@@ -639,6 +640,7 @@ model Inspection {
 model Estimate {
   upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
   remarks String?
+  customerRemarks String?
   version Int @default(1)
   supersedesId String? @unique
   supersedes Estimate? @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)

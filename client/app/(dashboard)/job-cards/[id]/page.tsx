@@ -1,4 +1,5 @@
 "use client";
+import { CustomerExplanation } from "@/components/CustomerExplanation";
 import {
   JOB_CARD_STATUS_TONES,
   canonicalJobStatus,
@@ -486,14 +487,16 @@ export default function JobCardDetailPage() {
             </div>
           )}
           {jobCard.remarks && (
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold">Remarks</h3>
+            <div className="mt-4 print:hidden">
+              <h3 className="text-sm font-semibold">Internal remarks</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
                 {jobCard.remarks}
               </p>
             </div>
           )}
         </SectionCard>
+
+        <CustomerExplanation text={jobCard.customerRemarks} />
 
         {canManage && <JobCardEditForm jobCard={jobCard} />}
         <section className="rounded-xl border bg-white p-5 space-y-2">
