@@ -381,3 +381,16 @@ test('return print rows distinguish required, issued and returned quantities wit
   for (const quantity of [5, 3, 1]) assert.ok(html.includes(`class="p-2">${quantity}</td>`));
   for (const text of ['Saved filter', 'Rack A', 'BIN-A', 'UNIT', 'Warranty rate:']) assert.ok(html.includes(text));
 });
+
+
+test('saved labour editors restore the campaign and goodwill reason', () => {
+  const base = { id: 'line', labourItemId: 'operation', description: 'Saved operation', rate: 100, amount: 200, chargedHours: 2, technicianId: 'login', mechanicId: 'employee' };
+  const props = { slipId: 'slip', branchId: 'branch', campaigns: [{ campaignId: 'campaign', campaignTitle: 'Saved campaign' }] };
+  const free = render('SavedLabourLine', { permissions: ['employee:read'], props: { ...props, line: { ...base, chargeLine: { chargeType: 'FREE', campaignId: 'campaign' } } } }).html;
+  assert.match(free, /value="campaign" selected=""/);
+  const goodwill = render('SavedLabourLine', { permissions: ['warranty:update'], props: { ...props, line: { ...base, chargeLine: { chargeType: 'GOODWILL', chargeTypeReason: 'Saved approval' } } } }).html;
+  assert.ok(goodwill.includes('value="Saved approval"'));
+  const grid = render('SlipRows', { source: 'SavedSlip', props: { document: { lines: [{ ...base, group: { code: 'TEAM-A', description: 'Saved team' } }] } } }).html;
+  assert.ok(grid.includes('Group: TEAM-A'));
+  assert.ok(grid.includes('Saved team'));
+});

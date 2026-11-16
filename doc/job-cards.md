@@ -121,6 +121,12 @@ No create, return or cancellation is allowed on billed/delivered/cancelled jobs 
 
 ### Labour slips and vehicle ready
 
+Editing a saved labour line retains its campaign, goodwill reason, assignment and
+group. For an employee who also has a login, the edit submits only `mechanicId`;
+the server resolves the associated login rather than accepting two assignees.
+Hours-only edits keep saved standard hours, rate and TIME/FIXED pricing. The staff
+grid and internal print show the line's group alongside its mechanic/technician.
+
 | Method and path                                 | Permission              | Behavior                                                                       |
 | ----------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
 | `GET /service/labour-slips`                     | `jobcard:read`          | Paginated branch/job list, same page/limit defaults as parts documents.        |

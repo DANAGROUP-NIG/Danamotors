@@ -311,3 +311,18 @@ Step 0 and P1–P4 complete on `issue-113/service-transactions`. Stop here; awai
 - Passed: backend and client strict typechecks, backend lint (same typecheck), scoped client ESLint, backend build (exit 0) and whitespace checks. Client webpack production build passed (exit 0); the known default Turbopack/NVM shim issue was not retried.
 - Updated doc/job-cards.md and Swagger return detail/print examples. No non-local database writes, browser/dev-server/screenshots, push, PR or issue mutations. Disposable integration cluster was shut down after the successful run.
 - Slice files: return-slip.service.ts, return-slip.integration.test.ts, SavedSlip.tsx, use-service-transactions.ts, service-transactions-ui.test.mjs, service-transactions.openapi.ts, doc/job-cards.md and this progress log. Changes remain uncommitted; pause for the user's next-slice instruction after build verification.
+
+
+## Approved follow-up slice 4 - labour slips (2026-11-16)
+
+- Preserved the existing feature branch, unrelated staged files and earlier parts-request work. No new model, column, migration, permission, dependency or database query was needed for the UI fix.
+- Fixed saved labour drafts dropping the FREE campaign and GOODWILL reason. A pure savedLabourDraft helper restores payer context, hours and group, while labourBody continues to send campaign/reason only for the selected payer.
+- Fixed employee-with-login edits sending both mechanicId and technicianId to an API requiring one assignee. Saved employee assignments now submit mechanicId alone; the server still resolves its associated login. Technician-only lines retain their technician.
+- Added line-group display to saved grids/internal print, and labelled labour payer selection Charge type while retaining Requisition type for parts.
+- Updated saved-line client types, doc/job-cards.md and Swagger labour detail/print examples. Pricing, standard-hour/rate snapshots, job-state, permissions, deposit and passed-QC rules remain unchanged.
+- Passed: 16 backend labour rule/route/mechanic tests; 9 OpenAPI contract tests; 2 focused labour payload tests; 12 rendered UI tests. The new tests verify saved campaign/reason restoration, one employee assignee and line-group output.
+- Passed: all 15 labour integration tests on a fresh disposable localhost PostgreSQL database. The new edit case preserves FREE campaign, GOODWILL reason, employee/login identity, TIME/FIXED model snapshots and footer totals. Existing tests cover billing, concurrent approved-hour limits, branch isolation, audit rollback and QC-gated READY.
+- Updated only integration fixture setup for current business requirements: valid advance receipts and campaign attendance before READY. The first live run found missing campaign attendance in the older fixed-price fixture; the corrected failing-file rerun passed. No production guard was weakened.
+- Passed: client/backend strict typechecks, backend lint (same typecheck), scoped client ESLint, backend production build (exit 0) and whitespace checks. Client webpack production build passed (exit 0); the known Turbopack/NVM issue was not retried.
+- All database writes were confined to the disposable localhost test cluster, stopped after testing. No browser, dev server, screenshots, push, PR or issue mutation. Changes remain uncommitted; await the next-slice instruction after final build verification.
+- Slice files: transaction.logic.ts, use-service-transactions.ts, SavedLabourLine.tsx, SavedSlip.tsx, LabourLineEditor.tsx, TransactionFields.tsx, both service-transactions client test files, labour-slip.integration.test.ts, service-transactions.openapi.ts, doc/job-cards.md and this progress log.

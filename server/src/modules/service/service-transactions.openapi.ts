@@ -98,6 +98,10 @@ for (const suffix of ['', '/print']) {
   const returnRead = serviceTransactionPaths[`/inventory/return-slips/{id}${suffix}`].get as ReturnType<typeof operation>;
   returnRead.responses['200'] = response('Return detail with saved requisition context (partial example)', { returnSlip: { id, returnNumber: '2026000001', status: 'COMPLETED', requisition: { requisitionNumber: '2026000001', chargeType: 'GOODWILL' }, lines: [{ id: lineId, partNumber: 'PART-EXAMPLE', description: 'Example filter', partSource: 'O', uom: 'UNIT', quantityRequired: 3, quantityIssued: 3, quantity: 1, location: 'Rack A', binCard: 'BIN-A', warrantyRate: '80.00', rate: '100.01', amount: '100.01' }], totals: { numberOfItems: 1, netQuantityReturned: 1, totalAmount: 100.01 } } });
 }
+for (const suffix of ['', '/print']) {
+  const labourRead = serviceTransactionPaths[`/service/labour-slips/{id}${suffix}`].get as ReturnType<typeof operation>;
+  labourRead.responses['200'] = response('Saved labour context (partial example)', { labourSlip: { id, slipNumber: '2026000001', lines: [{ id: lineId, labourItemId: id, description: 'Example operation', standardHours: 3, chargedHours: 1.5, hours: 1.5, pricing: 'TIME', rate: 100.01, amount: 150.02, group: { code: 'TEAM-A', description: 'Example team' }, chargeLine: { chargeType: 'FREE', campaignId: id, chargeTypeReason: null } }], totals: { freeAmount: 150.02, goodwillAmount: 0, totalAmount: 150.02 } } });
+}
 const remarksPut = serviceTransactionPaths['/service/job-cards/{id}/remarks'].put as ReturnType<typeof operation>;
 remarksPut.responses['200'] = response('Audited remarks saved', { document: { id, branchId, remarks: transactionExamples.remarks.remarks } });
 const pickingRead = serviceTransactionPaths['/service/job-cards/{id}/picking-list/print'].get as ReturnType<typeof operation>;

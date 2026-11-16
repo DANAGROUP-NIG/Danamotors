@@ -101,3 +101,21 @@ test('job opening uses the conversion endpoint only for a linked booking', async
   assert.equal(requests[0].body.serviceId, undefined);
   assert.equal(requests[1].url, '/service/job-cards');
 });
+
+
+test('saved labour edits retain campaign and goodwill context and send one employee assignee', () => {
+  const base = { id: 'line', labourItemId: 'operation', technicianId: 'login', mechanicId: 'employee', groupId: 'team', hours: 4, rate: 100, amount: 400 };
+  const free = logic.labourBody(logic.savedLabourDraft({ ...base, chargeLine: { chargeType: 'FREE', campaignId: 'campaign' } }));
+  assert.equal(free.campaignId, 'campaign');
+  assert.equal(free.mechanicId, 'employee');
+  assert.equal(free.technicianId, undefined);
+  assert.equal(free.groupId, 'team');
+  assert.equal(free.chargedHours, 4);
+  const goodwill = logic.labourBody(logic.savedLabourDraft({ ...base, chargeLine: { chargeType: 'GOODWILL', chargeTypeReason: '  Saved approval  ' } }));
+  assert.equal(goodwill.reason, 'Saved approval');
+  assert.equal(goodwill.campaignId, undefined);
+  const technician = logic.savedLabourDraft({ ...base, mechanicId: null, chargedHours: 2, chargeLine: { chargeType: 'CUSTOMER' } });
+  assert.equal(technician.technicianId, 'login');
+  assert.equal(technician.mechanicId, undefined);
+  assert.equal(technician.chargedHours, 2);
+});
