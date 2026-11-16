@@ -44,7 +44,7 @@ router.use(authMiddleware);
  *                 customerPercent: 70
  *     responses:
  *       201: { description: Requisition with line snapshots, charges and footer totals }
- *       400: { description: Invalid split, stock, warranty cover or job status }
+ *       400: { description: Invalid split, issued quantity above requested or available stock, warranty cover or job status }
  *       403: { description: Permission or branch access denied }
  * /inventory/requisitions/{id}:
  *   get:

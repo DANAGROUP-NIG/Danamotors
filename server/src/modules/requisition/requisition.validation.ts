@@ -17,7 +17,9 @@ export const requisitionBody = z.object({
     quantityIssued: z.number().int().nonnegative().max(2147483647),
     approvalPercent: percent.optional(),
     customerPercent: percent.optional(),
-  }).strict()).min(1).max(100),
+  }).strict().refine(line => line.quantityIssued <= line.quantityRequired, {
+    message: 'Issued quantity cannot exceed quantity required', path: ['quantityIssued'],
+  })).min(1).max(100),
 }).strict().refine(input => new Set(input.lines.map(line => line.sparePartId)).size === input.lines.length, 'Combine duplicate part rows');
 
 export type RequisitionInput = z.infer<typeof requisitionBody>;

@@ -19,6 +19,7 @@ const include = {
 } satisfies Prisma.PartRequisitionInclude;
 
 export class RequisitionService {
+  /** List requisitions within the actor's branch and requested page. */
   async list(query: RequisitionQuery, actor: RequisitionActor) {
     assertRequisitionBranch(actor, query.branchId);
     if (query.jobCardId) {
@@ -33,6 +34,7 @@ export class RequisitionService {
     });
   }
 
+  /** Read saved document snapshots after checking branch ownership. */
   async get(id: string, actor: RequisitionActor, db: Prisma.TransactionClient | typeof prisma = prisma) {
     const document = await db.partRequisition.findUnique({ where: { id }, include });
     if (!document) throw new NotFoundError('Requisition not found');
@@ -40,6 +42,7 @@ export class RequisitionService {
     return { ...document, lines: document.lines.map(line => ({ ...line, partNumber: line.sparePart.partNumber })), totals: requisitionFooter(document.lines) };
   }
 
+  /** Atomically issue stock, snapshot charges and audit one requisition. */
   async create(input: RequisitionInput, actor: RequisitionActor) {
     assertRequisitionBranch(actor, input.branchId);
     const validated = requisitionBody.safeParse(input);
@@ -59,8 +62,9 @@ export class RequisitionService {
       if (input.groupId && !await tx.workshopMaster.findFirst({ where: { id: input.groupId, kind: 'TEAM', active: true } })) throw new BadRequestError('Choose an active workshop group');
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
       const parts = await tx.sparePart.findMany({ where: { id: { in: input.lines.map(line => line.sparePartId) } } });
+      const partsById = new Map(parts.map(part => [part.id, part]));
       const resolved = input.lines.map(line => {
-        const part = parts.find(item => item.id === line.sparePartId);
+        const part = partsById.get(line.sparePartId);
         if (!part || part.partStatus !== PartStatus.ACTIVE) throw new BadRequestError('Choose an active part source record');
         const { campaignId } = assertChargeChange({ to: input.chargeType, campaignId: input.campaignId, kind: 'PART', coverageAtCreation: job.warrantyStatusAtCreation, hasWarrantyCase: !!job.warrantyCase, partWarrantyApplicable: part.warrantyApplicable, linkedCampaignIds: job.campaigns.map(row => row.campaignId), canChargeGoodwill: actor.goodwill });
         const rate = money(input.chargeType === ChargeType.WARRANTY ? part.warrantyRate ?? part.retailRate ?? part.unitPrice : part.retailRate ?? part.unitPrice);
@@ -69,7 +73,14 @@ export class RequisitionService {
       // Lock stock records in a stable order; reserved transfer stock is unavailable.
       for (const item of [...resolved].sort((a, b) => a.part.id.localeCompare(b.part.id))) {
         await tx.$queryRaw`SELECT id FROM "InventoryStock" WHERE "branchId" = ${input.branchId} AND "partId" = ${item.part.id} FOR UPDATE`;
-        const stock = await tx.inventoryStock.findUnique({ where: { branchId_partId: { branchId: input.branchId, partId: item.part.id } } });
+      }
+      const stocks = await tx.inventoryStock.findMany({
+        where: { branchId: input.branchId, partId: { in: resolved.map(item => item.part.id) } },
+        select: { partId: true, quantity: true, reservedQuantity: true, rackLocation: true, binCard: true },
+      });
+      const stockByPartId = new Map(stocks.map(stock => [stock.partId, stock]));
+      for (const item of resolved) {
+        const stock = stockByPartId.get(item.part.id);
         if (item.line.quantityIssued > (stock ? stock.quantity - stock.reservedQuantity : 0)) throw new BadRequestError('Insufficient available stock at this branch');
       }
       const issued = resolved.filter(item => item.line.quantityIssued > 0);
@@ -88,7 +99,7 @@ export class RequisitionService {
       const requisitionNumber = await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, now);
       const document = await tx.partRequisition.create({ data: { branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, groupId: input.groupId, engineerId: input.engineerId, goodwillReason: input.goodwillReason, createdById: actor.userId, requisitionNumber, requisitionDate: now } });
       for (const { line, part, rate, amounts, campaignId } of resolved) {
-        const stock = await tx.inventoryStock.findUnique({ where: { branchId_partId: { branchId: input.branchId, partId: part.id } } });
+        const stock = stockByPartId.get(part.id);
         const issuance = line.quantityIssued === 0 ? null : await tx.partIssuance.create({ data: { branchId: input.branchId, jobCardId: job.id, sparePartId: part.id, issuedById: actor.userId, quantity: line.quantityIssued, partSource: part.partFlag } });
         const { charges, ...snapshots } = amounts;
         const row = await tx.partRequisitionLine.create({ data: { requisitionId: document.id, sparePartId: part.id, partIssuanceId: issuance?.id, partSource: part.partFlag, description: part.name, uom: part.uom, location: stock?.rackLocation, binCard: stock?.binCard, quantityRequired: line.quantityRequired, quantityIssued: line.quantityIssued, rate, warrantyRate: part.warrantyRate, ...snapshots } });
@@ -110,6 +121,7 @@ export class RequisitionService {
     return result;
   }
 
+  /** Reverse an unbilled issue once, preserving its document and audit history. */
   async cancel(id: string, reason: string, actor: RequisitionActor) {
     if (!reason.trim()) throw new BadRequestError('Cancellation requires a reason');
     return prisma.$transaction(async tx => {

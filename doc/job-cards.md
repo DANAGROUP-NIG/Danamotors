@@ -54,7 +54,6 @@ Apply `20261020100000_estimate_versions_signatures` through the normal approved 
 
 Targeted checks: backend `estimate-revision`, `estimate-signature`, `estimate-approval`, `estimate-decisions`, `estimate-print`, `job-card-visibility`, and `roles.issue117` tests. Frontend: `node --test test/issue117-components.test.mjs` verifies required-field logic and rendered print exclusions/access/signature states.
 
-
 ## Service transactions (issue #113)
 
 The **Service transactions** section on a job card contains Requisition, Returns, Labour and Remarks tabs. Booking creation and conversion remain in **Appointments**. The six reference screens are represented by these existing flows and internal print pages; no second customer, vehicle, appointment, labour or stock model was introduced. Customer and vehicle selectors retain their existing inline creation forms and duplicate warnings.
@@ -63,14 +62,14 @@ All API paths below are relative to `/api`. Authentication and the listed permis
 
 ### Booking and conversion
 
-| Method and path | Permission | Behavior |
-| --- | --- | --- |
-| `POST /service/appointments` | `appointment:create` | Create from existing customer/vehicle IDs, branchName and scheduledAt; optional serviceTypeId, serviceId, requests, mileage, AC and follow-up job. |
-| `GET /service/appointments` | `appointment:read` | Paginated list; search includes number, status accepts canonical booking or legacy lifecycle values. |
-| `GET /service/appointments/:id` | `appointment:read` | Booking, linked vehicle/customer, requests, totals and linked jobs. |
-| `PUT /service/appointments/:id` | `appointment:update` | Edit/reschedule a booked, unlinked booking; cancel with a reason or record no-show. |
-| `POST /service/appointments/:id/convert` | `appointment:update` **and** `jobcard:create` | Run normal opening checks and create exactly one linked job atomically. |
-| `DELETE /service/appointments/:id` | `appointment:delete` | Only legacy unnumbered, unlinked eligible rows; numbered/converted/linked bookings return 409. |
+| Method and path                          | Permission                                    | Behavior                                                                                                                                           |
+| ---------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /service/appointments`             | `appointment:create`                          | Create from existing customer/vehicle IDs, branchName and scheduledAt; optional serviceTypeId, serviceId, requests, mileage, AC and follow-up job. |
+| `GET /service/appointments`              | `appointment:read`                            | Paginated list; search includes number, status accepts canonical booking or legacy lifecycle values.                                               |
+| `GET /service/appointments/:id`          | `appointment:read`                            | Booking, linked vehicle/customer, requests, totals and linked jobs.                                                                                |
+| `PUT /service/appointments/:id`          | `appointment:update`                          | Edit/reschedule a booked, unlinked booking; cancel with a reason or record no-show.                                                                |
+| `POST /service/appointments/:id/convert` | `appointment:update` **and** `jobcard:create` | Run normal opening checks and create exactly one linked job atomically.                                                                            |
+| `DELETE /service/appointments/:id`       | `appointment:delete`                          | Only legacy unnumbered, unlinked eligible rows; numbered/converted/linked bookings return 409.                                                     |
 
 `bookingNumber` and `createdAt` are automatic; `scheduledAt` is booked-for. Numbers use the branch sequence and Lagos year, stored as `<branch UUID>/<YYYY + six-digit sequence>` to satisfy global uniqueness. TODO(confirm): replace the display prefix only when a stable business branch code is agreed; historical numbers are not rewritten. Canonical `bookingStatus` is `BOOKED`, `CONVERTED`, `CANCELLED` or `NO_SHOW`; legacy `status` remains a separate appointment/workshop lifecycle field.
 
@@ -84,16 +83,24 @@ Vehicle then booking locks serialize edits and conversions. Job creation, job nu
 
 ### Parts requisitions and returns
 
-| Method and path | Permission | Result in `data` |
-| --- | --- | --- |
-| `GET /inventory/requisitions` | `requisition:read` | `requisitions` list |
-| `POST /inventory/requisitions` | `requisition:create` | `requisition`, lines and totals |
-| `GET /inventory/requisitions/:id` or `/:id/print` | `requisition:read` | Internal requisition detail/print projection |
-| `POST /inventory/requisitions/:id/cancel` | `requisition:cancel` | Cancelled requisition after stock/charge reversal |
-| `GET /inventory/return-slips` | `requisition:read` | `returnSlips` list |
-| `POST /inventory/return-slips` | `requisition:create` | `returnSlip`, lines and totals |
-| `GET /inventory/return-slips/:id` or `/:id/print` | `requisition:read` | Internal return detail/print projection |
-| `POST /inventory/return-slips/:id/cancel` | `requisition:cancel` | Cancelled return after reversing the return effect |
+Requisition lines enforce `quantityIssued <= quantityRequired` on the server as
+well as in the form. Zero issued quantity remains valid for request-only lines.
+The entry form reuses inventory lookups to preview the part flag, UOM, normal and
+warranty rates, and the job branch's on-hand/available stock, location and bin card.
+These previews require the existing part/stock read permissions and never replace
+the transactional stock check. Saves lock stock in stable part order, then read
+the required stock fields once for all lines and reuse those snapshots.
+
+| Method and path                                   | Permission           | Result in `data`                                   |
+| ------------------------------------------------- | -------------------- | -------------------------------------------------- |
+| `GET /inventory/requisitions`                     | `requisition:read`   | `requisitions` list                                |
+| `POST /inventory/requisitions`                    | `requisition:create` | `requisition`, lines and totals                    |
+| `GET /inventory/requisitions/:id` or `/:id/print` | `requisition:read`   | Internal requisition detail/print projection       |
+| `POST /inventory/requisitions/:id/cancel`         | `requisition:cancel` | Cancelled requisition after stock/charge reversal  |
+| `GET /inventory/return-slips`                     | `requisition:read`   | `returnSlips` list                                 |
+| `POST /inventory/return-slips`                    | `requisition:create` | `returnSlip`, lines and totals                     |
+| `GET /inventory/return-slips/:id` or `/:id/print` | `requisition:read`   | Internal return detail/print projection            |
+| `POST /inventory/return-slips/:id/cancel`         | `requisition:cancel` | Cancelled return after reversing the return effect |
 
 Lists accept branchId/jobCardId, page (1), limit (25, maximum 100) and chargeType; returns additionally accept requisitionId. Requisition input contains branchId, jobCardId, chargeType, optional group/engineer/campaign/goodwillReason and 1-100 distinct part lines (sparePartId, quantityRequired, quantityIssued). Quantities are whole numbers; issued cannot exceed branch available stock after reservations. Scope must remain within the approved estimate. The part number is read from the linked part master; descriptions, source flag, UOM, bin/location, rates and financial shares use their saved document data where present. Decimal rate/amount snapshots serialize as strings; footer totals are numbers.
 
@@ -105,14 +112,14 @@ No create, return or cancellation is allowed on billed/delivered/cancelled jobs 
 
 ### Labour slips and vehicle ready
 
-| Method and path | Permission | Behavior |
-| --- | --- | --- |
-| `GET /service/labour-slips` | `jobcard:read` | Paginated branch/job list, same page/limit defaults as parts documents. |
-| `POST /service/labour-slips` | `jobcard:labour:update` | Create a slip with branch/job, optional header group/engineer and 1-100 lines. |
-| `GET /service/labour-slips/:id` or `/:id/print` | `jobcard:read` | Internal saved hours, rates, mechanic, payer and totals. |
-| `POST /service/labour-slips/:id/lines` | `jobcard:labour:update` | Add one line; returns 200 with `data.labourSlip`. |
-| `PUT /service/labour-slips/:id/lines/:lineId` | `jobcard:labour:update` | Replace one saved line while preserving applicable snapshots. |
-| `PUT /service/job-cards/:id` | `jobcard:update` | Existing workDone and lifecycle endpoint; READY still requires passed QC. |
+| Method and path                                 | Permission              | Behavior                                                                       |
+| ----------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `GET /service/labour-slips`                     | `jobcard:read`          | Paginated branch/job list, same page/limit defaults as parts documents.        |
+| `POST /service/labour-slips`                    | `jobcard:labour:update` | Create a slip with branch/job, optional header group/engineer and 1-100 lines. |
+| `GET /service/labour-slips/:id` or `/:id/print` | `jobcard:read`          | Internal saved hours, rates, mechanic, payer and totals.                       |
+| `POST /service/labour-slips/:id/lines`          | `jobcard:labour:update` | Add one line; returns 200 with `data.labourSlip`.                              |
+| `PUT /service/labour-slips/:id/lines/:lineId`   | `jobcard:labour:update` | Replace one saved line while preserving applicable snapshots.                  |
+| `PUT /service/job-cards/:id`                    | `jobcard:update`        | Existing workDone and lifecycle endpoint; READY still requires passed QC.      |
 
 Each line selects exactly one technicianId login **or** mechanicId employee (including employees without logins), an operation, chargeType, optional chargedHours/group/campaign/reason. Standard hours, rate and pricing mode come from the vehicle model schedule. chargedHours defaults to standardHours; TIME uses charged hours times saved rate, while FIXED keeps the saved model amount. Existing `JobCardLabour.hours` remains the charged-hours column and the API also exposes chargedHours. Editing the same operation preserves rate/standard-hour/pricing snapshots; another operation resolves its model schedule.
 
@@ -120,13 +127,13 @@ Labour GOODWILL requires `warranty:update` and a reason (distinct from parts goo
 
 ### Remarks and internal picking print
 
-| Method and path | Permission | Behavior |
-| --- | --- | --- |
-| `GET /service/job-cards/:id/remarks` | `jobcard:read` | `data.document` with id, branchId and remarks. |
-| `GET /service/estimates/:id/remarks` | `estimate:read` | Same, including standalone estimates with an assigned branch. |
-| `PUT` either remarks path | `jobcard:remarks:update` | Strict body `{ "remarks": "Text" }` or null; maximum 5000 characters. |
-| `GET /service/job-cards/:id/picking-list/print` | `jobcard:picking-list:print` | Latest estimate's planned parts for the job. |
-| `GET /service/estimates/:id/picking-list/print` | `jobcard:picking-list:print` | Planned parts for that exact revision. |
+| Method and path                                 | Permission                   | Behavior                                                              |
+| ----------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `GET /service/job-cards/:id/remarks`            | `jobcard:read`               | `data.document` with id, branchId and remarks.                        |
+| `GET /service/estimates/:id/remarks`            | `estimate:read`              | Same, including standalone estimates with an assigned branch.         |
+| `PUT` either remarks path                       | `jobcard:remarks:update`     | Strict body `{ "remarks": "Text" }` or null; maximum 5000 characters. |
+| `GET /service/job-cards/:id/picking-list/print` | `jobcard:picking-list:print` | Latest estimate's planned parts for the job.                          |
+| `GET /service/estimates/:id/picking-list/print` | `jobcard:picking-list:print` | Planned parts for that exact revision.                                |
 
 Remarks remain editable in every status, including billed/delivered/cancelled jobs and approved/rejected/superseded estimates. Blank text becomes null; no-op saves do not create false change events. Actual changes atomically audit actor, branch, document ID and old/new values. They do not alter workDone, amounts, signed content, version, stock or lifecycle.
 

@@ -76,6 +76,14 @@ describeDb('Requisitions on isolated local PostgreSQL', () => {
     await db.sparePart.update({ where: { id: partId }, data: { retailRate: 100.01 } });
   });
 
+  it('rejects issue quantities above the request without changing stock or creating a document', async () => {
+    const card = await job();
+    const before = await stock();
+    await expect(service.create(input(card.id, { lines: [{ sparePartId: partId, quantityRequired: 1, quantityIssued: 2 }] }), actor)).rejects.toThrow('quantity required');
+    expect(await stock()).toBe(before);
+    expect(await db.partRequisition.count({ where: { jobCardId: card.id } })).toBe(0);
+  });
+
   it('splits goodwill, survives line sync and price changes, and bills only the customer share', async () => {
     const card = await job();
     const document = await service.create(input(card.id, { chargeType: 'GOODWILL', goodwillReason: 'Approved contribution', lines: [{ sparePartId: partId, quantityRequired: 3, quantityIssued: 3, approvalPercent: 30, customerPercent: 70 }] }), actor);
@@ -212,6 +220,7 @@ describeDb('Requisitions on isolated local PostgreSQL', () => {
 
   it('requires QC again after issuing or cancelling parts on a ready job', async () => {
     const card = await job('READY');
+    await db.receipt.create({ data: { receiptNumber: `REQ-ADV-${run}`, branchId, customerId, advanceJobCardId: card.id, amount: 1, advanceAmount: 1 } });
     await db.jobCard.update({ where: { id: card.id }, data: { qcStatus: 'PASSED', readyAt: new Date() } });
     const document = await service.create(input(card.id), actor);
     expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'IN_PROGRESS', qcStatus: 'PENDING', readyAt: null });
