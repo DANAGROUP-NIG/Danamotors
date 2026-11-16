@@ -71,7 +71,9 @@ export function canEditBooking(booking: {
 }) {
   return (
     (booking.bookingStatus ?? "BOOKED") === "BOOKED" &&
-    !["Completed", "Closed", "Cancelled", "No Show"].includes(booking.status) &&
+    !["COMPLETED", "CLOSED", "CANCELLED", "CANCELED", "NO SHOW"].includes(
+      booking.status.trim().toUpperCase().replace(/[_-]+/g, " "),
+    ) &&
     !booking.jobCards?.length
   );
 }

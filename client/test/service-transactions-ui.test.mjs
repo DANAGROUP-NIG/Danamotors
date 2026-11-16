@@ -394,3 +394,11 @@ test('saved labour editors restore the campaign and goodwill reason', () => {
   assert.ok(grid.includes('Group: TEAM-A'));
   assert.ok(grid.includes('Saved team'));
 });
+
+
+test('legacy uppercase cancelled bookings hide editing and conversion actions', () => {
+  const appointment = { id: 'legacy', customerId: 'customer', vehicleId: 'vehicle', status: 'CANCELLED', bookingStatus: 'BOOKED', scheduledAt: '2026-11-17T09:00:00Z', createdAt: '2026-11-16T09:00:00Z', requests: [], jobCards: [] };
+  const { html } = render('BookingPanel', { permissions: ['appointment:update', 'jobcard:create'], props: { appointment } });
+  assert.equal(html.includes('Save booking details'), false);
+  assert.equal(html.includes('Convert to job card'), false);
+});

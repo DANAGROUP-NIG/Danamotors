@@ -15,7 +15,7 @@ const APPOINTMENT_STATUSES = [
 
 const optionalDurationMins = z.union([
   z.literal("").transform(() => undefined),
-  z.coerce.number().int().positive(),
+  z.coerce.number().int().positive().max(2147483647),
 ]).optional();
 
 export const createAppointmentSchema = z.object({

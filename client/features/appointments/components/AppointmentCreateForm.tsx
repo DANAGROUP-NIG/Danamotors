@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { BookingVehicleSummary } from "@/features/service-transactions/components/BookingVehicleSummary";
 import { BookingFields } from "@/features/service-transactions/components/BookingFields";
-import { lagosIso } from "@/features/service-transactions/transaction.logic";
+import {
+  lagosInput,
+  lagosIso,
+} from "@/features/service-transactions/transaction.logic";
 import type { BookingExtra } from "../types/appointment.types";
 import { useForm, Controller } from "react-hook-form";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
@@ -53,13 +56,15 @@ export function AppointmentCreateForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateAppointmentFormInput, unknown, CreateAppointmentFormValues>({
-    resolver: zodResolver(createAppointmentSchema),
-    defaultValues: {
-      branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
-      ...initialValues,
+  } = useForm<CreateAppointmentFormInput, unknown, CreateAppointmentFormValues>(
+    {
+      resolver: zodResolver(createAppointmentSchema),
+      defaultValues: {
+        branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
+        ...initialValues,
+      },
     },
-  });
+  );
 
   const selectedCustomerId = watch("customerId");
   const selectedVehicleId = watch("vehicleId");
@@ -86,13 +91,7 @@ export function AppointmentCreateForm({
     });
   }
 
-  const getLocalDateTimePickerString = (date = new Date()) => {
-    const tzOffset = date.getTimezoneOffset() * 60000; // Offset in milliseconds
-    const localISOTime = new Date(date.getTime() - tzOffset).toISOString();
-    return localISOTime.slice(0, 16); // Extracts "YYYY-MM-DDTHH:mm"
-  };
-
-  const currentLocalTime = getLocalDateTimePickerString();
+  const earliestScheduledAt = lagosInput(new Date().toISOString());
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
@@ -210,7 +209,7 @@ export function AppointmentCreateForm({
               <DateTimeInput
                 value={field.value}
                 onChange={field.onChange}
-                min={currentLocalTime}
+                min={earliestScheduledAt}
               />
             )}
           />
@@ -220,7 +219,10 @@ export function AppointmentCreateForm({
         <summary className="cursor-pointer text-sm text-muted-foreground">
           Additional booking details
         </summary>
-        <Field label="Duration (mins, optional)" error={errors.durationMins?.message}>
+        <Field
+          label="Duration (mins, optional)"
+          error={errors.durationMins?.message}
+        >
           <input
             type="number"
             className={inputCls}

@@ -119,3 +119,11 @@ test('saved labour edits retain campaign and goodwill context and send one emplo
   assert.equal(technician.mechanicId, undefined);
   assert.equal(technician.chargedHours, 2);
 });
+
+
+test('legacy terminal booking spellings stay read-only', () => {
+  for (const status of ['CANCELLED', 'canceled', ' cancelled ', 'COMPLETED', 'closed', 'NO_SHOW', 'no-show']) {
+    assert.equal(logic.canEditBooking({ status, bookingStatus: 'BOOKED' }), false);
+  }
+  assert.equal(logic.canEditBooking({ status: 'Checked In', bookingStatus: 'BOOKED' }), true);
+});

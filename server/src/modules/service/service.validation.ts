@@ -66,7 +66,7 @@ export const createAppointmentSchema = z.object({
     serviceTypeId: z.string().uuid("Invalid service type ID").optional(),
     serviceId: z.string().uuid("Invalid service ID").optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date"),
-    durationMins: z.number().int().optional(),
+    durationMins: z.number().int().positive().max(2147483647).optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
     createdById: z.string().uuid("Invalid user ID").optional(),
@@ -80,7 +80,7 @@ export const updateAppointmentSchema = z.object({
     cancelReason: z.string().trim().min(1).max(2000).optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date").optional(),
     serviceId: z.string().uuid("Invalid service ID").optional(),
-    durationMins: z.number().int().optional(),
+    durationMins: z.number().int().positive().max(2147483647).optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
     // Odometer reading taken at check-in (status 'Checked In').

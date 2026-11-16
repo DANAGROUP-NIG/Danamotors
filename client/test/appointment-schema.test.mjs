@@ -30,7 +30,7 @@ for (const [name, schema, fields] of [
 
   test(`${name} accepts supplied whole minutes and rejects invalid duration`, () => {
     assert.equal(schema.parse({ ...fields, durationMins: '60' }).durationMins, 60);
-    for (const durationMins of [0, -1, 1.5, 'invalid']) {
+    for (const durationMins of [0, -1, 1.5, 2147483648, 'invalid']) {
       assert.equal(schema.safeParse({ ...fields, durationMins }).success, false);
     }
   });
