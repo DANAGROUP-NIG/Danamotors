@@ -30,7 +30,7 @@ const job = {
 };
 function render(
   name,
-  { permissions = [], card = job, data, error = false, props = {} } = {},
+  { permissions = [], card = job, data, error = false, props = {}, source = name } = {},
 ) {
   const cache = new Map();
   const queries = [];
@@ -175,7 +175,7 @@ function render(
     );
     return module.exports;
   }
-  const Component = load(path.join(root, folder + name + ".tsx"))[name];
+  const Component = load(path.join(root, folder + source + ".tsx"))[name];
   return {
     html: renderToStaticMarkup(
       React.createElement(Component, { job: card, ...props }),
@@ -372,4 +372,12 @@ test("converted booking is read-only and links to its job instead of permitting 
   assert.ok(html.includes("/job-cards/linked"));
   assert.equal(html.includes("Convert to job card"), false);
   assert.equal(html.includes("Save booking details"), false);
+});
+
+
+test('return print rows distinguish required, issued and returned quantities with saved context', () => {
+  const document = { returnNumber: 'RET-001', lines: [{ id: 'line', partNumber: 'PART-001', description: 'Saved filter', quantityRequired: 5, quantityIssued: 3, quantity: 1, rate: '100.01', amount: '100.01', location: 'Rack A', binCard: 'BIN-A', warrantyRate: '80.00', uom: 'UNIT' }] };
+  const { html } = render('SlipRows', { source: 'SavedSlip', props: { document } });
+  for (const quantity of [5, 3, 1]) assert.ok(html.includes(`class="p-2">${quantity}</td>`));
+  for (const text of ['Saved filter', 'Rack A', 'BIN-A', 'UNIT', 'Warranty rate:']) assert.ok(html.includes(text));
 });

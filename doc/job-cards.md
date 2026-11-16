@@ -108,6 +108,15 @@ Payer rules: CUSTOMER is non-warranty; WARRANTY is 100/0 and needs eligible cove
 
 A return selects one requisition and distinct requisitionLineIds with positive quantities, bounded by issued minus active previous returns. It restores branch stock and proportionally reduces both payer shares at saved rates. Cancelling a return reissues that quantity and restores those charges. Cancelling a requisition reverses its original issue; cancel active return slips first. Cancellation requires a nonempty reason and audits prior values; bill/claim references protect history.
 
+Return detail and print rows expose the saved requisition's required/issued
+quantities, location, bin card and warranty rate alongside the return quantity
+and saved return rate/amount. These are historical snapshots, not current stock.
+Print grids keep required, issued and returned quantities in separate columns.
+Cancellation locks stock in stable part order and reads availability in one batch;
+reserved stock cannot be reissued. Successive partial returns recalculate remaining
+payer shares from the original saved rate and percentages, so full return and
+out-of-order cancellation restore the original charges without rounding drift.
+
 No create, return or cancellation is allowed on billed/delivered/cancelled jobs or jobs with an active bill. Requisition/return changes to ready work reopen it for QC. Concurrent stock/return writes and audit failures cannot leave partial stock or charge changes.
 
 ### Labour slips and vehicle ready
