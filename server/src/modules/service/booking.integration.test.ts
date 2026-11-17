@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { createAppointmentSchema, updateAppointmentSchema } from './service.validation';
 import type { ServiceService } from "./service.service";
 import type { BookingCreate } from "./booking.persistence";
 import type { JobCardWorkflowService } from "./job-card-workflow.service";
@@ -686,4 +687,21 @@ suite("booking transactions on disposable localhost", () => {
       cancelReason: "Customer request",
     });
   });
+  it('saves and edits structured requests through API validation and copies exact codes and amounts on conversion', async () => {
+    const data = await input();
+    const complaint = await db.workshopMaster.create({ data: { kind: 'COMPLAINT', code: `GRID-C-${run}`, description: 'Structured complaint' } });
+    const defect = await db.warrantyDefectCode.create({ data: { code: `GRID-D-${run}`, description: 'Structured defect' } });
+    const row = { description: 'Inspect brakes', complaintCodeId: complaint.id, defectCode: defect.code, spare: 0.1, oil: 0.2, labour: 12.35 };
+    const { body } = createAppointmentSchema.parse({ body: { customerId, vehicleId: data.vehicleId, branchName: `Booking fixture ${run}`, scheduledAt: data.scheduledAt.toISOString(), requests: [row], serviceTypeId: typeId, mileage: 100 } });
+    const saved = await service.createAppointment(body);
+    expect(saved.totals.estimatedTotal).toBe(12.65);
+    const update = updateAppointmentSchema.parse({ params: { id: saved.id }, body: { requests: [{ ...row, description: 'Updated brake request' }] } });
+    const edited = await service.updateAppointment(saved.id, { ...update.body, actorId: advisorId });
+    expect(edited.totals.estimatedTotal).toBe(12.65);
+    expect(edited.requests[0]).toMatchObject({ complaintCodeId: complaint.id, defectCode: defect.code, description: 'Updated brake request' });
+    const card = await service.convertAppointment(saved.id, await jobInput(saved.id), advisorId);
+    const copied = await db.jobComplaint.findMany({ where: { jobCardId: card.id } });
+    expect(copied[0]).toMatchObject({ complaintCodeId: complaint.id, defectCode: defect.code, description: 'Updated brake request', spare: 0.1, oil: 0.2, labour: 12.35 });
+  });
+
 });

@@ -12,7 +12,7 @@ const spec = swaggerSpec as { paths: Record<string, Path>; components: { schemas
 const id = '11111111-1111-4111-8111-111111111111';
 
 it('validates booking create, update and conversion examples with the actual route bodies', () => {
-  for (const body of [examples.booking, examples.minimalBooking]) expect(() => createAppointmentSchema.parse({ body })).not.toThrow();
+  for (const body of [examples.booking, examples.minimalBooking, examples.detailedBooking]) expect(() => createAppointmentSchema.parse({ body })).not.toThrow();
   for (const body of [examples.reschedule, examples.cancelBooking, examples.noShow]) expect(() => updateAppointmentSchema.parse({ params: { id }, body })).not.toThrow();
   expect(() => jobOpeningBody.parse({ ...examples.conversion, customerId: id, vehicleId: examples.booking.vehicleId, branchName: examples.booking.branchName, description: 'Synthetic opening' })).not.toThrow();
 });

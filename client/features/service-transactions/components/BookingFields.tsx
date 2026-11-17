@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { emptyRequest } from "@/features/job-cards/components/opening/CustomerRequestsTab";
+import { BookingRequestGrid } from "./BookingRequestGrid";
 import { toast } from "sonner";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
@@ -16,17 +19,16 @@ export function BookingFields({
   disabled?: boolean;
   compact?: boolean;
 }) {
-  const requestField = (
-    <Field label="Customer request">
-      <textarea
-        className={inputCls}
-        maxLength={2000}
-        value={value.requests ?? ""}
-        onChange={(event) =>
-          onChange({ ...value, requests: event.target.value })
-        }
-      />
-    </Field>
+  const requestField = Array.isArray(value.requests) ? (
+    <BookingRequestGrid value={value.requests} vehicleId={vehicleId} onChange={requests => onChange({ ...value, requests })} />
+  ) : (
+    <div className="space-y-3">
+      <Field label="Customer request">
+        <textarea className={inputCls} maxLength={2000} value={value.requests ?? ''} onChange={event => onChange({ ...value, requests: event.target.value })} />
+      </Field>
+      <Button type="button" variant="outline" onClick={() => onChange({ ...value, requests: [{ ...emptyRequest(), description: typeof value.requests === 'string' ? value.requests : '' }] })}>Add request details</Button>
+      <p className="text-xs text-muted-foreground">Optional defect, parts, oil and labour estimates.</p>
+    </div>
   );
   if (compact)
     return (

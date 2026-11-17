@@ -489,6 +489,23 @@ suite("service document actions on disposable localhost", () => {
       }),
     ).toBe(1);
   });
+  it('prints saved checklist codes and free text without adding live checklist quantities', async () => {
+    const { job, estimate } = await fixture();
+    const code = `PICK-CHECK-${run}`;
+    const checklist = await db.workshopMaster.create({ data: { kind: 'CHECKLIST', code, description: 'Historical checklist', active: false } });
+    const model = await db.workshopMaster.create({ data: { kind: 'MODEL', code: `PICK-MODEL-${run}`, description: 'Checklist model' } });
+    await db.serviceChecklistLine.create({ data: { checklistId: checklist.id, modelId: model.id, kind: 'PART', sparePartId: partId, quantity: 99 } });
+    await db.jobCard.update({ where: { id: job.id }, data: { checklist: `  ${code.toLowerCase()}  ` } });
+    const print = await service.pickingPrint('job', job.id, actor);
+    expect(print.checklist).toMatchObject({ code, description: 'Historical checklist' });
+    expect(print.job?.date).toEqual(job.createdAt);
+    expect(print.totals).toEqual({ numberOfItems: 2, quantityRequired: 3, totalAmount: 0.3 });
+    await db.jobCard.update({ where: { id: job.id }, data: { checklist: 'Inspect brakes and tyres' } });
+    const freeText = await service.pickingPrint('estimate', estimate.id, actor);
+    expect(freeText.checklist).toEqual({ code: null, description: null, text: 'Inspect brakes and tyres' });
+    expect(freeText.totals.quantityRequired).toBe(3);
+  });
+
   it("uses the latest job estimate and never sums issued warranty/customer payer shares", async () => {
     const { job, estimate } = await fixture();
     const revised = await db.estimate.create({

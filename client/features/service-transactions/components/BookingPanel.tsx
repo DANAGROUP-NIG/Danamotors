@@ -15,7 +15,7 @@ import { BookingOpeningConsentModal } from "./BookingOpeningConsentModal";
 import type { OpeningConsentProof } from "../booking-opening-consent.logic";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { BookingFields } from "./BookingFields";
-import { bookingExtras, bookingOpeningValues } from "../booking.logic";
+import { bookingExtras, bookingOpeningValues, bookingRequestPayload, bookingRequestsEqual } from "../booking.logic";
 import {
   canEditBooking,
   lagosDate,
@@ -71,7 +71,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
           event.preventDefault();
           update.mutate({
             ...extra,
-            requests: extra.requests === bookingExtras(appointment).requests ? undefined : extra.requests,
+            requests: bookingRequestsEqual(extra.requests, bookingExtras(appointment).requests) ? undefined : bookingRequestPayload(extra.requests),
             serviceTypeId: serviceTypeId || undefined,
             scheduledAt: lagosIso(scheduled),
           });

@@ -1,4 +1,6 @@
-export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: string };
+import type { CreateJobCardFormValues } from '@/features/job-cards/schemas/job-card.schema';
+export type BookingRequest = CreateJobCardFormValues['complaints'][number];
+export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: string | BookingRequest[] };
 export type AppointmentStatus =
   | "Pending"
   | "Checked In"

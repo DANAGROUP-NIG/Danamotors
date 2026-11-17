@@ -95,7 +95,7 @@ it("requires customer requests and allows an optional service catalogue while re
   ).toBe(false);
 });
 
-it("accepts trimmed request text for create and update and rejects arrays, blank and oversized text", () => {
+it("accepts trimmed request text and rejects malformed, blank and oversized requests", () => {
   const id = "00000000-0000-4000-8000-000000000001";
   const body = {
     customerId: id,
@@ -119,7 +119,7 @@ it("accepts trimmed request text for create and update and rejects arrays, blank
     "   ",
     "x".repeat(2001),
     ["Noise"],
-    [{ description: "Noise" }],
+    [],
   ]) {
     expect(
       createAppointmentSchema.safeParse({ body: { ...body, requests } })
@@ -191,3 +191,15 @@ it.each([0, -1, 1.5, 2147483648])(
     ).toBe(false);
   },
 );
+
+
+it('accepts bounded structured request rows while rejecting invalid amounts and caller totals', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const body = { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-17T09:00:00Z' };
+  const row = { description: '  Inspect brakes  ', spare: 0.1, oil: 0.2, labour: 12.35 };
+  expect(createAppointmentSchema.parse({ body: { ...body, requests: [row] } }).body.requests).toEqual([{ ...row, description: 'Inspect brakes' }]);
+  expect(updateAppointmentSchema.parse({ params: { id }, body: { requests: [row] } }).body.requests).toHaveLength(1);
+  for (const requests of [Array.from({ length: 101 }, () => row), [{ ...row, spare: -1 }], [{ ...row, spare: 0.001 }], [{ ...row, total: 12.65 }]]) {
+    expect(createAppointmentSchema.safeParse({ body: { ...body, requests } }).success).toBe(false);
+  }
+});

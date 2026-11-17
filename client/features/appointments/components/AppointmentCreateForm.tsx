@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BookingVehicleSummary } from "@/features/service-transactions/components/BookingVehicleSummary";
+import { bookingRequestPayload, bookingRequestsValid } from '@/features/service-transactions/booking.logic';
 import { BookingFields } from "@/features/service-transactions/components/BookingFields";
 import {
   lagosInput,
@@ -70,7 +71,7 @@ export function AppointmentCreateForm({
   const selectedVehicleId = watch("vehicleId");
 
   function onSubmit(values: CreateAppointmentFormValues) {
-    if (!extra.requests?.trim()) {
+    if (!bookingRequestsValid(extra.requests)) {
       setRequestError("Add the customer request");
       return;
     }
@@ -78,6 +79,7 @@ export function AppointmentCreateForm({
     const payload = {
       ...values,
       ...extra,
+      requests: bookingRequestPayload(extra.requests),
       serviceId: values.serviceId || undefined,
       serviceTypeId: values.serviceTypeId || undefined,
       scheduledAt: lagosIso(values.scheduledAt),

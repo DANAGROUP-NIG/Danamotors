@@ -42,7 +42,7 @@ test('booking date entry and output use Lagos independently of the browser timez
 
 });
 
-test('booking service and requests remain optional', () => {
+test('booking catalogue service remains optional', () => {
 
   const schema = load('features/appointments/schemas/appointment.schema.ts').createAppointmentSchema;
 
@@ -126,4 +126,27 @@ test('legacy terminal booking spellings stay read-only', () => {
     assert.equal(logic.canEditBooking({ status, bookingStatus: 'BOOKED' }), false);
   }
   assert.equal(logic.canEditBooking({ status: 'Checked In', bookingStatus: 'BOOKED' }), true);
+});
+
+
+test('detailed booking edits preserve saved codes, decimal amounts and request identity', () => {
+  const appointment = { id: 'booking', requests: [{ id: 'stored', complaintCodeId: 'code', defectCode: 'DEFECT', description: 'Inspect brakes', estimatedParts: '0.10', estimatedOil: '0.20', estimatedLabour: '12.35' }] };
+  const extra = booking.bookingExtras(appointment);
+  assert.ok(Array.isArray(extra.requests));
+  const payload = booking.bookingRequestPayload(extra.requests);
+  assert.equal(payload[0].spare, 0.1);
+  assert.equal(payload[0].oil, 0.2);
+  assert.equal(payload[0].labour, 12.35);
+  assert.equal(payload[0].complaintCodeId, 'code');
+  assert.equal(payload[0].defectCode, 'DEFECT');
+  assert.equal(Object.hasOwn(payload[0], 'id'), false);
+  assert.equal(booking.bookingRequestsEqual(extra.requests, booking.bookingExtras(appointment).requests), true);
+  const edited = extra.requests.map(row => ({ ...row, description: 'Updated request' }));
+  assert.equal(booking.bookingRequestsEqual(edited, extra.requests), false);
+  assert.equal(booking.bookingRequestPayload(edited)[0].labour, 12.35);
+  assert.equal(booking.bookingRequestsValid(edited), true);
+  assert.equal(booking.bookingRequestsValid([]), false);
+  assert.equal(booking.bookingRequestsValid('  '), false);
+  assert.equal(booking.bookingRequestsValid('Inspect brakes'), true);
+  assert.equal(booking.bookingRequestsEqual('Inspect brakes', [{ description: 'Inspect brakes', complaintCodeId: '', spare: 0, oil: 0, labour: 0 }]), true);
 });

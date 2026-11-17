@@ -114,6 +114,8 @@ function render(
       JobCardOpeningModal: () => null,
     },
     "features/job-cards/components/opening/CustomerRequestsTab": {
+      emptyRequest: () => ({ description: '', complaintCodeId: '', spare: 0, oil: 0, labour: 0 }),
+      CustomerRequestsTab: () => React.createElement('p', null, 'Detailed customer requests'),
       requestTotals: (rows) =>
         Object.fromEntries(
           ["spare", "oil", "labour"].map((key) => [
@@ -412,4 +414,26 @@ test('remarks show document context and separate internal text from customer exp
   assert.ok(print.includes('Public &lt;explanation&gt;'));
   assert.equal(print.includes('Internal secret'), false);
   assert.equal(render('CustomerExplanation', { source: '../../../components/CustomerExplanation', props: { text: null } }).html, '');
+});
+
+
+test('internal picking headers show the job date, service code and checklist context', () => {
+  const pickingList = { branch: { name: 'Branch' }, job: { number: 'JOB-001', date: '2026-11-15T09:00:00Z', mileage: 1234, remarks: null, service: { code: 'SERVICE-A', description: 'Service A' } }, estimate: { number: 'EST-001', date: '2026-11-16T09:00:00Z', version: 1, status: 'Approved', currency: 'NGN', remarks: null }, checklist: { code: 'CHECK-A', description: 'Saved checklist', text: 'CHECK-A' }, vehicle: job.vehicle, lines: [], totals: { numberOfItems: 0, quantityRequired: 0, totalAmount: 0 }, printedAt: '2026-11-16T10:00:00Z' };
+  const props = { kind: 'job-picking', id: 'job' };
+  const { html } = render('ServiceDocumentPrint', { props, permissions: ['jobcard:picking-list:print'], data: { pickingList } });
+  for (const text of ['Job date:', 'Estimate date:', 'CHECK-A', 'Saved checklist', 'SERVICE-A']) assert.ok(html.includes(text));
+  assert.ok(html.includes('15 Nov 2026'));
+  assert.ok(html.includes('16 Nov 2026'));
+  const missing = render('ServiceDocumentPrint', { props, permissions: ['jobcard:picking-list:print'], data: { pickingList: { ...pickingList, checklist: null } } }).html;
+  assert.ok(missing.includes('Checklist code: Not recorded'));
+});
+
+
+test('booking keeps simple text entry and reuses the request grid for detailed rows', () => {
+  const simple = render('BookingFields', { props: { value: { requests: 'Inspect brakes' }, onChange: () => {}, compact: true } }).html;
+  assert.ok(simple.includes('Inspect brakes'));
+  assert.ok(simple.includes('Add request details'));
+  const detailed = render('BookingFields', { props: { value: { requests: [{ description: 'Inspect brakes', spare: 0.1, oil: 0.2, labour: 12.35 }] }, onChange: () => {}, compact: true } }).html;
+  assert.ok(detailed.includes('Detailed customer requests'));
+  assert.equal(detailed.includes('Add request details'), false);
 });
