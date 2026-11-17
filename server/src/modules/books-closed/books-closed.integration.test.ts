@@ -5,6 +5,9 @@
  *
  *   TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/danamotors_test npx jest books-closed.integration
  */
+// A module, so TEST_DB and describeDb stay local to this file (they clash as globals under ts-jest).
+export {};
+
 const TEST_DB = process.env.TEST_DATABASE_URL;
 const describeDb = TEST_DB ? describe : describe.skip;
 
