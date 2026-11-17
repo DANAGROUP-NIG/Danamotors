@@ -33,6 +33,11 @@ namespace Danamotors.Hhdc.Link
         {
             this.dev = dev;
             this.root = DeviceLayout.ResolveRoot(delegate(string p) { return dev.DirectoryExists(p); });
+            // The first RAPI calls after docking can fail silently (seen 2026-10-27 and 2026-11-12): \Application then
+            // looks missing and the app would be put in RAM (lost on a cold boot). \Windows is always there, so if it
+            // is not seen either the link is not ready yet; the station tries again on its next pass.
+            if (root == DeviceLayout.FallbackRoot && dev is RapiDevice && !dev.DirectoryExists("\\Windows"))
+                throw new LinkException("The handheld is not answering yet. It is tried again in a few seconds.");
         }
 
         public string Root { get { return root; } }

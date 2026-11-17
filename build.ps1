@@ -38,8 +38,16 @@ $refs = Resolve-Path $CfRefs -ErrorAction SilentlyContinue
 if (-not $refs) { throw "CF reference libraries not found at $CfRefs. Pass -CfRefs <folder with mscorlib.dll, System.dll, System.Drawing.dll, System.Windows.Forms.dll>." }
 $cf = @('mscorlib', 'System', 'System.Drawing', 'System.Windows.Forms') | ForEach-Object { "/r:$refs\$_.dll" }
 $icon = Join-Path $PSScriptRoot 'res\kmhh.ico'
+# CE 6 cannot read PNG icon images: the handheld gets a bitmap-only copy (res\make_ce_icon.py builds it).
+$ceIcon = Join-Path $PSScriptRoot 'res\kmhh-ce.ico'
+# Guard: every image in the device icon must be a bitmap (a PNG image starts with 0x89 'PNG'); CE 6 shows a blank icon otherwise.
+$ico = [IO.File]::ReadAllBytes($ceIcon)
+for ($i = 0; $i -lt [BitConverter]::ToUInt16($ico, 4); $i++) {
+    $at = [BitConverter]::ToInt32($ico, 6 + 16 * $i + 12)
+    if ($ico[$at] -eq 0x89 -and $ico[$at + 1] -eq 0x50) { throw "res\kmhh-ce.ico holds a PNG image; the handheld (CE 6) cannot show it. Run python res\make_ce_icon.py." }
+}
 $logo = Join-Path $PSScriptRoot 'res\kia-logo.png'
-Compile 'Kia Motors Handheld (device)' (@('/noconfig', '/nostdlib', '/target:winexe', "/out:$out\device\KMHH.exe", "/win32icon:$icon", "/resource:$logo,Kia.Logo.png") + $cf + (Sources 'shared', 'device\src'))
+Compile 'Kia Motors Handheld (device)' (@('/noconfig', '/nostdlib', '/target:winexe', "/out:$out\device\KMHH.exe", "/win32icon:$ceIcon", "/resource:$logo,Kia.Logo.png") + $cf + (Sources 'shared', 'device\src'))
 if ($DeviceOnly) { return }
 
 # PC tool and its command-line twin (shared logic in link\src\Core).
