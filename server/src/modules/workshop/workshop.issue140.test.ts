@@ -5,6 +5,7 @@ jest.mock("../../prisma/client", () => ({
     $queryRaw: jest.fn(),
     partIssuance: { findUnique: jest.fn(), update: jest.fn() },
     partCollectionSignature: { create: jest.fn() },
+    jobcardNotificationEvent: { upsert: jest.fn() },
     user: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
     jobCard: {
       groupBy: jest.fn(),

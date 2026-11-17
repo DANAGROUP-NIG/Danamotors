@@ -4,13 +4,13 @@ jest.mock('../../prisma/client', () => {
     user: { findMany: jest.fn(), findUnique: jest.fn() }, customer: { findUnique: jest.fn() },
     notification: { createMany: jest.fn() }, notificationFailure: { upsert: jest.fn() },
     jobcardNotificationAudit: { createMany: jest.fn() },
-    jobcardNotificationEvent: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), upsert: jest.fn() },
+    jobcardNotificationEvent: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), upsert: jest.fn(), createMany: jest.fn() },
   };
   return { __esModule: true, default: { ...tx, $transaction: jest.fn((fn: (client: typeof tx) => Promise<unknown>) => fn(tx)) } };
 });
 import { Prisma, type JobcardNotificationEvent } from '@prisma/client';
 import prisma from '../../prisma/client';
-import { notificationDedupeKey, processJobcardNotification, sendJobcardReminders } from './jobcard-notification-router';
+import { drainJobcardNotifications, notificationDedupeKey, processJobcardNotification, sendJobcardReminders } from './jobcard-notification-router';
 
 const snapshot = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'IN_PROGRESS', technicianId: 'tech', qualityInspectorId: 'qc', serviceAdvisorId: 'advisor', deliveryAdvisorId: null, createdById: 'requester', customerId: 'customer', qcStatus: 'PENDING', qcNotes: null, promisedAt: '2026-11-13T10:00:00.000Z' };
 function row(after = snapshot, before = { ...snapshot, status: 'OPEN' }): JobcardNotificationEvent {
@@ -31,7 +31,7 @@ it('persists exactly one per recipient with context, correct link and audit', as
   const data = (prisma.notification.createMany as jest.Mock).mock.calls[0][0].data;
   expect(data.map((entry: { userId: string }) => entry.userId)).toEqual(['tech', 'advisor']);
   expect(data[0]).toMatchObject({ link: '/job-cards/job', dedupeKey: 'jobcard:job:STATUS:event-1:user:tech' });
-  for (const fragment of ['J1 (job)', 'TEST', 'Test Customer', 'OPEN → IN_PROGRESS', 'Test Actor (actor)', 'due 2026', 'priority not recorded', 'Action required']) expect(data[0].message).toContain(fragment);
+  for (const fragment of ['Jobcard J1', 'TEST', 'Test Customer', 'Open to In progress', 'Test Actor', 'due 13 Nov 2026', 'priority not recorded', 'Action required']) expect(data[0].message).toContain(fragment);
   expect(data[1].title).toMatch(/^FYI:/);
   expect(prisma.jobcardNotificationAudit.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true, data: expect.arrayContaining([expect.objectContaining({ recipientId: 'user:tech', channel: 'in-app', status: 'DELIVERED' })]) }));
 });
@@ -92,10 +92,9 @@ it('suppresses obsolete actions while retaining FYI', async () => {
 
 it('enqueues stable reminder/escalation markers and does nothing outside working hours', async () => {
   (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([{ ...snapshot, promisedAt: new Date(snapshot.promisedAt), createdAt: new Date('2026-11-12T00:00:00Z'), statusHistory: [] }]);
-  (prisma.jobcardNotificationEvent.findFirst as jest.Mock).mockResolvedValue({ id: 'assignment-2', createdAt: new Date('2026-11-12T00:00:00Z') });
+  (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ jobCardId: 'job', id: 'assignment-2', createdAt: new Date('2026-11-12T00:00:00Z'), after: snapshot }]);
   await sendJobcardReminders(new Date('2026-11-12T12:00:00Z'));
-  expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'timer:job:REMINDER:assignment-2' } }));
-  expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'timer:job:ESCALATION:assignment-2' } }));
+  expect(prisma.jobcardNotificationEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true, data: expect.arrayContaining([expect.objectContaining({ id: 'timer:job:REMINDER:assignment-2' }), expect.objectContaining({ id: 'timer:job:ESCALATION:assignment-2' })]) }));
   jest.clearAllMocks();
   await sendJobcardReminders(new Date('2026-11-12T19:00:00Z'));
   expect(prisma.jobCard.findMany).not.toHaveBeenCalled();
@@ -107,11 +106,11 @@ it('keeps promised reminders at 24/12 hours with stable keys and current owners'
   try {
     const now = new Date('2026-11-12T12:00:00Z');
     (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([{ ...snapshot, promisedAt: new Date('2026-11-12T23:00:00Z'), createdAt: now, statusHistory: [] }]);
-    (prisma.jobcardNotificationEvent.findFirst as jest.Mock).mockResolvedValue({ id: 'action-1', createdAt: now });
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ jobCardId: 'job', id: 'action-1', createdAt: now, after: snapshot }]);
     await sendJobcardReminders(now);
     await sendJobcardReminders(now);
-    const keys = (prisma.jobcardNotificationEvent.upsert as jest.Mock).mock.calls.map(([input]) => input.where.id);
-    expect(new Set(keys)).toEqual(new Set(['timer:job:PROMISED_24H:2026-11-12T23:00:00.000Z', 'timer:job:PROMISED_12H:2026-11-12T23:00:00.000Z']));
+    const keys = (prisma.jobcardNotificationEvent.createMany as jest.Mock).mock.calls.flatMap(([input]) => input.data.map((event: { id: string }) => event.id));
+    expect(new Set(keys)).toEqual(new Set(['timer:job:PROMISED_12H:2026-11-12T23:00:00.000Z']));
   } finally {
     if (previous === undefined) delete process.env.JOB_PROMISED_REMINDERS_ENABLED; else process.env.JOB_PROMISED_REMINDERS_ENABLED = previous;
   }
@@ -133,5 +132,73 @@ it('uses the portal service-history route for the customer FYI', async () => {
   (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(ready);
   await processJobcardNotification(current);
   expect(prisma.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.arrayContaining([expect.objectContaining({ customerId: 'customer', link: '/portal/service-history/job', title: 'FYI: Vehicle ready' })]) }));
+});
+
+it('delivers promised reminders to the current action owner despite an intervening status change', async () => {
+  const previous = process.env.JOB_PROMISED_REMINDERS_ENABLED;
+  process.env.JOB_PROMISED_REMINDERS_ENABLED = 'true';
+  try {
+    const current = { ...row(), id: `timer:job:PROMISED_24H:${snapshot.promisedAt}`, actorId: null, after: { ...snapshot, notificationEvent: 'PROMISED_24H', actionOccurrence: 'old-action' } };
+    (prisma.jobcardNotificationEvent.findUnique as jest.Mock).mockResolvedValue(current);
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...snapshot, status: 'QC', promisedAt: new Date(snapshot.promisedAt), customer: { firstName: 'Test', lastName: 'Customer' }, vehicle: { registrationNumber: 'TEST' } });
+    await processJobcardNotification(current, new Date('2026-11-12T12:00:00Z'));
+    expect(prisma.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ userId: 'qc' })] }));
+    expect(prisma.jobcardNotificationEvent.findFirst).not.toHaveBeenCalled();
+  } finally { if (previous === undefined) delete process.env.JOB_PROMISED_REMINDERS_ENABLED; else process.env.JOB_PROMISED_REMINDERS_ENABLED = previous; }
+});
+
+it('suppresses an old promised date and a superseded 24-hour reminder', async () => {
+  const previous = process.env.JOB_PROMISED_REMINDERS_ENABLED;
+  process.env.JOB_PROMISED_REMINDERS_ENABLED = 'true';
+  try {
+    const current = { ...row(), id: 'timer:job:PROMISED_24H:old', actorId: null, after: { ...snapshot, notificationEvent: 'PROMISED_24H' } };
+    (prisma.jobcardNotificationEvent.findUnique as jest.Mock).mockResolvedValue(current);
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...snapshot, promisedAt: new Date('2026-11-13T11:00:00Z') });
+    await processJobcardNotification(current, new Date('2026-11-12T12:00:00Z'));
+    expect(prisma.notification.createMany).not.toHaveBeenCalled();
+    expect(prisma.jobcardNotificationAudit.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ recipientId: 'obsolete-promised-date' })] }));
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...snapshot, promisedAt: new Date(snapshot.promisedAt) });
+    await processJobcardNotification(current, new Date('2026-11-13T08:00:00Z'));
+    expect(prisma.notification.createMany).not.toHaveBeenCalled();
+  } finally { if (previous === undefined) delete process.env.JOB_PROMISED_REMINDERS_ENABLED; else process.env.JOB_PROMISED_REMINDERS_ENABLED = previous; }
+});
+
+it('batches reminder candidates and latest actions instead of querying once per job', async () => {
+  const previous = process.env.JOB_PROMISED_REMINDERS_ENABLED;
+  process.env.JOB_PROMISED_REMINDERS_ENABLED = 'true';
+  try {
+    const now = new Date('2026-11-12T12:00:00Z');
+    const cards = Array.from({ length: 101 }, (_, index) => ({ ...snapshot, id: `job-${index}`, promisedAt: new Date('2026-11-13T10:00:00Z'), createdAt: now, statusHistory: [] }));
+    (prisma.jobCard.findMany as jest.Mock).mockResolvedValueOnce(cards.slice(0, 100)).mockResolvedValueOnce(cards.slice(100));
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+    await sendJobcardReminders(now);
+    expect(prisma.jobCard.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.jobcardNotificationEvent.findFirst).not.toHaveBeenCalled();
+    expect(prisma.jobcardNotificationEvent.createMany).toHaveBeenCalledTimes(2);
+    expect(prisma.jobcardNotificationEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true, data: expect.arrayContaining([expect.objectContaining({ id: 'timer:job-100:PROMISED_24H:2026-11-13T10:00:00.000Z' })]) }));
+  } finally { if (previous === undefined) delete process.env.JOB_PROMISED_REMINDERS_ENABLED; else process.env.JOB_PROMISED_REMINDERS_ENABLED = previous; }
+});
+
+it('does not let deferred timers block ordinary outbox events outside working hours', async () => {
+  (prisma.jobcardNotificationEvent.findMany as jest.Mock).mockResolvedValue([]);
+  await drainJobcardNotifications(undefined, new Date('2026-11-12T23:00:00Z'));
+  expect(prisma.jobcardNotificationEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100, where: expect.objectContaining({ AND: expect.arrayContaining([{ NOT: { id: { startsWith: 'timer:' } } }]) }) }));
+});
+
+it('locks the job before the event to match producer lock order', async () => {
+  await processJobcardNotification(row());
+  const sql = (prisma.$queryRaw as jest.Mock).mock.calls.map(([query]) => query.sql as string);
+  expect(sql[0]).toContain('FROM "JobCard"');
+  expect(sql[1]).toContain('FROM jobcard_notification_events');
+});
+
+it('consumes parts events through the same atomic notification/audit/processed transaction', async () => {
+  const current = { ...row(), id: 'workshop:job:PART_REQUESTED:button:request', after: { ...snapshot, workshopEvent: 'PART_REQUESTED', workshopOccurrence: 'button:request', branchStoreOnly: true } };
+  (prisma.jobcardNotificationEvent.findUnique as jest.Mock).mockResolvedValue(current);
+  await processJobcardNotification(current);
+  expect(prisma.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true, data: [expect.objectContaining({ type: 'PART_REQUESTED', dedupeKey: 'PART_REQUESTED:job:button:request' })] }));
+  expect(prisma.jobcardNotificationAudit.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ eventType: 'PART_REQUESTED', status: 'DELIVERED' })] }));
+  expect(prisma.jobcardNotificationEvent.update).toHaveBeenCalledWith({ where: { id: current.id }, data: { processedAt: expect.any(Date) } });
 });
 

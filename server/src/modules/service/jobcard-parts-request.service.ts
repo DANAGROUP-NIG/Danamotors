@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
 import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
-import { workshopNotification } from '../notification/notification.events';
+import { enqueueWorkshopNotification } from '../notification/workshop-notification-outbox';
 import { canonicalNotificationStatus } from '../notification/jobcard-notification-policy';
 
 /** Notification only: no requisition, part issuance or lifecycle mutation. */
@@ -24,12 +24,7 @@ export async function requestJobcardParts(jobCardId: string, branchId: string, a
     select: { id: true },
   });
   if (!recipients.length) throw new BadRequestError('No other active Store Manager is available in this branch');
-  const notification = workshopNotification('PART_REQUESTED', {
-    dedupeKey: `${card.id}:button:${requestId}`, jobCardId: card.id, jobNumber: card.jobNumber, branchId: card.branchId,
-    customer: card.customer ? `${card.customer.firstName} ${card.customer.lastName}` : 'Customer',
-    registration: card.vehicle?.registrationNumber ?? 'Registration not recorded',
-  });
-  await tx.notification.createMany({ data: recipients.map(user => ({ ...notification, userId: user.id })), skipDuplicates: true });
+  await enqueueWorkshopNotification(tx, 'PART_REQUESTED', card, `button:${requestId}`, actorId, true);
   await tx.jobCard.update({ where: { id: card.id }, data: { partsRequestedAt: card.partsRequestedAt ?? new Date() } });
   });
 }

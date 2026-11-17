@@ -11,7 +11,7 @@ export function useRequestJobCardParts(jobCardId: string) {
     retry: false,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: jobCardKeys.detail(jobCardId) });
-      toast.success("Branch Store Manager notified of the parts request");
+      toast.success("Parts request queued for the Branch Store Manager");
     },
     onError: (error) => toast.error(apiErrorMessage(error, "Could not send the parts request")),
   });

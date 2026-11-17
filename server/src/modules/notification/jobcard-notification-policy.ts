@@ -115,3 +115,26 @@ export function reminderEvents(since: Date, now: Date, card: NotificationJob, po
   const age = (now.getTime() - since.getTime()) / 3_600_000;
   return [...(age >= policy.remindHours ? ['REMINDER' as const] : []), ...(age >= policy.escalateHours ? ['ESCALATION' as const] : [])];
 }
+
+export function promisedReminderEvents(now: Date, card: NotificationJob): JobNotificationEvent[] {
+  if (!['OPEN', 'IN_PROGRESS', 'WAITING_PARTS', 'QC'].includes(canonicalNotificationStatus(card.status)) || !card.promisedAt) return [];
+  const remaining = notificationInstant(card.promisedAt).getTime() - now.getTime();
+  if (!Number.isFinite(remaining) || remaining <= 0 || remaining > 24 * 3_600_000) return [];
+  // Recovery sends the most urgent due window, not two reminders at once.
+  return [remaining <= 12 * 3_600_000 ? 'PROMISED_12H' : 'PROMISED_24H'];
+}
+
+export function notificationStatusLabel(status: string): string {
+  const labels: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', WAITING_PARTS: 'Waiting for parts', QC: 'Quality check', READY: 'Ready', BILLED: 'Billed', DELIVERED: 'Delivered', CANCELLED: 'Cancelled', NONE: 'Not previously opened' };
+  return labels[canonicalNotificationStatus(status)] ?? 'Status not recorded';
+}
+
+export function notificationDueLabel(value: string | null): string {
+  if (!value || !Number.isFinite(notificationInstant(value).getTime())) return 'Not provided';
+  return new Intl.DateTimeFormat('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' }).format(notificationInstant(value));
+}
+
+/** Prisma timestamps are stored in UTC; PostgreSQL JSON snapshots may omit the zone suffix. */
+export function notificationInstant(value: string): Date {
+  return new Date(/(?:z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`);
+}

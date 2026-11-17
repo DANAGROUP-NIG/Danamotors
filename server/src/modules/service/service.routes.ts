@@ -906,6 +906,34 @@ router.get(
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
 );
+/**
+ * @openapi
+ * /service/job-cards/{id}/request-parts:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Queue a parts request for the branch store manager
+ *     description: Requires partissuance:create or partreturn:create and job branch access. An active non-actor branch store manager must exist. Stores an idempotent outbox event and the first-request timestamp atomically; no stock or requisition is created. Delivery happens after commit through the existing worker. A successful response confirms queuing, not completed delivery. Billed/delivered/cancelled jobs are rejected. The same requestId preserves dedupe keys on retries.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [requestId]
+ *             properties:
+ *               requestId: { type: string, format: uuid }
+ *           example: { requestId: '11111111-1111-4111-8111-111111111111' }
+ *     responses:
+ *       200: { description: 'Queued. Returns status=success, message=Parts request queued for the Branch Store Manager, data={}' }
+ *       400: { description: 'Invalid fields, closed/billed job, or no eligible store manager. Validation errors include field, message and code.' }
+ *       401: { description: Authentication required }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Job card not found }
+ */
 router.post(
   "/job-cards/:id/request-parts",
   requireAnyPermission(

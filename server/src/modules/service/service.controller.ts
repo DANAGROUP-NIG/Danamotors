@@ -451,7 +451,7 @@ export class ServiceController {
         .status(200)
         .json({
           status: "success",
-          message: "Branch Store Manager notified",
+          message: "Parts request queued for the Branch Store Manager",
           data: {},
         });
     } catch (error) {

@@ -20,17 +20,10 @@ it('preserves separate parts recipients from role/assignment', () => {
   expect(workshopRecipients('PARTS_UNAVAILABLE', card).OR).toContainEqual({ id: { in: ['advisor'] }, branchId: 'branch' });
 });
 it.each((Object.keys(WORKSHOP_EVENTS) as (keyof typeof WORKSHOP_EVENTS)[]).filter(event => event.startsWith('PART')))('preserves separate %s notifications with a stable per-recipient dedupe key', async event => {
-  const seen = new Set<string>();
-  (prisma.notification.createMany as jest.Mock).mockImplementation(({ data, skipDuplicates }: { data: { userId?: string; customerId?: string; dedupeKey: string }[]; skipDuplicates: boolean }) => {
-    expect(skipDuplicates).toBe(true);
-    data.forEach(row => seen.add(`${row.userId ?? row.customerId}:${row.dedupeKey}`));
-    return { count: data.length };
-  });
   await notifyWorkshopEvent(event, 'job', 'event1');
   await notifyWorkshopEvent(event, 'job', 'event1');
-  const customer = ['JOB_READY', 'PROMISED_24H', 'PROMISED_12H'].includes(event);
-  expect(seen.size).toBe(customer ? 2 : 1);
-  expect([...seen]).toContain(`staff:${event}:job:event1`);
+  expect(drainJobcardNotifications).toHaveBeenCalledWith('job');
+  expect(prisma.notification.createMany).not.toHaveBeenCalled();
 });
 it('retries persistence and keeps notification failures from breaking committed actions', async () => {
   const warning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {});

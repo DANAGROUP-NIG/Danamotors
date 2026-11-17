@@ -1,5 +1,59 @@
 # Jobcard notifications
 
+## Issue 140 reliability review
+
+The existing transactional outbox and worker now also handle PART_REQUESTED,
+PARTS_ISSUED, PARTS_UNAVAILABLE and PART_RECEIVED. Business transactions enqueue
+deterministic `workshop:job:event:occurrence` records; they never create the in-app
+message directly. Requisitions queue their request/issue/availability events with
+the stock write, and collection queues its event with signed collection evidence.
+Failures to enqueue roll back the business transaction rather than losing its event.
+Delivery failures after commit leave the business write intact and use the existing
+retry/failure/Admin alert/replay flow. No second queue, migration or dependency is added.
+
+The job's Request part button keeps its own branch-only store-manager rule, active
+recipient validation, actor exclusion, stable request UUID and first-request timestamp.
+Its API/toast now confirm queuing rather than claiming completed delivery. Formal
+requisition requests preserve their existing General Store Manager recipients.
+Issued/received notifications preserve advisor/technician recipients; unavailable
+parts notify the advisor. Ready jobs retain existing request-only behavior. Requests
+that become billed, delivered or cancelled before delivery are suppressed and audited.
+
+Workers acquire the job lock before the event lock, matching producer order. Recipient
+messages, delivery audit and the processed marker commit together. Existing notification
+dedupe keys remain compatible with old deliveries, including on replay. Failure recording
+also locks/rechecks the event so a competing successful worker is not followed by a
+false Admin failure alert.
+
+Promised reminders remain opt-in with JOB_PROMISED_REMINDERS_ENABLED=true and retain
+the configured working-hour policy. TODO(confirm): whether these optional reminders
+should bypass working hours needs a separate business decision. Outside working hours,
+deferred timer rows are excluded from ordinary outbox selection so they cannot block
+parts, assignment or QC delivery. Disabling promised reminders also defers already queued
+promised events without blocking other work.
+
+An upcoming working job receives a stable reminder per promised date/window. Status
+and assignment changes do not invalidate the promised date; delivery resolves the current
+action owner. Changed promises, finished work and expired deadlines suppress obsolete
+reminders. Recovery inside 12 hours sends the 12-hour reminder instead of sending both
+missed windows at once, and an old pending 24-hour reminder is suppressed once the
+12-hour window supersedes it. No reminder is sent for READY, BILLED, delivered or
+cancelled work. Customers/email are not added to the current owner routing.
+
+Reminder selection reads 100-job pages, fetches latest workflow occurrences in one
+parameterized DISTINCT ON query per page, and inserts all due events with one deduplicated
+createMany. Parts events do not reset workflow-action reminder age. Existing job/event
+indexes are reused; no cache or new index is asserted necessary without a local EXPLAIN.
+PostgreSQL JSON timestamps without a zone are interpreted using the existing UTC storage
+convention, then formatted for Africa/Lagos. Messages use readable statuses/dates and omit
+raw actor/job UUIDs from ordinary workflow copy.
+
+Validation is scoped to notification policy/router/outbox, request/collection producers,
+OpenAPI and the touched hook. Local integration tests are guarded to the disposable
+localhost notification_staging database and remain skipped without that configuration.
+No external database, email or real recipient was contacted. See issue-140-progress.md
+for actual command results and remaining live-validation limits.
+
 Implemented on `feat/jobcard-notification-handoffs`. Apply the additive migration
 `20261112120000_jobcard_notification_router` and generate the Prisma client before
 starting the backend. Existing schema startup checks require the new tables.
@@ -15,21 +69,21 @@ remain normalized without changing workflow transitions or permissions.
 | Event | Existing recipients | Finding |
 | --- | --- | --- |
 | Created unassigned | None | Assignment handoff missing |
-| Created assigned / assignment | Technician | Technician-ID key suppressed A → B → A |
-| OPEN → IN_PROGRESS | None | Work-start notification missing |
-| → WAITING_PARTS | Advisor | Store owner missed |
-| WAITING_PARTS → IN_PROGRESS | None | Resume handoff missing |
-| IN_PROGRESS / WAITING_PARTS → QC | Inspector plus all QC-capable branch users | Broadcast exceeded assigned owner |
+| Created assigned / assignment | Technician | Technician-ID key suppressed A  to  B  to  A |
+| OPEN  to  IN_PROGRESS | None | Work-start notification missing |
+|  to  WAITING_PARTS | Advisor | Store owner missed |
+| WAITING_PARTS  to  IN_PROGRESS | None | Resume handoff missing |
+| IN_PROGRESS / WAITING_PARTS  to  QC | Inspector plus all QC-capable branch users | Broadcast exceeded assigned owner |
 | QC PASSED | Advisor / branch advisors | Owner generally correct |
 | QC FAILED | Technician and advisor | Workshop Manager missing |
-| QC → IN_PROGRESS | None | Relied on previous failure send |
-| QC → READY | Advisor, CCU, portal customer, separate Billing Officers send | Scattered action/FYI sends, billing lacked dedupe |
-| READY → BILLED | None | Delivery handoff missing |
-| READY / BILLED → DELIVERED | None | Closure FYI missing |
-| OPEN / IN_PROGRESS / WAITING_PARTS / QC / READY → CANCELLED | None | Cancellation FYI missing |
-| Estimate revision READY → QC | None | Implicit transition bypassed notifications |
-| Parts/labour READY → IN_PROGRESS | Some separate parts notifications | Reopened-work handoff inconsistent |
-| Bill cancellation → READY | None | Rebilling handoff missing |
+| QC  to  IN_PROGRESS | None | Relied on previous failure send |
+| QC  to  READY | Advisor, CCU, portal customer, separate Billing Officers send | Scattered action/FYI sends, billing lacked dedupe |
+| READY  to  BILLED | None | Delivery handoff missing |
+| READY / BILLED  to  DELIVERED | None | Closure FYI missing |
+| OPEN / IN_PROGRESS / WAITING_PARTS / QC / READY  to  CANCELLED | None | Cancellation FYI missing |
+| Estimate revision READY  to  QC | None | Implicit transition bypassed notifications |
+| Parts/labour READY  to  IN_PROGRESS | Some separate parts notifications | Reopened-work handoff inconsistent |
+| Bill cancellation  to  READY | None | Rebilling handoff missing |
 | Promised delivery in 24 / 12 hours | Advisor, technician, active portal customer | Optional broadcast, no status-age escalation |
 
 Trigger sites were workflow/workshop services, inventory/requisition services
@@ -46,20 +100,20 @@ hosted runtime logs were unavailable, so successful delivery could not be inferr
 
 | Event | Action recipients | FYI recipients |
 | --- | --- | --- |
-| Created unassigned | Branch Workshop Manager and Service Advisors | — |
-| Created assigned / technician changed | Assigned Technician | — |
-| OPEN → IN_PROGRESS | Assigned Technician | Assigned Service Advisor |
-| → WAITING_PARTS | Branch Store Officers | Assigned Service Advisor |
-| WAITING_PARTS → IN_PROGRESS | Assigned Technician | — |
-| → QC, including estimate revision | Assigned Inspector; QC-permission branch users only if unassigned | — |
-| QC PASSED | Assigned Service Advisor, otherwise branch advisors | — |
-| Inspector reassigned / QC reset while awaiting inspection | Assigned Inspector, otherwise branch QC-permission users | — |
-| QC FAILED / QC → IN_PROGRESS | Technician, Service Advisor, Workshop Manager | — |
-| → READY | Branch Billing Officers | CCU Officers and active portal customer |
-| READY → BILLED | Delivery Advisor, otherwise Service Advisor/branch advisors | — |
-| → DELIVERED / CANCELLED | — | Requester (creator), Workshop Manager, Service Advisor |
-| READY → IN_PROGRESS, including parts/labour changes | Assigned Technician | — |
-| BILLED → READY (bill cancelled) | Billing Officers and Service Advisor; rebilling may be needed | — |
+| Created unassigned | Branch Workshop Manager and Service Advisors | - |
+| Created assigned / technician changed | Assigned Technician | - |
+| OPEN  to  IN_PROGRESS | Assigned Technician | Assigned Service Advisor |
+|  to  WAITING_PARTS | Branch Store Officers | Assigned Service Advisor |
+| WAITING_PARTS  to  IN_PROGRESS | Assigned Technician | - |
+|  to  QC, including estimate revision | Assigned Inspector; QC-permission branch users only if unassigned | - |
+| QC PASSED | Assigned Service Advisor, otherwise branch advisors | - |
+| Inspector reassigned / QC reset while awaiting inspection | Assigned Inspector, otherwise branch QC-permission users | - |
+| QC FAILED / QC  to  IN_PROGRESS | Technician, Service Advisor, Workshop Manager | - |
+|  to  READY | Branch Billing Officers | CCU Officers and active portal customer |
+| READY  to  BILLED | Delivery Advisor, otherwise Service Advisor/branch advisors | - |
+|  to  DELIVERED / CANCELLED | - | Requester (creator), Workshop Manager, Service Advisor |
+| READY  to  IN_PROGRESS, including parts/labour changes | Assigned Technician | - |
+| BILLED  to  READY (bill cancelled) | Billing Officers and Service Advisor; rebilling may be needed | - |
 
 Assigned Service Advisor falls back to branch advisors when unassigned. Missing
 active users for a target fall back to branch Admin/SuperAdmin, then global
@@ -74,7 +128,7 @@ A deferred database trigger captures JobCard creation and changes to status,
 technician, inspector or QC result in `jobcard_notification_events`. It commits with the
 business transaction. No screen is responsible for detecting transitions. The
 router normalizes aliases and ignores note-only edits and unchanged assignments
-or QC results. Each committed assignment gets an occurrence ID, so A → B → A
+or QC results. Each committed assignment gets an occurrence ID, so A  to  B  to  A
 produces three handoffs. Assignment/QC controllers pass transaction-local actor
 context; other status changes use the transaction's status-history actor.
 Parts/labour and estimate writers also propagate actor context for QC resets
@@ -112,7 +166,7 @@ Settings are centralized in `jobcard-notification-policy.ts`:
 | JOB_NOTIFICATION_ESCALATE_HOURS | 8 |
 | JOB_NOTIFICATION_TIMEZONE | Africa/Lagos |
 | JOB_NOTIFICATION_WORK_START / WORK_END | 8 / 18 |
-| JOB_NOTIFICATION_WORK_DAYS | 1,2,3,4,5 (Monday–Friday) |
+| JOB_NOTIFICATION_WORK_DAYS | 1,2,3,4,5 (Monday-Friday) |
 | JOB_PROMISED_REMINDERS_ENABLED | Existing opt-in `true` enables 24/12-hour reminders |
 
 TODO(confirm): confirm working days/hours and holiday requirements. Thresholds
@@ -176,7 +230,7 @@ are not verified by the database integration test.
 ## Final test results
 
 - Focused final run: **6 suites, 68 tests passed**, including **7 committed local
-  PostgreSQL staging cases**. Covers every routing row, A → B → A, legacy aliases,
+  PostgreSQL staging cases**. Covers every routing row, A  to  B  to  A, legacy aliases,
   QC rejection/rework/reset/reassignment, cancellation, empty-role fallback,
   actor exclusion, retry/replay idempotency, shortened timers, promised reminder
   markers, rollback safety, accurate UTC capture, nested-history actors and a

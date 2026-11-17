@@ -1,6 +1,7 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   $transaction: jest.fn(), $queryRaw: jest.fn(),
   jobCard: { findFirst: jest.fn(), update: jest.fn() }, user: { findMany: jest.fn() }, notification: { createMany: jest.fn() },
+  jobcardNotificationEvent: { upsert: jest.fn() },
 } }));
 import prisma from '../../prisma/client';
 import { requestJobcardParts } from './jobcard-parts-request.service';
@@ -19,7 +20,8 @@ it('notifies only active branch Store Managers, excludes the actor and follows t
   await requestJobcardParts('job', 'branch', 'actor', 'request-1');
   expect(prisma.jobCard.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job', branchId: 'branch' } }));
   expect(prisma.user.findMany).toHaveBeenCalledWith({ where: { branchId: 'branch', isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: 'actor' } }, select: { id: true } });
-  expect(prisma.notification.createMany).toHaveBeenCalledWith({ data: [{ userId: 'store-manager', type: 'PART_REQUESTED', title: 'Parts requested', message: 'Parts requested: J123 ? Test Customer ? TEST-123', link: '/job-cards/job', branchId: 'branch', dedupeKey: 'PART_REQUESTED:job:button:request-1' }], skipDuplicates: true });
+  expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'workshop:job:PART_REQUESTED:button:request-1' }, create: expect.objectContaining({ actorId: 'actor', after: expect.objectContaining({ workshopEvent: 'PART_REQUESTED', branchStoreOnly: true }) }) }));
+  expect(prisma.notification.createMany).not.toHaveBeenCalled();
   expect(prisma.jobCard.update).toHaveBeenCalledWith({ where: { id: 'job' }, data: { partsRequestedAt: expect.any(Date) } });
 });
 
@@ -27,7 +29,7 @@ it('uses the same dedupe key on a transport retry and a new key for a new reques
   await requestJobcardParts('job', 'branch', 'actor', 'request-1');
   await requestJobcardParts('job', 'branch', 'actor', 'request-1');
   await requestJobcardParts('job', 'branch', 'actor', 'request-2');
-  const keys = (prisma.notification.createMany as jest.Mock).mock.calls.map(([input]) => input.data[0].dedupeKey);
+  const keys = (prisma.jobcardNotificationEvent.upsert as jest.Mock).mock.calls.map(([input]) => input.where.id);
   expect(keys[0]).toBe(keys[1]);
   expect(keys[2]).not.toBe(keys[0]);
 });
@@ -57,7 +59,7 @@ it('does not notify for a missing or differently scoped jobcard', async () => {
 });
 
 it('propagates send failures so the UI cannot report a false success', async () => {
-  (prisma.notification.createMany as jest.Mock).mockRejectedValue(new Error('Persistence failed'));
+  (prisma.jobcardNotificationEvent.upsert as jest.Mock).mockRejectedValue(new Error('Persistence failed'));
   await expect(requestJobcardParts('job', 'branch', 'actor', 'request-1')).rejects.toThrow('Persistence failed');
   expect(prisma.jobCard.update).not.toHaveBeenCalled();
 });

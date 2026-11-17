@@ -1,4 +1,5 @@
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
+import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { setNotificationActor } from "../notification/jobcard-notification-router";
 import { assertRecordedScope } from "../service/estimate-approval";
 import { Prisma } from "@prisma/client";
@@ -179,6 +180,13 @@ export class WorkshopService {
           }),
         },
       });
+      await enqueueWorkshopNotification(
+        tx,
+        "PART_RECEIVED",
+        issue.jobCard,
+        id,
+        actorId,
+      );
       return received;
     });
     if (result?.jobCardId)

@@ -1,8 +1,23 @@
 import { ROLES, PERMISSIONS } from '../../shared/constants/roles';
+import { promisedReminderEvents, notificationDueLabel } from './jobcard-notification-policy';
 import { actionTargets, canonicalNotificationStatus, isWorkingTime, notificationEvents, notificationPolicy, reminderEvents, routeJobNotification, type NotificationJob } from './jobcard-notification-policy';
 
 const card: NotificationJob = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'OPEN', technicianId: 'tech', qualityInspectorId: 'inspector', serviceAdvisorId: 'advisor', deliveryAdvisorId: 'delivery', createdById: 'requester', customerId: 'customer', qcStatus: 'PENDING', qcNotes: null, promisedAt: null };
 const target = (from: string, to: string) => routeJobNotification('STATUS', { ...card, status: from }, { ...card, status: to });
+
+it.each([[24, ['PROMISED_24H']], [12.01, ['PROMISED_24H']], [12, ['PROMISED_12H']], [1, ['PROMISED_12H']], [0, []], [-1, []], [25, []]])('selects the most urgent pending promised window at %s hours', (hours, expected) => {
+  const now = new Date('2026-11-12T12:00:00Z');
+  expect(promisedReminderEvents(now, { ...card, promisedAt: new Date(now.getTime() + Number(hours) * 3600000).toISOString() })).toEqual(expected);
+});
+it.each(['READY', 'BILLED', 'DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'])('does not remind completed or cancelled %s jobs about promised work', status => {
+  expect(promisedReminderEvents(new Date('2026-11-12T12:00:00Z'), { ...card, status, promisedAt: '2026-11-13T10:00:00Z' })).toEqual([]);
+});
+it('formats notification deadlines in Lagos and handles absent dates without raw placeholders', () => {
+  expect(notificationDueLabel('2026-11-12T23:30:00Z')).toContain('13 Nov 2026');
+  expect(notificationDueLabel('2026-11-12T23:30:00')).toBe(notificationDueLabel('2026-11-12T23:30:00Z'));
+  expect(notificationDueLabel(null)).toBe('Not provided');
+  expect(notificationDueLabel('invalid')).toBe('Not provided');
+});
 
 it.each([
   ['Pending', 'OPEN'], ['On Hold', 'IN_PROGRESS'], ['Quality Check', 'QC'], ['Completed', 'READY'], ['Closed', 'DELIVERED'], ['Cancelled', 'CANCELLED'],

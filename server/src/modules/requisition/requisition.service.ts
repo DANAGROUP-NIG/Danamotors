@@ -1,6 +1,7 @@
 import { jobWorkUpdate } from './requisition-work';
 import { assertPartsRequested } from '../service/jobcard-parts-request.logic';
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
+import { enqueueWorkshopNotification } from '../notification/workshop-notification-outbox';
 import { ChargeType, PartStatus, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../shared/errors/appError';
@@ -115,11 +116,12 @@ export class RequisitionService {
       }
       if (issued.length) await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId) });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'REQUISITION_CREATED', details: JSON.stringify({ requisitionId: document.id, requisitionNumber, branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, goodwillReason: input.goodwillReason }) } });
+      await enqueueWorkshopNotification(tx, 'PART_REQUESTED', job, document.id, actor.userId);
+      if (input.lines.some(line => line.quantityIssued > 0)) await enqueueWorkshopNotification(tx, 'PARTS_ISSUED', job, document.id, actor.userId);
+      if (input.lines.some(line => line.quantityIssued < line.quantityRequired)) await enqueueWorkshopNotification(tx, 'PARTS_UNAVAILABLE', job, document.id, actor.userId);
       return this.get(document.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
     await notifyWorkshopEvent('PART_REQUESTED', input.jobCardId, result.id);
-    if (input.lines.some(line => line.quantityIssued > 0)) await notifyWorkshopEvent('PARTS_ISSUED', input.jobCardId, result.id);
-    if (input.lines.some(line => line.quantityIssued < line.quantityRequired)) await notifyWorkshopEvent('PARTS_UNAVAILABLE', input.jobCardId, result.id);
     return result;
   }
 

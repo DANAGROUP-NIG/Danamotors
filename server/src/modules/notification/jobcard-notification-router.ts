@@ -1,10 +1,12 @@
 import { Prisma, type JobcardNotificationEvent } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../../prisma/client';
+import { DURABLE_WORKSHOP_EVENTS, deliverWorkshopNotification } from './workshop-notification-outbox';
 import { ROLES } from '../../shared/constants/roles';
 import {
-  actionTargets, canonicalNotificationStatus, isWorkingTime, notificationEvents,
+  canonicalNotificationStatus, isWorkingTime, notificationEvents,
   notificationPolicy, reminderEvents, routeJobNotification,
+  promisedReminderEvents, notificationStatusLabel, notificationDueLabel, notificationInstant,
   type JobNotificationEvent, type NotificationJob, type RecipientTarget,
 } from './jobcard-notification-policy';
 
@@ -13,7 +15,12 @@ const jobSnapshot = z.object({
   technicianId: z.string().nullable(), qualityInspectorId: z.string().nullable(),
   serviceAdvisorId: z.string().nullable(), deliveryAdvisorId: z.string().nullable(),
   createdById: z.string().nullable(), customerId: z.string().nullable(),
-  qcStatus: z.string().nullable(), qcNotes: z.string().nullable(), promisedAt: z.string().nullable(),
+  qcStatus: z.string().nullable(), qcNotes: z.string().nullable(), promisedAt: z.string().nullable().transform((value, context) => {
+    if (value === null) return null;
+    const date = notificationInstant(value);
+    if (!Number.isFinite(date.getTime())) { context.addIssue({ code: 'custom', message: 'Invalid promised date in notification snapshot' }); return z.NEVER; }
+    return date.toISOString();
+  }),
 });
 
 function warning(message: string) {
@@ -71,12 +78,22 @@ export function notificationDedupeKey(jobCardId: string, event: string, eventId:
   return `jobcard:${jobCardId}:${event}:${eventId}:${recipientId}`;
 }
 
-async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEvent, event: JobNotificationEvent, before: NotificationJob | null, card: NotificationJob) {
+async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEvent, event: JobNotificationEvent, before: NotificationJob | null, card: NotificationJob, now: Date) {
   let targets = routeJobNotification(event, before, card);
   if (!targets.length) return;
   await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${card.id} FOR SHARE`);
   const live = await tx.jobCard.findUnique({ where: { id: card.id }, include: { vehicle: true, customer: true } });
   if (!live) throw new Error('Jobcard missing during notification routing');
+  if (event.startsWith('PROMISED_')) {
+    const liveCard = jobSnapshot.parse({ ...live, promisedAt: live.promisedAt instanceof Date ? live.promisedAt.toISOString() : live.promisedAt });
+    const currentWindow = promisedReminderEvents(now, liveCard);
+    if (liveCard.promisedAt !== card.promisedAt || !currentWindow.includes(event)) {
+      await tx.jobcardNotificationAudit.createMany({ data: [{ jobCardId: card.id, eventId: row.id, eventType: event, recipientId: 'obsolete-promised-date', status: 'SUPPRESSED_STALE_ACTION', createdAt: new Date() }], skipDuplicates: true });
+      return;
+    }
+    card = liveCard;
+    targets = routeJobNotification(event, before, card);
+  }
   const stale = canonicalNotificationStatus(live.status) !== canonicalNotificationStatus(card.status)
     || live.technicianId !== card.technicianId || live.qcStatus?.toUpperCase() !== card.qcStatus?.toUpperCase()
     || live.qualityInspectorId !== card.qualityInspectorId || live.serviceAdvisorId !== card.serviceAdvisorId
@@ -96,11 +113,11 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
   }
   const customer = live.customer ? `${live.customer.firstName} ${live.customer.lastName}` : 'Customer not recorded';
   const vehicle = live.vehicle?.registrationNumber ?? 'Vehicle not recorded';
-  const actorName = actor ? `${actor.firstName} ${actor.lastName} (${row.actorId})` : row.actorId ?? 'System';
+  const actorName = actor ? `${actor.firstName} ${actor.lastName}` : 'System';
   const from = before ? canonicalNotificationStatus(before.status) : 'NONE';
   const to = canonicalNotificationStatus(card.status);
   // TODO(confirm): JobCard has no priority field; never invent a priority.
-  const context = `Jobcard ${card.jobNumber} (${card.id}); ${vehicle}; ${customer}; ${from} → ${to}; triggered by ${actorName}; due ${card.promisedAt ?? 'not set'}; priority not recorded`;
+  const context = `Jobcard ${card.jobNumber}; ${vehicle}; ${customer}; ${notificationStatusLabel(from)} to ${notificationStatusLabel(to)}; updated by ${actorName}; due ${notificationDueLabel(card.promisedAt)}; priority not recorded`;
   const data = deliveries.map(delivery => ({
     ...(delivery.userId ? { userId: delivery.userId } : { customerId: delivery.customerId }),
     branchId: card.branchId, type: `JOBCARD_${event}`, title: `${delivery.fyi ? 'FYI: ' : ''}${[...delivery.intents].join('; ')}`,
@@ -115,15 +132,18 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
 async function recordFailure(row: JobcardNotificationEvent, attempts: number) {
   warning(`Jobcard ${row.jobCardId}: notification event ${row.id} failed after ${attempts} attempts`);
   // Store a bounded technical reason, never driver errors/SQL parameters.
-  await prisma.notificationFailure.upsert({ where: { eventId: row.id }, create: { jobCardId: row.jobCardId, eventId: row.id, reason: 'Notification routing or persistence failed; inspect server warning and event snapshot', attempts, createdAt: new Date() }, update: { attempts } });
   await prisma.$transaction(async tx => {
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM jobcard_notification_events WHERE id = ${row.id} FOR UPDATE`);
+    const current = await tx.jobcardNotificationEvent.findUnique({ where: { id: row.id } });
+    if (!current || current.processedAt) return;
+    await tx.notificationFailure.upsert({ where: { eventId: row.id }, create: { jobCardId: row.jobCardId, eventId: row.id, reason: 'Notification routing or persistence failed; inspect server warning and event snapshot', attempts, createdAt: new Date() }, update: { attempts } });
     const snapshot = jobSnapshot.extend({ vehicleId: z.string().nullable().optional() }).safeParse(row.after);
     const card = snapshot.success ? snapshot.data : null;
     const admins = (await activeAdmins(tx, card?.branchId)).filter(admin => admin.id !== row.actorId);
     if (!admins.length) throw new Error('No active Admin for notification failure alert');
     const previous = row.before ? jobSnapshot.safeParse(row.before) : null;
-    const context = `Jobcard ${card?.jobNumber ?? 'unknown'} (${row.jobCardId}); vehicle ${card?.vehicleId ?? 'not recorded'}; customer ${card?.customerId ?? 'not recorded'}; ${previous?.success ? canonicalNotificationStatus(previous.data.status) : 'NONE'} → ${card ? canonicalNotificationStatus(card.status) : 'UNKNOWN'}; triggered by ${row.actorId ?? 'System'}; due ${card?.promisedAt ?? 'not set'}; priority not recorded`;
-    await tx.notification.createMany({ data: admins.map(admin => ({ userId: admin.id, branchId: card?.branchId, type: 'JOBCARD_NOTIFICATION_FAILURE', title: 'Jobcard notification failed', message: `${context}; action required: investigate notification_failures and replay event ${row.id}, which failed after ${attempts} attempts.`, link: `/job-cards/${row.jobCardId}`, dedupeKey: notificationDedupeKey(row.jobCardId, 'FAILURE', row.id, admin.id) })), skipDuplicates: true });
+    const context = `Jobcard ${card?.jobNumber ?? 'Not provided'}; ${notificationStatusLabel(previous?.success ? previous.data.status : 'NONE')} to ${notificationStatusLabel(card?.status ?? 'UNKNOWN')}; due ${notificationDueLabel(card?.promisedAt ?? null)}`;
+    await tx.notification.createMany({ data: admins.map(admin => ({ userId: admin.id, branchId: card?.branchId, type: 'JOBCARD_NOTIFICATION_FAILURE', title: 'Jobcard notification failed', message: `${context}; Action required: review delivery failures and replay event ${row.id}, which failed after ${attempts} attempts.`, link: `/job-cards/${row.jobCardId}`, dedupeKey: notificationDedupeKey(row.jobCardId, 'FAILURE', row.id, admin.id) })), skipDuplicates: true });
     await tx.jobcardNotificationAudit.createMany({ data: admins.map(admin => ({ jobCardId: row.jobCardId, eventId: row.id, eventType: 'FAILURE_ALERT', recipientId: `user:${admin.id}`, status: 'DELIVERED', createdAt: new Date() })), skipDuplicates: true });
     await tx.jobcardNotificationAudit.createMany({ data: [{ jobCardId: row.jobCardId, eventId: row.id, eventType: 'ROUTING', recipientId: 'unresolved', status: 'FAILED', createdAt: new Date() }], skipDuplicates: true });
     await tx.jobcardNotificationEvent.update({ where: { id: row.id }, data: { processedAt: new Date() } });
@@ -135,18 +155,27 @@ export async function processJobcardNotification(row: JobcardNotificationEvent, 
   for (let attempt = 0; attempt <= policy.retryMs.length; attempt += 1) {
     try {
       await prisma.$transaction(async tx => {
+        // Producers lock the job before upserting an event. Use that order here too.
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${row.jobCardId} FOR SHARE`);
         // Serialize competing workers; deliveries/audit and processed marker commit together.
         await tx.$queryRaw(Prisma.sql`SELECT id FROM jobcard_notification_events WHERE id = ${row.id} FOR UPDATE`);
         const current = await tx.jobcardNotificationEvent.findUnique({ where: { id: row.id } });
         if (!current || current.processedAt) return;
         const card = jobSnapshot.parse(current.after);
         const before = current.before ? jobSnapshot.parse(current.before) : null;
-        const metadata = z.object({ notificationEvent: z.string().optional(), actionOccurrence: z.string().optional() }).parse(current.after);
+        const metadata = z.object({ notificationEvent: z.string().optional(), actionOccurrence: z.string().optional(), workshopEvent: z.enum(DURABLE_WORKSHOP_EVENTS).optional(), workshopOccurrence: z.string().optional(), branchStoreOnly: z.boolean().optional() }).parse(current.after);
+        if (metadata.workshopEvent) {
+          if (!metadata.workshopOccurrence) throw new Error('Parts event occurrence is missing');
+          await deliverWorkshopNotification(tx, current, metadata.workshopEvent, card, metadata.workshopOccurrence, metadata.branchStoreOnly ?? false, now);
+          await tx.jobcardNotificationEvent.update({ where: { id: current.id }, data: { processedAt: now } });
+          return;
+        }
         const timerEvents = ['REMINDER', 'ESCALATION', 'PROMISED_24H', 'PROMISED_12H'] as const;
         const timerEvent = timerEvents.find(event => event === metadata.notificationEvent);
+        if (timerEvent?.startsWith('PROMISED_') && process.env.JOB_PROMISED_REMINDERS_ENABLED !== 'true') return;
         if (timerEvent && !isWorkingTime(now, policy)) return;
-        if (timerEvent && metadata.actionOccurrence) {
-          const latest = await tx.jobcardNotificationEvent.findFirst({ where: { jobCardId: card.id, NOT: { id: { startsWith: 'timer:' } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
+        if (timerEvent && !timerEvent.startsWith('PROMISED_') && metadata.actionOccurrence) {
+          const latest = await tx.jobcardNotificationEvent.findFirst({ where: { jobCardId: card.id, NOT: [{ id: { startsWith: 'timer:' } }, { id: { startsWith: 'workshop:' } }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
           if (latest && latest.id !== metadata.actionOccurrence) {
             await tx.jobcardNotificationAudit.createMany({ data: [{ jobCardId: card.id, eventId: current.id, eventType: timerEvent, recipientId: 'obsolete-action', status: 'SUPPRESSED_STALE_ACTION', createdAt: now }], skipDuplicates: true });
             await tx.jobcardNotificationEvent.update({ where: { id: current.id }, data: { processedAt: now } });
@@ -154,7 +183,7 @@ export async function processJobcardNotification(row: JobcardNotificationEvent, 
           }
         }
         const events = timerEvent ? [timerEvent] : notificationEvents(before, card);
-        for (const event of events) await deliver(tx, current, event, before, card);
+        for (const event of events) await deliver(tx, current, event, before, card, now);
         await tx.jobcardNotificationEvent.update({ where: { id: row.id }, data: { processedAt: new Date() } });
       }, { maxWait: 5000, timeout: 15000 });
       return;
@@ -172,35 +201,52 @@ export async function processJobcardNotification(row: JobcardNotificationEvent, 
 
 export async function drainJobcardNotifications(jobCardId?: string, now?: Date) {
   try {
-    const rows = await prisma.jobcardNotificationEvent.findMany({ where: { processedAt: null, ...(jobCardId ? { jobCardId } : {}) }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 100 });
+    const at = now ?? new Date();
+    const filters: Prisma.JobcardNotificationEventWhereInput[] = [];
+    if (!isWorkingTime(at, notificationPolicy())) filters.push({ NOT: { id: { startsWith: 'timer:' } } });
+    if (process.env.JOB_PROMISED_REMINDERS_ENABLED !== 'true') filters.push({ NOT: { OR: [{ id: { contains: ':PROMISED_24H:' } }, { id: { contains: ':PROMISED_12H:' } }] } });
+    const rows = await prisma.jobcardNotificationEvent.findMany({ where: { processedAt: null, AND: filters, ...(jobCardId ? { jobCardId } : {}) }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 100 });
     for (const row of rows) await processJobcardNotification(row, now);
   } catch { warning('Jobcard notification outbox unavailable; pending events will be retried'); }
 }
 
 export async function sendJobcardReminders(now = new Date()) {
   const policy = notificationPolicy();
+  // TODO(confirm): retain the existing working-hour policy for promised reminders.
   if (!isWorkingTime(now, policy)) return;
-  const cards = await prisma.jobCard.findMany({ where: { status: { notIn: ['DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'] } }, include: { statusHistory: { orderBy: { createdAt: 'desc' }, take: 1 } } });
-  for (const live of cards) {
-    const card = jobSnapshot.parse(JSON.parse(JSON.stringify(live)));
-    if (!actionTargets(card).length) continue;
-    const latest = await prisma.jobcardNotificationEvent.findFirst({ where: { jobCardId: card.id, NOT: { id: { startsWith: 'timer:' } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
-    const since = latest?.createdAt ?? live.statusHistory[0]?.createdAt ?? live.createdAt;
-    const occurrence = latest?.id ?? `${canonicalNotificationStatus(card.status)}:${since.toISOString()}`;
-    const events = reminderEvents(since, now, card, policy);
-    if (process.env.JOB_PROMISED_REMINDERS_ENABLED === 'true' && card.promisedAt) {
-      const hours = (new Date(card.promisedAt).getTime() - now.getTime()) / 3_600_000;
-      if (hours > 0 && hours <= 24) events.push('PROMISED_24H');
-      if (hours > 0 && hours <= 12) events.push('PROMISED_12H');
+  let cursor: string | undefined;
+  while (true) {
+    const cards = await prisma.jobCard.findMany({ where: { status: { notIn: ['DELIVERED', 'CANCELLED', 'Closed', 'Cancelled'] } }, include: { statusHistory: { orderBy: { createdAt: 'desc' }, take: 1 } }, orderBy: { id: 'asc' }, take: 100, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+    if (!cards.length) return;
+    const latestRows = await prisma.$queryRaw<{ jobCardId: string; id: string; createdAt: Date; after: Prisma.JsonValue }[]>(Prisma.sql`
+      SELECT DISTINCT ON ("jobCardId") "jobCardId", id, "createdAt", "after"
+      FROM jobcard_notification_events
+      WHERE "jobCardId" IN (${Prisma.join(cards.map(card => card.id))})
+        AND id NOT LIKE 'timer:%' AND id NOT LIKE 'workshop:%'
+      ORDER BY "jobCardId", "createdAt" DESC, id DESC
+    `);
+    const latest = new Map(latestRows.map(row => [row.jobCardId, row]));
+    const pending: Prisma.JobcardNotificationEventCreateManyInput[] = [];
+    for (const live of cards) {
+      const card = jobSnapshot.parse({ ...live, promisedAt: live.promisedAt?.toISOString() ?? null });
+      const action = latest.get(card.id);
+      const actionCard = action ? jobSnapshot.parse(action.after) : card;
+      const since = action?.createdAt ?? live.statusHistory[0]?.createdAt ?? live.createdAt;
+      const occurrence = action?.id ?? `${canonicalNotificationStatus(card.status)}:${since.toISOString()}`;
+      for (const event of reminderEvents(since, now, actionCard, policy)) {
+        const id = `timer:${card.id}:${event}:${occurrence}`;
+        pending.push({ id, jobCardId: card.id, actorId: null, before: { ...actionCard }, after: { ...actionCard, notificationEvent: event, actionOccurrence: occurrence }, createdAt: now });
+      }
+      if (process.env.JOB_PROMISED_REMINDERS_ENABLED === 'true') for (const event of promisedReminderEvents(now, card)) {
+        const id = `timer:${card.id}:${event}:${card.promisedAt}`;
+        pending.push({ id, jobCardId: card.id, actorId: null, before: { ...card }, after: { ...card, notificationEvent: event }, createdAt: now });
+      }
     }
-    for (const event of events) {
-      const marker = event.startsWith('PROMISED_') ? card.promisedAt : occurrence;
-      const id = `timer:${card.id}:${event}:${marker}`;
-      await prisma.jobcardNotificationEvent.upsert({ where: { id }, create: { id, jobCardId: card.id, actorId: null, before: { ...card }, after: { ...card, notificationEvent: event, actionOccurrence: occurrence }, createdAt: now }, update: {} });
-    }
+    if (pending.length) await prisma.jobcardNotificationEvent.createMany({ data: pending, skipDuplicates: true });
+    if (cards.length < 100) return;
+    cursor = cards[cards.length - 1].id;
   }
 }
-
 export function startJobcardNotifications() {
   let running = false;
   const tick = async () => {

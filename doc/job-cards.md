@@ -1,5 +1,33 @@
 # JobCard database and workflow
 
+### Reliable parts, QC and promised-date notifications (issue #140)
+
+Request part, formal requisition request/issue/availability, and signed collection now
+enqueue events with their business transactions. The existing in-app outbox worker
+delivers after commit, retries failures and preserves recipient dedupe keys. QC review
+continues through its existing durable job-change event; it does not automatically set
+READY. Only the service advisor may do that after passed QC.
+
+The button request remains branch-store-manager only, excluding the actor. Formal
+requisition requests preserve existing General Store Manager routing; issued/received
+parts go to the advisor/technician, and unavailable parts go to the advisor. The button
+response means queued for delivery. Queue persistence failure rolls back the request,
+while later delivery failure never reverses stock, collection evidence or job progress.
+
+Optional 24/12-hour reminders retain their global opt-in flag and existing working-hour
+policy. They follow the current action owner and dedupe per promised date/window,
+independently of status changes. Downtime recovery sends only the currently urgent
+window; changed/expired dates and finished work are suppressed. Email and additional
+customer reminders remain outside this slice. See jobcard-notification-router.md for
+batching, retries, work-hour settings, UTC/Lagos handling and failure replay.
+
+No schema or permission migration is added here. Deploy with the existing notification
+router tables already applied. A rollback to older code cannot consume pending workshop
+event envelopes correctly: drain them with the compatible worker before rollback and do
+not start an older worker while new pending envelopes remain. Retain those rows for
+replay only with compatible code. No business records or notification history should
+be deleted for rollback. Duplicate recipient keys make replay safe.
+
 ### Signed job-opening approval (issue #140)
 
 Opening the administrative job record and authorizing repair costs remain separate steps.
