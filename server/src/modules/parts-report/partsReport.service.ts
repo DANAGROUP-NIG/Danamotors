@@ -27,6 +27,8 @@ export interface ReportResult {
   rows: Row[];
   totals: Record<string, number>;
   grouped: boolean;
+  /** Each group ends with a subtotal; off where every group is a single line (the subtotal would repeat it). */
+  subtotals: boolean;
   truncated: boolean;
 }
 
@@ -66,6 +68,13 @@ const SAMPLE_FLAG = "F";
 /** Legacy counter-sale handling and trade discount: bills cannot carry them yet (see SALE_HANDLING). */
 const NO_SALE_CHARGES = { handling: 0, tradeDiscount: 0 };
 
+/**
+ * Taxable for the sales registers' taxable / non-taxable columns: the part's tax status (legacy partmast.taxable,
+ * csfatax.taxstatus), not whether VAT was charged. Legacy billed taxable parts at 0% on forms X, Y and P and still
+ * printed them as taxable. The tax registers (datewise, annexure) instead split by the VAT charged (taxSplit).
+ */
+const taxableLine = (l: { vatPercent: number | null; part: { taxable: boolean } | null }) => (l.vatPercent ?? 0) > 0 || (l.part?.taxable ?? false);
+
 /** A document's heading line, as legacy prints it: "number · dd/mm/yyyy · store". */
 const documentHeading = (number: string, date: Date, store: string) =>
   `${number} · ${LAGOS_DAY.format(date).split("-").reverse().join("/")} · ${store}`;
@@ -104,6 +113,7 @@ export class PartsReportService {
       rows: rows.slice(0, limit),
       totals,
       grouped: !!definition.grouped && rows.some((r) => r.group != null),
+      subtotals: !definition.headingsOnly?.includes(option ?? ""),
       truncated: rows.length > limit,
     };
   }
@@ -185,7 +195,7 @@ export class PartsReportService {
       include: {
         customer: customerSelect,
         counterSale: { select: { gatePassNumber: true } },
-        lines: { include: { part: { select: { partType: true, id: true } } } },
+        lines: { include: { part: { select: { partType: true, taxable: true, id: true } } } },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
@@ -196,7 +206,7 @@ export class PartsReportService {
         if (wanted && !(l.partId && wanted.has(l.partId))) continue;
         const v = lineValues(l.quantity, l.rate, i.partsDiscountPercent, l.vatPercent);
         // Legacy columns: spares/kit (accessories included) and oil, each split into taxable and non-taxable value before discount.
-        const column = `${l.part?.partType === "O" ? "oil" : "spares"}${(l.vatPercent ?? 0) > 0 ? "Taxable" : "Exempt"}` as keyof typeof row;
+        const column = `${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as keyof typeof row;
         row[column] = money(row[column] + v.gross);
         row.discount = money(row.discount + v.discount);
         row.vat = money(row.vat + v.vat);
@@ -247,8 +257,8 @@ export class PartsReportService {
       include: {
         customer: customerSelect,
         cancelledBy: { select: { firstName: true, lastName: true } },
-        counterSale: { select: { salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
-        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true } } } },
+        counterSale: { select: { branch: { select: { name: true } }, salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
+        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true, taxable: true } } } },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
@@ -299,25 +309,32 @@ export class PartsReportService {
     return rows.sort((a, b) => a.group.localeCompare(b.group));
   }
 
-  /** Legacy Counter Sale Register Summary: spares/kit and oil (taxable and non-taxable) and accessories before discount, then discount, VAT, round-off and total. */
+  /**
+   * Legacy Counter Sale Register Summary: under each branch heading, spares/kit and oil (taxable and non-taxable)
+   * and accessories before discount, then discount, VAT, round-off and total.
+   */
   private async saleTotal(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f);
-    if (invoices.length === 0) return [];
-    const row = { sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
+    const branches = new Map<string, { bills: number; sparesTaxable: number; sparesExempt: number; oilTaxable: number; oilExempt: number; accessories: number; discount: number; vat: number; roundOff: number; net: number }>();
     for (const i of invoices) {
+      const branch = i.counterSale?.branch.name ?? "";
+      const row = branches.get(branch) ?? { bills: 0, sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
+      row.bills += 1;
       for (const l of i.lines) {
         const { gross } = lineValues(l.quantity, l.rate, 0, null);
-        const column =
-          l.part?.partType === "A" ? "accessories" : (`${l.part?.partType === "O" ? "oil" : "spares"}${(l.vatPercent ?? 0) > 0 ? "Taxable" : "Exempt"}` as const);
+        const column = l.part?.partType === "A" ? "accessories" : (`${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as const);
         row[column] = money(row[column] + gross);
       }
       row.discount = money(row.discount + i.partsDiscountAmount);
       row.vat = money(row.vat + i.vatAmount);
       row.roundOff = money(row.roundOff + i.roundOff);
       row.net = money(row.net + i.total);
+      branches.set(branch, row);
     }
-    // Every bill is on credit (legacy printed a CASH and a CREDIT line; no cash bill since 2018).
-    return [{ section: "Credit", bills: invoices.length, ...row, ...NO_SALE_CHARGES }];
+    // Every bill is on credit (legacy printed a CASH and a CREDIT line; no cash bill since mid-2009, CPD never).
+    return [...branches]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([branch, row]) => ({ group: branch, section: "Credit", ...row, ...NO_SALE_CHARGES }));
   }
 
   private async taxDatewise(f: ReportFilters): Promise<Row[]> {

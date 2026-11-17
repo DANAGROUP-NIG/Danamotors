@@ -75,7 +75,7 @@ describe('Part writes from users who cannot see cost', () => {
 describe('Parts report cost columns', () => {
   it('drops cost columns and their values from rows and totals', () => {
     const report = withoutCostColumns({
-      kind: 'current-stock', title: 'Current Stock', grouped: false, truncated: false,
+      kind: 'current-stock', title: 'Current Stock', grouped: false, subtotals: true, truncated: false,
       columns: [
         { key: 'partNumber', label: 'Part', type: 'text' },
         { key: 'quantity', label: 'Qty', type: 'qty', total: true },

@@ -117,12 +117,31 @@ describeDb("Parts reports (database)", () => {
     expect(bills.totals.net).toBe(249550);
   });
 
+  it("keeps a taxable part billed without VAT in the taxable columns, but not in the tax registers", async () => {
+    // Legacy billed taxable parts at 0% on forms X, Y and P (Lagos 2019-2026) and still printed them as taxable.
+    const line = await prisma.invoiceLine.findFirstOrThrow({ where: { partId: mirror.id, invoice: { cancelledAt: null, counterSale: { is: { branchId: cpd.id } } } } });
+    await prisma.invoiceLine.update({ where: { id: line.id }, data: { vatPercent: 0 } });
+    try {
+      const [bill] = (await report("counter-sales")).rows;
+      expect(bill).toMatchObject({ sparesTaxable: 273313.81, sparesExempt: 0, oilExempt: 28200 });
+      const [summary] = (await report("counter-sales-summary")).rows;
+      expect(summary).toMatchObject({ sparesTaxable: 273313.81, sparesExempt: 0 });
+      // The tax registers split by the VAT charged: legacy's datewise register prints such a bill as Tax Paid/N.Taxable.
+      const [day] = (await report("counter-sales-summary", { option: "DAY" })).rows;
+      expect(day).toMatchObject({ taxable: 0, exempt: 233673.2 });
+    } finally {
+      await prisma.invoiceLine.update({ where: { id: line.id }, data: { vatPercent: line.vatPercent } });
+    }
+  });
+
   it("summarises bills, splits taxable and exempt value by day, and lists cancellations", async () => {
-    // Defaults to the legacy Register Summary: the period's bills in one credit line.
+    // Defaults to the legacy Register Summary: one credit line under the branch heading, with no subtotal.
     const total = await report("counter-sales-summary");
     expect(total.rows).toEqual([
-      expect.objectContaining({ section: "Credit", bills: 1, sparesTaxable: 273313.81, oilExempt: 28200, handling: 0, tradeDiscount: 0, discount: 67840.61, net: 249550 }),
+      expect.objectContaining({ group: `CPD Reports ${run}`, section: "Credit", bills: 1, sparesTaxable: 273313.81, oilExempt: 28200, handling: 0, tradeDiscount: 0, discount: 67840.61, net: 249550 }),
     ]);
+    expect(total.grouped).toBe(true);
+    expect(total.subtotals).toBe(false);
 
     // The legacy executive-wise layout: value by part type before the cash discount.
     const summary = await report("counter-sales-summary", { option: "EXECUTIVE" });

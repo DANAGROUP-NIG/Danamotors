@@ -76,6 +76,8 @@ export interface ReportDefinition {
   countTypes?: { value: string; label: string }[];
   /** Rows carry a `group` value; the screen shows a heading and subtotal per group. */
   grouped?: boolean;
+  /** Options whose groups are headings only, with no subtotal: each group is a single line. */
+  headingsOnly?: string[];
   /** Printed and exported in pages that end with the running grand total (legacy "Carried Forward"). */
   carriedForward?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
@@ -396,7 +398,8 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales",
     title: "Counter Sales Register",
     group: "Part sales",
-    description: "Counter-sale bills in the legacy layout (spares/kit and oil, taxable and non-taxable, cash discount, VAT, round-off and total), or every bill line with its part, quantity and rate.",
+    description:
+      "Counter-sale bills in the legacy layout (spares/kit and oil, taxable and non-taxable parts, cash discount, VAT, round-off and total), or every bill line with its part, quantity and rate. Taxable follows the part's tax status, so a taxable part billed without VAT stays taxable.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", ...PART_FILTERS],
     labels: { option: "Show" },
@@ -444,7 +447,7 @@ export const REPORTS: ReportDefinition[] = [
     title: "Counter Sales Register Summary",
     group: "Part sales",
     description:
-      "The period's bills in one total line (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)).",
+      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", "executive"],
     labels: { option: "Group by" },
@@ -454,8 +457,12 @@ export const REPORTS: ReportDefinition[] = [
       { value: "DAY", label: "Day" },
     ],
     grouped: true,
+    // The Register Summary's single credit line under each branch, as legacy prints it, with no subtotal.
+    headingsOnly: ["TOTAL"],
     columns: {
-      // Legacy Counter Sale Register Summary: one line per CASH / CREDIT section; every bill since 2018 is credit.
+      // Legacy Counter Sale Register Summary: under each branch heading, one line per CASH / CREDIT section; every
+      // bill since mid-2009 is credit. Legacy's LST surcharge, entry tax and other charges are left out: zero on every
+      // counter sale in all three legacy databases, in every year (legacy_deliberate_omissions_log.md).
       TOTAL: [
         text("section", "Bills"),
         qty("bills", "Count"),
