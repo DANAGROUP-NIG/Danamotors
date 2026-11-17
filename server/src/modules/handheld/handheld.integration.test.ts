@@ -226,4 +226,52 @@ describeDb("Handheld documents (database)", () => {
     expect(done.status).toBe("RECEIVED");
     expect((await stockOf(horn.id)).quantity).toBe(stockBefore.quantity + 1);
   });
+
+  it("does not offer a CPO again once its pick is posted; units picked later go out on their own", async () => {
+    const order = await partSale.createOrder(
+      { branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: horn.id, quantity: 3 }] },
+      manager.id,
+    );
+    const lineId = order.lines[0].id;
+    // Pick 1 of 3 first (release the auto-pick, then pick one).
+    await partSale.releaseOrder(order.id);
+    await partSale.pickOrder(order.id, [{ lineId, quantity: 1 }]);
+
+    const first = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id, manual: true }, manager.id);
+    expect(first.lines.map((l) => l.expectedQuantity)).toEqual([1]);
+    await service.upload(first.id, { lines: [{ lineId: first.lines[0].id, quantity: 1 }] }, manager.id);
+    expect((await prisma.customerOrderLine.findUniqueOrThrow({ where: { id: lineId } }))).toMatchObject({ pickedQuantity: 1, handheldCheckedQuantity: 1 });
+
+    // Nothing unchecked: not listed, and a send is refused.
+    expect((await service.listSources("CPO_PICK", cpd.id)).map((s) => s.sourceId)).not.toContain(order.id);
+    await expect(service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id, manual: true }, manager.id)).rejects.toThrow(/already checked on a handheld/);
+
+    // Two more picked later: only those two go to the handheld; one is short.
+    await partSale.pickOrder(order.id, [{ lineId, quantity: 2 }]);
+    const listed = (await service.listSources("CPO_PICK", cpd.id)).find((s) => s.sourceId === order.id);
+    expect(listed).toMatchObject({ lines: 1, quantity: 2 });
+    const reserved = (await stockOf(horn.id)).reservedQuantity;
+    const second = await service.createDocument({ type: "CPO_PICK", sourceId: order.id, pickerId: picker.id, manual: true }, manager.id);
+    expect(second.lines.map((l) => l.expectedQuantity)).toEqual([2]);
+    await service.upload(second.id, { lines: [{ lineId: second.lines[0].id, quantity: 1, shortReason: "NOT_FOUND" }] }, manager.id);
+    expect((await prisma.customerOrderLine.findUniqueOrThrow({ where: { id: lineId } }))).toMatchObject({ pickedQuantity: 2, handheldCheckedQuantity: 2 });
+    expect((await stockOf(horn.id)).reservedQuantity).toBe(reserved - 1);
+
+    // Releasing the pick clears the checked units too.
+    await partSale.releaseOrder(order.id);
+    expect((await prisma.customerOrderLine.findUniqueOrThrow({ where: { id: lineId } }))).toMatchObject({ pickedQuantity: 0, handheldCheckedQuantity: 0 });
+  });
+
+  it("does not offer an indent's picking list again once its handheld pick is posted", async () => {
+    const indent = await transfers.createIndent(
+      { requestingBranchId: kp.id, sourceBranchId: cpd.id, authorisedBy: "SM", lines: [{ partId: retainer.id, urgentQuantity: 1 }] },
+      requester.id,
+    );
+    const approved = await transfers.approveIndent(indent.id, manager.id);
+    const listId = approved.openPickingList.id;
+    const doc = await service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id, manual: true }, manager.id);
+    await service.upload(doc.id, { lines: [{ lineId: doc.lines[0].id, quantity: 1 }] }, manager.id);
+    expect((await service.listSources("INDENT_PICK", cpd.id)).map((s) => s.sourceId)).not.toContain(listId);
+    await expect(service.createDocument({ type: "INDENT_PICK", sourceId: listId, pickerId: picker.id, manual: true }, manager.id)).rejects.toThrow(/already picked on a handheld and posted/);
+  });
 });

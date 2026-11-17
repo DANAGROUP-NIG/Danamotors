@@ -36,6 +36,8 @@ export type SalePart = {
 export type OrderLineCounts = {
   orderedQuantity: number;
   pickedQuantity: number;
+  /** Picked units a posted handheld pick confirmed; only the rest can be sent to a handheld. */
+  handheldCheckedQuantity?: number;
   billedQuantity: number;
   cancelledQuantity: number;
 };

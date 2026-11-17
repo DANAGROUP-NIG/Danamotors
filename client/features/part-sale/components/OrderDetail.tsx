@@ -95,6 +95,8 @@ export function OrderDetail({ id }: { id: string }) {
   const canBill = active && hasPermission(PART_SALE_PERMISSIONS.BILL);
   const open = order.lines.reduce((s, l) => s + openQuantity(l), 0);
   const picked = order.lines.reduce((s, l) => s + l.pickedQuantity, 0);
+  // Picked units no posted handheld pick has checked yet: only these can go to a handheld.
+  const unchecked = order.lines.reduce((s, l) => s + Math.max(0, l.pickedQuantity - (l.handheldCheckedQuantity ?? 0)), 0);
   const pickable = order.lines.some((l) => openQuantity(l) > 0 && l.freeStock > 0);
   const bills = new Map<string, { id?: string; number: string; date: string; status: string }>();
   for (const line of order.lines) {
@@ -252,7 +254,7 @@ export function OrderDetail({ id }: { id: string }) {
         <HandheldCard
           filter={{ sourceId: order.id }}
           canWrite={hasPermission(PART_SALE_PERMISSIONS.ORDER)}
-          send={active && picked > 0 ? { type: "CPO_PICK", sourceId: order.id, branchId: order.branchId, label: `CPO ${order.cpoNumber}` } : null}
+          send={active && unchecked > 0 ? { type: "CPO_PICK", sourceId: order.id, branchId: order.branchId, label: `CPO ${order.cpoNumber}` } : null}
         />
         <DocumentTermsBlock documentType="PARTS_QUOTATION" branchId={order.branchId} />
       </div>

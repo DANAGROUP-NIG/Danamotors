@@ -160,21 +160,21 @@ model User {
   transferDispatches InterBranchTransfer[] @relation("TransferDispatchedBy")
   transferReceives   InterBranchTransfer[] @relation("TransferReceivedBy")
 
-  indentsRequested     BranchIndent[]          @relation("IndentRequestedBy")
-  indentsApproved      BranchIndent[]          @relation("IndentApprovedBy")
-  indentsRejected      BranchIndent[]          @relation("IndentRejectedBy")
-  indentsCancelled     BranchIndent[]          @relation("IndentCancelledBy")
-  indentLinesCancelled BranchIndentLine[]      @relation("IndentLineCancelledBy")
-  transferStatusEvents TransferStatusHistory[] @relation("TransferStatusActor")
-  pickingListsCreated  PickingList[]           @relation("PickingListCreatedBy")
-  pickingListsDone     PickingList[]           @relation("PickingListCompletedBy")
-  stnsCreated          StockTransferNote[]     @relation("StnCreatedBy")
-  stnsDispatched       StockTransferNote[]     @relation("StnDispatchedBy")
-  transferCasesCreated TransferCase[]          @relation("TransferCaseCreatedBy")
-  packingListsCreated  PackingList[]           @relation("PackingListCreatedBy")
-  mitsCreated          MaterialInTransit[]     @relation("MitCreatedBy")
-  mrnsReceived         MaterialReceiptNote[]   @relation("MrnReceivedBy")
-  mrnDiscrepanciesApproved MaterialReceiptNote[] @relation("MrnDiscrepancyApprovedBy")
+  indentsRequested         BranchIndent[]          @relation("IndentRequestedBy")
+  indentsApproved          BranchIndent[]          @relation("IndentApprovedBy")
+  indentsRejected          BranchIndent[]          @relation("IndentRejectedBy")
+  indentsCancelled         BranchIndent[]          @relation("IndentCancelledBy")
+  indentLinesCancelled     BranchIndentLine[]      @relation("IndentLineCancelledBy")
+  transferStatusEvents     TransferStatusHistory[] @relation("TransferStatusActor")
+  pickingListsCreated      PickingList[]           @relation("PickingListCreatedBy")
+  pickingListsDone         PickingList[]           @relation("PickingListCompletedBy")
+  stnsCreated              StockTransferNote[]     @relation("StnCreatedBy")
+  stnsDispatched           StockTransferNote[]     @relation("StnDispatchedBy")
+  transferCasesCreated     TransferCase[]          @relation("TransferCaseCreatedBy")
+  packingListsCreated      PackingList[]           @relation("PackingListCreatedBy")
+  mitsCreated              MaterialInTransit[]     @relation("MitCreatedBy")
+  mrnsReceived             MaterialReceiptNote[]   @relation("MrnReceivedBy")
+  mrnDiscrepanciesApproved MaterialReceiptNote[]   @relation("MrnDiscrepancyApprovedBy")
 
   recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
   partRateChanges           PartRateHistory[]  @relation("PartRateChangedBy")
@@ -214,7 +214,9 @@ model User {
 
   employee Employee?
 
-  /** Per-user changes to the role's permissions: extra grants and denied role permissions. */
+  /**
+   * Per-user changes to the role's permissions: extra grants and denied role permissions.
+   */
   permissionOverrides UserPermission[]
 }
 
@@ -3519,13 +3521,16 @@ model CustomerOrderLine {
   partId  String
   part    SparePart     @relation(fields: [partId], references: [id], onDelete: Restrict)
 
-  orderedQuantity   Int
+  orderedQuantity         Int
   // Picked = reserved in CPD stock and waiting to be billed.
-  pickedQuantity    Int   @default(0)
-  billedQuantity    Int   @default(0)
-  cancelledQuantity Int   @default(0)
-  retailRate        Float
-  amount            Float
+  pickedQuantity          Int   @default(0)
+  // Of the picked units, how many a posted handheld pick has confirmed on the shelf. Only the rest
+  // (picked - checked) goes to a handheld; billing uses checked units first.
+  handheldCheckedQuantity Int   @default(0)
+  billedQuantity          Int   @default(0)
+  cancelledQuantity       Int   @default(0)
+  retailRate              Float
+  amount                  Float
 
   // Latest cancellation of the line (legacy CancelBy, CancelDate, CancelRemark).
   cancelledAt   DateTime?

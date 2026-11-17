@@ -293,8 +293,9 @@ export class PartSaleService {
   }
 
   /**
-   * Applies a handheld pick (legacy HHDC CPO upload): each line's reservation drops to what was
-   * physically picked and the short goes back to free stock. Runs inside the caller's transaction.
+   * Applies a handheld pick (legacy HHDC CPO upload). The handheld was sent the picked units not yet
+   * checked; what it found joins the checked units, and the short goes back to free stock. Runs
+   * inside the caller's transaction.
    */
   async applyHandheldPickInTx(tx: Tx, orderId: string, picked: { lineId: string; quantity: number }[]) {
     const order = await this.lockOrder(tx, orderId);
@@ -302,18 +303,21 @@ export class PartSaleService {
     for (const line of [...order.lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
       const entry = picked.find((p) => p.lineId === line.id);
       if (!entry) continue;
-      if (entry.quantity > line.pickedQuantity) {
-        throw new ConflictError(`${line.part.partNumber}: ${entry.quantity} picked but only ${line.pickedQuantity} reserved now`);
+      const sent = line.pickedQuantity - line.handheldCheckedQuantity;
+      if (entry.quantity > sent) {
+        throw new ConflictError(`${line.part.partNumber}: ${entry.quantity} picked but only ${Math.max(0, sent)} reserved and unchecked now`);
       }
-      const released = line.pickedQuantity - entry.quantity;
-      if (released === 0) continue;
-      const stock = await lockStock(tx, order.branchId, line.partId);
-      if (!stock || stock.reservedQuantity < released) {
-        throw new ConflictError(`Reserved stock for ${line.part.partNumber} no longer matches the pick; nothing was released`);
+      const nowPicked = line.handheldCheckedQuantity + entry.quantity;
+      const released = line.pickedQuantity - nowPicked;
+      if (released > 0) {
+        const stock = await lockStock(tx, order.branchId, line.partId);
+        if (!stock || stock.reservedQuantity < released) {
+          throw new ConflictError(`Reserved stock for ${line.part.partNumber} no longer matches the pick; nothing was released`);
+        }
+        await tx.inventoryStock.update({ where: { id: stock.id }, data: { reservedQuantity: { decrement: released } } });
+        short += released;
       }
-      await tx.inventoryStock.update({ where: { id: stock.id }, data: { reservedQuantity: { decrement: released } } });
-      await tx.customerOrderLine.update({ where: { id: line.id }, data: { pickedQuantity: entry.quantity } });
-      short += released;
+      await tx.customerOrderLine.update({ where: { id: line.id }, data: { pickedQuantity: nowPicked, handheldCheckedQuantity: nowPicked } });
     }
     return { short };
   }
@@ -455,7 +459,7 @@ export class PartSaleService {
         throw new ConflictError(`Reserved stock for ${line.part.partNumber} no longer matches the pick; nothing was released`);
       }
       await tx.inventoryStock.update({ where: { id: stock.id }, data: { reservedQuantity: { decrement: line.pickedQuantity } } });
-      await tx.customerOrderLine.update({ where: { id: line.id }, data: { pickedQuantity: 0 } });
+      await tx.customerOrderLine.update({ where: { id: line.id }, data: { pickedQuantity: 0, handheldCheckedQuantity: 0 } });
     }
   }
 
@@ -556,7 +560,12 @@ export class PartSaleService {
         });
         await tx.customerOrderLine.update({
           where: { id: line.id },
-          data: { pickedQuantity: { decrement: plan.fromPicked }, billedQuantity: { increment: quantity } },
+          data: {
+            pickedQuantity: { decrement: plan.fromPicked },
+            // Checked units are billed first: what stays checked cannot exceed what stays picked.
+            handheldCheckedQuantity: Math.min(line.handheldCheckedQuantity, line.pickedQuantity - plan.fromPicked),
+            billedQuantity: { increment: quantity },
+          },
         });
         issues.push({ partId: line.partId, quantity, note: `CPO ${line.order.cpoNumber}` });
       }

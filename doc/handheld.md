@@ -39,8 +39,8 @@ What posting does:
 | Job | Effect |
 | --- | --- |
 | Count sheet (`COUNT_SHEET`) | The counts are uploaded to the stock taking, once, as from the count screen. While a sheet has an active job, counts cannot be typed on its page. |
-| Indent pick (`INDENT_PICK`) | Each reservation drops to what was picked. The short goes back to the indent line's back order, the same rule as dispatch. If nothing at all was picked, the picking list is cancelled and the indent can be picked again. |
-| CPO pick (`CPO_PICK`) | Each reservation drops to what was picked. The short goes back to free stock. |
+| Indent pick (`INDENT_PICK`) | Each reservation drops to what was picked. The short goes back to the indent line's back order, the same rule as dispatch. If nothing at all was picked, the picking list is cancelled and the indent can be picked again. A picking list whose pick is posted is not offered again (its lines are fixed at approval). |
+| CPO pick (`CPO_PICK`) | Each reservation drops to what was picked. The short goes back to free stock. What was found becomes the line's `handheldCheckedQuantity`; a later send carries only picked units not yet checked (e.g. picked after the post), so Send to handheld is not offered while every picked unit is checked. Billing uses checked units first; releasing the pick clears them. |
 | MIT check (`MIT_RECEIVE`) | The MIT becomes **Verified**. Nothing goes into stock. The store checks and posts the MRN, filled in from the device counts. Lines the checker never reached start at the invoice quantity. |
 
 A picker who scans a different part (a supersession or another flag) does not pick it in its place. The device records

@@ -39,6 +39,10 @@ const ACTIVE_ORDER: CustomerOrderStatus[] = [CustomerOrderStatus.OPEN, CustomerO
 const { INDENT_PICK, CPO_PICK, MIT_RECEIVE, COUNT_SHEET } = HandheldDocumentType;
 const { QUEUED, SENT, RECEIVED, UPLOADED, CANCELLED } = HandheldDocumentStatus;
 const notActive = { handheldDocuments: { none: { status: { in: ACTIVE_HANDHELD_STATUSES } } } };
+// A picking list's lines are fixed when the indent is approved: once a handheld pick is posted, it is done.
+const notPosted = { handheldDocuments: { none: { status: HandheldDocumentStatus.UPLOADED } } };
+/** Picked CPO units that no posted handheld pick has confirmed yet. */
+const uncheckedOf = (l: { pickedQuantity: number; handheldCheckedQuantity: number }) => Math.max(0, l.pickedQuantity - l.handheldCheckedQuantity);
 
 export interface CreateDocumentInput {
   type: HandheldDocumentType;
@@ -141,7 +145,12 @@ export class HandheldService {
   async listSources(type: HandheldDocumentType, branchId?: string) {
     if (type === INDENT_PICK) {
       const lists = await prisma.pickingList.findMany({
-        where: { status: PickingListStatus.OPEN, ...(branchId && { branchId }), ...notActive, lines: { some: { pickedQuantity: { gt: 0 } } } },
+        where: {
+          status: PickingListStatus.OPEN,
+          ...(branchId && { branchId }),
+          AND: [notActive, notPosted],
+          lines: { some: { pickedQuantity: { gt: 0 } } },
+        },
         orderBy: { createdAt: "asc" },
         take: 300,
         include: {
@@ -166,17 +175,23 @@ export class HandheldService {
         where: { status: { in: ACTIVE_ORDER }, ...(branchId && { branchId }), ...notActive, lines: { some: { pickedQuantity: { gt: 0 } } } },
         orderBy: { orderDate: "asc" },
         take: 300,
-        include: { customer: { select: { companyName: true, firstName: true, lastName: true } }, lines: { select: { pickedQuantity: true } } },
+        include: {
+          customer: { select: { companyName: true, firstName: true, lastName: true } },
+          lines: { select: { pickedQuantity: true, handheldCheckedQuantity: true } },
+        },
       });
-      return orders.map((o) => ({
+      return orders
+        .map((o) => ({ ...o, unchecked: o.lines.map(uncheckedOf).filter((q) => q > 0) }))
+        .filter((o) => o.unchecked.length > 0)
+        .map((o) => ({
         sourceId: o.id,
         branchId: o.branchId,
         number: o.cpoNumber,
         reference: o.customerRefNo,
         date: o.orderDate,
         party: o.customer.companyName || `${o.customer.firstName} ${o.customer.lastName}`.trim(),
-        lines: o.lines.filter((l) => l.pickedQuantity > 0).length,
-        quantity: o.lines.reduce((s, l) => s + l.pickedQuantity, 0),
+        lines: o.unchecked.length,
+        quantity: o.unchecked.reduce((s, q) => s + q, 0),
         link: `/part-sale/orders/${o.id}`,
       }));
     }
@@ -632,6 +647,9 @@ export class HandheldService {
     if (type === INDENT_PICK) {
       const list = await tx.pickingList.findUniqueOrThrow({ where: { id: sourceId }, include: { lines: { include: { part } } } });
       if (list.status !== PickingListStatus.OPEN) throw new ConflictError(`Picking list ${list.pickingNumber} is ${list.status.toLowerCase()}`);
+      if (await tx.handheldDocument.count({ where: { pickingListId: sourceId, status: UPLOADED } })) {
+        throw new ConflictError(`Picking list ${list.pickingNumber} was already picked on a handheld and posted`);
+      }
       const lines = list.lines.filter((l) => l.pickedQuantity > 0);
       const bins = await this.binsOf(tx, branchId, lines.map((l) => l.partId));
       return lines
@@ -648,7 +666,11 @@ export class HandheldService {
     if (type === CPO_PICK) {
       const order = await tx.customerOrder.findUniqueOrThrow({ where: { id: sourceId }, include: { lines: { include: { part } } } });
       if (!ACTIVE_ORDER.includes(order.status)) throw new ConflictError(`CPO ${order.cpoNumber} is ${order.status.toLowerCase().replace("_", " ")}`);
-      const lines = order.lines.filter((l) => l.pickedQuantity > 0);
+      // Only picked units no posted handheld pick has confirmed yet (e.g. parts picked after the last one).
+      const lines = order.lines.filter((l) => uncheckedOf(l) > 0);
+      if (!lines.length && order.lines.some((l) => l.pickedQuantity > 0)) {
+        throw new ConflictError(`Every picked unit on CPO ${order.cpoNumber} was already checked on a handheld`);
+      }
       const bins = await this.binsOf(tx, branchId, lines.map((l) => l.partId));
       return lines
         .map((l) => ({
@@ -657,7 +679,7 @@ export class HandheldService {
           partNumber: l.part.partNumber,
           partName: l.part.name,
           binLocation: bins.get(l.partId) ?? null,
-          expectedQuantity: l.pickedQuantity,
+          expectedQuantity: uncheckedOf(l),
         }))
         .sort(byBinThenPart);
     }
@@ -687,7 +709,12 @@ export class HandheldService {
       doc.type === INDENT_PICK
         ? await tx.pickingListLine.findMany({ where: { id: { in: sent.map((l) => l.pickingListLineId!).filter(Boolean) } }, select: { id: true, pickedQuantity: true } })
         : doc.type === CPO_PICK
-          ? await tx.customerOrderLine.findMany({ where: { id: { in: sent.map((l) => l.customerOrderLineId!).filter(Boolean) } }, select: { id: true, pickedQuantity: true } })
+          ? (
+              await tx.customerOrderLine.findMany({
+                where: { id: { in: sent.map((l) => l.customerOrderLineId!).filter(Boolean) } },
+                select: { id: true, pickedQuantity: true, handheldCheckedQuantity: true },
+              })
+            ).map((l) => ({ id: l.id, pickedQuantity: uncheckedOf(l) }))
           : null;
     if (!current) {
       if (doc.type === MIT_RECEIVE && sent.some((l) => !l.mitLineId)) throw new ConflictError("The MIT changed after it was sent; cancel this job and send it again");
