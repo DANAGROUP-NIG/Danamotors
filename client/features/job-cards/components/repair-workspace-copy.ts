@@ -1,6 +1,7 @@
 export const WORKSPACE_COPY = {
   separator: ", ",
   completed: "Completed",
+  qcStates: { PASSED: "Passed", FAILED: "Failed", PENDING: "Pending" },
   saveFindings: "Save diagnosis & findings",
   workshop: "Workshop",
   jobCard: "Job card",

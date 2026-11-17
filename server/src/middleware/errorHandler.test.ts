@@ -15,6 +15,22 @@ function respond(err: Error) {
 }
 
 describe("errorHandler", () => {
+  it("does not expose unexpected error messages, database invocation details or stack traces", () => {
+    const unexpected = respond(
+      new Error("PRIVATE_SIGNATURE_DATA and internal invocation"),
+    );
+    expect(unexpected).toMatchObject({
+      status: 500,
+      body: { message: "Internal Server Error" },
+    });
+    expect(unexpected.body).not.toHaveProperty("stack");
+    const database = respond(
+      Object.assign(new Error("PRIVATE_SIGNATURE_DATA in query arguments"), {
+        code: "P2004",
+      }),
+    );
+    expect(JSON.stringify(database)).not.toContain("PRIVATE_SIGNATURE_DATA");
+  });
   it("preserves nested validation paths and exposes a stable issue code", () => {
     const parsed = z
       .object({

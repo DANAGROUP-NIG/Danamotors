@@ -1,4 +1,5 @@
 import { recordJobDeposit } from "./job-deposit.service";
+import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -52,6 +53,7 @@ const router = Router();
 const controller = new ServiceController();
 
 router.use(authMiddleware);
+router.use("/job-cards/:id/opening-consent", jobOpeningSignatureRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),

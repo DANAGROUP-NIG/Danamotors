@@ -7,6 +7,7 @@ import {
   isTerminalBookingStatus,
 } from "./booking.logic";
 import { allowedJobTransitions } from "./job-transitions";
+import { hasCurrentOpeningSignature } from "./job-opening-signature.service";
 import { upfrontAmount } from "./job-deposit.service";
 import {
   advanceCoverage,
@@ -704,6 +705,10 @@ export class ServiceService {
     if (!card) {
       throw new NotFoundError("Job card not found");
     }
+    const openingSignatureCurrent = await hasCurrentOpeningSignature(
+      prisma,
+      card,
+    );
 
     // This vehicle's progress in each campaign the job card was opened for.
     const campaignVehicles =
@@ -742,6 +747,7 @@ export class ServiceService {
     return scopeJobCard(
       {
         ...card,
+        openingSignatureCurrent,
         canStartWork: card.advanceReceipts.some(
           (receipt) =>
             receipt.status === "ACTIVE" &&

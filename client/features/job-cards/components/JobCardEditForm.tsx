@@ -19,6 +19,9 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const { isAdminOrAbove, hasPermission } = useAuth();
 
   const current = canonicalJobStatus(jobCard.status);
+  const openingSigned =
+    !jobCard.openingSignatureRequired ||
+    jobCard.openingSignatureCurrent === true;
   const billed = hasJobBill(jobCard);
   const canDeliver =
     (billed &&
@@ -195,7 +198,13 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
               onChange={(event) => setQcNotes(event.target.value)}
             />
           </Field>
-          <p className="text-sm">QC: {jobCard.qcStatus || "Pending"}</p>
+          <p className="text-sm">
+            QC:{" "}
+            {WORKSPACE_COPY.qcStates[
+              (jobCard.qcStatus?.toUpperCase() ??
+                "") as keyof typeof WORKSPACE_COPY.qcStates
+            ] ?? "Not recorded"}
+          </p>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -288,6 +297,8 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
                 key={value}
                 value={value}
                 disabled={
+                  (["IN_PROGRESS", "QC", "READY"].includes(value) &&
+                    !openingSigned) ||
                   (value === "IN_PROGRESS" && !jobCard.canStartWork) ||
                   (["IN_PROGRESS", "QC", "READY"].includes(value) &&
                     !estimateApproved) ||

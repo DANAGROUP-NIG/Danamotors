@@ -473,6 +473,8 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  openingSignatureRequired Boolean @default(true)
+  openingSignatures JobOpeningSignature[]
   openingConsent Json?
   advanceReceipts Receipt[] @relation("JobAdvances")
   consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
@@ -609,6 +611,24 @@ model JobCard {
   @@index([branchId, createdAt, id])
   @@index([branchId, status, createdAt, id])
   @@index([customerId, createdAt, id])
+}
+
+model JobOpeningSignature {
+  id String @id @default(uuid())
+  jobCardId String
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  revision Int
+  idempotencyKey String @unique
+  documentHash String @db.Char(64)
+  scopeHash String @db.Char(64)
+  evidenceHash String @db.Char(64)
+  snapshot Json
+  signerName String
+  relationship String?
+  capturedById String
+  signedAt DateTime @default(now())
+  signatureImage String @db.Text
+  @@unique([jobCardId, revision])
 }
 
 // ============================================================

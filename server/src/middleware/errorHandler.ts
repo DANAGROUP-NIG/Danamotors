@@ -1,7 +1,6 @@
 import { ZodError } from "zod";
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../shared/errors/appError";
-import { config } from "../config";
 
 interface PrismaError extends Error {
   code?: string;
@@ -74,7 +73,7 @@ export const errorHandler = (
         break;
       default:
         statusCode = 400;
-        message = err.message || "Database error occurred";
+        message = "Database operation could not be completed";
     }
   } else {
     // Other errors (e.g. JWT errors, SyntaxError)
@@ -84,8 +83,6 @@ export const errorHandler = (
     } else if (err.name === "TokenExpiredError") {
       statusCode = 401;
       message = "Your token has expired. Please log in again.";
-    } else {
-      message = err.message || message;
     }
   }
 
@@ -97,10 +94,6 @@ export const errorHandler = (
     ...(fieldErrors && { errors: fieldErrors }),
     ...(details !== undefined && { details }),
   };
-
-  if (config.NODE_ENV === "development") {
-    response.stack = err.stack;
-  }
 
   res.status(statusCode).json(response);
 };

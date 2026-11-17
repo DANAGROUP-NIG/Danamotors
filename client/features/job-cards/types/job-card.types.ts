@@ -46,7 +46,14 @@ export type Estimate = {
 
 export type CustomerApproval = {
   signatureState?: "valid" | "invalid" | "legacy" | "override";
-  signature?: { imageReference: string; signerName: string; signedAt: string; estimateVersion: number; totalSigned: number; relationship?: string | null } | null;
+  signature?: {
+    imageReference: string;
+    signerName: string;
+    signedAt: string;
+    estimateVersion: number;
+    totalSigned: number;
+    relationship?: string | null;
+  } | null;
 
   id: string;
   estimateId: string;
@@ -138,9 +145,28 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  openingSignatureRequired?: boolean;
+  openingSignatureCurrent?: boolean;
   canStartWork?: boolean;
-  advanceSummary?: { basis: 'ESTIMATE' | 'INVOICE'; hasEstimate: boolean; total: number; receivedAmount: number; paidPercent: number | null; balanceAmount: number; excessAmount: number; suggestedPercent: number };
-  advanceReceipts?: { id: string; receiptNumber: string; amount: number; advanceAmount: number; status: string; mode: string; issuedAt: string }[];
+  advanceSummary?: {
+    basis: "ESTIMATE" | "INVOICE";
+    hasEstimate: boolean;
+    total: number;
+    receivedAmount: number;
+    paidPercent: number | null;
+    balanceAmount: number;
+    excessAmount: number;
+    suggestedPercent: number;
+  };
+  advanceReceipts?: {
+    id: string;
+    receiptNumber: string;
+    amount: number;
+    advanceAmount: number;
+    status: string;
+    mode: string;
+    issuedAt: string;
+  }[];
   allowedTransitions?: string[];
   depositReceiptId?: string | null;
   labourLines?: { labourItem: { description: string } }[];
@@ -166,7 +192,11 @@ export type JobCard = {
   deliveredAt?: string | null;
   gatePassNumber?: string | null;
   serviceTypeId?: string | null;
-  serviceType?: { description: string; code?: string; chargedTo?: string } | null;
+  serviceType?: {
+    description: string;
+    code?: string;
+    chargedTo?: string;
+  } | null;
   bay?: { description: string } | null;
   team?: { description: string } | null;
   serviceAdvisorId?: string | null;
@@ -249,7 +279,11 @@ export type JobCard = {
     odometerReplacedReason?: string | null;
     previousMileage?: number | null;
   } | null;
-  warrantyAcknowledgedBy?: { id: string; firstName: string; lastName: string } | null;
+  warrantyAcknowledgedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
   warrantyAcknowledgedAt?: string | null;
   completedAt?: string | null;
   warrantyCase?: { id: string; caseNumber: string; status: CaseStatus } | null;
@@ -266,7 +300,11 @@ export type JobCard = {
     attendedBy: { id: string; firstName: string; lastName: string } | null;
     /** A FREE line is charged to this campaign, which pre-sets the answer to "done". */
     hasFreeLine: boolean;
-    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED"; jobCardText: string | null; printOnJobCard: boolean };
+    campaign: {
+      status: "DRAFT" | "ACTIVE" | "CLOSED";
+      jobCardText: string | null;
+      printOnJobCard: boolean;
+    };
   }[];
 };
 

@@ -1,5 +1,79 @@
 # JobCard database and workflow
 
+### Signed job-opening approval (issue #140)
+
+Opening the administrative job record and authorizing repair costs remain separate steps.
+The existing booking checkbox still acknowledges opening terms before conversion. After
+the job is saved, the advisor reviews **Job-opening approval** with the customer, captures
+their signature and saves the signed revision. This covers both booking conversion and
+direct job opening. It never creates or approves an estimate.
+
+The signed document captures the saved job number, customer/vehicle/branch identity,
+mileage, service, opening description, customer requests, promised date, statement and
+exact JOB_CARD terms/footer. Signer name, representative authority when applicable,
+capturing staff ID and server timestamp are recorded separately. The stored termsVersion
+is a canonical content hash of the accepted statement, terms and footer. Print and screen use
+the shared Africa/Lagos date formatter. Configure official company/branch JOB_CARD
+terms through the existing terms settings; the baseline statement authorizes the job
+record only and expressly leaves repair-cost approval to the estimate workflow.
+
+**Decision: separate immutable evidence.** JobOpeningSignature holds the signature PNG
+and saved JSON document, rather than putting sensitive images into ordinary job-card
+responses or reusing EstimateSignature. Canonical hashes bind the document, job scope,
+image, signer, capturing staff and timestamp. JSON object key order does not affect
+verification. There is no signature update/delete endpoint. The application detects
+changed/corrupted evidence; these hashes are not a cryptographic identity certificate
+or protection against a database administrator who can rewrite all evidence and audits.
+
+Material opening changes invalidate the current approval and require a new signed
+revision. Assignment, progress, findings/work-done text and estimate pricing are outside
+the opening scope. Later configuration changes do not retroactively invalidate the
+already signed terms. New signatures always use the latest reviewed terms. Previous
+revisions remain addressable and print their original snapshot, with a notice when it
+differs from the current job. A fresh document hash remounts the capture form so old ink
+and acceptance cannot carry over silently to new job details or terms.
+
+New jobs require a current verified signature for transitions to IN_PROGRESS, QC and
+READY, including automatic reopening from READY after parts/return/labour edits.
+The existing estimate approval, positive eligible advance, role, assigned-technician,
+QC and campaign checks still apply independently. UI progress options are disabled
+when opening consent is missing; the server is authoritative. The migration exempts
+historical jobs to preserve existing workflows. Signing a historical job opts it into
+current-signature enforcement; no historical signature or acceptance timestamp is invented.
+
+| Endpoint                                                          | Required permissions            | Behavior                                                                     |
+| ----------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------- |
+| GET /api/service/job-cards/:id/opening-consent                    | jobcard:read                    | Current review document/hash, state and latest image-free signature metadata |
+| POST /api/service/job-cards/:id/opening-consent                   | jobcard:read and estimate:sign  | Capture an independent job-opening signature                                 |
+| GET /api/service/job-cards/:id/opening-consent/:signatureId/print | jobcard:read and estimate:print | Verified saved revision, signature and original terms                        |
+
+All endpoints enforce job branch access. The existing customer-signature capture/print
+permissions are reused without adding seed grants; the permission name does not join
+opening approval to an estimate. POST requires accepted=true, expectedHash, UUID
+idempotencyKey, signerName and signatureImage, plus relationship/authority for a
+representative. PNG limits reuse estimate validation: 64 KiB decoded, 2048 by 1024
+pixels, with an 88,000-character request bound. Caller timestamps, actors and snapshots
+are rejected. Identical retries return the original revision; reuse with other details
+returns 409. Scope/terms conflicts return 409, authorization failures 403, missing
+records 404 and input errors 400 with field/message/code. Missing work approval uses
+JOB_OPENING_SIGNATURE_REQUIRED. No image or signer name is written into audit details.
+
+**Migration and performance.** Apply 20261117110000_job_opening_signatures after the
+parts-collection migration and regenerate Prisma before restarting. The additive
+JobCard.openingSignatureRequired column is false for existing rows and defaults to
+true for new jobs. JobOpeningSignature uses a unique retry key and unique job/revision
+index, which also supports latest-revision reads. Signature creation takes the existing
+job row lock and commits evidence, enforcement flag and audit together. Reads use
+constant query counts, not per-request-line queries, and do not send images unless
+the print permission is present. There are no network side effects in the transaction.
+
+Rollback application code first. Export/retain signature evidence before executing the
+provided rollback SQL; dropping the new table destroys evidence. Signed job deletion
+is restricted by its foreign key. The migration has not been applied in this session.
+Local-only integration coverage is included for JSONB persistence, retries, re-signing,
+old-revision printing, historical defaults and schema rollback; execution requires an
+explicit disposable localhost TEST_DATABASE_URL. No non-local database may be used.
+
 ### Suggested advances (issue #140, approved payment policy)
 
 Each estimate retains its suggested upfront percentage, default 60%, with 20%, 30%,
