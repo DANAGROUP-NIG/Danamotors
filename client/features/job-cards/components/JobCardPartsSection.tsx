@@ -13,6 +13,7 @@ import { jobCardKeys } from "../api/job-card.keys";
 import type { JobCard } from "../types/job-card.types";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { partSourceLabel } from "@/features/inventory/lib/part-codes";
+import { PartCollectionSignature } from "./PartCollectionSignature";
 
 type IssuableStock = {
   partId: string;
@@ -50,8 +51,19 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
   const [returnQuantity, setReturnQuantity] = useState(1);
 
   const receive = useMutation({
-    mutationFn: (id: string) => apiPost(`/workshop/parts/${id}/receive`, { confirmed: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobCardKeys.all }),
+    mutationFn: ({
+      id,
+      signatureImage,
+    }: {
+      id: string;
+      signatureImage: string;
+    }) =>
+      apiPost(`/workshop/parts/${id}/receive`, {
+        confirmed: true,
+        signatureImage,
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: jobCardKeys.all }),
   });
   const canIssue = hasPermission("partissuance:create");
   const canReturn = hasPermission("partreturn:create");
@@ -86,7 +98,11 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         `${API_ROUTES.inventory.stock.base}?${query.toString()}`,
       );
     },
-    enabled: canIssue && !closed && !!jobCard.partsRequestedAt && debouncedSearch.length >= 2,
+    enabled:
+      canIssue &&
+      !closed &&
+      !!jobCard.partsRequestedAt &&
+      debouncedSearch.length >= 2,
     staleTime: 15_000,
     retry: false,
   });
@@ -172,7 +188,11 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         </span>
       </div>
 
-      {canIssue && !jobCard.partsRequestedAt && <p className="text-sm text-muted-foreground">Click Request Parts before issuing parts for this job card.</p>}
+      {canIssue && !jobCard.partsRequestedAt && (
+        <p className="text-sm text-muted-foreground">
+          Click Request Parts before issuing parts for this job card.
+        </p>
+      )}
       {canIssue && (
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-end">
           <Field label="Find part by number or name">
@@ -323,7 +343,43 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         </div>
       )}
 
-      {user?.id === jobCard.technicianId && hasPermission("jobprogress:update") && !!jobCard.partIssuances?.length && <div className="space-y-2 rounded-xl border border-border p-4"><h3 className="font-semibold">Parts collection</h3>{jobCard.partIssuances.map(issue => <div key={issue.id} className="flex items-center justify-between gap-2 text-sm"><span>{issue.sparePart.name} ? {issue.quantity}</span>{issue.receivedAt ? <span>Received {new Date(issue.receivedAt).toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</span> : <Button type="button" disabled={receive.isPending} onClick={() => receive.mutate(issue.id)}>Confirm part received</Button>}</div>)}{receive.isError && <p role="alert" className="text-destructive">{messageFrom(receive.error, "Could not confirm collection")}</p>}</div>}
+      {user?.id === jobCard.technicianId &&
+        hasPermission("jobprogress:update") &&
+        !!jobCard.partIssuances?.length && (
+          <div className="space-y-2 rounded-xl border border-border p-4">
+            <h3 className="font-semibold">Parts collection</h3>
+            {jobCard.partIssuances.map((issue) => (
+              <div key={issue.id} className="space-y-2 text-sm">
+                <span>
+                  {issue.sparePart.name} ({issue.quantity})
+                </span>
+                {issue.receivedAt ? (
+                  <span>
+                    Received{" "}
+                    {new Date(issue.receivedAt).toLocaleString("en-NG", {
+                      timeZone: "Africa/Lagos",
+                    })}
+                  </span>
+                ) : !closed ? (
+                  <PartCollectionSignature
+                    label={`${issue.sparePart.name} (${issue.quantity})`}
+                    pending={receive.isPending}
+                    onSign={(signatureImage) =>
+                      receive.mutate({ id: issue.id, signatureImage })
+                    }
+                  />
+                ) : (
+                  <span>Collection not recorded</span>
+                )}
+              </div>
+            ))}
+            {receive.isError && (
+              <p role="alert" className="text-destructive">
+                {messageFrom(receive.error, "Could not confirm collection")}
+              </p>
+            )}
+          </div>
+        )}
       {canReturn && !!jobCard.partIssuances?.length && (
         <div className="grid gap-2 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)_auto] sm:items-end">
           <Field label="Return issued part">

@@ -1,5 +1,54 @@
 # JobCard database and workflow
 
+### Technician workflow review (issue #140)
+
+Assign technicians through **Workshop actions**, using `assignment:create`. The creation
+form currently records a group; its technician picker was intentionally hidden in the
+existing UI. The assignment picker previously included inactive accounts that the API
+correctly rejected. It now requests `GET /api/workshop/technicians?activeOnly=true`;
+the normal directory still includes inactive technicians. Assignment remains branch-scoped,
+rechecks closed/billed state under the job lock, and audits previous/new technician IDs.
+
+The technician's **Job done: send for QC** action moves an assigned job to QC. The server
+returns no progress actions to an unassigned technician and remains authoritative for
+assignment ownership. The existing estimate approval and positive-advance gates remain.
+60% is a recommendation; this slice does not introduce a percentage threshold.
+
+| Role                | From          | To                  | Additional rule                                |
+| ------------------- | ------------- | ------------------- | ---------------------------------------------- |
+| Assigned technician | OPEN          | IN_PROGRESS         | Approved scope and positive eligible advance   |
+| Assigned technician | IN_PROGRESS   | QC or WAITING_PARTS | Approved scope required for QC                 |
+| Assigned technician | WAITING_PARTS | IN_PROGRESS or QC   | Existing deposit/scope gates apply             |
+| Assigned technician | QC            | IN_PROGRESS         | QC failed and positive eligible advance        |
+| Service advisor     | QC            | READY               | Passed QC, recorded scope and campaign answers |
+
+The full role policy remains `JOB_TRANSITION_ROLES`; this table describes the technician
+handoff and advisor-ready subset. A QC reviewer does not automatically mark a job READY.
+
+**Parts collection:** new calls to `POST /api/workshop/parts/:id/receive` send
+`{ confirmed: true, signatureImage: "data:image/png;base64,..." }`. This tightens the
+former confirmation-only contract; deploy the matching client and server together.
+Only the active, same-branch assigned technician may sign. PNG validation reuses the
+estimate signature limits: 64 KiB decoded and at most 2048 by 1024 pixels. A shared
+canvas also serves estimate approval. Signature image, identity and server timestamp
+are stored in a separate `PartCollectionSignature` row so ordinary job-card responses
+and audit entries never include the image. The hash binds the original issuance scope,
+signer, timestamp and image. Application code never updates signed evidence; retries
+cannot overwrite it. Historical unsigned confirmations are preserved without inventing
+a signature. New collection on ready, billed, delivered, cancelled or cancelled-requisition
+work is rejected. Job-then-issuance locks serialize signing with reassignment and billing.
+
+Technician open/closed counts use one grouped query for the requested technician page,
+with branch filtering, then one in-memory accumulation. BILLED, DELIVERED and CANCELLED
+(including normalized legacy forms) count as closed. Empty pages skip the aggregate;
+no cache or new count index is introduced without a measured local query plan.
+
+Deployment: apply `20261117100000_part_collection_signatures` and regenerate Prisma
+before restarting. The additive table uses its issuance primary key for lookup/idempotency;
+existing rows need no backfill. Roll back application behavior first; export and retain
+signature evidence before using the provided rollback SQL. This migration has not been
+applied during development. No permission grants or dependencies changed.
+
 ### Job-opening validation errors
 
 Validation failures retain the existing HTTP 400 response and add an issue code:
@@ -152,13 +201,13 @@ Labour GOODWILL requires `warranty:update` and a reason (distinct from parts goo
 
 ### Remarks and internal picking print
 
-| Method and path                                 | Permission                   | Behavior                                                              |
-| ----------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
-| `GET /service/job-cards/:id/remarks`            | `jobcard:read`               | `data.document` with id, branchId and remarks.                        |
-| `GET /service/estimates/:id/remarks`            | `estimate:read`              | Same, including standalone estimates with an assigned branch.         |
+| Method and path                                 | Permission                   | Behavior                                                                                                                                                           |
+| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /service/job-cards/:id/remarks`            | `jobcard:read`               | `data.document` with id, branchId and remarks.                                                                                                                     |
+| `GET /service/estimates/:id/remarks`            | `estimate:read`              | Same, including standalone estimates with an assigned branch.                                                                                                      |
 | `PUT` either remarks path                       | `jobcard:remarks:update`     | Strict body with required `remarks` (text/null) and optional `customerRemarks` (text/null); each is at most 5000 characters. Omitted customerRemarks is preserved. |
-| `GET /service/job-cards/:id/picking-list/print` | `jobcard:picking-list:print` | Latest estimate's planned parts for the job.                          |
-| `GET /service/estimates/:id/picking-list/print` | `jobcard:picking-list:print` | Planned parts for that exact revision.                                |
+| `GET /service/job-cards/:id/picking-list/print` | `jobcard:picking-list:print` | Latest estimate's planned parts for the job.                                                                                                                       |
+| `GET /service/estimates/:id/picking-list/print` | `jobcard:picking-list:print` | Planned parts for that exact revision.                                                                                                                             |
 
 Internal `remarks` stay separate from explicit customer-visible `customerRemarks` on JobCard and Estimate. The remarks editor shows number/date/status, job date, registration, VIN, model/variant, mileage, service and customer name read-only. Staff must enter a customer explanation explicitly; existing internal text is never copied. Job card, estimate and bill customer prints include only that explanation. Combined bills show explanations for their linked jobs. Internal job-card remarks are hidden when printing. Estimate explanations are separately editable metadata and do not change the signed financial content hash, version or approval.
 

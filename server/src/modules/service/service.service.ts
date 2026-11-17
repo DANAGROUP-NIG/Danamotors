@@ -698,6 +698,7 @@ export class ServiceService {
     id: string,
     permissions: readonly string[] = [],
     role?: string,
+    actorId?: string,
   ) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
@@ -800,6 +801,7 @@ export class ServiceService {
         allowedTransitions: allowedJobTransitions(
           canonicalJobStatus(card.status),
           role,
+          actorId ? { actorId, technicianId: card.technicianId } : undefined,
         ),
         estimates: card.estimates.map((estimate) => ({
           ...estimate,

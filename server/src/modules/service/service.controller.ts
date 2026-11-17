@@ -1,12 +1,15 @@
 import { scopeJobCard } from "./job-card-visibility";
 import { Request, Response, NextFunction } from "express";
 import { ServiceService } from "./service.service";
-import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
+import {
+  assertBranchOwnership,
+  canAccessAllBranches,
+} from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import prisma from "../../prisma/client";
 import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 import { LabourService } from "./labour.service";
-import { requestJobcardParts } from './jobcard-parts-request.service';
+import { requestJobcardParts } from "./jobcard-parts-request.service";
 
 export class ServiceController {
   private serviceService: ServiceService;
@@ -84,7 +87,11 @@ export class ServiceController {
       );
       res
         .status(200)
-        .json({ status: "success", statusCode: 200, data: scopeJobCard({ labourLines }, req.user?.permissions ?? []) });
+        .json({
+          status: "success",
+          statusCode: 200,
+          data: scopeJobCard({ labourLines }, req.user?.permissions ?? []),
+        });
     } catch (error) {
       next(error);
     }
@@ -163,7 +170,10 @@ export class ServiceController {
         select: { jobCard: { select: { branchId: true } } },
       });
       assertBranchOwnership(req, existing?.jobCard.branchId);
-      await this.labourService.removeJobCardLine(req.params.lineId, req.user?.userId);
+      await this.labourService.removeJobCardLine(
+        req.params.lineId,
+        req.user?.userId,
+      );
       res.status(200).json({
         status: "success",
         statusCode: 200,
@@ -180,7 +190,9 @@ export class ServiceController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const branch = await prisma.branch.findUnique({ where: { name: req.body.branchName } });
+      const branch = await prisma.branch.findUnique({
+        where: { name: req.body.branchName },
+      });
       if (!branch) throw new NotFoundError("Branch not found");
       assertBranchOwnership(req, branch.id);
 
@@ -218,12 +230,11 @@ export class ServiceController {
       let createdById: string | undefined;
 
       // All-branch access is explicit; other users are locked to their home branch.
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user)
-      ) {
-        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
-        if (branchId && branchId !== req.user.branchId) throw new ForbiddenError("Cannot access another branch");
+      if (req.user && !canAccessAllBranches(req.user)) {
+        if (!req.user.branchId)
+          throw new ForbiddenError("Your account is not assigned to a branch");
+        if (branchId && branchId !== req.user.branchId)
+          throw new ForbiddenError("Cannot access another branch");
         branchId = req.user.branchId;
       }
 
@@ -297,13 +308,31 @@ export class ServiceController {
     }
   };
 
-  convertAppointment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  convertAppointment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const appointment = await this.serviceService.getAppointment(req.params.id);
+      const appointment = await this.serviceService.getAppointment(
+        req.params.id,
+      );
       assertBranchOwnership(req, appointment.branchId);
-      const result = await this.serviceService.convertAppointment(req.params.id, req.body, req.user!.userId);
-      res.status(201).json({ status: "success", statusCode: 201, data: { jobCard: result } });
-    } catch (error) { next(error); }
+      const result = await this.serviceService.convertAppointment(
+        req.params.id,
+        req.body,
+        req.user!.userId,
+      );
+      res
+        .status(201)
+        .json({
+          status: "success",
+          statusCode: 201,
+          data: { jobCard: result },
+        });
+    } catch (error) {
+      next(error);
+    }
   };
 
   deleteAppointment = async (
@@ -376,11 +405,9 @@ export class ServiceController {
       const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user)
-      ) {
-        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      if (req.user && !canAccessAllBranches(req.user)) {
+        if (!req.user.branchId)
+          throw new ForbiddenError("Your account is not assigned to a branch");
         branchId = req.user.branchId;
       }
 
@@ -402,14 +429,34 @@ export class ServiceController {
     }
   };
 
-  requestParts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  requestParts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const card = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
-      if (!card) throw new NotFoundError('Job card not found');
+      const card = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
+      if (!card) throw new NotFoundError("Job card not found");
       assertBranchOwnership(req, card.branchId);
-      await requestJobcardParts(req.params.id, card.branchId, req.user!.userId, req.body.requestId);
-      res.status(200).json({ status: 'success', message: 'Branch Store Manager notified', data: {} });
-    } catch (error) { next(error); }
+      await requestJobcardParts(
+        req.params.id,
+        card.branchId,
+        req.user!.userId,
+        req.body.requestId,
+      );
+      res
+        .status(200)
+        .json({
+          status: "success",
+          message: "Branch Store Manager notified",
+          data: {},
+        });
+    } catch (error) {
+      next(error);
+    }
   };
 
   getJobCard = async (
@@ -419,7 +466,12 @@ export class ServiceController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.serviceService.getJobCard(id, req.user?.permissions ?? [], req.user?.role);
+      const result = await this.serviceService.getJobCard(
+        id,
+        req.user?.permissions ?? [],
+        req.user?.role,
+        req.user?.userId,
+      );
       assertBranchOwnership(req, result.branchId);
       res.status(200).json({
         status: "success",
@@ -544,14 +596,26 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { branchId:true, jobCard: { select: { branchId: true } } },
+        select: { branchId: true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
+      assertBranchOwnership(
+        req,
+        estimate?.jobCard?.branchId ?? estimate?.branchId,
+      );
       const result = await this.serviceService.addApproval(
         id,
         req.body,
         req.user?.userId,
-        { deviceOrIp: `${req.ip ?? "unknown"} ${req.get("user-agent") ?? ""}`.slice(0, 1000), allowOverride: [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user!.role as "Admin" | "SuperAdmin") },
+        {
+          deviceOrIp:
+            `${req.ip ?? "unknown"} ${req.get("user-agent") ?? ""}`.slice(
+              0,
+              1000,
+            ),
+          allowOverride: [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(
+            req.user!.role as "Admin" | "SuperAdmin",
+          ),
+        },
       );
       res.status(201).json({
         status: "success",
@@ -573,9 +637,12 @@ export class ServiceController {
       const { id } = req.params;
       const estimate = await prisma.estimate.findUnique({
         where: { id },
-        select: { branchId:true, jobCard: { select: { branchId: true } } },
+        select: { branchId: true, jobCard: { select: { branchId: true } } },
       });
-      assertBranchOwnership(req, estimate?.jobCard?.branchId ?? estimate?.branchId);
+      assertBranchOwnership(
+        req,
+        estimate?.jobCard?.branchId ?? estimate?.branchId,
+      );
       const result = await this.serviceService.getApprovals(id);
       res.status(200).json({
         status: "success",
@@ -599,11 +666,9 @@ export class ServiceController {
       const status = req.query.status as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user)
-      ) {
-        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      if (req.user && !canAccessAllBranches(req.user)) {
+        if (!req.user.branchId)
+          throw new ForbiddenError("Your account is not assigned to a branch");
         branchId = req.user.branchId;
       }
 
@@ -634,11 +699,9 @@ export class ServiceController {
       const status = req.query.status as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user)
-      ) {
-        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      if (req.user && !canAccessAllBranches(req.user)) {
+        if (!req.user.branchId)
+          throw new ForbiddenError("Your account is not assigned to a branch");
         branchId = req.user.branchId;
       }
 

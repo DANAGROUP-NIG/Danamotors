@@ -1185,6 +1185,7 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  collectionSignature PartCollectionSignature?
   receivedById String?
   receivedAt DateTime?
   requisitionLine PartRequisitionLine?
@@ -1225,6 +1226,15 @@ model PartIssuance {
   @@index([jobCardId])
   @@index([issuedById])
   @@index([issuedAt])
+}
+
+model PartCollectionSignature {
+  issuanceId String @id
+  issuance PartIssuance @relation(fields: [issuanceId], references: [id], onDelete: Restrict)
+  signerId String
+  signedAt DateTime @default(now())
+  contentHash String @db.Char(64)
+  signatureImage String @db.Text
 }
 
 // ============================================================
