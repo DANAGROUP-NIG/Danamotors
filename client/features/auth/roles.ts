@@ -130,6 +130,11 @@ export const HANDHELD_PERMISSIONS = {
   STATIONS: "handheld:stations",
 } as const;
 
+// Finance owns the Mobis conversion rate, dealer factor and price bulletins (Finance → Mobis pricing).
+export const MOBIS_PRICING_PERMISSIONS = {
+  MANAGE: "mobispricing:manage",
+} as const;
+
 // Barcode labels on the branch's label printer (a Zebra on a handheld station PC).
 export const LABEL_PERMISSIONS = {
   PRINT: "labels:print",

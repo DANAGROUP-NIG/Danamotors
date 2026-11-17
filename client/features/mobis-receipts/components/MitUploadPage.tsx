@@ -14,7 +14,9 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { parseMitFile, type ParsedMitFile } from "../lib/parse-mit";
 import { matchPartsRequest } from "../api/mobis.api";
 import { useImportMit } from "../hooks/use-mobis";
-import { DEFAULT_CONVERSION_RATE, RECEIVED_MODE_LABELS, fmtNaira, fmtPrice, isCpd } from "../lib/mobis-labels";
+import { RECEIVED_MODE_LABELS, fmtNaira, fmtPrice, isCpd } from "../lib/mobis-labels";
+import { useQuery } from "@tanstack/react-query";
+import { MOBIS_PRICING_KEY, getMobisPricing } from "@/features/finance/api/mobis-pricing.api";
 import type { PartMatch, ReceivedMode } from "../types/mobis.types";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
@@ -41,7 +43,8 @@ export function MitUploadPage() {
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
-  const [conversionRate, setConversionRate] = useState(String(DEFAULT_CONVERSION_RATE));
+  // Finance sets the rate (Finance → Mobis pricing); the store only sees it.
+  const pricing = useQuery({ queryKey: MOBIS_PRICING_KEY, queryFn: getMobisPricing });
   const [physicalReceiptDate, setPhysicalReceiptDate] = useState(today());
   const [receivedMode, setReceivedMode] = useState<ReceivedMode | "">("");
   const [branchId, setBranchId] = useState("");
@@ -109,7 +112,7 @@ export function MitUploadPage() {
   const matchByNumber = useMemo(() => new Map((matches ?? []).map((m) => [m.partNumber, m.part])), [matches]);
   const missingParts = matchFailed ? [] : (matches ?? []).filter((m) => !m.part).map((m) => m.partNumber);
   const newParts = missingParts.length;
-  const rate = Number(conversionRate);
+  const rate = pricing.data?.conversionRate ?? 0;
   const totals = useMemo(() => {
     const lines = parsed?.lines ?? [];
     return {
@@ -122,7 +125,7 @@ export function MitUploadPage() {
   const errors: string[] = [];
   if (!parsed) errors.push("Choose the Mobis invoice file");
   if (!invoiceNumber.trim()) errors.push("Enter the invoice number");
-  if (!(rate > 0)) errors.push("Enter a conversion rate above zero");
+  if (!(rate > 0)) errors.push(pricing.isError ? "The conversion rate could not be loaded" : "Loading the conversion rate");
   if (!receivedMode) errors.push("Choose the received mode");
   if (!branchId) errors.push("Choose the receiving branch");
   if (newParts > 0 && !ignoreMissing) errors.push(`${newParts} part(s) are not in Part Master: proceed without them, or abort`);
@@ -134,7 +137,6 @@ export function MitUploadPage() {
         destinationBranchId: branchId,
         invoiceNumber: invoiceNumber.trim(),
         invoiceDate: invoiceDate || undefined,
-        conversionRate: rate,
         physicalReceiptDate: physicalReceiptDate || undefined,
         receivedMode: receivedMode as ReceivedMode,
         remarks: remarks.trim() || undefined,
@@ -252,8 +254,8 @@ export function MitUploadPage() {
           <Field label="Invoice date (optional)">
             <input type="date" className={inputCls} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
           </Field>
-          <Field label="Conversion rate">
-            <input type="number" min={0} step="0.01" className={inputCls} value={conversionRate} onChange={(e) => setConversionRate(e.target.value)} />
+          <Field label="Conversion rate (set by Finance)">
+            <input className={cn(inputCls, "bg-slate-50")} value={rate ? rate.toLocaleString("en-NG") : "…"} readOnly title="Finance sets the Mobis conversion rate under Finance → Mobis pricing" />
           </Field>
           <Field label="Material physical receipt date">
             <input type="date" className={inputCls} value={physicalReceiptDate} onChange={(e) => setPhysicalReceiptDate(e.target.value)} />

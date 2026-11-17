@@ -26,6 +26,8 @@ describeDb("Stock reports (database)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB;
     prisma = require("../../prisma/client").default;
+    // The MIT takes Finance's conversion rate (Finance → Mobis pricing); stubbed so parallel tests don't race on it.
+    jest.spyOn(require("../finance/mobis-pricing.service"), "getMobisPricing").mockResolvedValue({ conversionRate: 1000, dealerFactor: 0.616, updatedAt: null });
     reports = new (require("./partsReport.service").PartsReportService)();
     const sales = new (require("../part-sale/partSale.service").PartSaleService)();
     const transfers = new (require("../stock-transfer/stockTransfer.service").StockTransferService)();
@@ -62,7 +64,6 @@ describeDb("Stock reports (database)", () => {
       {
         destinationBranchId: cpd.id,
         invoiceNumber: `A5LA-${run}`,
-        conversionRate: 1000,
         receivedMode: "AIR",
         lines: [{ orderNumber: "AV10K6Q01R", partNumber: joint.partNumber, quantity: 6, unitPrice: 37.314, caseNumber: "C1" }],
       },

@@ -75,7 +75,7 @@ export type ImportMitPayload = {
   destinationBranchId: string;
   invoiceNumber: string;
   invoiceDate?: string;
-  conversionRate: number;
+  // No conversionRate: the server uses the rate Finance set (Finance → Mobis pricing).
   physicalReceiptDate?: string;
   receivedMode: ReceivedMode;
   remarks?: string;

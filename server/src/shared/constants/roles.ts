@@ -236,6 +236,9 @@ export const PERMISSIONS = {
   RECEIPT_ADJUST_REVERSE: "receipt:adjust:reverse",
   PARTY_OPENING_CREATE: "party:opening:create",
 
+  // ── Finance — Mobis pricing (conversion rate, dealer factor, price bulletins) ──
+  MOBIS_PRICING_MANAGE: "mobispricing:manage",
+
   // ── Finance — Reports ─────────────────────────────────────────────────────
   FINANCE_REPORT_READ: "financereport:read",
   RECEIPT_REGISTER_READ: "report:receipt-register",
@@ -645,6 +648,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
     PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.MOBIS_PRICING_MANAGE,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ,

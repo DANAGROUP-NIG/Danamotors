@@ -17,6 +17,7 @@ import { NotificationService } from "../notification/notification.service";
 import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
+import { getMobisPricing } from "../finance/mobis-pricing.service";
 import {
   DEFAULT_CONVERSION_RATE,
   ImportLineInput,
@@ -39,7 +40,6 @@ export interface ImportMitInput {
   destinationBranchId: string;
   invoiceNumber: string;
   invoiceDate?: Date;
-  conversionRate?: number;
   physicalReceiptDate?: Date;
   receivedMode: TransportMode;
   remarks?: string;
@@ -77,8 +77,8 @@ export class MobisPurchaseService {
   async importMit(input: ImportMitInput, actorId: string) {
     const invoiceNumber = input.invoiceNumber.trim();
     if (!invoiceNumber) throw new BadRequestError("The invoice number is missing");
-    const conversionRate = input.conversionRate ?? DEFAULT_CONVERSION_RATE;
-    if (!(conversionRate > 0)) throw new BadRequestError("The conversion rate must be greater than zero");
+    // The rate is set by Finance (Finance → Mobis pricing) and recorded on the MIT; its MRN costs at it.
+    const { conversionRate } = await getMobisPricing();
 
     const branch = await prisma.branch.findUnique({ where: { id: input.destinationBranchId } });
     if (!branch) throw new NotFoundError("Receiving branch not found");

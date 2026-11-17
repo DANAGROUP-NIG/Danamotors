@@ -176,9 +176,10 @@ model User {
   mrnsReceived             MaterialReceiptNote[]   @relation("MrnReceivedBy")
   mrnDiscrepanciesApproved MaterialReceiptNote[]   @relation("MrnDiscrepancyApprovedBy")
 
-  recordedStockTransactions StockTransaction[] @relation("UserStockTransactions")
-  partRateChanges           PartRateHistory[]  @relation("PartRateChangedBy")
-  partBinChanges            PartBinHistory[]   @relation("PartBinChangedBy")
+  recordedStockTransactions StockTransaction[]    @relation("UserStockTransactions")
+  partRateChanges           PartRateHistory[]     @relation("PartRateChangedBy")
+  partPriceAdjustments      PartPriceAdjustment[] @relation("PartPriceAdjustedBy")
+  partBinChanges            PartBinHistory[]      @relation("PartBinChangedBy")
 
   notifications Notification[]
 
@@ -1032,8 +1033,49 @@ model PartRateHistory {
   changedBy   User?    @relation("PartRateChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
   changedAt   DateTime @default(now())
 
+  // Set when the change came from a Mobis price bulletin or a conversion rate revaluation.
+  adjustmentId String?
+  adjustment   PartPriceAdjustment? @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+
   @@index([changedAt])
   @@index([partId])
+  @@index([adjustmentId])
+}
+
+enum PartPriceAdjustmentKind {
+  // A Mobis price bulletin (e.g. "KIA - Irregular Price Adjustment"): new USD list prices.
+  BULLETIN
+  // The Mobis conversion rate went up: every Mobis-priced part scaled by new rate / old rate.
+  RATE_CHANGE
+}
+
+// One Finance price run (legacy: SQL batches and the DateManager tool run as SUPERVISOR). Rates only ever
+// go up: a part whose new dealer rate is not above its current one is left alone. Each part changed has
+// a PartRateHistory row pointing here.
+model PartPriceAdjustment {
+  id             String                  @id @default(uuid())
+  number         Int                     @unique @default(autoincrement())
+  kind           PartPriceAdjustmentKind
+  // Bulletin title (first cell of the Mobis file) or "Rate 2700 → 2900".
+  reference      String
+  sourceFileName String?
+  // Bulletin "Go Live" date.
+  effectiveDate  DateTime?
+  conversionRate Float
+  dealerFactor   Float?
+  previousRate   Float?
+  linesInFile    Int                     @default(0)
+  updatedCount   Int
+  notHigherCount Int                     @default(0)
+  notFoundCount  Int                     @default(0)
+  remarks        String?
+  appliedById    String
+  appliedBy      User                    @relation("PartPriceAdjustedBy", fields: [appliedById], references: [id], onDelete: Restrict)
+  appliedAt      DateTime                @default(now())
+
+  rateChanges PartRateHistory[]
+
+  @@index([appliedAt])
 }
 
 // Legacy PartBinHistory: each change of a part's bin at a branch (its rack location). As in legacy,

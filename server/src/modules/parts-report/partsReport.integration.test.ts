@@ -35,6 +35,8 @@ describeDb("Parts reports (database)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB;
     prisma = require("../../prisma/client").default;
+    // The MIT takes Finance's conversion rate (Finance → Mobis pricing); stubbed so parallel tests don't race on it.
+    jest.spyOn(require("../finance/mobis-pricing.service"), "getMobisPricing").mockResolvedValue({ conversionRate: 1000, dealerFactor: 0.616, updatedAt: null });
     reports = new (require("./partsReport.service").PartsReportService)();
     sales = new (require("../part-sale/partSale.service").PartSaleService)();
     transfers = new (require("../stock-transfer/stockTransfer.service").StockTransferService)();
@@ -86,13 +88,13 @@ describeDb("Parts reports (database)", () => {
     // Two Mobis invoices: one received with a damaged and a missing tin, one still in transit.
     const mobisLine = (partNumber: string, quantity: number, caseNumber: string) => ({ orderNumber: "AV10K6Q01R", partNumber, quantity, unitPrice: 10, caseNumber });
     const received = await mobis.importMit(
-      { destinationBranchId: cpd.id, invoiceNumber: `INV-A-${run}`, conversionRate: 1000, receivedMode: "AIR", lines: [mobisLine(`RPT-M-${run}`, 2, "C1"), mobisLine(`RPT-O-${run}`, 6, "C2")] },
+      { destinationBranchId: cpd.id, invoiceNumber: `INV-A-${run}`, receivedMode: "AIR", lines: [mobisLine(`RPT-M-${run}`, 2, "C1"), mobisLine(`RPT-O-${run}`, 6, "C2")] },
       user.id,
     );
     await mobis.createMrn(received.id, user.id, {
       lines: received.lines.map((l) => (l.partId === oil.id ? { mitLineId: l.id, receivedQuantity: 4, damagedQuantity: 1 } : { mitLineId: l.id, receivedQuantity: 2 })),
     });
-    await mobis.importMit({ destinationBranchId: cpd.id, invoiceNumber: `INV-B-${run}`, conversionRate: 1000, receivedMode: "AIR", lines: [mobisLine(`RPT-O-${run}`, 3, "C9")] }, user.id);
+    await mobis.importMit({ destinationBranchId: cpd.id, invoiceNumber: `INV-B-${run}`, receivedMode: "AIR", lines: [mobisLine(`RPT-O-${run}`, 3, "C9")] }, user.id);
   });
 
   afterAll(async () => {
