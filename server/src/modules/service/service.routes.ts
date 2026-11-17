@@ -6,7 +6,7 @@ import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
-import { assertBranchOwnership, requireRole } from "../../middleware/authorize";
+import { assertBranchOwnership, requireRole, requireAnyPermission } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { JobCardWorkflowService, repeatCandidateWhere } from "./job-card-workflow.service";
 import { defaultBranchSettings, getBranchSettings } from "../company-settings/company-settings.service";
@@ -852,6 +852,12 @@ router.get(
   requirePermission(PERMISSIONS.JOBCARD_READ),
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
+);
+router.post(
+  '/job-cards/:id/request-parts',
+  requireAnyPermission(PERMISSIONS.PARTISSUANCE_CREATE, PERMISSIONS.PARTRETURN_CREATE),
+  validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ requestId: z.string().uuid() }).strict() })),
+  controller.requestParts,
 );
 router.post('/job-cards/:id/deposit', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ receiptId: z.string().uuid() }).strict() })), async (req, res, next) => {
   try {

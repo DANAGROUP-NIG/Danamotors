@@ -128,6 +128,7 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
         description: "Return test job",
         status: "OPEN",
         warrantyStatusAtCreation: "ACTIVE",
+        partsRequestedAt: new Date(),
       },
     });
     await db.receipt.create({

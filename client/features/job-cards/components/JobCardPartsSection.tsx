@@ -86,7 +86,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         `${API_ROUTES.inventory.stock.base}?${query.toString()}`,
       );
     },
-    enabled: canIssue && !closed && debouncedSearch.length >= 2,
+    enabled: canIssue && !closed && !!jobCard.partsRequestedAt && debouncedSearch.length >= 2,
     staleTime: 15_000,
     retry: false,
   });
@@ -172,6 +172,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
         </span>
       </div>
 
+      {canIssue && !jobCard.partsRequestedAt && <p className="text-sm text-muted-foreground">Click Request Parts before issuing parts for this job card.</p>}
       {canIssue && (
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_96px_auto] sm:items-end">
           <Field label="Find part by number or name">
@@ -188,6 +189,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
                 placeholder="Enter at least 2 characters"
                 autoComplete="off"
                 aria-label="Search inventory by part number or name"
+                disabled={!jobCard.partsRequestedAt}
               />
               {search && (
                 <button
@@ -221,6 +223,7 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
             size="sm"
             className="h-9"
             disabled={
+              !jobCard.partsRequestedAt ||
               !selectedPart ||
               selectedPart.availableQuantity < 1 ||
               quantity < 1 ||

@@ -46,7 +46,7 @@ describeDb('Requisitions on isolated local PostgreSQL', () => {
   afterAll(async () => { await db?.$disconnect(); });
 
   async function job(status = 'OPEN', scope = true) {
-    const card = await db.jobCard.create({ data: { branchId, customerId, jobNumber: `REQ-${run}-${++sequence}`, description: 'Requisition test job', status } });
+    const card = await db.jobCard.create({ data: { branchId, customerId, jobNumber: `REQ-${run}-${++sequence}`, description: 'Requisition test job', status, partsRequestedAt: new Date() } });
     if (scope) await db.estimate.create({ data: {
       branchId, jobCardId: card.id, customerId, description: 'Approved scope', amount: 20000, status: 'Approved',
       lines: { create: [{ type: 'PART', referenceId: partId, description: 'Source filter', quantity: 100, rate: 100.01, amount: 10001 }, { type: 'PART', referenceId: secondPartId, description: 'Local source', quantity: 100, rate: 50, amount: 5000 }] },

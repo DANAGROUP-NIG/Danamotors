@@ -1,4 +1,5 @@
 import { jobWorkUpdate } from './requisition-work';
+import { assertPartsRequested } from '../service/jobcard-parts-request.logic';
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
 import { ChargeType, PartStatus, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -59,6 +60,7 @@ export class RequisitionService {
       assertRequisitionBranch(actor, job.branchId);
       if (job.branchId !== input.branchId) throw new BadRequestError('Job card must belong to the requisition branch');
       assertRequisitionJob(job);
+      if (input.lines.some(line => line.quantityIssued > 0)) assertPartsRequested(job);
       if (input.groupId && !await tx.workshopMaster.findFirst({ where: { id: input.groupId, kind: 'TEAM', active: true } })) throw new BadRequestError('Choose an active workshop group');
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
       const parts = await tx.sparePart.findMany({ where: { id: { in: input.lines.map(line => line.sparePartId) } } });

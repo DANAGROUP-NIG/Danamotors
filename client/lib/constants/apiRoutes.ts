@@ -73,6 +73,7 @@ export const API_ROUTES = {
     jobCards: {
       base: "/service/job-cards",
       detail: (id: string) => `/service/job-cards/${id}`,
+      requestParts: (id: string) => `/service/job-cards/${id}/request-parts`,
     },
     labourItems: "/service/labour-items",
     jobCardLabour: (jobCardId: string) => `/service/job-cards/${jobCardId}/labour`,

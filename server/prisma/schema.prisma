@@ -513,6 +513,7 @@ model JobCard {
   deliveryAdvisor    User?                  @relation("JobDeliveryAdvisor", fields: [deliveryAdvisorId], references: [id], onDelete: Restrict)
   mileage            Int?
   promisedAt         DateTime?
+  partsRequestedAt   DateTime?
   acFitted           Boolean                @default(false)
   inHouse            Boolean                @default(true)
   remarks            String?

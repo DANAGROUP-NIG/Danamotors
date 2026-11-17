@@ -218,6 +218,7 @@ export type JobCard = {
   createdAt: string;
   updatedAt: string;
   billedAt?: string | null;
+  partsRequestedAt?: string | null;
   serviceId?: string | null;
   service?: {
     id: string;

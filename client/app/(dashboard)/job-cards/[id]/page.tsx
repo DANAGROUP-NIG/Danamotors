@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useJobCard } from "@/features/job-cards";
+import { useRequestJobCardParts } from "@/features/job-cards/hooks/use-request-job-card-parts";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   ArrowLeft,
@@ -66,6 +67,7 @@ export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: jobCard, isLoading, error } = useJobCard(id);
+  const requestParts = useRequestJobCardParts(id);
   const { hasPermission, isSuperAdmin } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -94,9 +96,7 @@ export default function JobCardDetailPage() {
   }
 
   function handleRequestParts() {
-    document
-      .getElementById("job-parts")
-      ?.scrollIntoView({ behavior: "smooth" });
+    if (!requestParts.isPending) requestParts.mutate(crypto.randomUUID());
   }
 
   if (isLoading || error || !jobCard)
@@ -215,9 +215,11 @@ export default function JobCardDetailPage() {
                     size="sm"
                     variant="outline"
                     onClick={handleRequestParts}
+                    disabled={requestParts.isPending}
                     className="gap-1.5"
                   >
-                    <Package className="size-4" /> Request Parts
+                    {requestParts.isPending ? <Loader2 className="size-4 animate-spin" /> : <Package className="size-4" />}
+                    {requestParts.isPending ? "Sending request…" : "Request Parts"}
                   </Button>
                 )}
             </>
