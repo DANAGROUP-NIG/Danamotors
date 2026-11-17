@@ -1,5 +1,31 @@
 # JobCard database and workflow
 
+### Suggested advances (issue #140, approved payment policy)
+
+Each estimate retains its suggested upfront percentage, default 60%, with 20%, 30%,
+60% presets and custom values from 0 through 100 with up to two decimal places.
+The estimate card and its standalone print show the saved percentage and calculated
+amount. Draft editor changes are calculated when the estimate is saved, using the
+server's catalogue/model rates rather than an approximate client total.
+
+The pure `estimate-advance.ts` helper calculates the recommendation with Prisma Decimal
+and the existing money helper, rounding half up to two decimal places. For example,
+60% of NGN 100.01 is NGN 60.01. The existing `job-deposit.service.ts` export remains
+compatible. Both screen and print use the shared en-NG currency formatter.
+
+The recommendation is not a minimum or an exact-payment requirement. An eligible
+advance of NGN 0.01, below-target, exact-target or above-target is accepted. A zero
+recommended percentage does not remove the positive-payment requirement. Work starts
+and automatic rework still require an active, positive, non-cheque, appropriately dated
+service advance reserved for the job; approval and role/status checks apply separately.
+Existing customer/branch ownership, receipt idempotency, reservation, reversal and
+final-invoice allocation rules remain unchanged. No new payment override is introduced.
+
+GET job-card estimate data already includes `upfrontPaymentPercent` and `upfrontAmount`.
+The standalone estimate-print response now includes these same additive fields, derived
+from that saved revision. Historical signatures are not rewritten by this display change.
+There is no migration, backfill, permission change or new dependency for this slice.
+
 ### Technician workflow review (issue #140)
 
 Assign technicians through **Workshop actions**, using `assignment:create`. The creation
