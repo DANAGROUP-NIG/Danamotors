@@ -1,5 +1,13 @@
 # JobCard database and workflow
 
+### Job-opening validation errors
+
+Validation failures retain the existing HTTP 400 response and add an issue code:
+`{ "status": "error", "statusCode": 400, "message": "Validation failed", "code": "FIELD_VALIDATION", "errors": [{ "field": "body.complaints.0.description", "message": "Required", "code": "too_small" }] }`.
+The creation form removes the request `body.` prefix, preserves nested request-row paths,
+and maps `promisedAt` to the promised-date control before selecting the affected tab.
+Duplicate-field failures retain HTTP 409 and include the per-field code `duplicate`.
+
 The generated Prisma client and database must use the same migrations. A missing
 `JobCard.billedAt` column means the billing migration has not been deployed.
 From `server`, run `npm run prisma:deploy`, then `npm run prisma:generate` before

@@ -5,6 +5,7 @@ import { Controller, FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import { jobCardErrorField } from "../schemas/job-card-error";
 import {
   Loader2,
   LockKeyhole,
@@ -70,7 +71,10 @@ const tabs = ["Vehicle Details", "Customer Requests", "Other Details"] as const;
 type Tab = (typeof tabs)[number];
 
 //Format the promised date
-const getMinDate = (scheduledAt?: string | Date, openedAt?: string | Date): string => {
+const getMinDate = (
+  scheduledAt?: string | Date,
+  openedAt?: string | Date,
+): string => {
   const baseDate = new Date(scheduledAt ?? openedAt ?? Date.now());
   const nextDay = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
 
@@ -464,7 +468,10 @@ export function JobCardCreateForm({
   const submit = handleSubmit(
     (values) => {
       if (values.promisedDate < minimumPromisedDate) {
-        setError("promisedDate", { type: "min", message: `Promised date must be on or after ${minimumPromisedDate}` });
+        setError("promisedDate", {
+          type: "min",
+          message: `Promised date must be on or after ${minimumPromisedDate}`,
+        });
         setTab("Vehicle Details");
         return;
       }
@@ -548,8 +555,7 @@ export function JobCardCreateForm({
                     ]
                   : []);
               for (const issue of fields) {
-                const field =
-                  issue.field === "promisedAt" ? "promisedDate" : issue.field;
+                const field = jobCardErrorField(issue.field);
                 setError(field as keyof CreateJobCardFormValues, {
                   type: "server",
                   message: issue.message,
@@ -557,10 +563,10 @@ export function JobCardCreateForm({
               }
               if (fields.length)
                 setTab(
-                  fields[0].field.startsWith("complaints")
+                  jobCardErrorField(fields[0].field).startsWith("complaints")
                     ? "Customer Requests"
-                    : fields[0].field === "promisedAt" ||
-                        otherErrors.includes(fields[0].field)
+                    : jobCardErrorField(fields[0].field) === "promisedDate" ||
+                        otherErrors.includes(jobCardErrorField(fields[0].field))
                       ? "Other Details"
                       : "Vehicle Details",
                 );
@@ -1169,8 +1175,17 @@ export function JobCardCreateForm({
                     name="promisedTime"
                     control={control}
                     render={({ field }) => (
-                      <OpeningField label="Promised time" required error={errors.promisedTime?.message}>
-                        <OpeningTimePicker value={field.value} onChange={field.onChange} onBlur={field.onBlur} invalid={!!errors.promisedTime} />
+                      <OpeningField
+                        label="Promised time"
+                        required
+                        error={errors.promisedTime?.message}
+                      >
+                        <OpeningTimePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          invalid={!!errors.promisedTime}
+                        />
                       </OpeningField>
                     )}
                   />

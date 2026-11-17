@@ -1,14 +1,43 @@
-import { z } from 'zod';
+import { z } from "zod";
 import type { Request, Response } from "express";
 import { errorHandler } from "./errorHandler";
 
 function respond(err: Error) {
-  const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as Response;
+  const res = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn(),
+  } as unknown as Response;
   errorHandler(err, {} as Request, res, jest.fn());
-  return { status: (res.status as jest.Mock).mock.calls[0][0], body: (res.json as jest.Mock).mock.calls[0][0] };
+  return {
+    status: (res.status as jest.Mock).mock.calls[0][0],
+    body: (res.json as jest.Mock).mock.calls[0][0],
+  };
 }
 
 describe("errorHandler", () => {
+  it("preserves nested validation paths and exposes a stable issue code", () => {
+    const parsed = z
+      .object({
+        body: z.object({
+          complaints: z.array(z.object({ description: z.string().min(1) })),
+        }),
+      })
+      .safeParse({ body: { complaints: [{ description: "" }] } });
+    if (parsed.success) throw new Error("Expected invalid fixture");
+    expect(respond(parsed.error)).toMatchObject({
+      status: 400,
+      body: {
+        code: "FIELD_VALIDATION",
+        errors: [
+          {
+            field: "body.complaints.0.description",
+            message: expect.any(String),
+            code: "too_small",
+          },
+        ],
+      },
+    });
+  });
   it("turns the annual stock taking freeze raised by the database into a 409", () => {
     // As Prisma reports a trigger exception: the database message is buried in the error text.
     const err = new Error(
@@ -18,15 +47,31 @@ describe("errorHandler", () => {
     expect(status).toBe(409);
     expect(body).toMatchObject({
       code: "STOCK_TAKE_FREEZE",
-      message: "Part 1244106207B is under annual stock taking (batch 2026000006). Its stock cannot move at this branch until the count is completed.",
+      message:
+        "Part 1244106207B is under annual stock taking (batch 2026000006). Its stock cannot move at this branch until the count is completed.",
     });
   });
 });
 
-it('returns structured fields for service validation and registration duplicates', () => {
-  const parsed = z.object({ registrationNumber: z.string().min(1) }).safeParse({ registrationNumber: '' });
-  if (parsed.success) throw new Error('Expected invalid fixture');
-  expect(respond(parsed.error)).toMatchObject({ status: 400, body: { errors: [{ field: 'registrationNumber', message: expect.any(String) }] } });
-  const duplicate = Object.assign(new Error('duplicate'), { code: 'P2002', meta: { target: ['registrationNumber'] } });
-  expect(respond(duplicate)).toMatchObject({ status: 409, body: { errors: [{ field: 'registrationNumber', message: expect.any(String) }] } });
+it("returns structured fields for service validation and registration duplicates", () => {
+  const parsed = z
+    .object({ registrationNumber: z.string().min(1) })
+    .safeParse({ registrationNumber: "" });
+  if (parsed.success) throw new Error("Expected invalid fixture");
+  expect(respond(parsed.error)).toMatchObject({
+    status: 400,
+    body: {
+      errors: [{ field: "registrationNumber", message: expect.any(String) }],
+    },
+  });
+  const duplicate = Object.assign(new Error("duplicate"), {
+    code: "P2002",
+    meta: { target: ["registrationNumber"] },
+  });
+  expect(respond(duplicate)).toMatchObject({
+    status: 409,
+    body: {
+      errors: [{ field: "registrationNumber", message: expect.any(String) }],
+    },
+  });
 });

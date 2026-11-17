@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import {
   bookingView,
+  bookingComplaints,
   bookingState,
   assertPromisedDate,
   assertBookable,
@@ -10,6 +11,37 @@ import {
   createAppointmentSchema,
   updateAppointmentSchema,
 } from "./service.validation";
+
+it("carries every saved request code, description and amount into job complaints", () => {
+  const requests = [
+    {
+      id: "request",
+      appointmentId: "appointment",
+      createdAt: new Date(),
+      complaintCodeId: "complaint",
+      defectCode: "defect",
+      description: "Inspect brakes",
+      estimatedParts: new Prisma.Decimal("10.10"),
+      estimatedOil: new Prisma.Decimal("0.20"),
+      estimatedLabour: new Prisma.Decimal("12.35"),
+    },
+  ];
+  expect(bookingComplaints(requests)).toEqual([
+    {
+      complaintCodeId: "complaint",
+      defectCode: "defect",
+      description: "Inspect brakes",
+      spare: 10.1,
+      oil: 0.2,
+      labour: 12.35,
+    },
+  ]);
+  expect(
+    bookingComplaints([
+      { ...requests[0], complaintCodeId: null, defectCode: null },
+    ])[0],
+  ).toMatchObject({ complaintCodeId: undefined, defectCode: undefined });
+});
 
 it("adds estimates using decimal arithmetic and returns zero for an empty booking", () => {
   expect(bookingView({ requests: [] }).totals.estimatedTotal).toBe(0);
@@ -114,13 +146,7 @@ it("accepts trimmed request text and rejects malformed, blank and oversized requ
       body: { requests: "  Check brakes  " },
     }).body.requests,
   ).toEqual([{ description: "Check brakes" }]);
-  for (const requests of [
-    "",
-    "   ",
-    "x".repeat(2001),
-    ["Noise"],
-    [],
-  ]) {
+  for (const requests of ["", "   ", "x".repeat(2001), ["Noise"], []]) {
     expect(
       createAppointmentSchema.safeParse({ body: { ...body, requests } })
         .success,
@@ -192,14 +218,37 @@ it.each([0, -1, 1.5, 2147483648])(
   },
 );
 
-
-it('accepts bounded structured request rows while rejecting invalid amounts and caller totals', () => {
-  const id = '00000000-0000-4000-8000-000000000001';
-  const body = { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-17T09:00:00Z' };
-  const row = { description: '  Inspect brakes  ', spare: 0.1, oil: 0.2, labour: 12.35 };
-  expect(createAppointmentSchema.parse({ body: { ...body, requests: [row] } }).body.requests).toEqual([{ ...row, description: 'Inspect brakes' }]);
-  expect(updateAppointmentSchema.parse({ params: { id }, body: { requests: [row] } }).body.requests).toHaveLength(1);
-  for (const requests of [Array.from({ length: 101 }, () => row), [{ ...row, spare: -1 }], [{ ...row, spare: 0.001 }], [{ ...row, total: 12.65 }]]) {
-    expect(createAppointmentSchema.safeParse({ body: { ...body, requests } }).success).toBe(false);
+it("accepts bounded structured request rows while rejecting invalid amounts and caller totals", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const body = {
+    customerId: id,
+    vehicleId: id,
+    branchName: "Synthetic",
+    scheduledAt: "2026-11-17T09:00:00Z",
+  };
+  const row = {
+    description: "  Inspect brakes  ",
+    spare: 0.1,
+    oil: 0.2,
+    labour: 12.35,
+  };
+  expect(
+    createAppointmentSchema.parse({ body: { ...body, requests: [row] } }).body
+      .requests,
+  ).toEqual([{ ...row, description: "Inspect brakes" }]);
+  expect(
+    updateAppointmentSchema.parse({ params: { id }, body: { requests: [row] } })
+      .body.requests,
+  ).toHaveLength(1);
+  for (const requests of [
+    Array.from({ length: 101 }, () => row),
+    [{ ...row, spare: -1 }],
+    [{ ...row, spare: 0.001 }],
+    [{ ...row, total: 12.65 }],
+  ]) {
+    expect(
+      createAppointmentSchema.safeParse({ body: { ...body, requests } })
+        .success,
+    ).toBe(false);
   }
 });
