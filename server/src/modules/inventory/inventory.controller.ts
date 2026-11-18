@@ -290,12 +290,11 @@ export class InventoryController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { partCode, partNumber, name, category, partStatus, page, limit } =
+      const { partCode, partNumber, name, partStatus, page, limit } =
         req.query as {
           partCode?: string;
           partNumber?: string;
           name?: string;
-          category?: string;
           partStatus?: string;
           page?: string;
           limit?: string;
@@ -304,7 +303,6 @@ export class InventoryController {
         partCode,
         partNumber,
         name,
-        category,
         partStatus: partStatus as PartStatus | undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
@@ -432,6 +430,53 @@ export class InventoryController {
       res
         .status(200)
         .json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  catalogueSummary = async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.catalogueSummary();
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  importPriceList = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.importPriceList(req.body.rows);
+      res.status(200).json({ status: "success", statusCode: 200, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createPartFromCatalogue = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.inventoryService.createPartFromCatalogue(
+        req.params.partNumber,
+        req.user?.userId,
+      );
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        message: "Part created successfully",
+        data: { part: result },
+      });
     } catch (error) {
       next(error);
     }

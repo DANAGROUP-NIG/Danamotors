@@ -217,15 +217,13 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const result = await this.authService.forgotPassword(req.body.email);
+      await this.authService.forgotPassword(req.body.email);
 
+      // The same answer whether or not the email exists.
       res.status(200).json({
         status: "success",
         statusCode: 200,
-        message: result
-          ? "Password reset link generated"
-          : "If an account exists for that email, a reset link will be sent",
-        data: result ?? undefined,
+        message: "If this email belongs to a staff account, an administrator has been asked to reset the password",
       });
     } catch (error) {
       next(error);

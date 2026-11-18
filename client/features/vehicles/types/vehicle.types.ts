@@ -102,7 +102,10 @@ export type VehicleLegacyPayload = Omit<VehicleLegacyFields, "tyres" | "batteryM
   batteryMakeId?: string | null;
 };
 
-export type UpdateVehiclePayload = Partial<Omit<CreateVehiclePayload, "customerId" | "vin">>;
+export type UpdateVehiclePayload = Partial<Omit<CreateVehiclePayload, "customerId">> & {
+  /** Required when VIN, registration, engine number, model or sale date changes. */
+  identityReason?: string;
+};
 
 export type VehicleListResponse = {
   vehicles: Vehicle[];

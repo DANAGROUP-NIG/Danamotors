@@ -46,6 +46,7 @@ export class AdminRepository {
               name: true,
             },
           },
+          _count: { select: { permissionOverrides: true } },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -59,6 +60,7 @@ export class AdminRepository {
     return prisma.user.findUnique({
       where: { id },
       include: {
+        branch: { select: { id: true, name: true } },
         role: {
           include: {
             permissions: {
@@ -68,6 +70,7 @@ export class AdminRepository {
             },
           },
         },
+        permissionOverrides: { include: { permission: { select: { name: true } } } },
       },
     });
   }

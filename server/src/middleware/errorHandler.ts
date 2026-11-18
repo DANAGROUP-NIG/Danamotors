@@ -21,6 +21,8 @@ export const errorHandler = (
   let fieldErrors: { field: string; message: string }[] | undefined;
   // Raised by the InventoryStock trigger while an annual stock taking is active.
   const freeze = /STOCK_TAKE_FREEZE: (.+? until the count is completed\.)/.exec(err.message ?? '');
+  // Raised by the books_closed_guard triggers on a write dated in a closed period (doc/books-closed.md).
+  const booksClosed = /BOOKS_CLOSED: (The books are closed up to [^\n"]+)/.exec(err.message ?? '');
 
   // Handle Custom AppError
   if (err instanceof AppError) {
@@ -36,6 +38,10 @@ export const errorHandler = (
     statusCode = 409;
     message = freeze[1];
     code = 'STOCK_TAKE_FREEZE';
+  } else if (booksClosed) {
+    statusCode = 409;
+    message = booksClosed[1];
+    code = 'BOOKS_CLOSED';
   }
   // Handle Prisma Database Errors (codes are always P2xxx/P1xxx style)
   else if ('code' in err && typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) {

@@ -57,11 +57,13 @@ export const createVehicleSchema = z.object({
   body: vehicleBody.refine(data => !!data.registrationNumber, { message: 'Registration number is required', path: ['registrationNumber'] }).refine(data => !!data.modelId || !!data.customModel?.trim() || (!!data.catalogueId && !!data.colourId), 'Select a catalog model or enter a custom model'),
 });
 
+export const updateVehicleBody = vehicleBody.omit({ customerId: true }).partial().extend({
+  /** Required when VIN, registration, engine number, model or sale date changes (vehicle-identity.ts). */
+  identityReason: z.string().trim().max(500).optional(),
+}).strict();
+
 export const updateVehicleSchema = z.object({
-  body: vehicleBody.omit({
-    vin: true,
-    customerId: true,
-  }).partial(),
+  body: updateVehicleBody,
 
   params: z.object({
     id: z.string().uuid(),

@@ -8,13 +8,16 @@
  * (and, if asked, any parts missing from Part Master). Generating the MRN
  * records what physically arrived and posts accepted stock exactly once.
  */
+import { discrepancyStatusFor, notifyDiscrepancyPending } from '../inventory/stockDiscrepancy';
 import { MitStatus, MrnSource, TransportMode } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
+import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import { nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES, planReceipt } from "../stock-transfer/stockTransfer.logic";
+import { getMobisPricing } from "../finance/mobis-pricing.service";
 import {
   DEFAULT_CONVERSION_RATE,
   ImportLineInput,
@@ -37,7 +40,6 @@ export interface ImportMitInput {
   destinationBranchId: string;
   invoiceNumber: string;
   invoiceDate?: Date;
-  conversionRate?: number;
   physicalReceiptDate?: Date;
   receivedMode: TransportMode;
   remarks?: string;
@@ -75,8 +77,8 @@ export class MobisPurchaseService {
   async importMit(input: ImportMitInput, actorId: string) {
     const invoiceNumber = input.invoiceNumber.trim();
     if (!invoiceNumber) throw new BadRequestError("The invoice number is missing");
-    const conversionRate = input.conversionRate ?? DEFAULT_CONVERSION_RATE;
-    if (!(conversionRate > 0)) throw new BadRequestError("The conversion rate must be greater than zero");
+    // The rate is set by Finance (Finance → Mobis pricing) and recorded on the MIT; its MRN costs at it.
+    const { conversionRate } = await getMobisPricing();
 
     const branch = await prisma.branch.findUnique({ where: { id: input.destinationBranchId } });
     if (!branch) throw new NotFoundError("Receiving branch not found");
@@ -189,7 +191,7 @@ export class MobisPurchaseService {
             part: { select: { id: true, partNumber: true, name: true, partStatus: true, unitPrice: true, uom: true } },
           },
         },
-        mrn: { include: { receivedBy: userSelect, lines: true } },
+        mrn: { include: { receivedBy: userSelect, discrepancyApprovedBy: userSelect, lines: true } },
       },
     });
     if (!mit) throw new NotFoundError("Mobis MIT not found");
@@ -224,16 +226,18 @@ export class MobisPurchaseService {
   async cancelMit(id: string, actorId: string, reason?: string) {
     const mit = await this.getMobisMit(id);
     if (mit.mrn) throw new ConflictError(`MIT ${mit.mitNumber} already has MRN ${mit.mrn.mrnNumber} and cannot be cancelled`);
-    const result = await prisma.materialInTransit.updateMany({
-      where: { id, status: { in: [MitStatus.IN_TRANSIT, MitStatus.VERIFIED] } },
-      data: {
-        status: MitStatus.CANCELLED,
-        cancelledAt: new Date(),
-        remarks: reason ? `${mit.remarks ? `${mit.remarks}\n` : ""}Cancelled: ${reason}` : mit.remarks,
-      },
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.materialInTransit.updateMany({
+        where: { id, status: { in: [MitStatus.IN_TRANSIT, MitStatus.VERIFIED] } },
+        data: {
+          status: MitStatus.CANCELLED,
+          cancelledAt: new Date(),
+          remarks: reason ? `${mit.remarks ? `${mit.remarks}\n` : ""}Cancelled: ${reason}` : mit.remarks,
+        },
+      });
+      if (result.count !== 1) throw new ConflictError("This MIT can no longer be cancelled");
+      await cancelSentHandheldDocuments(tx, { mitId: id }, "MIT cancelled", actorId);
     });
-    if (result.count !== 1) throw new ConflictError("This MIT can no longer be cancelled");
-    void actorId;
     return this.getMobisMit(id);
   }
 
@@ -297,6 +301,8 @@ export class MobisPurchaseService {
           totalDamaged: plan.totals.damaged,
           totalShort: plan.totals.short,
           totalValue,
+          // Damaged or short units wait for S/E approval (stockDiscrepancy.ts).
+          discrepancyStatus: discrepancyStatusFor(plan.totals),
           receivedById: actorId,
           lines: { create: mrnLines },
         },
@@ -333,6 +339,7 @@ export class MobisPurchaseService {
       }
 
       await tx.materialInTransit.update({ where: { id: mit.id }, data: { status: MitStatus.RECEIVED } });
+      await cancelSentHandheldDocuments(tx, { mitId: mit.id }, `Received on MRN ${mrnNumber} before the handheld result was uploaded`, actorId);
       return { mrnNumber, mit, totals: plan.totals, totalValue };
     }, TX_OPTIONS);
 
@@ -347,6 +354,16 @@ export class MobisPurchaseService {
         ".",
       link: `/inventory/mobis-receipts/${mit.id}`,
     });
+    if (discrepancyStatusFor(totals)) {
+      await notifyDiscrepancyPending({
+        mrnNumber: result.mrnNumber,
+        receivingBranchId: mit.destinationBranchId,
+        totalDamaged: totals.damaged,
+        totalShort: totals.short,
+        document: `Mobis invoice ${mit.invoiceNumber}, MIT ${mit.mitNumber}`,
+        link: `/inventory/mobis-receipts/${mit.id}`,
+      });
+    }
     // Mobis stock is what usually fills the branch back orders CPD is holding.
     await new StockTransferService().notifyBackOrdersPickable(
       mit.destinationBranchId,

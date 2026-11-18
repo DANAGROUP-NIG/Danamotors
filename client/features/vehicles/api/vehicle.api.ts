@@ -45,7 +45,7 @@ export async function updateVehicleRequest(
 ): Promise<{ vehicle: Vehicle }> {
   return apiPut<{ vehicle: Vehicle }, UpdateVehiclePayload>(
     API_ROUTES.vehicles.detail(id),
-    Object.fromEntries(Object.entries(payload).filter(([key]) => !["vin", "customerId", "make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : key === "vehicleModelId" ? value || null : value])) as UpdateVehiclePayload,
+    Object.fromEntries(Object.entries(payload).filter(([key]) => !["customerId", "make", "model", "trim", "warrantyProvider", "warrantyStatus", "warrantyExpiresAt"].includes(key)).map(([key, value]) => [key, ["pdiDate", "saleDate"].includes(key) ? (value ? new Date(String(value)).toISOString() : null) : key === "vehicleModelId" ? value || null : value])) as UpdateVehiclePayload,
   );
 }
 

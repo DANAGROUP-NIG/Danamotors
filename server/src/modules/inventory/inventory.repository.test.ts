@@ -20,7 +20,7 @@ describe('part master tax mapping and change tracking', () => {
   });
 
   it('creates a mapped part and records the acting user in the transaction', async () => {
-    const data = { partNumber: 'P1', name: 'Oil', category: 'Oil', uom: 'L', unitPrice: 20, taxCategory: 'B' };
+    const data = { partNumber: 'P1', name: 'Oil', uom: 'L', unitPrice: 20, taxCategory: 'B' };
     await repository.createPart(data, 'actor-1');
     expect(tx.sparePart.create).toHaveBeenCalledWith({ data: { ...data, reportTaxCategoryCode: 'OIL' } });
     expect(recordPartChange).toHaveBeenCalledWith(tx, null, after, 'actor-1');
@@ -32,7 +32,7 @@ describe('part master tax mapping and change tracking', () => {
     expect(recordPartChange).toHaveBeenCalledWith(tx, before, after, 'actor-1');
   });
 
-  it('leaves the category untouched for unrelated edits', async () => {
+  it('leaves the tax category untouched for unrelated edits', async () => {
     await repository.updatePart('part-1', { name: 'New name' });
     expect(tx.sparePart.update).toHaveBeenCalledWith({ where: { id: 'part-1' }, data: { name: 'New name' } });
   });

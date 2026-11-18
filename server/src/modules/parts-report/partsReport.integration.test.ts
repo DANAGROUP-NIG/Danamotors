@@ -35,6 +35,8 @@ describeDb("Parts reports (database)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB;
     prisma = require("../../prisma/client").default;
+    // The MIT takes Finance's conversion rate (Finance → Mobis pricing); stubbed so parallel tests don't race on it.
+    jest.spyOn(require("../finance/mobis-pricing.service"), "getMobisPricing").mockResolvedValue({ conversionRate: 1000, dealerFactor: 0.616, updatedAt: null });
     reports = new (require("./partsReport.service").PartsReportService)();
     sales = new (require("../part-sale/partSale.service").PartSaleService)();
     transfers = new (require("../stock-transfer/stockTransfer.service").StockTransferService)();
@@ -49,14 +51,14 @@ describeDb("Parts reports (database)", () => {
     await prisma.partCategory.upsert({ where: { code: "A" }, update: {}, create: { code: "A", description: "Co-op parts", markupMultiplier: 2.07 } });
     await prisma.partCategory.upsert({ where: { code: "O" }, update: {}, create: { code: "O", description: "Oil & lubricants", markupMultiplier: 1.5 } });
     mirror = await prisma.sparePart.create({
-      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A", binLocation: "53B3" },
+      data: { partCode: `RPT-M-${run}`, partNumber: `RPT-M-${run}`, name: "MIRROR ASSY", unitPrice: 132036.62, retailRate: 273313.81, priceCategoryCode: "A" },
     });
     oil = await prisma.sparePart.create({
       data: { partCode: `RPT-O-${run}`, partNumber: `RPT-O-${run}`, name: "ENGINE OIL 4L", unitPrice: 4700, retailRate: 7050, taxable: false, priceCategoryCode: "O", partType: "O" },
     });
     await prisma.inventoryStock.createMany({
       data: [
-        { branchId: cpd.id, partId: mirror.id, quantity: 10 },
+        { branchId: cpd.id, partId: mirror.id, quantity: 10, rackLocation: "53B3" },
         { branchId: cpd.id, partId: oil.id, quantity: 50 },
       ],
     });
@@ -86,13 +88,13 @@ describeDb("Parts reports (database)", () => {
     // Two Mobis invoices: one received with a damaged and a missing tin, one still in transit.
     const mobisLine = (partNumber: string, quantity: number, caseNumber: string) => ({ orderNumber: "AV10K6Q01R", partNumber, quantity, unitPrice: 10, caseNumber });
     const received = await mobis.importMit(
-      { destinationBranchId: cpd.id, invoiceNumber: `INV-A-${run}`, conversionRate: 1000, receivedMode: "AIR", lines: [mobisLine(`RPT-M-${run}`, 2, "C1"), mobisLine(`RPT-O-${run}`, 6, "C2")] },
+      { destinationBranchId: cpd.id, invoiceNumber: `INV-A-${run}`, receivedMode: "AIR", lines: [mobisLine(`RPT-M-${run}`, 2, "C1"), mobisLine(`RPT-O-${run}`, 6, "C2")] },
       user.id,
     );
     await mobis.createMrn(received.id, user.id, {
       lines: received.lines.map((l) => (l.partId === oil.id ? { mitLineId: l.id, receivedQuantity: 4, damagedQuantity: 1 } : { mitLineId: l.id, receivedQuantity: 2 })),
     });
-    await mobis.importMit({ destinationBranchId: cpd.id, invoiceNumber: `INV-B-${run}`, conversionRate: 1000, receivedMode: "AIR", lines: [mobisLine(`RPT-O-${run}`, 3, "C9")] }, user.id);
+    await mobis.importMit({ destinationBranchId: cpd.id, invoiceNumber: `INV-B-${run}`, receivedMode: "AIR", lines: [mobisLine(`RPT-O-${run}`, 3, "C9")] }, user.id);
   });
 
   afterAll(async () => {
@@ -117,9 +119,34 @@ describeDb("Parts reports (database)", () => {
     expect(bills.totals.net).toBe(249550);
   });
 
+  it("keeps a taxable part billed without VAT in the taxable columns, but not in the tax registers", async () => {
+    // Legacy billed taxable parts at 0% on forms X, Y and P (Lagos 2019-2026) and still printed them as taxable.
+    const line = await prisma.invoiceLine.findFirstOrThrow({ where: { partId: mirror.id, invoice: { cancelledAt: null, counterSale: { is: { branchId: cpd.id } } } } });
+    await prisma.invoiceLine.update({ where: { id: line.id }, data: { vatPercent: 0 } });
+    try {
+      const [bill] = (await report("counter-sales")).rows;
+      expect(bill).toMatchObject({ sparesTaxable: 273313.81, sparesExempt: 0, oilExempt: 28200 });
+      const [summary] = (await report("counter-sales-summary")).rows;
+      expect(summary).toMatchObject({ sparesTaxable: 273313.81, sparesExempt: 0 });
+      // The tax registers split by the VAT charged: legacy's datewise register prints such a bill as Tax Paid/N.Taxable.
+      const [day] = (await report("counter-sales-summary", { option: "DAY" })).rows;
+      expect(day).toMatchObject({ taxable: 0, exempt: 233673.2 });
+    } finally {
+      await prisma.invoiceLine.update({ where: { id: line.id }, data: { vatPercent: line.vatPercent } });
+    }
+  });
+
   it("summarises bills, splits taxable and exempt value by day, and lists cancellations", async () => {
-    // Defaults to the legacy executive-wise layout: value by part type before the cash discount.
-    const summary = await report("counter-sales-summary");
+    // Defaults to the legacy Register Summary: one credit line under the branch heading, with no subtotal.
+    const total = await report("counter-sales-summary");
+    expect(total.rows).toEqual([
+      expect.objectContaining({ group: `CPD Reports ${run}`, section: "Credit", bills: 1, sparesTaxable: 273313.81, oilExempt: 28200, handling: 0, tradeDiscount: 0, discount: 67840.61, net: 249550 }),
+    ]);
+    expect(total.grouped).toBe(true);
+    expect(total.subtotals).toBe(false);
+
+    // The legacy executive-wise layout: value by part type before the cash discount.
+    const summary = await report("counter-sales-summary", { option: "EXECUTIVE" });
     expect(summary.rows).toEqual([expect.objectContaining({ spares: 273313.81, accessories: 0, oil: 28200, net: 249550, roundOff: -9.57 })]);
 
     const datewise = await report("counter-sales-summary", { option: "DAY" });

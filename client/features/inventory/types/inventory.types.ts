@@ -50,8 +50,6 @@ export type PartMaster = LegacyPartFields & {
   partCode: string;
   partNumber: string;
   name: string;
-  description: string | null;
-  category: string | null;
   uom: string;
   taxCategory: string | null;
   taxForm: string | null;
@@ -70,8 +68,6 @@ export type PartMaster = LegacyPartFields & {
   partType: string;
   /** Legacy pricing category (A, C, E…); its multiplier derives the retail rate. */
   priceCategoryCode: string | null;
-  binLocation: string | null;
-  storeLocation: string | null;
   partStatus: PartStatus;
   /** Legacy partmast.WTYAPPLICABLE: only these parts can be claimed under warranty. */
   warrantyApplicable: boolean;
@@ -97,7 +93,6 @@ export type PartSourceRecord = {
   priceCategoryCode: string | null;
   dealerRate: number;
   retailRate: number | null;
-  binLocation: string | null;
   /** Stock at the branch asked for; null when no branch was given. */
   stock: { quantity: number; available: number; rackLocation: string | null } | null;
 };
@@ -109,13 +104,11 @@ export type SourceRecordPayload = {
   partNumber: string;
   dealerRate: number;
   priceCategoryCode?: string | null;
-  binLocation?: string;
 };
 
 export type PartMasterPayload = {
   partNumber: string;
   name: string;
-  category: string;
   uom: string;
   taxCategory?: string;
   taxForm?: string;
@@ -128,8 +121,6 @@ export type PartMasterPayload = {
   partFlag?: string;
   partType?: string;
   priceCategoryCode?: string | null;
-  binLocation?: string;
-  storeLocation?: string;
   partStatus?: PartStatus;
   warrantyApplicable?: boolean;
   warrantyRate?: number | null;
@@ -146,7 +137,7 @@ export type UpdatePartMasterPayload = Partial<PartMasterPayload>;
 
 export type PartListParams = {
   search?: string;
-  category?: string;
+  priceCategoryCode?: string;
   partStatus?: PartStatus;
   role?: PartRole;
   mainPartId?: string;
@@ -164,7 +155,6 @@ export type PartListResponse = {
 export type AlternatePartPayload = {
   partNumber: string;
   name: string;
-  description?: string;
 };
 
 export type PartStockItem = {
@@ -213,12 +203,40 @@ export type PartQueryAlternateRow = PartQueryRow & {
   partStatus: PartStatus;
 };
 
+/** Legacy FullpartList: a Mobis catalogue part, which may not be in Part Master yet. */
+export type PartCatalogueItem = {
+  partNumber: string;
+  name: string;
+  partFlag: string;
+  partType: string;
+  uom: string;
+  taxable: boolean;
+  priceCategoryCode: string | null;
+  dealerRate: number;
+  retailRate: number | null;
+  updatedAt: string;
+};
+
+export type PartCatalogueSummary = { count: number; lastUpdatedAt: string | null };
+
+export type PriceListRow = {
+  partNumber: string;
+  name: string;
+  partFlag?: string;
+  priceCategoryCode?: string | null;
+  dealerRate: number;
+  retailRate?: number | null;
+};
+
+/** Part Query answers from Part Master, or from the Mobis catalogue when the part is not there yet. */
+export type PartQueryResponse = PartQueryResult | { source: "CATALOGUE"; catalogue: PartCatalogueItem };
+
 export type PartQueryResult = {
+  source: "PART_MASTER";
   part: {
     id: string;
     partNumber: string;
     name: string;
-    description: string | null;
     uom: string;
     partFlag: string;
     taxable: boolean;

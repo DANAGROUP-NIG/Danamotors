@@ -14,7 +14,7 @@ export const importMitSchema = z.object({
     destinationBranchId: uuid("receiving branch ID"),
     invoiceNumber: z.string().trim().min(1, "Invoice number is required").max(40),
     invoiceDate: z.coerce.date().optional(),
-    conversionRate: z.number().positive("Conversion rate must be greater than zero").optional(),
+    // No conversionRate: the rate is Finance's (Finance → Mobis pricing), never the store's.
     physicalReceiptDate: z.coerce.date().optional(),
     receivedMode,
     remarks: optionalText(500),

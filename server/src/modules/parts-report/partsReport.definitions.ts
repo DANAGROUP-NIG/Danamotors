@@ -18,6 +18,8 @@ export interface ReportColumn {
   total?: boolean | "last";
   /** Percent columns: the total and subtotals are `of` over the sum of `over`, from their totals. */
   ratio?: { of: string; over: string[] };
+  /** Valued at dealer rate or cost: hidden from users without `sparepart:cost:read`. */
+  cost?: boolean;
 }
 
 export type ReportFilterKey =
@@ -74,6 +76,8 @@ export interface ReportDefinition {
   countTypes?: { value: string; label: string }[];
   /** Rows carry a `group` value; the screen shows a heading and subtotal per group. */
   grouped?: boolean;
+  /** Options whose groups are headings only, with no subtotal: each group is a single line. */
+  headingsOnly?: string[];
   /** Printed and exported in pages that end with the running grand total (legacy "Carried Forward"). */
   carriedForward?: boolean;
   columns: ReportColumn[] | Record<string, ReportColumn[]>;
@@ -82,11 +86,15 @@ export interface ReportDefinition {
 }
 
 const money = (key: string, label: string, total = true): ReportColumn => ({ key, label, type: "money", total });
+/** A money column valued at dealer rate or cost (stock values, purchase prices, transfers, cost and profit).
+ *  Hidden from users without `sparepart:cost:read`; selling prices stay `money`. */
+const cost = (key: string, label: string, total = true): ReportColumn => ({ ...money(key, label, total), cost: true });
 const qty = (key: string, label: string, total = true): ReportColumn => ({ key, label, type: "qty", total });
 const text = (key: string, label: string): ReportColumn => ({ key, label, type: "text" });
 const date = (key = "date", label = "Date"): ReportColumn => ({ key, label, type: "date" });
 const datetime = (key: string, label: string): ReportColumn => ({ key, label, type: "datetime" });
 const percent = (key: string, label: string, of: string, ...over: string[]): ReportColumn => ({ key, label, type: "percent", ratio: { of, over } });
+const costPercent = (key: string, label: string, of: string, ...over: string[]): ReportColumn => ({ ...percent(key, label, of, ...over), cost: true });
 const balance = (key: string, label: string, type: "qty" | "money"): ReportColumn => ({ key, label, type, total: "last" });
 
 const PART_FILTERS: ReportFilterKey[] = ["part", "partType", "partFlag", "priceCategory"];
@@ -104,7 +112,7 @@ const COUNT_PART_COLUMNS: ReportColumn[] = [
   text("flag", "Flag"),
   text("description", "Description"),
   text("bin", "Bin"),
-  money("rate", "Dealer rate", false),
+  cost("rate", "Dealer rate", false),
 ];
 const CATEGORY_COLUMNS: ReportColumn[] = [text("category", "Category"), text("categoryName", "Description")];
 /** Consumption Report (legacy Consumption Report (Consolidated)): issues by kind, net of returns, at retail rate, in the legacy order. */
@@ -125,6 +133,12 @@ const CONSUMPTION_COLUMNS: ReportColumn[] = [
   qty("quantity", "Total issues qty"),
   money("value", "Total issues amount"),
 ];
+/**
+ * Legacy counter-sale charges: handling (CPD in 2011 and 2013; Lagos to 2025) and a trade discount
+ * (csissue.discountper; Lagos to 2024, ABJ to 2026). Our bills cannot carry them yet, so both are zero.
+ */
+const SALE_HANDLING = money("handling", "Handling");
+const SALE_TRADE_DISCOUNT = money("tradeDiscount", "Discount");
 /** Sales Executive Wise Counter Sales Register: each executive's bills, value by part type as on legacy. */
 const SALE_EXECUTIVE_COLUMNS: ReportColumn[] = [
   date("date", "Delivery date"),
@@ -133,6 +147,8 @@ const SALE_EXECUTIVE_COLUMNS: ReportColumn[] = [
   money("spares", "Spares amount"),
   money("accessories", "Accessories"),
   money("oil", "Oil amount"),
+  SALE_HANDLING,
+  SALE_TRADE_DISCOUNT,
   money("discount", "Cash discount"),
   money("vat", "VAT"),
   money("roundOff", "Round off"),
@@ -143,9 +159,9 @@ const SALE_EXECUTIVE_COLUMNS: ReportColumn[] = [
 const PROFIT_COLUMNS: ReportColumn[] = [
   qty("quantity", "Qty"),
   money("sales", "Sale value"),
-  money("cost", "Cost"),
-  money("margin", "Profit"),
-  percent("marginPercent", "Profit %", "margin", "sales"),
+  cost("cost", "Cost"),
+  cost("margin", "Profit"),
+  costPercent("marginPercent", "Profit %", "margin", "sales"),
 ];
 const ORDER_STATUSES = [
   { value: "", label: "All" },
@@ -167,8 +183,8 @@ const STN_COLUMNS: ReportColumn[] = [
   text("partFlag", "Flag"),
   text("description", "Description"),
   qty("quantity", "Qty"),
-  money("rate", "Rate", false),
-  money("amount", "Amount"),
+  cost("rate", "Rate", false),
+  cost("amount", "Amount"),
 ];
 
 /**
@@ -183,9 +199,9 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
   const counted: ReportColumn[] = [qty("systemQuantity", "System qty"), qty("physicalQuantity", "Physical qty")];
   const discrepancy: ReportColumn[] = [
     qty("excessQuantity", "Excess qty"),
-    money("excessValue", "Excess value"),
+    cost("excessValue", "Excess value"),
     qty("shortageQuantity", "Shortage qty"),
-    money("shortageValue", "Shortage value"),
+    cost("shortageValue", "Shortage value"),
   ];
   const line = [batch, ...COUNT_PART_COLUMNS];
   return {
@@ -193,9 +209,9 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
     PART: [
       ...line,
       qty("systemQuantity", "System qty"),
-      money("systemValue", "System value"),
+      cost("systemValue", "System value"),
       qty("physicalQuantity", "Physical qty"),
-      money("physicalValue", "Physical value"),
+      cost("physicalValue", "Physical value"),
       qty("damagedQuantity", "Damaged qty"),
       qty("excessQuantity", "Excess qty"),
       qty("shortageQuantity", "Shortage qty"),
@@ -211,7 +227,7 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
       datetime("date", "Counted"),
       text("type", audit ? "Audit type" : "Type"),
       text("bin", "Bin"),
-      money("rate", "Dealer rate", false),
+      cost("rate", "Dealer rate", false),
       ...counted,
       ...discrepancy,
       by,
@@ -226,7 +242,7 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
       qty("damagedQuantity", "Damaged qty"),
       by,
     ],
-    DAMAGE: [...line, qty("physicalQuantity", "Physical qty"), qty("damagedQuantity", "Damaged qty"), money("damagedValue", "Damaged value"), by, remarks],
+    DAMAGE: [...line, qty("physicalQuantity", "Physical qty"), qty("damagedQuantity", "Damaged qty"), cost("damagedValue", "Damaged value"), by, remarks],
     // One line per count (legacy Summary). All branches gives every branch together (Combined Summary).
     SUMMARY: [
       batch,
@@ -235,12 +251,12 @@ function countColumns(audit: boolean): Record<string, ReportColumn[]> {
       text("status", "Status"),
       qty("parts", "Parts"),
       qty("countedParts", "Counted"),
-      money("systemValue", "System value"),
-      money("physicalValue", "Physical value"),
-      money("damagedValue", "Damaged value"),
-      money("excessValue", "Excess value"),
-      money("shortageValue", "Shortage value"),
-      money("netValue", "Net excess / (shortage)"),
+      cost("systemValue", "System value"),
+      cost("physicalValue", "Physical value"),
+      cost("damagedValue", "Damaged value"),
+      cost("excessValue", "Excess value"),
+      cost("shortageValue", "Shortage value"),
+      cost("netValue", "Net excess / (shortage)"),
       audit ? text("auditors", "Auditor(s)") : text("confirmedBy", "S/E approved by"),
       audit ? datetime("closedAt", "Completed") : datetime("closedAt", "S/E approved"),
     ],
@@ -382,7 +398,8 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales",
     title: "Counter Sales Register",
     group: "Part sales",
-    description: "Counter-sale bills in the legacy layout (spares/kit and oil, taxable and non-taxable, cash discount, VAT, round-off and total), or every bill line with its part, quantity and rate.",
+    description:
+      "Counter-sale bills in the legacy layout (spares/kit and oil, taxable and non-taxable parts, cash discount, VAT, round-off and total), or every bill line with its part, quantity and rate. Taxable follows the part's tax status, so a taxable part billed without VAT stays taxable.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", ...PART_FILTERS],
     labels: { option: "Show" },
@@ -399,8 +416,10 @@ export const REPORTS: ReportDefinition[] = [
         text("customer", "Customer"),
         money("sparesTaxable", "Spares/Kit taxable"),
         money("sparesExempt", "Spares/Kit non-taxable"),
+        SALE_HANDLING,
         money("oilTaxable", "Oil taxable"),
         money("oilExempt", "Oil non-taxable"),
+        SALE_TRADE_DISCOUNT,
         money("discount", "Cash discount"),
         money("vat", "VAT"),
         money("roundOff", "Round off"),
@@ -428,21 +447,44 @@ export const REPORTS: ReportDefinition[] = [
     title: "Counter Sales Register Summary",
     group: "Part sales",
     description:
-      "Bills grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)).",
+      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", "executive"],
     labels: { option: "Group by" },
     options: [
+      { value: "TOTAL", label: "Total (summary)" },
       { value: "EXECUTIVE", label: "Sales executive" },
       { value: "DAY", label: "Day" },
     ],
     grouped: true,
+    // The Register Summary's single credit line under each branch, as legacy prints it, with no subtotal.
+    headingsOnly: ["TOTAL"],
     columns: {
+      // Legacy Counter Sale Register Summary: under each branch heading, one line per CASH / CREDIT section; every
+      // bill since mid-2009 is credit. Legacy's LST surcharge, entry tax and other charges are left out: zero on every
+      // counter sale in all three legacy databases, in every year (legacy_deliberate_omissions_log.md).
+      TOTAL: [
+        text("section", "Bills"),
+        qty("bills", "Count"),
+        money("sparesTaxable", "Spares/Kit taxable"),
+        money("sparesExempt", "Spares/Kit non-taxable"),
+        SALE_HANDLING,
+        money("oilTaxable", "Oil taxable"),
+        money("oilExempt", "Oil non-taxable"),
+        SALE_TRADE_DISCOUNT,
+        money("discount", "Cash discount"),
+        money("vat", "VAT"),
+        money("accessories", "Accessories amount"),
+        money("roundOff", "Round off"),
+        money("net", "Total amount"),
+      ],
       EXECUTIVE: SALE_EXECUTIVE_COLUMNS,
       DAY: [
         date(),
         qty("bills", "Bills"),
         money("gross", "Spare total"),
+        SALE_HANDLING,
+        SALE_TRADE_DISCOUNT,
         money("discount", "Cash discount"),
         money("taxable", "Taxable amount"),
         money("exempt", "Non-taxable"),
@@ -466,7 +508,9 @@ export const REPORTS: ReportDefinition[] = [
       text("customer", "Customer"),
       text("address", "Address"),
       money("gross", "Spares total"),
+      SALE_TRADE_DISCOUNT,
       money("discount", "Cash discount"),
+      SALE_HANDLING,
       money("taxable", "Taxable amount"),
       money("exempt", "Non-taxable"),
       money("vat", "VAT"),
@@ -525,7 +569,7 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales-revenue",
     title: "Counter Sale Revenue",
     group: "Part sales",
-    description: "Sales less returns by price category, against dealer cost, with the margin.",
+    description: "Sales less returns by part category, against dealer cost, with the margin.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option"],
     options: [
@@ -540,9 +584,9 @@ export const REPORTS: ReportDefinition[] = [
       money("sales", "Sales value"),
       money("returns", "Returns"),
       money("netSales", "Net sales"),
-      money("cost", "Dealer cost"),
-      money("margin", "Margin"),
-      percent("marginPercent", "Margin %", "margin", "netSales"),
+      cost("cost", "Dealer cost"),
+      cost("margin", "Margin"),
+      costPercent("marginPercent", "Margin %", "margin", "netSales"),
     ],
   },
 
@@ -597,9 +641,9 @@ export const REPORTS: ReportDefinition[] = [
         text("partNumber", "Part Number"),
         text("description", "Description"),
         ...RECEIPT_QTY,
-        money("unitPrice", "Invoice price", false),
-        money("rate", "Rate (₦)", false),
-        money("value", "Value"),
+        cost("unitPrice", "Invoice price", false),
+        cost("rate", "Rate (₦)", false),
+        cost("value", "Value"),
       ],
       SUMMARY: [
         text("mrnNumber", "MRN No"),
@@ -610,7 +654,7 @@ export const REPORTS: ReportDefinition[] = [
         text("mitNumber", "MIT No"),
         qty("lines", "Lines"),
         ...RECEIPT_QTY,
-        money("value", "Value"),
+        cost("value", "Value"),
       ],
     },
   },
@@ -634,8 +678,8 @@ export const REPORTS: ReportDefinition[] = [
       qty("quantity", "Invoiced"),
       ...RECEIPT_QTY,
       qty("pending", "In transit"),
-      money("unitPrice", "Invoice price", false),
-      money("value", "Value (₦)"),
+      cost("unitPrice", "Invoice price", false),
+      cost("value", "Value (₦)"),
       text("status", "Status"),
     ],
   },
@@ -682,8 +726,8 @@ export const REPORTS: ReportDefinition[] = [
         text("description", "Description"),
         qty("expected", "Invoiced"),
         ...RECEIPT_QTY,
-        money("rate", "Rate (₦)", false),
-        money("value", "Short + damaged value"),
+        cost("rate", "Rate (₦)", false),
+        cost("value", "Short + damaged value"),
       ],
       SRN: [
         text("mrnNumber", "SRN No"),
@@ -696,8 +740,8 @@ export const REPORTS: ReportDefinition[] = [
         text("description", "Description"),
         qty("expected", "Sent"),
         ...RECEIPT_QTY,
-        money("rate", "Rate", false),
-        money("value", "Short + damaged value"),
+        cost("rate", "Rate", false),
+        cost("value", "Short + damaged value"),
       ],
     },
   },
@@ -762,10 +806,10 @@ export const REPORTS: ReportDefinition[] = [
     // could carry VAT and a discount (rarely); ours cannot yet, so these are zero and Net is Amount.
     columns: [
       ...STN_COLUMNS.filter((c) => c.key !== "toBranch" && c.key !== "rate"),
-      money("tax", "Tax"),
-      money("discount", "Discount"),
-      money("others", "Others"),
-      money("net", "Net Amount"),
+      cost("tax", "Tax"),
+      cost("discount", "Discount"),
+      cost("others", "Others"),
+      cost("net", "Net Amount"),
     ],
   },
   {
@@ -788,8 +832,8 @@ export const REPORTS: ReportDefinition[] = [
       qty("dispatched", "Dispatched"),
       qty("backOrder", "Back order"),
       qty("cancelled", "Cancelled"),
-      money("rate", "Rate", false),
-      money("value", "Value"),
+      cost("rate", "Rate", false),
+      cost("value", "Value"),
       text("status", "Status"),
     ],
   },
@@ -814,8 +858,8 @@ export const REPORTS: ReportDefinition[] = [
       qty("dispatched", "Dispatched"),
       qty("backOrder", "Back order"),
       qty("cancelled", "Cancelled"),
-      money("rate", "Rate", false),
-      money("value", "Value"),
+      cost("rate", "Rate", false),
+      cost("value", "Value"),
       text("status", "Status"),
     ],
   },
@@ -838,8 +882,8 @@ export const REPORTS: ReportDefinition[] = [
       qty("quantity", "Sent"),
       ...RECEIPT_QTY,
       qty("pending", "In transit"),
-      money("rate", "Rate", false),
-      money("value", "In-transit value"),
+      cost("rate", "Rate", false),
+      cost("value", "In-transit value"),
       text("status", "Status"),
     ],
   },
@@ -858,7 +902,7 @@ export const REPORTS: ReportDefinition[] = [
       text("flag", "Flag"),
       text("description", "Description"),
       text("category", "Category"),
-      money("dealerRate", "Dealer rate", false),
+      cost("dealerRate", "Dealer rate", false),
       money("retailRate", "Retail rate", false),
       ...CONSUMPTION_COLUMNS,
       qty("closing", "Closing balance"),
@@ -905,8 +949,8 @@ export const REPORTS: ReportDefinition[] = [
       text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty (+/−)"),
-      money("rate", "Dealer rate", false),
-      money("value", "Value"),
+      cost("rate", "Dealer rate", false),
+      cost("value", "Value"),
       text("notes", "Remarks"),
       text("by", "By"),
     ],
@@ -930,11 +974,11 @@ export const REPORTS: ReportDefinition[] = [
       text("party", "Party / Regn. No"),
       text("invoice", "Invoice / Job card"),
       date("invoiceDate", "Invoice date"),
-      money("rate", "Rate", false),
+      cost("rate", "Rate", false),
       qty("receiptQty", "Receipt qty"),
-      money("receiptValue", "Receipt value"),
+      cost("receiptValue", "Receipt value"),
       qty("issueQty", "Issue qty"),
-      money("issueValue", "Issue value"),
+      cost("issueValue", "Issue value"),
       balance("balanceQty", "Balance qty", "qty"),
       balance("balanceValue", "Balance value", "money"),
     ],
@@ -957,13 +1001,13 @@ export const REPORTS: ReportDefinition[] = [
       text("unit", "Unit"),
       text("bin", "Bin"),
       qty("openingQty", "Opening qty"),
-      money("openingValue", "Opening value"),
+      cost("openingValue", "Opening value"),
       qty("receiptQty", "Receipt qty"),
-      money("receiptValue", "Receipt value"),
+      cost("receiptValue", "Receipt value"),
       qty("issueQty", "Issue qty"),
-      money("issueValue", "Issue value"),
+      cost("issueValue", "Issue value"),
       qty("closingQty", "Closing qty"),
-      money("closingValue", "Closing value"),
+      cost("closingValue", "Closing value"),
     ],
   },
   {
@@ -984,8 +1028,8 @@ export const REPORTS: ReportDefinition[] = [
       text("category", "Category"),
       text("bin", "Bin"),
       qty("quantity", "Stock"),
-      money("rate", "Rate", false),
-      money("value", "Value"),
+      cost("rate", "Rate", false),
+      cost("value", "Value"),
     ],
   },
   {
@@ -1014,8 +1058,8 @@ export const REPORTS: ReportDefinition[] = [
       date("lastIssue", "Last issue"),
       qty("idleDays", "Days not issued", false),
       qty("quantity", "Balance"),
-      money("rate", "Dealer rate", false),
-      money("value", "Value"),
+      cost("rate", "Dealer rate", false),
+      cost("value", "Value"),
     ],
   },
   {
@@ -1030,7 +1074,7 @@ export const REPORTS: ReportDefinition[] = [
     labels: BASED_ON,
     grouped: true,
     // The age-band columns follow the limits asked for; see ageingColumns.
-    columns: [...PART_COLUMNS, qty("quantity", "Stock"), money("value", "Total value")],
+    columns: [...PART_COLUMNS, qty("quantity", "Stock"), cost("value", "Total value")],
   },
   {
     kind: "negative-stock",
@@ -1049,8 +1093,8 @@ export const REPORTS: ReportDefinition[] = [
       text("party", "Party / Regn. No"),
       qty("quantity", "Qty (+/−)", false),
       qty("balance", "Balance after", false),
-      money("rate", "Dealer rate", false),
-      money("value", "Shortfall value", false),
+      cost("rate", "Dealer rate", false),
+      cost("value", "Shortfall value", false),
     ],
   },
   {
@@ -1067,11 +1111,11 @@ export const REPORTS: ReportDefinition[] = [
       text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("openingQty", "Opening stock"),
-      money("openingValue", "Opening value"),
+      cost("openingValue", "Opening value"),
       qty("soldQty", "Sold qty"),
-      money("sales", "Sales (at cost)"),
+      cost("sales", "Sales (at cost)"),
       qty("closingQty", "Closing stock"),
-      money("closingValue", "Closing value"),
+      cost("closingValue", "Closing value"),
       qty("ratio", "Inventory / sales", false),
     ],
   },
@@ -1096,8 +1140,8 @@ export const REPORTS: ReportDefinition[] = [
         qty("quantity", "Stock"),
         qty("blocked", "Blocked"),
         qty("available", "Available"),
-        money("rate", "Dealer rate", false),
-        money("value", "Value"),
+        cost("rate", "Dealer rate", false),
+        cost("value", "Value"),
       ],
       TOTAL: [
         ...PART_COLUMNS,
@@ -1105,8 +1149,8 @@ export const REPORTS: ReportDefinition[] = [
         qty("quantity", "Stock"),
         qty("blocked", "Blocked"),
         qty("available", "Available"),
-        money("rate", "Dealer rate", false),
-        money("value", "Value"),
+        cost("rate", "Dealer rate", false),
+        cost("value", "Value"),
       ],
     },
   },
@@ -1173,8 +1217,8 @@ export const REPORTS: ReportDefinition[] = [
       qty("backOrder", "Indent back order"),
       qty("quantity", "Unavailable"),
       qty("free", "Free stock now", false),
-      money("rate", "Dealer rate", false),
-      money("value", "Value"),
+      cost("rate", "Dealer rate", false),
+      cost("value", "Value"),
     ],
   },
 
@@ -1213,8 +1257,8 @@ export const REPORTS: ReportDefinition[] = [
         qty("quantity", "Stock"),
         qty("shortfall", "Below minimum by"),
         qty("orderQty", "To order (up to maximum)"),
-        money("rate", "Dealer rate", false),
-        money("value", "Order value"),
+        cost("rate", "Dealer rate", false),
+        cost("value", "Order value"),
       ],
       REORDER: [
         ...PART_COLUMNS,
@@ -1315,8 +1359,8 @@ export const REPORTS: ReportDefinition[] = [
       text("description", "Description"),
       text("flag", "Flag"),
       text("category", "Category"),
-      money("oldDealerRate", "Old dealer rate", false),
-      money("newDealerRate", "New dealer rate", false),
+      cost("oldDealerRate", "Old dealer rate", false),
+      cost("newDealerRate", "New dealer rate", false),
       money("oldRetailRate", "Old retail rate", false),
       money("newRetailRate", "New retail rate", false),
       text("action", "Change"),
@@ -1327,15 +1371,9 @@ export const REPORTS: ReportDefinition[] = [
     kind: "part-bin-history",
     title: "Part Bin Location History",
     group: "MIS",
-    description: "Every change of a part's bin: the branch's rack location, or the default bin in Part Master.",
+    description: "Every change of a part's bin (rack location) at a branch.",
     permission: PERMISSIONS.STOCK_READ,
-    filters: [...PART_FILTERS, "option"],
-    labels: { option: "Show" },
-    options: [
-      { value: "ALL", label: "All" },
-      { value: "BRANCH", label: "Branch bin changes" },
-      { value: "PART_MASTER", label: "Part Master bin changes" },
-    ],
+    filters: PART_FILTERS,
     columns: [
       datetime("changedAt", "Changed on"),
       ...PART_COLUMNS,
@@ -1371,8 +1409,8 @@ export const REPORTS: ReportDefinition[] = [
       text("partNumber", "Part Number"),
       text("description", "Description"),
       qty("quantity", "Qty"),
-      money("rate", "Rate", false),
-      money("value", "Value"),
+      cost("rate", "Rate", false),
+      cost("value", "Value"),
     ],
     summaryColumns: [
       text("packingNumber", "Packing No"),
@@ -1386,7 +1424,7 @@ export const REPORTS: ReportDefinition[] = [
       qty("cases", "Cases"),
       qty("quantity", "Qty"),
       qty("weight", "Weight (kg)"),
-      money("value", "Value"),
+      cost("value", "Value"),
       text("status", "Status"),
     ],
   },
@@ -1396,8 +1434,8 @@ export const reportByKind = new Map(REPORTS.map((r) => [r.kind, r]));
 
 /** Ageing of Stock: stock and value in each age band of the limits asked for. */
 function ageingColumns(limits: number[]): ReportColumn[] {
-  const bands = bandLabels(limits).flatMap((label, i) => [qty(`age${i}Qty`, `${label} qty`), money(`age${i}Value`, `${label} value`)]);
-  return [...PART_COLUMNS, qty("quantity", "Stock"), ...bands, money("value", "Total value")];
+  const bands = bandLabels(limits).flatMap((label, i) => [qty(`age${i}Qty`, `${label} qty`), cost(`age${i}Value`, `${label} value`)]);
+  return [...PART_COLUMNS, qty("quantity", "Stock"), ...bands, cost("value", "Total value")];
 }
 
 /** Workshop issue quantity in each mileage band, and issues on jobs with no mileage recorded. */
@@ -1419,8 +1457,8 @@ export function columnsFor(definition: ReportDefinition, f: Pick<ReportFilters, 
         qty("job", "Workshop jobs"),
         qty("stn", "STNs"),
         qty("quantity", "Total consumed"),
-        money("rate", "Dealer rate", false),
-        money("value", "Value"),
+        cost("rate", "Dealer rate", false),
+        cost("value", "Value"),
         ...mileage,
       ];
     case "model-mileage-issue":

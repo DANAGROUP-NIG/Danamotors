@@ -75,6 +75,8 @@ export type ReportResult = {
   rows: ReportRow[];
   totals: Record<string, number>;
   grouped: boolean;
+  /** Each group ends with a subtotal; off where every group is a single line. */
+  subtotals?: boolean;
   truncated: boolean;
 };
 

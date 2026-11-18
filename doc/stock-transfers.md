@@ -116,8 +116,25 @@ one notification per event, even if they qualify through more than one role.
 | Stock arrived for a back order | Supplying branch store managers, general store managers |
 | Back order closed | Requester, requesting branch store managers |
 | MRN generated or transfer received | Supplying branch store managers, general store managers |
-| Damaged or short quantities | General store managers |
+| Damaged or short quantities | Users who may approve the shortage (see [Shortage / damage approval](#shortage--damage-approval-legacy-se-approval)) |
 | Indent cancelled | Requester, and supplying branch store managers if it was already submitted |
+
+## Shortage / damage approval (legacy S/E approval)
+
+Legacy let only users with **Can Approve Shortage/Excess in MIT/BIT** approve the shortage on a receipt
+(`SEApprovedBy`). The branch used it on 47 of 862 BIT receipts, Abuja on 51 of 108, and CPD on 21 MITs.
+
+- An MRN for a Mobis MIT or a branch STN that records damaged or short units starts as **awaiting approval**
+  (`discrepancyStatus = PENDING`). Stock is posted at receipt as before; approval accepts the shortage, it does
+  not hold the goods. Receipts cannot exceed what was invoiced or sent, so there is no excess to approve.
+  Vendor receipts are not included.
+- Users with `stock:discrepancy:approve` for the receiving branch (or with `inventory:cross-branch`) are notified.
+  They approve from the MRN card on the MIT or STN page, or from **Inventory → Shortage Approvals**, with an
+  optional remark. The MRN then shows who approved it and when. Audited as `STOCK_DISCREPANCY_APPROVED`.
+- Granted by default to Admin and General Store Manager (and every SuperAdmin).
+- `GET /api/inventory/discrepancies` lists pending receipts; `PATCH /api/inventory/mrn/:id/approve-discrepancy`
+  (`{ remark? }`) approves one. Only a pending receipt can be approved, so two approvers cannot both approve it.
+- Existing Mobis and transfer MRNs with damaged or short units were set to pending by the migration.
 
 ## Permissions and branch access
 
@@ -134,7 +151,7 @@ with `inventory:cross-branch` and super admins can act on any branch.
 | `BranchIndentDetail` (orderid, UrgentQty, Qty, BackOrdQty, Rate, VIN, Registrationno, Model, Jobno, JobDate, AuthorisedBy, ApprovalDate, partflag) | `BranchIndent` and `BranchIndentLine` |
 | `PickingHead`, `PickingDetail` | `PickingList`, `PickingListLine` |
 | `countersale` with trantype `M`, and `csissue` (parts STN; `OrderNo` = indent, empty on a direct STN) | `StockTransferNote` (linked to its indents), `StockTransferNoteLine` |
-| HHDC `BI` picking downloads (one indent each; picker recorded) | `PickingList` with `pickerName`; HHDC itself is not integrated yet |
+| HHDC `BI` picking downloads (one indent each; picker recorded) | `PickingList` with `pickerName`; picking on the handheld: [handheld.md](./handheld.md) |
 | `CaseHeader` and `CaseDetail` with trantype `CB` | `TransferCase`, `TransferCaseLine` |
 | `CaseHeader` with trantype `PB` (PackId, WayBillNo, CourierName, ConsignmentWeight) | `PackingList` |
 | `branchInTransithead`, `branchInTransitDetail` (PartOrdered vs PARTNO, QTYRECIEVED, QtyRejected) | The STN and its lines: the received, damaged and short totals on `StockTransferNoteLine` |

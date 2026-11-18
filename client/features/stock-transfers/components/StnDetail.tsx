@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useStn } from "../hooks/use-stns";
 import { ReceiveStnForm } from "./IndentDialogs";
+import { DiscrepancyPanel } from "@/features/stock-discrepancy/components/DiscrepancyPanel";
 import {
   STN_STATUS_LABELS,
   STN_STATUS_TONES,
@@ -200,8 +201,10 @@ export function StnDetail({ id }: { id: string }) {
               </p>
               <p className="mt-1 text-emerald-900">
                 {mrn.totalReceived} received{mrn.totalDamaged ? `, ${mrn.totalDamaged} damaged` : ""}
-                {mrn.totalShort ? `, ${mrn.totalShort} short` : ""} · {fmtCurrency(mrn.totalValue)}
+                {mrn.totalShort ? `, ${mrn.totalShort} short` : ""}
+                {mrn.totalValue != null ? ` · ${fmtCurrency(mrn.totalValue)}` : ""}
               </p>
+              <DiscrepancyPanel mrn={mrn} />
             </div>
           ))}
         </div>

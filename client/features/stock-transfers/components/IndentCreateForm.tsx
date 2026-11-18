@@ -273,7 +273,6 @@ export function IndentCreateForm() {
                       <p className="mt-1 text-sm text-slate-400">
                         {l.part.priceCategoryCode ? `Category ${l.part.priceCategoryCode} · ` : ""}
                         {l.part.uom} · {fmtCurrency(l.part.unitRate)} each
-                        {l.part.binLocation ? ` · Bin ${l.part.binLocation}` : ""}
                         {` · Your stock ${l.part.requestingStock}`}
                         {sourceBranchId ? ` · Available at supplier ${l.part.sourceAvailable}` : ""}
                       </p>

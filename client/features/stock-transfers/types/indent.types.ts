@@ -1,3 +1,5 @@
+import type { DiscrepancyFields } from "@/features/stock-discrepancy/types";
+
 export type IndentStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -26,11 +28,8 @@ export type PartRef = {
   id: string;
   partNumber: string;
   name: string;
-  description?: string | null;
   uom: string;
   unitPrice: number;
-  binLocation?: string | null;
-  storeLocation?: string | null;
   role: "MAIN" | "ALTERNATE";
   mainPartId?: string | null;
   partStatus: "ACTIVE" | "BLOCKED";
@@ -205,10 +204,11 @@ export type Mrn = {
   totalReceived: number;
   totalDamaged: number;
   totalShort: number;
+  /** Absent for users without sparepart:cost:read. */
   totalValue: number;
   receivedBy?: PersonRef | null;
   lines: MrnLine[];
-};
+} & DiscrepancyFields;
 
 export type Stn = {
   id: string;
