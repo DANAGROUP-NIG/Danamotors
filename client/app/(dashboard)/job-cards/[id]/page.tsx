@@ -654,12 +654,7 @@ export default function JobCardDetailPage() {
           </section>
         )}
         <JobCardPartsSection jobCard={jobCard} />
-        <JobCardLabourSection
-          jobCardId={jobCard.id}
-          status={jobCard.status}
-          branchId={jobCard.branchId}
-          billedAt={jobCard.billedAt}
-        />
+        <JobCardLabourSection jobCard={jobCard} />
 
         {/* ── Who pays for each part and labour line (warranty, goodwill, campaign, customer) ── */}
         <JobCardLinesCard jobCardId={jobCard.id} />
