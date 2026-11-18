@@ -23,7 +23,7 @@ export const errorHandler = (
   // Raised by the InventoryStock trigger while an annual stock taking is active.
   const freeze = /STOCK_TAKE_FREEZE: (.+? until the count is completed\.)/.exec(err.message ?? '');
   // Raised by the books_closed_guard triggers on a write dated in a closed period (doc/books-closed.md).
-  const booksClosed = /BOOKS_CLOSED: (The books are closed up to [^\n"]+)/.exec(err.message ?? '');
+  // const booksClosed = /BOOKS_CLOSED: (The books are closed up to [^\n"]+)/.exec(err.message ?? '');
 
   // Handle Custom AppError
   if (err instanceof AppError) {
