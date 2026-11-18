@@ -283,7 +283,7 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
       await db.$transaction((tx) => sync.syncLines(tx, job.id));
       await db.jobCard.update({
         where: { id: job.id },
-        data: { status: "READY" },
+        data: { status: "READY", qcStatus: "PASSED" },
       });
       const billing: JobBillingService =
         new (require("../finance/job-billing.service").JobBillingService)();
@@ -354,7 +354,7 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
       if (type === "CUSTOMER") {
         await db.jobCard.update({
           where: { id: job.id },
-          data: { status: "READY" },
+          data: { status: "READY", qcStatus: "PASSED" },
         });
         const billing: JobBillingService =
           new (require("../finance/job-billing.service").JobBillingService)();

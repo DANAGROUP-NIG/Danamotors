@@ -24,6 +24,7 @@ import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 import { applyJobAdvances } from "./job-advance";
 import { lockParty } from "./party-account.service";
+import { assertJobBillingReady, BILLABLE_STATUSES } from "./job-billing.logic";
 
 const JOB_BILL_INCLUDE = {
   estimates: latestEstimateQuery,
@@ -76,8 +77,6 @@ const JOB_BILL_INCLUDE = {
     },
   },
 } satisfies Prisma.JobCardInclude;
-
-const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
 
 function isActiveBillStatus(status: string) {
   return !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
@@ -151,6 +150,15 @@ export class JobBillingService {
     const review = {
       ...scopes[0].review,
       canBill: scopes.every((scope) => scope.review.canBill),
+      status:
+        scopes.find((scope) => !scope.review.canBill)?.review.status ??
+        scopes[0].review.status,
+      approvedSubtotal: sumMoney(
+        scopes.map((scope) => scope.review.approvedSubtotal),
+      ),
+      actualSubtotal: sumMoney(
+        scopes.map((scope) => scope.review.actualSubtotal),
+      ),
       issues: scopes.flatMap((scope) =>
         scope.review.issues.map((issue) => `${scope.card.jobNumber}: ${issue}`),
       ),
@@ -162,17 +170,7 @@ export class JobBillingService {
   private assertBillable(
     jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
   ) {
-    if (
-      !BILLABLE_STATUSES.includes(jobCard.status) &&
-      !(
-        ["DELIVERED", "Closed"].includes(jobCard.status) &&
-        jobCard.creditApprovedById
-      )
-    ) {
-      throw new BadRequestError(
-        "Only ready jobs or jobs delivered on approved credit can be billed",
-      );
-    }
+    assertJobBillingReady(jobCard);
     if (
       jobCard.billedAt ||
       jobCard.invoices.some((invoice) => isActiveBillStatus(invoice.status))
@@ -328,6 +326,7 @@ export class JobBillingService {
           },
         ],
         billedAt: null,
+        qcStatus: { equals: "PASSED", mode: "insensitive" },
         ...(branchId ? { branchId } : {}),
         invoices: {
           none: {
@@ -460,9 +459,18 @@ export class JobBillingService {
         return await prisma.$transaction(
           async (transaction) => {
             // Use the same customer -> job -> receipt lock order as advance receipt creation.
-            const owner = await transaction.jobCard.findUnique({ where: { id: input.jobCardId }, select: { customerId: true, appointment: { select: { customerId: true } } } });
+            const owner = await transaction.jobCard.findUnique({
+              where: { id: input.jobCardId },
+              select: {
+                customerId: true,
+                appointment: { select: { customerId: true } },
+              },
+            });
             const ownerId = owner?.customerId ?? owner?.appointment?.customerId;
-            if (!ownerId) throw new BadRequestError("The job card does not have a customer");
+            if (!ownerId)
+              throw new BadRequestError(
+                "The job card does not have a customer",
+              );
             await lockParty(transaction, ownerId);
             if (input.consolidateVehicle) {
               await transaction.$queryRaw`SELECT v.id FROM "Vehicle" v JOIN "JobCard" j ON j."vehicleId" = v.id WHERE j.id = ${input.jobCardId} FOR UPDATE OF v`;
@@ -481,7 +489,10 @@ export class JobBillingService {
               throw new BadRequestError(
                 "The job card does not have a customer",
               );
-            if (customerId !== ownerId) throw new ConflictError("The billing customer changed; refresh the job and retry");
+            if (customerId !== ownerId)
+              throw new ConflictError(
+                "The billing customer changed; refresh the job and retry",
+              );
 
             const advisor = await transaction.user.findUnique({
               where: { id: input.serviceAdvisorId },
@@ -621,11 +632,26 @@ export class JobBillingService {
                 },
               });
             }
-            const settled = await applyJobAdvances(transaction, jobCards.map(card => card.id), invoice, jobCard.branchId);
-            await transaction.auditLog.create({ data: {
-              userId: input.actorId ?? input.serviceAdvisorId, action: "JOB_ADVANCES_APPLIED",
-              details: JSON.stringify({ invoiceId: invoice.id, jobCardIds: jobCards.map(card => card.id), appliedAmount: sumMoney([invoice.total, -settled.outstandingAmount]) }),
-            } });
+            const settled = await applyJobAdvances(
+              transaction,
+              jobCards.map((card) => card.id),
+              invoice,
+              jobCard.branchId,
+            );
+            await transaction.auditLog.create({
+              data: {
+                userId: input.actorId ?? input.serviceAdvisorId,
+                action: "JOB_ADVANCES_APPLIED",
+                details: JSON.stringify({
+                  invoiceId: invoice.id,
+                  jobCardIds: jobCards.map((card) => card.id),
+                  appliedAmount: sumMoney([
+                    invoice.total,
+                    -settled.outstandingAmount,
+                  ]),
+                }),
+              },
+            });
             return settled;
           },
           {

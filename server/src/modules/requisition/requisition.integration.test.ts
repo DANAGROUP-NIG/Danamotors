@@ -166,6 +166,29 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
       })
     ).quantity;
 
+  it.each(["PENDING", "FAILED"])(
+    "blocks unfinished QC %s during actual billing without writing an invoice",
+    async (qcStatus) => {
+      const card = await job("READY");
+      await db.jobCard.update({ where: { id: card.id }, data: { qcStatus } });
+      const billing: JobBillingService =
+        new (require("../finance/job-billing.service").JobBillingService)();
+      await expect(
+        billing.createJobBill({
+          jobCardId: card.id,
+          serviceAdvisorId: actor.userId,
+          actorId: actor.userId,
+          partsDiscountPercent: 0,
+          labourDiscountPercent: 0,
+        }),
+      ).rejects.toThrow("passed quality check");
+      expect(await db.invoice.count({ where: { jobCardId: card.id } })).toBe(0);
+      expect(
+        await db.jobCard.findUniqueOrThrow({ where: { id: card.id } }),
+      ).toMatchObject({ status: "READY", billedAt: null, qcStatus });
+    },
+  );
+
   it("requires actual substitute scope for issuance and retains request-only substitution trace", async () => {
     const card = await job();
     const alternate = await db.sparePart.create({
@@ -336,7 +359,7 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
     ]);
     await db.jobCard.update({
       where: { id: card.id },
-      data: { status: "READY" },
+      data: { status: "READY", qcStatus: "PASSED" },
     });
     const billing: JobBillingService =
       new (require("../finance/job-billing.service").JobBillingService)();
