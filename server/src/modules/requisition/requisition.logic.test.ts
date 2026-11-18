@@ -80,7 +80,8 @@ describe('Requisition rules', () => {
 it('keeps permission migration grants equal to ROLE_PERMISSIONS and store grants separate from goodwill', () => {
   const sql = readFileSync(path.join(__dirname, '../../../prisma/migrations/20261021110000_requisition_permissions/migration.sql'), 'utf8');
   const grants = [...sql.matchAll(/\('([^']+)', '(requisition:[^']+)'\)/g)].map(match => `${match[1]}:${match[2]}`).sort();
-  const expected = Object.entries(ROLE_PERMISSIONS).flatMap(([role, permissions]) => permissions.filter(permission => permission.startsWith('requisition:')).map(permission => `${role}:${permission}`)).sort();
+  // The Auditor role came later: migration 20261105140000_user_permission_overrides grants its reads.
+  const expected = Object.entries(ROLE_PERMISSIONS).filter(([role]) => role !== ROLES.AUDITOR).flatMap(([role, permissions]) => permissions.filter(permission => permission.startsWith('requisition:')).map(permission => `${role}:${permission}`)).sort();
   expect(grants).toEqual(expected);
   for (const role of [ROLES.GENERAL_STORE_MANAGER, ROLES.BRANCH_STORE_MANAGER]) {
     expect(ROLE_PERMISSIONS[role]).toEqual(expect.arrayContaining([PERMISSIONS.REQUISITION_READ, PERMISSIONS.REQUISITION_CREATE, PERMISSIONS.REQUISITION_CANCEL]));

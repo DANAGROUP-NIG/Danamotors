@@ -15,6 +15,7 @@ export type AppRole =
   | "receptionist"
   | "receptionmanager"
   | "warrantyofficer"
+  | "auditor"
   | "customer";
 
 // Inventory permissions mirror server/src/shared/constants/roles.ts.
@@ -27,6 +28,10 @@ export const INVENTORY_PERMISSIONS = {
   SPAREPART_CREATE: "sparepart:create",
   SPAREPART_UPDATE: "sparepart:update",
   SPAREPART_DELETE: "sparepart:delete",
+  /** Dealer rates, purchase prices and stock values. */
+  SPAREPART_COST_READ: "sparepart:cost:read",
+  /** Approve the shortage/excess on an MIT or STN receipt. */
+  STOCK_DISCREPANCY_APPROVE: "stock:discrepancy:approve",
   STOCK_READ: "stock:read",
   STOCK_UPDATE: "stock:update",
   INVENTORY_CROSS_BRANCH: "inventory:cross-branch",
@@ -63,6 +68,16 @@ export const CAMPAIGN_PERMISSIONS = {
 } as const;
 
 export const BRANCH_ALL = "branch:all";
+
+/**
+ * Admin-level permissions (mirrors isAdminLevelPermission in server/src/shared/effectivePermissions.ts):
+ * managing users, roles and rights, the audit log, all-branch access and branch management. Only a super
+ * admin may grant them to a user.
+ */
+export function isAdminLevelPermission(name: string): boolean {
+  return ["branch:all", "branch:create", "branch:update", "branch:delete"].includes(name)
+    || ["user:", "role:", "audit:"].some((prefix) => name.startsWith(prefix));
+}
 
 /** Framework reports (#75) and report settings. */
 export const FRAMEWORK_REPORT_PERMISSIONS = [
@@ -108,6 +123,21 @@ export const STOCK_TAKE_PERMISSIONS = {
 export const STOCK_AUDIT_PERMISSIONS = {
   READ: "stockaudit:read",
   MANAGE: "stockaudit:manage",
+} as const;
+
+// Handheld stations (store PCs that move jobs to the handhelds): register them and issue their keys.
+export const HANDHELD_PERMISSIONS = {
+  STATIONS: "handheld:stations",
+} as const;
+
+// Finance owns the Mobis conversion rate, dealer factor and price bulletins (Finance → Mobis pricing).
+export const MOBIS_PRICING_PERMISSIONS = {
+  MANAGE: "mobispricing:manage",
+} as const;
+
+// Barcode labels on the branch's label printer (a Zebra on a handheld station PC).
+export const LABEL_PERMISSIONS = {
+  PRINT: "labels:print",
 } as const;
 
 // ─── Role groups ──────────────────────────────────────────────────────────────

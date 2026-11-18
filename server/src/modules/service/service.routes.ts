@@ -180,7 +180,7 @@ router.get(
 );
 router.post(
   "/labour-rates",
-  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.LABOUR_RATE_UPDATE),
   validateRequest(
     z.object({
       body: z

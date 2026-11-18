@@ -16,7 +16,8 @@ export type PartSelection = {
   from?: string;
   to?: string;
   partFlag?: string;
-  category?: string;
+  /** Legacy Part Type: S spare part, O oil, A accessory. */
+  partType?: string;
   priceCategoryCode?: string;
   dealerRateFrom?: number;
   dealerRateTo?: number;

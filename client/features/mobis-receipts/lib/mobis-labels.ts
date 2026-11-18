@@ -24,8 +24,6 @@ export const RECEIVED_MODE_LABELS: Record<ReceivedMode, string> = {
   ROAD: "Road",
 };
 
-export const DEFAULT_CONVERSION_RATE = 2700;
-
 /** Vendor price with two decimals (the invoice currency). */
 export const fmtPrice = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const fmtNaira = (n: number) => `₦${fmtPrice(n)}`;

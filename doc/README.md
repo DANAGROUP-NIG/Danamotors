@@ -24,8 +24,16 @@ danamotors/
 | [vehicle-catalog.md](./vehicle-catalog.md) | Kia catalogue seed, vehicle search, data assumptions and verification |
 | [database.md](./database.md) | Prisma data model, core entities and relations |
 | [roles-and-permissions.md](./roles-and-permissions.md) | Roles, permissions, and seed mappings |
+| [audit-log.md](./audit-log.md) | Audit log: field-level change log filled by database triggers (who changed what, in or outside the app), summary, retention |
+| [labour-rates.md](./labour-rates.md) | Model labour rates: grid, inline edit, bulk change, add a labour to models, copy a model's rates (replaces the legacy XLS utility) |
+| [books-closed.md](./books-closed.md) | Books closed (year end): company and branch closed dates, the database lock on finance and stock entries, reopening |
+| [vehicle-identity.md](./vehicle-identity.md) | Vehicle identity: VIN, registration, engine, model and sale date changes need `vehicle:identity:update` and a reason; identity history |
+| [backup-and-restore.md](./backup-and-restore.md) | Nightly backup script, point-in-time recovery, off-site copies, retention, the tested restore runbook; why there is no restore button |
 | [stock-transfers.md](./stock-transfers.md) | CPD and inter-branch transfer workflow: indent, picking, STN, cases, MRN |
+| [barcode-labels.md](./barcode-labels.md) | Part barcode labels on the Zebra at a handheld station PC: the page, the 2" × 2" label, how the station prints |
+| [handheld.md](./handheld.md) | Handheld picking for indents and CPOs, and checking Mobis MITs on the handheld before the MRN |
 | [mobis-receiving.md](./mobis-receiving.md) | Receiving purchases: Mobis MIT file upload and MRN to CPD stock; vendor receipts for local, used and repaired parts |
+| [mobis-pricing.md](./mobis-pricing.md) | Finance: Mobis conversion rate, dealer factor, price bulletins and rate-change revaluation (prices only go up) |
 | [part-sale.md](./part-sale.md) | CPD part sale: customer purchase order, picking, counter-sale bill, sale return |
 | [masters.md](./masters.md) | Legacy Masters menu mapped to the new system: shared code lists, employees, defects, checklists, terms |
 | [stock-taking.md](./stock-taking.md) | Physical stock taking: annual/perpetual batches, count sheets (handheld stand-in), S/E confirmation adjusting stock, bin update; stock audit (report only) |

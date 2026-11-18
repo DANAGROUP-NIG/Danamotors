@@ -1,6 +1,7 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: { jobCard: { findUnique: jest.fn(), findMany: jest.fn() }, user: { findMany: jest.fn() }, notification: { createMany: jest.fn() } } }));
 jest.mock('./jobcard-notification-router', () => ({ drainJobcardNotifications: jest.fn(), sendJobcardReminders: jest.fn(), startJobcardNotifications: jest.fn() }));
 import prisma from '../../prisma/client';
+import { holdsPermission } from '../../shared/effectivePermissions';
 import { NotificationService } from './notification.service';
 import { notifyWorkshopEvent, workshopRecipients } from './workshop-notifications';
 import { WORKSHOP_EVENTS } from './notification.events';
@@ -16,8 +17,10 @@ beforeEach(() => {
 });
 it('preserves separate parts recipients from role/assignment', () => {
   expect(workshopRecipients('PART_REQUESTED', card)).toMatchObject({ isActive: true, OR: expect.arrayContaining([{ role: { name: ROLES.GENERAL_STORE_MANAGER } }, { branchId: 'branch', role: { name: { in: [ROLES.BRANCH_STORE_MANAGER] } } }]) });
-  for (const event of ['PARTS_ISSUED', 'PART_RECEIVED'] as const) expect(workshopRecipients(event, card).OR).toContainEqual({ id: { in: ['advisor', 'tech'] }, branchId: 'branch' });
-  expect(workshopRecipients('PARTS_UNAVAILABLE', card).OR).toContainEqual({ id: { in: ['advisor'] }, branchId: 'branch' });
+  expect(workshopRecipients('TECHNICIAN_ASSIGNED', card)).toMatchObject({ OR: [{ id: { in: ['tech'] }, branchId: 'branch' }] });
+  expect(workshopRecipients('JOB_SENT_FOR_QC', card).OR).toEqual(expect.arrayContaining([{ branchId: 'branch', AND: [holdsPermission(PERMISSIONS.QCSTATUS_UPDATE)] }]));
+  for (const event of ['PARTS_ISSUED', 'PART_RECEIVED', 'QC_FAILED', 'PROMISED_24H', 'PROMISED_12H'] as const) expect(workshopRecipients(event, card).OR).toContainEqual({ id: { in: ['advisor', 'tech'] }, branchId: 'branch' });
+  for (const event of ['PARTS_UNAVAILABLE', 'QC_PASSED', 'JOB_READY'] as const) expect(workshopRecipients(event, card).OR).toContainEqual({ id: { in: ['advisor'] }, branchId: 'branch' });
 });
 it.each((Object.keys(WORKSHOP_EVENTS) as (keyof typeof WORKSHOP_EVENTS)[]).filter(event => event.startsWith('PART')))('preserves separate %s notifications with a stable per-recipient dedupe key', async event => {
   await notifyWorkshopEvent(event, 'job', 'event1');

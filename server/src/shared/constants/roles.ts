@@ -13,6 +13,8 @@ export const ROLES = {
   CCU_MANAGER: "CCUManager",
   CCU_OFFICER: "CCUOfficer",
   SERVICE_MANAGER: "ServiceManager",
+  /** Read-only: every module and report, no writes (legacy Auditormast). */
+  AUDITOR: "Auditor",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
@@ -89,6 +91,8 @@ export const PERMISSIONS = {
   VEHICLE_DELETE: "vehicle:delete",
   VEHICLE_IMAGE_CREATE: "vehicle:image:create",
   VEHICLE_OWNERSHIP_CREATE: "vehicle:ownership:create",
+  /** Change VIN, registration, engine number, model or sale date (replaces legacy VehicleUpdatePassword). */
+  VEHICLE_IDENTITY_UPDATE: "vehicle:identity:update",
 
   // ── Service — Appointments ────────────────────────────────────────────────
   APPOINTMENT_READ: "appointment:read",
@@ -112,6 +116,8 @@ export const PERMISSIONS = {
   LABOUR_ITEM_READ: "labour-item:read",
   LABOUR_ITEM_CREATE: "labour-item:create",
   LABOUR_ITEM_UPDATE: "labour-item:update",
+  /** Edit model labour rates, one at a time or in bulk (legacy Labour Rate Update Utility). */
+  LABOUR_RATE_UPDATE: "labour-rate:update",
 
   // ── Employee Master ───────────────────────────────────────────────────────
   EMPLOYEE_READ: "employee:read",
@@ -152,6 +158,10 @@ export const PERMISSIONS = {
   SPAREPART_CREATE: "sparepart:create",
   SPAREPART_UPDATE: "sparepart:update",
   SPAREPART_DELETE: "sparepart:delete",
+  /** See dealer rates, purchase prices and stock values (legacy "Can View Dealer Rate"). */
+  SPAREPART_COST_READ: "sparepart:cost:read",
+  /** Approve the shortage/excess on an MIT or STN receipt (legacy "Can Approve Shortage/Excess in MIT/BIT"). */
+  STOCK_DISCREPANCY_APPROVE: "stock:discrepancy:approve",
 
   // ── Inventory — Stock ─────────────────────────────────────────────────────
   STOCK_READ: "stock:read",
@@ -203,6 +213,9 @@ export const PERMISSIONS = {
   // ── Stock audit (report only; kept apart so a branch store cannot audit itself) ──
   STOCK_AUDIT_READ: "stockaudit:read",
   STOCK_AUDIT_MANAGE: "stockaudit:manage",
+  // Register store PCs as handheld stations and issue their keys.
+  HANDHELD_STATIONS: "handheld:stations",
+  LABELS_PRINT: "labels:print",
 
   // ── Finance — Payments ────────────────────────────────────────────────────
   PAYMENT_READ: "payment:read",
@@ -223,6 +236,9 @@ export const PERMISSIONS = {
   RECEIPT_ADJUST_REVERSE: "receipt:adjust:reverse",
   PARTY_OPENING_CREATE: "party:opening:create",
 
+  // ── Finance — Mobis pricing (conversion rate, dealer factor, price bulletins) ──
+  MOBIS_PRICING_MANAGE: "mobispricing:manage",
+
   // ── Finance — Reports ─────────────────────────────────────────────────────
   FINANCE_REPORT_READ: "financereport:read",
   RECEIPT_REGISTER_READ: "report:receipt-register",
@@ -238,6 +254,9 @@ export const PERMISSIONS = {
 
   // ── Audit ─────────────────────────────────────────────────────────────────
   AUDIT_READ: "audit:read",
+
+  // ── Books closed (period lock; legacy Year End freeze). SuperAdmin only. ──
+  BOOKS_CLOSE: "books:close",
 
   // ── Service — Job card lines (parts/labour and who pays) ──────────────────
   JOBCARD_LINE_UPDATE: "jobcard:line:update",
@@ -310,14 +329,23 @@ const MIS_WORKSHOP_REPORTS: PermissionType[] = [
   ...MIS_FRONT_OFFICE_REPORTS,
 ];
 
+/** The Auditor role: every read permission and every report, never a write (report settings are a write). */
+export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(PERMISSIONS).filter(
+  (name) => (name.endsWith(":read") || name.startsWith("report:")) && name !== PERMISSIONS.REPORT_SETTINGS,
+);
+
 // Mapping roles to their default initial permissions for seeding
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   [ROLES.ENGINEER]: [PERMISSIONS.JOBCARD_READ, PERMISSIONS.WORKSHOP_READ],
   // Full access
   [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
 
+  [ROLES.AUDITOR]: AUDITOR_PERMISSIONS,
+
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.MANAGEMENT_INFORMATION_READ,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
@@ -361,6 +389,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.VEHICLE_CREATE,
     PERMISSIONS.VEHICLE_UPDATE,
+    PERMISSIONS.VEHICLE_IDENTITY_UPDATE,
     PERMISSIONS.VEHICLE_IMAGE_CREATE,
     PERMISSIONS.VEHICLE_OWNERSHIP_CREATE,
     PERMISSIONS.APPOINTMENT_READ,
@@ -377,6 +406,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.LABOUR_ITEM_READ,
     PERMISSIONS.LABOUR_ITEM_CREATE,
     PERMISSIONS.LABOUR_ITEM_UPDATE,
+    PERMISSIONS.LABOUR_RATE_UPDATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.INSPECTION_CREATE,
     PERMISSIONS.ESTIMATE_READ,
@@ -391,6 +421,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SPAREPART_UPDATE,
     PERMISSIONS.STOCK_READ,
     PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.LABELS_PRINT,
     PERMISSIONS.PURCHASEREQUEST_READ,
     PERMISSIONS.PURCHASEREQUEST_CREATE,
     PERMISSIONS.PURCHASEREQUEST_UPDATE,
@@ -415,6 +446,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.STOCK_TAKE_CONFIRM,
     PERMISSIONS.STOCK_AUDIT_READ,
     PERMISSIONS.STOCK_AUDIT_MANAGE,
+    PERMISSIONS.HANDHELD_STATIONS,
     PERMISSIONS.INVOICE_READ,
     PERMISSIONS.PAYMENT_READ,
     PERMISSIONS.INVOICE_CREATE,
@@ -452,6 +484,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Cross-branch inventory manager: manages stock across ALL branches
   [ROLES.GENERAL_STORE_MANAGER]: [
+    PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
@@ -468,6 +502,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SPAREPART_DELETE,
     PERMISSIONS.STOCK_READ,
     PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.LABELS_PRINT,
     PERMISSIONS.INVENTORY_CROSS_BRANCH,
     PERMISSIONS.PURCHASEREQUEST_READ,
     PERMISSIONS.PURCHASEREQUEST_CREATE,
@@ -501,6 +536,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch-scoped inventory manager: manages stock for their assigned branch only
   [ROLES.BRANCH_STORE_MANAGER]: [
+    PERMISSIONS.SPAREPART_COST_READ,
     ...MIS_STORE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.REQUISITION_READ,
@@ -515,6 +551,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.SPAREPART_UPDATE,
     PERMISSIONS.STOCK_READ,
     PERMISSIONS.STOCK_UPDATE,
+    PERMISSIONS.LABELS_PRINT,
     PERMISSIONS.PURCHASEREQUEST_READ,
     PERMISSIONS.PURCHASEREQUEST_CREATE,
     PERMISSIONS.PARTISSUANCE_READ,
@@ -610,6 +647,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Oversees accounting: finance, invoices, payments, receipts
   [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.SPAREPART_COST_READ,
+    PERMISSIONS.MOBIS_PRICING_MANAGE,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ,

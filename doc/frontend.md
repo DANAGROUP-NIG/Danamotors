@@ -15,7 +15,7 @@ authenticated workspace is in the `(dashboard)` group.
 | --- | --- |
 | `/login` | Sign in |
 | `/register` | Self-registration (first user becomes SuperAdmin) |
-| `/forgot-password` | Request a reset link (link is shown on success) |
+| `/forgot-password` | Ask an administrator to reset the password (no link is shown) |
 | `/reset-password` | Complete reset via `?token=` from the email/link |
 
 ### Dashboard (`(dashboard)` group)

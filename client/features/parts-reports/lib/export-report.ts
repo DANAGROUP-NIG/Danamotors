@@ -77,7 +77,7 @@ export async function exportReportXlsx(
   let current: string | null | undefined;
   let groupRows: ReportRow[] = [];
   const closeGroup = () => {
-    if (current == null) return;
+    if (current == null || result.subtotals === false) return;
     const sub = subtotal(groupRows, columns);
     aoa.push(["", ...columns.map((c, i) => (i === 0 ? "Subtotal" : c.key in sub ? sub[c.key] : null))]);
   };

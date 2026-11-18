@@ -14,11 +14,11 @@ import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
+import { preparePriceList, type PriceListRow } from "./partCatalogue";
 import { recordBinChange, recordPartChange } from "./partHistory";
 import type { LegacyPartFields } from "./inventory.validation";
 
 const INHERITABLE_FIELDS = [
-  "category",
   "uom",
   "taxCategory",
   "taxForm",
@@ -31,7 +31,6 @@ const INHERITABLE_FIELDS = [
   "partFlag",
   "partType",
   "priceCategoryCode",
-  "storeLocation",
 ] as const;
 
 type InheritableField = (typeof INHERITABLE_FIELDS)[number];
@@ -40,8 +39,6 @@ type InheritedDefaults = Pick<SparePart, InheritableField>;
 interface CreateMainPartInput {
   partNumber: string;
   name: string;
-  description?: string;
-  category?: string;
   uom?: string;
   taxCategory?: string;
   taxForm?: string;
@@ -50,8 +47,6 @@ interface CreateMainPartInput {
   mainPartId?: string;
   reorderQty?: number;
   unitPrice?: number;
-  binLocation?: string;
-  storeLocation?: string;
   branchStock?: {
     branchId: string;
     quantity: number;
@@ -65,8 +60,6 @@ interface CreateAlternatePartInput {
   mainPartId: string;
   partNumber: string;
   name: string;
-  description?: string;
-  binLocation?: string;
   // Any of these, if provided, OVERRIDE the inherited value from main.
   overrides?: Partial<InheritedDefaults>;
 }
@@ -76,7 +69,7 @@ interface ListPartsQuery {
   partCode?: string;
   partNumber?: string;
   name?: string;
-  category?: string;
+  priceCategoryCode?: string;
   partStatus?: PartStatus | string;
   role?: PartRole | string;
   mainPartId?: string;
@@ -128,9 +121,9 @@ export class InventoryService {
   ): Promise<number | null> {
     if (!code) return null;
     const category = await prisma.partCategory.findUnique({ where: { code } });
-    if (!category) throw new BadRequestError(`Unknown price category ${code}`);
+    if (!category) throw new BadRequestError(`Unknown part category ${code}`);
     if (!category.isActive)
-      throw new BadRequestError(`Price category ${code} is inactive`);
+      throw new BadRequestError(`Part category ${code} is inactive`);
     return Math.round(dealerRate * category.markupMultiplier * 100) / 100;
   }
 
@@ -261,8 +254,6 @@ export class InventoryService {
     id: string,
     data: {
       name?: string;
-      description?: string;
-      category?: string;
       unitPrice?: number;
     },
     changedById?: string,
@@ -326,8 +317,6 @@ export class InventoryService {
       mainPartId,
       partNumber,
       name,
-      description,
-      binLocation,
       overrides,
     } = data;
 
@@ -337,8 +326,6 @@ export class InventoryService {
           mainPartId,
           partNumber,
           name,
-          description,
-          binLocation,
           role: PartRole.ALTERNATE,
           ...inherited,
           ...overrides,
@@ -373,7 +360,7 @@ export class InventoryService {
       name,
       partCode,
       partNumber,
-      category,
+      priceCategoryCode,
       partStatus,
       mainPartId,
       search,
@@ -385,9 +372,7 @@ export class InventoryService {
       ...(partCode && { partCode }),
       ...(partNumber && { partNumber }),
       ...(name && { name: { contains: name, mode: "insensitive" } }),
-      ...(category && {
-        category: { contains: category, mode: "insensitive" },
-      }),
+      ...(priceCategoryCode && { priceCategoryCode }),
       ...(partStatus && { partStatus: partStatus as PartStatus }),
       ...(role && { role: role as PartRole }),
       ...(mainPartId && { mainPartId }),
@@ -458,7 +443,6 @@ export class InventoryService {
     partCode?: string;
     partNumber: string;
     name: string;
-    category: string;
     uom: string;
     taxCategory?: string;
     taxForm?: string;
@@ -471,8 +455,6 @@ export class InventoryService {
     partFlag?: string;
     partType?: string;
     priceCategoryCode?: string;
-    binLocation?: string;
-    storeLocation?: string;
     partStatus?: PartStatus;
     warrantyApplicable?: boolean;
     warrantyRate?: number | null;
@@ -511,7 +493,6 @@ export class InventoryService {
     partCode?: string;
     partNumber?: string;
     name?: string;
-    category?: string;
     partStatus?: PartStatus;
     page?: number;
     limit?: number;
@@ -524,7 +505,6 @@ export class InventoryService {
       partCode: filters?.partCode,
       partNumber: filters?.partNumber,
       name: filters?.name,
-      category: filters?.category,
       partStatus: filters?.partStatus,
       skip,
       take: limit,
@@ -556,7 +536,6 @@ export class InventoryService {
       partCode?: string;
       partNumber?: string;
       name?: string;
-      category?: string;
       uom?: string;
       taxCategory?: string;
       taxForm?: string;
@@ -569,8 +548,6 @@ export class InventoryService {
       partFlag?: string;
       partType?: string;
       priceCategoryCode?: string | null;
-      binLocation?: string;
-      storeLocation?: string;
       partStatus?: PartStatus;
       warrantyApplicable?: boolean;
       warrantyRate?: number | null;
@@ -660,7 +637,6 @@ export class InventoryService {
         priceCategoryCode: record.priceCategoryCode,
         dealerRate: record.unitPrice,
         retailRate: record.retailRate,
-        binLocation: record.binLocation,
         stock: branchId
           ? { quantity: stock?.quantity ?? 0, available: (stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0), rackLocation: stock?.rackLocation ?? null }
           : null,
@@ -677,7 +653,7 @@ export class InventoryService {
    */
   async createSourceRecord(
     mainPartId: string,
-    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null; binLocation?: string | null },
+    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null },
     changedById?: string,
   ) {
     const main = await prisma.sparePart.findUnique({
@@ -705,8 +681,6 @@ export class InventoryService {
           partCode: partNumber,
           partNumber,
           name: main.name,
-          description: `${sourceLabel(data.source)} source of ${main.partNumber}`,
-          category: main.category ?? "",
           uom: main.uom,
           taxCategory: main.taxCategory,
           taxForm: main.taxForm,
@@ -720,7 +694,6 @@ export class InventoryService {
           retailRate,
           partFlag: data.source,
           priceCategoryCode,
-          binLocation: data.binLocation?.trim() || null,
           partStatus: PartStatus.ACTIVE,
           warrantyApplicable: false,
           sourceOfPartId: main.id,
@@ -898,12 +871,22 @@ export class InventoryService {
     return this.withAvailableQuantity(stock);
   }
 
-  /** Legacy Part Query: stock at the home premises, alternates, and other branches. */
+  /**
+   * Legacy Part Query and Part Enquiry: stock at the home premises, alternates, and other branches;
+   * a part missing from Part Master is looked up in the Mobis catalogue so it can be created.
+   */
   async partQuery(partNumber: string, homeBranchId?: string | null) {
     const part = await prisma.sparePart.findFirst({
       where: { partNumber: { equals: partNumber, mode: "insensitive" } },
     });
-    if (!part) throw new NotFoundError(`Part ${partNumber} not found`);
+    if (!part) {
+      const catalogue = await prisma.partCatalogueItem.findUnique({
+        where: { partNumber: partNumber.trim().toUpperCase() },
+      });
+      if (!catalogue)
+        throw new NotFoundError(`Part ${partNumber} not found in Part Master or the Mobis catalogue`);
+      return { source: "CATALOGUE" as const, catalogue };
+    }
 
     const rootId = part.mainPartId ?? part.id;
     const alternates = await prisma.sparePart.findMany({
@@ -930,7 +913,83 @@ export class InventoryService {
         },
       }),
     ]);
-    return buildPartQuery({ part, alternates, branches, stocks, homeBranchId });
+    return {
+      source: "PART_MASTER" as const,
+      ...buildPartQuery({ part, alternates, branches, stocks, homeBranchId }),
+    };
+  }
+
+  // ── Mobis catalogue (legacy FullpartList) ─────────────────────────────
+
+  async catalogueSummary() {
+    const agg = await prisma.partCatalogueItem.aggregate({
+      _count: true,
+      _max: { updatedAt: true },
+    });
+    return { count: agg._count, lastUpdatedAt: agg._max.updatedAt };
+  }
+
+  /** One batch of the Mobis price list: new parts are added, known ones take the new name and rates. */
+  async importPriceList(rows: PriceListRow[]) {
+    const categories = await prisma.partCategory.findMany();
+    const { items, problems } = preparePriceList(rows, categories);
+    if (problems.length) {
+      const more = problems.length > 10 ? ` and ${problems.length - 10} more` : "";
+      throw new BadRequestError(`The price list was not saved: ${problems.slice(0, 10).join("; ")}${more}`);
+    }
+    // xmax = 0 only on a freshly inserted row, which tells added from updated.
+    const saved = await prisma.$queryRaw<{ inserted: boolean }[]>`
+      INSERT INTO "PartCatalogueItem"
+        ("partNumber", "name", "partFlag", "priceCategoryCode", "dealerRate", "retailRate", "updatedAt")
+      SELECT t.*, NOW() FROM UNNEST(
+        ${items.map((i) => i.partNumber)}::text[],
+        ${items.map((i) => i.name)}::text[],
+        ${items.map((i) => i.partFlag)}::text[],
+        ${items.map((i) => i.priceCategoryCode)}::text[],
+        ${items.map((i) => i.dealerRate)}::float8[],
+        ${items.map((i) => i.retailRate)}::float8[]
+      ) AS t
+      ON CONFLICT ("partNumber") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "partFlag" = EXCLUDED."partFlag",
+        "priceCategoryCode" = EXCLUDED."priceCategoryCode",
+        "dealerRate" = EXCLUDED."dealerRate",
+        "retailRate" = EXCLUDED."retailRate",
+        "updatedAt" = NOW()
+      RETURNING (xmax = 0) AS inserted`;
+    const added = saved.filter((r) => r.inserted).length;
+    return { added, updated: saved.length - added };
+  }
+
+  /** Legacy Part Enquiry > Create Part: the catalogue row becomes a Part Master part. */
+  async createPartFromCatalogue(partNumber: string, changedById?: string) {
+    const item = await prisma.partCatalogueItem.findUnique({
+      where: { partNumber: partNumber.trim().toUpperCase() },
+    });
+    if (!item) throw new NotFoundError(`Part ${partNumber} is not in the Mobis catalogue`);
+    const existing = await prisma.sparePart.findFirst({
+      where: { partNumber: { equals: item.partNumber, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existing) throw new ConflictError(`Part ${item.partNumber} is already in Part Master`);
+    const priceCategory = item.priceCategoryCode
+      ? await prisma.partCategory.findUnique({ where: { code: item.priceCategoryCode } })
+      : null;
+    return this.createPart(
+      {
+        partNumber: item.partNumber,
+        name: item.name,
+        uom: item.uom,
+        unitRate: item.dealerRate,
+        retailRate: item.retailRate ?? undefined,
+        taxable: item.taxable,
+        partFlag: item.partFlag,
+        partType: item.partType,
+        // A category deactivated since the upload is left off; the rates are still the list's.
+        priceCategoryCode: priceCategory?.isActive ? priceCategory.code : undefined,
+      },
+      changedById,
+    );
   }
 
   async listStockTransactions(branchId?: string, partId?: string) {

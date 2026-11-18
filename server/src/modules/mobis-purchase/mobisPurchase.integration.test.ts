@@ -21,7 +21,6 @@ describeDb("Mobis purchase receiving (database)", () => {
   const invoice = (suffix = "") => ({
     destinationBranchId: cpd.id,
     invoiceNumber: `A6EA${run}${suffix}`,
-    conversionRate: 2700,
     receivedMode: "AIR" as const,
     sourceFileName: "A6EA0567A.xls",
     lines: [
@@ -36,6 +35,8 @@ describeDb("Mobis purchase receiving (database)", () => {
     prisma = require("../../prisma/client").default;
     service = new (require("./mobisPurchase.service").MobisPurchaseService)();
     const role = await prisma.role.upsert({ where: { name: "GeneralStoreManager" }, update: {}, create: { name: "GeneralStoreManager" } });
+    // The MIT takes Finance's conversion rate (Finance → Mobis pricing); stubbed so parallel tests don't race on it.
+    jest.spyOn(require("../finance/mobis-pricing.service"), "getMobisPricing").mockResolvedValue({ conversionRate: 2700, dealerFactor: 0.616, updatedAt: null });
     cpd = await prisma.branch.create({ data: { name: `CPD Mobis ${run}` } });
     user = await prisma.user.create({
       data: { email: `mobis.${run}@test.local`, passwordHash: "x", firstName: "Store", lastName: "Test", roleId: role.id },
