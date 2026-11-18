@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Ban,
+  Barcode,
   Boxes,
   CheckCircle,
   GitBranch,
@@ -28,7 +29,8 @@ import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
+import { INVENTORY_PERMISSIONS, LABEL_PERMISSIONS } from "@/features/auth/roles";
+import { PrintLabelDialog } from "@/features/labels";
 import { usePart, usePartAlternates, usePartStock, usePriceCategories } from "../hooks/use-parts";
 import { useCreateAlternate, useDeletePart, useSetPartStatus } from "../hooks/use-part-mutations";
 import { alternatePartSchema, type AlternatePartFormValues } from "../schemas/inventory.schema";
@@ -64,13 +66,10 @@ function DetailField({
   label,
   value,
   mono,
-  wide,
 }: {
   label: string;
   value?: ReactNode;
   mono?: boolean;
-  /** Takes the full row on phones, for long text such as descriptions. */
-  wide?: boolean;
 }) {
   const empty = value === null || value === undefined || value === "";
   return (
@@ -94,24 +93,21 @@ function AlternateForm({ mainPartId, onDone }: { mainPartId: string; onDone: () 
       className="grid gap-4"
       noValidate
       onSubmit={handleSubmit((values) =>
-        create.mutate({ ...values, description: values.description || undefined }, { onSuccess: onDone }),
+        create.mutate(values, { onSuccess: onDone }),
       )}
     >
       <p className="text-sm text-slate-600">
-        The alternate copies category, unit of measure, tax, stock levels, unit rate and store location from the main
+        The alternate copies part category, unit of measure, tax, stock levels and unit rate from the main
         part. You can change them afterwards on the alternate’s own page.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Part number" error={errors.partNumber?.message}>
           <input className={inputCls} placeholder="e.g. 96611P2710" {...register("partNumber")} />
         </Field>
-        <Field label="Name" error={errors.name?.message}>
+        <Field label="Part description" error={errors.name?.message}>
           <input className={inputCls} {...register("name")} />
         </Field>
       </div>
-      <Field label="Description (optional)" error={errors.description?.message}>
-        <input className={inputCls} {...register("description")} />
-      </Field>
       <Button type="submit" disabled={create.isPending}>
         {create.isPending ? "Adding…" : "Add alternate"}
       </Button>
@@ -135,7 +131,7 @@ function FamilyRow({ part, current }: { part: PartMaster; current?: boolean }) {
       <td className="px-3 py-2">
         <PartRoleBadge role={part.role} />
       </td>
-      <td className="px-3 py-2 text-slate-600">{fmtNaira(part.unitRate)}</td>
+      <td className="px-3 py-2 text-slate-600">{(part.unitRate != null ? fmtNaira(part.unitRate) : "—")}</td>
       <td className="px-3 py-2">
         <PartStatusBadge status={part.partStatus} />
       </td>
@@ -152,6 +148,8 @@ export function PartDetail({ id }: { id: string }) {
   const canCreate = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_CREATE);
   const canReadStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_READ);
   const canUpdateStock = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
+  const canPrintLabel = hasPermission(LABEL_PERMISSIONS.PRINT);
+  const crossBranch = hasPermission(INVENTORY_PERMISSIONS.INVENTORY_CROSS_BRANCH);
   const { user } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const [editingStock, setEditingStock] = useState<
@@ -160,6 +158,7 @@ export function PartDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [addingAlt, setAddingAlt] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [printingLabel, setPrintingLabel] = useState(false);
   const setStatus = useSetPartStatus();
   const { data: priceCategories } = usePriceCategories();
   const del = useDeletePart();
@@ -204,6 +203,11 @@ export function PartDetail({ id }: { id: string }) {
               <Link href={`/inventory/part-query?part=${encodeURIComponent(part.partNumber)}`}>
                 <Search className="size-4" /> Part query
               </Link>
+            </Button>
+          )}
+          {canPrintLabel && part.partStatus === "ACTIVE" && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPrintingLabel(true)}>
+              <Barcode className="size-4" /> Print label
             </Button>
           )}
           {canEdit &&
@@ -277,12 +281,11 @@ export function PartDetail({ id }: { id: string }) {
             </p>
           )}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <DetailField label="Category" value={part.category} />
             <DetailField label="Unit of measure" value={part.uom} />
             <DetailField label="Part type" value={codeLabel(PART_TYPE_LABELS, part.partType ?? "S")} />
             <DetailField label="Purchase source" value={codeLabel(PART_FLAG_LABELS, part.partFlag)} />
             <DetailField
-              label="Price category"
+              label="Part category"
               value={
                 part.priceCategoryCode
                   ? (() => {
@@ -292,7 +295,7 @@ export function PartDetail({ id }: { id: string }) {
                   : null
               }
             />
-            <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />
+            {part.unitRate != null && <DetailField label="Dealer rate" value={fmtNaira(part.unitRate)} />}
             <DetailField label="Retail rate" value={part.retailRate != null ? fmtNaira(part.retailRate) : null} />
             <DetailField label="Tax status" value={part.taxable ? "Taxable" : "Not taxable"} />
             <DetailField
@@ -313,7 +316,6 @@ export function PartDetail({ id }: { id: string }) {
                 .filter(Boolean)
                 .join(", ") || null}
             />
-            <DetailField label="Description" value={part.description} wide />
           </div>
         </div>
 
@@ -321,20 +323,12 @@ export function PartDetail({ id }: { id: string }) {
           <PartSources part={part} branchId={sourcesBranchId} branchName={activeBranch?.name} canCreate={canCreate} />
         </SectionCard>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <SectionCard icon={<Receipt className="size-4" />} title="Tax">
-            <div className="grid grid-cols-2 gap-4">
-              <DetailField label="Tax category" value={part.taxCategory} />
-              <DetailField label="Tax form" value={part.taxForm} />
-            </div>
-          </SectionCard>
-          <SectionCard icon={<MapPin className="size-4" />} title="Location">
-            <div className="grid grid-cols-2 gap-4">
-              <DetailField label="Bin location" value={part.binLocation} mono />
-              <DetailField label="Store location" value={part.storeLocation} />
-            </div>
-          </SectionCard>
-        </div>
+        <SectionCard icon={<Receipt className="size-4" />} title="Tax">
+          <div className="grid grid-cols-2 gap-4">
+            <DetailField label="Tax category" value={part.taxCategory} />
+            <DetailField label="Tax form" value={part.taxForm} />
+          </div>
+        </SectionCard>
 
         <SectionCard icon={<Tag className="size-4" />} title="Stock levels">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -503,6 +497,14 @@ export function PartDetail({ id }: { id: string }) {
       <ModalFame isOpen={addingAlt} onClose={() => setAddingAlt(false)} title={`Add alternate for ${part.partNumber}`}>
         {addingAlt && <AlternateForm mainPartId={part.id} onDone={() => setAddingAlt(false)} />}
       </ModalFame>
+
+      {printingLabel && (
+        <PrintLabelDialog
+          part={part}
+          branchId={crossBranch ? (activeBranch?.id ?? user?.branchId ?? undefined) : undefined}
+          onClose={() => setPrintingLabel(false)}
+        />
+      )}
 
       <ConfirmDeleteModal
         isOpen={confirmDelete}

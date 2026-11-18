@@ -26,13 +26,23 @@ const SETTINGS_CARDS = [
     href: "/settings/workshop-masters",
   },
   {
+    title: "Books Closed",
+    description: "Year end: the date up to which finance and stock entries are locked, per company or branch.",
+    href: "/settings/books-closed",
+  },
+  {
+    title: "Model Labour Rates",
+    description: "Hours and rate per labour and model, with bulk changes, add-to-models and copy-model.",
+    href: "/settings/labour-rates",
+  },
+  {
     title: "Service Checklists",
     description: "Parts and labour per checklist and model, and the checklist due at each mileage.",
     href: "/settings/service-checklists",
   },
   {
     title: "Part Categories",
-    description: "Retail multiplier per price category and each branch's discount, handling and cost %.",
+    description: "Retail multiplier per part category and each branch's discount, handling and cost %.",
     href: "/settings/part-categories",
   },
   {
@@ -44,6 +54,11 @@ const SETTINGS_CARDS = [
     title: "Integrations",
     description: "Connect payment gateways and external services.",
     href: "/settings",
+  },
+  {
+    title: "HHDC",
+    description: "Handheld stations (store PCs with the cradle), the handhelds, jobs not yet posted, and what is ready to send.",
+    href: "/settings/hhdc",
   },
   {
     title: "Warranty",

@@ -4,7 +4,8 @@ import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { REPORTS, reportByKind } from "./partsReport.definitions";
-import { PartsReportService, ReportFilters } from "./partsReport.service";
+import { PartsReportService, ReportFilters, withoutCostColumns } from "./partsReport.service";
+import { canSeeCost } from "../../middleware/costVisibility";
 
 const handle =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
@@ -82,6 +83,7 @@ export class PartsReportController {
     const branchId = crossBranch ? query.branchId : req.user!.branchId ?? undefined;
     if (!crossBranch) assertInventoryBranchAccess(req, [branchId]);
     const result = await this.service.run(definition.kind, { ...query, branchId });
-    res.json({ status: "success", statusCode: 200, data: { report: result } });
+    // Cost columns are dropped for users without sparepart:cost:read (legacy "Can View Dealer Rate").
+    res.json({ status: "success", statusCode: 200, data: { report: canSeeCost(req.user) ? result : withoutCostColumns(result) } });
   });
 }

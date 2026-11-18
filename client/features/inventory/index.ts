@@ -4,6 +4,7 @@ export { PartMasterTable } from "./components/PartMasterTable";
 export { PartForm } from "./components/PartForm";
 export { PartDetail } from "./components/PartDetail";
 export { PartQueryPage } from "./components/PartQueryPage";
+export { PartCataloguePage } from "./components/PartCataloguePage";
 export { useParts, usePart, usePartAlternates, usePartStock, usePartQuery, usePriceCategories } from "./hooks/use-parts";
 export {
   useCreatePart,

@@ -18,7 +18,7 @@ Express 4 + Prisma 6 + PostgreSQL + TypeScript. All routes are mounted under `/a
 | POST | `/login` | none | Login, returns `{ accessToken, refreshToken, user }` |
 | POST | `/refresh` | none | Exchange refresh token for a new access token |
 | POST | `/logout` | none | Revoke a refresh token |
-| POST | `/forgot-password` | none | Generates a one-time reset token (1 h expiry). Returns the reset link in the response until a mailer is wired up |
+| POST | `/forgot-password` | none | Asks for a reset: notifies the super admins (and, for branch staff, the branch admins) with a link to the user. Creates and returns no reset link; the same answer whether or not the email exists |
 | POST | `/reset-password` | none | Completes reset with `{ token, newPassword }`; invalidates sessions |
 | POST | `/logout-all` | JWT | Revoke all refresh tokens for the user |
 | GET | `/me` | JWT | Current user profile |
@@ -33,6 +33,7 @@ Express 4 + Prisma 6 + PostgreSQL + TypeScript. All routes are mounted under `/a
 | POST | `/users` | `user:create` | Create user |
 | PUT | `/users/:id` | `user:update` (SuperAdmin/Admin only) | Update user |
 | DELETE | `/users/:id` | `user:delete` | Delete user |
+| POST | `/users/:id/reset-password` | `user:update` (SuperAdmin/Admin only) | Set another user's password `{ newPassword }`. SuperAdmin: any other user. Admin: own-branch staff, not Admins or SuperAdmins. Signs the user out of all sessions; audited as `USER_PASSWORD_RESET` |
 | GET | `/roles` | `role:read` | List roles |
 | GET | `/roles/:id` | `role:read` | Get role with permissions |
 | POST | `/roles` | `role:update` | Create role |
@@ -199,9 +200,10 @@ Errors are handled centrally by `server/src/middleware/errorHandler.ts`:
 
 ## Known limitations
 
-- No email transport is wired yet; `POST /auth/forgot-password` returns the reset link
-  directly in the response (envelope `data.resetLink`). `nodemailer` is already a
-  dependency for future wiring.
+- No email transport is wired yet, so forgot-password creates no reset link. It used to return
+  the link in the response, which let anyone who knew an email address take over that account.
+  Administrators reset passwords from the user's page instead. `POST /auth/reset-password` still
+  works for a token, for when email is wired (`nodemailer` is already a dependency).
 - Request body size for file uploads (customer documents, vehicle images) uses
   `multer`; cloudinary integration is available as a dependency.
 

@@ -20,7 +20,8 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  label: string;
+  /** Heading shown above the group; omitted for a group without one (log out). */
+  label?: string;
   items: NavItem[];
   /** Backend permission strings required to see this group. Takes precedence over `roles`. */
   permissions?: string[];

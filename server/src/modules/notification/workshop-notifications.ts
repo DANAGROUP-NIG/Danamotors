@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
+import { holdsPermission } from '../../shared/effectivePermissions';
 import { NotificationService } from './notification.service';
 import type { WorkshopEvent } from './notification.events';
 
@@ -15,7 +16,7 @@ export function workshopRecipients(event: WorkshopEvent, card: { branchId: strin
     if (card.technicianId) ids.push(card.technicianId);
   } else if (event === 'JOB_SENT_FOR_QC') {
     if (card.qualityInspectorId) ids.push(card.qualityInspectorId);
-    queries.push({ branchId: card.branchId, role: { permissions: { some: { permission: { name: PERMISSIONS.QCSTATUS_UPDATE } } } } });
+    queries.push({ branchId: card.branchId, AND: [holdsPermission(PERMISSIONS.QCSTATUS_UPDATE)] });
   } else {
     if (card.serviceAdvisorId) ids.push(card.serviceAdvisorId); else roles.push(ROLES.SERVICE_ADVISOR);
     if (['PARTS_ISSUED', 'PART_RECEIVED', 'QC_FAILED', 'PROMISED_24H', 'PROMISED_12H'].includes(event) && card.technicianId) ids.push(card.technicianId);

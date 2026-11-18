@@ -49,7 +49,7 @@ function AddSourceForm({ main, usedSources, onDone }: { main: PartMaster; usedSo
     >
       <p className="text-sm text-slate-600">
         A local, used or repaired part is its own record with its own stock, rates and bin. It copies the name, unit of
-        measure, tax and classification of {main.partNumber}. The retail rate is the dealer rate × the price category
+        measure, tax and classification of {main.partNumber}. The retail rate is the dealer rate × the part category
         multiplier; a vendor receipt updates both.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -78,7 +78,7 @@ function AddSourceForm({ main, usedSources, onDone }: { main: PartMaster; usedSo
         <Field label="Dealer rate (cost)">
           <input type="number" min="0.01" step="0.01" className={inputCls} value={dealerRate} onChange={(event) => setDealerRate(event.target.value)} />
         </Field>
-        <Field label="Price category">
+        <Field label="Part category">
           <select className={inputCls} value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="">No category (retail not set)</option>
             {categories
@@ -158,7 +158,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
                   )}
                 </td>
                 <td className="px-3 py-2 text-slate-600">{record.stock ? record.stock.quantity : "—"}</td>
-                <td className="px-3 py-2 text-slate-600">{fmtNaira(record.dealerRate)}</td>
+                <td className="px-3 py-2 text-slate-600">{(record.dealerRate != null ? fmtNaira(record.dealerRate) : "—")}</td>
                 <td className="px-3 py-2 text-slate-600">{record.retailRate != null ? fmtNaira(record.retailRate) : "Not set"}</td>
                 <td className="px-3 py-2">
                   <PartStatusBadge status={record.partStatus} />

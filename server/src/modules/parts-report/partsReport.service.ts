@@ -27,7 +27,23 @@ export interface ReportResult {
   rows: Row[];
   totals: Record<string, number>;
   grouped: boolean;
+  /** Each group ends with a subtotal; off where every group is a single line (the subtotal would repeat it). */
+  subtotals: boolean;
   truncated: boolean;
+}
+
+/** The report without its cost columns (dealer rates, stock and purchase values, cost and profit). */
+export function withoutCostColumns(report: ReportResult): ReportResult {
+  const hidden = new Set(report.columns.filter(column => column.cost).map(column => column.key));
+  if (!hidden.size) return report;
+  const keep = <T extends Record<string, unknown>>(record: T) =>
+    Object.fromEntries(Object.entries(record).filter(([key]) => !hidden.has(key))) as T;
+  return {
+    ...report,
+    columns: report.columns.filter(column => !column.cost),
+    rows: report.rows.map(keep),
+    totals: keep(report.totals),
+  };
 }
 
 const MAX_ROWS = 5000;
@@ -39,7 +55,7 @@ const customerSelect = {
   select: { id: true, code: true, companyName: true, firstName: true, lastName: true, house: true, street: true, address: true, city: true, state: true },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, binLocation: true, unitPrice: true, retailRate: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, unitPrice: true, retailRate: true, priceCategoryCode: true, priceCategory: { select: { description: true } } },
 } as const;
 
 /** Consumption Report issue columns (legacy order): workshop issues by job type and who pays the line, then the other issues. */
@@ -49,6 +65,15 @@ const CHARGE_COLUMN: Record<ChargeType, string> = { CUSTOMER: "job", WARRANTY: "
 const CONSUMPTION_AMOUNTS: Record<string, string> = { job: "jobAmount", counterSale: "counterSaleAmount" };
 /** Legacy part flag F: samples, issued at no value. */
 const SAMPLE_FLAG = "F";
+/** Legacy counter-sale handling and trade discount: bills cannot carry them yet (see SALE_HANDLING). */
+const NO_SALE_CHARGES = { handling: 0, tradeDiscount: 0 };
+
+/**
+ * Taxable for the sales registers' taxable / non-taxable columns: the part's tax status (legacy partmast.taxable,
+ * csfatax.taxstatus), not whether VAT was charged. Legacy billed taxable parts at 0% on forms X, Y and P and still
+ * printed them as taxable. The tax registers (datewise, annexure) instead split by the VAT charged (taxSplit).
+ */
+const taxableLine = (l: { vatPercent: number | null; part: { taxable: boolean } | null }) => (l.vatPercent ?? 0) > 0 || (l.part?.taxable ?? false);
 
 /** A document's heading line, as legacy prints it: "number · dd/mm/yyyy · store". */
 const documentHeading = (number: string, date: Date, store: string) =>
@@ -88,6 +113,7 @@ export class PartsReportService {
       rows: rows.slice(0, limit),
       totals,
       grouped: !!definition.grouped && rows.some((r) => r.group != null),
+      subtotals: !definition.headingsOnly?.includes(option ?? ""),
       truncated: rows.length > limit,
     };
   }
@@ -169,7 +195,7 @@ export class PartsReportService {
       include: {
         customer: customerSelect,
         counterSale: { select: { gatePassNumber: true } },
-        lines: { include: { part: { select: { partType: true, id: true } } } },
+        lines: { include: { part: { select: { partType: true, taxable: true, id: true } } } },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
@@ -180,7 +206,7 @@ export class PartsReportService {
         if (wanted && !(l.partId && wanted.has(l.partId))) continue;
         const v = lineValues(l.quantity, l.rate, i.partsDiscountPercent, l.vatPercent);
         // Legacy columns: spares/kit (accessories included) and oil, each split into taxable and non-taxable value before discount.
-        const column = `${l.part?.partType === "O" ? "oil" : "spares"}${(l.vatPercent ?? 0) > 0 ? "Taxable" : "Exempt"}` as keyof typeof row;
+        const column = `${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as keyof typeof row;
         row[column] = money(row[column] + v.gross);
         row.discount = money(row.discount + v.discount);
         row.vat = money(row.vat + v.vat);
@@ -194,6 +220,7 @@ export class PartsReportService {
         customerCode: i.customer.code,
         customer: partyName(i.customer),
         ...row,
+        ...NO_SALE_CHARGES,
         roundOff,
         net: money(row.sparesTaxable + row.sparesExempt + row.oilTaxable + row.oilExempt - row.discount + row.vat + roundOff),
       };
@@ -230,8 +257,8 @@ export class PartsReportService {
       include: {
         customer: customerSelect,
         cancelledBy: { select: { firstName: true, lastName: true } },
-        counterSale: { select: { salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
-        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true } } } },
+        counterSale: { select: { branch: { select: { name: true } }, salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
+        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true, taxable: true } } } },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
@@ -249,9 +276,13 @@ export class PartsReportService {
     return { taxable: money(taxable), exempt: money(exempt) };
   }
 
-  /** Bills grouped by sales executive (legacy Sales Executive Wise register), or one line per day (legacy datewise register). */
+  /**
+   * The period's bills in one line (legacy Register Summary), bills grouped by sales executive (legacy
+   * Sales Executive Wise register), or one line per day (legacy datewise register).
+   */
   private async counterSalesSummary(f: ReportFilters): Promise<Row[]> {
     if (f.option === "DAY") return this.taxDatewise(f);
+    if (f.option === "TOTAL") return this.saleTotal(f);
     const invoices = await this.saleInvoices(f);
     const rows = invoices.map((i) => {
       // Value by part type before discount, as the legacy executive register printed it.
@@ -266,6 +297,7 @@ export class PartsReportService {
         billNumber: i.invoiceNumber,
         customer: partyName(i.customer),
         ...byType,
+        ...NO_SALE_CHARGES,
         discount: i.partsDiscountAmount,
         vat: i.vatAmount,
         roundOff: i.roundOff,
@@ -277,12 +309,40 @@ export class PartsReportService {
     return rows.sort((a, b) => a.group.localeCompare(b.group));
   }
 
+  /**
+   * Legacy Counter Sale Register Summary: under each branch heading, spares/kit and oil (taxable and non-taxable)
+   * and accessories before discount, then discount, VAT, round-off and total.
+   */
+  private async saleTotal(f: ReportFilters): Promise<Row[]> {
+    const invoices = await this.saleInvoices(f);
+    const branches = new Map<string, { bills: number; sparesTaxable: number; sparesExempt: number; oilTaxable: number; oilExempt: number; accessories: number; discount: number; vat: number; roundOff: number; net: number }>();
+    for (const i of invoices) {
+      const branch = i.counterSale?.branch.name ?? "";
+      const row = branches.get(branch) ?? { bills: 0, sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
+      row.bills += 1;
+      for (const l of i.lines) {
+        const { gross } = lineValues(l.quantity, l.rate, 0, null);
+        const column = l.part?.partType === "A" ? "accessories" : (`${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as const);
+        row[column] = money(row[column] + gross);
+      }
+      row.discount = money(row.discount + i.partsDiscountAmount);
+      row.vat = money(row.vat + i.vatAmount);
+      row.roundOff = money(row.roundOff + i.roundOff);
+      row.net = money(row.net + i.total);
+      branches.set(branch, row);
+    }
+    // Every bill is on credit (legacy printed a CASH and a CREDIT line; no cash bill since mid-2009, CPD never).
+    return [...branches]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([branch, row]) => ({ group: branch, section: "Credit", ...row, ...NO_SALE_CHARGES }));
+  }
+
   private async taxDatewise(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f);
     const days = new Map<string, Row>();
     for (const i of invoices) {
       const day = LAGOS_DAY.format(i.issuedDate);
-      const row = days.get(day) ?? { date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
+      const row = days.get(day) ?? { date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, ...NO_SALE_CHARGES, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
       const split = this.taxSplit(i);
       row.bills = Number(row.bills) + 1;
       for (const [key, value] of Object.entries({
@@ -310,6 +370,7 @@ export class PartsReportService {
       customer: partyName(i.customer),
       address: [i.customer.house, i.customer.street, i.customer.address, i.customer.city, i.customer.state].filter(Boolean).join(", "),
       gross: i.partsTotal,
+      ...NO_SALE_CHARGES,
       discount: i.partsDiscountAmount,
       ...this.taxSplit(i),
       vat: i.vatAmount,
@@ -405,7 +466,7 @@ export class PartsReportService {
         row = {
           ...(byCustomer && { group: [customer.code, partyName(customer)].filter(Boolean).join(" · ") }),
           category,
-          categoryName: part?.priceCategory?.description ?? "No price category",
+          categoryName: part?.priceCategory?.description ?? "No part category",
           quantity: 0,
           sales: 0,
           returns: 0,
@@ -612,7 +673,7 @@ export class PartsReportService {
     const rack = await this.racks(f, lines.map((l) => l.partId));
     return lines
       .map((l) => ({
-        bin: rack.get(l.partId) ?? l.part.binLocation ?? "",
+        bin: rack.get(l.partId) ?? "",
         partNumber: l.part.partNumber,
         description: l.part.name,
         date: l.mrn.receiptDate.toISOString(),
@@ -718,7 +779,7 @@ export class PartsReportService {
       partNumber: l.part.partNumber,
       description: l.part.name,
       requestedPart: l.isAlternate ? l.requestedPart.partNumber : null,
-      bin: l.binLocation ?? l.part.binLocation,
+      bin: l.binLocation,
       picked: l.pickedQuantity,
       picker: l.pickingList.pickerName || userName(l.pickingList.createdBy),
       status: statusLabel(l.pickingList.status),
@@ -955,7 +1016,7 @@ export class PartsReportService {
       const key = f.summary ? (t.part.priceCategoryCode ?? "") : t.partId;
       const row = byPart.get(key) ?? {
         ...(f.summary
-          ? { categoryName: t.part.priceCategory?.description ?? "No price category" }
+          ? { categoryName: t.part.priceCategory?.description ?? "No part category" }
           : { partNumber: t.part.partNumber, flag: t.part.partFlag, description: t.part.name }),
         category: t.part.priceCategoryCode,
         ...(!f.summary && { dealerRate: t.part.unitPrice, retailRate }),

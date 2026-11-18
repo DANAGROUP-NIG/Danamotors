@@ -41,8 +41,6 @@ export const createSparePartSchema = z.object({
   body: z.object({
     partNumber: z.string().min(1, "Part number is required"),
     name: z.string().min(1, "Name is required"),
-    description: z.string().optional(),
-    category: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
     branchStock: z
       .array(
@@ -60,8 +58,6 @@ export const createSparePartSchema = z.object({
 export const updateSparePartSchema = z.object({
   body: z.object({
     name: z.string().optional(),
-    description: z.string().optional(),
-    category: z.string().optional(),
     unitPrice: z.number().nonnegative().optional(),
   }),
   params: z.object({
@@ -85,7 +81,6 @@ export const listPartsFilterQuerySchema = z.object({
     partCode: z.string().optional(),
     partNumber: z.string().optional(),
     name: z.string().optional(),
-    category: z.string().optional(),
     partStatus: z.nativeEnum(PartStatus).optional(),
   }),
 });
@@ -116,7 +111,6 @@ const basePartMasterFields = {
     .max(50, "Part code must be 50 characters or less"),
   partNumber: z.string().min(1, "Part number is required"),
   name: z.string().min(1, "Name is required"),
-  category: z.string().min(1, "Category is required"),
   uom: z.string().min(1, "Unit of measure is required"),
   taxCategory: z.string().optional(),
   taxForm: z.string().optional(),
@@ -150,10 +144,8 @@ const basePartMasterFields = {
     .string()
     .trim()
     .toUpperCase()
-    .max(2, "Price category must be 1 or 2 characters")
+    .max(2, "Part category must be 1 or 2 characters")
     .optional(),
-  binLocation: z.string().optional(),
-  storeLocation: z.string().optional(),
   // Legacy partmast.WTYAPPLICABLE / warrrate.
   warrantyApplicable: z.boolean().optional(),
   warrantyRate: z.number().nonnegative('Warranty rate must be 0 or more').nullable().optional(),
@@ -186,7 +178,6 @@ export const updatePartMasterSchema = z.object({
       partCode: basePartMasterFields.partCode.optional(),
       partNumber: basePartMasterFields.partNumber.optional(),
       name: basePartMasterFields.name.optional(),
-      category: basePartMasterFields.category.optional(),
       uom: basePartMasterFields.uom.optional(),
       taxCategory: basePartMasterFields.taxCategory,
       taxForm: basePartMasterFields.taxForm,
@@ -199,8 +190,6 @@ export const updatePartMasterSchema = z.object({
       partFlag: basePartMasterFields.partFlag,
       partType: basePartMasterFields.partType,
       priceCategoryCode: basePartMasterFields.priceCategoryCode.nullable(),
-      binLocation: basePartMasterFields.binLocation,
-      storeLocation: basePartMasterFields.storeLocation,
       warrantyApplicable: basePartMasterFields.warrantyApplicable,
       warrantyRate: basePartMasterFields.warrantyRate,
       partStatus: partStatusEnum.optional(),
@@ -246,8 +235,7 @@ export const createSourceRecordSchema = z.object({
       partNumber: z.string().trim().min(1, "Part number is required").max(40, "Part number must be 40 characters or less"),
       dealerRate: z.number().finite().positive("Dealer rate must be greater than zero"),
       // Omitted: L (local consumable, 1.5x) for local, used and repaired records, else the main part's category.
-      priceCategoryCode: z.string().trim().toUpperCase().max(2, "Price category must be 1 or 2 characters").nullable().optional(),
-      binLocation: z.string().trim().max(30).optional(),
+      priceCategoryCode: z.string().trim().toUpperCase().max(2, "Part category must be 1 or 2 characters").nullable().optional(),
     })
     .strict(),
 });
@@ -257,7 +245,6 @@ export const listPartsQuerySchema = z.object({
     partCode: z.string().optional(),
     partNumber: z.string().optional(),
     name: z.string().optional(),
-    category: z.string().optional(),
     partStatus: partStatusEnum.optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -269,7 +256,7 @@ export const listPartsQueryWithFiltersSchema = z.object({
     partCode: z.string().optional(),
     partNumber: z.string().optional(),
     name: z.string().optional(),
-    category: z.string().optional(),
+    priceCategoryCode: z.string().trim().toUpperCase().max(2).optional(),
     partStatus: partStatusEnum.optional(),
     role: z.nativeEnum(PartRole).optional(),
     mainPartId: z.string().uuid().optional(), // add
@@ -386,6 +373,31 @@ export const partQueryQuerySchema = z.object({
     partNumber: z.string().trim().min(1, "Enter a part number").max(40),
     branchId: z.string().uuid("Invalid branch ID").optional(),
   }),
+});
+
+// The browser reads the whole Mobis price list and sends it in batches of up to 2,000 rows.
+export const PRICE_LIST_BATCH_MAX = 2000;
+
+export const importPriceListSchema = z.object({
+  body: z.object({
+    rows: z
+      .array(
+        z.object({
+          partNumber: z.string().trim().min(1, "Part number is required").max(40),
+          name: z.string().trim().min(1, "Part name is required").max(200),
+          partFlag: z.string().trim().max(2).optional(),
+          priceCategoryCode: z.string().trim().max(2).nullable().optional(),
+          dealerRate: z.number().positive("Dealer rate must be greater than zero"),
+          retailRate: z.number().nonnegative().nullable().optional(),
+        }),
+      )
+      .min(1, "No price list rows")
+      .max(PRICE_LIST_BATCH_MAX, `Send at most ${PRICE_LIST_BATCH_MAX} rows at a time`),
+  }),
+});
+
+export const createPartFromCatalogueSchema = z.object({
+  params: z.object({ partNumber: z.string().trim().min(1).max(40) }),
 });
 
 const optionalLocationText = (max: number) =>

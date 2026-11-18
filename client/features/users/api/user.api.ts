@@ -59,3 +59,16 @@ export async function getRolesRequest(): Promise<{ roles: Role[] }> {
 export async function deleteUserRequest(id: string): Promise<void> {
   return apiDelete<void>(API_ROUTES.administration.users.detail(id));
 }
+
+/** Replaces the user's own grants and denials on top of their role. */
+export async function setUserPermissionsRequest(
+  id: string,
+  payload: { grants: string[]; denies: string[] },
+): Promise<{ user: UserWithRole }> {
+  return apiPut<{ user: UserWithRole }, typeof payload>(API_ROUTES.administration.users.permissions(id), payload);
+}
+
+/** Sets a new password for another user. The user is signed out of all sessions. */
+export async function resetUserPasswordRequest(id: string, newPassword: string): Promise<void> {
+  await apiPost<void, { newPassword: string }>(API_ROUTES.administration.users.resetPassword(id), { newPassword });
+}

@@ -43,7 +43,6 @@ const partSelect = {
     name: true,
     uom: true,
     partFlag: true,
-    binLocation: true,
     unitPrice: true,
     retailRate: true,
     sourceOfPart: { select: { id: true, partNumber: true } },
@@ -96,7 +95,7 @@ export class VendorReceiptService {
       ...part,
       sourceLabel: sourceLabel(part.partFlag),
       stock: inventoryStocks[0]?.quantity ?? 0,
-      bin: inventoryStocks[0]?.rackLocation ?? part.binLocation,
+      bin: inventoryStocks[0]?.rackLocation ?? null,
     }));
   }
 
@@ -232,7 +231,7 @@ export class VendorReceiptService {
       lines: mrn.lines.map((line) => ({
         ...line,
         sourceLabel: sourceLabel(line.part.partFlag),
-        bin: stocks.find((s) => s.partId === line.partId)?.rackLocation ?? line.part.binLocation,
+        bin: stocks.find((s) => s.partId === line.partId)?.rackLocation ?? null,
       })),
     };
   }

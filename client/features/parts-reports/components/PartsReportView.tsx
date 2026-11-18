@@ -663,7 +663,7 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
                         </Fragment>
                       );
                     })}
-                    {g.name !== null && (
+                    {g.name !== null && result.subtotals !== false && (
                       <tr className="border-b bg-muted/10 font-medium">
                         <td />
                         {result.columns.map((c, i) => {

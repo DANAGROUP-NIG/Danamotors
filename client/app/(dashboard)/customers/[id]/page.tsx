@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { CustomerMergeCard } from "@/features/customers/components/CustomerMergeCard";
+import { CustomerMergeHistory } from "@/features/customers/components/CustomerMergeHistory";
 import { useCustomer } from "@/features/customers";
 import { CustomerPortalAccessCard } from "@/features/customers/components/CustomerPortalAccessCard";
 import { CustomerCreditCard } from "@/features/customers/components/CustomerCreditCard";
@@ -78,6 +79,7 @@ export default function CustomerDetailPage() {
       </nav>
       {tab === "account" ? <CustomerCreditCard customer={customer} /> : <>
       <CustomerMergeCard customer={customer} />
+      <CustomerMergeHistory customerId={customer.id} />
       <Link
         href="/customers"
         className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"

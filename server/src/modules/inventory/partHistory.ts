@@ -5,14 +5,11 @@
 import { PartChangeAction, Prisma, SparePart } from "@prisma/client";
 
 type Db = Prisma.TransactionClient;
-type TrackedPart = Pick<SparePart, "id" | "partNumber" | "name" | "partFlag" | "priceCategoryCode" | "unitPrice" | "retailRate" | "binLocation">;
+type TrackedPart = Pick<SparePart, "id" | "partNumber" | "name" | "partFlag" | "priceCategoryCode" | "unitPrice" | "retailRate">;
 
 const bin = (value: string | null | undefined) => value?.trim() || null;
 
-/**
- * Records a part being added (`before` null), edited, or deleted (`after` null): its rates when
- * they changed, and its Part Master bin when that changed.
- */
+/** Records a part being added (`before` null), edited, or deleted (`after` null) when its rates changed. */
 export async function recordPartChange(db: Db, before: TrackedPart | null, after: TrackedPart | null, changedById?: string | null) {
   const part = after ?? before;
   if (!part) return;
@@ -35,14 +32,13 @@ export async function recordPartChange(db: Db, before: TrackedPart | null, after
       },
     });
   }
-  if (before && after) await recordBinChange(db, after.id, null, before.binLocation, after.binLocation, changedById);
 }
 
-/** Records a bin change: a branch's rack location, or the Part Master bin when `branchId` is null. */
+/** Records a change of a branch's rack location for a part. */
 export async function recordBinChange(
   db: Db,
   partId: string,
-  branchId: string | null,
+  branchId: string,
   oldBin: string | null | undefined,
   newBin: string | null | undefined,
   changedById?: string | null,

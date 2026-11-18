@@ -129,7 +129,7 @@ const read = requirePermission(PERMISSIONS.TRANSFER_READ);
  *             example:
  *               status: success
  *               data:
- *                 part: { partNumber: "2630035505", name: "FILTER ASSY-ENGINE OIL", uom: "UNIT", unitRate: 9056.34, binLocation: "A-12" }
+ *                 part: { partNumber: "2630035505", name: "FILTER ASSY-ENGINE OIL", uom: "UNIT", unitRate: 9056.34 }
  *                 requestingBranchStock: { quantity: 52, reserved: 0, available: 52 }
  *                 sourceBranchStock: { quantity: 300, reserved: 10, available: 290 }
  *                 alternates: [{ part: { partNumber: "2630035504" }, sourceBranchStock: { available: 12 } }]

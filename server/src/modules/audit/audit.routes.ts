@@ -5,11 +5,15 @@ import { authMiddleware } from '../../middleware/authMiddleware';
 import { requirePermission } from '../../middleware/authorize';
 import { PERMISSIONS } from '../../shared/constants/roles';
 import { listAuditLogsSchema, auditLogIdParamSchema } from './audit.validation';
+import changeLogRoutes from './changeLog.routes';
 
 const router = Router();
 const controller = new AuditController();
 
 router.use(authMiddleware);
+
+// Field-level change log (ChangeLog, filled by database triggers).
+router.use('/changes', changeLogRoutes);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /audit/logs — List audit logs (paginated, filtered)

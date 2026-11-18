@@ -8,6 +8,9 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useUpdateUser } from "../hooks/use-update-user";
 import { useRoles } from "../hooks/use-roles";
+import { CopyAccessSelect } from "./copy-access-select";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useBranches } from "@/features/branches/hooks/use-branches";
 import {
   updateUserSchema,
   type UpdateUserFormValues,
@@ -23,6 +26,10 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
   const update = useUpdateUser(user.id);
   const { data: rolesData } = useRoles();
   const roles = rolesData?.roles ?? [];
+  // Only a super admin may move a user to another branch (the server enforces it too).
+  const { isSuperAdmin } = useAuth();
+  const { data: branchesData } = useBranches({ page: 1, limit: 100 });
+  const branches = (branchesData?.branches ?? []).filter((b) => b.isActive || b.id === user.branchId);
 
   const {
     register,
@@ -38,7 +45,9 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
       lastName: user.lastName,
       phoneNumber: user.phoneNumber ?? "",
       roleId: user.roleId,
+      branchId: user.branchId ?? "",
       isActive: user.isActive,
+      copyFromUserId: "",
     },
   });
 
@@ -48,12 +57,24 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
       lastName: user.lastName,
       phoneNumber: user.phoneNumber ?? "",
       roleId: user.roleId,
+      branchId: user.branchId ?? "",
       isActive: user.isActive,
+      copyFromUserId: "",
     });
   }, [user, reset]);
 
+  const copyFrom = watch("copyFromUserId") ?? "";
+
   function onSubmit(values: UpdateUserFormValues) {
-    update.mutate(values, { onSuccess });
+    // Send the branch only when a super admin actually changed it. Copying replaces the role, so the
+    // role field is not sent with it.
+    const { branchId, copyFromUserId, roleId, ...rest } = values;
+    const access = copyFromUserId
+      ? { copyFromUserId }
+      : { roleId };
+    if (copyFromUserId && !window.confirm("Replace this user's role and own permissions with the chosen user's?")) return;
+    const payload = isSuperAdmin && branchId && branchId !== user.branchId ? { ...rest, ...access, branchId } : { ...rest, ...access };
+    update.mutate(payload, { onSuccess });
   }
 
   const isActive = watch("isActive");
@@ -73,9 +94,22 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
         <input className={inputCls} {...register("phoneNumber")} />
       </Field>
 
+      {isSuperAdmin && (
+        <Field label="Branch" error={errors.branchId?.message}>
+          <select className={inputCls} {...register("branchId")}>
+            {!user.branchId && <option value="">No branch</option>}
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Role" error={errors.roleId?.message}>
-          <select className={inputCls} {...register("roleId")}>
+          <select className={inputCls} disabled={!!copyFrom} {...register("roleId")}>
             <option value="">Select role</option>
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
@@ -109,6 +143,19 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
           </div>
         </Field>
       </div>
+
+      <Field label="Copy access from user (optional)">
+        <CopyAccessSelect
+          value={copyFrom}
+          excludeId={user.id}
+          onChange={(id) => setValue("copyFromUserId", id)}
+        />
+        {copyFrom && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Replaces the role and any permissions granted or denied to this user with the chosen user&apos;s.
+          </p>
+        )}
+      </Field>
 
       <Button type="submit" disabled={update.isPending} size="sm">
         {update.isPending ? "Saving…" : "Save changes"}

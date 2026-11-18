@@ -6,6 +6,7 @@
 import { BadRequestError } from "../../shared/errors/appError";
 
 export const MOBIS_VENDOR = "MOBIS";
+/** Only for MITs saved before the rate was recorded; new MITs carry Finance's rate (finance/mobis-pricing). */
 export const DEFAULT_CONVERSION_RATE = 2700;
 export const MRN_TAX_FORM = "P";
 
