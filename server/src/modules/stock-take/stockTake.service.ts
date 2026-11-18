@@ -18,6 +18,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../shared/erro
 import { lockStock, nextDocumentNumber, StockTransferService } from "../stock-transfer/stockTransfer.service";
 import { DOC_TYPES } from "../stock-transfer/stockTransfer.logic";
 import { recordBinChange } from "../inventory/partHistory";
+import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import {
   adjustedStock,
   Basis,
@@ -48,9 +49,9 @@ export interface PartSelection {
   to?: string;
   /** Legacy "Source of Purchase" (O original, A authorised source, L local, F FOC). */
   partFlag?: string;
-  /** Legacy "Part Type" (Part Master category). */
-  category?: string;
-  /** Legacy "Part Category" (price category). */
+  /** Legacy "Part Type" (partmast.parttype): S spare part, O oil, A accessory. */
+  partType?: string;
+  /** Legacy "Part Category" (partmast.partcategory). */
   priceCategoryCode?: string;
   dealerRateFrom?: number;
   dealerRateTo?: number;
@@ -131,7 +132,7 @@ export class StockTakeService {
         part: {
           partStatus: PartStatus.ACTIVE,
           ...(s.partFlag && { partFlag: s.partFlag }),
-          ...(s.category && { category: s.category }),
+          ...(s.partType && { partType: s.partType }),
           ...(s.priceCategoryCode && { priceCategoryCode: s.priceCategoryCode }),
           ...((s.dealerRateFrom != null || s.dealerRateTo != null) && {
             unitPrice: { ...(s.dealerRateFrom != null && { gte: s.dealerRateFrom }), ...(s.dealerRateTo != null && { lte: s.dealerRateTo }) },
@@ -142,7 +143,7 @@ export class StockTakeService {
         partId: true,
         quantity: true,
         rackLocation: true,
-        part: { select: { partNumber: true, name: true, partFlag: true, unitPrice: true, binLocation: true } },
+        part: { select: { partNumber: true, name: true, partFlag: true, unitPrice: true } },
       },
     });
     let rows = stocks
@@ -151,7 +152,7 @@ export class StockTakeService {
         partNumber: st.part.partNumber,
         name: st.part.name,
         partFlag: st.part.partFlag,
-        bin: st.rackLocation ?? st.part.binLocation ?? "",
+        bin: st.rackLocation ?? "",
         dealerRate: st.part.unitPrice,
         stock: st.quantity,
       }))
@@ -418,6 +419,8 @@ export class StockTakeService {
         throw new ConflictError(`Stock audit ${take.batchNumber} is completed and can no longer be cancelled`);
       }
       const now = new Date();
+      const open = await tx.stockTakeSheet.findMany({ where: { stockTakeId: id, uploadedAt: null, cancelledAt: null }, select: { id: true } });
+      await cancelSentHandheldDocuments(tx, open.map((sh) => ({ stockTakeSheetId: sh.id })), "Stock taking cancelled", actorId);
       await tx.stockTakeSheet.updateMany({
         where: { stockTakeId: id, uploadedAt: null, cancelledAt: null },
         data: { cancelledAt: now, cancelRemark: "Stock taking cancelled" },
@@ -486,10 +489,11 @@ export class StockTakeService {
     return sheet;
   }
 
-  async cancelSheet(id: string, sheetId: string, remark: string) {
+  async cancelSheet(id: string, sheetId: string, remark: string, actorId?: string) {
     await prisma.$transaction(async (tx) => {
       await this.lockTake(tx, id, [StockTakeStatus.ACTIVE]);
       const sheet = await this.lockSheet(tx, id, sheetId);
+      await cancelSentHandheldDocuments(tx, { stockTakeSheetId: sheet.id }, `Sheet cancelled on the web: ${remark}`, actorId);
       await tx.stockTakeSheet.update({ where: { id: sheet.id }, data: { cancelledAt: new Date(), cancelRemark: remark } });
       await tx.stockTakeLine.updateMany({ where: { sheetId: sheet.id }, data: { sheetId: null } });
     }, TX_OPTIONS);
@@ -509,19 +513,26 @@ export class StockTakeService {
    * counted (ZERO) or go back to the pool for another sheet (RELEASE).
    */
   async uploadSheet(id: string, sheetId: string, input: { entries: CountEntry[]; uncounted: UncountedOnSheet }, actorId: string) {
-    await prisma.$transaction(async (tx) => {
-      const take = await this.lockTake(tx, id, [StockTakeStatus.ACTIVE]);
-      const sheet = await this.lockSheet(tx, id, sheetId);
-      await this.applyCounts(tx, take, input.entries, actorId, sheet.id);
-      if (input.uncounted === "ZERO") {
-        await this.zeroUncounted(tx, take, actorId, { sheetId: sheet.id, remark: `Not found when counting sheet ${sheet.sheetNumber}` });
-      } else {
-        await tx.stockTakeLine.updateMany({ where: { sheetId: sheet.id, countedQuantity: null }, data: { sheetId: null } });
-      }
-      const countedCount = await tx.stockTakeLine.count({ where: { sheetId: sheet.id, countedQuantity: { not: null } } });
-      await tx.stockTakeSheet.update({ where: { id: sheet.id }, data: { uploadedAt: new Date(), uploadedById: actorId, countedCount } });
-    }, TX_OPTIONS);
+    await prisma.$transaction((tx) => this.uploadSheetInTx(tx, id, sheetId, input, actorId), TX_OPTIONS);
     return this.getStockTake(id);
+  }
+
+  /**
+   * The sheet upload inside a caller's transaction (posting a handheld job, which has already marked
+   * itself posted). Any other active handheld job of the sheet is cancelled: its result is now stale.
+   */
+  async uploadSheetInTx(tx: Tx, id: string, sheetId: string, input: { entries: CountEntry[]; uncounted: UncountedOnSheet }, actorId: string) {
+    const take = await this.lockTake(tx, id, [StockTakeStatus.ACTIVE]);
+    const sheet = await this.lockSheet(tx, id, sheetId);
+    await cancelSentHandheldDocuments(tx, { stockTakeSheetId: sheet.id }, "Counts uploaded directly", actorId);
+    await this.applyCounts(tx, take, input.entries, actorId, sheet.id);
+    if (input.uncounted === "ZERO") {
+      await this.zeroUncounted(tx, take, actorId, { sheetId: sheet.id, remark: `Not found when counting sheet ${sheet.sheetNumber}` });
+    } else {
+      await tx.stockTakeLine.updateMany({ where: { sheetId: sheet.id, countedQuantity: null }, data: { sheetId: null } });
+    }
+    const countedCount = await tx.stockTakeLine.count({ where: { sheetId: sheet.id, countedQuantity: { not: null } } });
+    await tx.stockTakeSheet.update({ where: { id: sheet.id }, data: { uploadedAt: new Date(), uploadedById: actorId, countedCount } });
   }
 
   /** Counts entered on the count screen, without a sheet (legacy manual entry, ThroughHHDC = 0). */
@@ -543,10 +554,10 @@ export class StockTakeService {
     const byId = [...new Set(entries.filter((e) => e.partId).map((e) => e.partId!))];
     const byNumber = [...new Set(entries.filter((e) => !e.partId && e.partNumber?.trim()).map((e) => e.partNumber!.trim().toUpperCase()))];
     const parts = [
-      ...(byId.length ? await tx.sparePart.findMany({ where: { id: { in: byId } }, select: { id: true, partNumber: true, binLocation: true } }) : []),
+      ...(byId.length ? await tx.sparePart.findMany({ where: { id: { in: byId } }, select: { id: true, partNumber: true } }) : []),
       ...(byNumber.length
-        ? await tx.$queryRaw<{ id: string; partNumber: string; binLocation: string | null }[]>`
-            SELECT "id", "partNumber", "binLocation" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${byNumber}::text[])`
+        ? await tx.$queryRaw<{ id: string; partNumber: string }[]>`
+            SELECT "id", "partNumber" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${byNumber}::text[])`
         : []),
     ];
     const missing = byId.find((pid) => !parts.some((p) => p.id === pid));
@@ -587,7 +598,7 @@ export class StockTakeService {
             stockTakeId: take.id,
             partId: part?.id ?? null,
             partNumber: part?.partNumber ?? group.partNumber!,
-            binLocation: st?.rackLocation ?? part?.binLocation ?? null,
+            binLocation: st?.rackLocation ?? null,
             systemStock: st?.quantity ?? 0,
             addedDuringCount: true,
           },
@@ -718,8 +729,8 @@ export class StockTakeService {
   private async relinkUnknownParts(tx: Tx, take: { id: string; branchId: string; type: StockTakeType }) {
     const unknown = await tx.stockTakeLine.findMany({ where: { stockTakeId: take.id, partId: null } });
     if (!unknown.length) return;
-    const parts = await tx.$queryRaw<{ id: string; partNumber: string; binLocation: string | null }[]>`
-      SELECT "id", "partNumber", "binLocation" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${unknown.map((l) => l.partNumber.toUpperCase())}::text[])`;
+    const parts = await tx.$queryRaw<{ id: string; partNumber: string }[]>`
+      SELECT "id", "partNumber" FROM "SparePart" WHERE UPPER("partNumber") = ANY(${unknown.map((l) => l.partNumber.toUpperCase())}::text[])`;
     if (!parts.length) return;
     const busy = await this.partsInOpenCounts(tx, take.branchId);
     const stock = await this.stockOf(tx, take.branchId, parts.map((p) => p.id));
@@ -749,7 +760,7 @@ export class StockTakeService {
             partId: part.id,
             partNumber: part.partNumber,
             notRequired: false,
-            binLocation: st?.rackLocation ?? part.binLocation,
+            binLocation: st?.rackLocation ?? null,
             systemStock: st?.quantity ?? 0,
             stockAtCount: st?.quantity ?? 0,
           },
@@ -831,7 +842,7 @@ export class StockTakeService {
     if (!take) throw new NotFoundError("Stock taking not found");
     const lines = await prisma.stockTakeLine.findMany({
       where: { stockTakeId: id, partId: { not: null }, countedBins: { not: null } },
-      select: { id: true, partId: true, partNumber: true, countedBins: true, part: { select: { name: true, partFlag: true, binLocation: true } } },
+      select: { id: true, partId: true, partNumber: true, countedBins: true, part: { select: { name: true, partFlag: true } } },
       orderBy: { partNumber: "asc" },
     });
     const stock = await this.stockOf(prisma, take.branchId, lines.map((l) => l.partId!));
@@ -842,7 +853,7 @@ export class StockTakeService {
         partNumber: l.partNumber,
         name: l.part?.name ?? "",
         partFlag: l.part?.partFlag ?? "",
-        currentBin: stock.get(l.partId!)?.rackLocation ?? l.part?.binLocation ?? null,
+        currentBin: stock.get(l.partId!)?.rackLocation ?? null,
         countedBins: l.countedBins!,
       }))
       .filter((l) => (l.currentBin ?? "").toUpperCase() !== l.countedBins.toUpperCase());

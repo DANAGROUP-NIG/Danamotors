@@ -61,7 +61,7 @@ describeDb("Part source records (database)", () => {
 
     // 1. A Mobis shock absorber (category C, 3.33x) with used and local source records.
     const main = await inventory.createPart(
-      { partNumber: `54651${run}`, name: "Shock absorber", category: "Suspension", uom: "EA", unitRate: 20000, priceCategoryCode: "C" },
+      { partNumber: `54651${run}`, name: "Shock absorber", uom: "EA", unitRate: 20000, priceCategoryCode: "C" },
       user.id,
     );
     expect(main.retailRate).toBe(66600);

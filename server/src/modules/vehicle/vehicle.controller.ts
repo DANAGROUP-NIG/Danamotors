@@ -68,7 +68,8 @@ export class VehicleController {
   updateVehicle = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const result = await this.vehicleService.updateVehicle(id, req.body);
+      // Identity fields need vehicle:identity:update and a reason (vehicle-identity.ts).
+      const result = await this.vehicleService.updateVehicle(id, req.body, req.user!);
 
       res.status(200).json({
         status: 'success',
@@ -78,6 +79,15 @@ export class VehicleController {
           vehicle: result,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getIdentityHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const history = await this.vehicleService.getIdentityHistory(req.params.id);
+      res.status(200).json({ status: 'success', statusCode: 200, data: { history } });
     } catch (error) {
       next(error);
     }

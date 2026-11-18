@@ -1,5 +1,5 @@
 import prisma from "../../prisma/client";
-import { User, Role, RefreshToken, Customer, CustomerAccount, CustomerRefreshToken } from "@prisma/client";
+import { User, Role, PermissionEffect, RefreshToken, Customer, CustomerAccount, CustomerRefreshToken } from "@prisma/client";
 
 export interface UserWithRoleAndPermissions extends User {
   role: Role & {
@@ -9,6 +9,7 @@ export interface UserWithRoleAndPermissions extends User {
       };
     }[];
   };
+  permissionOverrides: { effect: PermissionEffect; permission: { name: string } }[];
 }
 
 export interface CustomerWithAccount extends Customer {
@@ -38,6 +39,7 @@ export class AuthRepository {
             },
           },
         },
+        permissionOverrides: { include: { permission: { select: { name: true } } } },
       },
     }) as Promise<UserWithRoleAndPermissions | null>;
   }
@@ -55,6 +57,7 @@ export class AuthRepository {
             },
           },
         },
+        permissionOverrides: { include: { permission: { select: { name: true } } } },
       },
     }) as Promise<UserWithRoleAndPermissions | null>;
   }
@@ -174,6 +177,7 @@ export class AuthRepository {
             },
           },
         },
+        permissionOverrides: { include: { permission: { select: { name: true } } } },
       },
     }) as Promise<UserWithRoleAndPermissions>;
   }
@@ -209,6 +213,7 @@ export class AuthRepository {
                 },
               },
             },
+            permissionOverrides: { include: { permission: { select: { name: true } } } },
           },
         },
       },

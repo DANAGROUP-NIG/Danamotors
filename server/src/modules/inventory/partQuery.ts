@@ -17,7 +17,6 @@ export interface QueryPart {
   partNumber: string;
   partCode: string;
   name: string;
-  description: string | null;
   uom: string;
   partFlag: string;
   taxable: boolean;
@@ -148,7 +147,6 @@ export function buildPartQuery(input: {
       partNumber: part.partNumber,
       partCode: part.partCode,
       name: part.name,
-      description: part.description,
       uom: part.uom,
       partFlag: part.partFlag,
       taxable: part.taxable,

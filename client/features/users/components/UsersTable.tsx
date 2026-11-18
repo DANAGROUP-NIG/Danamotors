@@ -229,8 +229,18 @@ export function UsersTable() {
     {
       header: "Role",
       render: (u) => (
-        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-sm font-medium">
-          {u.role?.name ?? "—"}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-sm font-medium">
+            {u.role?.name ?? "—"}
+          </span>
+          {!!u._count?.permissionOverrides && (
+            <span
+              className="text-xs text-amber-700"
+              title="Permissions granted or denied to this user on top of the role"
+            >
+              +{u._count.permissionOverrides} own
+            </span>
+          )}
         </span>
       ),
     },

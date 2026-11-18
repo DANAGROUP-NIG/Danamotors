@@ -31,11 +31,11 @@ title, filters, options and columns are defined once, in
 | Legacy report | Kind | What it shows |
 |---|---|---|
 | Counter Sales Register | `counter-sales` | **Show** Bills (legacy layout, one line per bill: spares/kit and oil value, each taxable and non-taxable, cash discount, VAT, round-off and total amount) or Lines (every bill line: part, quantity, rate, discount, VAT and net, before the bill's round-off). Filters: customer, part filters. With a part filter, Bills lists only the matching lines' value and no round-off |
-| Counter Sales Register Summary, Counter Sales Tax Register (Datewise), Sales Executive Wise Counter Sales Register | `counter-sales-summary` | **Group by** Bill (one line per bill: sales executive, taxable and exempt value, VAT, round-off, outstanding and status), Sales executive (the same bills under each executive, with subtotals) or Day (one line per day: bills, taxable and exempt value, VAT, round-off and net). Filters: customer, sales executive |
+| Counter Sales Register Summary, Counter Sales Tax Register (Datewise), Sales Executive Wise Counter Sales Register | `counter-sales-summary` | **Group by** Total (the legacy Register Summary: the period's bills in one Credit line, with spares/kit and oil each taxable and non-taxable, handling, discount, cash discount, VAT, accessories, round-off and total), Sales executive (each bill under its executive, with spares, accessories and oil, discounts, VAT, round-off, net, outstanding and status, and subtotals) or Day (one line per day: bills, spare total, handling, discounts, taxable and exempt value, VAT, round-off and net). Filters: customer, sales executive |
 | Counter Sales Tax Register (Annexure) | `counter-sales-tax-annexure` | Bill-wise VAT with customer address; can list cancelled bills, which are never totalled |
 | Counter Sales Return Register | `counter-sales-returns` | Returned lines at the bill's discount and VAT, with the credit note number |
 | Counter Sales Cancellation Register | `counter-sales-cancellations` | Cancelled bills: All, Counter sales, or FOC (a 100% cash discount) |
-| Counter Sale Revenue | `counter-sales-revenue` | Sales less returns by price category against dealer cost, with margin; optionally by customer |
+| Counter Sale Revenue | `counter-sales-revenue` | Sales less returns by part category against dealer cost, with margin; optionally by customer |
 | CPO Register | `cpo-register` | CPO lines with ordered, picked, billed, cancelled and pending; Pending, Cancelled or Executed (and only fully executed) |
 | MRN Register | `mrn-register` | Vendor (Mobis) MRN lines grouped by vendor with subtotals, or **Summary (invoice wise)**: one line per MRN and supplier invoice (filters: vendor, MRN no., part filters) |
 | Material In Transit Report | `mit-register` | Mobis MIT lines by case and order number: invoiced, received, damaged, short and still in transit, valued at the conversion rate; **All** or **Pending** (no MRN yet) |
@@ -90,15 +90,27 @@ Counter-sale reports merged or left out, so that no report repeats another:
 
 - The legacy **Counter Sales Register Summary**, **Counter Sales Tax Register (Datewise)** and **Sales
   Executive Wise Counter Sales Register** all totalled the same bills, so they are the three **Group by**
-  choices of one report. The legacy executive screen took a *From exec* and *To exec* range; the
+  choices of one report. On **Total**, accessories have their own column and are not in the spares/kit
+  value, so the columns add up to the total. The legacy executive screen took a *From exec* and *To exec* range; the
   **Sales executive** filter picks one executive, or all.
 - **Cash and credit totals** (legacy printed every bill register in a CASH and a CREDIT section) are left
-  out. Part sale is a CPD feature and every CPD bill is on credit. What is still owed is on the summary's
+  out. CPD never made a cash bill, and the branches made none after 2009. Every bill here is on credit. The summary's **Total** prints the one Credit line. What is still owed is on the summary's
   Outstanding and Status columns.
 - **Accessories** have no column of their own: as on the legacy register, they are in the spares/kit value.
   The **Part type** filter still splits any register by type.
-- **Handling, entry tax, LST surcharge, other charges and CST** columns are left out: no CPD bill has them
-  (handling is applied only on some branch cash and credit bills, which part sale does not cover).
+- **Handling** and the trade **Discount** (legacy DISCOUNT, apart from CASH DISCOUNT) are kept on the
+  register, the summary and the annexure. CPD charged handling in 2011 and 2013. Lagos charged it every
+  year from 2011 to 2025, and ABJ from 2011 to 2016 and in 2021. A trade discount was given at Lagos
+  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. A bill here can carry only a cash
+  discount, so both columns show zero until bills can record them.
+- **Entry tax, LST surcharge and other charges** are left out: they are zero on every counter-sale bill,
+  in every year, in all three databases.
+- **Tax form is not covered yet.** Legacy gave each bill a tax form: L (VAT, a local sale), X
+  (TRNSFR WO/V, a transfer without VAT), or P, Y or Z (purchase forms). The datewise register's
+  "Local sales" and "Central sales" blocks split bills by form, and the annexure groups them under the
+  form's name. CPD billed form X up to 2024 (15 non-VAT-form bills since 2010, one of ₦19.3m in 2022),
+  and Lagos billed form X in 2026. Our bills have no tax form, so a bill without VAT cannot be told
+  apart from a bill of VAT-exempt parts.
 
 Stock reports merged or left out, so that no report repeats another:
 
@@ -117,7 +129,7 @@ Physical stock taking and stock audit reports merged or left out:
 - The legacy menus had nine report screens over the same count lines. Here they are two reports (physical
   counts and audits) with options, and two logs. See [stock-taking.md](./stock-taking.md#reports).
 - **Bin Location Updation Mismatch** had the same screen as **Part BIN Location History** (Part Master and
-  PST bin location updation). A stock taking's bin update is a branch bin change on that report.
+  PST bin location updation). Both changed a store's bin, as a stock taking's bin update does here.
 - The **S/E Approved By**, **Checker** and **Auditor** filters are left out. The **Summary** shows who
   approved each count, and **Checker wise** / **Auditor wise** lists each person's parts under their name.
 
@@ -137,7 +149,7 @@ The legacy **MIS Reports** menu.
 | Profitability Statement, Profitability Statement Revised | `profitability` | Sale value against cost, by kind: counter sales, FOC bills, workshop jobs, PDI jobs, STNs and SANs; cost FIFO or at dealer rate. **Only summary** totals by part category |
 | Percent Fill Report | `percent-fill` | Ordered against supplied, part by part: CPO quantities billed and branch indent quantities sent on STNs. **Order type** CPO, branch indent or all |
 | Part Rate History | `part-rate-history` | Every dealer and retail rate set in Part Master, with date, time and user. **Changed retail rate**, **Changed dealer rate**, **Both**, or **Only deleted records** (parts deleted from Part Master) |
-| Part BIN Location History | `part-bin-history` | Every bin change, with date, time and user: the branch's rack location, the Part Master bin, or both |
+| Part BIN Location History | `part-bin-history` | Every change of a part's bin (rack location) at a branch, with date, time and user |
 | Packing List Cum Gate Pass Report for STN | `packing-list-register` | Packing lists for STNs sent from the branch, **Branch**, **Courier name**, **Packing list date** or **Packing list no.** wise: each case and part, or with **Only summary** one line per packing list (gate pass, STN, mode, courier, waybill, cases, quantity, weight and value) |
 
 MIS reports merged or left out, so that no report repeats another:
@@ -151,7 +163,8 @@ MIS reports merged or left out, so that no report repeats another:
   its quantities, so there is never a mismatch to list.
 - **Log Report of Counter Sale / STN Editing** is left out: bills and STNs cannot be edited once posted.
   A bill can only be cancelled, and cancellations are on the Counter Sales Cancellation Register.
-- **Part Enquiry** is Part Query (**Inventory → Part Query**), which also shows alternates and other branches.
+- **Part Enquiry** is part of Part Query (**Inventory → Part Query**): a part not in Part Master is found in
+  the Mobis catalogue and can be created from it. See [masters.md](./masters.md#mobis-catalogue-and-part-enquiry).
 - **Data Downloading** and **Data Uploading** (full part list and part master files between CPD and the
   branches) are left out: every branch works in the one database.
 - **Only Top Movers** is left out, as on the stock reports, and so are the profitability's **With / without
@@ -180,7 +193,7 @@ MIS reports merged or left out, so that no report repeats another:
     spare, but the branch (AutoEnhancer) has 889 accessories and 122 oils
   - **Purchase source:** Original part (O), Authorised source (A), FOC item (F) or Local (L): the
     legacy part flag
-  - **Part category:** the price category
+  - **Part category:** legacy `partmast.partcategory`
 - **Counter-sale values** are priced exactly as the bill was: cash discount first, then VAT on
   taxable parts. Line totals therefore equal the bill before its round-off to ₦10 below, and
   the round-off is shown on the summary and datewise reports.
@@ -233,9 +246,8 @@ MIS reports merged or left out, so that no report repeats another:
   still being approved, picked or back-ordered) are shown but not counted; fill % is supplied ÷ (supplied
   + not supplied).
 - **Rate and bin history** start when this system went live: Part Master records each part added,
-  re-rated or deleted, and each bin change, including parts created from a Mobis invoice. The rate history
-  covers every branch (rates are the same everywhere). A Part Master bin change shows on every branch's bin
-  history.
+  re-rated or deleted, and each branch bin change. The rate history covers every branch (rates are the same
+  everywhere); a bin change belongs to one branch, as in legacy.
 
 ## Tests
 

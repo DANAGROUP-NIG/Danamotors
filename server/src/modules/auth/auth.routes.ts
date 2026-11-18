@@ -200,7 +200,10 @@ router.post("/login", authLimiter, validateRequest(loginSchema), controller.logi
  *   post:
  *     tags:
  *       - Auth
- *     summary: Request a password reset email
+ *     summary: Ask an administrator to reset a forgotten password
+ *     description: |
+ *       No reset link is created or returned. The super admins, and for branch staff the branch's admins,
+ *       are notified and reset the password from the user's page (`POST /admin/users/{id}/reset-password`).
  *     security: []
  *     requestBody:
  *       required: true
@@ -216,7 +219,7 @@ router.post("/login", authLimiter, validateRequest(loginSchema), controller.logi
  *                 example: staff@danamotors.com
  *     responses:
  *       200:
- *         description: Reset email sent (always returns 200 to prevent email enumeration)
+ *         description: The same answer whether or not the email exists, so emails cannot be probed
  *         content:
  *           application/json:
  *             schema:

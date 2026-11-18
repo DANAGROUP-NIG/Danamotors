@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { vehicleBody } from './vehicle.validation';
+import { vehicleBody, updateVehicleBody } from './vehicle.validation';
+import { assertCanChangeIdentity, identityChanges, identityHistory, recordIdentityChange } from './vehicle-identity';
 import { resolveVehicleIdentity } from '../vehicle-catalog/vehicle-identity';
 import { WorkshopVehicleCatalog } from '../vehicle-catalog/workshop-vehicle-catalog';
 import { Prisma } from '@prisma/client';
@@ -211,8 +212,12 @@ export class VehicleService {
     });
   }
 
-  async updateVehicle(id: string, input: Partial<Omit<z.infer<typeof vehicleBody>, 'vin' | 'customerId'>>) {
-    const data = vehicleBody.omit({ vin: true, customerId: true }).partial().parse(input);
+  /**
+   * Updates a vehicle. A change to an identity field (VIN, registration, engine number, model, sale date)
+   * needs `vehicle:identity:update` and `identityReason`; the controller passes the signed-in user as `actor`.
+   */
+  async updateVehicle(id: string, input: z.infer<typeof updateVehicleBody>, actor?: { userId: string; role: string; permissions?: string[] }) {
+    const { identityReason, ...data } = updateVehicleBody.parse(input);
     return prisma.$transaction(async tx => {
       await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${id} FOR UPDATE`);
 
@@ -224,6 +229,13 @@ export class VehicleService {
 
       if (!vehicle)
         throw new NotFoundError('Vehicle not found');
+
+      const changes = identityChanges(vehicle, data);
+      if (actor) {
+        assertCanChangeIdentity(actor, changes, identityReason);
+        if (Object.keys(changes).length)
+          await recordIdentityChange(tx, { actorId: actor.userId, vehicle, changes, reason: identityReason! });
+      }
 
       const identityChanged = ['modelId', 'customModel', 'customMake', 'generationId', 'engineId'].some(key => Object.prototype.hasOwnProperty.call(data, key));
       let identity: Prisma.VehicleUncheckedUpdateInput = {};
@@ -255,7 +267,7 @@ export class VehicleService {
         await this.assertWarrantyModel(tx, data.vehicleModelId);
 
       const { tyres, batteryMakeId, ...rest } = data;
-      return tx.vehicle.update({
+      const updated = await tx.vehicle.update({
         where: {
           id,
         },
@@ -268,7 +280,18 @@ export class VehicleService {
           pdiDate: data.pdiDate === undefined ? undefined : data.pdiDate ? new Date(data.pdiDate) : null,
         },
       });
+      // A corrected VIN may be on a campaign list or in a campaign VIN range, as at creation.
+      if (changes.vin) {
+        await linkCampaignVehiclesByVin(tx, updated);
+        await addVehicleToRangeCampaigns(tx, updated);
+      }
+      return updated;
     });
+  }
+
+  /** Identity changes of one vehicle, with the reasons (vehicle-identity.ts). */
+  getIdentityHistory(id: string) {
+    return identityHistory(id);
   }
 
   /** The warranty policy model (VehicleModel) must exist and be active when one is chosen. */

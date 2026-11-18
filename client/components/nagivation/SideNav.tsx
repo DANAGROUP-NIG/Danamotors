@@ -277,7 +277,7 @@ export default function SideNav({
                     )}
                   >
                     {/* Group label — hidden when collapsed */}
-                    {!collapsed && (
+                    {!collapsed && group.label && (
                       <p className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
                         {group.label}
                       </p>

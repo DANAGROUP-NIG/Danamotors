@@ -4,7 +4,7 @@ import { rng, sleep } from "./helpers";
 export default async function seedInventoryStock(
   prisma: PrismaClient,
   branches: { id: string; name: string }[],
-  parts: { id: string; category: string | null }[]
+  parts: { id: string }[]
 ) {
   let count = 0;
   for (const branch of branches) {
@@ -58,7 +58,7 @@ if (require.main === module) {
         select: { id: true, name: true },
       });
       const parts = await prisma.sparePart.findMany({
-        select: { id: true, category: true },
+        select: { id: true },
       });
       await seedInventoryStock(prisma, branches, parts);
     } finally {

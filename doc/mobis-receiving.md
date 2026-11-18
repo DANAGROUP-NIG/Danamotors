@@ -11,8 +11,11 @@ branch shares one database, so internal transfers need no files. See
 
 | Step | Screen | What happens |
 | --- | --- | --- |
-| 1. Upload MIT | Operations → MIT → **Upload MIT** | Choose the invoice file. It is read in the browser and previewed: invoice number (prefilled), lines, totals, and which parts already exist in Part Master. Vendor is Mobis, conversion rate defaults to 2700, physical receipt date defaults to today, received mode is Air, Ship or Road, and the receiving branch defaults to CPD. Save creates the MIT. |
+| 1. Upload MIT | Operations → MIT → **Upload MIT** | Choose the invoice file. It is read in the browser and previewed: invoice number (prefilled), lines, totals, and which parts already exist in Part Master. Vendor is Mobis, the conversion rate is the one Finance set ([Mobis pricing](./mobis-pricing.md)) and cannot be changed here, physical receipt date defaults to today, received mode is Air, Ship or Road, and the receiving branch defaults to CPD. Save creates the MIT. |
 | 2. Generate MRN | MIT detail → **Generate MRN** | Confirm what physically arrived. By default everything is received in good condition; enter damaged or missing quantities only when needed. Tax form defaults to P. Good units are added to the receiving branch stock as `RECEIVED` transactions. |
+
+Between the steps the MIT can be checked on the handheld as the cases are unpacked. The MIT then shows
+**Verified** and Generate MRN is filled in from the counts. See [handheld.md](./handheld.md).
 
 Both steps send a dashboard notification to the general store managers and the receiving
 branch's store managers.
@@ -36,10 +39,10 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
 
 ## Rules
 
-- **New parts.** Invoice parts missing from Part Master are refused unless "create new parts"
-  is ticked, which it is by default. Created parts get the invoice name, part code = part number,
-  category "Mobis import", and a dealer rate of unit price × conversion rate. Complete their
-  details in Part Master afterwards. The MIT marks them as NEW.
+- **New parts.** Parts are never created from an invoice. Invoice parts missing from Part Master
+  are refused unless the user chooses to proceed without them, which leaves their lines off the
+  MIT. To receive them, create them first from **Part Query** (they are found in the Mobis
+  catalogue, see [masters.md](./masters.md#mobis-catalogue-and-part-enquiry)), then upload again.
 - **No double import.** The same Mobis invoice number cannot be imported twice unless the
   earlier MIT was cancelled.
 - **No double posting.** An MIT has at most one MRN. The MIT row is locked while the MRN is
@@ -49,6 +52,8 @@ AV10K6Q01R 0001  84710Q6020WK  CRASH PAD ASSY-MAIN  1    165.08      165.08     
   recorded as short.
 - **Value.** The MRN value is received quantity × unit price × conversion rate.
 - **Cancelling.** An MIT can be cancelled only before its MRN.
+- **Shortage approval.** An MRN with damaged or short units waits for approval by a user with
+  `stock:discrepancy:approve`. See [stock-transfers.md](./stock-transfers.md#shortage--damage-approval-legacy-se-approval).
 - **Permissions.** Uploading and generating the MRN need `stock:update` and access to the
   receiving branch. Viewing needs `stock:read`.
 
@@ -73,7 +78,7 @@ invoice, numbered like every MRN.
   [masters.md](./masters.md#part-sources-and-source-records)), but any active part can be received; legacy branches
   also buy some O-flag parts from local vendors.
 - Posting adds the stock to the branch, writes a RECEIVED stock transaction, sets each record's dealer rate to the
-  unit cost, recalculates its retail rate from its price category and records the rate change in the part's history.
+  unit cost, recalculates its retail rate from its part category and records the rate change in the part's history.
 - Discounts, handling, tax and other charges are not recorded: they were zero on every legacy MRN since 2024.
 - The same vendor invoice cannot be received twice. A vendor whose name contains "Mobis" is refused: Mobis
   invoices come in through the MIT upload above.
