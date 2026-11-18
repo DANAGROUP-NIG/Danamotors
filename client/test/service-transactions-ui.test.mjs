@@ -30,7 +30,14 @@ const job = {
 };
 function render(
   name,
-  { permissions = [], card = job, data, error = false, props = {}, source = name } = {},
+  {
+    permissions = [],
+    card = job,
+    data,
+    error = false,
+    props = {},
+    source = name,
+  } = {},
 ) {
   const cache = new Map();
   const queries = [];
@@ -82,12 +89,14 @@ function render(
       useServiceData: (url, enabled = true) => {
         queries.push({ url, enabled });
         return {
-          data: data ?? {
-            document: { id: "document", remarks: "Saved remarks" },
-            requisitions: [],
-            returnSlips: [],
-            labourSlips: [],
-          },
+          data: url.includes("/requisitions/part-options")
+            ? undefined
+            : (data ?? {
+                document: { id: "document", remarks: "Saved remarks" },
+                requisitions: [],
+                returnSlips: [],
+                labourSlips: [],
+              }),
           isError: error,
           isLoading: false,
           refetch: () => {},
@@ -114,8 +123,15 @@ function render(
       JobCardOpeningModal: () => null,
     },
     "features/job-cards/components/opening/CustomerRequestsTab": {
-      emptyRequest: () => ({ description: '', complaintCodeId: '', spare: 0, oil: 0, labour: 0 }),
-      CustomerRequestsTab: () => React.createElement('p', null, 'Detailed customer requests'),
+      emptyRequest: () => ({
+        description: "",
+        complaintCodeId: "",
+        spare: 0,
+        oil: 0,
+        labour: 0,
+      }),
+      CustomerRequestsTab: () =>
+        React.createElement("p", null, "Detailed customer requests"),
       requestTotals: (rows) =>
         Object.fromEntries(
           ["spare", "oil", "labour"].map((key) => [
@@ -376,64 +392,313 @@ test("converted booking is read-only and links to its job instead of permitting 
   assert.equal(html.includes("Save booking details"), false);
 });
 
-
-test('return print rows distinguish required, issued and returned quantities with saved context', () => {
-  const document = { returnNumber: 'RET-001', lines: [{ id: 'line', partNumber: 'PART-001', description: 'Saved filter', quantityRequired: 5, quantityIssued: 3, quantity: 1, rate: '100.01', amount: '100.01', location: 'Rack A', binCard: 'BIN-A', warrantyRate: '80.00', uom: 'UNIT' }] };
-  const { html } = render('SlipRows', { source: 'SavedSlip', props: { document } });
-  for (const quantity of [5, 3, 1]) assert.ok(html.includes(`class="p-2">${quantity}</td>`));
-  for (const text of ['Saved filter', 'Rack A', 'BIN-A', 'UNIT', 'Warranty rate:']) assert.ok(html.includes(text));
+test("return print rows distinguish required, issued and returned quantities with saved context", () => {
+  const document = {
+    returnNumber: "RET-001",
+    lines: [
+      {
+        id: "line",
+        partNumber: "PART-001",
+        description: "Saved filter",
+        quantityRequired: 5,
+        quantityIssued: 3,
+        quantity: 1,
+        rate: "100.01",
+        amount: "100.01",
+        location: "Rack A",
+        binCard: "BIN-A",
+        warrantyRate: "80.00",
+        uom: "UNIT",
+      },
+    ],
+  };
+  const { html } = render("SlipRows", {
+    source: "SavedSlip",
+    props: { document },
+  });
+  for (const quantity of [5, 3, 1])
+    assert.ok(html.includes(`class="p-2">${quantity}</td>`));
+  for (const text of [
+    "Saved filter",
+    "Rack A",
+    "BIN-A",
+    "UNIT",
+    "Warranty rate:",
+  ])
+    assert.ok(html.includes(text));
 });
 
-
-test('saved labour editors restore the campaign and goodwill reason', () => {
-  const base = { id: 'line', labourItemId: 'operation', description: 'Saved operation', rate: 100, amount: 200, chargedHours: 2, technicianId: 'login', mechanicId: 'employee' };
-  const props = { slipId: 'slip', branchId: 'branch', campaigns: [{ campaignId: 'campaign', campaignTitle: 'Saved campaign' }] };
-  const free = render('SavedLabourLine', { permissions: ['employee:read'], props: { ...props, line: { ...base, chargeLine: { chargeType: 'FREE', campaignId: 'campaign' } } } }).html;
+test("saved labour editors restore the campaign and goodwill reason", () => {
+  const base = {
+    id: "line",
+    labourItemId: "operation",
+    description: "Saved operation",
+    rate: 100,
+    amount: 200,
+    chargedHours: 2,
+    technicianId: "login",
+    mechanicId: "employee",
+  };
+  const props = {
+    slipId: "slip",
+    branchId: "branch",
+    campaigns: [{ campaignId: "campaign", campaignTitle: "Saved campaign" }],
+  };
+  const free = render("SavedLabourLine", {
+    permissions: ["employee:read"],
+    props: {
+      ...props,
+      line: {
+        ...base,
+        chargeLine: { chargeType: "FREE", campaignId: "campaign" },
+      },
+    },
+  }).html;
   assert.match(free, /value="campaign" selected=""/);
-  const goodwill = render('SavedLabourLine', { permissions: ['warranty:update'], props: { ...props, line: { ...base, chargeLine: { chargeType: 'GOODWILL', chargeTypeReason: 'Saved approval' } } } }).html;
+  const goodwill = render("SavedLabourLine", {
+    permissions: ["warranty:update"],
+    props: {
+      ...props,
+      line: {
+        ...base,
+        chargeLine: {
+          chargeType: "GOODWILL",
+          chargeTypeReason: "Saved approval",
+        },
+      },
+    },
+  }).html;
   assert.ok(goodwill.includes('value="Saved approval"'));
-  const grid = render('SlipRows', { source: 'SavedSlip', props: { document: { lines: [{ ...base, group: { code: 'TEAM-A', description: 'Saved team' } }] } } }).html;
-  assert.ok(grid.includes('Group: TEAM-A'));
-  assert.ok(grid.includes('Saved team'));
+  const grid = render("SlipRows", {
+    source: "SavedSlip",
+    props: {
+      document: {
+        lines: [
+          { ...base, group: { code: "TEAM-A", description: "Saved team" } },
+        ],
+      },
+    },
+  }).html;
+  assert.ok(grid.includes("Group: TEAM-A"));
+  assert.ok(grid.includes("Saved team"));
 });
 
-
-test('legacy uppercase cancelled bookings hide editing and conversion actions', () => {
-  const appointment = { id: 'legacy', customerId: 'customer', vehicleId: 'vehicle', status: 'CANCELLED', bookingStatus: 'BOOKED', scheduledAt: '2026-11-17T09:00:00Z', createdAt: '2026-11-16T09:00:00Z', requests: [], jobCards: [] };
-  const { html } = render('BookingPanel', { permissions: ['appointment:update', 'jobcard:create'], props: { appointment } });
-  assert.equal(html.includes('Save booking details'), false);
-  assert.equal(html.includes('Convert to job card'), false);
+test("legacy uppercase cancelled bookings hide editing and conversion actions", () => {
+  const appointment = {
+    id: "legacy",
+    customerId: "customer",
+    vehicleId: "vehicle",
+    status: "CANCELLED",
+    bookingStatus: "BOOKED",
+    scheduledAt: "2026-11-17T09:00:00Z",
+    createdAt: "2026-11-16T09:00:00Z",
+    requests: [],
+    jobCards: [],
+  };
+  const { html } = render("BookingPanel", {
+    permissions: ["appointment:update", "jobcard:create"],
+    props: { appointment },
+  });
+  assert.equal(html.includes("Save booking details"), false);
+  assert.equal(html.includes("Convert to job card"), false);
 });
 
-
-test('remarks show document context and separate internal text from customer explanations', () => {
-  const context = { documentNumber: 'EST-001', documentDate: '2026-11-16T09:00:00Z', status: 'Approved', jobNumber: 'JOB-001', jobDate: '2026-11-15T09:00:00Z', customerName: 'Synthetic customer', mileage: 1234, vehicle: { vin: 'SYNTHETICVIN', registrationNumber: 'REG-001', model: 'Model A', trim: 'Variant A' }, service: { code: 'SERVICE-A', description: 'Service A' } };
-  const { html } = render('RemarksPanel', { permissions: ['jobcard:read', 'jobcard:remarks:update'], data: { document: { id: 'job', remarks: 'Internal only', customerRemarks: 'Customer explanation', context } } });
-  for (const text of ['EST-001', 'JOB-001', 'Synthetic customer', 'SYNTHETICVIN', 'Model A', 'Variant A', 'SERVICE-A', 'Internal remarks', 'Customer explanation (prints)']) assert.ok(html.includes(text));
-  const print = render('CustomerExplanation', { source: '../../../components/CustomerExplanation', props: { text: 'Public <explanation>', remarks: 'Internal secret' } }).html;
-  assert.ok(print.includes('Public &lt;explanation&gt;'));
-  assert.equal(print.includes('Internal secret'), false);
-  assert.equal(render('CustomerExplanation', { source: '../../../components/CustomerExplanation', props: { text: null } }).html, '');
+test("remarks show document context and separate internal text from customer explanations", () => {
+  const context = {
+    documentNumber: "EST-001",
+    documentDate: "2026-11-16T09:00:00Z",
+    status: "Approved",
+    jobNumber: "JOB-001",
+    jobDate: "2026-11-15T09:00:00Z",
+    customerName: "Synthetic customer",
+    mileage: 1234,
+    vehicle: {
+      vin: "SYNTHETICVIN",
+      registrationNumber: "REG-001",
+      model: "Model A",
+      trim: "Variant A",
+    },
+    service: { code: "SERVICE-A", description: "Service A" },
+  };
+  const { html } = render("RemarksPanel", {
+    permissions: ["jobcard:read", "jobcard:remarks:update"],
+    data: {
+      document: {
+        id: "job",
+        remarks: "Internal only",
+        customerRemarks: "Customer explanation",
+        context,
+      },
+    },
+  });
+  for (const text of [
+    "EST-001",
+    "JOB-001",
+    "Synthetic customer",
+    "SYNTHETICVIN",
+    "Model A",
+    "Variant A",
+    "SERVICE-A",
+    "Internal remarks",
+    "Customer explanation (prints)",
+  ])
+    assert.ok(html.includes(text));
+  const print = render("CustomerExplanation", {
+    source: "../../../components/CustomerExplanation",
+    props: { text: "Public <explanation>", remarks: "Internal secret" },
+  }).html;
+  assert.ok(print.includes("Public &lt;explanation&gt;"));
+  assert.equal(print.includes("Internal secret"), false);
+  assert.equal(
+    render("CustomerExplanation", {
+      source: "../../../components/CustomerExplanation",
+      props: { text: null },
+    }).html,
+    "",
+  );
 });
 
-
-test('internal picking headers show the job date, service code and checklist context', () => {
-  const pickingList = { branch: { name: 'Branch' }, job: { number: 'JOB-001', date: '2026-11-15T09:00:00Z', mileage: 1234, remarks: null, service: { code: 'SERVICE-A', description: 'Service A' } }, estimate: { number: 'EST-001', date: '2026-11-16T09:00:00Z', version: 1, status: 'Approved', currency: 'NGN', remarks: null }, checklist: { code: 'CHECK-A', description: 'Saved checklist', text: 'CHECK-A' }, vehicle: job.vehicle, lines: [], totals: { numberOfItems: 0, quantityRequired: 0, totalAmount: 0 }, printedAt: '2026-11-16T10:00:00Z' };
-  const props = { kind: 'job-picking', id: 'job' };
-  const { html } = render('ServiceDocumentPrint', { props, permissions: ['jobcard:picking-list:print'], data: { pickingList } });
-  for (const text of ['Job date:', 'Estimate date:', 'CHECK-A', 'Saved checklist', 'SERVICE-A']) assert.ok(html.includes(text));
-  assert.ok(html.includes('15 Nov 2026'));
-  assert.ok(html.includes('16 Nov 2026'));
-  const missing = render('ServiceDocumentPrint', { props, permissions: ['jobcard:picking-list:print'], data: { pickingList: { ...pickingList, checklist: null } } }).html;
-  assert.ok(missing.includes('Checklist code: Not recorded'));
+test("internal picking headers show the job date, service code and checklist context", () => {
+  const pickingList = {
+    branch: { name: "Branch" },
+    job: {
+      number: "JOB-001",
+      date: "2026-11-15T09:00:00Z",
+      mileage: 1234,
+      remarks: null,
+      service: { code: "SERVICE-A", description: "Service A" },
+    },
+    estimate: {
+      number: "EST-001",
+      date: "2026-11-16T09:00:00Z",
+      version: 1,
+      status: "Approved",
+      currency: "NGN",
+      remarks: null,
+    },
+    checklist: {
+      code: "CHECK-A",
+      description: "Saved checklist",
+      text: "CHECK-A",
+    },
+    vehicle: job.vehicle,
+    lines: [],
+    totals: { numberOfItems: 0, quantityRequired: 0, totalAmount: 0 },
+    printedAt: "2026-11-16T10:00:00Z",
+  };
+  const props = { kind: "job-picking", id: "job" };
+  const { html } = render("ServiceDocumentPrint", {
+    props,
+    permissions: ["jobcard:picking-list:print"],
+    data: { pickingList },
+  });
+  for (const text of [
+    "Job date:",
+    "Estimate date:",
+    "CHECK-A",
+    "Saved checklist",
+    "SERVICE-A",
+  ])
+    assert.ok(html.includes(text));
+  assert.ok(html.includes("15 Nov 2026"));
+  assert.ok(html.includes("16 Nov 2026"));
+  const missing = render("ServiceDocumentPrint", {
+    props,
+    permissions: ["jobcard:picking-list:print"],
+    data: { pickingList: { ...pickingList, checklist: null } },
+  }).html;
+  assert.ok(missing.includes("Checklist code: Not recorded"));
 });
 
+test("booking keeps simple text entry and reuses the request grid for detailed rows", () => {
+  const simple = render("BookingFields", {
+    props: {
+      value: { requests: "Inspect brakes" },
+      onChange: () => {},
+      compact: true,
+    },
+  }).html;
+  assert.ok(simple.includes("Inspect brakes"));
+  assert.ok(simple.includes("Add request details"));
+  const detailed = render("BookingFields", {
+    props: {
+      value: {
+        requests: [
+          {
+            description: "Inspect brakes",
+            spare: 0.1,
+            oil: 0.2,
+            labour: 12.35,
+          },
+        ],
+      },
+      onChange: () => {},
+      compact: true,
+    },
+  }).html;
+  assert.ok(detailed.includes("Detailed customer requests"));
+  assert.equal(detailed.includes("Add request details"), false);
+});
 
-test('booking keeps simple text entry and reuses the request grid for detailed rows', () => {
-  const simple = render('BookingFields', { props: { value: { requests: 'Inspect brakes' }, onChange: () => {}, compact: true } }).html;
-  assert.ok(simple.includes('Inspect brakes'));
-  assert.ok(simple.includes('Add request details'));
-  const detailed = render('BookingFields', { props: { value: { requests: [{ description: 'Inspect brakes', spare: 0.1, oil: 0.2, labour: 12.35 }] }, onChange: () => {}, compact: true } }).html;
-  assert.ok(detailed.includes('Detailed customer requests'));
-  assert.equal(detailed.includes('Add request details'), false);
+test("alternate chooser keeps catalogue identity and loads options only on demand", () => {
+  const { html, queries } = render("RequisitionPartChooser", {
+    permissions: ["sparepart:read", "stock:read", "requisition:create"],
+    props: {
+      requestedId: "",
+      actualId: "",
+      branchId: "branch",
+      label: "Requested part",
+      chargeType: "CUSTOMER",
+      onRequested() {},
+      onSupply() {},
+    },
+  });
+  assert.ok(html.includes("Choose a requested part"));
+  assert.ok(
+    queries.some(
+      (query) =>
+        query.url.includes("/requisitions/part-options") &&
+        query.enabled === false,
+    ),
+  );
+  const denied = render("RequisitionPartChooser", {
+    props: {
+      requestedId: "private-id",
+      actualId: "private-id",
+      branchId: "branch",
+      label: "Requested part",
+      chargeType: "CUSTOMER",
+      onRequested() {},
+      onSupply() {},
+    },
+  });
+  assert.ok(denied.html.includes("unavailable with your permissions"));
+  assert.equal(denied.html.includes("private-id"), false);
+  assert.ok(denied.queries.every((query) => query.enabled === false));
+});
+
+test("saved internal requisition rows print the requested part and escaped substitution reason", () => {
+  const document = {
+    lines: [
+      {
+        id: "line",
+        sparePartId: "actual",
+        partNumber: "SUPPLY-001",
+        requestedSparePartId: "requested",
+        requestedPartNumber: "REQUEST-001",
+        substitutionReason: "Unavailable <part>",
+        description: "Supply part",
+        quantityRequired: 1,
+        quantityIssued: 0,
+        rate: 10,
+        amount: 0,
+      },
+    ],
+  };
+  const { html } = render("SlipRows", {
+    source: "SavedSlip",
+    props: { document },
+  });
+  assert.ok(html.includes("REQUEST-001"));
+  assert.ok(html.includes("Unavailable &lt;part&gt;"));
 });

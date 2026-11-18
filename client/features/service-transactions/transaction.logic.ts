@@ -1,5 +1,68 @@
 import type { LabourDraft } from "./document.types";
 import type { DocumentLine } from "./hooks/use-service-transactions";
+
+const documentLabels: Record<string, string> = {
+  CUSTOMER: "Customer",
+  WARRANTY: "Warranty",
+  GOODWILL: "Goodwill",
+  FREE: "Free",
+  ISSUED: "Issued",
+  REQUESTED: "Requested",
+  CANCELLED: "Cancelled",
+  COMPLETED: "Completed",
+  RETURNED: "Returned",
+  POSTED: "Posted",
+  DRAFT: "Draft",
+  LABOUR: "Labour",
+};
+export function serviceDocumentLabel(value?: string | null): string {
+  return value
+    ? (documentLabels[value.toUpperCase()] ?? "Unknown status")
+    : "Not recorded";
+}
+
+export type RequisitionPartDraft = {
+  sparePartId: string;
+  requestedSparePartId?: string;
+  substitutionReason?: string;
+  quantityRequired: number;
+  quantityIssued: number;
+  approvalPercent: number;
+  customerPercent: number;
+};
+export function chooseRequisitionSupply(
+  row: RequisitionPartDraft,
+  id: string,
+): RequisitionPartDraft {
+  if (id === row.sparePartId) return row;
+  return {
+    ...row,
+    requestedSparePartId: row.requestedSparePartId || row.sparePartId,
+    sparePartId: id,
+    quantityIssued: 0,
+    substitutionReason: "",
+  };
+}
+export function requisitionLinePayload(
+  row: RequisitionPartDraft,
+  chargeType: string,
+) {
+  const changed =
+    !!row.requestedSparePartId && row.requestedSparePartId !== row.sparePartId;
+  return {
+    sparePartId: row.sparePartId,
+    requestedSparePartId: row.requestedSparePartId || undefined,
+    substitutionReason: changed
+      ? row.substitutionReason?.trim() || undefined
+      : undefined,
+    quantityRequired: row.quantityRequired,
+    quantityIssued: row.quantityIssued,
+    approvalPercent:
+      chargeType === "GOODWILL" ? row.approvalPercent : undefined,
+    customerPercent:
+      chargeType === "GOODWILL" ? row.customerPercent : undefined,
+  };
+}
 export function lagosDate(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
     timeZone: "Africa/Lagos",
