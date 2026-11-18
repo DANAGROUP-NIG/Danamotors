@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Boxes, Building2, GitBranch, Loader2, LogOut, RotateCcw, Search } from "lucide-react";
+import { BookOpen, Boxes, Building2, GitBranch, Loader2, LogOut, PackagePlus, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/headers/page-header";
 import { inputCls } from "@/components/forms/FormField";
@@ -13,8 +13,10 @@ import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
 import { usePartQuery } from "../hooks/use-parts";
+import { useCreatePartFromCatalogue } from "../hooks/use-part-mutations";
+import { PART_TYPE_LABELS } from "../lib/part-codes";
 import { PartStatusBadge, fmtNaira } from "./PartStatusBadge";
-import type { PartQueryAlternateRow, PartQueryRow } from "../types/inventory.types";
+import type { PartCatalogueItem, PartQueryAlternateRow, PartQueryRow } from "../types/inventory.types";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -51,7 +53,7 @@ function StockCells({ r }: { r: PartQueryRow }) {
       </td>
       <td className={cn(tdCls, "text-slate-600")}>{r.location ?? ""}</td>
       <td className={cn(tdCls, "text-slate-600")}>{r.binCard ?? ""}</td>
-      <td className={cn(tdCls, "text-right")}>{fmtNaira(r.dealerRate)}</td>
+      <td className={cn(tdCls, "text-right")}>{(r.dealerRate != null ? fmtNaira(r.dealerRate) : "—")}</td>
       <td className={cn(tdCls, "text-right")}>{r.retailRate != null ? fmtNaira(r.retailRate) : "—"}</td>
       <td className={cn(tdCls, "text-right", r.qtyBlocked > 0 ? "font-medium text-amber-700" : "text-slate-400")}>
         {r.qtyBlocked}
@@ -128,6 +130,65 @@ function AlternateRows({ rows }: { rows: PartQueryAlternateRow[] }) {
   );
 }
 
+/**
+ * Legacy Part Enquiry: the part is in the Mobis catalogue but not in Part Master, so it has no stock
+ * yet. Create part copies the catalogue row into Part Master; the query then shows the usual grids.
+ */
+function CatalogueResult({ item, canCreate }: { item: PartCatalogueItem; canCreate: boolean }) {
+  const createPart = useCreatePartFromCatalogue();
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="font-mono text-lg font-semibold text-slate-800">{item.partNumber}</p>
+          <p className="text-sm text-slate-500">{item.name}</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-700">
+          <BookOpen className="size-3.5" /> Mobis catalogue
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
+        {[
+          ["Flag", item.partFlag],
+          ["Type", PART_TYPE_LABELS[item.partType] ?? item.partType],
+          ["Part category", item.priceCategoryCode ?? "—"],
+          ["UOM", item.uom],
+          ["Dealer rate", (item.dealerRate != null ? fmtNaira(item.dealerRate) : "—")],
+          ["Retail rate", item.retailRate != null ? fmtNaira(item.retailRate) : "—"],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="text-sm font-medium uppercase tracking-wider text-slate-400">{label}</p>
+            <p className="mt-0.5 text-slate-700">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-medium">This part is not in Part Master, so no branch holds stock of it.</p>
+        {canCreate ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              className="gap-1.5"
+              disabled={createPart.isPending}
+              onClick={() => createPart.mutate(item.partNumber)}
+            >
+              {createPart.isPending ? <Loader2 className="size-4 animate-spin" /> : <PackagePlus className="size-4" />}
+              Create part
+            </Button>
+            <p className="text-amber-800">
+              The name, flag, type, unit, part category and rates are copied from the catalogue. Complete the rest in
+              Part Master.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-1">Ask someone who can create parts to add it to Part Master.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PartQueryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,13 +225,13 @@ export function PartQueryPage() {
 
   // Only top-level branches can be a home premises.
   const premisesChoices = branches.filter((b) => !b.parentBranchId);
-  const premisesName = data?.premises[0]?.name;
+  const premisesName = data?.source === "PART_MASTER" ? data.premises[0]?.name : undefined;
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
         title="Part Query"
-        description="Where a part is held, how much, and at what dealer and retail rate, including alternates and other branches."
+        description="Where a part is held, how much, and at what dealer and retail rate, including alternates and other branches. A part not in Part Master is looked up in the Mobis catalogue and can be created from it."
       />
 
       <form onSubmit={show} className="rounded-xl border border-slate-200 bg-white p-4">
@@ -223,6 +284,8 @@ export function PartQueryPage() {
         <div className="flex justify-center py-12">
           <Loader2 className="size-6 animate-spin text-slate-400" />
         </div>
+      ) : data.source === "CATALOGUE" ? (
+        <CatalogueResult item={data.catalogue} canCreate={hasPermission(INVENTORY_PERMISSIONS.SPAREPART_CREATE)} />
       ) : (
         <>
           {/* ── Part details ── */}
@@ -239,10 +302,10 @@ export function PartQueryPage() {
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
               {[
                 ["Flag", data.part.partFlag],
-                ["Price category", data.part.priceCategoryCode ?? "—"],
+                ["Part category", data.part.priceCategoryCode ?? "—"],
                 ["Taxable", data.part.taxable ? "Yes" : "No"],
                 ["UOM", data.part.uom],
-                ["Dealer rate", fmtNaira(data.part.dealerRate)],
+                ["Dealer rate", (data.part.dealerRate != null ? fmtNaira(data.part.dealerRate) : "—")],
                 ["Retail rate", data.part.retailRate != null ? fmtNaira(data.part.retailRate) : "—"],
               ].map(([label, value]) => (
                 <div key={label}>

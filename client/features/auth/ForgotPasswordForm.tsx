@@ -32,30 +32,19 @@ function ForgotPasswordFormContent() {
     <Card>
       <CardHeader>
         <CardTitle>Reset your password</CardTitle>
-        <Badge className="mt-2">We&apos;ll email a reset link</Badge>
+        <Badge className="mt-2">An administrator resets it for you</Badge>
       </CardHeader>
       <CardContent>
         {forgotPassword.isSuccess ? (
           <div className="grid gap-4">
             <p className="text-sm text-muted-foreground">
-              A reset link was generated for this account.
+              If this email belongs to a staff account, your administrator has been asked to reset
+              your password. They will give you a new password; change it from your profile after
+              you sign in.
             </p>
-            {forgotPassword.data && (
-              <a
-                href={forgotPassword.data}
-                className="block break-all rounded-md border border-border bg-muted px-3 py-2 text-sm text-primary hover:underline"
-              >
-                {forgotPassword.data}
-              </a>
-            )}
-            <Button
-              variant="outline"
-              size="lg"
-              className="mt-1"
-              onClick={() => forgotPassword.reset()}
-            >
-              Send another link
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              Customers: please contact the dealership to reset your portal password.
+            </p>
             <p className="text-center text-sm text-muted-foreground">
               <a className="text-primary hover:underline" href="/login">
                 Back to sign in
@@ -82,7 +71,7 @@ function ForgotPasswordFormContent() {
               className="mt-2"
               disabled={forgotPassword.isPending}
             >
-              {forgotPassword.isPending ? "Sending…" : "Send reset link"}
+              {forgotPassword.isPending ? "Sending…" : "Ask for a reset"}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">

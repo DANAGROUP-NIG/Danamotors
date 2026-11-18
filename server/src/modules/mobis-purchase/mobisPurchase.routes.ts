@@ -27,8 +27,8 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  * tags:
  *   - name: Mobis Purchase
  *     description: |
- *       Receiving parts bought from Mobis (issue #62, Process B). The Mobis invoice file in MIT format is the
- *       only file ever uploaded in the app; everything else is shared through the single database.
+ *       Receiving parts bought from Mobis (issue #62, Process B). The Mobis invoice file in MIT format and the
+ *       Mobis price list are the only files uploaded in the app; everything else is shared through the single database.
  *
  *       1. Upload the invoice file (parsed in the browser) → MIT (MIT is used for Mobis invoices only).
  *       2. Generate the MRN → accepted quantities are posted to the receiving branch (CPD) once.
@@ -48,7 +48,7 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  *     tags: [Mobis Purchase]
  *     summary: Import a Mobis invoice (MIT format)
  *     description: |
- *       Creates the MIT; Part Master prices are not changed. Parts missing from Part
+ *       Creates the MIT at the conversion rate Finance set (Finance → Mobis pricing); Part Master prices are not changed. Parts missing from Part
  *       Master are never created: they are rejected unless `ignoreMissingParts` is true, in which case their lines
  *       are left off the MIT. The same
  *       invoice cannot be imported twice unless the earlier MIT was cancelled. Line amounts must equal qty x unit price.
@@ -58,7 +58,6 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  *           example:
  *             destinationBranchId: 9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d
  *             invoiceNumber: A6EA0567A
- *             conversionRate: 2700
  *             receivedMode: AIR
  *             sourceFileName: A6EA0567A.xls
  *             lines:

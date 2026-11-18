@@ -99,6 +99,11 @@ export const API_ROUTES = {
       query: "/inventory/parts/query",
       categories: "/inventory/part-categories",
     },
+    catalogue: {
+      base: "/inventory/part-catalogue",
+      import: "/inventory/part-catalogue/import",
+      createPart: (partNumber: string) => `/inventory/part-catalogue/${encodeURIComponent(partNumber)}/part`,
+    },
   },
   finance: {
     quotations: {
@@ -139,6 +144,8 @@ export const API_ROUTES = {
     users: {
       base: "/admin/users",
       detail: (id: string) => `/admin/users/${id}`,
+      resetPassword: (id: string) => `/admin/users/${id}/reset-password`,
+      permissions: (id: string) => `/admin/users/${id}/permissions`,
     },
     roles: {
       base: "/admin/roles",
@@ -152,6 +159,12 @@ export const API_ROUTES = {
     logs: "/audit/logs",
     detail: (id: string) => `/audit/logs/${id}`,
     stats: "/audit/stats",
+    changes: "/audit/changes",
+    change: (id: string) => `/audit/changes/${id}`,
+    changeSummary: "/audit/changes/summary",
+    changeEntities: "/audit/changes/entities",
+    recordHistory: (entity: string, recordId: string) =>
+      `/audit/changes/${encodeURIComponent(entity)}/${encodeURIComponent(recordId)}`,
   },
   search: {
     base: "/search",

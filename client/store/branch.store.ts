@@ -17,6 +17,8 @@ export interface Branch {
   location?: string;
   /** Legacy store-location code, e.g. A, QS, DH. */
   code?: string | null;
+  /** Legacy storelocation.ShortName, e.g. VI-2 (printed on barcode labels). */
+  shortName?: string | null;
   /** Set when this branch is a sub-location (store, godown) at another branch's premises. */
   parentBranchId?: string | null;
   parentBranch?: { id: string; name: string; code: string | null } | null;

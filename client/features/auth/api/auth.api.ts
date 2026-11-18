@@ -28,9 +28,9 @@ export async function customerRegisterRequest(payload: CustomerRegisterPayload):
   return apiPost<LoginResponse>(API_ROUTES.auth.customerRegister, payload);
 }
 
-export async function forgotPasswordRequest(email: string): Promise<string | undefined> {
-  const result = await apiPost<{ resetLink?: string }>(API_ROUTES.auth.forgotPassword, { email });
-  return result.resetLink;
+/** Asks an administrator to reset the password. No reset link comes back. */
+export async function forgotPasswordRequest(email: string): Promise<void> {
+  await apiPost<void>(API_ROUTES.auth.forgotPassword, { email });
 }
 
 export async function resetPasswordRequest(payload: {

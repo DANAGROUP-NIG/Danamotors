@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Pencil,
   Download,
@@ -72,6 +74,7 @@ function BranchRowActions({
   onDelete: (branch: Branch) => void;
 }) {
   const updateBranch = useUpdateBranch(branch.id);
+  const router = useRouter();
 
   return (
     <DataTableRowActions
@@ -89,7 +92,7 @@ function BranchRowActions({
           id: "view",
           label: "View details",
           icon: <Eye className="size-4" />,
-          onClick: () => onEdit(branch.id),
+          onClick: () => router.push(`/branches/${branch.id}`),
         },
         {
           id: "download",
@@ -280,7 +283,7 @@ export function BranchesTable() {
       header: "Name",
       render: (b) => (
         <div>
-          <span className="font-medium">{b.name}</span>
+          <Link href={`/branches/${b.id}`} className="font-medium hover:text-primary hover:underline">{b.name}</Link>
           {b.code && <span className="ml-1.5 font-mono text-sm text-muted-foreground">{b.code}</span>}
           {b.parentBranch && (
             <p className="text-sm text-muted-foreground">Sub-location of {b.parentBranch.name}</p>

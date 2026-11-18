@@ -3,6 +3,7 @@ import { NavGroup, NavItem } from "./type";
 import {
   CAMPAIGN_PERMISSIONS,
   INVENTORY_PERMISSIONS,
+  LABEL_PERMISSIONS,
   PART_SALE_PERMISSIONS,
   STOCK_AUDIT_PERMISSIONS,
   STOCK_TAKE_PERMISSIONS,
@@ -34,6 +35,7 @@ import {
   PackageSearch,
   Ship,
   Truck,
+  ShieldAlert,
   Landmark,
   Megaphone,
   ShoppingCart,
@@ -42,6 +44,7 @@ import {
   FileSearch,
   Database,
   Ban,
+  Barcode,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -200,6 +203,12 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
+        label: "Barcode Labels",
+        href: "/inventory/barcode-labels",
+        icon: Barcode,
+        permissions: [LABEL_PERMISSIONS.PRINT],
+      },
+      {
         label: "MIT",
         href: "/inventory/mobis-receipts",
         icon: Ship,
@@ -210,6 +219,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/inventory/vendor-receipts",
         icon: Truck,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
+        label: "Shortage Approvals",
+        href: "/inventory/discrepancies",
+        icon: ShieldAlert,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_DISCREPANCY_APPROVE],
       },
       {
         label: "Stock Taking",
@@ -438,8 +453,8 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  // No heading: log out sits on its own at the bottom.
   {
-    label: "Account",
     items: [
       {
         label: "Log out",

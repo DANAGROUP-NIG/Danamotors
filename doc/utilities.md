@@ -12,8 +12,9 @@ or was never used. So there is no Utilities menu.
 | SAN Upload Utility | Stock Taking → S/E confirmation posts the adjustments. See [SAN upload](#san-upload) |
 | Part Deletion Utility | Inventory → Parts: tick parts, then **Delete** or **Block part**. See [Part deletion](#part-deletion) |
 
-The only file upload in the system is the Mobis invoice (MIT) in
-[mobis-receiving.md](./mobis-receiving.md), because Mobis is outside the system.
+The only file uploads in the system come from Mobis, because Mobis is outside the system: the Mobis invoice
+(MIT) in [mobis-receiving.md](./mobis-receiving.md) and the Mobis price list in
+[masters.md](./masters.md#mobis-catalogue-and-part-enquiry).
 
 ## SRN and STN upload
 

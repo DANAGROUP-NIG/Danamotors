@@ -9,6 +9,7 @@ import { ActionMenu } from "@/components/ui/ActionMenu";
 import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import Link from "next/link";
 import { useCustomers } from "../hooks/use-customers";
 import { downloadCsv, downloadExcel } from "@/lib/table-actions";
 import { CustomerCreateForm } from "./CustomerCreateForm";
@@ -83,7 +84,7 @@ function ExportCustomersButton() {
 export function CustomersPage() {
   const [showForm, setShowForm] = useState(false);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdminOrAbove } = useAuth();
   const canCreate = hasPermission("customer:create");
   const { data } = useCustomers({
     page: 1,
@@ -103,6 +104,11 @@ export function CustomersPage() {
         actions={
           <div className="flex items-center gap-2">
             <ExportCustomersButton />
+            {isAdminOrAbove && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/customers/duplicates">Duplicates</Link>
+              </Button>
+            )}
             {canCreate && (
               <Button onClick={() => setShowForm(true)} size="sm">
                 <Plus className="size-4" />

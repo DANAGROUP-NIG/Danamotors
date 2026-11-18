@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
-import { PART_CATEGORIES } from "@/features/inventory/components/PartForm";
+import { PART_TYPE_LABELS, codeLabel } from "@/features/inventory/lib/part-codes";
 import { usePriceCategories } from "@/features/inventory/hooks/use-parts";
 import { apiErrorMessage } from "@/features/stock-transfers/hooks/use-indent-mutations";
 import { previewPartsRequest } from "../api/stock-taking.api";
@@ -51,7 +51,7 @@ export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [partFlag, setPartFlag] = useState("");
-  const [category, setCategory] = useState("");
+  const [partType, setPartType] = useState("");
   const [priceCategoryCode, setPriceCategoryCode] = useState("");
   const [rateFrom, setRateFrom] = useState("");
   const [rateTo, setRateTo] = useState("");
@@ -76,14 +76,14 @@ export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
       from: from.trim() || undefined,
       to: to.trim() || undefined,
       partFlag: partFlag || undefined,
-      category: category || undefined,
+      partType: partType || undefined,
       priceCategoryCode: priceCategoryCode || undefined,
       dealerRateFrom: num(rateFrom),
       dealerRateTo: num(rateTo),
       onlyWithStock: onlyWithStock || undefined,
       topConsumed: num(topCount) ? { count: num(topCount)!, months: num(topMonths) ?? 0, includeStn: includeStn || undefined } : undefined,
     }),
-    [basis, from, to, partFlag, category, priceCategoryCode, rateFrom, rateTo, onlyWithStock, topCount, topMonths, includeStn],
+    [basis, from, to, partFlag, partType, priceCategoryCode, rateFrom, rateTo, onlyWithStock, topCount, topMonths, includeStn],
   );
   const key = JSON.stringify({ branchId, selection });
   const stale = !!loaded && loaded.key !== key;
@@ -114,7 +114,7 @@ export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
     setFrom("");
     setTo("");
     setPartFlag("");
-    setCategory("");
+    setPartType("");
     setPriceCategoryCode("");
     setRateFrom("");
     setRateTo("");
@@ -299,11 +299,11 @@ export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
             </select>
           </Field>
           <Field label="Part type">
-            <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <select className={inputCls} value={partType} onChange={(e) => setPartType(e.target.value)}>
               <option value="">All</option>
-              {PART_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              {Object.keys(PART_TYPE_LABELS).map((code) => (
+                <option key={code} value={code}>
+                  {codeLabel(PART_TYPE_LABELS, code)}
                 </option>
               ))}
             </select>

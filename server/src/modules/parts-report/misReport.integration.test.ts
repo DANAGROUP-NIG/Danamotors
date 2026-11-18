@@ -28,6 +28,8 @@ describeDb("MIS reports (database)", () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB;
     prisma = require("../../prisma/client").default;
+    // The MIT takes Finance's conversion rate (Finance → Mobis pricing); stubbed so parallel tests don't race on it.
+    jest.spyOn(require("../finance/mobis-pricing.service"), "getMobisPricing").mockResolvedValue({ conversionRate: 1000, dealerFactor: 0.616, updatedAt: null });
     reports = new (require("./partsReport.service").PartsReportService)();
     const sales = new (require("../part-sale/partSale.service").PartSaleService)();
     const transfers = new (require("../stock-transfer/stockTransfer.service").StockTransferService)();
@@ -43,16 +45,17 @@ describeDb("MIS reports (database)", () => {
     const customer = await prisma.customer.create({ data: { firstName: "Cavem", lastName: "Ltd", companyName: `CAVEM ${run}`, code: `M${run}`, branchId: cpd.id } });
     await prisma.partCategory.upsert({ where: { code: "A" }, update: {}, create: { code: "A", description: "Co-op parts", markupMultiplier: 2.07 } });
 
-    // Part Master: added at ₦39,258 (retail 2.07×), then re-rated to ₦40,000 and moved to bin 54A1;
-    // CPD keeps it in rack N-4A2 with its own minimum of 4. A part added by mistake is deleted.
+    // Part Master: added at ₦39,258 (retail 2.07×), then re-rated to ₦40,000; CPD keeps it in
+    // rack N-4A2 with its own minimum of 4, then moves it to 54A1. A part added by mistake is deleted.
     const created = await inventory.createPart(
-      { partNumber: `MIS-J-${run}`, name: "BALL JOINT ASSY-LWR ARM", category: "Parts", uom: "EA", unitRate: 39258, priceCategoryCode: "A", binLocation: "53B3", minLevel: 5, maxLevel: 10, reorderQty: 2 },
+      { partNumber: `MIS-J-${run}`, name: "BALL JOINT ASSY-LWR ARM", uom: "EA", unitRate: 39258, priceCategoryCode: "A", minLevel: 5, maxLevel: 10, reorderQty: 2 },
       user.id,
     );
     joint = { id: created.id, partNumber: created.partNumber };
-    await inventory.updatePart(joint.id, { unitRate: 40000, binLocation: "54A1" }, user.id);
+    await inventory.updatePart(joint.id, { unitRate: 40000 }, user.id);
     await inventory.updateStockLocation(cpd.id, joint.id, { rackLocation: "N-4A2", minimumStock: 4 }, user.id);
-    const mistake = await inventory.createPart({ partNumber: `MIS-X-${run}`, name: "WRONG PART", category: "Parts", uom: "EA", unitRate: 100 }, user.id);
+    await inventory.updateStockLocation(cpd.id, joint.id, { rackLocation: "54A1" }, user.id);
+    const mistake = await inventory.createPart({ partNumber: `MIS-X-${run}`, name: "WRONG PART", uom: "EA", unitRate: 100 }, user.id);
     await inventory.deletePart(mistake.id, user.id);
     bolt = await prisma.sparePart.create({
       data: { partCode: `MIS-B-${run}`, partNumber: `MIS-B-${run}`, name: "BOLT-FLANGE", unitPrice: 500, retailRate: 1035, priceCategoryCode: "A", minLevel: 10, maxLevel: 20 },
@@ -66,7 +69,6 @@ describeDb("MIS reports (database)", () => {
       {
         destinationBranchId: cpd.id,
         invoiceNumber: `MIS-INV-${run}`,
-        conversionRate: 1000,
         receivedMode: "AIR",
         lines: [{ orderNumber: "AV10K6Q01R", partNumber: joint.partNumber, quantity: 6, unitPrice: 37.314, caseNumber: "C1" }],
       },
@@ -116,7 +118,7 @@ describeDb("MIS reports (database)", () => {
     const levels = await report("stock-levels");
     expect(pick(levels.rows, "partNumber", "bin", "minLevel", "maxLevel", "reorderQty", "quantity", "level")).toEqual([
       [bolt.partNumber, "", 10, 20, null, 2, "Below minimum"],
-      [joint.partNumber, "N-4A2", 4, 10, 2, 2, "Below minimum"],
+      [joint.partNumber, "54A1", 4, 10, 2, 2, "Below minimum"],
     ]);
 
     const below = await report("stock-levels", { option: "BELOW_MIN" });
@@ -200,14 +202,13 @@ describeDb("MIS reports (database)", () => {
     ]);
   });
 
-  it("keeps every bin change, at the branch and in Part Master", async () => {
+  it("keeps every bin change at the branch", async () => {
     const r = await report("part-bin-history", { partId: joint.id });
     expect(pick(r.rows, "location", "oldBin", "newBin", "by")).toEqual([
-      ["Part Master", "53B3", "54A1", "Emeka Store"],
       [cpd.name, null, "N-4A2", "Emeka Store"],
+      [cpd.name, "N-4A2", "54A1", "Emeka Store"],
     ]);
-    expect((await report("part-bin-history", { partId: joint.id, option: "BRANCH" })).rows).toHaveLength(1);
-    expect((await report("part-bin-history", { partId: joint.id, branchId: plaza.id, option: "BRANCH" })).rows).toHaveLength(0);
+    expect((await report("part-bin-history", { partId: joint.id, branchId: plaza.id })).rows).toHaveLength(0);
   });
 
   it("lists the STN packing list by case and part, or one line per packing list", async () => {

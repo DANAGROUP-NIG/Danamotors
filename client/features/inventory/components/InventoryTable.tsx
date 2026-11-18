@@ -39,11 +39,10 @@ import { useBranchStore } from "@/store/branch.store";
 import { useBranchStock } from "../hooks/use-branch-stock";
 import { useBulkDeleteParts } from "../hooks/use-bulk-delete-inventory";
 import { normalizePart } from "../api/inventory.api";
-import { PartForm, PART_CATEGORIES } from "./PartForm";
+import { PartForm } from "./PartForm";
 import type { BranchStockItem } from "../types/inventory.types";
 
 const PAGE_SIZE = 10;
-const CATEGORIES = PART_CATEGORIES;
 
 function formatCurrency(amount: number) {
   return `₦${amount.toLocaleString()}`;
@@ -53,11 +52,12 @@ function formatInventoryText(stock: BranchStockItem) {
   const lines = [
     `*${stock.part.name}*`,
     `Part Number: ${stock.part.partNumber}`,
-    `Category: ${stock.part.category}`,
+    `Part category: ${stock.part.priceCategoryCode ?? "—"}`,
     `Quantity: ${stock.quantity}`,
     `Minimum Stock: ${stock.minimumStock}`,
-    `Unit Rate: ${formatCurrency(stock.part.unitPrice)}`,
   ];
+  // The dealer rate is absent for users without sparepart:cost:read.
+  if (stock.part.unitPrice != null) lines.push(`Unit Rate: ${formatCurrency(stock.part.unitPrice)}`);
   if (stock.rackLocation) lines.push(`Rack Location: ${stock.rackLocation}`);
   return lines.join("\n");
 }
@@ -66,8 +66,8 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   return {
     partName: stock.part.name,
     partNumber: stock.part.partNumber,
-    category: stock.part.category ?? "",
-    unitPrice: stock.part.unitPrice,
+    partCategory: stock.part.priceCategoryCode ?? "",
+    unitPrice: stock.part.unitPrice ?? "",
     quantity: stock.quantity,
     minimumStock: stock.minimumStock,
     maximumStock: stock.maximumStock ?? "",
@@ -76,18 +76,18 @@ function flattenStock(stock: BranchStockItem): Record<string, string | number> {
   };
 }
 
-function exportColumns() {
+function exportColumns(canSeeCost = true) {
   return [
     { key: "partName", label: "Part Name" },
     { key: "partNumber", label: "Part Number" },
-    { key: "category", label: "Category" },
+    { key: "partCategory", label: "Part Category" },
     { key: "unitPrice", label: "Unit Price" },
     { key: "quantity", label: "Quantity" },
     { key: "minimumStock", label: "Minimum Stock" },
     { key: "maximumStock", label: "Maximum Stock" },
     { key: "rackLocation", label: "Rack Location" },
     { key: "reservedQuantity", label: "Reserved Quantity" },
-  ];
+  ].filter((column) => canSeeCost || column.key !== "unitPrice");
 }
 
 export function InventoryTable() {
@@ -101,6 +101,7 @@ export function InventoryTable() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_UPDATE);
   const canDelete = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_DELETE);
+  const canSeeCost = hasPermission(INVENTORY_PERMISSIONS.SPAREPART_COST_READ);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
   const { data: stockData, isLoading, isError, isFetching } = useBranchStock(activeBranch?.id ?? null);
@@ -109,7 +110,7 @@ export function InventoryTable() {
     if (!stockData) return [];
     let items = stockData;
     if (categoryFilter) {
-      items = items.filter((s) => s.part.category === categoryFilter);
+      items = items.filter((s) => s.part.priceCategoryCode === categoryFilter);
     }
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
@@ -120,6 +121,12 @@ export function InventoryTable() {
     }
     return items;
   }, [stockData, categoryFilter, debouncedSearch]);
+
+  // Legacy part categories (A, C, E…) held at this branch.
+  const categories = useMemo(
+    () => [...new Set((stockData ?? []).map((s) => s.part.priceCategoryCode).filter((c): c is string => !!c))].sort(),
+    [stockData],
+  );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -141,7 +148,7 @@ export function InventoryTable() {
     downloadCsv(
       `inventory-${new Date().toISOString().split("T")[0]}`,
       items.map(flattenStock),
-      exportColumns(),
+      exportColumns(canSeeCost),
     );
   }
 
@@ -149,7 +156,7 @@ export function InventoryTable() {
     downloadExcel(
       `inventory-${new Date().toISOString().split("T")[0]}`,
       items.map(flattenStock),
-      exportColumns(),
+      exportColumns(canSeeCost),
     );
   }
 
@@ -218,8 +225,8 @@ export function InventoryTable() {
       render: (stock) => stock.part.name,
     },
     {
-      header: "Category",
-      render: (stock) => <span className="text-muted-foreground">{stock.part.category}</span>,
+      header: "Part category",
+      render: (stock) => <span className="text-muted-foreground">{stock.part.priceCategoryCode ?? "—"}</span>,
     },
     {
       header: "Qty",
@@ -241,10 +248,10 @@ export function InventoryTable() {
       header: "Rack location",
       render: (stock) => <span className="text-muted-foreground">{stock.rackLocation ?? "—"}</span>,
     },
-    {
+    ...(canSeeCost ? [{
       header: "Unit price",
-      render: (stock) => <span className="text-muted-foreground">{formatCurrency(stock.part.unitPrice)}</span>,
-    },
+      render: (stock: BranchStockItem) => <span className="text-muted-foreground">{formatCurrency(stock.part.unitPrice)}</span>,
+    }] : []),
     {
       header: "Actions",
       headerClassName: "text-right",
@@ -332,7 +339,7 @@ export function InventoryTable() {
         data={paginated}
         isLoading={isLoading}
         isFetching={isFetching}
-        emptyMessage={categoryFilter ? `No items in category "${categoryFilter}"` : "No inventory items yet. Add a part above."}
+        emptyMessage={categoryFilter ? `No items in part category "${categoryFilter}"` : "No inventory items yet. Add a part above."}
         rowKey={(s) => s.id}
         page={page}
         pageSize={PAGE_SIZE}
@@ -356,7 +363,7 @@ export function InventoryTable() {
           placeholder="Search by part name or number…"
           filters={
             <DataTableFilterChips
-              options={[{ label: "All", value: "" }, ...CATEGORIES.map((c) => ({ label: c, value: c }))]}
+              options={[{ label: "All", value: "" }, ...categories.map((c) => ({ label: c, value: c }))]}
               selected={categoryFilter}
               onChange={changeCategory}
             />

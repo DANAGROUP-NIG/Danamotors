@@ -29,7 +29,6 @@ export type SalePart = {
   partNumber: string;
   name: string;
   uom: string;
-  binLocation: string | null;
   partFlag: string;
   taxable: boolean;
 };
@@ -37,6 +36,8 @@ export type SalePart = {
 export type OrderLineCounts = {
   orderedQuantity: number;
   pickedQuantity: number;
+  /** Picked units a posted handheld pick confirmed; only the rest can be sent to a handheld. */
+  handheldCheckedQuantity?: number;
   billedQuantity: number;
   cancelledQuantity: number;
 };
@@ -65,6 +66,8 @@ export type CustomerOrderLine = OrderLineCounts & {
   retailRate: number;
   amount: number;
   freeStock: number;
+  /** Where the order's branch keeps the part (its rack location). */
+  bin: string | null;
   invoiceLines: {
     quantity: number;
     invoice: { id: string; invoiceNumber: string; issuedDate: string; status: string; counterSale: { id: string } | null };

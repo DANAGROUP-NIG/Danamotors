@@ -17,20 +17,6 @@ import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues }
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
 
-export const PART_CATEGORIES = [
-  "Engine",
-  "Electrical",
-  "Brakes",
-  "Tyres",
-  "Body",
-  "Lubricants",
-  "Fluids",
-  "Filters",
-  "Suspension",
-  "Transmission",
-  "Accessories",
-  "Other",
-];
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
 const LEGACY_FLAGS = [
@@ -59,7 +45,6 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
   return {
     partNumber: part.partNumber,
     name: part.name,
-    category: part.category ?? "",
     uom: part.uom,
     taxCategory: part.taxCategory ?? "",
     taxForm: part.taxForm ?? "",
@@ -72,8 +57,6 @@ function toDefaults(part?: PartMaster): Partial<PartMasterFormInput> {
     partFlag: part.partFlag,
     partType: (part.partType ?? "S") as PartMasterFormInput["partType"],
     priceCategoryCode: part.priceCategoryCode ?? "",
-    binLocation: part.binLocation ?? "",
-    storeLocation: part.storeLocation ?? "",
     partStatus: part.partStatus,
     warrantyApplicable: part.warrantyApplicable ?? false,
     warrantyRate: part.warrantyRate ?? undefined,
@@ -144,8 +127,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       warrantyRate: values.warrantyRate ?? (isEdit ? null : undefined),
       taxCategory: text(values.taxCategory),
       taxForm: text(values.taxForm),
-      binLocation: text(values.binLocation),
-      storeLocation: text(values.storeLocation),
       vehicleSystem: values.vehicleSystem?.trim() || null,
       vehicleGroup: values.vehicleGroup?.trim() || null,
       applicableModels: (values.applicableModels ?? "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean),
@@ -204,16 +185,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {...register("partNumber")}
             />
           </Field>
-          <Field label="Name" error={errors.name?.message}>
+          <Field label="Part description" error={errors.name?.message}>
             <input className={inputCls} placeholder="e.g. FILTER ASSY-ENGINE OIL" {...register("name")} />
-          </Field>
-          <Field label="Category" error={errors.category?.message}>
-            <input className={inputCls} list="part-categories" placeholder="Select or type" {...register("category")} />
-            <datalist id="part-categories">
-              {PART_CATEGORIES.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
           </Field>
           <Field label="Part type" error={errors.partType?.message}>
             <select className={inputCls} {...register("partType")}>
@@ -260,7 +233,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
             <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
           </Field>
-          <Field label="Price category" error={errors.priceCategoryCode?.message}>
+          <Field label="Part category" error={errors.priceCategoryCode?.message}>
             <select className={inputCls} {...register("priceCategoryCode")}>
               <option value="">None</option>
               {(priceCategories ?? [])
@@ -283,8 +256,8 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             />
             {derivedRetail != null && !retailDirty && (
               <span className="text-sm text-muted-foreground">
-                {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from category {selectedCategory?.code} when
-                the dealer rate or category changes. Type a value to override.
+                {isEdit ? "Recalculated" : "Calculated"} as ₦{derivedRetail.toLocaleString()} from part category {selectedCategory?.code} when
+                the dealer rate or part category changes. Type a value to override.
               </span>
             )}
           </Field>
@@ -378,7 +351,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
       </div>
 
       <div className={sectionCls}>
-        <p className={sectionTitle}>Stock levels and location</p>
+        <p className={sectionTitle}>Stock levels</p>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Min level (optional)" error={errors.minLevel?.message}>
             <input type="number" min={0} className={inputCls} {...register("minLevel")} />
@@ -388,12 +361,6 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
           </Field>
           <Field label="Reorder qty (optional)" error={errors.reorderQty?.message}>
             <input type="number" min={0} className={inputCls} {...register("reorderQty")} />
-          </Field>
-          <Field label="Bin location (optional)" error={errors.binLocation?.message}>
-            <input className={inputCls} placeholder="e.g. A-12" {...register("binLocation")} />
-          </Field>
-          <Field label="Store location (optional)" error={errors.storeLocation?.message}>
-            <input className={inputCls} placeholder="e.g. MAINSTORE" {...register("storeLocation")} />
           </Field>
         </div>
       </div>

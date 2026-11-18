@@ -1,4 +1,5 @@
 import { accountantCustomerReadScope } from './customer-read-scope';
+import { duplicateGroups, duplicateGroupsQuery, mergeBatchSchema, mergeHistory, mergeKeepSchema } from './customer-merge-extras';
 import { listCustomerSchema } from './customer.validation';
 import { z } from 'zod';
 import { CustomerService } from './customer.service';
@@ -28,8 +29,31 @@ router.use(accountantCustomerReadScope);
 router.get('/duplicates', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: z.object({ phoneNumber: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), companyName: z.string().optional() }) })), async (req, res, next) => {
   try { res.json({ status: 'success', data: { customers: await new CustomerService().findDuplicates(req.query) } }); } catch (error) { next(error); }
 });
-router.post('/:id/merge', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ targetId: z.string().uuid() }).strict() })), async (req, res, next) => {
-  try { res.json({ status: 'success', data: { customer: await new CustomerService().merge(req.params.id, req.body.targetId, req.user!.userId) } }); } catch (error) { next(error); }
+router.post('/:id/merge', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ targetId: z.string().uuid(), keep: mergeKeepSchema.optional() }).strict() })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: { customer: await new CustomerService().merge(req.params.id, req.body.targetId, req.user!.userId, req.body.keep) } }); } catch (error) { next(error); }
+});
+/** Likely duplicates grouped by phone, name or company (Customers → Duplicates). */
+router.get('/duplicate-groups', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: duplicateGroupsQuery })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: await duplicateGroups(duplicateGroupsQuery.parse(req.query)) }); } catch (error) { next(error); }
+});
+/** Many merges in one go; each pair is its own transaction and reports its own result. */
+router.post('/merge-batch', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ body: mergeBatchSchema })), async (req, res, next) => {
+  try {
+    const service = new CustomerService();
+    const results = [];
+    for (const pair of mergeBatchSchema.parse(req.body).merges) {
+      try {
+        await service.merge(pair.sourceId, pair.targetId, req.user!.userId, pair.keep);
+        results.push({ ...pair, ok: true });
+      } catch (error) {
+        results.push({ ...pair, ok: false, error: (error as Error).message });
+      }
+    }
+    res.json({ status: 'success', data: { merged: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, results } });
+  } catch (error) { next(error); }
+});
+router.get('/:id/merge-history', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }) })), async (req, res, next) => {
+  try { res.json({ status: 'success', data: { history: await mergeHistory(req.params.id) } }); } catch (error) { next(error); }
 });
 
 

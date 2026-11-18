@@ -4,6 +4,7 @@ import { config } from '../config';
 import prisma from '../prisma/client';
 import { UnauthorizedError } from '../shared/errors/appError';
 import { loadStaffUser } from './authMiddleware';
+import { setRequestUser } from '../shared/requestContext';
 
 const CUSTOMER_ROLE = 'customer';
 
@@ -113,6 +114,7 @@ export const combinedAuthMiddleware = async (
     }
 
     req.user = user;
+    setRequestUser(user.userId);
     next();
   } catch (error) {
     next(error);
