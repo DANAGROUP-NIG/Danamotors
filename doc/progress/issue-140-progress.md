@@ -1,5 +1,19 @@
 # Issue 140 progress
 
+## Integrated startup compilation repair (2026-11-18)
+
+- Restored nullable Estimate.customerRemarks, already defined by migration 20261116150000_customer_service_explanations. Its absence made the document select invalid and caused the cascading jobCard/vehicle/customer inferred-type errors in the pasted ts-node failure. Kept the prior requisition/signature schema repairs. No type assertions, schema reset or new migration.
+- Removed five unused imports from the workshop notification compatibility adapter. The compatibility test referenced native assignment/QC/reminder routing through the parts-only recipient helper; scoped that assertion to the four durable parts events. Existing native forwarding tests remain, and central notification policy coverage was run. Production recipient/delivery logic unchanged.
+- Prisma validate and client generation 6.19.3 passed. Full backend no-emit TypeScript check passed, superseding the previous repair milestone's compile failures. Four affected document/routes/notification-policy/compatibility suites passed 69/69 tests after correcting the stale recipient expectation. Whitespace check passed. No full backend suite/build or frontend checks repeated for this backend-only repair.
+- Work isolated on fix/issue-140-startup-compile-20261118 from the user's current DevPastey branch, retaining the existing uncommitted schema repair. Database URLs overridden to localhost for checks, integration DB unset. No database connection, migration application, server launch/restart command, dependency change, UI change, commit or push. Actual runtime/schema readiness still depends on the operator's authorized database deployment.
+
+## Prisma relation repair after integration (2026-11-18)
+
+- Current starting branch DevPastey at fd22d64 had an index on missing PartRequisitionLine.requestedSparePartId and an unmatched SparePart.requestedRequisitionLines relation. Restored nullable requestedSparePartId, its named requestedSparePart relation, and substitutionReason to match the existing 20261117120000 migration. Subsequent validation exposed a missing inverse PartIssuance.collectionSignature relation; restored that optional relation as well. No new migration or data change is required for these model restorations.
+- Work isolated on fix/issue-140-prisma-relations-20261118, preserving the current integrated branch. Prisma validate and generate both passed with CLI/client 6.19.3. Database URLs overridden to localhost for these offline operations; no database connection, migration application or server restart.
+- Backend TypeScript check still fails in the current integrated source, including notification test imports/unused notification-module imports and Estimate.customerRemarks/select typing in service-document.service.ts. These are separate from the repaired P1012 model error and were not changed. Earlier final validation results describe the pre-integration implementation, not this current merged branch. No claim that the integrated backend builds or starts successfully.
+- Whitespace check passed. Only the four schema lines and this progress record changed; no commit/push or UI changes.
+
 ## Final validation after approved review (2026-11-18)
 
 - Validated committed implementation through dbbd4c0 on fix/issue-140-booking-review. Full backend suite completed once: 112 suites passed, 29 skipped; 1,327 tests passed, 208 skipped, zero failures. DATABASE_URL and DIRECT_URL forced to localhost and TEST_DATABASE_URL unset; no non-local database connection or migration application. No failing-file rerun needed.

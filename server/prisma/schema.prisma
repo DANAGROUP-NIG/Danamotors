@@ -720,6 +720,7 @@ model Inspection {
 // ============================================================
 
 model Estimate {
+  customerRemarks String?
   upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
   remarks String?
   version Int @default(1)
@@ -1306,6 +1307,7 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  collectionSignature PartCollectionSignature?
   receivedById String?
   receivedAt DateTime?
   requisitionLine PartRequisitionLine?
@@ -4448,6 +4450,9 @@ model PartRequisition {
 }
 
 model PartRequisitionLine {
+  requestedSparePartId String?
+  requestedSparePart SparePart? @relation("RequisitionRequestedPart", fields: [requestedSparePartId], references: [id], onDelete: Restrict)
+  substitutionReason String?
   id String @id @default(uuid())
   requisitionId String
   requisition PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
