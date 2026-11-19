@@ -210,9 +210,11 @@ export class WarrantyCaseService {
   async openManually(jobCardId: string, actorId: string, complaint?: string) {
     const jobCard = await prisma.jobCard.findUnique({
       where: { id: jobCardId },
-      select: { id: true, jobNumber: true, vehicleId: true, customerId: true, branchId: true, description: true, mileage: true, warrantyStatusAtCreation: true },
+      select: { id: true, jobNumber: true, jobType: true, vehicleId: true, customerId: true, branchId: true, description: true, mileage: true, warrantyStatusAtCreation: true },
     });
     if (!jobCard) throw new NotFoundError("Job card not found");
+    // PDI work stays out of the vehicle's warranty claim history; PDI warranty parts use PDI warranty requisitions.
+    if (jobCard.jobType === "PDI") throw new BadRequestError("A PDI job card cannot have a warranty case");
     if (!jobCard.vehicleId) throw new BadRequestError("The job card has no vehicle, so no warranty case can be opened");
     const created = await prisma.$transaction(async (tx) => {
       const existing = await tx.warrantyCase.findUnique({ where: { jobCardId } });

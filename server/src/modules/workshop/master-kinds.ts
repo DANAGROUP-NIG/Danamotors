@@ -9,6 +9,8 @@ export const MASTER_KINDS = [
   'CHECKLIST',
   'BAY',
   'COMPLAINT',
+  // PDI defects found on new vehicles (code, description, group); separate from service complaints.
+  'PDI_DEFECT',
   'TEAM',
   'LATE_REASON',
   'MAKE',
@@ -49,6 +51,7 @@ export const MASTER_PARENTS: Partial<Record<MasterKind, ParentRule>> = {
   VEHICLE_GROUP: { kind: 'VEHICLE_SYSTEM', required: true },
   // Legacy defects carry a system and usually a group; the group implies the system.
   COMPLAINT: { kind: 'VEHICLE_GROUP', required: false },
+  PDI_DEFECT: { kind: 'VEHICLE_GROUP', required: false },
   STATE: { kind: 'ZONE', required: false },
   CITY: { kind: 'STATE', required: false },
 };
@@ -73,6 +76,9 @@ export const MASTER_ATTRIBUTES: Partial<Record<MasterKind, z.ZodTypeAny>> = {
   }).strict(),
   VARIANT: z.object({
     features: text(2000),
+    // Tyre sizes, shown on the PDI tyre details (e.g. 205/55 R16).
+    frontTyreSize: text(30),
+    rearTyreSize: text(30),
   }).strict(),
   COLOUR: z.object({
     colourType: text(20),

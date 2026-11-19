@@ -103,6 +103,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Workshop",
     permissions: [
       "jobcard:read",
+      "pdi:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -124,6 +125,19 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/job-cards",
         icon: ClipboardList,
         permissions: ["jobcard:read"],
+      },
+      {
+        label: "PDI",
+        icon: ClipboardCheck,
+        permissions: ["pdi:read"],
+        children: [
+          { label: "PDI Job Cards", href: "/pdi", icon: ClipboardCheck, permissions: ["pdi:read"] },
+          { label: "Open PDI", href: "/pdi/new", icon: ClipboardList, permissions: ["pdi:create"] },
+          { label: "PDI Requisitions", href: "/pdi/requisitions", icon: Package, permissions: ["pdi:read"] },
+          { label: "PDI Returns", href: "/pdi/returns", icon: Package, permissions: ["pdi:read"] },
+          { label: "PDI Labour", href: "/pdi/labour-slips", icon: ListChecks, permissions: ["pdi:read"] },
+          { label: "PDI Bills", href: "/pdi/bills", icon: FileText, permissions: ["pdi:read", "pdi:bill"] },
+        ],
       },
       {
         label: "Services",

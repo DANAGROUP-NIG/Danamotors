@@ -326,6 +326,7 @@ model ChangeLog {
 // ============================================================
 
 model Customer {
+  pdiDefaultFor          PdiSettings[]       @relation("PdiDefaultCustomer")
   standaloneEstimates    Estimate[]
   outstandingLetters     OutstandingLetter[]
   id                     String              @id @default(uuid())
@@ -534,6 +535,12 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  /// SERVICE (default) or PDI. PDI jobs have their own number series and stay out of service history.
+  jobType              JobCardType          @default(SERVICE)
+  /// PDI only: the temporary registration (default: last 6 of the VIN). Never the vehicle's real plate.
+  pdiRegistration      String?
+  /// First print of the job card; edit-after-print rules (PDI settings) apply from then.
+  printedAt            DateTime?
   consolidatedInvoices Invoice[]            @relation("WarrantyJobBills")
   depositReceiptId     String?              @unique
   depositReceipt       Receipt?             @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
@@ -666,6 +673,13 @@ model JobCard {
   @@index([branchId, createdAt, id])
   @@index([branchId, status, createdAt, id])
   @@index([customerId, createdAt, id])
+  @@index([jobType, branchId, createdAt])
+  @@index([vehicleId, jobType])
+}
+
+enum JobCardType {
+  SERVICE
+  PDI
 }
 
 // ============================================================
@@ -1484,6 +1498,11 @@ model Invoice {
   cancelledById String?
   cancelledBy   User?     @relation("InvoiceCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   cancelRemark  String?
+
+  // PDI bills: credit company and card for INVOICE bills, and the first print time.
+  creditCompany String?
+  cardNumber    String?
+  printedAt     DateTime?
 
   tallyVoucherNo  String?
   tallyPostedAt   DateTime?
@@ -4352,6 +4371,10 @@ model PartRequisition {
   engineerId        String?
   engineer          User?                 @relation("RequisitionEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
   goodwillReason    String?
+  /// Legacy picking list reference (free text; job picking lists are print-only).
+  pickingListNumber String?
+  mileage           Int?
+  printedAt         DateTime?
   status            String                @default("ISSUED")
   createdById       String
   createdBy         User                  @relation("RequisitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -4413,6 +4436,7 @@ model PartReturnSlip {
   jobCard       JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
   requisitionId String
   requisition   PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  printedAt     DateTime?
   status        String          @default("COMPLETED")
   createdById   String
   createdBy     User            @relation("ReturnSlipCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -4442,6 +4466,8 @@ model LabourSlip {
   group       WorkshopMaster? @relation("LabourSlipGroup", fields: [groupId], references: [id], onDelete: Restrict)
   engineerId  String?
   engineer    User?           @relation("LabourSlipEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
+  mileage     Int?
+  printedAt   DateTime?
   createdById String
   createdBy   User            @relation("LabourSlipCreator", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime        @default(now())
@@ -4476,4 +4502,37 @@ model MileageBand {
   updatedAt DateTime @updatedAt
 
   @@index([sortOrder])
+}
+
+/// Company-wide PDI settings (single row, id "default"). Company-wide on purpose: the legacy
+/// per-branch history flag let branches drift apart.
+model PdiSettings {
+  id                         String    @id @default("default")
+  /// No create or edit of a PDI document dated on or before its freeze date.
+  jobFreezeDate              DateTime? @db.Date
+  requisitionFreezeDate      DateTime? @db.Date
+  returnFreezeDate           DateTime? @db.Date
+  labourFreezeDate           DateTime? @db.Date
+  billFreezeDate             DateTime? @db.Date
+  jobEditBeforePrint         Boolean   @default(true)
+  jobEditAfterPrint          Boolean   @default(false)
+  requisitionEditBeforePrint Boolean   @default(true)
+  requisitionEditAfterPrint  Boolean   @default(false)
+  returnEditBeforePrint      Boolean   @default(true)
+  returnEditAfterPrint       Boolean   @default(false)
+  labourEditBeforePrint      Boolean   @default(true)
+  labourEditAfterPrint       Boolean   @default(false)
+  billEditBeforePrint        Boolean   @default(true)
+  billEditAfterPrint         Boolean   @default(false)
+  roundBill                  Boolean   @default(true)
+  defaultCustomerId          String?
+  defaultCustomer            Customer? @relation("PdiDefaultCustomer", fields: [defaultCustomerId], references: [id], onDelete: SetNull)
+  includeInHistory           Boolean   @default(false)
+  postBillsToTally           Boolean   @default(true)
+  invoiceTitle               String    @default("PDI INVOICE")
+  cashMemoTitle              String    @default("PDI CASH MEMO")
+  updatedById                String?
+  updatedAt                  DateTime  @updatedAt
+
+  @@index([defaultCustomerId])
 }

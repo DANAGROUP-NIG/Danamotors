@@ -25,6 +25,10 @@ export const PERMISSIONS = {
   REQUISITION_CANCEL: "requisition:cancel",
   REQUISITION_GOODWILL: "requisition:goodwill",
   PDI_READ: 'pdi:read',
+  PDI_CREATE: 'pdi:create',
+  PDI_UPDATE: 'pdi:update',
+  PDI_BILL: 'pdi:bill',
+  PDI_SETTINGS: 'pdi:settings',
   TAX_REGISTER_READ: "report:tax-register",
   BOOKED_VS_AVAILED_READ: "report:booked-vs-availed",
   ESTIMATE_VS_JOB_READ: "report:estimate-vs-job",
@@ -334,9 +338,13 @@ export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(PERMISSIONS).
   (name) => (name.endsWith(":read") || name.startsWith("report:")) && name !== PERMISSIONS.REPORT_SETTINGS,
 );
 
+// PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
+const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
+const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
+
 // Mapping roles to their default initial permissions for seeding
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
-  [ROLES.ENGINEER]: [PERMISSIONS.JOBCARD_READ, PERMISSIONS.WORKSHOP_READ],
+  [ROLES.ENGINEER]: [PERMISSIONS.JOBCARD_READ, PERMISSIONS.WORKSHOP_READ, PERMISSIONS.PDI_READ, PERMISSIONS.PDI_UPDATE],
   // Full access
   [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
 
@@ -354,7 +362,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.REQUISITION_CREATE,
     PERMISSIONS.REQUISITION_CANCEL,
     PERMISSIONS.REQUISITION_GOODWILL,
-    PERMISSIONS.PDI_READ,
+    ...PDI_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ, PERMISSIONS.DELIVERED_MODEL_READ,
@@ -577,6 +585,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
+    ...PDI_WORKSHOP_PERMISSIONS,
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -689,6 +698,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   [ROLES.BILLING_OFFICER]: [
+    PERMISSIONS.PDI_READ, PERMISSIONS.PDI_BILL,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ,
@@ -723,6 +733,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    ...PDI_WORKSHOP_PERMISSIONS,
     ...MIS_FRONT_OFFICE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -770,6 +781,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): #97 names WorkshopManager; the service manager also runs the MIS.
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
@@ -816,6 +828,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Executes repairs, updates job card progress
   [ROLES.TECHNICIAN]: [
+    PERMISSIONS.PDI_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,

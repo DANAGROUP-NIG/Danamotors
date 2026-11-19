@@ -5,7 +5,10 @@ import { sumMoney } from '../finance/money';
 import { assertBookable, assertPromisedDate, bookingComplaints } from './booking.logic';
 import { assertApprovedOperation, assertRecordedScope } from './estimate-approval';
 import { getBranchSettings } from '../company-settings/company-settings.service';
-import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import { JobCardType, Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import { nextSequenceNumber } from "../../shared/db/documentSequence";
+import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey, serviceHistoryWhere } from "../pdi/pdi.logic";
+import { getPdiSettings } from "../pdi/pdi.settings.service";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -70,7 +73,9 @@ export function repeatCandidateWhere(
   mileage?: number,
   now = new Date(),
 ): Prisma.JobCardWhereInput {
+  // A PDI is never a previous visit: repeat checks use the service history only.
   return {
+    AND: [serviceHistoryWhere()],
     OR: [
       { createdAt: { gte: repeatWindowStart(now, window.repeatWindowDays) } },
       ...(window.repeatWindowKm && mileage !== undefined
@@ -148,21 +153,37 @@ async function requireStaff(
   return user;
 }
 
+export type JobOpeningOptions = {
+  /** Only the PDI module opens PDI job cards; the service routes always open SERVICE jobs. */
+  jobType?: JobCardType;
+  /** PDI registration; defaults to the last 6 characters of the VIN. */
+  pdiRegistration?: string;
+};
+
 export class JobCardWorkflowService {
   async open(
     input: z.infer<typeof jobOpeningBody> & {
       createdById?: string;
       bookingVersion?: string;
     },
+    options: JobOpeningOptions = {},
   ) {
     const { createdById, bookingVersion, ...body } = input;
 
     if (!createdById) throw new UnauthorizedError();
 
     const data = jobOpeningBody.parse(body);
+    const jobType = options.jobType ?? JobCardType.SERVICE;
+    const pdi = jobType === JobCardType.PDI;
+    if (pdi) {
+      if (data.appointmentId) throw new BadRequestError("PDI job cards are not opened from bookings").withCode("FIELD_VALIDATION", { field: "appointmentId" });
+      if (data.isRepeat) throw new BadRequestError("A PDI job card cannot be a repeat job").withCode("FIELD_VALIDATION", { field: "isRepeat" });
+      if (!data.engineerId) throw new BadRequestError("Select the engineer for the PDI").withCode("FIELD_VALIDATION", { field: "engineerId" });
+    }
     if (!data.appointmentId) assertPromisedDate(data.promisedAt, new Date());
 
     const result = await prisma.$transaction(async (tx) => {
+      if (pdi) assertNotFrozen("job", (await getPdiSettings(tx)).jobFreezeDate, new Date());
       const branch = await tx.branch.findFirst({
         where: {
           name: data.branchName,
@@ -198,7 +219,8 @@ export class JobCardWorkflowService {
       const check = buildCheck(vehicle, data.mileage, openCampaigns);
       const acknowledged = new Set(data.acknowledgedCampaignIds ?? []);
       const unacknowledgedCampaigns = openCampaigns.filter((c) => !acknowledged.has(c.campaignId));
-      const coverageNeedsAck = check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged;
+      // A PDI is pre-sale work: no warranty acknowledgement or warranty case (open campaigns still apply).
+      const coverageNeedsAck = !pdi && check.coverage.status === WarrantyCoverageStatus.ACTIVE && !data.warrantyAcknowledged;
       if (coverageNeedsAck || unacknowledgedCampaigns.length > 0)
         throw new ConflictError(
           coverageNeedsAck
@@ -248,9 +270,11 @@ export class JobCardWorkflowService {
 
       await openingField("bayId", () => requireMaster(tx, data.bayId, "BAY"));
 
-      const serviceType = await openingField("serviceTypeId", () => new ServiceTypeService().requireAvailable(
-        tx, vehicle.id, data.serviceTypeId, new Date(),
-      ));
+      const serviceType = await openingField("serviceTypeId", async () => {
+        const option = await new ServiceTypeService().requireAvailable(tx, vehicle.id, data.serviceTypeId, new Date(), jobType);
+        assertServiceTypeForJob(jobType, option);
+        return option;
+      });
       // Appointment services remain a separate catalogue and are never used
       // to determine the opening dropdown or its model-specific charge.
       if (data.serviceId && !(await tx.service.findFirst({
@@ -290,7 +314,7 @@ export class JobCardWorkflowService {
           );
       }
 
-      const complaints = await resolveJobComplaints(tx, data.complaints);
+      const complaints = await resolveJobComplaints(tx, data.complaints, pdi ? "PDI_DEFECT" : "COMPLAINT");
 
       const tyres = data.tyres
         ? await Promise.all(
@@ -359,7 +383,11 @@ export class JobCardWorkflowService {
           createdById,
           promisedAt: new Date(promisedAt),
           status: "OPEN",
-          jobNumber: await nextDocumentNumber(tx, "JOB_CARD"),
+          jobType,
+          pdiRegistration: pdi ? (options.pdiRegistration?.trim().toUpperCase() || pdiRegistrationFromVin(vehicle.vin)) : undefined,
+          jobNumber: pdi
+            ? pdiDocumentNumber("JOB_CARD", await nextSequenceNumber(tx, pdiSequenceKey("JOB_CARD")))
+            : await nextDocumentNumber(tx, "JOB_CARD"),
 
           complaints: {
             create: complaints,
@@ -403,6 +431,9 @@ export class JobCardWorkflowService {
         data: {
           lastRecordedMileage: odometerReplaced ? data.mileage : Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage),
           lastMileageAt: now,
+          // PDI tyres (up to five makes and numbers) are saved to the vehicle.
+          ...(pdi && tyres ? { tyres: tyres as unknown as Prisma.InputJsonValue } : {}),
+          ...(pdi && batteryMake !== undefined ? { batteryMake, batteryNumber: data.batteryNumber ?? null } : {}),
         },
       });
 
@@ -420,7 +451,7 @@ export class JobCardWorkflowService {
       }
 
       const warrantyCase =
-        check.coverage.status === WarrantyCoverageStatus.ACTIVE
+        !pdi && check.coverage.status === WarrantyCoverageStatus.ACTIVE
           ? await new WarrantyCaseService().openForJobCard(tx, {
               jobCardId: card.id,
               vehicleId: vehicle.id,
@@ -470,6 +501,9 @@ export class JobCardWorkflowService {
 
       if (!current) throw new NotFoundError("Job card not found");
       current.invoices.push(...(current.consolidatedInvoices ?? []));
+      // PDI jobs move through the PDI screens (work done, vehicle ready, bill); only delivery is shared.
+      if (current.jobType === JobCardType.PDI && (data.status !== "DELIVERED" || Object.entries(data).some(([key, value]) => value !== undefined && !["status", "deliveryAdvisorId", "lateReasonIds", "remarks"].includes(key))))
+        throw new BadRequestError("PDI job cards are updated from the PDI menu");
 
       const from = canonicalJobStatus(current.status);
 

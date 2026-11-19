@@ -1,3 +1,4 @@
+import { getPdiSettings } from '../pdi/pdi.settings.service';
 import { z } from 'zod';
 import { vehicleBody, updateVehicleBody } from './vehicle.validation';
 import { assertCanChangeIdentity, identityChanges, identityHistory, recordIdentityChange } from './vehicle-identity';
@@ -97,7 +98,7 @@ export class VehicleService {
   }
 
   async getVehicle(id: string) {
-    const vehicle = await this.vehicleRepository.findVehicleById(id);
+    const vehicle = await this.vehicleRepository.findVehicleById(id, (await getPdiSettings()).includeInHistory);
 
     if (!vehicle) {
       throw new NotFoundError('Vehicle not found');
@@ -150,6 +151,8 @@ export class VehicleService {
     input: z.infer<typeof vehicleBody> & {
       createdById?: string;
     },
+    // A new vehicle opened for PDI has no plate yet; its PDI registration lives on the job card.
+    options: { requireRegistration?: boolean } = {},
   ) {
     const {
       createdById,
@@ -157,7 +160,7 @@ export class VehicleService {
     } = input;
 
     const data = vehicleBody.parse(body);
-    if (!data.registrationNumber) throw new BadRequestError("Registration number is required").withCode("FIELD_VALIDATION", { field: "registrationNumber" });
+    if (options.requireRegistration !== false && !data.registrationNumber) throw new BadRequestError("Registration number is required").withCode("FIELD_VALIDATION", { field: "registrationNumber" });
 
     return prisma.$transaction(async tx => {
       if (data.customerId && !(await tx.customer.findFirst({
