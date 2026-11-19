@@ -141,16 +141,16 @@ export function jobFilterSql(scope: ReportScope, filters: DimensionFilters, opti
   }${jobTypeSql(options.jobType ?? (options.includePdi ? 'BOTH' : 'REGULAR'))}`;
 }
 
-/** SQL true for a PDI job (service type st): pre-delivery, or the legacy PDI category. */
-export const isPdiSql = Prisma.sql`(COALESCE(st."preDelivery", false) OR UPPER(COALESCE(st."category", '')) = 'PDI')`;
+/** SQL true for a PDI job (j, service type st): a PDI job card, a pre-delivery service type, or the legacy PDI category. */
+export const isPdiSql = Prisma.sql`(j."jobType" = 'PDI' OR COALESCE(st."preDelivery", false) OR UPPER(COALESCE(st."category", '')) = 'PDI')`;
 
 export function jobTypeSql(jobType: JobType): Prisma.Sql {
   if (jobType === 'BOTH') return Prisma.empty;
   return jobType === 'PDI' ? Prisma.sql` AND ${isPdiSql}` : notPdiSql;
 }
 
-/** Excludes PDI jobs: a pre-delivery service type, or the legacy PDI category. */
-export const notPdiSql = Prisma.sql` AND NOT COALESCE(st."preDelivery", false) AND UPPER(COALESCE(st."category", '')) <> 'PDI'`;
+/** Excludes PDI jobs: PDI job cards, a pre-delivery service type, or the legacy PDI category. */
+export const notPdiSql = Prisma.sql` AND j."jobType" <> 'PDI' AND NOT COALESCE(st."preDelivery", false) AND UPPER(COALESCE(st."category", '')) <> 'PDI'`;
 
 /** Bills that count in reports: not cancelled. */
 export const activeInvoiceSql = Prisma.sql`i."cancelledAt" IS NULL AND LOWER(i."status") NOT IN ('cancelled', 'canceled', 'void')`;

@@ -170,7 +170,8 @@ export class WorkshopMasterService {
     const defect = await prisma.workshopMaster.findFirst({
       where: {
         id,
-        kind: 'COMPLAINT',
+        // Model estimates apply to service complaints and PDI defects alike.
+        kind: { in: ['COMPLAINT', 'PDI_DEFECT'] },
       },
     });
 

@@ -212,10 +212,12 @@ export class ServiceRepository {
     customerId?: string;
     search?: string;
     status?: string;
+    jobType?: 'SERVICE' | 'PDI' | 'ALL';
     dateFrom?: string;
     dateTo?: string;
   }) {
     const where: Record<string, unknown> = {};
+    if (params?.jobType !== 'ALL') where.jobType = params?.jobType ?? 'SERVICE';
 
     if (params?.branchId) {
       where.branchId = params.branchId;
