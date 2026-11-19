@@ -98,6 +98,7 @@ export type JobCardVehicle = {
 };
 
 export type PartIssuance = {
+  requisitionLine?: { requisitionId: string; requisition: { status: string } } | null;
   receivedById?: string | null;
   receivedAt?: string | null;
   id: string;
@@ -169,7 +170,7 @@ export type JobCard = {
   }[];
   allowedTransitions?: string[];
   depositReceiptId?: string | null;
-  labourLines?: { labourItem: { description: string } }[];
+  labourLines?: { id: string; description: string; hours: number; rate?: number; amount?: number; labourSlipId?: string | null; labourItem: { code?: string; description: string }; technician?: { firstName: string; lastName: string } | null; mechanic?: { name: string } | null }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;
   batteryNumber?: string | null;

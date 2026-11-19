@@ -292,7 +292,7 @@ export class ServiceRepository {
       where: { id },
       include: {
         advanceReceipts: { orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }], select: { id: true, receiptNumber: true, amount: true, advanceAmount: true, status: true, mode: true, issuedAt: true } },
-        labourLines: { include: { labourItem: true } },
+        labourLines: { include: { labourItem: { select: { id: true, code: true, description: true } }, technician: { select: { firstName: true, lastName: true } }, mechanic: { select: { name: true } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
@@ -335,6 +335,7 @@ export class ServiceRepository {
         },
         partIssuances: {
           include: {
+            requisitionLine: { select: { requisitionId: true, requisition: { select: { status: true } } } },
             sparePart: {
               select: { id: true, partNumber: true, name: true, unitPrice: true, retailRate: true },
             },
