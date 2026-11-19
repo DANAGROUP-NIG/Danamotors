@@ -369,7 +369,7 @@ export class ServiceController {
       const customerId = req.query.customerId as string | undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      const jobType = req.query.jobType as "SERVICE" | "PDI" | "ALL" | undefined;
+      const jobType = req.query.jobType as "SERVICE" | "PDI" | "ALL" | "HISTORY" | undefined;
       const dateFrom = req.query.dateFrom as string | undefined;
       const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;

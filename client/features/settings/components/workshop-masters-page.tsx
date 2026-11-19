@@ -323,7 +323,7 @@ export function WorkshopMastersPage() {
         </form>}
         {form?.id && kind === "SERVICE_TYPE" && <ServiceTypeModelSettings key={form.id} serviceTypeId={form.id} />}
         {form && !form.id && kind === "SERVICE_TYPE" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the service type first, then edit it to configure model charges.</p>}
-        {form?.id && kind === "COMPLAINT" && <DefectModelEstimates key={form.id} defectId={form.id} />}
+        {form?.id && (kind === "COMPLAINT" || kind === "PDI_DEFECT") && <DefectModelEstimates key={form.id} defectId={form.id} />}
         {form && !form.id && kind === "COMPLAINT" && <p className="px-5 pb-5 text-sm text-muted-foreground">Save the defect first, then edit it to enter model-wise estimates.</p>}
       </ModalFame>
     </div>

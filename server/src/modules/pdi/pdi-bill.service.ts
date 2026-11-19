@@ -183,7 +183,7 @@ export class PdiBillService {
       pdiBillType: type,
       printTitle: pdiPrintTitle(type, settings),
       // Voucher details: the accounts posting of this bill.
-      voucher: { number: bill.tallyVoucherNo ?? tallyLog?.voucherNumber ?? null, type: 'Sales', status: bill.tallyPostedAt ? 'POSTED' : tallyLog?.status ?? (settings.postBillsToTally ? 'PENDING' : 'NOT_POSTED'), postedAt: bill.tallyPostedAt ?? tallyLog?.postedAt ?? null },
+      voucher: { number: bill.tallyVoucherNo ?? tallyLog?.voucherNumber ?? null, type: 'Sales', status: bill.tallyPostedAt ? 'POSTED' : tallyLog?.status ?? (settings.postBillsToTally && bill.total !== 0 ? 'PENDING' : 'NOT_POSTED'), postedAt: bill.tallyPostedAt ?? tallyLog?.postedAt ?? null },
       job: { id: jobCard.id, jobNumber: jobCard.jobNumber, pdiRegistration: jobCard.pdiRegistration, createdAt: jobCard.createdAt, mileage: jobCard.mileage, vehicle: jobCard.vehicle, engineer: jobCard.engineer, bay: jobCard.bay, serviceType: jobCard.serviceType, branch: jobCard.branch },
       jobLines: chargesOf(jobCard),
     };

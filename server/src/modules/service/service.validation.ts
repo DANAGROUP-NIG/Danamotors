@@ -118,7 +118,8 @@ export const listJobCardsSchema = z.object({
       search: z.string().optional(),
       status: z.string().optional(),
       // SERVICE (default) lists service jobs only; PDI jobs have their own menu.
-      jobType: z.enum(["SERVICE", "PDI", "ALL"]).optional(),
+      // HISTORY: a vehicle's history; includes PDI only when the PDI setting says so.
+      jobType: z.enum(["SERVICE", "PDI", "ALL", "HISTORY"]).optional(),
       dateFrom: jobCardDate.optional(),
       dateTo: jobCardDate.optional(),
     })

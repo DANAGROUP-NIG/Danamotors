@@ -1,3 +1,4 @@
+import { getPdiSettings } from "../pdi/pdi.settings.service";
 import { BookingFields, bookingRelations } from './booking.persistence';
 import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
 import { allowedJobTransitions } from "./job-transitions";
@@ -485,10 +486,11 @@ export class ServiceService {
     customerId?: string;
     search?: string;
     status?: string;
-    jobType?: "SERVICE" | "PDI" | "ALL";
+    jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
     dateFrom?: string;
     dateTo?: string;
   }) {
+    const jobType = params?.jobType === "HISTORY" ? ((await getPdiSettings()).includeInHistory ? "ALL" : "SERVICE") : params?.jobType;
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -496,7 +498,7 @@ export class ServiceService {
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
     if (params?.status) where.status = jobStatusFilter(params.status);
-    if (params?.jobType !== "ALL") where.jobType = params?.jobType ?? "SERVICE";
+    if (jobType !== "ALL") where.jobType = jobType ?? "SERVICE";
 
     if (params?.search) {
       where.OR = [
@@ -557,7 +559,7 @@ export class ServiceService {
         customerId: params?.customerId,
         search: params?.search,
         status: params?.status,
-        jobType: params?.jobType,
+        jobType,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
       }),

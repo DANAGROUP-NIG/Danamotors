@@ -66,5 +66,11 @@ Pre-existing on main, found while seeding: the demo seed's part fixtures still s
 `binLocation` and `category` (dropped from parts in a4a93f8), and the MIS stock vehicle has no plate.
 Fixed minimally. The service-job demo scenarios still stop at JC-01 ("Record the required upfront
 deposit before starting work"); that is outside PDI, so `--pdi-only` runs the PDI demo on its own.
-- [ ] Phase 4: frontend
-- [ ] Phase 5: docs (`doc/pdi.md`, testing guide), full checks
+- [x] Phase 4: frontend (`client/features/pdi`, routes under `/pdi` and `/settings/pdi`, vehicle PDI section,
+      PDI menu, PDI defect and tyre size masters, PDI bill in the Tally mapping screen)
+- [x] Phase 5: docs (`doc/pdi.md`, `doc/pdi-testing-guide.md`), checks: server tsc + build, all server unit
+      tests (vehicle-catalog routes test times out only under full-suite load, passes alone), PDI integration
+      tests (5), client tsc, lint (0 errors), `next build`, client `node --test test/pdi-logic.test.mjs`,
+      HTTP smoke test of `/api/pdi` on the local demo database.
+
+Not done: a browser click-through of the screens.

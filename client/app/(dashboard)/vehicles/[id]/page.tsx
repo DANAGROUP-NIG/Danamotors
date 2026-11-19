@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { VehicleEditForm, useVehicle } from "@/features/vehicles";
 import { VehicleHistoryCard } from "@/features/vehicles/components/VehicleHistoryCard";
+import { VehiclePdiSection } from "@/features/pdi";
 import { VehicleIdentityHistory } from "@/features/vehicles/components/VehicleIdentityHistory";
 import { useJobCards } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -31,7 +32,8 @@ export default function VehicleDetailPage() {
   const [filter, setFilter] = useState<HistoryFilter>("");
 
   const vehicle = data?.vehicle;
-  const history = useJobCards({ search: vehicle?.vin, limit: 50 }, Boolean(vehicle?.vin));
+  // Service history: PDI jobs only when the "Include PDI in vehicle history" setting is on.
+  const history = useJobCards({ search: vehicle?.vin, limit: 50, jobType: "HISTORY" }, Boolean(vehicle?.vin));
   const jobs = useMemo(() => {
     const all = (history.data?.jobCards ?? []).filter((j) => j.vehicleId === id);
     if (filter === "warranty") return all.filter((j) => j.warrantyStatusAtCreation === "ACTIVE");
@@ -183,6 +185,9 @@ export default function VehicleDetailPage() {
       </SectionCard>
 
       <VehicleHistoryCard vehicle={vehicle} showServiceHistory={false} />
+
+      {/* ── PDI: done/date, tyres; PDI jobs (pdi:read) are listed here, never in the service history ── */}
+      <VehiclePdiSection vehicle={vehicle} />
 
       <VehicleIdentityHistory vehicleId={vehicle.id} />
 
