@@ -9,6 +9,7 @@ type UseJobCardsParams = {
   customerId?: string;
   search?: string;
   status?: string;
+  jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
   dateFrom?: string;
   dateTo?: string;
 };

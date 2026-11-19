@@ -171,11 +171,12 @@ export async function ensureReference(ctx: DemoContext): Promise<Reference> {
   const inventory = new InventoryService();
   const parts = {} as Reference["parts"];
   for (const [key, p] of Object.entries(PARTS) as [PartKey, (typeof PARTS)[PartKey]][]) {
-    const { stock, warrantyRate, ...fields } = p as (typeof PARTS)[PartKey] & { warrantyRate?: number };
+    // Parts have no category, description or part-level location any more; the stock row holds the rack.
+    const { stock, warrantyRate, category: _category, ...fields } = p as (typeof PARTS)[PartKey] & { warrantyRate?: number };
     const part =
       (await prisma.sparePart.findUnique({ where: { partNumber: p.partNumber } })) ??
       (await prisma.sparePart.create({
-        data: { ...fields, warrantyRate: warrantyRate ?? null, description: `${p.name} (demo data)`, taxable: true, binLocation: stock.main.rack },
+        data: { ...fields, warrantyRate: warrantyRate ?? null, taxable: true },
       }));
     parts[key] = part.id;
     for (const branchKey of ["main", "second"] as const) {

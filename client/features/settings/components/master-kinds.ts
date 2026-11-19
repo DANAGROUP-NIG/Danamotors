@@ -36,7 +36,11 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
     label: "Variant",
     group: "Vehicle catalogue",
     parent: { kind: "MODEL", label: "Model", required: true, fixed: true },
-    attributes: [{ key: "features", label: "Features", type: "textarea" }],
+    attributes: [
+      { key: "features", label: "Features", type: "textarea" },
+      { key: "frontTyreSize", label: "Front tyre size", type: "text" },
+      { key: "rearTyreSize", label: "Rear tyre size", type: "text" },
+    ],
   },
   COLOUR_TYPE: { label: "Colour type", group: "Vehicle catalogue" },
   COLOUR: {
@@ -92,6 +96,12 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
         ],
       },
     ],
+  },
+  // PDI defects found on new vehicles; picked on the PDI job card defects grid.
+  PDI_DEFECT: {
+    label: "PDI defect",
+    group: "Workshop",
+    parent: { kind: "VEHICLE_GROUP", label: "Group", required: false },
   },
   TEAM: { label: "Employee group / team", group: "Workshop" },
   LATE_REASON: { label: "Late delivery reason", group: "Workshop" },

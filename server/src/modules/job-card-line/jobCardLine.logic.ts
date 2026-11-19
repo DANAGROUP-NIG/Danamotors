@@ -41,6 +41,8 @@ export interface ChargeChange {
   partWarrantyApplicable: boolean | null;
   linkedCampaignIds: string[];
   canChargeGoodwill: boolean;
+  /** PDI job: warranty needs no warranty case and free of cost needs no campaign (dealer-borne). */
+  pdi?: boolean;
 }
 
 /** Validates a manual charge type change. Returns the campaign the line is charged to (FREE only). */
@@ -49,7 +51,8 @@ export function assertChargeChange(change: ChargeChange): { campaignId: string |
     case ChargeType.CUSTOMER:
       return { campaignId: null };
     case ChargeType.WARRANTY: {
-      const covered = change.coverageAtCreation === WarrantyCoverageStatus.ACTIVE || change.hasWarrantyCase;
+      // TODO(confirm): PDI warranty is the manufacturer's PDI claim; a new vehicle has no warranty case.
+      const covered = change.pdi || change.coverageAtCreation === WarrantyCoverageStatus.ACTIVE || change.hasWarrantyCase;
       if (!covered) {
         throw new BadRequestError(
           "The vehicle was not under warranty when the job card was opened. A warranty officer must open a warranty case first, or charge goodwill.",
@@ -67,6 +70,8 @@ export function assertChargeChange(change: ChargeChange): { campaignId: string |
       return { campaignId: null };
     case ChargeType.FREE: {
       const campaignId = change.campaignId ?? (change.linkedCampaignIds.length === 1 ? change.linkedCampaignIds[0] : null);
+      // TODO(confirm): free of cost on a PDI is dealer-borne unless a campaign is chosen.
+      if (!campaignId && change.pdi && !change.campaignId) return { campaignId: null };
       if (!campaignId) {
         throw new BadRequestError(
           change.linkedCampaignIds.length === 0

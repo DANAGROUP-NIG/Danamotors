@@ -5,6 +5,21 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { jobBillMappingAmounts, generateTallyImportXml, generateTallyVoucherXml, type LedgerEntry, type TallyDocumentType } from './tally-xml';
+import { getPdiSettings } from '../pdi/pdi.settings.service';
+
+/**
+ * PDI bills post to PDI ledgers: the PDI_BILL mapping for each amount (falling back to its SALES
+ * account, then to the job bill mapping for VAT and round-off) and the PDI party (PDI_BILL PARTY).
+ */
+export function pdiLedgerFor(key: string, pdi: Map<string, string>, job: Map<string, string>) {
+  if (pdi.has(key)) return pdi.get(key);
+  if (key === 'VAT' || key === 'ROUND_OFF') return job.get(key);
+  return pdi.get('SALES');
+}
+/** A PDI bill is left out of Tally when PDI posting is off, or when it is a zero bill (nothing to post). */
+export function pdiBillExcluded(invoice: { total: number; jobCard: { jobType: string } | null }, postPdiBills: boolean) {
+  return invoice.jobCard?.jobType === 'PDI' && (!postPdiBills || invoice.total === 0);
+}
 
 export { generateTallyImportXml, generateTallyVoucherXml } from './tally-xml';
 
@@ -130,21 +145,28 @@ export class TallyService {
         include: { customer: { include: { tallyLedger: true } }, jobCard: true },
         orderBy: { invoiceNumber: 'asc' },
       });
+      const pdiSettings = await getPdiSettings();
+      const pdiParty = (await this.mappingsFor('PDI_BILL' as TallyDocumentType, prisma)).get('PARTY');
       const logs = await prisma.tallyPostingLog.findMany({
         where: { documentType: 'JOB_BILL', status: { in: ['EXPORTED', 'POSTED'] }, documentId: { in: invoices.map((invoice) => invoice.id) } },
         select: { documentId: true },
       });
       const exportedIds = new Set(logs.map((log) => log.documentId));
-      return invoices.filter((invoice) => !exportedIds.has(invoice.id)).map((invoice) => ({
-        id: invoice.id,
-        documentNumber: invoice.invoiceNumber,
-        date: invoice.issuedDate,
-        customerName: invoice.customer.companyName || `${invoice.customer.firstName} ${invoice.customer.lastName}`,
-        tallyLedger: invoice.customer.tallyLedger,
-        ready: Boolean(invoice.customer.tallyLedger?.active),
-        reason: invoice.customer.tallyLedger?.active ? undefined : 'Customer has no Tally ledger mapping',
-        total: invoice.total,
-      }));
+      return invoices.filter((invoice) => !exportedIds.has(invoice.id) && !pdiBillExcluded(invoice, pdiSettings.postBillsToTally)).map((invoice) => {
+        const pdi = invoice.jobCard?.jobType === 'PDI';
+        const ready = pdi ? Boolean(pdiParty) : Boolean(invoice.customer.tallyLedger?.active);
+        return {
+          id: invoice.id,
+          documentNumber: invoice.invoiceNumber,
+          date: invoice.issuedDate,
+          customerName: invoice.customer.companyName || `${invoice.customer.firstName} ${invoice.customer.lastName}`,
+          tallyLedger: pdi ? (pdiParty ? { name: pdiParty } : null) : invoice.customer.tallyLedger,
+          ready,
+          reason: ready ? undefined : pdi ? 'Map the PDI party ledger (PDI_BILL PARTY)' : 'Customer has no Tally ledger mapping',
+          total: invoice.total,
+          pdi,
+        };
+      });
     }
 
     const receipts = await prisma.receipt.findMany({
@@ -174,7 +196,7 @@ export class TallyService {
     }));
   }
 
-  private async mappingsFor(type: TallyDocumentType, transaction: Prisma.TransactionClient) {
+  private async mappingsFor(type: TallyDocumentType | 'PDI_BILL', transaction: Prisma.TransactionClient | typeof prisma) {
     const mappings = await transaction.tallyAccountMapping.findMany({ where: { documentType: type } });
     const ledgers = await transaction.tallyLedger.findMany({ where: { code: { in: mappings.map((mapping) => mapping.tallyLedgerCode) }, active: true } });
     const names = new Map(ledgers.map((ledger) => [ledger.code, ledger.name]));
@@ -209,29 +231,37 @@ export class TallyService {
         if (selected.type === 'JOB_BILL') {
           const invoice = await transaction.invoice.findUnique({
             where: { id: selected.id },
-            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } } },
+            include: { customer: { include: { tallyLedger: true } }, counterSale: { select: { id: true } }, jobCard: { select: { jobType: true } } },
           });
           if (!invoice || (!invoice.jobCardId && !invoice.counterSale) || invoice.tallyPostedAt || !isValidInvoiceStatus(invoice.status)) {
             skipped.push({ ...selected, reason: 'Job bill is missing or cancelled' });
             continue;
           }
           documentNumber = invoice.invoiceNumber;
-          if (!invoice.customer.tallyLedger?.active) {
-            skipped.push({ ...selected, documentNumber, reason: 'Customer has no active Tally ledger mapping' });
+          const pdi = invoice.jobCard?.jobType === 'PDI';
+          if (pdi && pdiBillExcluded(invoice, (await getPdiSettings(transaction)).postBillsToTally)) {
+            skipped.push({ ...selected, documentNumber, reason: invoice.total === 0 ? 'Zero PDI bill: nothing to post' : 'PDI bill posting to Tally is switched off in PDI settings' });
             continue;
           }
+          const pdiMappings = pdi ? await this.mappingsFor('PDI_BILL', transaction) : new Map<string, string>();
+          const party = pdi ? pdiMappings.get('PARTY') : invoice.customer.tallyLedger?.active ? invoice.customer.tallyLedger.name : undefined;
+          if (!party) {
+            skipped.push({ ...selected, documentNumber, reason: pdi ? 'Map the PDI party ledger (PDI_BILL PARTY)' : 'Customer has no active Tally ledger mapping' });
+            continue;
+          }
+          const ledgerFor = (key: string) => pdi ? pdiLedgerFor(key, pdiMappings, mappings) : mappings.get(key);
           const values = jobBillMappingAmounts(invoice);
-          const missingMapping = values.find(([key, amount]) => amount !== 0 && !mappings.has(key));
+          const missingMapping = values.find(([key, amount]) => amount !== 0 && !ledgerFor(key));
           if (missingMapping) {
-            skipped.push({ ...selected, documentNumber, reason: `Missing Tally account mapping: ${missingMapping[0]}` });
+            skipped.push({ ...selected, documentNumber, reason: `Missing Tally account mapping: ${pdi ? 'PDI_BILL ' : ''}${missingMapping[0]}` });
             continue;
           }
           const entries: LedgerEntry[] = [
-            { name: invoice.customer.tallyLedger.name, amount: invoice.total, bills: [{ name: invoice.invoiceNumber, type: 'New Ref', amount: invoice.total }] },
-            ...values.filter(([, amount]) => amount !== 0).map(([key, amount]) => ({ name: mappings.get(key)!, amount })),
+            { name: party, amount: invoice.total, bills: [{ name: invoice.invoiceNumber, type: 'New Ref', amount: invoice.total }] },
+            ...values.filter(([, amount]) => amount !== 0).map(([key, amount]) => ({ name: ledgerFor(key)!, amount })),
           ];
           if (sumMoney(entries.map((entry) => entry.amount)) !== 0) { skipped.push({ ...selected, documentNumber, reason: 'Invoice ledger totals do not balance; review the bill snapshot' }); continue; }
-          payload = generateTallyVoucherXml({ type: selected.type, number: invoice.invoiceNumber, id: invoice.id, date: invoice.issuedDate, party: invoice.customer.tallyLedger.name, entries });
+          payload = generateTallyVoucherXml({ type: selected.type, number: invoice.invoiceNumber, id: invoice.id, date: invoice.issuedDate, party, entries });
         } else if (selected.type === 'DEBIT_NOTE' || selected.type === 'CREDIT_NOTE') {
           const note=await transaction.partyNote.findUnique({where:{id:selected.id},include:{customer:{include:{tallyLedger:true}},accountLines:{orderBy:{position:'asc'}},creditAdjustments:{where:{reversedAt:null},include:{invoice:{select:{invoiceNumber:true}},debitNote:{select:{number:true}}}}}});
           if(!note||note.direction!==(selected.type==='DEBIT_NOTE'?'DEBIT':'CREDIT')||note.type==='OPENING'||note.tallyExcluded||note.status!=='ACTIVE'||note.tallyPostedAt){skipped.push({...selected,reason:'Note is missing, cancelled or excluded from Tally'});continue;}
