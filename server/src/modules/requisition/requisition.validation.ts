@@ -11,6 +11,8 @@ export const requisitionBody = z.object({
   engineerId: id.optional(),
   campaignId: id.optional(),
   goodwillReason: z.string().trim().min(1).max(2000).optional(),
+  pickingListNumber: z.string().trim().min(1).max(50).optional(),
+  mileage: z.number().int().min(0).max(9_999_999).optional(),
   lines: z.array(z.object({
     sparePartId: id,
     quantityRequired: z.number().int().positive().max(2147483647),

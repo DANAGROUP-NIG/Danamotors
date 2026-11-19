@@ -7,6 +7,8 @@ export interface LabourSlipActor {
   branchId?: string | null;
   allBranches: boolean;
   goodwill: boolean;
+  pdi?: boolean;
+  pdiOnly?: boolean;
 }
 
 export function labourSlipPricing(input: { pricing: string; standardHours: number; chargedHours?: number; rate: number }) {

@@ -6,7 +6,7 @@ import { BadRequestError } from '../../shared/errors/appError';
 export const inactiveStatuses = ['Cancelled', 'CANCELLED', 'Canceled', 'CANCELED', 'VOID', 'Void', 'cancelled', 'canceled', 'void'];
 export const activeInvoice = { cancelledAt: null, status: { notIn: inactiveStatuses, mode: 'insensitive' } } satisfies Prisma.InvoiceWhereInput;
 export function jobScope(input: ReportInput): Prisma.JobCardWhereInput {
-    return { branchId: input.branchId, status: { notIn: inactiveStatuses, mode: 'insensitive' }, ...(input.includePdi === 'true' ? {} : { AND: [{ OR: [{ serviceTypeId: null }, { serviceType: { preDelivery: false } }] }, { OR: [{ serviceTypeId: null }, { serviceType: { code: { notIn: ['PDI'], mode: 'insensitive' } } }] }] }) };
+    return { branchId: input.branchId, status: { notIn: inactiveStatuses, mode: 'insensitive' }, ...(input.includePdi === 'true' ? {} : { AND: [{ jobType: 'SERVICE' }, { OR: [{ serviceTypeId: null }, { serviceType: { preDelivery: false } }] }, { OR: [{ serviceTypeId: null }, { serviceType: { code: { notIn: ['PDI'], mode: 'insensitive' } } }] }] }) };
 }
 export const vehicleInclude = { customer: true, vehicleModel: true, catalogModel: true, catalogue: { include: { parent: { include: { parent: true } } } }, colour: true } satisfies Prisma.VehicleInclude;
 export const jobInclude = {

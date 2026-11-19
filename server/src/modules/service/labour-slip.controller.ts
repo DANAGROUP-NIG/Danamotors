@@ -8,7 +8,7 @@ import { listLabourSlipsSchema } from './labour-slip.validation';
 
 export function labourSlipActor(req: Request): LabourSlipActor {
   if (!req.user) throw new UnauthorizedError();
-  return { userId: req.user.userId, branchId: req.user.branchId, allBranches: canAccessAllBranches(req.user), goodwill: req.user.role === ROLES.SUPER_ADMIN || req.user.permissions.includes(PERMISSIONS.WARRANTY_UPDATE) };
+  return { userId: req.user.userId, branchId: req.user.branchId, allBranches: canAccessAllBranches(req.user), goodwill: req.user.role === ROLES.SUPER_ADMIN || req.user.permissions.includes(PERMISSIONS.WARRANTY_UPDATE), pdi: req.user.role === ROLES.SUPER_ADMIN || req.user.permissions.includes(PERMISSIONS.PDI_UPDATE) };
 }
 
 export class LabourSlipController {

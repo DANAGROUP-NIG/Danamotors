@@ -12,6 +12,11 @@ import { apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 
 type DocumentType = "JOB_BILL" | "RECEIPT" | "DEBIT_NOTE" | "CREDIT_NOTE";
+// PDI bills export as job bills but post to the PDI_BILL ledgers: the PDI party and the PDI account.
+type MappingType = DocumentType | "PDI_BILL";
+const JOB_BILL_ROLES = ["PARTS_SALES", "LABOUR_SALES", "SERVICE_SALES", "PARTS_DISCOUNT", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"];
+const mappingRoles = (type: MappingType) =>
+  type === "JOB_BILL" ? JOB_BILL_ROLES : type === "PDI_BILL" ? ["PARTY", "SALES", ...JOB_BILL_ROLES] : type === "DEBIT_NOTE" ? ["RECEIPT", "AMOUNT"] : ["BANK", "CASH"];
 type TallyDocument = {
   id: string;
   documentNumber: string;
@@ -23,7 +28,7 @@ type TallyDocument = {
 };
 type Ledger = { id: string; code: string; name: string; active: boolean };
 type AccountMapping = {
-  documentType: DocumentType;
+  documentType: MappingType;
   accountType: string;
   tallyLedgerCode: string;
   tallyLedgerName: string;
@@ -106,7 +111,7 @@ export function TallyWorkspace() {
   const [batch, setBatch] = useState<ExportBatch | null>(null);
   const [voucherNumbers, setVoucherNumbers] = useState<Record<string, string>>({});
   const [ledgerImportText, setLedgerImportText] = useState("");
-  const [mappingType, setMappingType] = useState<DocumentType>("JOB_BILL");
+  const [mappingType, setMappingType] = useState<MappingType>("JOB_BILL");
   const [accountType, setAccountType] = useState("PARTS_SALES");
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [selectedLedgerCode, setSelectedLedgerCode] = useState("");
@@ -273,8 +278,8 @@ export function TallyWorkspace() {
 
       <section className="grid gap-4 border-y py-4 md:grid-cols-4">
         <div className="md:col-span-4"><h2 className="font-semibold">Account mappings</h2></div>
-        <Field label="Document type"><select className={inputCls} value={mappingType} onChange={(event) => { setMappingType(event.target.value as DocumentType); setAccountType(event.target.value === "JOB_BILL" ? "PARTS_SALES" : event.target.value === "DEBIT_NOTE" ? "RECEIPT" : "BANK"); }}><option value="JOB_BILL">Job bill</option><option value="RECEIPT">Receipt</option><option value="DEBIT_NOTE">Debit Note</option></select></Field>
-        <Field label="Account role"><select className={inputCls} value={accountType} onChange={(event) => setAccountType(event.target.value)}>{(mappingType === "JOB_BILL" ? ["PARTS_SALES", "LABOUR_SALES", "SERVICE_SALES", "PARTS_DISCOUNT", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"] : mappingType === "DEBIT_NOTE" ? ["RECEIPT", "AMOUNT"] : ["BANK", "CASH"]).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></Field>
+        <Field label="Document type"><select className={inputCls} value={mappingType} onChange={(event) => { const next = event.target.value as MappingType; setMappingType(next); setAccountType(mappingRoles(next)[0]); }}><option value="JOB_BILL">Job bill</option><option value="PDI_BILL">PDI bill</option><option value="RECEIPT">Receipt</option><option value="DEBIT_NOTE">Debit Note</option></select></Field>
+        <Field label="Account role"><select className={inputCls} value={accountType} onChange={(event) => setAccountType(event.target.value)}>{mappingRoles(mappingType).map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></Field>
         <Field label="Find ledger by code/name"><input className={inputCls} value={ledgerSearch} onChange={(event) => { setLedgerSearch(event.target.value); setSelectedLedgerCode(""); }} /></Field>
         <Field label="Selected ledger"><select className={inputCls} value={selectedLedgerCode} onChange={(event) => setSelectedLedgerCode(event.target.value)}><option value="">Choose a matching ledger</option>{ledgers.data?.ledgers.map((ledger) => <option key={ledger.id} value={ledger.code}>{ledger.code} - {ledger.name}</option>)}</select></Field>
         <div className="flex items-end"><Button variant="outline" onClick={saveMapping} disabled={!selectedLedgerCode}>Save mapping</Button></div>

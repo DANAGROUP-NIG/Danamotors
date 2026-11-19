@@ -566,8 +566,10 @@ describe("JobCard workflow", () => {
       dateTo: "2026-09-28",
     });
 
+    // Service jobs by default: PDI jobs have their own list.
     expect(prisma.jobCard.count).toHaveBeenCalledWith({
       where: {
+        jobType: "SERVICE",
         createdAt: {
           lte: new Date("2026-09-28T23:59:59.999Z"),
         },
