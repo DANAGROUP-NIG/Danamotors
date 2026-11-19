@@ -485,6 +485,7 @@ export class ServiceService {
     customerId?: string;
     search?: string;
     status?: string;
+    jobType?: "SERVICE" | "PDI" | "ALL";
     dateFrom?: string;
     dateTo?: string;
   }) {
@@ -495,6 +496,7 @@ export class ServiceService {
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
     if (params?.status) where.status = jobStatusFilter(params.status);
+    if (params?.jobType !== "ALL") where.jobType = params?.jobType ?? "SERVICE";
 
     if (params?.search) {
       where.OR = [
@@ -555,6 +557,7 @@ export class ServiceService {
         customerId: params?.customerId,
         search: params?.search,
         status: params?.status,
+        jobType: params?.jobType,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
       }),

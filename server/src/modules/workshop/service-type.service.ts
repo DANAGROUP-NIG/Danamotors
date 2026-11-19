@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { JobCardType, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
@@ -15,13 +15,15 @@ function toOption(row: EligibleServiceRow, date: Date) {
   return {
     id: row.id!, code: row.code!, description: row.description!, chargedTo: row.chargedTo!,
     displayOrder: row.displayOrder,
+    preDelivery: row.preDelivery ?? false,
+    category: row.category,
     serviceCharge: effectiveServiceCharge({ ...row, serviceCharge: row.serviceCharge! }, date),
   };
 }
 
 export class ServiceTypeService {
-  async options(vehicleId: string, date = new Date(), db: ServiceTypeDb = prisma) {
-    const rows = await loadEligibleServiceTypes(vehicleId, db);
+  async options(vehicleId: string, date = new Date(), db: ServiceTypeDb = prisma, jobType: JobCardType = JobCardType.SERVICE) {
+    const rows = await loadEligibleServiceTypes(vehicleId, db, undefined, jobType);
     if (!rows.length) throw new NotFoundError('Vehicle not found');
     const vehicleName = [rows[0].vehicleMake, rows[0].vehicleModel].filter(Boolean).join(' ');
     if (!rows[0].modelId) return {
@@ -38,8 +40,9 @@ export class ServiceTypeService {
     };
   }
 
-  async requireAvailable(db: ServiceTypeDb, vehicleId: string, serviceTypeId: string, date: Date) {
-    const rows = await loadEligibleServiceTypes(vehicleId, db, serviceTypeId);
+  // No job type filter here, so the caller can say why a PDI or service type is refused.
+  async requireAvailable(db: ServiceTypeDb, vehicleId: string, serviceTypeId: string, date: Date, jobType?: JobCardType) {
+    const rows = await loadEligibleServiceTypes(vehicleId, db, serviceTypeId, jobType === JobCardType.PDI ? JobCardType.PDI : undefined);
     if (!rows.length) throw new NotFoundError('Vehicle not found');
     if (!rows[0].id) throw new BadRequestError('Service type not available for this vehicle model');
     return toOption(rows[0], date);

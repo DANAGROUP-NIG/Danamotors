@@ -12,6 +12,7 @@ export function requisitionActor(req: Request): RequisitionActor {
     userId: req.user.userId, branchId: req.user.branchId,
     allBranches: canAccessAllBranches(req.user),
     goodwill: req.user.role === ROLES.SUPER_ADMIN || req.user.permissions.includes(PERMISSIONS.REQUISITION_GOODWILL),
+    pdi: req.user.role === ROLES.SUPER_ADMIN || req.user.permissions.includes(PERMISSIONS.PDI_UPDATE),
   };
 }
 

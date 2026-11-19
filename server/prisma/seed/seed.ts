@@ -14,6 +14,7 @@ import seedCustomerPortal from "./portal";
 import seedWorkshop from "./workshop";
 import seedEnquiries from "./enquiries";
 import seedWarranty from "./warranty";
+import { seedPdiReference } from "./pdi";
 
 const prisma = new PrismaClient();
 
@@ -36,6 +37,9 @@ async function main() {
   const services = await seedServices(prisma);
 
   await seedWorkshop(prisma);
+
+  console.log("Seeding PDI defects, tyre and battery makes and the PDI customer...");
+  await seedPdiReference(prisma);
 
   console.log("Seeding Kia vehicle models, generations and engines...");
   console.log(await seedKiaCatalog(prisma));

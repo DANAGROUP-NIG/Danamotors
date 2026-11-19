@@ -1,9 +1,10 @@
 /**
  * Demo data seed: a small, repeatable set of dummy job cards, estimates, bills, part issues,
- * warranty cases (including TEST- cases), campaigns, an FPC bulletin and MIS report history for the Dana Motors Demo account.
+ * warranty cases (including TEST- cases), campaigns, an FPC bulletin, MIS report history and PDI job cards for the Dana Motors Demo account.
  *
  *   npm run prisma:seed:demo                      load the demo data (safe to run again)
  *   npm run prisma:seed:demo -- --reset-test         put the TEST- warranty cases back to OPEN
+ *   npm run prisma:seed:demo -- --pdi-only           only the PDI demo (reference data, new vehicles, PDI job cards)
  *
  * Options:
  *   --allow-database=<name>   required when the database name does not contain "demo"
@@ -24,18 +25,20 @@ import { JobResult, seedJob } from "./jobs";
 import { seedCampaign } from "./campaigns";
 import { seedFpc } from "./fpc";
 import { seedMis } from "./mis";
+import { seedPdi } from "./pdi";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS } from "./fixtures";
 
-const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
+const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
 function parseArgs(argv: string[]) {
-  const options = { resetTest: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
+  const options = { resetTest: false, pdiOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
   for (const arg of argv) {
     const [name, ...rest] = arg.split("=");
     const value = rest.join("=");
     if (name === "--reset-test" && !value) options.resetTest = true;
+    else if (name === "--pdi-only" && !value) options.pdiOnly = true;
     else if (name === "--help" || name === "-h") options.help = true;
     else if (name === "--allow-database" && value) options.allowDatabase = value;
     else if (name === "--main-branch" && value) options.mainBranch = value;
@@ -43,6 +46,12 @@ function parseArgs(argv: string[]) {
     else throw new Error(`Unknown option ${arg}\n${USAGE}`);
   }
   return options;
+}
+
+async function printPdi(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  console.log("PDI job cards:");
+  for (const row of await seedPdi(ctx, ref))
+    console.log(`  ${row.key} VIN ${row.vin}: ${row.jobNumber ? `${row.jobNumber} ${row.status}${row.bill ? `, bill ${row.bill}` : ""}` : "no PDI yet (open one in the UI)"}`);
 }
 
 async function main() {
@@ -65,6 +74,11 @@ async function main() {
 
   const ref = await ensureReference(ctx);
   console.log("Reference data ready: workshop models, labour operations, parts and opening stock");
+  if (options.pdiOnly) {
+    await printPdi(ctx, ref);
+    console.log(`\n${DEMO_TAG}: PDI demo done. Running it again changes nothing.`);
+    return;
+  }
   const parties = await ensureParties(ctx, ref);
   console.log("Customers and vehicles ready");
 
@@ -88,6 +102,9 @@ async function main() {
 
   // Service MIS reports (#97): finished job history across every service category.
   await seedMis(ctx, ref);
+
+  // PDI (pre-delivery inspection): new vehicles and PDI job cards at every step.
+  await printPdi(ctx, ref);
 
   await printSummary(ctx);
   console.log(`\n${DEMO_TAG}: done. Running it again changes nothing; use --reset-test to reopen the TEST- warranty cases.`);

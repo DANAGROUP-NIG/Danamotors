@@ -7,6 +7,10 @@ export interface RequisitionActor {
   branchId?: string | null;
   allBranches: boolean;
   goodwill: boolean;
+  /** pdi:update: may record documents on PDI jobs. */
+  pdi?: boolean;
+  /** Called from the PDI routes: only PDI jobs. */
+  pdiOnly?: boolean;
 }
 
 export function assertRequisitionBranch(actor: RequisitionActor, branchId?: string, label = 'requisitions') {

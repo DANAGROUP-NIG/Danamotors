@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { JobCardType, Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 
 export type ServiceTypeDb = Prisma.TransactionClient;
@@ -12,6 +12,8 @@ export type EligibleServiceRow = {
   description: string | null;
   chargedTo: string | null;
   displayOrder: number | null;
+  preDelivery: boolean | null;
+  category: string | null;
   serviceCharge: number | null;
   previousCharge: number | null;
   effectiveFrom: Date | null;
@@ -78,13 +80,21 @@ export async function resolveVehicleWorkshopModel(vehicleId: string, db: Service
 // One database round trip for vehicle/model resolution and the eligible options.
 // Keep the base vehicle row when no model or setting exists, so the service can
 // distinguish missing vehicles from unconfigured models without another query.
-export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: string) {
+// With a job type, only that job type's service types are offered: PDI types on PDI jobs only.
+const PDI_TYPE_SQL = Prisma.sql`(st."preDelivery" OR UPPER(COALESCE(st."category", '')) = 'PDI')`;
+function jobTypeFilter(jobType?: JobCardType) {
+  if (jobType === JobCardType.PDI) return Prisma.sql`AND ${PDI_TYPE_SQL}`;
+  if (jobType === JobCardType.SERVICE) return Prisma.sql`AND NOT ${PDI_TYPE_SQL} AND (v."saleDate" IS NULL OR NOT st."preDelivery")`;
+  return Prisma.sql`AND (v."saleDate" IS NULL OR NOT st."preDelivery")`;
+}
+
+export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: string, jobType?: JobCardType) {
   return Prisma.sql`
     ${vehicleContextCte(vehicleId)}
     SELECT v.id AS "vehicleId", v."modelId", v."vehicleMake", v."vehicleModel", options.*
     FROM vehicle_context v
     LEFT JOIN LATERAL (
-      SELECT st.id, st.code, st.description, st."chargedTo", st."displayOrder",
+      SELECT st.id, st.code, st.description, st."chargedTo", st."displayOrder", st."preDelivery", st."category",
         s."serviceCharge", s."previousCharge", s."effectiveFrom"
       FROM "ServiceTypeModelSetting" s
       JOIN "WorkshopMaster" st ON st.id = s."serviceTypeId"
@@ -92,15 +102,15 @@ export function eligibleServiceTypesQuery(vehicleId: string, serviceTypeId?: str
       WHERE s."modelId" = v."modelId" AND s.active
         AND model.kind = 'MODEL' AND model.active
         AND st.kind = 'SERVICE_TYPE' AND st.active AND st.code <> 'AF'
-        AND (v."saleDate" IS NULL OR NOT st."preDelivery")
+        ${jobTypeFilter(jobType)}
         ${serviceTypeId ? Prisma.sql`AND st.id = ${serviceTypeId}` : Prisma.empty}
     ) options ON true
     ORDER BY options."displayOrder" ASC NULLS LAST, options.code ASC
   `;
 }
 
-export function loadEligibleServiceTypes(vehicleId: string, db: ServiceTypeDb = prisma, serviceTypeId?: string) {
-  return db.$queryRaw<EligibleServiceRow[]>(eligibleServiceTypesQuery(vehicleId, serviceTypeId));
+export function loadEligibleServiceTypes(vehicleId: string, db: ServiceTypeDb = prisma, serviceTypeId?: string, jobType?: JobCardType) {
+  return db.$queryRaw<EligibleServiceRow[]>(eligibleServiceTypesQuery(vehicleId, serviceTypeId, jobType));
 }
 
 export const adminSettingSelect = {

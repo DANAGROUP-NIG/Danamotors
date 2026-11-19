@@ -1,3 +1,4 @@
+import { serviceHistoryWhere } from '../pdi/pdi.logic';
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: { branchSettings: { findUnique: jest.fn() } } }));
 import prisma from '../../prisma/client';
 import { calculateJobBillTotals } from '../finance/job-bill-calculator';
@@ -20,10 +21,12 @@ it('rounds a job bill down to the branch round-off value, as legacy did', () => 
 
 it('treats a previous job within the days or within the km as a repeat candidate', () => {
   const now = new Date('2026-10-15T00:00:00Z');
-  expect(repeatCandidateWhere({ repeatWindowDays: 45, repeatWindowKm: 4000 }, 52000, now)).toEqual({ OR: [
+  expect(repeatCandidateWhere({ repeatWindowDays: 45, repeatWindowKm: 4000 }, 52000, now)).toEqual({ AND: [serviceHistoryWhere()], OR: [
     { createdAt: { gte: new Date('2026-08-31T00:00:00Z') } },
     { mileage: { gte: 48000, lte: 52000 } },
   ] });
+  // A PDI is never a previous visit.
+  expect(repeatCandidateWhere({ repeatWindowDays: 45, repeatWindowKm: null }, 52000, now).AND).toEqual([expect.objectContaining({ jobType: 'SERVICE' })]);
   expect(repeatCandidateWhere({ repeatWindowDays: 30, repeatWindowKm: null }, 52000, now).OR).toHaveLength(1);
   expect(repeatCandidateWhere({ repeatWindowDays: 30, repeatWindowKm: 1500 }, undefined, now).OR).toHaveLength(1);
 });

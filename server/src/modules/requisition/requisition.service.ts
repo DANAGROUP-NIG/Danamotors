@@ -1,5 +1,7 @@
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
-import { ChargeType, PartStatus, Prisma } from '@prisma/client';
+import { ChargeType, JobCardType, PartStatus, Prisma } from '@prisma/client';
+import { assertJobTypeAccess, pdiDocumentNumber, pdiRequisitionDocument, pdiSequenceKey } from '../pdi/pdi.logic';
+import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../shared/errors/appError';
 import { nextSequenceNumber } from '../../shared/db/documentSequence';
@@ -55,13 +57,16 @@ export class RequisitionService {
       assertRequisitionBranch(actor, job.branchId);
       if (job.branchId !== input.branchId) throw new BadRequestError('Job card must belong to the requisition branch');
       assertRequisitionJob(job);
+      assertJobTypeAccess(job, actor);
+      const pdi = job.jobType === JobCardType.PDI;
+      if (pdi) await assertPdiDocumentChange(tx, 'requisition', new Date(), { create: true });
       if (input.groupId && !await tx.workshopMaster.findFirst({ where: { id: input.groupId, kind: 'TEAM', active: true } })) throw new BadRequestError('Choose an active workshop group');
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
       const parts = await tx.sparePart.findMany({ where: { id: { in: input.lines.map(line => line.sparePartId) } } });
       const resolved = input.lines.map(line => {
         const part = parts.find(item => item.id === line.sparePartId);
         if (!part || part.partStatus !== PartStatus.ACTIVE) throw new BadRequestError('Choose an active part source record');
-        const { campaignId } = assertChargeChange({ to: input.chargeType, campaignId: input.campaignId, kind: 'PART', coverageAtCreation: job.warrantyStatusAtCreation, hasWarrantyCase: !!job.warrantyCase, partWarrantyApplicable: part.warrantyApplicable, linkedCampaignIds: job.campaigns.map(row => row.campaignId), canChargeGoodwill: actor.goodwill });
+        const { campaignId } = assertChargeChange({ to: input.chargeType, campaignId: input.campaignId, kind: 'PART', coverageAtCreation: job.warrantyStatusAtCreation, hasWarrantyCase: !!job.warrantyCase, partWarrantyApplicable: part.warrantyApplicable, linkedCampaignIds: job.campaigns.map(row => row.campaignId), canChargeGoodwill: actor.goodwill, pdi });
         const rate = money(input.chargeType === ChargeType.WARRANTY ? part.warrantyRate ?? part.retailRate ?? part.unitPrice : part.retailRate ?? part.unitPrice);
         return { line, part, rate, campaignId, amounts: requisitionAmounts(input.chargeType, line.quantityIssued, rate, line.approvalPercent, line.customerPercent) };
       });
@@ -72,7 +77,8 @@ export class RequisitionService {
         if (item.line.quantityIssued > (stock ? stock.quantity - stock.reservedQuantity : 0)) throw new BadRequestError('Insufficient available stock at this branch');
       }
       const issued = resolved.filter(item => item.line.quantityIssued > 0);
-      if (issued.length) {
+      // PDI: the defects grid is the internal estimate; no signed estimate gate (TODO(confirm)).
+      if (issued.length && !pdi) {
         const previous = await tx.partIssuance.findMany({ where: { jobCardId: job.id, OR: [{ requisitionLine: null }, { requisitionLine: { requisition: { status: 'ISSUED' } } }] }, include: { sparePart: true, returns: true, requisitionLine: true } });
         await assertApprovedOperation(tx, job.id, job.customerId, [
           ...previous.map(row => {
@@ -85,8 +91,11 @@ export class RequisitionService {
       }
       const now = new Date();
       const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(now));
-      const requisitionNumber = await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, new Date(year, 6, 1));
-      const document = await tx.partRequisition.create({ data: { branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, groupId: input.groupId, engineerId: input.engineerId, goodwillReason: input.goodwillReason, createdById: actor.userId, requisitionNumber, requisitionDate: now } });
+      const pdiDocument = pdiRequisitionDocument(input.chargeType);
+      const requisitionNumber = pdi
+        ? pdiDocumentNumber(pdiDocument, await nextSequenceNumber(tx, pdiSequenceKey(pdiDocument, input.branchId), new Date(year, 6, 1)))
+        : await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, new Date(year, 6, 1));
+      const document = await tx.partRequisition.create({ data: { branchId: input.branchId, jobCardId: job.id, chargeType: input.chargeType, groupId: input.groupId, engineerId: input.engineerId, goodwillReason: input.goodwillReason, pickingListNumber: input.pickingListNumber, mileage: input.mileage ?? (pdi ? job.mileage : undefined), createdById: actor.userId, requisitionNumber, requisitionDate: now } });
       for (const { line, part, rate, amounts, campaignId } of resolved) {
         const stock = await tx.inventoryStock.findUnique({ where: { branchId_partId: { branchId: input.branchId, partId: part.id } } });
         const issuance = line.quantityIssued === 0 ? null : await tx.partIssuance.create({ data: { branchId: input.branchId, jobCardId: job.id, sparePartId: part.id, issuedById: actor.userId, quantity: line.quantityIssued, partSource: part.partFlag } });
@@ -119,6 +128,8 @@ export class RequisitionService {
       await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`;
       const job = await tx.jobCard.findUniqueOrThrow({ where: { id: initial.jobCardId }, include: { invoices: { select: { status: true } } } });
       assertRequisitionJob(job);
+      assertJobTypeAccess(job, actor);
+      if (job.jobType === JobCardType.PDI) await assertPdiDocumentChange(tx, 'requisition', initial.requisitionDate, { printedAt: initial.printedAt });
       const document = await tx.partRequisition.findUniqueOrThrow({ where: { id }, include: { lines: { include: { partIssuance: { include: { returns: true } }, jobCardLines: { include: { warrantyCaseLines: true, invoiceLines: true } } } } } });
       if (document.status === 'CANCELLED') throw new ConflictError('Requisition is already cancelled');
       // TODO(confirm): require returns to be cancelled first; this preserves their audit/stock history.

@@ -204,10 +204,11 @@ async function ensureMisReference(ctx: DemoContext, ref: Reference) {
   const inventory = new InventoryService();
   const parts = {} as Record<MisPart, { id: string; partFlag: string; retailRate: number; warrantyRate: number | null; name: string }>;
   for (const [key, p] of Object.entries(MIS_PARTS) as [MisPart, (typeof MIS_PARTS)[MisPart]][]) {
-    const fields = { ...p, warrantyRate: "warrantyRate" in p ? p.warrantyRate : null };
+    const { category: _category, ...rest } = p;
+    const fields = { ...rest, warrantyRate: "warrantyRate" in p ? p.warrantyRate : null };
     const part =
       (await prisma.sparePart.findUnique({ where: { partNumber: p.partNumber } })) ??
-      (await prisma.sparePart.create({ data: { ...fields, description: `${p.name} (demo data)`, taxable: true, binLocation: "MIS-01" } }));
+      (await prisma.sparePart.create({ data: { ...fields, taxable: true } }));
     parts[key] = { id: part.id, partFlag: part.partFlag, retailRate: part.retailRate ?? part.unitPrice, warrantyRate: part.warrantyRate, name: part.name };
     for (const branchKey of ["main", "second"] as const) {
       const branchId = ctx.branches[branchKey].id;
@@ -261,7 +262,7 @@ async function ensureMisParties(ctx: DemoContext, ref: Reference) {
     const created = await vehicleService.createVehicle({
       customerId,
       vin: v.vin,
-      registrationNumber: v.registrationNumber,
+      registrationNumber: v.registrationNumber ?? undefined,
       catalogueId: model.variantId,
       colourId: model.colourId,
       vehicleModelId: ref.warrantyModels[v.model as WorkshopModelKey],
@@ -272,7 +273,7 @@ async function ensureMisParties(ctx: DemoContext, ref: Reference) {
       sellingDealer: saleDate ? "Dana Motors (demo)" : undefined,
       ownershipStatus: customerId ? "Owned" : undefined,
       createdById: ctx.staff.main.advisor.id,
-    });
+    }, { requireRegistration: v.registrationNumber !== null });
     vehicles[key] = { id: created.id, customerId };
   }
   return { customers, vehicles };

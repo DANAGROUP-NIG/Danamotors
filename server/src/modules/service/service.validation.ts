@@ -117,6 +117,8 @@ export const listJobCardsSchema = z.object({
       customerId: z.string().uuid().optional(),
       search: z.string().optional(),
       status: z.string().optional(),
+      // SERVICE (default) lists service jobs only; PDI jobs have their own menu.
+      jobType: z.enum(["SERVICE", "PDI", "ALL"]).optional(),
       dateFrom: jobCardDate.optional(),
       dateTo: jobCardDate.optional(),
     })

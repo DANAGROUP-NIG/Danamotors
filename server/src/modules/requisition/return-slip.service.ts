@@ -1,4 +1,6 @@
-import { ChargeType, Prisma } from '@prisma/client';
+import { ChargeType, JobCardType, Prisma } from '@prisma/client';
+import { assertJobTypeAccess, pdiDocumentNumber, pdiSequenceKey } from '../pdi/pdi.logic';
+import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { nextSequenceNumber } from '../../shared/db/documentSequence';
@@ -78,6 +80,9 @@ export class ReturnSlipService {
       await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`;
       const job = await tx.jobCard.findUniqueOrThrow({ where: { id: initial.jobCardId }, include: { invoices: { select: { status: true } } } });
       assertRequisitionJob(job);
+      assertJobTypeAccess(job, actor);
+      const pdi = job.jobType === JobCardType.PDI;
+      if (pdi) await assertPdiDocumentChange(tx, 'return', new Date(), { create: true });
       const requisition = await tx.partRequisition.findUniqueOrThrow({ where: { id: initial.id }, include: { lines: { include: lineInclude } } });
       if (requisition.status !== 'ISSUED') throw new ConflictError('Cannot return parts of a cancelled requisition');
       const rows = input.lines.map(request => {
@@ -91,7 +96,9 @@ export class ReturnSlipService {
       for (const { line } of rows) await tx.$queryRaw`SELECT id FROM "InventoryStock" WHERE "branchId" = ${requisition.branchId} AND "partId" = ${line.sparePartId} FOR UPDATE`;
       const now = new Date();
       const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(now));
-      const returnNumber = await nextSequenceNumber(tx, `RETURN_${requisition.branchId}`, new Date(year, 6, 1));
+      const returnNumber = pdi
+        ? pdiDocumentNumber('RETURN', await nextSequenceNumber(tx, pdiSequenceKey('RETURN', requisition.branchId), new Date(year, 6, 1)))
+        : await nextSequenceNumber(tx, `RETURN_${requisition.branchId}`, new Date(year, 6, 1));
       const slip = await tx.partReturnSlip.create({ data: { returnNumber, returnDate: now, branchId: requisition.branchId, jobCardId: job.id, requisitionId: requisition.id, createdById: actor.userId } });
       for (const { line, request, returned } of rows) {
         const returnedLine = await tx.partReturn.create({ data: { returnSlipId: slip.id, requisitionLineId: line.id, partIssuanceId: line.partIssuanceId!, returnedById: actor.userId, quantity: request.quantity, status: 'Completed', ...returnSnapshot(request.quantity, line.rate) } });
@@ -114,6 +121,8 @@ export class ReturnSlipService {
       await tx.$queryRaw`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`;
       const job = await tx.jobCard.findUniqueOrThrow({ where: { id: initial.jobCardId }, include: { invoices: { select: { status: true } } } });
       assertRequisitionJob(job);
+      assertJobTypeAccess(job, actor);
+      if (job.jobType === JobCardType.PDI) await assertPdiDocumentChange(tx, 'return', initial.returnDate, { printedAt: initial.printedAt });
       const slip = await tx.partReturnSlip.findUniqueOrThrow({ where: { id }, include: { requisition: true, lines: { include: { requisitionLine: { include: lineInclude } } } } });
       if (slip.status === 'CANCELLED') throw new ConflictError('Return slip is already cancelled');
       if (slip.requisition.status !== 'ISSUED') throw new ConflictError('Cannot cancel a return of a cancelled requisition');
