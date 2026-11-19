@@ -30,7 +30,7 @@ it.each([
   ['IN_PROGRESS', 'QC', ['inspector']],
   ['WAITING_PARTS', 'QC', ['inspector']],
   ['READY', 'QC', ['inspector']],
-  ['QC', 'IN_PROGRESS', ['tech', 'advisor', ROLES.WORKSHOP_MANAGER]],
+  ['QC', 'IN_PROGRESS', []],
   ['QC', 'READY', [ROLES.BILLING_OFFICER, ROLES.CCU_OFFICER, 'customer']],
   ['READY', 'BILLED', ['delivery']],
   ['READY', 'DELIVERED', ['requester', ROLES.WORKSHOP_MANAGER, 'advisor']],
@@ -60,10 +60,14 @@ it('routes QC changes separately and suppresses repeated results/alias-only chan
   const qc = { ...card, status: 'QC' };
   const passed = { ...qc, qcStatus: 'PASSED' };
   expect(notificationEvents(qc, passed)).toEqual(['QC_PASSED']);
-  expect(routeJobNotification('QC_PASSED', qc, passed).map(row => row.userId)).toEqual(['advisor']);
+  expect(routeJobNotification('QC_PASSED', qc, passed).map(row => row.userId)).toEqual(['advisor', 'tech']);
   expect(routeJobNotification('QC_PASSED', qc, { ...passed, serviceAdvisorId: null })[0]?.role).toBe(ROLES.SERVICE_ADVISOR);
   expect(notificationEvents(qc, { ...qc, qcStatus: 'FAILED' })).toEqual(['QC_FAILED']);
   expect(routeJobNotification('QC_FAILED', qc, { ...qc, qcStatus: 'FAILED' }).map(row => row.userId ?? row.role)).toEqual(['tech', 'advisor', ROLES.WORKSHOP_MANAGER]);
+  expect(routeJobNotification('QC_PASSED', qc, { ...passed, technicianId: null }).map(row => row.userId)).toEqual(['advisor']);
+  expect(routeJobNotification('QC_FAILED', qc, { ...qc, technicianId: null }).map(row => row.userId ?? row.role)).toEqual(['advisor', ROLES.WORKSHOP_MANAGER]);
+  expect(notificationEvents({ ...qc, qcStatus: 'FAILED' }, qc)).toEqual(['QC_REVIEW_REQUIRED']);
+  expect(notificationEvents(qc, { ...qc, qcStatus: 'FAILED' })).toEqual(['QC_FAILED']);
   expect(notificationEvents(passed, { ...passed, qcNotes: 'Additional note' })).toEqual([]);
   expect(notificationEvents(card, { ...card, status: 'Pending' })).toEqual([]);
 });

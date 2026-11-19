@@ -171,11 +171,29 @@ with branch filtering, then one in-memory accumulation. BILLED, DELIVERED and CA
 (including normalized legacy forms) count as closed. Empty pages skip the aggregate;
 no cache or new count index is introduced without a measured local query plan.
 
+After a collection commits, the notification worker sends **Parts collection confirmed** to the technician who signed and the named service advisor, when eligible in the job branch. Delivery uses the recorded signer even if the job is reassigned while the event is pending. Retrying collection uses the original receipt and notification occurrence.
+
 Deployment: apply `20261117100000_part_collection_signatures` and regenerate Prisma
 before restarting. The additive table uses its issuance primary key for lookup/idempotency;
 existing rows need no backfill. Roll back application behavior first; export and retain
 signature evidence before using the provided rollback SQL. This migration has not been
 applied during development. No permission grants or dependencies changed.
+
+### Decision on issuing parts against an estimate
+
+Direct parts issues and requisitions that move stock require approved estimate scope for the actual parts. A blocked issue leaves stock unchanged and reports the approval problem. Ask the service advisor to prepare or revise the estimate, record customer approval, and retry the issue. No draft is started by the issue request. The existing upfront payment and deposit checks remain in their respective workflow steps.
+
+### QC review notifications
+
+A recorded QC pass or failure queues a background in-app notification for the technician assigned when the review was recorded. The technician must still have an active account in the job branch when delivery occurs. Jobs with a team only or no assignment retain their advisor and workshop-manager handoffs where applicable. The notification links to the job card for QC notes. An identical retry or return to work after a failure does not send another review message. A later review can send a new message.
+
+### Opening without a technician
+
+A job card can open without a technician or workshop team. The job-card list and detail show **Not assigned** for a missing technician. Select **Unassigned technician** in the job-card list to find these jobs, including team-only jobs. The branch-scoped list API accepts `unassignedTechnician=true`.
+
+Open the job card and use **Assign technician** to select an active technician from the same branch. The assignment endpoint requires `assignment:create` and records the change in the audit log. Technician collection and technician-owned progress use the individual assignment.
+
+The opening API input remains compatible with existing clients that send technician or team IDs. Both database fields already allow null, so there is no migration or backfill. A rollback can restore validation for new requests while preserving already opened jobs.
 
 ### Job-opening validation errors
 

@@ -819,6 +819,9 @@ export class JobCardWorkflowService {
             await completeCampaignVehiclesForJobCard(tx, id);
           }
 
+          if (from === "QC" && data.status === "IN_PROGRESS") {
+            update.qcStatus = "PENDING";
+          }
           update.status = data.status;
 
           await tx.jobCardStatusHistory.create({

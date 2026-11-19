@@ -22,6 +22,7 @@ jest.mock("../notification/jobcard-notification-router", () => ({
   setNotificationActor: jest.fn(),
 }));
 import prisma from "../../prisma/client";
+import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { WorkshopService } from "./workshop.service";
 import { WorkshopRepository } from "./workshop.repository";
 import { receivePartsSchema } from "./workshop.validation";
@@ -69,6 +70,12 @@ it("records assigned technician identity and server time, once per issuance", as
   await new WorkshopService().receiveParts("issue", "tech", signature);
   expect(prisma.partIssuance.update).toHaveBeenCalledTimes(1);
   expect(prisma.partCollectionSignature.create).toHaveBeenCalledTimes(1);
+  expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledTimes(1);
+  expect(prisma.jobcardNotificationEvent.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    where: { id: "workshop:job:PART_RECEIVED:issue" },
+    create: expect.objectContaining({ actorId: "tech" }),
+  }));
+  expect(notifyWorkshopEvent).not.toHaveBeenCalled();
   await expect(
     new WorkshopService().receiveParts("issue", "other", signature),
   ).rejects.toThrow("assigned technician");
@@ -257,4 +264,31 @@ it("assigns a branch technician and audits old and new assignments in the transa
     },
   });
   find.mockRestore();
+});
+
+it("audits a QC outcome once and leaves notification delivery to the worker", async () => {
+  const pending = { id: "job", status: "QC", branchId: "branch", qcStatus: "PENDING" };
+  const failed = { ...pending, qcStatus: "FAILED", qcNotes: "Private review note" };
+  jest.spyOn(WorkshopRepository.prototype, "findJobCardById").mockResolvedValueOnce(
+    pending as Awaited<ReturnType<WorkshopRepository["findJobCardById"]>>,
+  ).mockResolvedValueOnce(
+    failed as Awaited<ReturnType<WorkshopRepository["findJobCardById"]>>,
+  );
+  (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce(pending).mockResolvedValueOnce(failed);
+  (prisma.jobCard.update as jest.Mock).mockResolvedValueOnce(failed);
+  const workshop = new WorkshopService();
+
+  await workshop.updateQC("job", "FAILED", failed.qcNotes, "inspector");
+  await workshop.updateQC("job", "FAILED", failed.qcNotes, "inspector");
+
+  expect(prisma.jobCard.update).toHaveBeenCalledTimes(1);
+  expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  expect(prisma.auditLog.create).toHaveBeenCalledWith({
+    data: {
+      userId: "inspector",
+      action: "JOB_QC_OUTCOME_CHANGED",
+      details: JSON.stringify({ jobCardId: "job", branchId: "branch", previousOutcome: "PENDING", outcome: "FAILED" }),
+    },
+  });
+  expect(notifyWorkshopEvent).not.toHaveBeenCalled();
 });

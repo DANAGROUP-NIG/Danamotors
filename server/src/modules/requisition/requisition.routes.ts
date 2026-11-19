@@ -78,7 +78,7 @@ router.get(
  *     tags: [Inventory]
  *     summary: Issue several parts under one branch requisition number
  *     security: [{ bearerAuth: [] }]
- *     description: Requires requisition:create. GOODWILL also requires requisition:goodwill and a reason. Optional line requestedSparePartId and substitutionReason retain original intent; different supplied parts must share a registered family and require a reason. Source record prices are snapshotted; reserved stock is unavailable. Existing approved-estimate rules apply to the actual issued part. Zero issued quantity records a request without stock effect. Dates use Africa/Lagos.
+ *     description: Requires requisition:create. GOODWILL also requires requisition:goodwill and a reason. Optional line requestedSparePartId and substitutionReason retain original intent; different supplied parts must share a registered family and require a reason. Source record prices are snapshotted; reserved stock is unavailable. Existing approved-estimate rules apply to the actual issued part. An estimate approval blocker returns 400 with code PARTS_ISSUE_ESTIMATE_APPROVAL_REQUIRED. Zero issued quantity records a request without stock effect. Dates use Africa/Lagos.
  *     requestBody:
  *       required: true
  *       content:

@@ -276,7 +276,7 @@ export class RequisitionService {
                   type: "PART",
                   referenceId: row.sparePartId,
                   partSource: row.partSource,
-                  description: row.sparePart.name,
+                  description: `${row.sparePart.partNumber} (${row.sparePart.name})`,
                   quantity,
                   rate,
                   amount: quantity > 0 ? lineAmount(quantity, rate) : 0,
@@ -287,12 +287,12 @@ export class RequisitionService {
               type: "PART",
               referenceId: item.part.id,
               partSource: item.part.partFlag,
-              description: item.part.name,
+              description: `${item.part.partNumber} (${item.part.name})`,
               quantity: item.line.quantityIssued,
               rate: item.rate,
               amount: item.amounts.amount,
             })),
-          ]);
+          ], "parts issue");
         }
         const now = new Date();
         const requisitionNumber = await nextSequenceNumber(

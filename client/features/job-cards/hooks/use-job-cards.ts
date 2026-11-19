@@ -9,6 +9,7 @@ type UseJobCardsParams = {
   customerId?: string;
   search?: string;
   status?: string;
+  unassignedTechnician?: boolean;
   dateFrom?: string;
   dateTo?: string;
 };

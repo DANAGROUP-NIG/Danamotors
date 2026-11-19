@@ -123,6 +123,7 @@ export const listJobCardsSchema = z.object({
       customerId: z.string().uuid().optional(),
       search: z.string().optional(),
       status: z.string().optional(),
+      unassignedTechnician: z.enum(["true", "false"]).optional(),
       dateFrom: jobCardDate.optional(),
       dateTo: jobCardDate.optional(),
     })
@@ -191,13 +192,6 @@ export const jobOpeningBody = z
   .strict()
   .superRefine((data, ctx) => {
     if (data.appointmentId && !data.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Accept the job opening terms before converting this appointment' });
-    if (!data.technicianId && !data.teamId)
-      ctx.addIssue({
-        code: "custom",
-        path: ["technicianId"],
-        message: "Select a main mechanic or team",
-      });
-
     if (data.isRepeat && (!data.previousJobId || !data.repeatReason))
       ctx.addIssue({
         code: "custom",

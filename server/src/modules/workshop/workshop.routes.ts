@@ -113,6 +113,7 @@ router.use(authMiddleware);
  *     tags:
  *       - Workshop
  *     summary: Update quality control (QC) status
+ *     description: Requires qcstatus:update and job branch access. A changed pass or fail outcome is audited and queued for background notification.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -145,7 +146,7 @@ router.use(authMiddleware);
  *   post:
  *     tags: [Workshop]
  *     summary: Sign for issued parts
- *     description: Requires jobprogress:update, branch access and the active assigned technician. A PNG signature is required for new requests. Stores immutable evidence with server timestamp; does not return the image. Repeated collection cannot replace existing evidence. Historical unsigned confirmations remain readable.
+ *     description: Requires jobprogress:update, branch access and the active assigned technician. A PNG signature is required for new requests. Stores immutable evidence with server timestamp; does not return the image. Repeated collection cannot replace existing evidence. Historical unsigned confirmations remain readable. After commit, the notification worker confirms collection to the signer and named service advisor when eligible.
  *     security: [{ BearerAuth: [] }]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }

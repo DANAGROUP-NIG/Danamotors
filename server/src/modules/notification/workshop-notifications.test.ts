@@ -16,7 +16,8 @@ beforeEach(() => {
 });
 it('preserves separate durable parts recipients from role/assignment', () => {
   expect(workshopRecipients('PART_REQUESTED', card)).toMatchObject({ isActive: true, OR: expect.arrayContaining([{ role: { name: ROLES.GENERAL_STORE_MANAGER } }, { branchId: 'branch', role: { name: { in: [ROLES.BRANCH_STORE_MANAGER] } } }]) });
-  for (const event of ['PARTS_ISSUED', 'PART_RECEIVED'] as const) expect(workshopRecipients(event, card).OR).toContainEqual({ id: { in: ['advisor', 'tech'] }, branchId: 'branch' });
+  expect(workshopRecipients('PARTS_ISSUED', card).OR).toContainEqual({ id: { in: ['advisor', 'tech'] }, branchId: 'branch' });
+  expect(workshopRecipients('PART_RECEIVED', card, 'signer').OR).toEqual([{ id: { in: ['signer', 'advisor'] }, branchId: 'branch' }]);
   expect(workshopRecipients('PARTS_UNAVAILABLE', card).OR).toContainEqual({ id: { in: ['advisor'] }, branchId: 'branch' });
 });
 it.each((Object.keys(WORKSHOP_EVENTS) as (keyof typeof WORKSHOP_EVENTS)[]).filter(event => event.startsWith('PART')))('preserves separate %s notifications with a stable per-recipient dedupe key', async event => {

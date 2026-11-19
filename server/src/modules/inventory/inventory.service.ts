@@ -1134,7 +1134,7 @@ export class InventoryService {
         const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => !['REJECTED', 'CANCELLED'].includes(r.status.toUpperCase())).reduce((n, r) => n + r.quantity, 0), 0);
         if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
         // Each source is its own part record: the approved estimate must name this exact record.
-        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: `${sparePart.partNumber} (${sparePart.name})`, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }], 'parts issue');
       }
       const updated = await tx.inventoryStock.updateMany({
         where: {

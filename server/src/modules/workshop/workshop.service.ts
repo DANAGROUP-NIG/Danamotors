@@ -108,7 +108,7 @@ export class WorkshopService {
   /** Records immutable collection evidence for the assigned technician, once per issuance. */
   async receiveParts(id: string, actorId: string, signatureImage: string) {
     assertSignaturePng(signatureImage);
-    const result = await prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx) => {
       const owner = await tx.partIssuance.findUnique({
         where: { id },
         select: { jobCardId: true },
@@ -189,9 +189,6 @@ export class WorkshopService {
       );
       return received;
     });
-    if (result?.jobCardId)
-      await notifyWorkshopEvent("PART_RECEIVED", result.jobCardId, id);
-    return result;
   }
 
   async assignTechnician(
@@ -329,7 +326,7 @@ export class WorkshopService {
       )
     )
       throw new BadRequestError("This job card is no longer open");
-    const result = await prisma.$transaction(
+    return prisma.$transaction(
       async (tx) => {
         await setNotificationActor(tx, actorId);
         await tx.$queryRaw(
@@ -353,19 +350,27 @@ export class WorkshopService {
         )
           return current;
         if (qcStatus === "PASSED") await assertRecordedScope(tx, id);
-        return tx.jobCard.update({
+        const reviewed = await tx.jobCard.update({
           where: { id },
           data: { qcStatus, qcNotes },
         });
+        if (actorId && current.qcStatus !== qcStatus) {
+          await tx.auditLog.create({
+            data: {
+              userId: actorId,
+              action: "JOB_QC_OUTCOME_CHANGED",
+              details: JSON.stringify({
+                jobCardId: id,
+                branchId: current.branchId,
+                previousOutcome: current.qcStatus,
+                outcome: qcStatus,
+              }),
+            },
+          });
+        }
+        return reviewed;
       },
       { maxWait: 5000, timeout: 15000 },
     );
-    if (qcStatus !== "PENDING")
-      await notifyWorkshopEvent(
-        qcStatus === "PASSED" ? "QC_PASSED" : "QC_FAILED",
-        id,
-        result.updatedAt.toISOString(),
-      );
-    return result;
   }
 }

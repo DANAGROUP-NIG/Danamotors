@@ -418,6 +418,7 @@ export class ServiceController {
         customerId,
         search,
         status,
+        unassignedTechnician: req.query.unassignedTechnician === "true",
         dateFrom,
         dateTo,
       });

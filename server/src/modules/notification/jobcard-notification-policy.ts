@@ -41,11 +41,14 @@ export interface NotificationJob {
 }
 export type JobNotificationEvent = 'CREATED' | 'ASSIGNED' | 'STATUS' | 'QC_PASSED' | 'QC_FAILED' | 'QC_REVIEW_REQUIRED' | 'REMINDER' | 'ESCALATION' | 'PROMISED_24H' | 'PROMISED_12H';
 export interface RecipientTarget {
-  userId?: string; role?: string; permission?: string; customerId?: string;
+  userId?: string; assignedTechnicianOnly?: boolean; role?: string; permission?: string; customerId?: string;
   intent: string; fyi?: boolean;
 }
 const roleTarget = (role: string, intent: string, fyi = false): RecipientTarget => ({ role, intent, fyi });
 const userTarget = (userId: string | null, role: string, intent: string, fyi = false): RecipientTarget => userId ? { userId, intent, fyi } : roleTarget(role, intent, fyi);
+
+const qcTechnician = (card: NotificationJob, intent: string): RecipientTarget[] =>
+  card.technicianId ? [{ userId: card.technicianId, assignedTechnicianOnly: true, intent }] : [];
 
 export function actionTargets(card: NotificationJob): RecipientTarget[] {
   const tech = (intent: string) => userTarget(card.technicianId, ROLES.TECHNICIAN, intent);
@@ -56,7 +59,7 @@ export function actionTargets(card: NotificationJob): RecipientTarget[] {
     case 'WAITING_PARTS': return [roleTarget(ROLES.BRANCH_STORE_MANAGER, 'Resolve parts availability')];
     case 'QC':
       if (card.qcStatus?.toUpperCase() === 'PASSED') return [advisor('Review passed QC and mark Ready')];
-      if (card.qcStatus?.toUpperCase() === 'FAILED') return [tech(`Rework required: ${card.qcNotes || 'Review QC notes'}`), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
+      if (card.qcStatus?.toUpperCase() === 'FAILED') return [...qcTechnician(card, 'QC failed. Review the job card for rework'), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
       return card.qualityInspectorId ? [{ userId: card.qualityInspectorId, intent: 'Inspect completed work' }] : [{ permission: PERMISSIONS.QCSTATUS_UPDATE, intent: 'Inspect completed work' }];
     case 'READY': return [roleTarget(ROLES.BILLING_OFFICER, 'Prepare job bill')];
     case 'BILLED': return [userTarget(card.deliveryAdvisorId ?? card.serviceAdvisorId, ROLES.SERVICE_ADVISOR, 'Arrange vehicle delivery')];
@@ -72,9 +75,10 @@ export function routeJobNotification(event: JobNotificationEvent, before: Notifi
   if (event === 'REMINDER' || event.startsWith('PROMISED_')) return actionTargets(card).map(target => ({ ...target, intent: `${event === 'REMINDER' ? 'Reminder' : 'Promised delivery approaching'}: ${target.intent}` }));
   if (event === 'CREATED') return actionTargets({ ...card, status: 'OPEN' });
   if (event === 'ASSIGNED') return card.technicianId ? [{ userId: card.technicianId, intent: 'Start assigned work by the due date' }] : actionTargets({ ...card, status: 'OPEN' });
-  if (event === 'QC_PASSED') return [advisor('Review passed QC and mark Ready')];
+  if (event === 'QC_PASSED') return [advisor('Review passed QC and mark Ready'), ...qcTechnician(card, 'QC passed')];
   if (event === 'QC_REVIEW_REQUIRED') return actionTargets(card);
-  if (event === 'QC_FAILED' || (event === 'STATUS' && from === 'QC' && to === 'IN_PROGRESS')) return [userTarget(card.technicianId, ROLES.TECHNICIAN, `Rework required: ${card.qcNotes || 'Review QC notes'}`), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
+  if (event === 'QC_FAILED') return [...qcTechnician(card, 'QC failed. Review the job card for rework'), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
+  if (event === 'STATUS' && from === 'QC' && to === 'IN_PROGRESS') return [];
   if (event !== 'STATUS' || from === to) return [];
   if (to === 'DELIVERED' || to === 'CANCELLED') return [
     ...(card.createdById ? [{ userId: card.createdById, intent: `Jobcard ${to.toLowerCase()}`, fyi: true }] : []),

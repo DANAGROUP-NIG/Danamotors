@@ -525,7 +525,7 @@ router.delete(
  *     tags:
  *       - Service & Job Cards
  *     summary: Create a job card
- *     description: Opens a new job card to track a vehicle's repair workflow.
+ *     description: Requires jobcard:create and branch access. A technician and team are optional.
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -545,8 +545,8 @@ router.delete(
  *               serviceId: { type: string, format: uuid, description: Optional separate appointment service; does not set the opening charge }
  *               bayId: { type: string, format: uuid }
  *               serviceAdvisorId: { type: string, format: uuid }
- *               technicianId: { type: string, format: uuid, description: Required when teamId is absent }
- *               teamId: { type: string, format: uuid }
+ *               technicianId: { type: string, format: uuid, description: Optional legacy assignment input. Use the workshop assign endpoint for normal assignment. }
+ *               teamId: { type: string, format: uuid, description: Optional legacy team input }
  *               mileage: { type: integer, minimum: 0, example: 12500 }
  *               promisedAt: { type: string, format: date-time }
  *               checklist: { type: string, maxLength: 5000 }
@@ -601,6 +601,7 @@ router.delete(
  *     tags:
  *       - Service & Job Cards
  *     summary: List all job cards
+ *     description: Requires jobcard:read. Branch-scoped staff see jobs in their own branch.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -613,6 +614,10 @@ router.delete(
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [OPEN, IN_PROGRESS, QC, READY, BILLED, DELIVERED, CANCELLED] }
+ *       - in: query
+ *         name: unassignedTechnician
+ *         description: When true, return jobs without an individual technician, including team-only jobs.
+ *         schema: { type: boolean, example: true }
  *     responses:
  *       200:
  *         description: Paginated job card list

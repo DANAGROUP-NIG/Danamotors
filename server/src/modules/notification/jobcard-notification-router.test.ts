@@ -202,3 +202,17 @@ it('consumes parts events through the same atomic notification/audit/processed t
   expect(prisma.jobcardNotificationEvent.update).toHaveBeenCalledWith({ where: { id: current.id }, data: { processedAt: expect.any(Date) } });
 });
 
+
+it.each(['PASSED', 'FAILED'])('delivers a recorded QC %s after workflow advances without exposing review notes', async outcome => {
+  const before = { ...snapshot, status: 'QC' };
+  const result = { ...row(before, before), after: { ...before, qcStatus: outcome, qcNotes: 'Private notes' } };
+  (prisma.jobcardNotificationEvent.findUnique as jest.Mock).mockResolvedValue(result);
+  await processJobcardNotification(result);
+  expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+    where: { id: 'tech', branchId: 'branch', isActive: true, role: { name: 'Technician' } },
+  }));
+  const { data } = (prisma.notification.createMany as jest.Mock).mock.calls[0][0];
+  const technician = data.find((entry: { userId: string }) => entry.userId === 'tech');
+  expect(technician.message).toContain(outcome === 'PASSED' ? 'QC passed' : 'QC failed');
+  expect(technician.message).not.toMatch(/Private notes|Test Customer|Test Actor/);
+});

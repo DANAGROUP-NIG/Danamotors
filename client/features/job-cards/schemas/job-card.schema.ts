@@ -12,8 +12,6 @@ export const createJobCardSchema = z
     bayId: z.string().uuid("Select a bay"),
     serviceAdvisorId: z.string().uuid("Select a service advisor"),
     engineerId: z.union([z.string().uuid(), z.literal("")]).optional(),
-    technicianId: z.union([z.string().uuid(), z.literal("")]).optional(),
-    teamId: z.union([z.string().uuid(), z.literal("")]).optional(),
     mileage: z
       .number({ invalid_type_error: "Enter the current odometer reading" })
       .int()
@@ -99,13 +97,6 @@ export const createJobCardSchema = z
         path: ["promisedTime"],
         message: "Promised delivery must be in the future",
       });
-    if (!v.technicianId && !v.teamId)
-      ctx.addIssue({
-        code: "custom",
-        path: ["technicianId"],
-        message: "Select a mechanic or team",
-      });
-
     if (v.isRepeat && !v.previousJobId)
       ctx.addIssue({ code: "custom", path: ["previousJobId"], message: "Choose a previous job" });
     if (v.isRepeat && !v.repeatReason?.trim())

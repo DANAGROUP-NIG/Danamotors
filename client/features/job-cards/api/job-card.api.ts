@@ -13,6 +13,7 @@ export async function getJobCardsRequest(params?: {
   customerId?: string;
   search?: string;
   status?: string;
+  unassignedTechnician?: boolean;
   dateFrom?: string;
   dateTo?: string;
 }): Promise<JobCardListResponse> {
@@ -23,6 +24,7 @@ export async function getJobCardsRequest(params?: {
   if (params?.customerId) query.set("customerId", params.customerId);
   if (params?.search) query.set("search", params.search);
   if (params?.status) query.set("status", params.status);
+  if (params?.unassignedTechnician) query.set("unassignedTechnician", "true");
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);
   const qs = query.toString();

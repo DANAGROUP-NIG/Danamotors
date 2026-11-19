@@ -54,8 +54,10 @@ async function resolveTargets(tx: Prisma.TransactionClient, card: NotificationJo
     const users = await tx.user.findMany({ where: {
       isActive: true, branchId: card.branchId,
       ...(target.userId ? { id: target.userId } : target.permission ? { role: { permissions: { some: { permission: { name: target.permission } } } } } : { role: { name: target.role } }),
+      ...(target.assignedTechnicianOnly ? { role: { name: ROLES.TECHNICIAN } } : {}),
     }, select: { id: true } });
     if (users.length) { users.forEach(user => add(user.id, target)); continue; }
+    if (target.assignedTechnicianOnly) continue;
     warning(`Jobcard ${card.id}: no active recipient for ${target.role ?? target.permission ?? target.userId}; falling back to Admin`);
     const admins = await activeAdmins(tx, card.branchId);
     const eligible = admins.filter(user => user.id !== actorId);
@@ -82,7 +84,8 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
   let targets = routeJobNotification(event, before, card);
   if (!targets.length) return;
   await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${card.id} FOR SHARE`);
-  const live = await tx.jobCard.findUnique({ where: { id: card.id }, include: { vehicle: true, customer: true } });
+  const isQcReview = event === 'QC_PASSED' || event === 'QC_FAILED';
+  const live = await tx.jobCard.findUnique({ where: { id: card.id }, include: { vehicle: true, customer: !isQcReview } });
   if (!live) throw new Error('Jobcard missing during notification routing');
   if (event.startsWith('PROMISED_')) {
     const liveCard = jobSnapshot.parse({ ...live, promisedAt: live.promisedAt instanceof Date ? live.promisedAt.toISOString() : live.promisedAt });
@@ -98,12 +101,12 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
     || live.technicianId !== card.technicianId || live.qcStatus?.toUpperCase() !== card.qcStatus?.toUpperCase()
     || live.qualityInspectorId !== card.qualityInspectorId || live.serviceAdvisorId !== card.serviceAdvisorId
     || live.deliveryAdvisorId !== card.deliveryAdvisorId;
-  if (stale) {
+  if (live.branchId !== card.branchId || (stale && !isQcReview)) {
     await tx.jobcardNotificationAudit.createMany({ data: [{ jobCardId: card.id, eventId: row.id, eventType: event, recipientId: 'obsolete-action', status: 'SUPPRESSED_STALE_ACTION', createdAt: new Date() }], skipDuplicates: true });
-    targets = targets.filter(target => target.fyi);
+    targets = live.branchId === card.branchId ? targets.filter(target => target.fyi) : [];
     if (!targets.length) return;
   }
-  const actor = row.actorId ? await tx.user.findUnique({ where: { id: row.actorId }, select: { firstName: true, lastName: true } }) : null;
+  const actor = !isQcReview && row.actorId ? await tx.user.findUnique({ where: { id: row.actorId }, select: { firstName: true, lastName: true } }) : null;
   const deliveries = await resolveTargets(tx, card, row.actorId, targets);
   if (!deliveries.length) {
     // This is expected when every resolved recipient is the acting user, or the
@@ -117,7 +120,8 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
   const from = before ? canonicalNotificationStatus(before.status) : 'NONE';
   const to = canonicalNotificationStatus(card.status);
   // TODO(confirm): JobCard has no priority field; never invent a priority.
-  const context = `Jobcard ${card.jobNumber}; ${vehicle}; ${customer}; ${notificationStatusLabel(from)} to ${notificationStatusLabel(to)}; updated by ${actorName}; due ${notificationDueLabel(card.promisedAt)}; priority not recorded`;
+  const context = isQcReview ? `Job card ${card.jobNumber}, ${vehicle}, ${event === 'QC_PASSED' ? 'QC passed' : 'QC failed'}`
+    : `Jobcard ${card.jobNumber}; ${vehicle}; ${customer}; ${notificationStatusLabel(from)} to ${notificationStatusLabel(to)}; updated by ${actorName}; due ${notificationDueLabel(card.promisedAt)}; priority not recorded`;
   const data = deliveries.map(delivery => ({
     ...(delivery.userId ? { userId: delivery.userId } : { customerId: delivery.customerId }),
     branchId: card.branchId, type: `JOBCARD_${event}`, title: `${delivery.fyi ? 'FYI: ' : ''}${[...delivery.intents].join('; ')}`,

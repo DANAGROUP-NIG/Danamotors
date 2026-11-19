@@ -340,7 +340,6 @@ export function JobCardCreateForm({
       });
 
       setValue("serviceAdvisorId", "");
-      setValue("technicianId", "");
       setValue("engineerId", "");
     }
 
@@ -375,7 +374,6 @@ export function JobCardCreateForm({
       });
 
     setValue("serviceAdvisorId", "");
-    setValue("technicianId", "");
     setValue("engineerId", "");
 
     setValue(
@@ -508,12 +506,10 @@ export function JobCardCreateForm({
             `${promisedDate}T${promisedTime}:00+01:00`,
           ).toISOString(),
           engineerId: values.engineerId || undefined,
-          technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat
             ? values.repeatReason?.trim()
             : undefined,
-          teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,
@@ -617,7 +613,7 @@ export function JobCardCreateForm({
   );
 
   const masterPicker = (
-    name: "bayId" | "teamId",
+    name: "bayId",
     label: string,
     kind: string,
     required = false,
@@ -1124,9 +1120,9 @@ export function JobCardCreateForm({
                               <option value="">Select previous job</option>
                               {recentJobs.data.jobs.map((job) => (
                                 <option key={job.id} value={job.id}>
-                                  {job.jobNumber} — {formatDate(job.createdAt)}
+                                  {job.jobNumber}, {formatDate(job.createdAt)}
                                   {job.technician
-                                    ? ` — ${job.technician.firstName} ${job.technician.lastName}`
+                                    ? `, ${job.technician.firstName} ${job.technician.lastName}`
                                     : ""}
                                 </option>
                               ))}
@@ -1189,7 +1185,6 @@ export function JobCardCreateForm({
                       </OpeningField>
                     )}
                   />
-                  {masterPicker("teamId", "Group", "TEAM")}
                   <Controller
                     name="engineerId"
                     control={control}
@@ -1207,22 +1202,6 @@ export function JobCardCreateForm({
                     )}
                   />
 
-                  {/* <Controller
-                    name="technicianId"
-                    control={control}
-                    render={({ field }) => (
-                      <WorkshopPicker
-                        label="Technician"
-                        endpoint={`/service/staff?role=Technician&branchId=${branchId ?? ""}`}
-                        collection="users"
-                        disabled={!branchId}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        error={errors.technicianId?.message}
-                      />
-                    )}
-                  /> */}
                   <Controller
                     name="serviceAdvisorId"
                     control={control}

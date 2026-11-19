@@ -212,6 +212,7 @@ export class ServiceRepository {
     customerId?: string;
     search?: string;
     status?: string;
+    unassignedTechnician?: boolean;
     dateFrom?: string;
     dateTo?: string;
   }) {
@@ -228,6 +229,8 @@ export class ServiceRepository {
     if (params?.status) {
       where.status = jobStatusFilter(params.status);
     }
+
+    if (params?.unassignedTechnician) where.technicianId = null;
 
     if (params?.search) {
       where.OR = [

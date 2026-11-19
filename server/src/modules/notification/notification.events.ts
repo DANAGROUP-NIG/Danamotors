@@ -8,8 +8,9 @@ export type WorkshopEvent = keyof typeof WORKSHOP_EVENTS;
 // Email is intentionally excluded: issue #140 marks it as a suggestion.
 export const EVENT_CHANNELS = Object.fromEntries(Object.keys(WORKSHOP_EVENTS).map(event => [event, ['in-app'] as const]));
 export interface WorkshopNotificationPayload {
-  dedupeKey: string; jobCardId: string; jobNumber: string; customer: string; registration: string; branchId: string;
+  dedupeKey: string; jobCardId: string; jobNumber: string; customer?: string; registration: string; branchId: string;
 }
 export function workshopNotification(event: WorkshopEvent, payload: WorkshopNotificationPayload) {
-  return { type: event, title: WORKSHOP_EVENTS[event], message: `${WORKSHOP_EVENTS[event]}: ${payload.jobNumber}, ${payload.customer}, ${payload.registration}`, link: `/job-cards/${payload.jobCardId}`, branchId: payload.branchId, dedupeKey: `${event}:${payload.dedupeKey}` };
+  const context = [payload.jobNumber, payload.customer, payload.registration].filter(Boolean).join(', ');
+  return { type: event, title: WORKSHOP_EVENTS[event], message: `${WORKSHOP_EVENTS[event]}: ${context}`, link: `/job-cards/${payload.jobCardId}`, branchId: payload.branchId, dedupeKey: `${event}:${payload.dedupeKey}` };
 }

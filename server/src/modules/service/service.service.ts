@@ -608,6 +608,7 @@ export class ServiceService {
     customerId?: string;
     search?: string;
     status?: string;
+    unassignedTechnician?: boolean;
     dateFrom?: string;
     dateTo?: string;
   }) {
@@ -618,6 +619,8 @@ export class ServiceService {
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
     if (params?.status) where.status = jobStatusFilter(params.status);
+
+    if (params?.unassignedTechnician) where.technicianId = null;
 
     if (params?.search) {
       where.OR = [
@@ -678,6 +681,7 @@ export class ServiceService {
         customerId: params?.customerId,
         search: params?.search,
         status: params?.status,
+        unassignedTechnician: params?.unassignedTechnician,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
       }),

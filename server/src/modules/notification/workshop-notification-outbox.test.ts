@@ -33,3 +33,34 @@ it('suppresses obsolete requests after job completion and refuses silent loss wh
   mocks.user.findMany.mockResolvedValue([]);
   await expect(deliverWorkshopNotification(tx, row, 'PART_REQUESTED', job, 'request', true, new Date())).rejects.toThrow('No active');
 });
+
+it('delivers signed collection to the signer and named advisor after reassignment', async () => {
+  const { tx, mocks } = database();
+  const row = { id: 'event', jobCardId: 'job', actorId: 'signer', after: job, before: null, createdAt: new Date(), processedAt: null };
+  mocks.user.findMany.mockResolvedValue([{ id: 'signer' }, { id: 'advisor' }]);
+
+  await deliverWorkshopNotification(tx, row, 'PART_RECEIVED', job, 'issuance', false, new Date());
+
+  expect(mocks.user.findMany).toHaveBeenCalledWith({
+    where: { isActive: true, OR: [{ id: { in: ['signer', 'advisor'] }, branchId: 'branch' }] },
+    select: { id: true },
+  });
+  expect(mocks.notification.createMany).toHaveBeenCalledWith({
+    data: ['signer', 'advisor'].map(userId => expect.objectContaining({
+      userId, dedupeKey: 'PART_RECEIVED:job:issuance', message: 'Parts collection confirmed: J1, SYNTHETIC',
+    })),
+    skipDuplicates: true,
+  });
+});
+
+it('audits suppressed receipt delivery when no eligible recipient remains', async () => {
+  const { tx, mocks } = database();
+  const row = { id: 'event', jobCardId: 'job', actorId: 'signer', after: job, before: null, createdAt: new Date(), processedAt: null };
+  mocks.jobCard.findUnique.mockResolvedValue({ ...job, technicianId: null, serviceAdvisorId: null });
+  mocks.user.findMany.mockResolvedValue([]);
+  await deliverWorkshopNotification(tx, row, 'PART_RECEIVED', job, 'issuance', false, new Date());
+  expect(mocks.notification.createMany).not.toHaveBeenCalled();
+  expect(mocks.jobcardNotificationAudit.createMany).toHaveBeenCalledWith(expect.objectContaining({
+    data: [expect.objectContaining({ status: 'SUPPRESSED_NO_ELIGIBLE_RECIPIENT' })],
+  }));
+});
