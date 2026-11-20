@@ -8,6 +8,10 @@ The view requires job-card read and `jobcard:multi-vehicle:read`. The latter is 
 
 Payer comes from the job's recorded charge lines and service billing rule. A job may have several payers. If neither source records a payer, the view shows Not recorded. The current job model has no insurance payer field.
 
+### Gate-pass verification (issue 142)
+
+On a migrated disposable PostgreSQL database, fully paid and approved-credit jobs moved to Delivered and received consecutive gate-pass numbers. An unpaid job without credit approval stayed Billed and had no gate pass. Chrome printed the existing gate-pass markup and print rules from a synthetic fixture to one PDF page. Visual review confirmed the gate-pass number, job card, customer, vehicle, registration and Africa/Lagos delivery date, with the surrounding fixture content hidden. Printing from the authenticated screen and physical printer output remain pending. The wider workshop integration test stopped before delivery because the estimate approval fixture omitted the expected version and content hash.
+
 ### Customer categories (issue 142)
 
 The customer profile, customer directory and job-card header use Individual, Corporate, Government, In-House and Others. The directory category filter combines with the existing search and branch scope. Vendor is a party status. Vendor receipts and debtor reports continue to recognize legacy Vendor records during cutover.
