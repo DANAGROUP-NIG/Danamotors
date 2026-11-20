@@ -39,6 +39,12 @@ through the app: a booking (CSC-5), a call before the vehicle went overdue (CSC-
 CSC-10 R0003) and a partial closure (CSC-11 R0001). CSC-8 is already visited; CSC-14 is left out. See
 `doc/csc-testing-guide.md`.
 
+Only the late delivery demo: `npm run prisma:seed:demo -- --late-only` (needs the late deliveries migration). It
+adds customers `DEMO-C51` (main branch) and `DEMO-C52` (second branch) with vehicles `LSL-801LD`…`LSL-809LD` and
+`ABJ-810LD`, and finished jobs `DM-LATE-1`…`DM-LATE-10` at fixed January 2026 dates: late by date (one just after
+midnight), late by time, on time, exactly on time, not delivered, and one at the second branch. Some have reasons and
+remarks, some none. See `doc/late-deliveries-testing-guide.md`.
+
 The run prints a summary at the end. It lists the job numbers, bills (with VAT and round-off), warranty case numbers, stock per branch, campaign VIN statuses and the warranty check result for each vehicle. Share it with the testers.
 
 ## Re-run
