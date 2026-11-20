@@ -65,7 +65,8 @@ export function capRows<R>(rows: R[]): { rows: R[]; truncated: boolean } {
 
 /** Summary mode returns totals only; detail and detail-with-summary return rows too. */
 export function applyMode<R extends ReportRow>(body: ReportBody<R>, mode: ReportMode | undefined): ReportBody<R> {
-  return mode === 'summary' ? { ...body, rows: [] } : body;
+  if (mode === 'summary') return { ...body, rows: [] };
+  return mode === 'detail' && body.sections ? { ...body, sections: [] } : body;
 }
 
 export function countBy<R extends ReportRow>(rows: R[], key: (row: R) => string): Record<string, number> {

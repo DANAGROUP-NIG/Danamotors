@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import type { ReportConfig, ReportGroup, ReportResponse, ReportRow } from "../types";
 import { cellValue, visibleColumns } from "../components/ReportTable";
 import { COMPANY_NAME, appliedText, branchAddress, periodText } from "../components/ReportPrintLayout";
+import { sectionCell } from "../components/ReportSections";
 import { fmtDate, fmtDateTime, fmtTime, isNumericFormat, plural } from "./report-format";
 
 type Cell = string | number | null;
@@ -91,7 +92,26 @@ export async function exportReportExcel<Row extends ReportRow>(config: ReportCon
   worksheet["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: headerRow, c: 0 }, e: { r: headerRow, c: Math.max(columns.length - 1, 0) } }) };
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, config.title.slice(0, 31).replace(/[\\/?*[\]:]/g, " "));
+  const sheetName = config.title.slice(0, 31).replace(/[\\/?*[\]:]/g, " ");
+  const sections = data.sections ?? [];
+  // Summary-only runs of reports with summary tables export just the tables.
+  if (!(sections.length && mode === "summary")) XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  if (sections.length) {
+    const summary: Cell[][] = [[COMPANY_NAME], [config.title.toUpperCase()], [periodText(config, data)], [appliedText(data)], []];
+    const numeric = (column: (typeof sections)[number]["columns"][number], row: Record<string, unknown>): Cell => {
+      const raw = row[column.key];
+      return isNumericFormat(column.format) ? (typeof raw === "number" ? raw : null) : sectionCell(column, row) || null;
+    };
+    for (const section of sections) {
+      summary.push([section.title.toUpperCase()], section.columns.map((column) => column.label));
+      for (const row of section.rows) summary.push(section.columns.map((column) => numeric(column, row)));
+      if (section.total) summary.push(section.columns.map((column) => numeric(column, section.total!)));
+      summary.push([]);
+    }
+    const summarySheet = XLSX.utils.aoa_to_sheet(summary);
+    summarySheet["!cols"] = [{ wch: 40 }, ...Array.from({ length: 6 }, () => ({ wch: 16 }))];
+    XLSX.utils.book_append_sheet(workbook, summarySheet, workbook.SheetNames.length ? "Summary" : sheetName);
+  }
   const query = data.filters.query as Record<string, string>;
   const stamp = config.period.kind === "date" ? query.date : config.period.kind === "range" ? `${query.from}_to_${query.to}` : data.report.generatedAt.slice(0, 10);
   const filename = `${config.slug}-${stamp}.xlsx`;

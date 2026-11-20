@@ -16,6 +16,7 @@ import { defaultParams, parseParams, sameParams, toApiQuery, toSearch, validateP
 import type { ReportConfig, ReportResponse, ReportRow } from "../types";
 import { ReportFilterBar } from "./ReportFilterBar";
 import { appliedText, ReportPrintLayout } from "./ReportPrintLayout";
+import { ReportSections } from "./ReportSections";
 import { ReportSummaryStrip } from "./ReportSummaryStrip";
 import { ReportTable } from "./ReportTable";
 
@@ -103,6 +104,8 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
   }
 
   const rowCount = data ? data.totals.count ?? data.meta.rowCount : 0;
+  // Summary-only runs of reports with summary tables show the tables instead of an empty detail table.
+  const sectionsOnly = Boolean(data?.sections?.length) && options.mode === "summary";
   const isEmpty = data && rowCount === 0;
   const printedBy = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : "";
 
@@ -175,6 +178,7 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
           {config.summaryCards && <ReportSummaryStrip cards={config.summaryCards(data, options)} />}
           {config.extra && <div className="print:hidden">{config.extra(data)}</div>}
 
+          {!sectionsOnly && (
           <section className="relative overflow-hidden rounded-xl border border-border bg-white shadow-sm print:hidden" aria-label="Report results" aria-busy={report.isFetching}>
             <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-3 sm:px-5">
               <div className="min-w-0">
@@ -210,6 +214,8 @@ export function ReportRunner<Row extends ReportRow>({ config }: { config: Report
             )}
             {config.footnote && !isEmpty && <p className="border-t border-border px-5 py-2.5 text-sm text-muted-foreground">{config.footnote}</p>}
           </section>
+          )}
+          {data.sections && <ReportSections sections={data.sections} />}
 
           {(config.printList?.(options) ?? true) && <ReportPrintLayout config={config} data={data} options={options} printedBy={printedBy} />}
           {config.printSections?.(data, options)}

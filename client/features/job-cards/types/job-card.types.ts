@@ -160,6 +160,10 @@ export type JobCard = {
   promisedAt?: string | null;
   readyAt?: string | null;
   deliveredAt?: string | null;
+  /** LATE_REASON master ids recorded at delivery or on the late-delivery entry screens. */
+  lateReasonIds?: string[];
+  /** Internal delay remark. */
+  lateRemarks?: string | null;
   gatePassNumber?: string | null;
   serviceTypeId?: string | null;
   serviceType?: { description: string; code?: string; chargedTo?: string } | null;

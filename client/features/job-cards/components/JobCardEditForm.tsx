@@ -35,6 +35,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const [advisor, setAdvisor] = useState(jobCard.serviceAdvisorId ?? "");
   const [engineer, setEngineer] = useState(jobCard.engineerId ?? "");
   const [reasons, setReasons] = useState<string[]>([]);
+  const [lateRemarks, setLateRemarks] = useState("");
 
   const lateReasons = useQuery({
     queryKey: ["late-reasons"],
@@ -43,6 +44,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       apiGet<{
         items: {
           id: string;
+          code: string;
           description: string;
         }[];
       }>("/workshop-masters?kind=LATE_REASON&limit=100"),
@@ -79,6 +81,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           ? {
               deliveryAdvisorId: advisor,
               lateReasonIds: reasons,
+              ...(late && lateRemarks.trim() ? { lateRemarks: lateRemarks.trim() } : {}),
             }
           : {}),
       }),
@@ -88,6 +91,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       setStatus("");
       setRemarks("");
       setReasons([]);
+      setLateRemarks("");
       await refresh();
     },
   });
@@ -204,12 +208,25 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
               {lateReasons.data?.items.map((reason) => (
                 <label key={reason.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={reasons.includes(reason.id)} disabled={reasons.length >= 6 && !reasons.includes(reason.id)} onChange={(event) => setReasons((current) => event.target.checked ? [...current, reason.id] : current.filter((id) => id !== reason.id))} />
+                  {reason.code.length <= 2 && <span className="font-mono text-xs text-slate-500">{reason.code}</span>}
                   {reason.description}
                 </label>
               ))}
               {lateReasons.data?.items.length === 0 && <p className="text-sm text-muted-foreground">No late-delivery reasons are configured. Ask an administrator to add them in workshop masters.</p>}
             </div>
           </Field>
+          {late && (
+            <Field label="Delay remark (optional)">
+              <textarea
+                value={lateRemarks}
+                maxLength={1000}
+                rows={2}
+                onChange={(event) => setLateRemarks(event.target.value)}
+                placeholder="What held the job up? Internal; not printed for the customer."
+                className={inputCls}
+              />
+            </Field>
+          )}
         </>
       )}
       {(update.isError || credit.isError || qc.isError) && (

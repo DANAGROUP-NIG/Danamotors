@@ -107,6 +107,12 @@ export const FRAMEWORK_REPORT_PERMISSIONS = [
   "report:csc-followup",
   "report:csc-not-visited",
   "report:csc-no-show",
+  // Late deliveries (promised date / time discrepancy)
+  "report:promise-date-discrepancy",
+  "report:promise-time-discrepancy",
+  "report:promise-date-analysis",
+  "report:promise-time-analysis",
+  "report:delayed-deliveries",
 ] as const;
 export const REPORT_SETTINGS_PERMISSION = "report:settings";
 
