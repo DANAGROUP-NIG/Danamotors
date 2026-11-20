@@ -10,6 +10,7 @@ import { nextSequenceNumber } from "../../shared/db/documentSequence";
 import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey } from "../pdi/pdi.logic";
 import { getPdiSettings } from "../pdi/pdi.settings.service";
 import { createRepeatRecord, resolveRepeatAtOpening, windowOf } from "../repeat-job/repeat-job.detect";
+import { matchCasesSafely } from "../csc/csc.match";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -394,6 +395,9 @@ export class JobCardWorkflowService {
 
       if (repeat && repeatWindow)
         await createRepeatRecord(tx, { jobCardId: card.id, branchId: branch.id, repeat, window: repeatWindow, note: repeatNote });
+
+      // A service job is the visit for the vehicle's open CSC cases (never blocks the opening).
+      if (!pdi) await matchCasesSafely(tx, { jobCardId: card.id, vehicleId: vehicle.id, at: card.createdAt, actorId: createdById });
 
       if (data.appointmentId) {
         await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: 'CONVERTED' } });

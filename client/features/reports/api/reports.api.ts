@@ -14,7 +14,8 @@ export type LookupSource =
   | "engineer"
   | "serviceGroup"
   | "partCategory"
-  | "freeService";
+  | "freeService"
+  | "cscReason";
 
 export function runReportRequest(slug: string, query: Record<string, string>) {
   const search = new URLSearchParams(query).toString();

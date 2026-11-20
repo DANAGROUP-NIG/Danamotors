@@ -311,6 +311,16 @@ export const PERMISSIONS = {
   REPEAT_LIST_READ: "report:repeat-list",
   REPEAT_ANALYSIS_READ: "report:repeat-analysis",
   REPEAT_SUMMARY_READ: "report:repeat-summary",
+
+  // ── CSC: service due reminders and follow-up (legacy Service → CSC) ──────
+  CSC_MASTER_READ: "csc:master:read",
+  CSC_MASTER_UPDATE: "csc:master:update",
+  CSC_CASE_READ: "csc:case:read",
+  CSC_CASE_GENERATE: "csc:case:generate",
+  CSC_FOLLOWUP_UPDATE: "csc:followup:update",
+  CSC_FOLLOWUP_REPORT_READ: "report:csc-followup",
+  CSC_NOT_VISITED_REPORT_READ: "report:csc-not-visited",
+  CSC_NO_SHOW_REPORT_READ: "report:csc-no-show",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -354,6 +364,16 @@ const REPEAT_JOB_READ_PERMISSIONS: PermissionType[] = [
 ];
 const REPEAT_JOB_PERMISSIONS: PermissionType[] = [...REPEAT_JOB_READ_PERMISSIONS, PERMISSIONS.REPEAT_JOB_REVIEW];
 
+// CSC: the CCU makes the calls; the service manager owns the master. TODO(confirm) grants with the business.
+const CSC_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
+  PERMISSIONS.CSC_NOT_VISITED_REPORT_READ,
+  PERMISSIONS.CSC_NO_SHOW_REPORT_READ,
+];
+const CSC_CALLER_PERMISSIONS: PermissionType[] = [PERMISSIONS.CSC_MASTER_READ, PERMISSIONS.CSC_CASE_READ, PERMISSIONS.CSC_FOLLOWUP_UPDATE];
+const CSC_SUPERVISOR_PERMISSIONS: PermissionType[] = [...CSC_CALLER_PERMISSIONS, PERMISSIONS.CSC_CASE_GENERATE, ...CSC_REPORT_PERMISSIONS];
+const CSC_PERMISSIONS: PermissionType[] = [...CSC_SUPERVISOR_PERMISSIONS, PERMISSIONS.CSC_MASTER_UPDATE];
+
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
 const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
 const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
@@ -380,6 +400,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.REQUISITION_GOODWILL,
     ...PDI_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
+    ...CSC_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ, PERMISSIONS.DELIVERED_MODEL_READ,
@@ -800,6 +821,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    ...CSC_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
     ...REPEAT_JOB_READ_PERMISSIONS,
@@ -868,6 +890,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.CCU_OFFICER]: [
+    ...CSC_CALLER_PERMISSIONS,
+    PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -892,6 +916,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
+    ...CSC_SUPERVISOR_PERMISSIONS,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,

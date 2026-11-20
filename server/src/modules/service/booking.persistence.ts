@@ -88,7 +88,7 @@ export async function bookingRelations(
   }));
 }
 
-export async function createBooking(data: BookingCreate) {
+export async function createBooking(data: BookingCreate, outer?: Prisma.TransactionClient) {
   data = {
     ...data,
     requests: z
@@ -106,7 +106,7 @@ export async function createBooking(data: BookingCreate) {
     }).format(new Date()),
   );
   const sequenceDate = new Date(year, 6, 1);
-  const booking = await prisma.$transaction(async (tx) => {
+  const write = async (tx: Prisma.TransactionClient) => {
     // The locking read also establishes existence; keep duplicate detection under this lock.
     const vehicles = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`;
     if (vehicles.length === 0)
@@ -173,6 +173,8 @@ export async function createBooking(data: BookingCreate) {
       },
     });
     return booking;
-  }, { timeout: 10000 });
+  };
+  // Inside a caller's transaction (CSC follow-up) the booking commits or rolls back with it.
+  const booking = outer ? await write(outer) : await prisma.$transaction(write, { timeout: 10000 });
   return bookingView(booking);
 }

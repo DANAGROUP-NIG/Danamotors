@@ -103,6 +103,10 @@ export const FRAMEWORK_REPORT_PERMISSIONS = [
   "report:repeat-list",
   "report:repeat-analysis",
   "report:repeat-summary",
+  // CSC follow-up
+  "report:csc-followup",
+  "report:csc-not-visited",
+  "report:csc-no-show",
 ] as const;
 export const REPORT_SETTINGS_PERMISSION = "report:settings";
 
