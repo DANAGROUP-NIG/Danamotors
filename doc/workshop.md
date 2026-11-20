@@ -15,7 +15,7 @@ Issue: [#67](https://github.com/DANAGROUP-NIG/Danamotors/issues/67).
 
 ## Defaults and permissions
 
-- `JOB_REPEAT_WINDOW_DAYS=30` by default; supported range 1–3650. Recent jobs are shown for the selected vehicle. Repeats require a previous job within that window and a reason.
+- Repeat jobs: the window is set per branch in **Settings → Company → Branch rules** (default 15 days / 500 km; `JOB_REPEAT_WINDOW_DAYS` is only the days default for a branch never saved). See *Repeat jobs* below.
 - Workshop transactions remain branch-scoped. Shared customer/vehicle lookup does not grant cross-branch billing or inventory access.
 - Master writes, customer merges, supplied customer codes, rate overrides and credit approvals require Admin/SuperAdmin. Existing job, labour, inventory and estimate permissions protect their respective actions.
 - A company-charged service excludes its parts/labour from the customer bill. Manufacturer claim accounting and per-line warranty/goodwill charges belong to #64.
@@ -32,7 +32,7 @@ All paths below are relative to `/api`; staff authentication is required except 
 | `POST /customers/:id/merge` | Merge into body `{ targetId }` |
 | `POST /vehicles/:id/ownerships` | Owner change with `{ customerId, purchaseDate }` |
 | `GET /service/staff` | Active branch advisors/technicians |
-| `GET /service/vehicles/:id/recent-jobs` | Recent jobs for repeat assessment |
+| `GET /service/vehicles/:id/recent-jobs` | Repeat check for the opening form: the automatic candidate and the vehicle's earlier jobs |
 | `GET/POST /service/labour-rates` | Model rates; POST upserts by operation/model |
 | `POST /service/job-cards` | Validated opening with generated number |
 | `PUT /service/job-cards/:id` | Findings or lifecycle action |
@@ -104,3 +104,88 @@ Masters** unless stated.
 | **Recorded by** | `VehicleOwnership.createdById`, set when an owner change is saved | S12. |
 | **Mileage bands** | `MileageBand` (same table as PR #81) | S2 by model. Eight default bands; edited with the report settings once PR #81's settings screen is restored. |
 
+## Repeat jobs
+
+Legacy **Service → Repeat Job**. A repeat job is a vehicle back soon after a job, usually because the first
+repair did not fix the problem. A repeat counts against the engineer and service advisor of the **previous** job.
+
+### Flagging at opening
+
+- When a job card is opened (not PDI), the server looks for the vehicle's **most recent billed job**: any branch,
+  not cancelled, not PDI, opened before the new job. Billed = `billedAt` set, or legacy status Billed/Delivered.
+- The new job is a **candidate repeat** when it is within the branch's **days** (local calendar days between the
+  two job dates, last day included) **or** its **km** (both readings recorded and the new one not lower).
+- On a match the job is saved with `isRepeat = true`, `previousJobId` set and a `RepeatJob` record:
+  previous job, days and km difference, the previous job's engineer, service advisor and technicians (main
+  mechanic and labour-line technicians), the **window in force**, source `AUTOMATIC` and status `PENDING_REVIEW`.
+- The opening form shows the comparison before saving (*Repeat check* card). No reason is needed at opening;
+  the advisor may add a note (`repeatReason`, stored as the record's opening note).
+- The advisor can flag a repeat **by hand** (any earlier, non-cancelled, non-PDI job of the vehicle, inside or
+  outside the window): source `MANUAL`.
+- Detection runs inside the opening transaction, in a savepoint. If the lookup fails the job still opens,
+  unflagged, and an audit row `REPEAT_DETECTION_FAILED` is written.
+
+### Review (legacy "Repeat Job Details (Entry)")
+
+**Workshop → Repeat Jobs** lists repeats pending review (newest first), with confirmed, not-a-repeat and all
+tabs, search (job no, previous job, registration, VIN), source and date filters. The review screen shows both
+jobs side by side (date, mileage, service type, advisor, engineer, technicians, customer requests, work done,
+labour) with the days and km against the window. The job card detail page has a *Review repeat* button.
+
+- One to five distinct reasons from the **REPEAT_REASON** master (Settings → Workshop Masters → Repeat job
+  reason), plus remarks (always required). Typing a code on the review screen toggles it.
+- A reason with `isNotRepeat` (code **0 – Not a repeat job**) cannot be combined; it sets `NOT_REPEAT`, keeps the
+  job in history and takes it out of repeat counts (`JobCard.isRepeat` becomes false, so MIS A4 and the vehicle
+  history card follow). Any other code sets `CONFIRMED`.
+- Reviewer and time are stored. A reviewed record can be changed only by its reviewer or an Admin/SuperAdmin.
+  Every review is audited (`REPEAT_JOB_REVIEWED`, before and after).
+
+Seeded codes: 0 not a repeat job, 1 component failure, 2 wrong diagnosis by supervisor, 3 road test not
+conducted, 4 workmanship problem, 5 engineer negligence, 6 spares unavailable.
+
+### Settings
+
+Per branch (Admin, Settings → Company → Branch rules): repeat window days (default 15), km (default 500; blank =
+days only) and **print repeat block on job card** (default on). Saves are audited (`BRANCH_SETTINGS_UPDATED`).
+Each repeat keeps the window it was flagged under; records back-filled from older repeat jobs show "window not
+recorded".
+
+### Where repeats show
+
+- **Repeat** tag with the review status on job card lists, the job detail header and the vehicle page history
+  (with a *Repeat jobs* filter); the vehicle history card report lists the review status and reasons.
+- The job card detail has a **repeat block** (previous job, days and km since, previous engineer, reasons and
+  remarks once reviewed). It prints with the job card when the branch setting is on.
+
+### Reports (Reports → Service · Repeat jobs)
+
+| Slug | Legacy | Notes |
+|---|---|---|
+| `repeat-list` (132) | List of repeat job | Model/variant filters. Options: include "not a repeat" vehicles; only "not a repeat" vehicles (overrides). |
+| `repeat-analysis` (132) | Repeat job analysis | By model, variant, previous advisor or previous engineer. Jobs opened per group, repeats (confirmed + pending), repeat %, a count per reason code. Detail with summary, detail, only summary. |
+| `repeat-summary` (80) | Date-wise summary of repeat jobs | Per day: jobs opened, repeats, repeat %, pending, confirmed, not a repeat. Advisor/engineer filters select jobs opened by them and repeats of jobs they handled before. |
+
+### API
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /repeat-jobs` | `repeatjob:read` | List with status counts (`status`, `source`, `search`, `dateFrom`, `dateTo`, paging) |
+| `GET /repeat-jobs/:id` | `repeatjob:read` | Review details, both jobs side by side, `canReview`, neighbouring pending records |
+| `PUT /repeat-jobs/:id/review` | `repeatjob:review` | `{ reasonIds: uuid[1..5], remarks }` |
+| `GET /repeat-jobs/job/:jobCardId` | `jobcard:read` | Repeat summary of a job card and the print setting |
+| `GET /repeat-jobs/reasons` | `jobcard:read` | Reason codes with `isNotRepeat` and `active` |
+
+Permissions: `repeatjob:read`, `repeatjob:review`, `report:repeat-list`, `report:repeat-analysis`,
+`report:repeat-summary`. WorkshopManager, Admin and SuperAdmin get all; ServiceAdviser and ServiceManager get read
+and the reports (`TODO(confirm)` for the service manager); Auditor gets read and the reports.
+
+### Data and migration
+
+Migration `20261120100000_repeat_jobs` (additive, idempotent): enums `RepeatJobSource`, `RepeatJobStatus`; tables
+`RepeatJob` and `RepeatJobReason`; `BranchSettings.printRepeatBlock` and new column defaults 15 / 500 (saved
+branches keep their values); REPEAT_REASON codes 0–6; permissions and grants; a `MANUAL`, `PENDING_REVIEW` record
+for every existing `isRepeat` job.
+
+Code: `server/src/modules/repeat-job` (logic, detection, service, routes, OpenAPI, tests) and
+`server/src/modules/reports/repeat`; client `client/features/repeat-jobs` and `features/reports/configs/repeat.tsx`.
+Plan and open decisions: `doc/plans/repeat-jobs-plan.md`. Manual test steps: `doc/repeat-jobs-testing-guide.md`.

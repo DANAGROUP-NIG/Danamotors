@@ -116,6 +116,13 @@ the data columns stand for.
 3. Client: add a `ReportConfig` in `client/features/reports/configs` and list it in
    `configs/index.ts`. The hub card, page, filter bar, table, print and Excel follow from it.
 
+## Service · Repeat jobs
+
+Three reports: `repeat-list` (132 col), `repeat-analysis` (132 col) and `repeat-summary` (80 col), permissions
+`report:repeat-list`, `report:repeat-analysis` and `report:repeat-summary`. Rules, options and grants are in
+`doc/workshop.md`, *Repeat jobs*. The date-wise summary names its advisor filter "Service advisor": a report may
+rename a shared filter with `filterLabels` (server `ReportDefinition` and client `ReportConfig`).
+
 ## Service · FPC reports (#98)
 
 Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis

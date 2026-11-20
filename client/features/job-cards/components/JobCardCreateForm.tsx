@@ -31,6 +31,8 @@ import { apiGet } from "@/lib/api/apiClient";
 import { getCustomerRequest } from "@/features/customers/api/customer.api";
 import { getVehicleRequest } from "@/features/vehicles/api/vehicle.api";
 import { useCreateJobCard } from "../hooks/use-create-job-card";
+import { useRepeatPreview } from "@/features/repeat-jobs/hooks/use-repeat-jobs";
+import { OpeningRepeatCheck } from "@/features/repeat-jobs/components/OpeningRepeatCheck";
 import {
   createJobCardSchema,
   type CreateJobCardFormValues,
@@ -197,14 +199,9 @@ export function JobCardCreateForm({
   }, [vehicleId, debouncedMileage]);
   const needsAck = canSeeWarranty && Boolean(check?.requiresAcknowledgement) && !acknowledged;
   const lastJob = vehicle?.jobCards?.[0];
-  const recentJobs = useQuery({
-    // Previous jobs within the branch's repeat window: its days, or its km of this reading.
-    queryKey: ["job-opening-recent-jobs", vehicleId, branchId, debouncedMileage],
-    queryFn: () => apiGet<{ jobs: { id: string; jobNumber: string; createdAt: string; technician?: { firstName: string; lastName: string } | null }[] }>(
-      `/service/vehicles/${vehicleId}/recent-jobs?${new URLSearchParams({ ...(branchId ? { branchId } : {}), ...(Number.isFinite(debouncedMileage) ? { mileage: String(debouncedMileage) } : {}) })}`,
-    ),
-    enabled: !!vehicleId && hasPermission("jobcard:read"),
-  });
+  // Same query as the repeat check card below (deduplicated): drives the header tag.
+  const repeatPreview = useRepeatPreview(vehicleId, branchId, Number.isFinite(debouncedMileage) ? debouncedMileage : undefined, !!vehicleId && hasPermission("jobcard:read"));
+  const repeatCandidate = repeatPreview.data?.candidate;
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -415,7 +412,7 @@ export function JobCardCreateForm({
           engineerId: values.engineerId || undefined,
           technicianId: values.technicianId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
-          repeatReason: values.isRepeat ? values.repeatReason?.trim() : undefined,
+          repeatReason: values.isRepeat ? values.repeatReason?.trim() || undefined : undefined,
           teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
@@ -554,14 +551,21 @@ export function JobCardCreateForm({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {lastJob && (
+                {repeatCandidate ? (
+                  <span
+                    title={`Back ${repeatCandidate.daysDifference} days after job ${repeatCandidate.previousJob.jobNumber}`}
+                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-sm font-semibold text-amber-800"
+                  >
+                    Repeat job
+                  </span>
+                ) : lastJob ? (
                   <span
                     title={`Last visit: ${formatDate(lastJob.createdAt)}`}
                     className="rounded-full bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary"
                   >
-                    Repeat visit
+                    Returning vehicle
                   </span>
-                )}
+                ) : null}
                 {customer?.vip && (
                   <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
                     VIP
@@ -915,27 +919,8 @@ export function JobCardCreateForm({
                   />
                 }
               />
-              {vehicleId && (
-                <OpeningCard title="Repeat visit" description="Review recent jobs for this vehicle before opening a new one.">
-                  {recentJobs.isLoading && <p role="status" className="text-sm">Loading recent jobs...</p>}
-                  {recentJobs.isError && <p role="alert" className="text-sm text-destructive">Could not load recent jobs. <button type="button" className="underline" onClick={() => recentJobs.refetch()}>Retry</button></p>}
-                  {recentJobs.data?.jobs.length === 0 && <p className="text-sm text-muted-foreground">No jobs within the configured repeat window.</p>}
-                  {!!recentJobs.data?.jobs.length && <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">{recentJobs.data.jobs.length} recent job(s). Latest: <Link href={`/job-cards/${recentJobs.data.jobs[0].id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">{recentJobs.data.jobs[0].jobNumber}</Link> ({formatDate(recentJobs.data.jobs[0].createdAt)}).</p>
-                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("isRepeat")} /> This is a repeat job</label>
-                    {watch("isRepeat") && <>
-                      <OpeningField label="Previous job" required error={errors.previousJobId?.message}>
-                        <select className={openingInput} aria-invalid={!!errors.previousJobId} {...register("previousJobId")}>
-                          <option value="">Select previous job</option>
-                          {recentJobs.data.jobs.map((job) => <option key={job.id} value={job.id}>{job.jobNumber} — {formatDate(job.createdAt)}{job.technician ? ` — ${job.technician.firstName} ${job.technician.lastName}` : ""}</option>)}
-                        </select>
-                      </OpeningField>
-                      <OpeningField label="Repeat reason" required error={errors.repeatReason?.message}>
-                        <textarea className={`${openingInput} h-24 py-2`} maxLength={2000} aria-invalid={!!errors.repeatReason} {...register("repeatReason")} />
-                      </OpeningField>
-                    </>}
-                  </div>}
-                </OpeningCard>
+              {vehicleId && hasPermission("jobcard:read") && (
+                <OpeningRepeatCheck vehicleId={vehicleId} branchId={branchId} mileage={Number.isFinite(debouncedMileage) ? debouncedMileage : undefined} />
               )}
               <OpeningCard title="Job scheduling & estimate">
                 <div className={openingGrid}>

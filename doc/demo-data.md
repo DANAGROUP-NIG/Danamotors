@@ -26,6 +26,12 @@ Before running:
   Store and billing users are used when present; otherwise the service adviser stands in.
 - The two branches must exist and be active. The defaults are `Main Branch` and `Dana Motors Demo` (the Demo account's two branches). Pass other names with `-- --main-branch="…" --second-branch="…"`; for example, a local database built with `npm run prisma:seed` has `Abuja Branch` instead, so add `-- --second-branch="Abuja Branch"` there.
 
+Only the repeat job demo: `npm run prisma:seed:demo -- --repeat-only` (needs the repeat job migration). It sets
+the repeat window to 15 days / 500 km at the main branch and 45 days / 4,000 km at the second branch, adds customer
+`DEMO-C31` with vehicles `LSR-701RP`…`LSR-708RP`, earlier visits as finished history, and opens repeat visits
+today through the app (RPT-1…RPT-5: automatic pending, automatic by km, confirmed, not a repeat, manual).
+RPT-6…RPT-8 have no new job, for testing the opening form. See `doc/repeat-jobs-testing-guide.md`.
+
 The run prints a summary at the end. It lists the job numbers, bills (with VAT and round-off), warranty case numbers, stock per branch, campaign VIN statuses and the warranty check result for each vehicle. Share it with the testers.
 
 ## Re-run

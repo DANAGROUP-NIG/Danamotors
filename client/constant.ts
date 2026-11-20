@@ -45,6 +45,7 @@ import {
   Database,
   Ban,
   Barcode,
+  Repeat2,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export const NAV_GROUPS: NavGroup[] = [
     permissions: [
       "jobcard:read",
       "pdi:read",
+      "repeatjob:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -138,6 +140,12 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "PDI Labour", href: "/pdi/labour-slips", icon: ListChecks, permissions: ["pdi:read"] },
           { label: "PDI Bills", href: "/pdi/bills", icon: FileText, permissions: ["pdi:read", "pdi:bill"] },
         ],
+      },
+      {
+        label: "Repeat Jobs",
+        href: "/repeat-jobs",
+        icon: Repeat2,
+        permissions: ["repeatjob:read"],
       },
       {
         label: "Services",

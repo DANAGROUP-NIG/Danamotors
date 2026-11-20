@@ -176,6 +176,8 @@ export type JobCard = {
   } | null;
   isRepeat?: boolean;
   repeatReason?: string | null;
+  /** The repeat record (status of its review) when the job is, or was flagged as, a repeat. */
+  repeatRecord?: { id: string; status: "PENDING_REVIEW" | "CONFIRMED" | "NOT_REPEAT"; source: "AUTOMATIC" | "MANUAL" } | null;
   complaints?: {
     id: string;
     description: string;
