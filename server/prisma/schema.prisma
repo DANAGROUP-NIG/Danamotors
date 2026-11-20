@@ -9,6 +9,7 @@ datasource db {
 
 model Branch {
   requisitions           PartRequisition[]
+  repeatJobRecords       RepeatJob[]            @relation("RepeatJobBranch")
   handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
   handheldStations       HandheldStation[]      @relation("HandheldStationBranch")
   labelPrintJobs         LabelPrintJob[]        @relation("LabelPrintJobBranch")
@@ -88,6 +89,9 @@ model Branch {
 
 model User {
   createdRequisitions            PartRequisition[]      @relation("RequisitionCreator")
+  repeatJobsAsPreviousEngineer   RepeatJob[]            @relation("RepeatJobPreviousEngineer")
+  repeatJobsAsPreviousAdvisor    RepeatJob[]            @relation("RepeatJobPreviousAdvisor")
+  repeatJobsReviewed             RepeatJob[]            @relation("RepeatJobReviewer")
   handheldDocumentsSent          HandheldDocument[]     @relation("HandheldDocumentSentBy")
   handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
   handheldDocumentsCancelled     HandheldDocument[]     @relation("HandheldDocumentCancelledBy")
@@ -588,6 +592,9 @@ model JobCard {
   previousJobId      String?
   previousJob        JobCard?               @relation("RepeatJob", fields: [previousJobId], references: [id], onDelete: Restrict)
   repeatJobs         JobCard[]              @relation("RepeatJob")
+  /// The repeat record when this job is a repeat (#repeat-jobs); isRepeat/previousJobId stay for old readers.
+  repeatRecord       RepeatJob?             @relation("RepeatJobCurrent")
+  repeatedBy         RepeatJob[]            @relation("RepeatJobPrevious")
   repeatReason       String?
   readyAt            DateTime?
   deliveredAt        DateTime?
@@ -2081,6 +2088,7 @@ model WorkshopMaster {
   departmentEmployees      Employee[]                @relation("EmployeeDepartment")
   teamEmployees            Employee[]                @relation("EmployeeTeam")
   defectEstimates          DefectModelEstimate[]     @relation("DefectEstimates")
+  repeatJobReasons         RepeatJobReason[]
   modelDefectEstimates     DefectModelEstimate[]     @relation("ModelDefectEstimates")
   checklistLines           ServiceChecklistLine[]    @relation("ChecklistLines")
   modelChecklistLines      ServiceChecklistLine[]    @relation("ChecklistLineModel")
@@ -4310,10 +4318,12 @@ model BranchSettings {
   // Job bills are rounded down to a multiple of this (legacy RoundOffValue).
   roundOffValue    Int   @default(10)
 
-  // Workshop rules
-  repeatWindowDays Int  @default(30)
-  repeatWindowKm   Int? @default(1500)
-  bookingMaxDays   Int  @default(30)
+  // Workshop rules. A job is a repeat when it is within either limit of the vehicle's last billed job.
+  repeatWindowDays Int     @default(15)
+  repeatWindowKm   Int?    @default(500)
+  /// Print the repeat block (previous job, differences, reasons) on the job card.
+  printRepeatBlock Boolean @default(true)
+  bookingMaxDays   Int     @default(30)
 
   // Workshop information
   contactPerson             String?
@@ -4329,6 +4339,79 @@ model BranchSettings {
   signatories               String[] @default([])
 
   updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// REPEAT JOBS (legacy Service → Repeat Job): a vehicle back soon after a billed job.
+// Flagged at opening (automatically within the branch window, or by hand), then reviewed
+// with reason codes (WorkshopMaster kind REPEAT_REASON). A repeat counts against the
+// previous job's engineer and service advisor.
+// ============================================================
+
+enum RepeatJobSource {
+  AUTOMATIC
+  MANUAL
+}
+
+enum RepeatJobStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  NOT_REPEAT
+}
+
+model RepeatJob {
+  id            String  @id @default(uuid())
+  jobCardId     String  @unique
+  jobCard       JobCard @relation("RepeatJobCurrent", fields: [jobCardId], references: [id], onDelete: Cascade)
+  previousJobId String
+  previousJob   JobCard @relation("RepeatJobPrevious", fields: [previousJobId], references: [id], onDelete: Restrict)
+  /// The repeat job's branch, for branch-scoped lists and reports.
+  branchId      String
+  branch        Branch  @relation("RepeatJobBranch", fields: [branchId], references: [id], onDelete: Cascade)
+
+  /// Local calendar days from the previous job's date to this job's date.
+  daysDifference           Int
+  /// Null when either mileage is missing or the reading went down (odometer replaced).
+  kmDifference             Int?
+  previousEngineerId       String?
+  previousEngineer         User?    @relation("RepeatJobPreviousEngineer", fields: [previousEngineerId], references: [id], onDelete: SetNull)
+  previousServiceAdvisorId String?
+  previousServiceAdvisor   User?    @relation("RepeatJobPreviousAdvisor", fields: [previousServiceAdvisorId], references: [id], onDelete: SetNull)
+  /// Main mechanic and labour-line technicians of the previous job (user ids).
+  previousTechnicianIds    String[] @default([])
+  /// Branch window in force when flagged; null on records back-filled from old repeat jobs.
+  windowDays               Int?
+  windowKm                 Int?
+
+  source       RepeatJobSource
+  status       RepeatJobStatus   @default(PENDING_REVIEW)
+  /// Advisor's note at opening (also JobCard.repeatReason).
+  openingNote  String?
+  remarks      String?
+  reasons      RepeatJobReason[]
+  reviewedById String?
+  reviewedBy   User?             @relation("RepeatJobReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId, status, createdAt])
+  @@index([previousJobId])
+  @@index([previousEngineerId])
+  @@index([previousServiceAdvisorId])
+}
+
+model RepeatJobReason {
+  repeatJobId String
+  repeatJob   RepeatJob      @relation(fields: [repeatJobId], references: [id], onDelete: Cascade)
+  reasonId    String
+  reason      WorkshopMaster @relation(fields: [reasonId], references: [id], onDelete: Restrict)
+  /// Order the reviewer entered the codes (1–5).
+  position    Int
+
+  @@id([repeatJobId, reasonId])
+  @@index([reasonId])
 }
 
 // Service transaction documents. Numbers are allocated by DocumentSequence in the

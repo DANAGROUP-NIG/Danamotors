@@ -46,6 +46,7 @@ import documentTermsRoutes from '../modules/document-terms/document-terms.routes
 import companySettingsRoutes from '../modules/company-settings/company-settings.routes';
 import booksClosedRoutes from '../modules/books-closed/books-closed.routes';
 import pdiRoutes from '../modules/pdi/pdi.routes';
+import repeatJobRoutes from '../modules/repeat-job/repeat-job.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
@@ -58,6 +59,7 @@ router.use('/document-terms', documentTermsRoutes);
 router.use('/company-settings', companySettingsRoutes);
 router.use('/books-closed', booksClosedRoutes);
 router.use('/pdi', pdiRoutes);
+router.use('/repeat-jobs', repeatJobRoutes);
 router.use('/job-cards', serviceTypeOptionsRouter);
 router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 

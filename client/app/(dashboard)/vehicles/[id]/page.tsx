@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Copy, FileText, Phone, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { OpenCampaignsCard } from "@/features/warranty/components/OpenCampaignsC
 import { FilterPills, PageState, Pill, SectionCard, tdCls, thCls } from "@/features/warranty/components/ui";
 import { COVERAGE_LABELS, COVERAGE_TONES, fmtDate, fmtKm, fmtNaira } from "@/features/warranty/lib/warranty-format";
 
-type HistoryFilter = "" | "warranty" | "customer";
+type HistoryFilter = "" | "warranty" | "customer" | "repeat";
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +39,7 @@ export default function VehicleDetailPage() {
     const all = (history.data?.jobCards ?? []).filter((j) => j.vehicleId === id);
     if (filter === "warranty") return all.filter((j) => j.warrantyStatusAtCreation === "ACTIVE");
     if (filter === "customer") return all.filter((j) => j.warrantyStatusAtCreation !== "ACTIVE");
+    if (filter === "repeat") return all.filter((j) => j.repeatRecord);
     return all;
   }, [history.data, filter, id]);
 
@@ -134,6 +136,7 @@ export default function VehicleDetailPage() {
               { label: "All", value: "" },
               { label: "Warranty", value: "warranty" },
               { label: "Customer pay", value: "customer" },
+              { label: "Repeat jobs", value: "repeat" },
             ]}
           />
         }
@@ -162,6 +165,7 @@ export default function VehicleDetailPage() {
                       <Link href={`/job-cards/${j.id}`} className="font-mono text-xs font-medium hover:underline">
                         {j.jobNumber}
                       </Link>
+                      {j.repeatRecord && <RepeatTag status={j.repeatRecord.status} className="ml-1.5" />}
                     </td>
                     <td className={tdCls}>{fmtDate(j.createdAt)}</td>
                     <td className={tdCls}>{fmtKm(j.mileage)}</td>

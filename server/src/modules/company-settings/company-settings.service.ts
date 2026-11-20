@@ -26,6 +26,7 @@ export const branchSettingsSchema = z.object({
   roundOffValue: z.number().int().min(1).max(1000),
   repeatWindowDays: z.number().int().min(1).max(3650),
   repeatWindowKm: z.number().int().min(1).max(1_000_000).nullable(),
+  printRepeatBlock: z.boolean().default(true),
   bookingMaxDays: z.number().int().min(1).max(3650),
   contactPerson: text(100),
   shifts: z.number().int().min(1).max(5),
@@ -41,13 +42,15 @@ export const branchSettingsSchema = z.object({
 
 export type BranchSettingsValues = z.infer<typeof branchSettingsSchema>;
 
-// A branch without saved settings uses these; VAT and repeat days keep the old server settings.
+// A branch without saved settings uses these; VAT and repeat days keep the old server settings
+// (JOB_REPEAT_WINDOW_DAYS), otherwise the legacy main-branch window of 15 days / 500 km.
 export function defaultBranchSettings(): BranchSettingsValues {
   return {
     labourVatPercent: config.JOB_BILL_VAT_RATE,
     roundOffValue: 10,
-    repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 30),
-    repeatWindowKm: 1500,
+    repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 15),
+    repeatWindowKm: 500,
+    printRepeatBlock: true,
     bookingMaxDays: 30,
     contactPerson: null,
     shifts: 1,
@@ -93,13 +96,17 @@ export class CompanySettingsService {
     return getBranchSettings(branchId);
   }
 
-  async saveBranch(branchId: string, values: BranchSettingsValues) {
-    await this.getBranch(branchId);
-    const { branchId: _branchId, updatedAt: _updatedAt, ...saved } = await prisma.branchSettings.upsert({
-      where: { branchId },
-      create: { branchId, ...values },
-      update: values,
+  /** Saves a branch's rules; every change is audited with the values before and after. */
+  async saveBranch(branchId: string, values: BranchSettingsValues, actorId?: string) {
+    const before = await this.getBranch(branchId);
+    return prisma.$transaction(async (tx) => {
+      const { branchId: _branchId, updatedAt: _updatedAt, ...saved } = await tx.branchSettings.upsert({
+        where: { branchId },
+        create: { branchId, ...values },
+        update: values,
+      });
+      await tx.auditLog.create({ data: { userId: actorId ?? null, action: 'BRANCH_SETTINGS_UPDATED', details: JSON.stringify({ branchId, before, after: saved }) } });
+      return saved;
     });
-    return saved;
   }
 }

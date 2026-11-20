@@ -11,6 +11,7 @@ import { FinanceReportNav } from "./finance-report-nav";
 
 const CATEGORY_NOTES: Partial<Record<ReportCategory, string>> = {
   "Service MIS": "Management reports for the workshop manager, the service manager and management.",
+  "Service · Repeat jobs": "Vehicles back soon after a billed job, and why. Repeats count against the previous job's engineer and service advisor.",
 };
 
 /** Framework reports (#75) the user may run and that match the search, grouped by category and subgroup in first-seen order. */
