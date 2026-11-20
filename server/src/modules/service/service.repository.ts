@@ -256,6 +256,7 @@ export class ServiceRepository {
       skip: params?.skip ?? 0,
       take: params?.take ?? 50,
       include: {
+        repeatRecord: { select: { id: true, status: true, source: true } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
         service: true,
@@ -292,6 +293,7 @@ export class ServiceRepository {
       include: {
         labourLines: { include: { labourItem: true } },
         previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        repeatRecord: { select: { id: true, status: true, source: true } },
         serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
         deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
         service: true,

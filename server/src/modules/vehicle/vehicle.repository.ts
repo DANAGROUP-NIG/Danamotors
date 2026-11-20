@@ -72,7 +72,7 @@ export class VehicleRepository {
             branchId: true,
           },
         },
-        jobCards: { where: serviceHistoryWhere(includePdi), select: { id: true, jobNumber: true, jobType: true, createdAt: true, mileage: true, status: true, description: true, workDone: true }, orderBy: { createdAt: 'desc' } },
+        jobCards: { where: serviceHistoryWhere(includePdi), select: { id: true, jobNumber: true, jobType: true, createdAt: true, mileage: true, status: true, description: true, workDone: true, isRepeat: true, repeatRecord: { select: { id: true, status: true, source: true } } }, orderBy: { createdAt: 'desc' } },
         catalogue: { include: { parent: true } },
         images: true,
         ownerships: { include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true } } }, orderBy: { purchaseDate: 'desc' } },

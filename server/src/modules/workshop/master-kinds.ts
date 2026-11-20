@@ -13,6 +13,8 @@ export const MASTER_KINDS = [
   'PDI_DEFECT',
   'TEAM',
   'LATE_REASON',
+  // Why a vehicle came back (repeat job review); code 0 / isNotRepeat = not a repeat job.
+  'REPEAT_REASON',
   'MAKE',
   'PRODUCT',
   'MODEL',
@@ -62,6 +64,10 @@ export const FIXED_PARENT_KINDS: MasterKind[] = ['PRODUCT', 'MODEL', 'VARIANT', 
 const text = (max: number) => z.string().trim().max(max).nullable().optional();
 
 export const MASTER_ATTRIBUTES: Partial<Record<MasterKind, z.ZodTypeAny>> = {
+  REPEAT_REASON: z.object({
+    // Choosing this reason dismisses the repeat flag; it cannot be combined with other reasons.
+    isNotRepeat: z.boolean().optional(),
+  }).strict(),
   SERVICE_TYPE: z.object({
     // Legacy multiserv: can be opened together with another service on one job.
     multiService: z.boolean().optional(),

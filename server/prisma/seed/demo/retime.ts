@@ -66,7 +66,14 @@ export async function retimeJob(jobCardId: string, window: JobWindow, promiseHou
     prisma.$executeRaw`UPDATE "JobCardCampaign" SET ${set(["createdAt"])} WHERE "jobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "CampaignVehicle" SET ${set(["scheduledAt", "completedAt"])} WHERE "completedJobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "JobCard" SET ${set(["createdAt", "updatedAt", "readyAt", "deliveredAt", "billedAt", "warrantyAcknowledgedAt"])} WHERE id = ${jobCardId}`,
+    prisma.$executeRaw`UPDATE "RepeatJob" SET ${set(["createdAt", "updatedAt", "reviewedAt"])} WHERE "jobCardId" = ${jobCardId}`,
   ]);
+  // A repeat's day difference follows the moved job date (Lagos calendar days from the previous job).
+  await prisma.$executeRaw`
+    UPDATE "RepeatJob" r SET "daysDifference" = GREATEST(0,
+      ((j."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Lagos')::date - ((p."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Africa/Lagos')::date)
+    FROM "JobCard" j, "JobCard" p
+    WHERE r."jobCardId" = ${jobCardId} AND j."id" = r."jobCardId" AND p."id" = r."previousJobId"`;
 
   // Promised delivery: after the work for delivered jobs; still ahead for open ones.
   const card = await prisma.jobCard.findUniqueOrThrow({ where: { id: jobCardId }, select: { createdAt: true, deliveredAt: true } });

@@ -25,6 +25,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/branches": ["branch:read"],
   "/job-cards/new": ["jobcard:create"],
   "/job-cards": ["jobcard:read"],
+  "/repeat-jobs": ["repeatjob:read"],
   "/invoices": ["invoice:read"],
   "/labour-catalogue": ["labour-item:read"],
   "/inspections": ["inspection:read"],

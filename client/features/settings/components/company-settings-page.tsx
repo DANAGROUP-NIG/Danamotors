@@ -15,6 +15,7 @@ type BranchSettings = {
   roundOffValue: number;
   repeatWindowDays: number;
   repeatWindowKm: number | null;
+  printRepeatBlock: boolean;
   bookingMaxDays: number;
   contactPerson: string | null;
   shifts: number;
@@ -45,7 +46,7 @@ const NUMBER_GROUPS: { title: string; note: string; fields: [NumberKey, string, 
   },
   {
     title: "Repeat jobs and bookings",
-    note: "A previous job counts as a repeat when it is within the days, or within the km of the new reading.",
+    note: "A new job is flagged as a repeat when the vehicle's last billed job is within the days, or within the km of the new reading (either is enough). Each repeat keeps the window in force when it was flagged.",
     fields: [
       ["repeatWindowDays", "Repeat window (days)", "1"],
       ["repeatWindowKm", "Repeat window (km, blank = days only)", "1"],
@@ -127,6 +128,10 @@ function BranchRules({ canManage }: { canManage: boolean }) {
           <input className={inputCls} type="number" min={key === "vorOrderDays" || key === "labourVatPercent" ? 0 : 1} step={step}
             required={key !== "repeatWindowKm"} value={form[key] ?? ""}
             onChange={event => setForm({ ...form, [key]: event.target.value === "" ? null : Number(event.target.value) })} /></Field>)}</div>
+        {group.fields.some(([key]) => key === "repeatWindowDays") && <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={form.printRepeatBlock ?? true} onChange={event => setForm({ ...form, printRepeatBlock: event.target.checked })} />
+          Print the repeat block (previous job, days and km since, reasons) on the job card
+        </label>}
       </fieldset>)}
       <fieldset className="grid gap-3 border-t pt-4 md:grid-cols-3" disabled={!canManage}>
         <legend className="text-sm font-semibold">Contact, hours, letters and signatories</legend>
