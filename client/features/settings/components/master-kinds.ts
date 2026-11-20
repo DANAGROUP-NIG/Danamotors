@@ -105,6 +105,12 @@ export const MASTER_KINDS: Record<string, MasterKindConfig> = {
   },
   TEAM: { label: "Employee group / team", group: "Workshop" },
   LATE_REASON: { label: "Late delivery reason", group: "Workshop" },
+  // Repeat job review codes (legacy legend 0–6). "Not a repeat" dismisses the flag and stands alone.
+  REPEAT_REASON: {
+    label: "Repeat job reason",
+    group: "Workshop",
+    attributes: [{ key: "isNotRepeat", label: "Means \"not a repeat job\" (dismisses the flag; cannot be combined)", type: "checkbox" }],
+  },
   DEPARTMENT: { label: "Department", group: "People" },
   DESIGNATION: {
     label: "Designation",

@@ -18,8 +18,9 @@ Billed cards allow delivery only through lifecycle writes; delivered and cancell
 Opening from an appointment copies its saved customer, vehicle and service through the single-conversion endpoint.
 The appointment's vehicle and branch must match. Vehicle lookup searches all
 vehicles. Direct job opening preserves vehicle selection when changing the bill-to customer; booking conversion uses the saved booking customer, vehicle and branch;
-it does not change ownership. Recent jobs use `JOB_REPEAT_WINDOW_DAYS`; repeats
-require a previous job and reason. Saving opens the new card's detail page.
+it does not change ownership. The repeat check compares the visit with the vehicle's last billed job against the
+branch window and flags repeats automatically; a repeat needs a previous job, the reason is recorded at review
+(see `workshop.md`, *Repeat jobs*). Saving opens the new card's detail page.
 
 Delivery requires a bill or admin credit approval, a delivery advisor and, after
 the promised time, one to six late-delivery reasons. Delivery generates a gate

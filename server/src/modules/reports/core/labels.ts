@@ -24,6 +24,7 @@ export async function resolveFilterLabels(
   db: ReportDb,
   keys: FilterKey[],
   query: Partial<Record<FilterKey, string[] | undefined>>,
+  labels: Partial<Record<FilterKey, string>> = {},
 ): Promise<AppliedFilter[]> {
   const ids = (list: FilterKey[]) => list.filter((key) => keys.includes(key)).flatMap((key) => query[key] ?? []);
   const masterIds = ids(MASTER_KEYS);
@@ -46,7 +47,7 @@ export async function resolveFilterLabels(
 
   return keys.map((key) => ({
     key,
-    label: FILTER_LABELS[key],
+    label: labels[key] ?? FILTER_LABELS[key],
     values: (query[key] ?? []).map((id) => names.get(id) ?? 'Unknown'),
   }));
 }

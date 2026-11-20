@@ -91,7 +91,7 @@ function Section({ label, children, className }: { label: string; children: Reac
   );
 }
 
-function FilterField({ filterKey, value, onChange, branchId, modelIds, followValue }: {
+function FilterField({ filterKey, value, onChange, branchId, modelIds, followValue, label }: {
   filterKey: FilterKey;
   value: string[] | undefined;
   onChange: (value: string[] | undefined) => void;
@@ -99,8 +99,10 @@ function FilterField({ filterKey, value, onChange, branchId, modelIds, followVal
   modelIds?: string[];
   /** Value of the option this filter follows (e.g. the campaign type); "ALL" or blank keeps every option. */
   followValue?: string;
+  /** The report's own name for this filter. */
+  label?: string;
 }) {
-  const meta = FILTERS[filterKey];
+  const meta = { ...FILTERS[filterKey], ...(label ? { label } : {}) };
   const lookup = useReportLookup(meta.source, branchId);
   // Variants follow the model filter when models are picked; campaigns follow the type option.
   const options = (lookup.data ?? []).filter(
@@ -339,6 +341,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
                 branchId={lookupBranch}
                 modelIds={key === "variant" ? draft.filters.model : undefined}
                 followValue={FILTERS[key].followsOption ? draft.options[FILTERS[key].followsOption!] : undefined}
+                label={config.filterLabels?.[key]}
               />
             ))}
           </div>

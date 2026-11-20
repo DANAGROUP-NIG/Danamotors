@@ -117,6 +117,8 @@ export interface ReportDefinition<Q extends BaseReportQuery = BaseReportQuery> {
   /** Zod schema for req.query. */
   query: z.ZodType<Q, z.ZodTypeDef, unknown>;
   filterKeys: FilterKey[];
+  /** Report-specific names for shared filters (e.g. the advisor filter of the repeat reports). */
+  filterLabels?: Partial<Record<FilterKey, string>>;
   /** Report-specific query parameters for the API docs (shared ones are added automatically). */
   params?: ReportParamDoc[];
   example?: Record<string, unknown>;

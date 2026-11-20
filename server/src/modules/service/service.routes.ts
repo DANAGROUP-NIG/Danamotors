@@ -6,8 +6,10 @@ import { z } from "zod";
 import prisma from "../../prisma/client";
 import { assertBranchOwnership, requireRole } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
-import { JobCardWorkflowService, repeatCandidateWhere } from "./job-card-workflow.service";
-import { defaultBranchSettings, getBranchSettings } from "../company-settings/company-settings.service";
+import { JobCardWorkflowService } from "./job-card-workflow.service";
+import { RepeatJobService } from "../repeat-job/repeat-job.service";
+import { repeatActor } from "../repeat-job/repeat-job.actor";
+import { repeatPreviewSchema } from "../repeat-job/repeat-job.validation";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
@@ -100,34 +102,12 @@ router.get(
 router.get(
   "/vehicles/:id/recent-jobs",
   requirePermission(PERMISSIONS.JOBCARD_READ),
-  validateRequest(jobCardIdParamSchema.extend({
-    query: z.object({
-      branchId: z.string().uuid().optional(),
-      mileage: z.coerce.number().int().nonnegative().optional(),
-    }),
-  })),
+  validateRequest(repeatPreviewSchema),
   async (req, res, next) => {
     try {
-      // Candidates for a repeat job at the branch opening the job card.
-      const branchId = (req.query.branchId as string | undefined) ?? req.user?.branchId ?? undefined;
-      const window = branchId ? await getBranchSettings(branchId) : defaultBranchSettings();
-      const mileage = req.query.mileage === undefined ? undefined : Number(req.query.mileage);
-      const jobs = await prisma.jobCard.findMany({
-        where: {
-          vehicleId: req.params.id,
-          ...repeatCandidateWhere(window, mileage),
-          status: { notIn: ["Cancelled", "CANCELLED"] },
-        },
-        select: {
-          id: true,
-          jobNumber: true,
-          createdAt: true,
-          technician: { select: { firstName: true, lastName: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
-      res.json({ status: "success", data: { jobs } });
+      // Repeat check for the opening form: the automatic candidate and the vehicle's earlier jobs.
+      const { params, query } = repeatPreviewSchema.parse({ params: req.params, query: req.query });
+      res.json({ status: "success", data: await new RepeatJobService().preview(params.id, query, repeatActor(req)) });
     } catch (error) {
       next(error);
     }

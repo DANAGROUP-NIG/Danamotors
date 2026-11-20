@@ -99,6 +99,10 @@ export const FRAMEWORK_REPORT_PERMISSIONS = [
   "report:skipped-free-service",
   "report:vehicle-list",
   "report:management-information",
+  // Repeat jobs
+  "report:repeat-list",
+  "report:repeat-analysis",
+  "report:repeat-summary",
 ] as const;
 export const REPORT_SETTINGS_PERMISSION = "report:settings";
 

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api/apiClient";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -65,7 +66,7 @@ export function VehicleHistoryCard(
         <h3 className="font-medium">Service history</h3>
         {!vehicle.jobCards?.length && <p className="text-sm text-slate-500">No job cards recorded.</p>}
         {vehicle.jobCards?.map(
-          job => <div key={job.id} className="border-t py-2 text-sm"><Link className="text-primary underline" href={`/job-cards/${job.id}`}>{job.jobNumber}</Link>· {new Date(job.createdAt).toLocaleDateString()}· {job.mileage ?? "—"}km · {job.status}<p>{job.description}</p><p>{job.workDone}</p></div>,
+          job => <div key={job.id} className="border-t py-2 text-sm"><Link className="text-primary underline" href={`/job-cards/${job.id}`}>{job.jobNumber}</Link>{job.repeatRecord && <RepeatTag status={job.repeatRecord.status} className="mx-1.5 align-middle" />}· {new Date(job.createdAt).toLocaleDateString()}· {job.mileage ?? "—"}km · {job.status}<p>{job.description}</p><p>{job.workDone}</p></div>,
         )}
       </>}
       <ModalFame isOpen={open} onClose={() => setOpen(false)} title="Change vehicle owner"><form

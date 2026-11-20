@@ -55,6 +55,11 @@ jest.mock("../../prisma/client", () => ({
     },
 
     $queryRaw: jest.fn(),
+    // Repeat detection runs in a savepoint against the branch window.
+    $executeRaw: jest.fn(),
+    branchSettings: { findUnique: jest.fn() },
+    repeatJob: { create: jest.fn() },
+    auditLog: { create: jest.fn() },
 
     jobCardStatusHistory: {
       create: jest.fn(),
@@ -83,7 +88,6 @@ import {
 } from "./service.validation";
 import {
   assertTransition,
-  repeatWindowStart,
   jobStatusFilter,
 } from "./job-card-workflow.service";
 const id = "00000000-0000-4000-8000-000000000001";
@@ -461,19 +465,10 @@ describe("JobCard workflow", () => {
     ).rejects.toThrow("branch");
   });
 
-  it("requires previous job and reason for repeats", () => {
-    expect(
-      createJobCardSchema.safeParse({
-        body: {
-          ...input,
-          isRepeat: true,
-        },
-      }).success,
-    ).toBe(false);
-
-    expect(
-      repeatWindowStart(new Date("2026-10-01T00:00:00Z"), 30).toISOString(),
-    ).toBe("2026-09-01T00:00:00.000Z");
+  it("requires the previous job for a repeat; the reason waits for the review", () => {
+    expect(createJobCardSchema.safeParse({ body: { ...input, isRepeat: true } }).success).toBe(false);
+    expect(createJobCardSchema.safeParse({ body: { ...input, isRepeat: true, previousJobId: id } }).success).toBe(true);
+    expect(createJobCardSchema.safeParse({ body: { ...input, previousJobId: id } }).success).toBe(false);
   });
 
   it("enforces transitions, cancellation reasons and late delivery reasons", () => {
