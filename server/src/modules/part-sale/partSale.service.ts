@@ -19,7 +19,8 @@ import { DOC_TYPES } from "../stock-transfer/stockTransfer.logic";
 import { nextDocumentNumber as nextFinanceNumber } from "../finance/document-number";
 import { creditDueDate, defaultCreditDays } from "../finance/credit-terms";
 import { lockParty, PartyAccountService, withPartyTransaction } from "../finance/party-account.service";
-import { money, sumMoney } from "../finance/money";
+import { lineAmount, money, sumMoney } from "../finance/money";
+import { invoiceSpareHeads } from "../finance/invoice-bill-heads";
 import { reportEnd, reportStart } from "../finance/party-report";
 import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import {
@@ -521,7 +522,7 @@ export class PartSaleService {
       });
 
       const quantityOf = (lineId: string) => input.lines.find((l) => l.orderLineId === lineId)!.quantity;
-      const gross = sumMoney(orderLines.map((l) => money(quantityOf(l.id) * l.retailRate)));
+      const gross = sumMoney(orderLines.map((l) => lineAmount(quantityOf(l.id), l.retailRate)));
       const discountPercent =
         input.cashDiscountAmount !== undefined
           ? discountPercentFromAmount(gross, input.cashDiscountAmount)
@@ -582,6 +583,12 @@ export class PartSaleService {
           dueDate: creditDueDate(now, customer.creditDays ?? (await defaultCreditDays(tx))),
           subtotal: totals.gross,
           partsTotal: totals.gross,
+          ...invoiceSpareHeads(
+            orderLines.map((line, index) => ({ partSource: line.part.partFlag, amount: priced.lines[index].gross })),
+            { partsTotal: totals.gross, partsDiscountAmount: totals.discount, labourTotal: 0,
+              labourDiscountAmount: 0, serviceTotal: 0, vatRate: VAT_RATE,
+              vatAmount: totals.vat, roundOff: totals.roundOff, total: totals.total },
+          ),
           partsDiscountPercent: discountPercent,
           partsDiscountAmount: totals.discount,
           vatRate: VAT_RATE,
@@ -597,6 +604,7 @@ export class PartSaleService {
               data: orderLines.map((line, index) => ({
                 type: "PART",
                 partId: line.partId,
+                partSource: line.part.partFlag,
                 description: line.part.name,
                 quantity: quantityOf(line.id),
                 rate: line.retailRate,

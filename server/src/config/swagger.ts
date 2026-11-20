@@ -376,6 +376,8 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
               example: 'ISSUED',
             },
             totalAmount: { type: 'number', example: 75000.0 },
+            kiaSpareTotal: { type: 'string', nullable: true, example: '100.01', description: 'Stored gross Kia spare amount in NGN. Null when the split is unavailable.' },
+            nonKiaSpareTotal: { type: 'string', nullable: true, example: '50.02', description: 'Stored gross Non-Kia spare amount in NGN. Null when the split is unavailable.' },
             paidAmount: { type: 'number', example: 50000.0 },
             dueDate: { type: 'string', format: 'date', nullable: true },
             createdAt: { type: 'string', format: 'date-time' },

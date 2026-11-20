@@ -150,6 +150,7 @@ const returns = requirePermission(PERMISSIONS.PART_SALE_RETURN);
  *   get:
  *     tags: [Part Sale]
  *     summary: Get a counter sale with its bill lines and returns
+ *     description: Requires part-sale read access and branch scope. The nested invoice includes kiaSpareTotal and nonKiaSpareTotal as decimal strings, or null when unavailable.
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
  *     responses: { 200: { description: Counter sale } }
  * /part-sale/counter-sales/{id}/cancel:

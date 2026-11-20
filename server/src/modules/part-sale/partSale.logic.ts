@@ -13,6 +13,7 @@
 import { CustomerOrderStatus, Prisma } from "@prisma/client";
 import { BadRequestError } from "../../shared/errors/appError";
 import { money, sumMoney } from "../finance/money";
+import { finalizeJobBill } from "../finance/job-bill-calculator";
 
 export interface PriceLineInput {
   quantity: number;
@@ -65,9 +66,11 @@ export function priceSale(lines: PriceLineInput[], cashDiscountPercent: number):
   const gross = sumMoney(priced.map((l) => l.gross));
   const discount = sumMoney(priced.map((l) => l.discount));
   const vat = sumMoney(priced.map((l) => l.vat));
-  const beforeRoundOff = money(gross - discount + vat);
-  const total = floorToTen(beforeRoundOff);
-  return { lines: priced, totals: { gross, discount, vat, roundOff: money(total - beforeRoundOff), total } };
+  const { total, roundOff } = finalizeJobBill({
+    partsTotal: gross, partsDiscountAmount: discount, labourTotal: 0,
+    labourDiscountAmount: 0, serviceTotal: 0, vatRate: 0, vatAmount: vat,
+  }, 10);
+  return { lines: priced, totals: { gross, discount, vat, roundOff, total } };
 }
 
 /**

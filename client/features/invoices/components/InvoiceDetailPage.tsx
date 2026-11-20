@@ -2,6 +2,7 @@
 import { CustomerExplanation } from "@/components/CustomerExplanation";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { VatBreakdownTable } from './VatBreakdownTable';
+import { BillHeads } from "./BillHeads";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -57,7 +58,16 @@ export function InvoiceDetailPage() {
         </tbody></table></div>
       </section>
 
-      <section className="ml-auto grid w-full max-w-sm grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 text-sm">
+      {invoice.kiaSpareTotal != null && invoice.nonKiaSpareTotal != null ? (
+        <BillHeads
+          {...invoice}
+          kiaSpareTotal={invoice.kiaSpareTotal}
+          nonKiaSpareTotal={invoice.nonKiaSpareTotal}
+          serviceTotal={invoice.serviceTotal ?? 0}
+          discount={invoice.partsDiscountAmount + invoice.labourDiscountAmount}
+          standardVat={invoice.vatRate === 7.5 && !invoice.vatBreakdown?.some(row => Number(row.rate) !== 0 && Number(row.rate) !== 7.5)}
+        />
+      ) : <section className="ml-auto grid w-full max-w-sm grid-cols-2 gap-x-6 gap-y-2 border-t pt-4 text-sm">
         <span>Parts</span><span className="text-right">{currency.format(invoice.partsTotal)}</span>
         <span>Parts discount ({invoice.partsDiscountPercent}%)</span><span className="text-right">-{currency.format(invoice.partsDiscountAmount)}</span>
         <span>Labour</span><span className="text-right">{currency.format(invoice.labourTotal)}</span>
@@ -66,8 +76,7 @@ export function InvoiceDetailPage() {
         <span>Total VAT</span><span className="text-right">{currency.format(invoice.vatAmount)}</span>
         <span>Round-off</span><span className="text-right">{currency.format(invoice.roundOff)}</span>
         <span className="border-t pt-2 font-semibold">Total</span><span className="border-t pt-2 text-right font-semibold">{currency.format(invoice.total)}</span>
-      </section>
-
+      </section>}
       <VatBreakdownTable rows={invoice.vatBreakdown}/>
       <section className="grid gap-3 border-t pt-4">
         <h2 className="font-semibold">Receipts allocated</h2>

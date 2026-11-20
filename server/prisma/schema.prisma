@@ -1503,6 +1503,8 @@ model Invoice {
   total    Float
 
   partsTotal            Float @default(0)
+  kiaSpareTotal         Decimal? @db.Decimal(18, 2)
+  nonKiaSpareTotal      Decimal? @db.Decimal(18, 2)
   labourTotal           Float @default(0)
   partsDiscountPercent  Float @default(0)
   labourDiscountPercent Float @default(0)

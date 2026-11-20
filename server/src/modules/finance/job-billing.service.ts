@@ -17,6 +17,7 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { calculateBillWithPartsVat, partsVatSettings } from "./parts-vat";
+import { invoiceSpareHeads } from "./invoice-bill-heads";
 import { categoryOf } from "../reports/report.logic";
 import { taxRegisterValues } from "../reports/tax-register-layout";
 import { getBranchSettings } from "../company-settings/company-settings.service";
@@ -576,6 +577,7 @@ export class JobBillingService {
                 total: totals.total,
                 outstandingAmount: totals.total,
                 partsTotal: totals.partsTotal,
+                ...invoiceSpareHeads(lines.filter((line) => line.type === "PART"), totals),
                 labourTotal: totals.labourTotal,
                 serviceTotal: totals.serviceTotal,
                 partsDiscountPercent: input.partsDiscountPercent,

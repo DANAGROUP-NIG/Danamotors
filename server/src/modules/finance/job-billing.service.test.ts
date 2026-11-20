@@ -351,6 +351,7 @@ describe("Job billing after delivery on credit", () => {
           sparePart: {
             partNumber: "P",
             name: "Filter",
+            partFlag: "O",
             retailRate: 100,
             taxCategory: "A",
             taxable: true,
@@ -394,6 +395,8 @@ describe("Job billing after delivery on credit", () => {
       ]),
     );
     expect(data.vatAmount).toBe(partsVat + 7.5);
+    expect(data.kiaSpareTotal.toString()).toBe("200");
+    expect(data.nonKiaSpareTotal.toString()).toBe("0");
     expect(data.total).toBe(total);
     expect(data.roundOff).toBe(roundOff);
     expect(data.taxRegisterSnapshot.source).toBe("BILLING");

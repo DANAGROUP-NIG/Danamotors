@@ -71,6 +71,8 @@ export type Invoice = {
   total: number;
   outstandingAmount: number;
   partsTotal: number;
+  kiaSpareTotal?: string | null;
+  nonKiaSpareTotal?: string | null;
   labourTotal: number;
   serviceTotal: number;
   partsDiscountPercent: number;
