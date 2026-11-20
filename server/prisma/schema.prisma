@@ -10,6 +10,7 @@ datasource db {
 model Branch {
   requisitions           PartRequisition[]
   repeatJobRecords       RepeatJob[]            @relation("RepeatJobBranch")
+  cscCases               CscCase[]              @relation("CscCaseBranch")
   handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
   handheldStations       HandheldStation[]      @relation("HandheldStationBranch")
   labelPrintJobs         LabelPrintJob[]        @relation("LabelPrintJobBranch")
@@ -92,6 +93,10 @@ model User {
   repeatJobsAsPreviousEngineer   RepeatJob[]            @relation("RepeatJobPreviousEngineer")
   repeatJobsAsPreviousAdvisor    RepeatJob[]            @relation("RepeatJobPreviousAdvisor")
   repeatJobsReviewed             RepeatJob[]            @relation("RepeatJobReviewer")
+  cscCasesClosed                 CscCase[]              @relation("CscCaseClosedBy")
+  cscCasesGenerated              CscCase[]              @relation("CscCaseGeneratedBy")
+  cscContacts                    CscContact[]           @relation("CscContactDoneBy")
+  cscStageClosures               CscStageClosure[]      @relation("CscStageClosedBy")
   handheldDocumentsSent          HandheldDocument[]     @relation("HandheldDocumentSentBy")
   handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
   handheldDocumentsCancelled     HandheldDocument[]     @relation("HandheldDocumentCancelledBy")
@@ -410,6 +415,7 @@ model Customer {
   vehicleOwnerships VehicleOwnership[]
   appointments      ServiceAppointment[]
   jobCards          JobCard[]
+  cscCases          CscCase[]
   approvals         CustomerApproval[]
   invoices          Invoice[]
   receipts          Receipt[]
@@ -525,6 +531,7 @@ model ServiceAppointment {
   enquiry  Enquiry?
 
   campaignVehicles CampaignVehicle[]
+  cscCases         CscCase[]         @relation("CscCaseBooking")
 
   @@index([followUpJobId])
   @@index([branchId, bookingStatus, scheduledAt])
@@ -595,6 +602,8 @@ model JobCard {
   /// The repeat record when this job is a repeat (#repeat-jobs); isRepeat/previousJobId stay for old readers.
   repeatRecord       RepeatJob?             @relation("RepeatJobCurrent")
   repeatedBy         RepeatJob[]            @relation("RepeatJobPrevious")
+  cscCasesLastVisit  CscCase[]              @relation("CscCaseLastVisit")
+  cscCasesVisited    CscCase[]              @relation("CscCaseVisit")
   repeatReason       String?
   readyAt            DateTime?
   deliveredAt        DateTime?
@@ -874,6 +883,7 @@ model Vehicle {
   jobCards         JobCard[]
   warrantyCases    WarrantyCase[]
   campaignVehicles CampaignVehicle[]
+  cscCases         CscCase[]
 
   @@index([customerId])
   @@index([modelId])
@@ -2089,6 +2099,9 @@ model WorkshopMaster {
   teamEmployees            Employee[]                @relation("EmployeeTeam")
   defectEstimates          DefectModelEstimate[]     @relation("DefectEstimates")
   repeatJobReasons         RepeatJobReason[]
+  cscRulesForModel         CscRule[]                 @relation("CscRuleModel")
+  cscRulesForService       CscRule[]                 @relation("CscRuleServiceType")
+  cscCases                 CscCase[]                 @relation("CscCaseServiceType")
   modelDefectEstimates     DefectModelEstimate[]     @relation("ModelDefectEstimates")
   checklistLines           ServiceChecklistLine[]    @relation("ChecklistLines")
   modelChecklistLines      ServiceChecklistLine[]    @relation("ChecklistLineModel")
@@ -4618,4 +4631,164 @@ model PdiSettings {
   updatedAt                  DateTime  @updatedAt
 
   @@index([defaultCustomerId])
+}
+
+// ============================================================
+// CSC: service due reminders and follow-up (legacy Service → CSC)
+// ============================================================
+
+enum CscClosureType {
+  /// Closes the case: no more follow-ups (counted in the no-show analysis).
+  FINAL
+  /// "Particular follow-up closure": closes the current follow-up stage only.
+  PARTIAL
+}
+
+enum CscCaseStatus {
+  OPEN
+  VISITED
+  CLOSED
+}
+
+enum CscStage {
+  FIRST
+  SECOND
+  NOT_VISITED
+}
+
+/// When a model's service falls due and when to call (legacy CSCMaster). A later effectiveDate
+/// supersedes an earlier one for vehicles sold from that date; old versions are kept.
+model CscRule {
+  id               String         @id @default(uuid())
+  modelId          String
+  model            WorkshopMaster @relation("CscRuleModel", fields: [modelId], references: [id], onDelete: Restrict)
+  serviceTypeId    String
+  serviceType      WorkshopMaster @relation("CscRuleServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  effectiveDate    DateTime       @db.Date
+  /// Days and km from the start (sale) date at which this service is due.
+  dueDays          Int
+  dueKm            Int
+  /// Interval for the next one after this service is done (the periodic service, RG).
+  rotationDays     Int
+  rotationKm       Int
+  /// Call this many days before the due date.
+  followUp1Days    Int
+  followUp2Days    Int
+  /// Grace after the due date before the service lapses and the next one is due.
+  variationDays    Int
+  variationKm      Int
+  /// "Consider job against CSC": a job this many days before / after the due date is the visit.
+  matchDaysBefore  Int            @default(10)
+  matchDaysAfter   Int            @default(10)
+  /// Vehicles not seen for longer than this are left out of generation.
+  notVisitedMonths Int            @default(48)
+  active           Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cases            CscCase[]
+
+  @@unique([modelId, serviceTypeId, effectiveDate])
+  @@index([modelId, effectiveDate])
+}
+
+/// Reason codes for closing a follow-up (legacy CSCCauses).
+model CscCloseReason {
+  id               String            @id @default(uuid())
+  code             String            @unique
+  description      String
+  shortDescription String?
+  closureType      CscClosureType
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  cases            CscCase[]
+  stageClosures    CscStageClosure[]
+}
+
+/// One vehicle due for one service on one date (legacy reminder).
+model CscCase {
+  id                 String              @id @default(uuid())
+  vehicleId          String
+  vehicle            Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  customerId         String?
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  branchId           String
+  branch             Branch              @relation("CscCaseBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  serviceTypeId      String
+  serviceType        WorkshopMaster      @relation("CscCaseServiceType", fields: [serviceTypeId], references: [id], onDelete: Restrict)
+  ruleId             String?
+  rule               CscRule?            @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  dueDate            DateTime            @db.Date
+  dueMileage         Int?
+  followUp1Date      DateTime            @db.Date
+  followUp2Date      DateTime            @db.Date
+  /// Copied from the rule when generated, so later rule edits don't move existing cases.
+  matchDaysBefore    Int                 @default(10)
+  matchDaysAfter     Int                 @default(10)
+  status             CscCaseStatus       @default(OPEN)
+  /// The vehicle's last visit when the case was generated.
+  lastVisitJobCardId String?
+  lastVisitJobCard   JobCard?            @relation("CscCaseLastVisit", fields: [lastVisitJobCardId], references: [id], onDelete: SetNull)
+  /// The job that satisfied the case.
+  visitJobCardId     String?
+  visitJobCard       JobCard?            @relation("CscCaseVisit", fields: [visitJobCardId], references: [id], onDelete: SetNull)
+  visitedAt          DateTime?
+  bookingId          String?
+  booking            ServiceAppointment? @relation("CscCaseBooking", fields: [bookingId], references: [id], onDelete: SetNull)
+  bookedAt           DateTime?
+  closeReasonId      String?
+  closeReason        CscCloseReason?     @relation(fields: [closeReasonId], references: [id], onDelete: Restrict)
+  closeRemarks       String?
+  closedAt           DateTime?
+  closedById         String?
+  closedBy           User?               @relation("CscCaseClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  generatedById      String?
+  generatedBy        User?               @relation("CscCaseGeneratedBy", fields: [generatedById], references: [id], onDelete: SetNull)
+  generatedAt        DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  contacts           CscContact[]
+  stageClosures      CscStageClosure[]
+
+  @@unique([vehicleId, serviceTypeId, dueDate])
+  @@index([branchId, status, dueDate])
+  @@index([branchId, followUp1Date])
+  @@index([branchId, followUp2Date])
+  @@index([vehicleId, status])
+  @@index([closeReasonId])
+}
+
+/// A call made on a case: three lines per follow-up stage, as on the legacy screens.
+model CscContact {
+  id            String   @id @default(uuid())
+  caseId        String
+  case          CscCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  stage         CscStage
+  slot          Int
+  contactDate   DateTime @db.Date
+  contactPerson String?
+  remarks       String?
+  doneById      String?
+  doneBy        User?    @relation("CscContactDoneBy", fields: [doneById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([caseId, stage, slot])
+  @@index([doneById])
+}
+
+/// A follow-up stage closed with a reason. A FINAL reason also closes the case.
+model CscStageClosure {
+  id         String         @id @default(uuid())
+  caseId     String
+  case       CscCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  stage      CscStage
+  reasonId   String
+  reason     CscCloseReason @relation(fields: [reasonId], references: [id], onDelete: Restrict)
+  remarks    String?
+  closedAt   DateTime       @default(now())
+  closedById String?
+  closedBy   User?          @relation("CscStageClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@unique([caseId, stage])
+  @@index([reasonId])
 }

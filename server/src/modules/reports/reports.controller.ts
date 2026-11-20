@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type { NextFunction, Request, Response } from 'express';
 import prisma from '../../prisma/client';
 import { ForbiddenError, UnauthorizedError } from '../../shared/errors/appError';
@@ -47,12 +48,14 @@ export async function executeReport(
 export function runReport(definition: ReportDefinition, user: JWTPayload, query: Record<string, unknown>) {
   return prisma.$transaction(
     async (tx) => {
-      await tx.$executeRawUnsafe('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+      // The isolation level is set at BEGIN (option below): the change-log wrapper (prisma/client.ts) runs
+      // set_config first, and PostgreSQL refuses an isolation level after a query. READ ONLY may follow it.
+      await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
       const timeout = definition.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '${Math.round((timeout - 5_000) / 1000)}s'`);
       return executeReport(tx, definition, user, query);
     },
-    { maxWait: 5_000, timeout: definition.timeoutMs ?? DEFAULT_TIMEOUT_MS },
+    { maxWait: 5_000, timeout: definition.timeoutMs ?? DEFAULT_TIMEOUT_MS, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
   );
 }
 

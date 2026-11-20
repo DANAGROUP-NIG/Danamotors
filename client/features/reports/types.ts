@@ -19,7 +19,7 @@ export type FilterKey =
 
 export type ReportMode = "both" | "summary" | "detail";
 export type ReportWidth = 80 | 132;
-export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS" | "Service · Repeat jobs";
+export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS" | "Service · Repeat jobs" | "Service · CSC";
 
 export interface ReportBranch {
   id: string;
