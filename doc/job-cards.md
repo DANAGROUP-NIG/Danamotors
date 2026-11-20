@@ -1,5 +1,13 @@
 # JobCard database and workflow
 
+### Vehicles with multiple job cards (issue 142)
+
+Open **Vehicles with multiple jobs** from Job cards. The default view groups vehicles with at least two visible, open and unbilled jobs. A closed date range adds delivered jobs based on their recorded delivery date in Africa/Lagos. The range can span up to 366 days. Cancelled jobs and historical jobs without a delivery date do not enter the closed results.
+
+The view requires job-card read and `jobcard:multi-vehicle:read`. The latter is granted to Service Manager, Billing Officer and Workshop Manager through the role seed. Branch permissions apply before counting and loading jobs. The API pages by vehicle ID and returns each job-card ID so the existing detail and consolidation flows can be used.
+
+Payer comes from the job's recorded charge lines and service billing rule. A job may have several payers. If neither source records a payer, the view shows Not recorded. The current job model has no insurance payer field.
+
 ### Customer categories (issue 142)
 
 The customer profile, customer directory and job-card header use Individual, Corporate, Government, In-House and Others. The directory category filter combines with the existing search and branch scope. Vendor is a party status. Vendor receipts and debtor reports continue to recognize legacy Vendor records during cutover.

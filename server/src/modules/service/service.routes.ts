@@ -1,4 +1,5 @@
 import { recordJobDeposit } from "./job-deposit.service";
+import { listMultiJobVehicles, multiJobBranch, multiJobVehiclesQuery } from "./multi-job-vehicles";
 import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
@@ -904,6 +905,40 @@ router.get(
   requirePermission(PERMISSIONS.JOBCARD_READ),
   validateRequest(listJobCardsSchema),
   controller.listJobCards,
+);
+/**
+ * @openapi
+ * /service/job-cards/multi-job-vehicles:
+ *   get:
+ *     tags: [Service]
+ *     summary: List vehicles with at least two visible job cards
+ *     description: Requires jobcard:read and jobcard:multi-vehicle:read. Closed jobs use delivery dates in Africa/Lagos. Use nextCursor as after for the next page.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: branchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: after, schema: { type: string, format: uuid } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 50 } }
+ *       - { in: query, name: closedFrom, schema: { type: string, format: date } }
+ *       - { in: query, name: closedTo, schema: { type: string, format: date } }
+ *     responses:
+ *       200: { description: Vehicle IDs and registration and VIN with job IDs and details and nextCursor }
+ *       400: { description: Invalid cursor or closed date range }
+ *       403: { description: Branch or permission denied }
+ */
+router.get(
+  "/job-cards/multi-job-vehicles",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  requirePermission(PERMISSIONS.JOBCARD_MULTI_VEHICLE_READ),
+  validateRequest(z.object({ query: multiJobVehiclesQuery })),
+  async (req, res, next) => {
+    try {
+      const query = multiJobVehiclesQuery.parse(req.query);
+      const data = await listMultiJobVehicles(query, multiJobBranch(req.user, query.branchId));
+      res.json({ status: "success", statusCode: 200, data });
+    } catch (error) {
+      next(error);
+    }
+  },
 );
 router.get(
   "/job-cards/:id",
