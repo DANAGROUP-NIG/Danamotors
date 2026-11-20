@@ -483,7 +483,7 @@ export class JobCardWorkflowService {
       if (!current) throw new NotFoundError("Job card not found");
       current.invoices.push(...(current.consolidatedInvoices ?? []));
       // PDI jobs move through the PDI screens (work done, vehicle ready, bill); only delivery is shared.
-      if (current.jobType === JobCardType.PDI && (data.status !== "DELIVERED" || Object.entries(data).some(([key, value]) => value !== undefined && !["status", "deliveryAdvisorId", "lateReasonIds", "remarks"].includes(key))))
+      if (current.jobType === JobCardType.PDI && (data.status !== "DELIVERED" || Object.entries(data).some(([key, value]) => value !== undefined && !["status", "deliveryAdvisorId", "lateReasonIds", "lateRemarks", "remarks"].includes(key))))
         throw new BadRequestError("PDI job cards are updated from the PDI menu");
 
       const from = canonicalJobStatus(current.status);
@@ -569,6 +569,7 @@ export class JobCardWorkflowService {
           update.deliveredAt = now;
           update.deliveryAdvisorId = data.deliveryAdvisorId;
           update.lateReasonIds = data.lateReasonIds ?? [];
+          update.lateRemarks = data.lateRemarks?.trim() || null;
           update.gatePassNumber = await nextDocumentNumber(
             tx,
             "GATE_PASS",

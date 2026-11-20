@@ -321,6 +321,14 @@ export const PERMISSIONS = {
   CSC_FOLLOWUP_REPORT_READ: "report:csc-followup",
   CSC_NOT_VISITED_REPORT_READ: "report:csc-not-visited",
   CSC_NO_SHOW_REPORT_READ: "report:csc-no-show",
+
+  // ── Late deliveries: promised date / time discrepancy (legacy Service menu) ──
+  LATE_REASON_UPDATE: "jobcard:late-reason:update",
+  PROMISE_DATE_DISCREPANCY_READ: "report:promise-date-discrepancy",
+  PROMISE_TIME_DISCREPANCY_READ: "report:promise-time-discrepancy",
+  PROMISE_DATE_ANALYSIS_READ: "report:promise-date-analysis",
+  PROMISE_TIME_ANALYSIS_READ: "report:promise-time-analysis",
+  DELAYED_DELIVERIES_READ: "report:delayed-deliveries",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -374,6 +382,17 @@ const CSC_CALLER_PERMISSIONS: PermissionType[] = [PERMISSIONS.CSC_MASTER_READ, P
 const CSC_SUPERVISOR_PERMISSIONS: PermissionType[] = [...CSC_CALLER_PERMISSIONS, PERMISSIONS.CSC_CASE_GENERATE, ...CSC_REPORT_PERMISSIONS];
 const CSC_PERMISSIONS: PermissionType[] = [...CSC_SUPERVISOR_PERMISSIONS, PERMISSIONS.CSC_MASTER_UPDATE];
 
+// Late deliveries: the service and workshop managers correct reasons and run the reports.
+// TODO(confirm): issue names ServiceManager and WorkshopManager; Admin added as for the other workshop reports.
+const LATE_DELIVERY_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PROMISE_DATE_DISCREPANCY_READ,
+  PERMISSIONS.PROMISE_TIME_DISCREPANCY_READ,
+  PERMISSIONS.PROMISE_DATE_ANALYSIS_READ,
+  PERMISSIONS.PROMISE_TIME_ANALYSIS_READ,
+  PERMISSIONS.DELAYED_DELIVERIES_READ,
+];
+const LATE_DELIVERY_PERMISSIONS: PermissionType[] = [...LATE_DELIVERY_REPORT_PERMISSIONS, PERMISSIONS.LATE_REASON_UPDATE];
+
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
 const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
 const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
@@ -400,6 +419,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.REQUISITION_GOODWILL,
     ...PDI_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
+    ...LATE_DELIVERY_PERMISSIONS,
     ...CSC_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
@@ -625,6 +645,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   [ROLES.WORKSHOP_MANAGER]: [
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
+    ...LATE_DELIVERY_PERMISSIONS,
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -825,6 +846,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
     ...REPEAT_JOB_READ_PERMISSIONS,
+    ...LATE_DELIVERY_PERMISSIONS,
     // TODO(confirm): #97 names WorkshopManager; the service manager also runs the MIS.
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
