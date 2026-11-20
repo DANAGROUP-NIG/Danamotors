@@ -4,6 +4,7 @@ import { serviceTransactionPaths, serviceTransactionSchemas } from '../modules/s
 import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
 import { pdiPaths } from '../modules/pdi/pdi.openapi';
 import { repeatJobPaths } from '../modules/repeat-job/repeat-job.openapi';
+import { cscPaths } from '../modules/csc/csc.openapi';
 import { buildReportPaths } from '../modules/reports/framework.openapi';
 import { REPORTS } from '../modules/reports/reports.registry';
 
@@ -55,6 +56,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
       {
         name: 'Repeat Jobs',
         description: 'Vehicles back soon after a billed job (legacy Service → Repeat Job): automatic flag at opening within the branch window (days or km), review with reason codes, job card summary. Reports: repeat-list, repeat-analysis, repeat-summary under /reports.',
+      },
+      {
+        name: 'CSC',
+        description: 'Service due reminders (legacy Service → CSC): schedule per model and service, closure reasons, case generation, 1st / 2nd / not-visited follow-ups with booking and closure, automatic visit matching. Reports: csc-call-sheet, csc-followup, csc-not-visited, csc-no-show under /reports.',
       },
       {
         name: 'Auth',
@@ -510,7 +515,7 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
 const swaggerSpec = swaggerJsdoc(options);
 const spec = swaggerSpec as { paths?: Record<string, unknown>; components?: { schemas?: Record<string, unknown> } };
 // Framework report endpoints are generated from the report registry, so their docs come from it too.
-spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths};
+spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths,...cscPaths};
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
   spec.paths[route] = { ...(spec.paths[route] as Record<string, unknown> | undefined), ...methods };
 }

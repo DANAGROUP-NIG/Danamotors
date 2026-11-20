@@ -123,6 +123,16 @@ Three reports: `repeat-list` (132 col), `repeat-analysis` (132 col) and `repeat-
 `doc/workshop.md`, *Repeat jobs*. The date-wise summary names its advisor filter "Service advisor": a report may
 rename a shared filter with `filterLabels` (server `ReportDefinition` and client `ReportConfig`).
 
+## Service · CSC
+
+Four reports: `csc-call-sheet` (`csc:case:read`), `csc-followup` (`report:csc-followup`), `csc-not-visited`
+(`report:csc-not-visited`) and `csc-no-show` (`report:csc-no-show`), all 132 col and selected on the case's due
+date. A new lookup source `cscReason` feeds the no-show reason filter. Rules and options are in `doc/csc.md`.
+
+Each framework report runs in one read-only, repeatable-read transaction. The isolation level is set when the
+transaction begins (Prisma `isolationLevel`), not with `SET TRANSACTION`: the change-log wrapper in
+`prisma/client.ts` runs `set_config` first, and PostgreSQL refuses an isolation level after a query.
+
 ## Service · FPC reports (#98)
 
 Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis
