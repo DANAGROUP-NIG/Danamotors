@@ -12,6 +12,8 @@ export const vehicleInclude = { customer: true, vehicleModel: true, catalogModel
 export const jobInclude = {
     vehicle: { include: vehicleInclude }, customer: true, serviceType: true, service: true, team: true, engineer: { select: { firstName: true, lastName: true } }, serviceAdvisor: { select: { firstName: true, lastName: true } }, deliveryAdvisor: { select: { firstName: true, lastName: true } },
     invoices: { where: activeInvoice, include: { lines: true } }, complaints: true,
+    previousJob: { select: { jobNumber: true } },
+    repeatRecord: { select: { status: true, openingNote: true, remarks: true, reasons: { orderBy: { position: 'asc' }, select: { reason: { select: { code: true, description: true } } } } } },
     lines: { include: { sparePart: true, partIssuance: { include: { returns: true } }, jobCardLabour: { include: { labourItem: true } }, warrantyCaseLines: { include: { case: { include: { statusHistory: true } } } } } },
 } satisfies Prisma.JobCardInclude;
 export type ReportJob = Prisma.JobCardGetPayload<{

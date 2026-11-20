@@ -19,7 +19,8 @@ router.use(authMiddleware);
  *     description: |
  *       Legacy Control screen. Company details (name, TIN, RC number, dealer code) are company-wide and
  *       print on documents. Billing and workshop rules are per branch, as each legacy database set its own:
- *       labour VAT %, bill round-off (bills round down to a multiple), repeat-job window (days or km),
+ *       labour VAT %, bill round-off (bills round down to a multiple), repeat-job window (days or km) and
+ *       whether the repeat block prints on the job card,
  *       booking horizon, shifts, working hours, weekly holiday, VOR order days, reorder months,
  *       court location, reminder-letter designation and signatories.
  *
@@ -36,7 +37,7 @@ router.use(authMiddleware);
  *     summary: A branch's billing and workshop rules (defaults when never saved)
  *   put:
  *     tags: [Company Settings]
- *     summary: Save a branch's billing and workshop rules (Admin)
+ *     summary: Save a branch's billing and workshop rules (Admin; audited as BRANCH_SETTINGS_UPDATED)
  */
 router.get('/company', async (_req, res, next) => {
   try {
@@ -66,7 +67,7 @@ router.get('/branches/:branchId', validateRequest(z.object({ params: branchParam
 router.put('/branches/:branchId', admin, validateRequest(z.object({ params: branchParams, body: branchSettingsSchema })), async (req, res, next) => {
   try {
     assertBranchOwnership(req, req.params.branchId);
-    res.json({ status: 'success', data: { settings: await service.saveBranch(req.params.branchId, req.body) } });
+    res.json({ status: 'success', data: { settings: await service.saveBranch(req.params.branchId, req.body, req.user?.userId) } });
   } catch (error) {
     next(error);
   }

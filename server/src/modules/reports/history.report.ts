@@ -47,7 +47,7 @@ export async function history(input: ReportInput): Promise<ReportResult> {
     const readings = jobs.map(j => j.mileage).filter((n): n is number => n != null);
     const distance = readings.length > 1 ? Math.max(...readings) - Math.min(...readings) : 0;
     const total = sumMoney(expenses.map(r => r.amount as number));
-    sections.push({ title: 'Repair cost and repeat jobs', rows: [{ recordType: 'Repair cost', totalExpenses: total, recordedDistanceKm: distance, averageCostPerKm: distance > 0 ? money(new Prisma.Decimal(total).div(distance).toNumber()) : null }, ...jobs.filter(j => j.isRepeat).map(j => ({ recordType: 'Repeat job', ...identity(j), previousJob: j.previousJobId, reason: j.repeatReason }))] });
+    sections.push({ title: 'Repair cost and repeat jobs', rows: [{ recordType: 'Repair cost', totalExpenses: total, recordedDistanceKm: distance, averageCostPerKm: distance > 0 ? money(new Prisma.Decimal(total).div(distance).toNumber()) : null }, ...jobs.filter(j => j.isRepeat || j.repeatRecord).map(j => ({ recordType: 'Repeat job', ...identity(j), previousJob: j.previousJob?.jobNumber ?? j.previousJobId, reviewStatus: repeatStatusLabel(j.repeatRecord?.status), reason: repeatReasonText(j) }))] });
     for (const [index, section] of sections.entries()) {
         section.columns = HISTORY_COLUMNS[section.title];
         section.pageBreak = index > 0;
@@ -67,5 +67,19 @@ const HISTORY_COLUMNS: Record<string, string[]> = {
     'Labour and service charges': ['jobNumber', 'date', 'itemCode', 'description', 'quantity', 'rate', 'amount', 'chargeType', 'caseNumber'],
     'Expenses by service type': ['serviceType', 'amount'],
     'Warranty, FOC and goodwill': ['jobNumber', 'date', 'kind', 'itemCode', 'description', 'quantity', 'rate', 'amount', 'chargeType', 'caseNumber'],
-    'Repair cost and repeat jobs': ['recordType', 'totalExpenses', 'recordedDistanceKm', 'averageCostPerKm', 'jobNumber', 'jobDate', 'serviceType', 'previousJob', 'reason'],
+    'Repair cost and repeat jobs': ['recordType', 'totalExpenses', 'recordedDistanceKm', 'averageCostPerKm', 'jobNumber', 'jobDate', 'serviceType', 'previousJob', 'reviewStatus', 'reason'],
 };
+
+const REPEAT_STATUS_LABELS: Record<string, string> = { PENDING_REVIEW: 'Pending review', CONFIRMED: 'Confirmed', NOT_REPEAT: 'Not a repeat' };
+
+function repeatStatusLabel(status: string | undefined): string {
+    return status ? REPEAT_STATUS_LABELS[status] ?? status : 'Pending review';
+}
+
+/** Reviewed reasons (codes and descriptions) with the remarks, else the opening note. */
+function repeatReasonText(job: { repeatReason: string | null; repeatRecord: { openingNote: string | null; remarks: string | null; reasons: { reason: { code: string; description: string } }[] } | null }): string | null {
+    const record = job.repeatRecord;
+    if (!record?.reasons.length) return record?.openingNote ?? job.repeatReason;
+    const reasons = record.reasons.map(({ reason }) => `${reason.code} ${reason.description}`).join('; ');
+    return record.remarks ? `${reasons}: ${record.remarks}` : reasons;
+}

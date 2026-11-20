@@ -7,8 +7,9 @@ import { assertApprovedOperation, assertRecordedScope } from './estimate-approva
 import { getBranchSettings } from '../company-settings/company-settings.service';
 import { JobCardType, Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import { nextSequenceNumber } from "../../shared/db/documentSequence";
-import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey, serviceHistoryWhere } from "../pdi/pdi.logic";
+import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey } from "../pdi/pdi.logic";
 import { getPdiSettings } from "../pdi/pdi.settings.service";
+import { createRepeatRecord, resolveRepeatAtOpening, windowOf } from "../repeat-job/repeat-job.detect";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -54,35 +55,6 @@ export function canonicalJobStatus(status: string) {
 export function jobStatusFilter(status: string) {
   const canonical = canonicalJobStatus(status);
   return { in: ["OPEN", "IN_PROGRESS", "QC", "READY", "BILLED", "DELIVERED", "CANCELLED", "WAITING_PARTS", "Open", "Pending", "In Progress", "On Hold", "Quality Check", "Ready", "Completed", "Billed", "Closed", "Cancelled"].filter((value) => canonicalJobStatus(value) === canonical) };
-}
-
-export function repeatWindowStart(
-  now = new Date(),
-  days = Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 30),
-) {
-  if (!Number.isInteger(days) || days < 1 || days > 3650)
-    throw new BadRequestError("Invalid repeat window days");
-
-  return new Date(now.getTime() - days * 86400000);
-}
-
-// A previous job qualifies for a repeat when it is within the branch's repeat days, or within
-// its repeat km of the current reading (legacy: either limit is enough).
-export function repeatCandidateWhere(
-  window: { repeatWindowDays: number; repeatWindowKm: number | null },
-  mileage?: number,
-  now = new Date(),
-): Prisma.JobCardWhereInput {
-  // A PDI is never a previous visit: repeat checks use the service history only.
-  return {
-    AND: [serviceHistoryWhere()],
-    OR: [
-      { createdAt: { gte: repeatWindowStart(now, window.repeatWindowDays) } },
-      ...(window.repeatWindowKm && mileage !== undefined
-        ? [{ mileage: { gte: mileage - window.repeatWindowKm, lte: mileage } }]
-        : []),
-    ],
-  };
 }
 
 export function assertTransition(
@@ -295,24 +267,20 @@ export class JobCardWorkflowService {
       if (data.technicianId)
         await requireStaff(tx, data.technicianId, branch.id, ROLES.TECHNICIAN);
 
-      if (data.isRepeat) {
-        const previous = await tx.jobCard.findFirst({
-          where: {
-            id: data.previousJobId,
+      // Repeat check against the vehicle's last billed job (automatic), or the job the advisor picked (manual).
+      const openedAt = new Date();
+      const repeatWindow = pdi ? null : windowOf(await getBranchSettings(branch.id, tx));
+      const repeat = repeatWindow
+        ? await resolveRepeatAtOpening(tx, {
             vehicleId: vehicle.id,
-            ...repeatCandidateWhere(await getBranchSettings(branch.id, tx), data.mileage),
-
-            status: {
-              notIn: ["CANCELLED", "Cancelled"],
-            },
-          },
-        });
-
-        if (!previous)
-          throw new BadRequestError(
-            "Previous job must be for this vehicle within the repeat window",
-          );
-      }
+            mileage: data.mileage ?? null,
+            at: openedAt,
+            window: repeatWindow,
+            actorId: createdById,
+            manualPreviousJobId: data.isRepeat ? data.previousJobId : undefined,
+          })
+        : null;
+      const repeatNote = repeat ? data.repeatReason?.trim() || null : null;
 
       const complaints = await resolveJobComplaints(tx, data.complaints, pdi ? "PDI_DEFECT" : "COMPLAINT");
 
@@ -356,6 +324,9 @@ export class JobCardWorkflowService {
         warrantyAcknowledged: _warrantyAcknowledged,
         acknowledgedCampaignIds: _acknowledgedCampaignIds,
         promisedAt,
+        isRepeat: _isRepeat,
+        previousJobId: _previousJobId,
+        repeatReason: _repeatReason,
         ...fields
       } = data;
       const now = new Date();
@@ -364,6 +335,9 @@ export class JobCardWorkflowService {
       const card = await tx.jobCard.create({
         data: {
           ...fields,
+          isRepeat: Boolean(repeat),
+          previousJobId: repeat?.previous.id ?? null,
+          repeatReason: repeatNote,
           serviceCharge,
           tyres,
           batteryMake,
@@ -417,6 +391,9 @@ export class JobCardWorkflowService {
           ...(check.requiresAcknowledgement && { warrantyAcknowledgedById: createdById, warrantyAcknowledgedAt: now }),
         },
       });
+
+      if (repeat && repeatWindow)
+        await createRepeatRecord(tx, { jobCardId: card.id, branchId: branch.id, repeat, window: repeatWindow, note: repeatNote });
 
       if (data.appointmentId) {
         await tx.serviceAppointment.update({ where: { id: data.appointmentId }, data: { bookingStatus: 'CONVERTED' } });

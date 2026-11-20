@@ -3,6 +3,7 @@ import path from 'path';
 import { serviceTransactionPaths, serviceTransactionSchemas } from '../modules/service/service-transactions.openapi';
 import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
 import { pdiPaths } from '../modules/pdi/pdi.openapi';
+import { repeatJobPaths } from '../modules/repeat-job/repeat-job.openapi';
 import { buildReportPaths } from '../modules/reports/framework.openapi';
 import { REPORTS } from '../modules/reports/reports.registry';
 
@@ -50,6 +51,10 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
       {
         name: 'Health',
         description: 'API health check endpoint',
+      },
+      {
+        name: 'Repeat Jobs',
+        description: 'Vehicles back soon after a billed job (legacy Service → Repeat Job): automatic flag at opening within the branch window (days or km), review with reason codes, job card summary. Reports: repeat-list, repeat-analysis, repeat-summary under /reports.',
       },
       {
         name: 'Auth',
@@ -505,7 +510,7 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
 const swaggerSpec = swaggerJsdoc(options);
 const spec = swaggerSpec as { paths?: Record<string, unknown>; components?: { schemas?: Record<string, unknown> } };
 // Framework report endpoints are generated from the report registry, so their docs come from it too.
-spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths};
+spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths};
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
   spec.paths[route] = { ...(spec.paths[route] as Record<string, unknown> | undefined), ...methods };
 }

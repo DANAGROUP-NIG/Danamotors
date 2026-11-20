@@ -204,7 +204,7 @@
  *       "tags": [
  *         "Workshop"
  *       ],
- *       "summary": "Recent jobs for repeat assessment (the branch's repeat window: days, or km of ?mileage)",
+ *       "summary": "Repeat check for the opening form: candidate = the vehicle's last billed job (not cancelled, not PDI, any branch) when within the branch window (days, or km of ?mileage); jobs = earlier service jobs for flagging a repeat by hand",
  *       "security": [
  *         {
  *           "BearerAuth": []

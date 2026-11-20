@@ -21,7 +21,7 @@ export async function executeReport(
 ): Promise<ReportResponse> {
   const scope = await resolveReportScope(db, user, query.branchId as string | undefined);
   const body = applyMode(await definition.run(db, scope, query), query.mode as ReportMode | undefined);
-  const applied = await resolveFilterLabels(db, definition.filterKeys, query as Record<string, string[] | undefined>);
+  const applied = await resolveFilterLabels(db, definition.filterKeys, query as Record<string, string[] | undefined>, definition.filterLabels);
   return {
     report: { slug: definition.slug, title: definition.title, width: definition.width, generatedAt: new Date().toISOString() },
     filters: { query, applied },
