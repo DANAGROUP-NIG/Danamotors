@@ -608,7 +608,10 @@ model JobCard {
   readyAt            DateTime?
   deliveredAt        DateTime?
   gatePassNumber     String?                @unique
+  /// LATE_REASON master ids (≤ 6, distinct), set at delivery and corrected on the late-delivery entry screens.
   lateReasonIds      String[]               @default([])
+  /// Why the job was delivered late (internal; not the customer-facing remarks).
+  lateRemarks        String?
   creditApprovedById String?
   creditApprovedBy   User?                  @relation("JobCreditApprover", fields: [creditApprovedById], references: [id], onDelete: Restrict)
   complaints         JobComplaint[]
