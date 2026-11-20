@@ -96,7 +96,7 @@ export class PartyAccountService {
   async search(branchId: string | undefined, search: string, order: "name" | "code", limit: number) {
     const term = "%" + search.replace(/[\\%_]/g, character => "\\" + character) + "%";
     return prisma.$queryRaw<Array<{ id: string; code: string; name: string }>>(Prisma.sql`SELECT id, code, COALESCE(NULLIF("companyName",''), "firstName" || ' ' || "lastName") AS name FROM "Customer"
-      WHERE "mergedIntoId" IS NULL AND UPPER(type) <> 'VENDOR' ${branchId ? Prisma.sql`AND "branchId" = ${branchId}` : Prisma.empty}
+      WHERE "mergedIntoId" IS NULL AND UPPER(type) <> 'VENDOR' AND "partyStatus" <> 'VENDOR' ${branchId ? Prisma.sql`AND "branchId" = ${branchId}` : Prisma.empty}
       AND (code ILIKE ${term} OR "companyName" ILIKE ${term} OR ("firstName" || ' ' || "lastName") ILIKE ${term})
       ORDER BY ${order === "code" ? Prisma.sql`code, name, id` : Prisma.sql`name, code, id`} LIMIT ${limit}`);
   }
@@ -150,7 +150,7 @@ export class PartyAccountService {
     const date = new Date(input.date);
     if (date.getTime() > Date.now()) throw new BadRequestError('Adjustment date cannot be in the future');
     const customer = await lockParty(transaction, input.customerId);
-    if (customer.type?.toUpperCase() === 'VENDOR') throw new BadRequestError('Vendor party adjustments are not enabled');
+    if ((customer.partyStatus === 'VENDOR' || customer.type?.toUpperCase() === 'VENDOR')) throw new BadRequestError('Vendor party adjustments are not enabled');
     if (!await transaction.branch.findFirst({ where: { id: input.branchId, isActive: true } })) throw new BadRequestError('Select an active branch');
     await lockSelectedDocuments(transaction, [...input.debits,...input.credits]);
     await assertNoReservedAdvances(transaction, input.credits.filter(line => line.kind === 'RECEIPT').map(line => line.id));
@@ -231,7 +231,7 @@ export class PartyAccountService {
         return existing;
       }
       const customer = await lockParty(transaction,body.customerId);
-      if (customer.type?.toUpperCase() === 'VENDOR') throw new BadRequestError('Vendor party adjustments are not enabled');
+      if ((customer.partyStatus === 'VENDOR' || customer.type?.toUpperCase() === 'VENDOR')) throw new BadRequestError('Vendor party adjustments are not enabled');
       if (customer.branchId !== body.branchId) throw new BadRequestError('Opening balances belong to the customer branch');
       const date = new Date(body.date);
       if (date.getTime() > Date.now()) throw new BadRequestError('Opening date cannot be in the future');

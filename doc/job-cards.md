@@ -1,5 +1,15 @@
 # JobCard database and workflow
 
+### Customer categories (issue 142)
+
+The customer profile, customer directory and job-card header use Individual, Corporate, Government, In-House and Others. The directory category filter combines with the existing search and branch scope. Vendor is a party status. Vendor receipts and debtor reports continue to recognize legacy Vendor records during cutover.
+
+Legacy C maps to Corporate, I to Individual, G to Government and F (Fleet) to Corporate. Existing company-owned customer records map to In-House. The migration retains the previous values of changed rows and moves legacy vendors to Vendor status while preserving IDs and related transactions. Review unusual category codes, Vendor records flagged as company-owned, and company-owned customers with conflicting categories before applying the migration. Unknown codes are preserved for review. The customer directory can still open those records.
+
+In-House is the ownership source of truth. The database maintains the compatibility `ownCompanyVehicle` field from category and vendor status. A caller cannot edit that flag independently. Category or party status edits are audited by record ID and old and new values. Branch-scoped staff can edit profiles in their own branch.
+
+Pause customer writes during deployment and verify migrated categories, vendor selection and debtor exclusions before resuming. The migration rollback restores the pre-migration values and is intended for a cutover rollback before writes resume. After writes resume, review and reconcile intervening category or party status changes before any data rollback.
+
 ### Reliable parts, QC and promised-date notifications (issue #140)
 
 Request part, formal requisition request/issue/availability, and signed collection now

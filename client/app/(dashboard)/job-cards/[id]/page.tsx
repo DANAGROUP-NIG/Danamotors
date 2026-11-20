@@ -1,5 +1,6 @@
 "use client";
 import { CustomerExplanation } from "@/components/CustomerExplanation";
+import { customerCategoryLabel } from "@/features/customers/lib/customer-category";
 import {
   JOB_CARD_STATUS_TONES,
   JOB_CARD_STATUS_LABELS,
@@ -324,6 +325,7 @@ export default function JobCardDetailPage() {
           <SectionCard icon={<User className="size-4" />} title="Customer">
             <div className="space-y-2 text-sm">
               <p className="font-medium text-slate-800">{customerName}</p>
+              <DetailField label="Customer category" value={customerCategoryLabel(jobCard.customer)} />
               <p className="text-slate-500">
                 {jobCard.customer?.phoneNumber ?? "No mobile recorded"}
               </p>

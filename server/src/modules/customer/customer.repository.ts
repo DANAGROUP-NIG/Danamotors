@@ -2,9 +2,13 @@ import prisma from '../../prisma/client';
 import { Customer, CustomerDocument, ServiceHistory, Prisma } from '@prisma/client';
 
 export class CustomerRepository {
-  async listCustomers(params: { skip: number; take: number; search?: string; branchId?: string; createdById?: string }) {
+  async listCustomers(params: { skip: number; take: number; search?: string; category?: string; branchId?: string; createdById?: string }) {
     const where: Prisma.CustomerWhereInput = { mergedIntoId: null };
     if (params.branchId) where.branchId = params.branchId;
+    if (params.category) {
+      where.type = params.category;
+      where.partyStatus = { not: 'VENDOR' };
+    }
 
     if (params.search) {
       const nameParts = params.search.trim().split(/\s+/);

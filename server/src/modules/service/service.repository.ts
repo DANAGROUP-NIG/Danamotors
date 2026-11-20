@@ -307,6 +307,8 @@ export class ServiceRepository {
         customer: {
           select: {
             id: true,
+            type: true,
+            partyStatus: true,
             firstName: true,
             lastName: true,
             email: true,

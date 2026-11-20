@@ -239,7 +239,9 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
           properties: {
             id: { type: 'string', format: 'uuid' },
             creditDays: { type: 'integer', nullable: true, minimum: 0, maximum: 3650, description: 'Null uses company default credit days for future job bills' },
-            partyStatus: { type: 'string', enum: ['CUSTOMER','DEALER','FA_PARTY'], default: 'CUSTOMER' },
+            partyStatus: { type: 'string', enum: ['CUSTOMER','DEALER','FA_PARTY','VENDOR'], default: 'CUSTOMER' },
+            type: { type: 'string', description: 'Customer category for non-vendor parties. Legacy records may have an unmapped category.', example: 'IN_HOUSE' },
+            ownCompanyVehicle: { type: 'boolean', readOnly: true, description: 'Derived from In-House customer category.' },
             firstName: { type: 'string', example: 'Adaeze' },
             lastName: { type: 'string', example: 'Okafor' },
             email: { type: 'string', format: 'email', nullable: true },

@@ -78,6 +78,8 @@ export type JobCardBranch = {
 
 export type JobCardCustomer = {
   id: string;
+  type?: string | null;
+  partyStatus?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;

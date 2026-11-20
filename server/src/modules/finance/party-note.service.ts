@@ -15,7 +15,7 @@ export class PartyNoteService{
   const hash=createHash('sha256').update(JSON.stringify(input)).digest('hex');
   try{return await withPartyTransaction(async tx=>{
    const customer=await lockParty(tx,input.customerId);
-   if(customer.type.toUpperCase()==='VENDOR'||customer.branchId!==input.branchId)throw new BadRequestError('Choose a debtor party in this branch');
+   if((customer.partyStatus==='VENDOR'||customer.type.toUpperCase()==='VENDOR')||customer.branchId!==input.branchId)throw new BadRequestError('Choose a debtor party in this branch');
    const existing=await tx.partyNote.findUnique({where:{idempotencyKey:input.idempotencyKey},include});
    if(existing){if(existing.requestHash!==hash)throw new ConflictError('This request key was already used with different details');return existing;}
    if(!await tx.branch.findUnique({where:{id:input.branchId}}))throw new NotFoundError('Branch not found');
