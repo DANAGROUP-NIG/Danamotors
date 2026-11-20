@@ -323,7 +323,10 @@ describe("Job billing after delivery on credit", () => {
     expect(prisma.invoice.create).not.toHaveBeenCalled();
   });
 
-  it("persists the enabled customer parts VAT breakdown on a newly created invoice", async () => {
+  it.each([
+    { governmentVehicle: false, partsVat: 15, rate: 7.5, total: 320, roundOff: -2.5 },
+    { governmentVehicle: true, partsVat: 0, rate: 0, total: 300, roundOff: -7.5 },
+  ])("persists the enabled VAT breakdown (government vehicle: $governmentVehicle)", async ({ governmentVehicle, partsVat, rate, total, roundOff }) => {
     (prisma.financeSetting.findUnique as jest.Mock).mockImplementation(
       ({ where }: { where: { key: string } }) =>
         Promise.resolve({
@@ -337,6 +340,7 @@ describe("Job billing after delivery on credit", () => {
     );
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
       ...card,
+      customer: { governmentVehicle },
       partIssuances: [
         {
           id: "issue",
@@ -381,16 +385,17 @@ describe("Job billing after delivery on credit", () => {
       expect.arrayContaining([
         expect.objectContaining({
           category: "SPARES",
-          rate: 7.5,
+          rate,
           saleAmount: 200,
           discount: 0,
           taxableAmount: 200,
-          vat: 15,
+          vat: partsVat,
         }),
       ]),
     );
-    expect(data.vatAmount).toBe(22.5);
-    expect(data.total).toBe(323);
+    expect(data.vatAmount).toBe(partsVat + 7.5);
+    expect(data.total).toBe(total);
+    expect(data.roundOff).toBe(roundOff);
     expect(data.taxRegisterSnapshot.source).toBe("BILLING");
   });
 

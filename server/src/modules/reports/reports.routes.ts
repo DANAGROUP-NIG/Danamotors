@@ -75,10 +75,11 @@ router.get('/billing-settings', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), asy
 router.put('/billing-settings', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ body: z.object({ enabled: z.boolean(), rates: partsVatRatesSchema }).strict() })), async (req, res, next) => {
     try {
         await prisma.$transaction(async (tx) => {
+            const previous = await tx.financeSetting.findMany({ where: { key: { in: ['JOB_BILL_PARTS_VAT_ENABLED', 'partsVatRates'] } } });
             for (const [key, value] of [['JOB_BILL_PARTS_VAT_ENABLED', req.body.enabled], ['partsVatRates', req.body.rates]] as const)
                 await tx.financeSetting.upsert({ where: { key }, create: { key, value }, update: { value } });
-            await tx.auditLog.create({ data: { userId: req.user!.userId, action: 'PARTS_VAT_SETTINGS_CHANGED', details: JSON.stringify(req.body) } });
-        });
+            await tx.auditLog.create({ data: { userId: req.user!.userId, action: 'PARTS_VAT_SETTINGS_CHANGED', details: JSON.stringify({ before: Object.fromEntries(previous.map(({ key, value }) => [key, value])), after: req.body }) } });
+        }, { isolationLevel: 'Serializable' });
         res.json({ status: 'success', statusCode: 200, data: req.body });
     }
     catch (e) {

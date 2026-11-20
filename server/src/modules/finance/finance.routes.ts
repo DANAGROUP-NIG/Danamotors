@@ -506,7 +506,7 @@ router.put(
  *               labourDiscountPercent: { type: number, minimum: 0, maximum: 100 }
  *     responses:
  *       200: { description: Computed bill preview }
- *       400: { description: Job readiness, passed QC or consolidation requirements not met }
+ *       400: { description: "Job readiness, passed QC or consolidation requirements not met, or a customer-paid part needs classification. Example - Classify part P-123 as spares, oil or accessories before billing." }
  *       409: { description: An included job already has an active bill }
  * /finance/job-bills:
  *   post:
@@ -515,7 +515,7 @@ router.put(
  *     description: Rechecks every job's readiness, passed QC, active bill and approved estimate scope under transaction locks. A prior preview does not authorize billing unfinished work. A consolidated invoice and all job billing markers are written atomically.
  *     responses:
  *       201: { description: Bill created with generated invoice number }
- *       400: { description: Readiness, passed QC, approved scope or consolidation requirements not met }
+ *       400: { description: "Readiness, passed QC, approved scope or consolidation requirements not met, or a customer-paid part needs classification. Example - Classify part P-123 as spares, oil or accessories before billing." }
  *       409: { description: Active bill or concurrent billing conflict }
  * /finance/invoices/{id}/cancel:
  *   patch:

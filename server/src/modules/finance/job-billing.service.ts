@@ -31,7 +31,7 @@ const JOB_BILL_INCLUDE = {
   customer: true,
   serviceType: true,
   service: { select: { name: true } },
-  appointment: { select: { customerId: true } },
+  appointment: { select: { customerId: true, customer: { select: { governmentVehicle: true } } } },
   vehicle: true,
   branch: true,
   partIssuances: {
@@ -212,6 +212,7 @@ export class JobBillingService {
           type: "PART" as const,
           jobCardLineId: issuance.jobCardLine?.id,
           taxCategory: categoryOf(issuance.sparePart),
+          partNumber: issuance.sparePart.partNumber,
           taxable: issuance.sparePart.taxable,
           partId: issuance.sparePartId,
           referenceId: issuance.sparePartId,
@@ -264,6 +265,7 @@ export class JobBillingService {
         partId: line.sparePartId,
         referenceId: line.sparePartId,
         taxCategory: categoryOf(line.sparePart),
+        partNumber: line.sparePart.partNumber,
         taxable: line.taxable,
         partSource: line.partSource,
         description: line.description,
@@ -402,6 +404,7 @@ export class JobBillingService {
           ? [
               {
                 amount: line.amount,
+                partNumber: line.partNumber,
                 category: line.taxCategory,
                 taxable: line.taxable,
                 customerPaid: line.customerPaid,
@@ -411,6 +414,7 @@ export class JobBillingService {
       ),
       taxSettings.enabled,
       taxSettings.rates,
+      jobCard.customer?.governmentVehicle ?? jobCard.appointment?.customer?.governmentVehicle ?? false,
     );
   }
 
@@ -592,10 +596,12 @@ export class JobBillingService {
                       const {
                         taxCategory: _taxCategory,
                         taxable: _taxable,
+                        partNumber: _partNumber,
                         ...stored
                       } = snapshot as typeof snapshot & {
                         taxCategory?: string;
                         taxable?: boolean;
+                        partNumber?: string;
                       };
                       return stored;
                     }),

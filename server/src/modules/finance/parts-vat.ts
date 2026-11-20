@@ -1,12 +1,13 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { calculateJobBillTotals, JobBillTotalsInput } from './job-bill-calculator';
+import { calculateJobBillTotals, finalizeJobBill, JobBillTotalsInput } from './job-bill-calculator';
 import { money, sumMoney } from './money';
 import { BadRequestError } from '../../shared/errors/appError';
 export const partsVatRatesSchema = z.object({ SPARES: z.number().min(0).max(100).multipleOf(0.01), OIL: z.number().min(0).max(100).multipleOf(0.01), ACCESSORIES: z.number().min(0).max(100).multipleOf(0.01) }).strict();
 export type PartsVatRates = z.infer<typeof partsVatRatesSchema>;
 export const defaultPartsVatRates: PartsVatRates = { SPARES: 7.5, OIL: 7.5, ACCESSORIES: 7.5 };
 export interface TaxPart {
+    partNumber?: string;
     amount: number;
     category: string;
     taxable: boolean;
@@ -20,7 +21,7 @@ export interface VatRow {
     taxableAmount: number;
     vat: number;
 }
-export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxPart[], enabled: boolean, rates = defaultPartsVatRates) {
+export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxPart[], enabled: boolean, rates = defaultPartsVatRates, governmentVehicle = false) {
     const base = calculateJobBillTotals(input);
     if (enabled) partsVatRatesSchema.parse(rates);
     let incomplete = false;
@@ -38,8 +39,8 @@ export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxP
             continue;
         }
         if (enabled && !Object.prototype.hasOwnProperty.call(rates, p.category))
-            throw new BadRequestError('Classify every customer-paid part as spares, oil or accessories before enabling parts VAT');
-        const rate = enabled && p.taxable ? rates[p.category as keyof PartsVatRates] : 0;
+            throw new BadRequestError(`Classify ${p.partNumber ? `part ${p.partNumber}` : 'the customer-paid part'} as spares, oil or accessories before billing`);
+        const rate = enabled && p.taxable && !governmentVehicle ? rates[p.category as keyof PartsVatRates] : 0;
         const key = p.category + ':' + rate;
         const prior = grouped.get(key);
         grouped.set(key, { category: p.category, rate, sale: (prior?.sale ?? new Prisma.Decimal(0)).plus(p.amount) });
@@ -76,9 +77,7 @@ export function calculateBillWithPartsVat(input: JobBillTotalsInput, parts: TaxP
     if (!enabled)
         return { totals: base, breakdown };
     const vatAmount = sumMoney(breakdown.map(r => r.vat));
-    const beforeRound = money(new Prisma.Decimal(base.partsTotal).minus(base.partsDiscountAmount).plus(base.labourTotal).minus(base.labourDiscountAmount).plus(base.serviceTotal).plus(vatAmount).toNumber());
-    const total = Math.round(beforeRound);
-    return { totals: { ...base, vatAmount, total, roundOff: money(new Prisma.Decimal(total).minus(beforeRound).toNumber()) }, breakdown };
+    return { totals: finalizeJobBill({ ...base, vatAmount }, input.roundOffValue), breakdown };
 }
 export async function partsVatSettings(db: Prisma.TransactionClient) {
     // TODO(confirm): business approval is required before enabling parts VAT; default is OFF.
