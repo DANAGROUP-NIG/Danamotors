@@ -304,6 +304,13 @@ export const PERMISSIONS = {
   SKIPPED_FREE_SERVICE_READ: "report:skipped-free-service",
   VEHICLE_LIST_READ: "report:vehicle-list",
   MANAGEMENT_INFORMATION_READ: "report:management-information",
+
+  // ── Repeat jobs (legacy Service → Repeat Job) ─────────────────────────────
+  REPEAT_JOB_READ: "repeatjob:read",
+  REPEAT_JOB_REVIEW: "repeatjob:review",
+  REPEAT_LIST_READ: "report:repeat-list",
+  REPEAT_ANALYSIS_READ: "report:repeat-analysis",
+  REPEAT_SUMMARY_READ: "report:repeat-summary",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -338,6 +345,15 @@ export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(PERMISSIONS).
   (name) => (name.endsWith(":read") || name.startsWith("report:")) && name !== PERMISSIONS.REPORT_SETTINGS,
 );
 
+// Repeat jobs: everyone who follows the workshop's quality sees them; the workshop manager reviews them.
+const REPEAT_JOB_READ_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.REPEAT_JOB_READ,
+  PERMISSIONS.REPEAT_LIST_READ,
+  PERMISSIONS.REPEAT_ANALYSIS_READ,
+  PERMISSIONS.REPEAT_SUMMARY_READ,
+];
+const REPEAT_JOB_PERMISSIONS: PermissionType[] = [...REPEAT_JOB_READ_PERMISSIONS, PERMISSIONS.REPEAT_JOB_REVIEW];
+
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
 const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
 const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
@@ -363,6 +379,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.REQUISITION_CANCEL,
     PERMISSIONS.REQUISITION_GOODWILL,
     ...PDI_PERMISSIONS,
+    ...REPEAT_JOB_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ, PERMISSIONS.DELIVERED_MODEL_READ,
@@ -586,6 +603,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
     ...PDI_WORKSHOP_PERMISSIONS,
+    ...REPEAT_JOB_PERMISSIONS,
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -734,6 +752,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
     ...PDI_WORKSHOP_PERMISSIONS,
+    ...REPEAT_JOB_READ_PERMISSIONS,
     ...MIS_FRONT_OFFICE_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,
     PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -782,6 +801,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
     ...PDI_WORKSHOP_PERMISSIONS,
+    // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
+    ...REPEAT_JOB_READ_PERMISSIONS,
     // TODO(confirm): #97 names WorkshopManager; the service manager also runs the MIS.
     ...MIS_WORKSHOP_REPORTS,
     PERMISSIONS.JOBCARD_PICKING_LIST_PRINT,

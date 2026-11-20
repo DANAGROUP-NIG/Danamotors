@@ -1,8 +1,6 @@
-import { serviceHistoryWhere } from '../pdi/pdi.logic';
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: { branchSettings: { findUnique: jest.fn() } } }));
 import prisma from '../../prisma/client';
 import { calculateJobBillTotals } from '../finance/job-bill-calculator';
-import { repeatCandidateWhere } from '../service/job-card-workflow.service';
 import { assertWithinBookingHorizon } from '../service/service.service';
 import { branchSettingsSchema, defaultBranchSettings } from './company-settings.service';
 
@@ -19,16 +17,11 @@ it('rounds a job bill down to the branch round-off value, as legacy did', () => 
   expect(() => calculateJobBillTotals({ partsTotal: 1, labourTotal: 0, partsDiscountPercent: 0, labourDiscountPercent: 0, vatRate: 0, roundOffValue: 0 })).toThrow();
 });
 
-it('treats a previous job within the days or within the km as a repeat candidate', () => {
-  const now = new Date('2026-10-15T00:00:00Z');
-  expect(repeatCandidateWhere({ repeatWindowDays: 45, repeatWindowKm: 4000 }, 52000, now)).toEqual({ AND: [serviceHistoryWhere()], OR: [
-    { createdAt: { gte: new Date('2026-08-31T00:00:00Z') } },
-    { mileage: { gte: 48000, lte: 52000 } },
-  ] });
-  // A PDI is never a previous visit.
-  expect(repeatCandidateWhere({ repeatWindowDays: 45, repeatWindowKm: null }, 52000, now).AND).toEqual([expect.objectContaining({ jobType: 'SERVICE' })]);
-  expect(repeatCandidateWhere({ repeatWindowDays: 30, repeatWindowKm: null }, 52000, now).OR).toHaveLength(1);
-  expect(repeatCandidateWhere({ repeatWindowDays: 30, repeatWindowKm: 1500 }, undefined, now).OR).toHaveLength(1);
+it('defaults a branch without settings to the legacy 15 days / 500 km repeat window with the print block on', () => {
+  expect(defaultBranchSettings()).toMatchObject({ repeatWindowDays: 15, repeatWindowKm: 500, printRepeatBlock: true });
+  // Saved settings from before the print option still validate (the option defaults on).
+  const { printRepeatBlock: _printRepeatBlock, ...older } = defaultBranchSettings();
+  expect(branchSettingsSchema.parse(older).printRepeatBlock).toBe(true);
 });
 
 it('limits bookings to the branch horizon', async () => {

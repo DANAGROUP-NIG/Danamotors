@@ -19,7 +19,7 @@ export type FilterKey =
 
 export type ReportMode = "both" | "summary" | "detail";
 export type ReportWidth = 80 | 132;
-export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS";
+export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS" | "Service · Repeat jobs";
 
 export interface ReportBranch {
   id: string;
@@ -166,6 +166,8 @@ export interface ReportConfig<Row extends ReportRow = ReportRow> {
   icon: LucideIcon;
   period: PeriodDef;
   filters: FilterKey[];
+  /** Report-specific names for shared filters (e.g. "Service advisor" instead of "Received by"). */
+  filterLabels?: Partial<Record<FilterKey, string>>;
   options?: OptionDef[];
   /** True when the report has the detail / summary choice. */
   hasMode?: boolean;

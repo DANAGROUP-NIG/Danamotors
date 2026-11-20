@@ -193,14 +193,15 @@ export const jobOpeningBody = z
         message: "Select a main mechanic or team",
       });
 
-    if (data.isRepeat && (!data.previousJobId || !data.repeatReason))
+    // The reason is recorded at review; at opening the advisor may add a note (repeatReason).
+    if (data.isRepeat && !data.previousJobId)
       ctx.addIssue({
         code: "custom",
-        path: ["repeatReason"],
-        message: "A repeat requires a previous job and reason",
+        path: ["previousJobId"],
+        message: "Choose the previous job this visit repeats",
       });
 
-    if (!data.isRepeat && (data.previousJobId || data.repeatReason))
+    if (!data.isRepeat && data.previousJobId)
       ctx.addIssue({
         code: "custom",
         path: ["isRepeat"],
