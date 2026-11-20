@@ -48,6 +48,7 @@ import booksClosedRoutes from '../modules/books-closed/books-closed.routes';
 import pdiRoutes from '../modules/pdi/pdi.routes';
 import repeatJobRoutes from '../modules/repeat-job/repeat-job.routes';
 import cscRoutes from '../modules/csc/csc.routes';
+import lateDeliveryRoutes from '../modules/late-delivery/late-delivery.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
@@ -62,6 +63,7 @@ router.use('/books-closed', booksClosedRoutes);
 router.use('/pdi', pdiRoutes);
 router.use('/repeat-jobs', repeatJobRoutes);
 router.use('/csc', cscRoutes);
+router.use('/late-deliveries', lateDeliveryRoutes);
 router.use('/job-cards', serviceTypeOptionsRouter);
 router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 

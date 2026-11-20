@@ -4,6 +4,7 @@ import { serviceTransactionPaths, serviceTransactionSchemas } from '../modules/s
 import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
 import { pdiPaths } from '../modules/pdi/pdi.openapi';
 import { repeatJobPaths } from '../modules/repeat-job/repeat-job.openapi';
+import { lateDeliveryPaths } from '../modules/late-delivery/late-delivery.openapi';
 import { cscPaths } from '../modules/csc/csc.openapi';
 import { buildReportPaths } from '../modules/reports/framework.openapi';
 import { REPORTS } from '../modules/reports/reports.registry';
@@ -515,7 +516,7 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
 const swaggerSpec = swaggerJsdoc(options);
 const spec = swaggerSpec as { paths?: Record<string, unknown>; components?: { schemas?: Record<string, unknown> } };
 // Framework report endpoints are generated from the report registry, so their docs come from it too.
-spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths,...cscPaths};
+spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths,...cscPaths,...lateDeliveryPaths};
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
   spec.paths[route] = { ...(spec.paths[route] as Record<string, unknown> | undefined), ...methods };
 }

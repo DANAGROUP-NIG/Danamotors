@@ -23,6 +23,8 @@ import {
   UserCog,
   Settings,
   CalendarDays,
+  CalendarClock,
+  Clock3,
   ClipboardList,
   ClipboardCheck,
   Shield,
@@ -107,6 +109,7 @@ export const NAV_GROUPS: NavGroup[] = [
       "jobcard:read",
       "pdi:read",
       "repeatjob:read",
+      "jobcard:late-reason:update",
       "csc:case:read",
       "csc:master:read",
       "services:read",
@@ -149,6 +152,15 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/repeat-jobs",
         icon: Repeat2,
         permissions: ["repeatjob:read"],
+      },
+      {
+        label: "Late Deliveries",
+        icon: CalendarClock,
+        permissions: ["jobcard:late-reason:update"],
+        children: [
+          { label: "Promise Date Entry", href: "/late-deliveries/date", icon: CalendarClock, permissions: ["jobcard:late-reason:update"] },
+          { label: "Promise Time Entry", href: "/late-deliveries/time", icon: Clock3, permissions: ["jobcard:late-reason:update"] },
+        ],
       },
       {
         label: "CSC Follow-up",

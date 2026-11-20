@@ -19,7 +19,7 @@ export type FilterKey =
 
 export type ReportMode = "both" | "summary" | "detail";
 export type ReportWidth = 80 | 132;
-export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS" | "Service · Repeat jobs" | "Service · CSC";
+export type ReportCategory = "Front office" | "Workshop" | "Productivity" | "Billing" | "Vehicle analysis" | "Finance" | "Service · FPC" | "Service MIS" | "Service · Repeat jobs" | "Service · CSC" | "Service · Late deliveries";
 
 export interface ReportBranch {
   id: string;
@@ -55,7 +55,19 @@ export interface ReportResponse<Row extends ReportRow = ReportRow> {
   breakdown?: { key: string; label: string; count: number; amount?: number }[];
   /** Columns that depend on the data (months, service types, branches) in matrix reports. */
   columns?: { key: string; label: string; format?: ColumnFormat }[];
+  /** Summary tables shown after the detail (screen, print and Excel); empty in detail mode. */
+  sections?: ReportSection[];
   meta: { rowCount: number; truncated: boolean; branch: ReportBranch | "ALL"; timeZone: string };
+}
+
+/** A server-built summary table, e.g. late jobs by model, service type and reason. */
+export interface ReportSection {
+  key: string;
+  title: string;
+  columns: { key: string; label: string; format?: ColumnFormat }[];
+  rows: ReportRow[];
+  /** Total line with the same keys; its first column holds the label. */
+  total?: ReportRow;
 }
 
 export interface LookupOption {

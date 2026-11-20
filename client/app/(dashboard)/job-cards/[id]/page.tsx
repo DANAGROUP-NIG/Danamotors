@@ -8,6 +8,7 @@ import { JobCardPartsSection } from "@/features/job-cards/components/JobCardPart
 import { RepairWorkspacePage } from "@/features/job-cards/components/RepairWorkspacePage";
 import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
 import { JobCardRepeatPanel } from "@/features/repeat-jobs/components/JobCardRepeatPanel";
+import { JobCardLatePanel } from "@/features/late-deliveries/components/JobCardLatePanel";
 import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 
 import { useParams, useRouter } from "next/navigation";
@@ -281,6 +282,8 @@ export default function JobCardDetailPage() {
 
         {/* Repeat block: previous job, days/km since and the review; prints when the branch setting is on. */}
         <JobCardRepeatPanel jobCardId={jobCard.id} enabled={Boolean(jobCard.repeatRecord || jobCard.isRepeat)} />
+        {/* Delivered after the promise: reasons, remark and a link to the late-delivery entry screen. */}
+        <JobCardLatePanel jobCard={jobCard} />
 
         <CampaignPrintBox jobCard={jobCard} />
 
