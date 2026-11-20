@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, isNumericFormat, plural } from "../lib/report-format";
 import type { ReportBranch, ReportConfig, ReportGroup, ReportResponse, ReportRow } from "../types";
+import { PrintSections } from "./ReportSections";
 import { cellText, totalText, visibleColumns } from "./ReportTable";
 
 export const COMPANY_NAME = "DANA MOTORS LTD.";
@@ -56,6 +57,7 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
   const printed = `Printed ${fmtDateTime(new Date())} by ${printedBy}`;
   const landscape = config.width === 132;
   const branch = data.meta.branch;
+  const sectionsOnly = Boolean(data.sections?.length) && mode === "summary";
 
   const pageCss = `@page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 12mm 10mm 14mm;
     @bottom-left { content: ${cssString(printed)}; font: 8pt sans-serif; color: #475569; }
@@ -92,6 +94,7 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
       </header>
       <p className="mb-2 mt-1.5 text-[8.5pt] text-slate-600">{appliedText(data) || "No filters"}</p>
 
+      {!sectionsOnly && (
       <table className={cn("w-full border-collapse", landscape ? "text-[7.5pt]" : "text-[8.5pt]")}>
         <thead className="[display:table-header-group]">
           <tr className="border-y border-black">
@@ -133,6 +136,8 @@ export function ReportPrintLayout<Row extends ReportRow>({ config, data, options
           {!config.hideGrandTotal && totalRow(data.totals, config.totalLabel?.(data) ?? `Grand total · ${plural(data.totals.count ?? data.meta.rowCount, config.noun)}`, "border-y-[3px] border-double border-black")}
         </tbody>
       </table>
+      )}
+      {data.sections && <PrintSections sections={data.sections} landscape={landscape} />}
       {config.footnote && <p className="mt-2 text-[8pt] text-slate-600">{config.footnote}</p>}
     </div>
   );

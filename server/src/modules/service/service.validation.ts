@@ -241,6 +241,8 @@ export const jobUpdateBody = z
         "Reasons must be distinct",
       )
       .optional(),
+    /** Delay remark recorded with the late-delivery reasons (internal). */
+    lateRemarks: z.string().trim().max(1000).optional(),
   })
   .strict();
 

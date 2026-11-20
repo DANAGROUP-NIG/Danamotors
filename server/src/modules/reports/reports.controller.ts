@@ -32,6 +32,7 @@ export async function executeReport(
     summary: body.summary,
     breakdown: body.breakdown,
     columns: body.columns,
+    ...(body.sections ? { sections: body.sections } : {}),
     meta: {
       rowCount: body.rows.length,
       truncated: Boolean(body.truncated),
