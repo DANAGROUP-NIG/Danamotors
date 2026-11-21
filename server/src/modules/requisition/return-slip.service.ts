@@ -246,12 +246,11 @@ export class ReturnSlipService {
           await tx.$queryRaw`SELECT id FROM "InventoryStock" WHERE "branchId" = ${requisition.branchId} AND "partId" = ${line.sparePartId} FOR UPDATE`;
         const now = new Date();
         const returnNumber = pdi
-        ? pdiDocumentNumber('RETURN', await nextSequenceNumber(tx, pdiSequenceKey('RETURN', requisition.branchId), new Date(year, 6, 1)))
-        : await nextSequenceNumber(
-          tx,
-          `RETURN_${requisition.branchId}`,
-          now,
-        );
+          ? pdiDocumentNumber(
+              "RETURN",
+              await nextSequenceNumber(tx, pdiSequenceKey("RETURN", requisition.branchId), now),
+            )
+          : await nextSequenceNumber(tx, `RETURN_${requisition.branchId}`, now);
         const slip = await tx.partReturnSlip.create({
           data: {
             returnNumber,
