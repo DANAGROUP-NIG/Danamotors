@@ -35,9 +35,9 @@ export function useSaveReportSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: saveReportSettingsRequest,
-    onSuccess: (data) => {
+    onSuccess: (data, body) => {
       qc.setQueryData(["report-settings"], data);
-      toast.success(data.fpcLetterIsDefault ? "Letter reset to the default template" : "Letter template saved");
+      toast.success(Object.values(body).includes(null) ? "Letter reset to the default template" : "Letter template saved");
     },
     onError: (error) => toast.error(apiErrorMessage(error, "Could not save the letter template")),
   });

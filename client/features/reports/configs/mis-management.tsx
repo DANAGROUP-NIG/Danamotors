@@ -62,7 +62,7 @@ const managementInformation: ReportConfig = {
         Some sections are hidden because they come from reports you do not have access to (closing stock and parts profit need stock:read; outstanding needs the age-wise party outstanding report).
       </p>
     ) : null,
-  footnote: "Each section is read from the report that owns it: workshop figures from the MIS job aggregation (jobs delivered, all charge types), counter sale from the counter sales summary, stock and profit from the parts reports, transfers from the STN register, purchases from vendor MRNs, outstanding from the age-wise party outstanding as on the end date. A6 (PSF satisfaction) is not recorded yet.",
+  footnote: "Each section is read from the report that owns it: workshop figures from the MIS job aggregation (jobs delivered, all charge types), counter sale from the counter sales summary, stock and profit from the parts reports, transfers from the STN register, purchases from vendor MRNs, outstanding from the age-wise party outstanding as on the end date. A6 (PSF) reads the current post-service follow-up status of each job: satisfaction % = satisfied ÷ (satisfied + dissatisfied).",
 };
 
 export const MIS_MANAGEMENT_CONFIGS: ReportConfig[] = [managementInformation];

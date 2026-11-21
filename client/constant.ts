@@ -49,6 +49,10 @@ import {
   Barcode,
   Repeat2,
   PhoneCall,
+  Frown,
+  Mail,
+  SmilePlus,
+  Tags,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -112,6 +116,7 @@ export const NAV_GROUPS: NavGroup[] = [
       "jobcard:late-reason:update",
       "csc:case:read",
       "csc:master:read",
+      "psf:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -173,6 +178,18 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "Generate Cases", href: "/csc/generate", icon: ListChecks, permissions: ["csc:case:generate"] },
           { label: "CSC Master", href: "/csc/schedule", icon: Settings, permissions: ["csc:master:read"] },
           { label: "Closure Reasons", href: "/csc/close-reasons", icon: ClipboardList, permissions: ["csc:master:read"] },
+        ],
+      },
+      {
+        label: "Post-service Follow-up",
+        icon: SmilePlus,
+        permissions: ["psf:read", "psf:letter"],
+        children: [
+          { label: "Follow-up Entry", href: "/psf", icon: PhoneCall, permissions: ["psf:read"] },
+          { label: "Follow-up List", href: "/reports/psf-followup-list", icon: ListChecks, permissions: ["psf:read"] },
+          { label: "Dissatisfied Customers", href: "/reports/psf-dissatisfied", icon: Frown, permissions: ["report:psf-dissatisfied"] },
+          { label: "Follow-up Letters", href: "/reports/psf-letter", icon: Mail, permissions: ["psf:letter"] },
+          { label: "Mailing List", href: "/reports/psf-mailing-list", icon: Tags, permissions: ["psf:letter"] },
         ],
       },
       {

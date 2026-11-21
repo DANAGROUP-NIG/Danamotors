@@ -45,6 +45,14 @@ adds customers `DEMO-C51` (main branch) and `DEMO-C52` (second branch) with vehi
 midnight), late by time, on time, exactly on time, not delivered, and one at the second branch. Some have reasons and
 remarks, some none. See `doc/late-deliveries-testing-guide.md`.
 
+Only the post-service follow-up demo: `npm run prisma:seed:demo -- --psf-only` (needs the PSF migration). It adds
+customers `DEMO-C61`…`DEMO-C65` (C62 and C65 without a phone, C65 without an address; C64 at the second branch),
+labour `DM-PSF-AC` (followed up), `DM-PSF-ENG` (major) and `DM-PSF-WASH` (not followed up), service type `AC`
+(accidental) when missing, and jobs `DM-PSF-1`…`DM-PSF-11` delivered at fixed February 2026 dates with calls at fixed
+times: not followed up, not available then satisfied, dissatisfied, dissatisfied then closed, no phone, accidental,
+not delivered, and one at the second branch. A job that already has a follow-up is left as the tester changed it.
+See `doc/psf-testing-guide.md`.
+
 The run prints a summary at the end. It lists the job numbers, bills (with VAT and round-off), warranty case numbers, stock per branch, campaign VIN statuses and the warranty check result for each vehicle. Share it with the testers.
 
 ## Re-run
