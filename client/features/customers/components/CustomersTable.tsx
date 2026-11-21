@@ -45,6 +45,8 @@ import {
 } from "../services/customer.service";
 import { CustomerEditForm } from "./CustomerEditForm";
 import type { Customer } from "../types/customer.types";
+import { customerCategories, customerCategoryLabel, customerCategoryLabels, type CustomerCategory } from "../lib/customer-category";
+import { inputCls } from "@/components/forms/FormField";
 
 const PAGE_SIZE = 10;
 
@@ -69,6 +71,7 @@ export function CustomersTable() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<CustomerCategory | "">("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteCandidates, setDeleteCandidates] = useState<Customer[] | null>(null);
 
@@ -86,6 +89,7 @@ export function CustomersTable() {
     page,
     limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
+    category: category || undefined,
     branchId: activeBranch?.id,
   });
 
@@ -179,6 +183,7 @@ export function CustomersTable() {
         </div>
       ),
     },
+    { header: "Category", render: customerCategoryLabel },
     {
       header: "Email",
       render: (c) => (
@@ -314,7 +319,9 @@ export function CustomersTable() {
         isLoading={isLoading}
         isFetching={isFetching}
         emptyMessage={
-          debouncedSearch
+          category
+            ? "No customers match the current filters. Choose All categories to broaden the results."
+            : debouncedSearch
             ? `No customers matching "${debouncedSearch}"`
             : "No customers yet. Add one above."
         }
@@ -327,6 +334,16 @@ export function CustomersTable() {
         selection={selection}
       >
         <div className="flex flex-col gap-4">
+          <label className="grid w-full max-w-xs gap-1.5 text-sm font-medium">
+            Customer category
+            <select className={inputCls} value={category} onChange={(event) => {
+              setCategory(event.target.value as CustomerCategory | "");
+              setPage(1);
+            }}>
+              <option value="">All categories</option>
+              {customerCategories.map(value => <option key={value} value={value}>{customerCategoryLabels[value]}</option>)}
+            </select>
+          </label>
           <DataTableToolbar
             search={search}
             onSearchChange={setSearch}
@@ -392,6 +409,7 @@ export function CustomersTable() {
 
       <ModalFame
         isOpen={!!editingId}
+        preventAccidentalClose
         onClose={() => setEditingId(null)}
         title="Edit customer"
       >

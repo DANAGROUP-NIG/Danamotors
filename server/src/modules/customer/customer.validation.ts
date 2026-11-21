@@ -16,6 +16,8 @@ export const customerTallyLedgerSchema = z.object({
   }).strict(),
 });
 
+export const customerCategory = z.enum(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'IN_HOUSE', 'OTHERS']);
+
 export const customerBody = z.object({
   firstName: z.string().trim().max(100).default(''),
   lastName: z.string().trim().max(100).default(''),
@@ -23,8 +25,8 @@ export const customerBody = z.object({
   phoneNumber: z.string().trim().min(1).max(30),
   code: z.string().trim().min(1).max(50).optional(),
   creditDays: z.number().int().min(0).max(3650).nullable().optional(),
-  partyStatus: z.enum(['CUSTOMER','DEALER','FA_PARTY']).optional(),
-  type: z.enum(['INDIVIDUAL', 'CORPORATE', 'GOVERNMENT', 'VENDOR']).default('INDIVIDUAL'),
+  partyStatus: z.enum(['CUSTOMER','DEALER','FA_PARTY','VENDOR']).optional(),
+  type: customerCategory.default('INDIVIDUAL'),
   // Codes from the SALUTATION master (legacy has PROF., MAJ., REV. and more).
   salutation: z.string().trim().min(1).max(20).nullable().optional(),
   companyName: z.string().trim().max(200).nullable().optional(),
@@ -58,7 +60,6 @@ export const customerBody = z.object({
   vendorType: z.string().trim().max(20).nullable().optional(),
   mrnRateType: z.enum(['D', 'R']).nullable().optional(),
   governmentVehicle: z.boolean().optional(),
-  ownCompanyVehicle: z.boolean().optional(),
   creditLimit: z.number().min(0).max(1e12).nullable().optional(),
   organizationId: z.string().uuid().nullable().optional(),
   branchId: z.string().uuid(),
@@ -67,19 +68,21 @@ export const customerBody = z.object({
 export function validateCustomerIdentity(
   data: {
     type: string;
+    partyStatus?: string;
     firstName: string;
     lastName: string;
     companyName?: string | null;
   },
   ctx: z.RefinementCtx,
 ) {
-  if (data.type === 'INDIVIDUAL' && (!data.firstName || !data.lastName)) ctx.addIssue({
+  if (data.partyStatus !== 'VENDOR' && data.type === 'INDIVIDUAL' && (!data.firstName || !data.lastName)) ctx.addIssue({
     code: 'custom',
     path: ['firstName'],
     message: 'Individuals require first and last names',
   });
 
-  if (data.type !== 'INDIVIDUAL' && !data.companyName) ctx.addIssue({
+  const needsCompany = data.partyStatus === 'VENDOR' || ['CORPORATE', 'GOVERNMENT', 'IN_HOUSE'].includes(data.type);
+  if ((needsCompany || (data.type === 'OTHERS' && (!data.firstName || !data.lastName))) && !data.companyName) ctx.addIssue({
     code: 'custom',
     path: ['companyName'],
     message: 'Company name is required',
@@ -140,6 +143,7 @@ export const listCustomerSchema = z.object({
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().max(1000).default(10),
     search: z.string().trim().max(100).optional(),
+    category: customerCategory.optional(),
     branchId: z.string().uuid().optional(),
   }),
 });

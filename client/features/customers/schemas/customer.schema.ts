@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { customerCategories } from "../lib/customer-category";
 
 export const customerFields = z.object({
   firstName: z.string().trim(),
@@ -7,8 +8,8 @@ export const customerFields = z.object({
   phoneNumber: z.string().trim().min(1, "Mobile is required"),
   branchId: z.string().min(1, "Home branch is required"),
   creditDays: z.number().int().min(0).max(3650).nullable().optional(),
-  partyStatus: z.enum(["CUSTOMER","DEALER","FA_PARTY"]).optional(),
-  type: z.enum(["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"]).optional(),
+  partyStatus: z.enum(["CUSTOMER","DEALER","FA_PARTY","VENDOR"]).optional(),
+  type: z.enum(customerCategories).optional(),
   // Codes from the SALUTATION master.
   salutation: z.string().max(20).optional(),
   code: z.string().optional(),
@@ -41,19 +42,19 @@ export const customerFields = z.object({
   vendorType: z.string().max(20).nullable().optional(),
   mrnRateType: z.enum(["", "D", "R"]).nullable().optional(),
   governmentVehicle: z.boolean().optional(),
-  ownCompanyVehicle: z.boolean().optional(),
   creditLimit: z.number().min(0).nullable().optional(),
   organizationId: z.string().nullable().optional(),
 });
 
 export const createCustomerSchema = customerFields.superRefine((v, ctx) => {
-  if ((!v.type || v.type === "INDIVIDUAL") && (!v.firstName || !v.lastName)) ctx.addIssue({
+  if (v.partyStatus !== "VENDOR" && (!v.type || v.type === "INDIVIDUAL") && (!v.firstName || !v.lastName)) ctx.addIssue({
     code: "custom",
     path: ["firstName"],
     message: "Individuals require first and last names",
   });
 
-  if (v.type && v.type !== "INDIVIDUAL" && !v.companyName?.trim()) ctx.addIssue({
+  const needsCompany = v.partyStatus === "VENDOR" || v.type === "CORPORATE" || v.type === "GOVERNMENT" || v.type === "IN_HOUSE";
+  if ((needsCompany || (v.type === "OTHERS" && (!v.firstName || !v.lastName))) && !v.companyName?.trim()) ctx.addIssue({
     code: "custom",
     path: ["companyName"],
     message: "Company name is required",

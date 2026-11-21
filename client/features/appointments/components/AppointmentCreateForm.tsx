@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import { BookingVehicleSummary } from "@/features/service-transactions/components/BookingVehicleSummary";
+import { bookingRequestPayload, bookingRequestsValid } from '@/features/service-transactions/booking.logic';
 import { BookingFields } from "@/features/service-transactions/components/BookingFields";
-import { lagosIso } from "@/features/service-transactions/transaction.logic";
+import {
+  lagosInput,
+  lagosIso,
+} from "@/features/service-transactions/transaction.logic";
 import type { BookingExtra } from "../types/appointment.types";
 import { useForm, Controller } from "react-hook-form";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
@@ -19,6 +23,7 @@ import { CustomerSelectWithCreate } from "@/features/customers/components/Custom
 import { VehicleSelectWithCreate } from "@/features/vehicles/components/VehicleSelectWithCreate";
 import {
   createAppointmentSchema,
+  type CreateAppointmentFormInput,
   type CreateAppointmentFormValues,
 } from "../schemas/appointment.schema";
 
@@ -33,7 +38,7 @@ export function AppointmentCreateForm({
 }: AppointmentCreateFormProps) {
   const create = useCreateAppointment();
   const [extra, setExtra] = useState<BookingExtra>({
-    requests: [{ description: "" }],
+    requests: "",
   });
   const [requestError, setRequestError] = useState("");
   const activeBranch = useBranchStore((s) => s.activeBranch);
@@ -52,24 +57,21 @@ export function AppointmentCreateForm({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateAppointmentFormValues>({
-    resolver: zodResolver(createAppointmentSchema),
-    defaultValues: {
-      branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
-      ...initialValues,
+  } = useForm<CreateAppointmentFormInput, unknown, CreateAppointmentFormValues>(
+    {
+      resolver: zodResolver(createAppointmentSchema),
+      defaultValues: {
+        branchName: isSuperAdmin ? "" : (activeBranch?.name ?? ""),
+        ...initialValues,
+      },
     },
-  });
+  );
 
   const selectedCustomerId = watch("customerId");
   const selectedVehicleId = watch("vehicleId");
 
   function onSubmit(values: CreateAppointmentFormValues) {
-    if (
-      !extra.requests?.some(
-        (row) =>
-          row.description.trim() || row.complaintCodeId || row.defectCode,
-      )
-    ) {
+    if (!bookingRequestsValid(extra.requests)) {
       setRequestError("Add the customer request");
       return;
     }
@@ -77,6 +79,7 @@ export function AppointmentCreateForm({
     const payload = {
       ...values,
       ...extra,
+      requests: bookingRequestPayload(extra.requests),
       serviceId: values.serviceId || undefined,
       serviceTypeId: values.serviceTypeId || undefined,
       scheduledAt: lagosIso(values.scheduledAt),
@@ -84,11 +87,13 @@ export function AppointmentCreateForm({
     create.mutate(payload, {
       onSuccess: () => {
         reset();
-        setExtra({ requests: [{ description: "" }] });
+        setExtra({ requests: "" });
         onSuccess?.();
       },
     });
   }
+
+  const earliestScheduledAt = lagosInput(new Date().toISOString());
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
@@ -203,7 +208,11 @@ export function AppointmentCreateForm({
             control={control}
             name="scheduledAt"
             render={({ field }) => (
-              <DateTimeInput value={field.value} onChange={field.onChange} />
+              <DateTimeInput
+                value={field.value}
+                onChange={field.onChange}
+                min={earliestScheduledAt}
+              />
             )}
           />
         </Field>
@@ -213,7 +222,7 @@ export function AppointmentCreateForm({
           Additional booking details
         </summary>
         <Field
-          label="Duration (minutes, optional)"
+          label="Duration (mins, optional)"
           error={errors.durationMins?.message}
         >
           <input

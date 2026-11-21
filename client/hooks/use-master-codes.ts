@@ -7,7 +7,12 @@ type MasterCode = { code: string; description: string };
 export function useMasterCodes(kind: string) {
   return useQuery({
     queryKey: ["master-codes", kind],
-    queryFn: async () => (await apiGet<{ items: MasterCode[] }>(`/workshop-masters?kind=${kind}&limit=100`)).items,
+    queryFn: async () =>
+      (
+        await apiGet<{ items: MasterCode[] }>(
+          `/workshop-masters?kind=${kind}&limit=100`,
+        )
+      ).items,
     staleTime: 5 * 60_000,
   });
 }

@@ -11,9 +11,11 @@ import type {
   BookingExtra,
 } from "@/features/appointments/types/appointment.types";
 import { JobCardOpeningModal } from "@/features/job-cards/components/JobCardOpeningModal";
+import { BookingOpeningConsentModal } from "./BookingOpeningConsentModal";
+import type { OpeningConsentProof } from "../booking-opening-consent.logic";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { BookingFields } from "./BookingFields";
-import { bookingExtras, bookingOpeningValues } from "../booking.logic";
+import { bookingExtras, bookingOpeningValues, bookingRequestPayload, bookingRequestsEqual } from "../booking.logic";
 import {
   canEditBooking,
   lagosDate,
@@ -25,6 +27,8 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
   const { hasPermission } = useAuth();
   const update = useUpdateAppointment(appointment.id);
   const [open, setOpen] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [openingConsent, setOpeningConsent] = useState<OpeningConsentProof>();
   const [extra, setExtra] = useState<BookingExtra>(() =>
     bookingExtras(appointment),
   );
@@ -67,6 +71,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
           event.preventDefault();
           update.mutate({
             ...extra,
+            requests: bookingRequestsEqual(extra.requests, bookingExtras(appointment).requests) ? undefined : bookingRequestPayload(extra.requests),
             serviceTypeId: serviceTypeId || undefined,
             scheduledAt: lagosIso(scheduled),
           });
@@ -147,7 +152,7 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
         </div>
       )}
       {editable && hasPermission("jobcard:create") && (
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={() => { setOpeningConsent(undefined); setConsentOpen(true); }}>
           Convert to job card
         </Button>
       )}
@@ -165,9 +170,10 @@ export function BookingPanel({ appointment }: { appointment: Appointment }) {
       })}
       <JobCardOpeningModal
         isOpen={open}
-        onClose={() => setOpen(false)}
-        defaultValues={bookingOpeningValues(appointment)}
+        onClose={() => { setOpen(false); setOpeningConsent(undefined); }}
+        defaultValues={{ ...bookingOpeningValues(appointment), openingConsent }}
       />
+      <BookingOpeningConsentModal isOpen={consentOpen} appointmentId={appointment.id} onClose={() => setConsentOpen(false)} onAccept={consent => { setOpeningConsent(consent); setConsentOpen(false); setOpen(true); }} />
     </section>
   );
 }

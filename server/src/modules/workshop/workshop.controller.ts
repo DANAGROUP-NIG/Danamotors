@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { WorkshopService } from "./workshop.service";
 import { ROLES } from "../../shared/constants/roles";
-import { assertBranchOwnership, canAccessAllBranches } from "../../middleware/authorize";
+import {
+  assertBranchOwnership,
+  canAccessAllBranches,
+} from "../../middleware/authorize";
 import prisma from "../../prisma/client";
 import { ForbiddenError, NotFoundError } from "../../shared/errors/appError";
 
@@ -32,13 +35,12 @@ export class WorkshopController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
+      const activeOnly = req.query.activeOnly === "true";
       let branchId = req.query.branchId as string | undefined;
 
-      if (
-        req.user &&
-        !canAccessAllBranches(req.user)
-      ) {
-        if (!req.user.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+      if (req.user && !canAccessAllBranches(req.user)) {
+        if (!req.user.branchId)
+          throw new ForbiddenError("Your account is not assigned to a branch");
         branchId = req.user.branchId;
       }
 
@@ -47,6 +49,7 @@ export class WorkshopController {
         limit,
         branchId,
         search,
+        activeOnly,
       });
       res
         .status(200)
@@ -69,15 +72,14 @@ export class WorkshopController {
         id,
         technicianId,
         qualityInspectorId,
+        req.user?.userId,
       );
-      res
-        .status(200)
-        .json({
-          status: "success",
-          statusCode: 200,
-          message: "Technician assigned successfully",
-          data: { jobCard: result },
-        });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Technician assigned successfully",
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
@@ -98,14 +100,12 @@ export class WorkshopController {
         status,
         req.user?.userId,
       );
-      res
-        .status(200)
-        .json({
-          status: "success",
-          statusCode: 200,
-          message: "Job progress updated successfully",
-          data: { jobCard: result },
-        });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "Job progress updated successfully",
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
@@ -120,15 +120,18 @@ export class WorkshopController {
       const { id } = req.params;
       const { qcStatus, qcNotes } = req.body;
       await assertJobAccess(req);
-      const result = await this.workshopService.updateQC(id, qcStatus, qcNotes);
-      res
-        .status(200)
-        .json({
-          status: "success",
-          statusCode: 200,
-          message: "QC status updated successfully",
-          data: { jobCard: result },
-        });
+      const result = await this.workshopService.updateQC(
+        id,
+        qcStatus,
+        qcNotes,
+        req.user?.userId,
+      );
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        message: "QC status updated successfully",
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }

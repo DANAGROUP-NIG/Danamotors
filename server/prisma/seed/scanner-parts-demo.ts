@@ -50,7 +50,7 @@ async function main() {
   const kiaPlaza = await prisma.branch.findFirstOrThrow({ where: { name: { startsWith: "KIA PLAZA" } } });
   const actor = await prisma.user.findFirstOrThrow({ where: { email: "superadmin@danamotors.com" } });
   const checker = (await prisma.user.findFirst({ where: { email: "checker.cpd@danamotors.local", isActive: true } })) ?? actor;
-  const customer = await prisma.customer.findFirstOrThrow({ where: { code: { not: null }, NOT: { type: "VENDOR" } }, orderBy: { createdAt: "asc" } });
+  const customer = await prisma.customer.findFirstOrThrow({ where: { code: { not: null }, NOT: [{ type: "VENDOR" }, { partyStatus: "VENDOR" }] }, orderBy: { createdAt: "asc" } });
 
   // ── The three parts, with stock and a bin at CPD ──
   const parts: Part[] = [];

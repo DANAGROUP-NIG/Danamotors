@@ -50,12 +50,12 @@ const partSelect = {
 } as const;
 
 export class VendorReceiptService {
-  /** Vendors are Customer rows of type VENDOR. */
+  /** Vendors are parties with Vendor status. */
   async searchVendors(search?: string) {
     const term = search?.trim();
     const vendors = await prisma.customer.findMany({
       where: {
-        type: "VENDOR",
+        AND: [{ OR: [{ partyStatus: "VENDOR" }, { type: "VENDOR" }] }],
         mergedIntoId: null,
         ...(term && {
           OR: [
@@ -107,8 +107,8 @@ export class VendorReceiptService {
     const branch = await prisma.branch.findUnique({ where: { id: input.receivingBranchId } });
     if (!branch) throw new NotFoundError("Receiving branch not found");
     if (!branch.isActive) throw new BadRequestError(`${branch.name} is not active`);
-    const vendor = await prisma.customer.findUnique({ where: { id: input.vendorId }, select: { ...vendorSelect.select, type: true } });
-    if (!vendor || vendor.type !== "VENDOR") throw new BadRequestError("Choose a vendor (a party of type VENDOR)");
+    const vendor = await prisma.customer.findUnique({ where: { id: input.vendorId }, select: { ...vendorSelect.select, type: true, partyStatus: true, mergedIntoId: true } });
+    if (!vendor || vendor.mergedIntoId || (vendor.partyStatus !== "VENDOR" && vendor.type !== "VENDOR")) throw new BadRequestError("Choose a party with Vendor status");
     const vendorName = partyName(vendor);
     if (isMobisVendor(vendorName))
       throw new BadRequestError("Mobis invoices are received through Mobis receipts (MIT upload), not as a vendor receipt");

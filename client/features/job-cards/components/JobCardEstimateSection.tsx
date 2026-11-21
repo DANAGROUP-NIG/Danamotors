@@ -65,9 +65,12 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     jobCard.serviceType?.description ?? jobCard.service?.name ?? COPY.service;
   const estimates = jobCard.estimates ?? [];
   const latest = estimates[0];
-  const [upfrontPaymentPercent, setUpfrontPaymentPercent] = useState(String(latest?.upfrontPaymentPercent ?? 60));
-  const validUpfront = /^\d{1,3}(?:\.\d{1,2})?$/.test(upfrontPaymentPercent) && Number(upfrontPaymentPercent) <= 100;
-  const [receiptId, setReceiptId] = useState("");
+  const [upfrontPaymentPercent, setUpfrontPaymentPercent] = useState(
+    String(latest?.upfrontPaymentPercent ?? 60),
+  );
+  const validUpfront =
+    /^\d{1,3}(?:\.\d{1,2})?$/.test(upfrontPaymentPercent) &&
+    Number(upfrontPaymentPercent) <= 100;
   const [editing, setEditing] = useState(false);
   const [lines, setLines] = useState<Line[]>(
     serviceReference
@@ -110,10 +113,6 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       await refresh();
     },
   });
-  const deposit = useMutation({
-    mutationFn: () => apiPost(`/service/job-cards/${jobCard.id}/deposit`, { receiptId }),
-    onSuccess: refresh,
-  });
   const open =
     !hasJobBill(jobCard) &&
     !["BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -132,8 +131,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         type: line.type.replace("INCLUDED_", "") as Line["type"],
         referenceId:
           line.type === "SERVICE"
-            ? serviceReference ?? line.referenceId ?? undefined
-            : line.referenceId ?? undefined,
+            ? (serviceReference ?? line.referenceId ?? undefined)
+            : (line.referenceId ?? undefined),
         description: line.description,
         quantity: line.quantity,
         includedInService: line.type.startsWith("INCLUDED_"),
@@ -163,15 +162,6 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
     ) : null;
   return (
     <div id="estimate-approval" className="min-w-0 space-y-5 print:hidden">
-      {latest && <div className="space-y-3 rounded-xl border border-border p-4">
-        <p>Upfront deposit ({String(latest.upfrontPaymentPercent ?? 60)}%): {formatEstimateMoney(latest.upfrontAmount ?? 0, latest.currency)}</p>
-        {latest.upfrontAmount === 0 ? <p className="text-sm text-muted-foreground">No upfront deposit required</p> : jobCard.depositReceiptId ? <p className="text-sm text-muted-foreground">Deposit receipt recorded</p> : open && hasPermission("receipt:create") && <>
-          <p className="text-sm text-muted-foreground">Record the payment in Receipts, then select its receipt here.</p>
-          <WorkshopPicker label="Deposit receipt" endpoint={`/finance/receipts?customerId=${jobCard.customerId ?? ""}&branchId=${jobCard.branchId}&category=SERVICE_PARTS`} collection="receipts" value={receiptId} onChange={setReceiptId} />
-          <Button disabled={!receiptId || deposit.isPending} onClick={() => deposit.mutate()}>Record deposit</Button>
-          {deposit.isError && <p role="alert" className="text-sm text-destructive">{isAxiosError(deposit.error) ? deposit.error.response?.data?.message : "Could not record deposit"}</p>}
-        </>}
-      </div>}
       <EstimateApprovalCard
         estimate={view}
         printAction={printAction}
@@ -219,9 +209,41 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               <p className="text-sm text-muted-foreground">
                 {COPY.editor.help}
               </p>
-              <Field label="Upfront payment (%)" error={validUpfront ? undefined : "Enter a percentage from 0 to 100 (up to two decimal places)"}>
-                <input className={inputCls} type="number" min="0" max="100" step="0.01" list="upfront-percentages" value={upfrontPaymentPercent} onChange={event => setUpfrontPaymentPercent(event.target.value)} />
-                <datalist id="upfront-percentages">{[20, 30, 60].map(value => <option key={value} value={value} />)}</datalist>
+              <Field
+                label="Suggested advance (%)"
+                error={
+                  validUpfront
+                    ? undefined
+                    : "Enter a percentage from 0 to 100 (up to two decimal places)"
+                }
+              >
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  list="upfront-percentages"
+                  aria-label="Suggested advance percentage"
+                  aria-invalid={!validUpfront}
+                  aria-describedby="suggested-advance-help"
+                  value={upfrontPaymentPercent}
+                  onChange={(event) =>
+                    setUpfrontPaymentPercent(event.target.value)
+                  }
+                />
+                <datalist id="upfront-percentages">
+                  {[20, 30, 60].map((value) => (
+                    <option key={value} value={value} />
+                  ))}
+                </datalist>
+                <p
+                  id="suggested-advance-help"
+                  className="text-sm text-muted-foreground"
+                >
+                  The suggested amount is calculated when you save the estimate.
+                  Any positive eligible advance is accepted.
+                </p>
               </Field>
               {lines.map((line, index) => (
                 <div
@@ -229,7 +251,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                   className="flex flex-wrap items-center justify-between gap-3 border-b py-2 text-sm"
                 >
                   <span>
-                    {line.description || line.type}
+                    {line.description || "Description not provided"}
                     {COPY.separator}
                     {line.quantity}
                     {line.includedInService
@@ -365,7 +387,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  disabled={!lines.length || busy || duplicatePart || !validUpfront}
+                  disabled={
+                    !lines.length || busy || duplicatePart || !validUpfront
+                  }
                   onClick={() => create.mutate()}
                 >
                   {COPY.editor.submit}

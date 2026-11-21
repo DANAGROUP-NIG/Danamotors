@@ -3,7 +3,7 @@ import { CustomerService } from './customer.service';
 import { ROLES } from '../../shared/constants/roles';
 import { TallyService } from '../finance/tally.service';
 import { ForbiddenError } from '../../shared/errors/appError';
-import { directoryBranchFilter } from '../../middleware/authorize';
+import { canAccessAllBranches, directoryBranchFilter } from '../../middleware/authorize';
 
 export class CustomerController {
   private customerService: CustomerService;
@@ -33,7 +33,8 @@ export class CustomerController {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
-      const result = await this.customerService.listCustomers({ page, limit, search, branchId: req.user?.role === ROLES.ACCOUNTANT ? req.user.branchId ?? undefined : directoryBranchFilter(req) });
+      const category = req.query.category as string | undefined;
+      const result = await this.customerService.listCustomers({ page, limit, search, category, branchId: req.user?.role === ROLES.ACCOUNTANT ? req.user.branchId ?? undefined : directoryBranchFilter(req) });
 
       res.status(200).json({
         status: 'success',
@@ -89,7 +90,8 @@ export class CustomerController {
       const { id } = req.params;
 
       if (req.body.code && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may change customer codes');
-      const result = await this.customerService.updateCustomer(id, req.body);
+      const branchId = canAccessAllBranches(req.user) ? undefined : req.user?.branchId ?? null;
+      const result = await this.customerService.updateCustomer(id, req.body, { id: req.user!.userId, branchId });
 
       res.status(200).json({
         status: 'success',
