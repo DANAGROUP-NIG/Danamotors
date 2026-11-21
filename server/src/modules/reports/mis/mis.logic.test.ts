@@ -349,7 +349,7 @@ describe('S13 skipped free service', () => {
 
 describe('S15 management information report', () => {
   const facts = (overrides: Partial<MirFacts> = {}): MirFacts => ({
-    jobs: [job({ warranty: true }), running({ isRepeat: true, bodyLabour: 400, promisedAt: new Date('2026-01-05T10:00:00Z'), deliveredAt: new Date('2026-01-06T10:00:00Z') })],
+    jobs: [job({ warranty: true, psfStatus: 'SATISFIED' }), running({ isRepeat: true, bodyLabour: 400, promisedAt: new Date('2026-01-05T10:00:00Z'), deliveredAt: new Date('2026-01-06T10:00:00Z'), psfStatus: 'NOT_AVAILABLE' })],
     timeZone: TZ,
     counter: { spares: 100, accessories: 20, oil: 30, net: 160 },
     stock: 5000,
@@ -376,7 +376,11 @@ describe('S15 management information report', () => {
     expect(value(lines, 'e-total')).toBe(2160);
     expect(value(lines, 'o-total')).toBe(360);
     expect(value(lines, 'o-pct')).toBe(16.67);
-    expect(lines.find((line) => line.id === 'a6-psf')).toMatchObject({ kind: 'note', value: null });
+    expect(value(lines, 'a6-psf-contacted')).toBe(1);
+    expect(value(lines, 'a6-psf-satisfied')).toBe(1);
+    expect(value(lines, 'a6-psf-dissatisfied')).toBe(0);
+    expect(value(lines, 'a6-psf-unreached')).toBe(1);
+    expect(value(lines, 'a6-psf-pct')).toBe(100);
   });
 
   it('hides the sections the user may not see', () => {

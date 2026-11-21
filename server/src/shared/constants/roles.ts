@@ -329,6 +329,16 @@ export const PERMISSIONS = {
   PROMISE_DATE_ANALYSIS_READ: "report:promise-date-analysis",
   PROMISE_TIME_ANALYSIS_READ: "report:promise-time-analysis",
   DELAYED_DELIVERIES_READ: "report:delayed-deliveries",
+
+  // ── PSF: post-service follow-up (legacy Service → Follow-up) ──────────────
+  PSF_READ: "psf:read",
+  PSF_UPDATE: "psf:update",
+  PSF_LETTER: "psf:letter",
+  PSF_ANALYSIS_READ: "report:psf-analysis",
+  PSF_ANALYSIS_MODEL_READ: "report:psf-analysis-model",
+  PSF_DISSATISFIED_READ: "report:psf-dissatisfied",
+  PSF_CLOSED_READ: "report:psf-closed",
+  PSF_HISTORY_READ: "report:psf-history",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -393,6 +403,19 @@ const LATE_DELIVERY_REPORT_PERMISSIONS: PermissionType[] = [
 ];
 const LATE_DELIVERY_PERMISSIONS: PermissionType[] = [...LATE_DELIVERY_REPORT_PERMISSIONS, PERMISSIONS.LATE_REASON_UPDATE];
 
+// PSF: the CCU makes the calls; the service manager owns the module; the workshop manager reads and reports.
+// TODO(confirm) grants with the business (#111 open question 2).
+const PSF_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_ANALYSIS_READ,
+  PERMISSIONS.PSF_ANALYSIS_MODEL_READ,
+  PERMISSIONS.PSF_DISSATISFIED_READ,
+  PERMISSIONS.PSF_CLOSED_READ,
+  PERMISSIONS.PSF_HISTORY_READ,
+];
+const PSF_READ_PERMISSIONS: PermissionType[] = [PERMISSIONS.PSF_READ, ...PSF_REPORT_PERMISSIONS];
+const PSF_CALLER_PERMISSIONS: PermissionType[] = [PERMISSIONS.PSF_READ, PERMISSIONS.PSF_UPDATE, PERMISSIONS.PSF_LETTER, PERMISSIONS.PSF_DISSATISFIED_READ, PERMISSIONS.PSF_HISTORY_READ];
+const PSF_PERMISSIONS: PermissionType[] = [...PSF_READ_PERMISSIONS, PERMISSIONS.PSF_UPDATE, PERMISSIONS.PSF_LETTER];
+
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
 const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
 const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
@@ -421,6 +444,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     ...REPEAT_JOB_PERMISSIONS,
     ...LATE_DELIVERY_PERMISSIONS,
     ...CSC_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ, PERMISSIONS.DELIVERED_MODEL_READ,
@@ -643,6 +667,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions 
   [ROLES.WORKSHOP_MANAGER]: [
+    ...PSF_READ_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
     ...LATE_DELIVERY_PERMISSIONS,
@@ -843,6 +868,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
     ...CSC_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
     ...REPEAT_JOB_READ_PERMISSIONS,
@@ -913,6 +939,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.CCU_OFFICER]: [
     ...CSC_CALLER_PERMISSIONS,
+    ...PSF_CALLER_PERMISSIONS,
     PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
@@ -939,6 +966,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
     ...CSC_SUPERVISOR_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,

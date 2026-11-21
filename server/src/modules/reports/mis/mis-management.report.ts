@@ -8,6 +8,7 @@ import { localDateOf, localDayRange, localToday } from '../core/dates';
 import { flag, rangeQuery } from '../core/filters';
 import { activeInvoiceSql } from '../core/sql';
 import { defineReport, type ReportDb, type ReportRow, type ReportScope } from '../core/types';
+import { satisfactionPct } from '../../psf/psf.logic';
 import { loadMisJobs, type MisJob } from './mis.data';
 import { CATEGORY_LABELS, lateByDate, lateByTime, percentOf, perUnit, sumMoney } from './mis.logic';
 
@@ -70,6 +71,10 @@ export function mirLines(facts: MirFacts): MirLine[] {
   const engineerLabour = (predicate: (job: MisJob) => boolean, value: (job: MisJob) => number = (job) => job.labourNet) =>
     perUnit(sum(jobs.filter((job) => job.engineerId && predicate(job)).map(value)), engineers);
   const totalBilling = sum([facts.workshopBilling, facts.counter.net]);
+  // A6: the current post-service follow-up status of each job (#111). Contacted = satisfied + dissatisfied.
+  const psfSatisfied = count((job) => job.psfStatus === 'SATISFIED');
+  const psfDissatisfied = count((job) => job.psfStatus === 'DISSATISFIED');
+  const psfContacted = psfSatisfied + psfDissatisfied;
 
   const lines: MirLine[] = [
     line('A', 'a1-spares', 'A1. Spares billed', 'money', sum([spares, -accessories])),
@@ -93,7 +98,11 @@ export function mirLines(facts: MirFacts): MirLine[] {
     line('A', 'a5-late-date-pct', 'A5. Delivered late by date %', 'percent', percentOf(lateDate, delivered.length)),
     line('A', 'a5-late-time', 'A5. Delivered late — by time', 'integer', lateTime),
     line('A', 'a5-late-time-pct', 'A5. Delivered late by time %', 'percent', percentOf(lateTime, delivered.length)),
-    line('A', 'a6-psf', 'A6. PSF satisfaction — not recorded yet (no follow-up module)', 'integer', null, 'note'),
+    line('A', 'a6-psf-contacted', 'A6. PSF — customers contacted', 'integer', psfContacted),
+    line('A', 'a6-psf-satisfied', 'A6. PSF — satisfied', 'integer', psfSatisfied),
+    line('A', 'a6-psf-dissatisfied', 'A6. PSF — dissatisfied', 'integer', psfDissatisfied),
+    line('A', 'a6-psf-unreached', 'A6. PSF — not reachable (no phone / not available)', 'integer', count((job) => job.psfStatus === 'NO_PHONE' || job.psfStatus === 'NOT_AVAILABLE')),
+    line('A', 'a6-psf-pct', 'A6. PSF satisfaction %', 'percent', satisfactionPct(psfSatisfied, psfDissatisfied)),
     line('A', 'a7-service-spares', 'A7. Spares per vehicle — service', 'money', perUnit(sum(service.map((job) => job.spares)), service.length)),
     line('A', 'a7-service-labour', 'A7. Labour per vehicle — service', 'money', perUnit(sum(service.map((job) => job.labourNet)), service.length)),
     line('A', 'a7-running-spares', 'A7. Spares per vehicle — running repair', 'money', perUnit(sum(running.map((job) => job.spares)), running.length)),
