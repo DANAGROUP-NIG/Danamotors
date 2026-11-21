@@ -116,6 +116,50 @@ the data columns stand for.
 3. Client: add a `ReportConfig` in `client/features/reports/configs` and list it in
    `configs/index.ts`. The hub card, page, filter bar, table, print and Excel follow from it.
 
+## Service · Repeat jobs
+
+Three reports: `repeat-list` (132 col), `repeat-analysis` (132 col) and `repeat-summary` (80 col), permissions
+`report:repeat-list`, `report:repeat-analysis` and `report:repeat-summary`. Rules, options and grants are in
+`doc/workshop.md`, *Repeat jobs*. The date-wise summary names its advisor filter "Service advisor": a report may
+rename a shared filter with `filterLabels` (server `ReportDefinition` and client `ReportConfig`).
+
+## Service · CSC
+
+Four reports: `csc-call-sheet` (`csc:case:read`), `csc-followup` (`report:csc-followup`), `csc-not-visited`
+(`report:csc-not-visited`) and `csc-no-show` (`report:csc-no-show`), all 132 col and selected on the case's due
+date. A new lookup source `cscReason` feeds the no-show reason filter. Rules and options are in `doc/csc.md`.
+
+Each framework report runs in one read-only, repeatable-read transaction. The isolation level is set when the
+transaction begins (Prisma `isolationLevel`), not with `SET TRANSACTION`: the change-log wrapper in
+`prisma/client.ts` runs `set_config` first, and PostgreSQL refuses an isolation level after a query.
+
+## Service · Late deliveries
+
+Five reports on promised vs delivered (rules in `doc/job-cards.md`, *Late deliveries*). The period filters the
+**promised** date; late status comes from the stored `promisedAt` / `deliveredAt`, never from today, so a past
+period gives the same answer later. Only delivered, not cancelled jobs with a promise count.
+
+| Report | Slug / permission | Width | Content |
+|---|---|---|---|
+| Promised date discrepancy | `promise-date-discrepancy` | 132 | One row per job late by date: job, registration, model / variant, service type, service advisor, promised and delivered date-times, days late, reasons, remarks |
+| Promised time discrepancy | `promise-time-discrepancy` | 132 | Same for late by time: promised date, promised and delivered time, late by (h m) |
+| Promised date delayed delivery analysis | `promise-date-analysis` | 80 | Late-by-date jobs per reason (count, % of late jobs, average days late) and *No reason recorded*; totals delivered, late, late % |
+| Promised time delayed delivery analysis | `promise-time-analysis` | 80 | Same for late by time (average delay) |
+| List of delayed deliveries | `delayed-deliveries` | 132 | Every late job, a *Late by* column saying Date or Time; the union of the two discrepancy reports |
+
+Discrepancy filters: model, variant (follows the model), service type, service group, service advisor, job type
+(All / Regular / PDI, default All) and *All promised dates*. Print: detail with summary, summary only or detail
+only. The summary is three tables: by model and by service type (delivered, late, late %, average late) and by
+reason (late jobs, % of late jobs, average late, *No reason recorded*). A job with several reasons counts under
+each. With every filter on All, the discrepancy totals equal the analysis totals for the same period.
+
+The summary tables use a framework extension: a report may return `sections` (`{ key, title, columns, rows,
+total }`), shown after the detail on screen, in print and as a *Summary* sheet in Excel; they are dropped in
+detail mode, and in summary mode they replace the detail table.
+
+Grants: ServiceManager, WorkshopManager, Admin and SuperAdmin (reports and entry); Auditor (reports only).
+TODO(confirm) other roles with the business.
+
 ## Service · FPC reports (#98)
 
 Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis

@@ -1,4 +1,7 @@
-import { ChargeType, Prisma } from "@prisma/client";
+import { ChargeType, Prisma, RepeatJobSource } from "@prisma/client";
+import { getBranchSettings } from "../../../src/modules/company-settings/company-settings.service";
+import { createRepeatRecord, requireManualPrevious, windowOf } from "../../../src/modules/repeat-job/repeat-job.detect";
+import { repeatDifference } from "../../../src/modules/repeat-job/repeat-job.logic";
 import prisma from "../../../src/prisma/client";
 import { ROLES } from "../../../src/shared/constants/roles";
 import { CustomerService } from "../../../src/modules/customer/customer.service";
@@ -204,10 +207,11 @@ async function ensureMisReference(ctx: DemoContext, ref: Reference) {
   const inventory = new InventoryService();
   const parts = {} as Record<MisPart, { id: string; partFlag: string; retailRate: number; warrantyRate: number | null; name: string }>;
   for (const [key, p] of Object.entries(MIS_PARTS) as [MisPart, (typeof MIS_PARTS)[MisPart]][]) {
-    const fields = { ...p, warrantyRate: "warrantyRate" in p ? p.warrantyRate : null };
+    const { category: _category, ...rest } = p;
+    const fields = { ...rest, warrantyRate: "warrantyRate" in p ? p.warrantyRate : null };
     const part =
       (await prisma.sparePart.findUnique({ where: { partNumber: p.partNumber } })) ??
-      (await prisma.sparePart.create({ data: { ...fields, description: `${p.name} (demo data)`, taxable: true, binLocation: "MIS-01" } }));
+      (await prisma.sparePart.create({ data: { ...fields, taxable: true } }));
     parts[key] = { id: part.id, partFlag: part.partFlag, retailRate: part.retailRate ?? part.unitPrice, warrantyRate: part.warrantyRate, name: part.name };
     for (const branchKey of ["main", "second"] as const) {
       const branchId = ctx.branches[branchKey].id;
@@ -261,7 +265,7 @@ async function ensureMisParties(ctx: DemoContext, ref: Reference) {
     const created = await vehicleService.createVehicle({
       customerId,
       vin: v.vin,
-      registrationNumber: v.registrationNumber,
+      registrationNumber: v.registrationNumber ?? undefined,
       catalogueId: model.variantId,
       colourId: model.colourId,
       vehicleModelId: ref.warrantyModels[v.model as WorkshopModelKey],
@@ -272,7 +276,7 @@ async function ensureMisParties(ctx: DemoContext, ref: Reference) {
       sellingDealer: saleDate ? "Dana Motors (demo)" : undefined,
       ownershipStatus: customerId ? "Owned" : undefined,
       createdById: ctx.staff.main.advisor.id,
-    });
+    }, { requireRegistration: v.registrationNumber !== null });
     vehicles[key] = { id: created.id, customerId };
   }
   return { customers, vehicles };
@@ -333,6 +337,15 @@ async function seedMisJob(ctx: DemoContext, ref: Reference, mis: MisReference, p
 
     for (const complaint of fx.complaints ?? [])
       await tx.jobComplaint.create({ data: { jobCardId: card.id, complaintCodeId: complaint.code ? mis.complaints[complaint.code] : null, description: complaint.text } });
+
+    // The repeat record a job opened today would get (flagged automatically within the branch window).
+    if (fx.repeatOf) {
+      const previous = await requireManualPrevious(tx, vehicle.id, done.get(fx.repeatOf)!, opened);
+      const window = windowOf(await getBranchSettings(branchId, tx));
+      const difference = repeatDifference({ date: opened, mileage: fx.mileage }, { date: previous.createdAt, mileage: previous.mileage });
+      await createRepeatRecord(tx, { jobCardId: card.id, branchId, repeat: { previous, difference, source: RepeatJobSource.AUTOMATIC }, window, note: "Same complaint within 30 days" });
+      await tx.repeatJob.update({ where: { jobCardId: card.id }, data: { createdAt: opened } });
+    }
 
     let labourTotal = new Prisma.Decimal(0);
     for (const line of fx.labour) {

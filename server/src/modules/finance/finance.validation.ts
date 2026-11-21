@@ -157,7 +157,8 @@ export const importTallyLedgersSchema = z.object({
 export const saveTallyMappingsSchema = z.object({
   body: z.object({
     mappings: z.array(z.object({
-      documentType: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
+      // PDI_BILL: the PDI account (SALES, or per amount type) and the PDI party (PARTY) for PDI bills.
+      documentType: z.enum(['JOB_BILL', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE', 'PDI_BILL']),
       accountType: z.string().trim().min(1).max(50),
       tallyLedgerCode: z.string().trim().min(1).max(100),
       tallyLedgerName: z.string().trim().min(1).max(300),

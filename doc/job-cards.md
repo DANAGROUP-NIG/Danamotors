@@ -243,14 +243,50 @@ Billed cards allow delivery only through lifecycle writes; delivered and cancell
 Opening from an appointment copies its saved customer, vehicle and service through the single-conversion endpoint.
 The appointment's vehicle and branch must match. Vehicle lookup searches all
 vehicles. Direct job opening preserves vehicle selection when changing the bill-to customer; booking conversion uses the saved booking customer, vehicle and branch;
-it does not change ownership. Recent jobs use `JOB_REPEAT_WINDOW_DAYS`; repeats
-require a previous job and reason. Saving opens the new card's detail page.
+it does not change ownership. The repeat check compares the visit with the vehicle's last billed job against the
+branch window and flags repeats automatically; a repeat needs a previous job, the reason is recorded at review
+(see `workshop.md`, *Repeat jobs*). Saving opens the new card's detail page.
 
 Delivery requires a bill or admin credit approval, a delivery advisor and, after
 the promised time, one to six late-delivery reasons. Delivery generates a gate
 pass with a separate print action. Jobs delivered on approved credit remain
 billable; subsequent billing preserves their delivered status and gate pass.
 The service catalog and service-type behavior remain unchanged.
+
+## Late deliveries: promise date / time details entry
+
+Legacy Service → *Promised date details entry* and *Promised time details entry*. The job card keeps one promised
+date-time (`promisedAt`) and one delivery date-time (`deliveredAt`); days are Lagos calendar days.
+
+- **Late by date**: delivered on a later day than promised (days late = calendar days between).
+- **Late by time**: delivered on the promised day, after the promised time (minutes late, rounded up).
+- A job is one or the other, never both; on or before the promise it is on time. Only delivered, not cancelled
+  jobs count. Rules: `server/src/modules/late-delivery/late-delivery.logic.ts` (SQL twin in `late-delivery.sql.ts`).
+
+Delivery after the promise still requires one to six distinct `LATE_REASON` ids, and now also takes an optional
+delay remark (`lateRemarks`, internal, not the customer-facing `remarks`). The six legacy reasons are seeded as
+codes 1–6: Engineer absent, Spare unavailable, On diagnosis, Customer's decision awaited, Wrong estimation, Open
+time. The older "Awaiting parts" / "Awaiting customer approval" are made inactive (TODO(confirm)); jobs that used
+them keep them. Masters are never deleted, only made inactive.
+
+**Entry screens** (Workshop → Late Deliveries → Promise Date Entry / Promise Time Entry, `/late-deliveries/date`
+and `/late-deliveries/time`, permission `jobcard:late-reason:update`): a worklist of jobs late of that kind
+(promised-date range, filter by job no / registration, *No reason* / *Recorded* tabs with counts) beside the
+selected job: promised → delivered → late by, service type, advisors, gate pass, six numbered reason tiles (keys
+1–6 toggle them, as the legacy screen took reason numbers), remarks, Save / Save & next, and the change history.
+*Find* takes a job number or a registration (the vehicle's latest job late of that kind). A job that is not late,
+not delivered, or late of the other kind is refused with a message (code `NOT_LATE`) and a link to the right
+screen. `?job=<id>` and `?find=<text>` deep-link. The job card page shows a *Delivered late* panel with the
+reasons and a link to the right screen.
+
+Saving needs 1–6 distinct reasons (a retired reason may stay only where the job already has it) and a remark of
+at most 1000 characters. Both screens edit the same reasons and remark on the job (TODO(confirm)). Each change
+writes an audit entry `LATE_DELIVERY_REASONS_UPDATED` with the previous and new reasons and remark. Users see only
+their branch (403 otherwise) unless they have `branch:all`.
+
+API (`/api/late-deliveries`, Swagger tag *Late Deliveries*): `GET /reasons`, `GET /` (worklist), `GET /find`,
+`GET /{jobCardId}?kind=`, `PUT /{jobCardId}`. Migration `20261122100000_late_deliveries` (additive, idempotent).
+Reports: `doc/reports.md`, *Service · Late deliveries*. Manual steps: `doc/late-deliveries-testing-guide.md`.
 
 Verification: run `npm test -- --runInBand` and `npm run typecheck` in `server`, and
 `npx tsc --noEmit --incremental false` in `client`.

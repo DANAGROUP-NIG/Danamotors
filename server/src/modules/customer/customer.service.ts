@@ -472,6 +472,7 @@ export class CustomerService {
         outstandingLetters: (await tx.outstandingLetter.updateMany({ where, data })).count,
         documents: (await tx.customerDocument.updateMany({ where, data })).count,
         serviceHistory: (await tx.serviceHistory.updateMany({ where, data })).count,
+        pdiSettings: (await tx.pdiSettings.updateMany({ where: { defaultCustomerId: sourceId }, data: { defaultCustomerId: targetId } })).count,
         // Customers merged into the duplicate earlier now point at the survivor, so no chain is left behind.
         earlierMerges: (await tx.customer.updateMany({ where: { mergedIntoId: sourceId }, data: { mergedIntoId: targetId } })).count,
       };

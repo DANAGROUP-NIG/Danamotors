@@ -14,6 +14,8 @@ import seedCustomerPortal from "./portal";
 import seedWorkshop from "./workshop";
 import seedEnquiries from "./enquiries";
 import seedWarranty from "./warranty";
+import { seedPdiReference } from "./pdi";
+import { seedCscReference } from "./csc";
 
 const prisma = new PrismaClient();
 
@@ -37,8 +39,14 @@ async function main() {
 
   await seedWorkshop(prisma);
 
+  console.log("Seeding PDI defects, tyre and battery makes and the PDI customer...");
+  await seedPdiReference(prisma);
+
   console.log("Seeding Kia vehicle models, generations and engines...");
   console.log(await seedKiaCatalog(prisma));
+
+  console.log("Seeding CSC closure reasons and service due rules...");
+  console.log(await seedCscReference(prisma));
 
   // 5. Spare parts
   console.log("\nSeeding spare parts...");

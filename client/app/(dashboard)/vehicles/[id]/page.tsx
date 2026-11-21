@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Copy, FileText, Phone, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { VehicleEditForm, useVehicle } from "@/features/vehicles";
 import { VehicleHistoryCard } from "@/features/vehicles/components/VehicleHistoryCard";
+import { VehiclePdiSection } from "@/features/pdi";
 import { VehicleIdentityHistory } from "@/features/vehicles/components/VehicleIdentityHistory";
 import { useJobCards } from "@/features/job-cards";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -19,7 +21,7 @@ import { OpenCampaignsCard } from "@/features/warranty/components/OpenCampaignsC
 import { FilterPills, PageState, Pill, SectionCard, tdCls, thCls } from "@/features/warranty/components/ui";
 import { COVERAGE_LABELS, COVERAGE_TONES, fmtDate, fmtKm, fmtNaira } from "@/features/warranty/lib/warranty-format";
 
-type HistoryFilter = "" | "warranty" | "customer";
+type HistoryFilter = "" | "warranty" | "customer" | "repeat";
 
 export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,11 +33,13 @@ export default function VehicleDetailPage() {
   const [filter, setFilter] = useState<HistoryFilter>("");
 
   const vehicle = data?.vehicle;
-  const history = useJobCards({ search: vehicle?.vin, limit: 50 }, Boolean(vehicle?.vin));
+  // Service history: PDI jobs only when the "Include PDI in vehicle history" setting is on.
+  const history = useJobCards({ search: vehicle?.vin, limit: 50, jobType: "HISTORY" }, Boolean(vehicle?.vin));
   const jobs = useMemo(() => {
     const all = (history.data?.jobCards ?? []).filter((j) => j.vehicleId === id);
     if (filter === "warranty") return all.filter((j) => j.warrantyStatusAtCreation === "ACTIVE");
     if (filter === "customer") return all.filter((j) => j.warrantyStatusAtCreation !== "ACTIVE");
+    if (filter === "repeat") return all.filter((j) => j.repeatRecord);
     return all;
   }, [history.data, filter, id]);
 
@@ -132,6 +136,7 @@ export default function VehicleDetailPage() {
               { label: "All", value: "" },
               { label: "Warranty", value: "warranty" },
               { label: "Customer pay", value: "customer" },
+              { label: "Repeat jobs", value: "repeat" },
             ]}
           />
         }
@@ -160,6 +165,7 @@ export default function VehicleDetailPage() {
                       <Link href={`/job-cards/${j.id}`} className="font-mono text-xs font-medium hover:underline">
                         {j.jobNumber}
                       </Link>
+                      {j.repeatRecord && <RepeatTag status={j.repeatRecord.status} className="ml-1.5" />}
                     </td>
                     <td className={tdCls}>{fmtDate(j.createdAt)}</td>
                     <td className={tdCls}>{fmtKm(j.mileage)}</td>
@@ -183,6 +189,9 @@ export default function VehicleDetailPage() {
       </SectionCard>
 
       <VehicleHistoryCard vehicle={vehicle} showServiceHistory={false} />
+
+      {/* ── PDI: done/date, tyres; PDI jobs (pdi:read) are listed here, never in the service history ── */}
+      <VehiclePdiSection vehicle={vehicle} />
 
       <VehicleIdentityHistory vehicleId={vehicle.id} />
 

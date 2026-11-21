@@ -34,6 +34,8 @@ import { apiGet } from "@/lib/api/apiClient";
 import { getCustomerRequest } from "@/features/customers/api/customer.api";
 import { getVehicleRequest } from "@/features/vehicles/api/vehicle.api";
 import { useCreateJobCard } from "../hooks/use-create-job-card";
+import { useRepeatPreview } from "@/features/repeat-jobs/hooks/use-repeat-jobs";
+import { OpeningRepeatCheck } from "@/features/repeat-jobs/components/OpeningRepeatCheck";
 import {
   createJobCardSchema,
   type CreateJobCardFormValues,
@@ -255,6 +257,9 @@ export function JobCardCreateForm({
       ),
     enabled: !!vehicleId && hasPermission("jobcard:read"),
   });
+  // Same query as the repeat check card below (deduplicated): drives the header tag.
+  const repeatPreview = useRepeatPreview(vehicleId, branchId, Number.isFinite(debouncedMileage) ? debouncedMileage : undefined, !!vehicleId && hasPermission("jobcard:read"));
+  const repeatCandidate = repeatPreview.data?.candidate;
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -507,9 +512,8 @@ export function JobCardCreateForm({
           ).toISOString(),
           engineerId: values.engineerId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
-          repeatReason: values.isRepeat
-            ? values.repeatReason?.trim()
-            : undefined,
+          repeatReason: values.isRepeat ? values.repeatReason?.trim() || undefined : undefined,
+          teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,
@@ -677,14 +681,21 @@ export function JobCardCreateForm({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {lastJob && (
+                {repeatCandidate ? (
+                  <span
+                    title={`Back ${repeatCandidate.daysDifference} days after job ${repeatCandidate.previousJob.jobNumber}`}
+                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-sm font-semibold text-amber-800"
+                  >
+                    Repeat job
+                  </span>
+                ) : lastJob ? (
                   <span
                     title={`Last visit: ${formatDate(lastJob.createdAt)}`}
                     className="rounded-full bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary"
                   >
-                    Repeat visit
+                    Returning vehicle
                   </span>
-                )}
+                ) : null}
                 {customer?.vip && (
                   <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
                     VIP
@@ -1145,6 +1156,8 @@ export function JobCardCreateForm({
                     </div>
                   )}
                 </OpeningCard>
+              {vehicleId && hasPermission("jobcard:read") && (
+                <OpeningRepeatCheck vehicleId={vehicleId} branchId={branchId} mileage={Number.isFinite(debouncedMileage) ? debouncedMileage : undefined} />
               )}
               <OpeningCard title="Job scheduling & estimate">
                 <div className={openingGrid}>

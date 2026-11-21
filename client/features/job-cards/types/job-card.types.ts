@@ -193,6 +193,10 @@ export type JobCard = {
   promisedAt?: string | null;
   readyAt?: string | null;
   deliveredAt?: string | null;
+  /** LATE_REASON master ids recorded at delivery or on the late-delivery entry screens. */
+  lateReasonIds?: string[];
+  /** Internal delay remark. */
+  lateRemarks?: string | null;
   gatePassNumber?: string | null;
   serviceTypeId?: string | null;
   serviceType?: {
@@ -213,6 +217,8 @@ export type JobCard = {
   } | null;
   isRepeat?: boolean;
   repeatReason?: string | null;
+  /** The repeat record (status of its review) when the job is, or was flagged as, a repeat. */
+  repeatRecord?: { id: string; status: "PENDING_REVIEW" | "CONFIRMED" | "NOT_REPEAT"; source: "AUTOMATIC" | "MANUAL" } | null;
   complaints?: {
     id: string;
     description: string;

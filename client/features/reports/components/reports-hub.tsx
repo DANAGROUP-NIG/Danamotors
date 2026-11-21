@@ -11,6 +11,9 @@ import { FinanceReportNav } from "./finance-report-nav";
 
 const CATEGORY_NOTES: Partial<Record<ReportCategory, string>> = {
   "Service MIS": "Management reports for the workshop manager, the service manager and management.",
+  "Service · Repeat jobs": "Vehicles back soon after a billed job, and why. Repeats count against the previous job's engineer and service advisor.",
+  "Service · CSC": "Service due reminders: the call sheet, follow-up calls made and their outcome, vehicles that missed their due date, and why customers did not come.",
+  "Service · Late deliveries": "Jobs delivered after the promised date or time: discrepancy reports with detail and summary, the reason analysis, and the combined list of delayed deliveries.",
 };
 
 /** Framework reports (#75) the user may run and that match the search, grouped by category and subgroup in first-seen order. */

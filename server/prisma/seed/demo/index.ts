@@ -1,9 +1,13 @@
 /**
  * Demo data seed: a small, repeatable set of dummy job cards, estimates, bills, part issues,
- * warranty cases (including TEST- cases), campaigns, an FPC bulletin and MIS report history for the Dana Motors Demo account.
+ * warranty cases (including TEST- cases), campaigns, an FPC bulletin, MIS report history, PDI job cards and repeat jobs for the Dana Motors Demo account.
  *
  *   npm run prisma:seed:demo                      load the demo data (safe to run again)
  *   npm run prisma:seed:demo -- --reset-test         put the TEST- warranty cases back to OPEN
+ *   npm run prisma:seed:demo -- --pdi-only           only the PDI demo (reference data, new vehicles, PDI job cards)
+ *   npm run prisma:seed:demo -- --repeat-only        only the repeat job demo (earlier visits, repeats at every review step)
+ *   npm run prisma:seed:demo -- --csc-only           only the CSC demo (service due cases at every follow-up step)
+ *   npm run prisma:seed:demo -- --late-only          only the late delivery demo (promised date / time discrepancies, January 2026)
  *
  * Options:
  *   --allow-database=<name>   required when the database name does not contain "demo"
@@ -24,18 +28,26 @@ import { JobResult, seedJob } from "./jobs";
 import { seedCampaign } from "./campaigns";
 import { seedFpc } from "./fpc";
 import { seedMis } from "./mis";
+import { seedPdi } from "./pdi";
+import { seedRepeat } from "./repeat";
+import { seedCsc } from "./csc";
+import { seedLate } from "./late";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS } from "./fixtures";
 
-const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
+const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
 function parseArgs(argv: string[]) {
-  const options = { resetTest: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
+  const options = { resetTest: false, pdiOnly: false, repeatOnly: false, cscOnly: false, lateOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
   for (const arg of argv) {
     const [name, ...rest] = arg.split("=");
     const value = rest.join("=");
     if (name === "--reset-test" && !value) options.resetTest = true;
+    else if (name === "--pdi-only" && !value) options.pdiOnly = true;
+    else if (name === "--repeat-only" && !value) options.repeatOnly = true;
+    else if (name === "--csc-only" && !value) options.cscOnly = true;
+    else if (name === "--late-only" && !value) options.lateOnly = true;
     else if (name === "--help" || name === "-h") options.help = true;
     else if (name === "--allow-database" && value) options.allowDatabase = value;
     else if (name === "--main-branch" && value) options.mainBranch = value;
@@ -43,6 +55,28 @@ function parseArgs(argv: string[]) {
     else throw new Error(`Unknown option ${arg}\n${USAGE}`);
   }
   return options;
+}
+
+async function printPdi(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  console.log("PDI job cards:");
+  for (const row of await seedPdi(ctx, ref))
+    console.log(`  ${row.key} VIN ${row.vin}: ${row.jobNumber ? `${row.jobNumber} ${row.status}${row.bill ? `, bill ${row.bill}` : ""}` : "no PDI yet (open one in the UI)"}`);
+}
+
+async function printRepeat(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  console.log("Repeat jobs:");
+  for (const row of await seedRepeat(ctx, ref)) console.log(`  ${row.key} ${row.registration}: ${row.jobNumber ? `${row.jobNumber} ${row.status}` : row.status}`);
+}
+
+async function printCsc(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  const { generated, rows } = await seedCsc(ctx, ref);
+  console.log(`CSC cases (due ${generated.from} to ${generated.to}): ${generated.due} due, ${generated.created} new, ${generated.alreadyVisited} already visited`);
+  for (const row of rows) console.log(`  ${row.key} ${row.registration}: ${row.status}`);
+}
+
+async function printLate(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  console.log("Late deliveries (Lagos times):");
+  for (const row of await seedLate(ctx, ref)) console.log(`  ${row.key} ${row.registration} ${row.jobNumber}: ${row.outcome}`);
 }
 
 async function main() {
@@ -65,6 +99,26 @@ async function main() {
 
   const ref = await ensureReference(ctx);
   console.log("Reference data ready: workshop models, labour operations, parts and opening stock");
+  if (options.repeatOnly) {
+    await printRepeat(ctx, ref);
+    console.log(`\n${DEMO_TAG}: repeat job demo done. Running it again changes nothing.`);
+    return;
+  }
+  if (options.cscOnly) {
+    await printCsc(ctx, ref);
+    console.log(`\n${DEMO_TAG}: CSC demo done. Running it again changes nothing.`);
+    return;
+  }
+  if (options.lateOnly) {
+    await printLate(ctx, ref);
+    console.log(`\n${DEMO_TAG}: late delivery demo done. Running it again changes nothing.`);
+    return;
+  }
+  if (options.pdiOnly) {
+    await printPdi(ctx, ref);
+    console.log(`\n${DEMO_TAG}: PDI demo done. Running it again changes nothing.`);
+    return;
+  }
   const parties = await ensureParties(ctx, ref);
   console.log("Customers and vehicles ready");
 
@@ -88,6 +142,18 @@ async function main() {
 
   // Service MIS reports (#97): finished job history across every service category.
   await seedMis(ctx, ref);
+
+  // PDI (pre-delivery inspection): new vehicles and PDI job cards at every step.
+  await printPdi(ctx, ref);
+
+  // Repeat jobs: earlier visits and repeats at every review step.
+  await printRepeat(ctx, ref);
+
+  // CSC: service due cases at every follow-up step.
+  await printCsc(ctx, ref);
+
+  // Late deliveries: promised date / time discrepancies at fixed January 2026 dates.
+  await printLate(ctx, ref);
 
   await printSummary(ctx);
   console.log(`\n${DEMO_TAG}: done. Running it again changes nothing; use --reset-test to reopen the TEST- warranty cases.`);

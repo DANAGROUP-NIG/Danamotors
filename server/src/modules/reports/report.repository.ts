@@ -6,12 +6,14 @@ import { BadRequestError } from '../../shared/errors/appError';
 export const inactiveStatuses = ['Cancelled', 'CANCELLED', 'Canceled', 'CANCELED', 'VOID', 'Void', 'cancelled', 'canceled', 'void'];
 export const activeInvoice = { cancelledAt: null, status: { notIn: inactiveStatuses, mode: 'insensitive' } } satisfies Prisma.InvoiceWhereInput;
 export function jobScope(input: ReportInput): Prisma.JobCardWhereInput {
-    return { branchId: input.branchId, status: { notIn: inactiveStatuses, mode: 'insensitive' }, ...(input.includePdi === 'true' ? {} : { AND: [{ OR: [{ serviceTypeId: null }, { serviceType: { preDelivery: false } }] }, { OR: [{ serviceTypeId: null }, { serviceType: { code: { notIn: ['PDI'], mode: 'insensitive' } } }] }] }) };
+    return { branchId: input.branchId, status: { notIn: inactiveStatuses, mode: 'insensitive' }, ...(input.includePdi === 'true' ? {} : { AND: [{ jobType: 'SERVICE' }, { OR: [{ serviceTypeId: null }, { serviceType: { preDelivery: false } }] }, { OR: [{ serviceTypeId: null }, { serviceType: { code: { notIn: ['PDI'], mode: 'insensitive' } } }] }] }) };
 }
 export const vehicleInclude = { customer: true, vehicleModel: true, catalogModel: true, catalogue: { include: { parent: { include: { parent: true } } } }, colour: true } satisfies Prisma.VehicleInclude;
 export const jobInclude = {
     vehicle: { include: vehicleInclude }, customer: true, serviceType: true, service: true, team: true, engineer: { select: { firstName: true, lastName: true } }, serviceAdvisor: { select: { firstName: true, lastName: true } }, deliveryAdvisor: { select: { firstName: true, lastName: true } },
     invoices: { where: activeInvoice, include: { lines: true } }, complaints: true,
+    previousJob: { select: { jobNumber: true } },
+    repeatRecord: { select: { status: true, openingNote: true, remarks: true, reasons: { orderBy: { position: 'asc' }, select: { reason: { select: { code: true, description: true } } } } } },
     lines: { include: { sparePart: true, partIssuance: { include: { returns: true } }, jobCardLabour: { include: { labourItem: true } }, warrantyCaseLines: { include: { case: { include: { statusHistory: true } } } } } },
 } satisfies Prisma.JobCardInclude;
 export type ReportJob = Prisma.JobCardGetPayload<{

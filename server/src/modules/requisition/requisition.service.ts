@@ -2,7 +2,14 @@ import { jobWorkUpdate } from "./requisition-work";
 import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
-import { ChargeType, PartStatus, Prisma } from "@prisma/client";
+import { ChargeType, JobCardType, PartStatus, Prisma } from "@prisma/client";
+import {
+  assertJobTypeAccess,
+  pdiDocumentNumber,
+  pdiRequisitionDocument,
+  pdiSequenceKey,
+} from "../pdi/pdi.logic";
+import { assertPdiDocumentChange } from "../pdi/pdi.settings.service";
 import prisma from "../../prisma/client";
 import {
   BadRequestError,
@@ -144,6 +151,12 @@ export class RequisitionService {
             "Job card must belong to the requisition branch",
           );
         assertRequisitionJob(job);
+        assertJobTypeAccess(job, actor);
+        const pdi = job.jobType === JobCardType.PDI;
+        if (pdi)
+          await assertPdiDocumentChange(tx, "requisition", new Date(), {
+            create: true,
+          });
         if (input.lines.some((line) => line.quantityIssued > 0))
           assertPartsRequested(job);
         if (
@@ -255,44 +268,50 @@ export class RequisitionService {
             },
             include: { sparePart: true, returns: true, requisitionLine: true },
           });
-          await assertApprovedOperation(tx, job.id, job.customerId, [
-            ...previous
-              .map((row) => {
-                const quantity =
-                  row.quantity -
-                  row.returns
-                    .filter(
-                      (ret) =>
-                        !["REJECTED", "CANCELLED"].includes(
-                          ret.status.toUpperCase(),
-                        ),
-                    )
-                    .reduce((sum, ret) => sum + ret.quantity, 0);
-                const rate =
-                  row.requisitionLine?.rate.toNumber() ??
-                  row.sparePart.retailRate ??
-                  row.sparePart.unitPrice;
-                return {
-                  type: "PART",
-                  referenceId: row.sparePartId,
-                  partSource: row.partSource,
-                  description: `${row.sparePart.partNumber} (${row.sparePart.name})`,
-                  quantity,
-                  rate,
-                  amount: quantity > 0 ? lineAmount(quantity, rate) : 0,
-                };
-              })
-              .filter((line) => line.quantity > 0),
-            ...issued.map((item) => ({
-              type: "PART",
-              referenceId: item.part.id,
-              partSource: item.part.partFlag,
-              description: `${item.part.partNumber} (${item.part.name})`,
-              quantity: item.line.quantityIssued,
-              rate: item.rate,
-              amount: item.amounts.amount,
-            })),
-          ], "parts issue");
+          await assertApprovedOperation(
+            tx,
+            job.id,
+            job.customerId,
+            [
+              ...previous
+                .map((row) => {
+                  const quantity =
+                    row.quantity -
+                    row.returns
+                      .filter(
+                        (ret) =>
+                          !["REJECTED", "CANCELLED"].includes(
+                            ret.status.toUpperCase(),
+                          ),
+                      )
+                      .reduce((sum, ret) => sum + ret.quantity, 0);
+                  const rate =
+                    row.requisitionLine?.rate.toNumber() ??
+                    row.sparePart.retailRate ??
+                    row.sparePart.unitPrice;
+                  return {
+                    type: "PART",
+                    referenceId: row.sparePartId,
+                    partSource: row.partSource,
+                    description: `${row.sparePart.partNumber} (${row.sparePart.name})`,
+                    quantity,
+                    rate,
+                    amount: quantity > 0 ? lineAmount(quantity, rate) : 0,
+                  };
+                })
+                .filter((line) => line.quantity > 0),
+              ...issued.map((item) => ({
+                type: "PART",
+                referenceId: item.part.id,
+                partSource: item.part.partFlag,
+                description: `${item.part.partNumber} (${item.part.name})`,
+                quantity: item.line.quantityIssued,
+                rate: item.rate,
+                amount: item.amounts.amount,
+              })),
+            ],
+            "parts issue",
+          );
         }
         const now = new Date();
         const requisitionNumber = await nextSequenceNumber(
@@ -550,7 +569,7 @@ export class RequisitionService {
         if (document.lines.some((line) => line.quantityIssued > 0))
           await tx.jobCard.update({
             where: { id: job.id },
-            data: await jobWorkUpdate(tx, job, actor.userId),
+            data: requisitionWorkUpdate(job.status, actor.userId),
           });
         await tx.auditLog.create({
           data: {

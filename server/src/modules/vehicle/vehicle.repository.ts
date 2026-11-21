@@ -1,3 +1,4 @@
+import { serviceHistoryWhere } from '../pdi/pdi.logic';
 import prisma from '../../prisma/client';
 import { Prisma, Vehicle, VehicleImage, VehicleOwnership } from '@prisma/client';
 
@@ -53,7 +54,8 @@ export class VehicleRepository {
     return { vehicles, total };
   }
 
-  async findVehicleById(id: string) {
+  /** includePdi: the "Include PDI in vehicle history" setting; PDI jobs are left out by default. */
+  async findVehicleById(id: string, includePdi = false) {
     return prisma.vehicle.findUnique({
       where: { id },
       include: {
@@ -70,7 +72,7 @@ export class VehicleRepository {
             branchId: true,
           },
         },
-        jobCards: { select: { id: true, jobNumber: true, createdAt: true, mileage: true, status: true, description: true, workDone: true }, orderBy: { createdAt: 'desc' } },
+        jobCards: { where: serviceHistoryWhere(includePdi), select: { id: true, jobNumber: true, jobType: true, createdAt: true, mileage: true, status: true, description: true, workDone: true, isRepeat: true, repeatRecord: { select: { id: true, status: true, source: true } } }, orderBy: { createdAt: 'desc' } },
         catalogue: { include: { parent: true } },
         images: true,
         ownerships: { include: { customer: { select: { id: true, firstName: true, lastName: true, companyName: true } } }, orderBy: { purchaseDate: 'desc' } },

@@ -1,111 +1,967 @@
 /** Service transaction contracts override obsolete route comments in the assembled spec. */
-const uuid = (description?: string) => ({ type: 'string', format: 'uuid', ...(description ? { description } : {}) });
-const text = (maxLength = 2000) => ({ type: 'string', maxLength });
-const amount = { type: 'number', minimum: 0, maximum: 1e12, multipleOf: 0.01 };
-const integer = { type: 'integer', minimum: 0, maximum: 2147483647 };
-const chargeType = { type: 'string', enum: ['CUSTOMER', 'WARRANTY', 'FREE', 'GOODWILL'] };
+const uuid = (description?: string) => ({
+  type: "string",
+  format: "uuid",
+  ...(description ? { description } : {}),
+});
+const text = (maxLength = 2000) => ({ type: "string", maxLength });
+const amount = { type: "number", minimum: 0, maximum: 1e12, multipleOf: 0.01 };
+const integer = { type: "integer", minimum: 0, maximum: 2147483647 };
+const chargeType = {
+  type: "string",
+  enum: ["CUSTOMER", "WARRANTY", "FREE", "GOODWILL"],
+};
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
-const id = '11111111-1111-4111-8111-111111111111';
-const vehicleId = '22222222-2222-4222-8222-222222222222';
-const branchId = '33333333-3333-4333-8333-333333333333';
-const jobId = '44444444-4444-4444-8444-444444444444';
-const partId = '55555555-5555-4555-8555-555555555555';
-const lineId = '66666666-6666-4666-8666-666666666666';
-const serviceTypeId = '77777777-7777-4777-8777-777777777777';
-const bayId = '88888888-8888-4888-8888-888888888888';
-const advisorId = '99999999-9999-4999-8999-999999999999';
+const id = "11111111-1111-4111-8111-111111111111";
+const vehicleId = "22222222-2222-4222-8222-222222222222";
+const branchId = "33333333-3333-4333-8333-333333333333";
+const jobId = "44444444-4444-4444-8444-444444444444";
+const partId = "55555555-5555-4555-8555-555555555555";
+const lineId = "66666666-6666-4666-8666-666666666666";
+const serviceTypeId = "77777777-7777-4777-8777-777777777777";
+const bayId = "88888888-8888-4888-8888-888888888888";
+const advisorId = "99999999-9999-4999-8999-999999999999";
 export const transactionExamples = {
-  detailedBooking: { customerId: id, vehicleId, branchName: 'Example branch', scheduledAt: '2026-10-22T09:00:00.000Z', requests: [{ description: 'Inspect brakes', spare: 0.1, oil: 0.2, labour: 12.35 }] },
-  minimalBooking: { requests: 'Inspect engine noise', customerId: id, vehicleId, branchName: 'Example branch', scheduledAt: '2026-10-22T09:00:00.000Z' },
-  booking: { customerId: id, vehicleId, branchName: 'Example branch', serviceTypeId, scheduledAt: '2026-10-22T09:00:00.000Z', mileage: 12000, acFitted: true, requests: 'Inspect engine noise' },
-  reschedule: { scheduledAt: '2026-10-23T09:00:00.000Z' },
-  cancelBooking: { bookingStatus: 'CANCELLED', cancelReason: 'Customer requested another date' },
-  noShow: { bookingStatus: 'NO_SHOW' },
-  conversion: { openingConsent: { accepted: true, termsHash: 'a'.repeat(64) }, bayId, serviceAdvisorId: advisorId, teamId: id, serviceTypeId, mileage: 12000, promisedAt: '2026-10-22T15:00:00.000Z', complaints: [{ description: 'Inspect engine noise' }], warrantyAcknowledged: true, acknowledgedCampaignIds: [] },
-  requisition: { branchId, jobCardId: jobId, chargeType: 'CUSTOMER', lines: [{ sparePartId: partId, quantityRequired: 3, quantityIssued: 2 }] },
-  goodwill: { branchId, jobCardId: jobId, chargeType: 'GOODWILL', goodwillReason: 'Approved assistance', lines: [{ sparePartId: partId, quantityRequired: 3, quantityIssued: 2, approvalPercent: 70, customerPercent: 30 }] },
-  warranty: { branchId, jobCardId: jobId, chargeType: 'WARRANTY', lines: [{ sparePartId: partId, quantityRequired: 1, quantityIssued: 1 }] },
-  free: { branchId, jobCardId: jobId, chargeType: 'FREE', campaignId: id, lines: [{ sparePartId: partId, quantityRequired: 1, quantityIssued: 1 }] },
-  returnSlip: { requisitionId: id, lines: [{ requisitionLineId: lineId, quantity: 1 }] },
-  cancellation: { reason: 'Entered against the wrong job' },
-  labour: { branchId, jobCardId: jobId, lines: [{ labourItemId: partId, technicianId: advisorId, chargeType: 'CUSTOMER', chargedHours: 2.5 }] },
-  employeeLabour: { labourItemId: partId, mechanicId: advisorId, chargeType: 'CUSTOMER', chargedHours: 2 },
-  remarks: { remarks: 'Customer contacted; collection arranged.' },
+  detailedBooking: {
+    customerId: id,
+    vehicleId,
+    branchName: "Example branch",
+    scheduledAt: "2026-10-22T09:00:00.000Z",
+    requests: [
+      { description: "Inspect brakes", spare: 0.1, oil: 0.2, labour: 12.35 },
+    ],
+  },
+  minimalBooking: {
+    requests: "Inspect engine noise",
+    customerId: id,
+    vehicleId,
+    branchName: "Example branch",
+    scheduledAt: "2026-10-22T09:00:00.000Z",
+  },
+  booking: {
+    customerId: id,
+    vehicleId,
+    branchName: "Example branch",
+    serviceTypeId,
+    scheduledAt: "2026-10-22T09:00:00.000Z",
+    mileage: 12000,
+    acFitted: true,
+    requests: "Inspect engine noise",
+  },
+  reschedule: { scheduledAt: "2026-10-23T09:00:00.000Z" },
+  cancelBooking: {
+    bookingStatus: "CANCELLED",
+    cancelReason: "Customer requested another date",
+  },
+  noShow: { bookingStatus: "NO_SHOW" },
+  conversion: {
+    openingConsent: { accepted: true, termsHash: "a".repeat(64) },
+    bayId,
+    serviceAdvisorId: advisorId,
+    teamId: id,
+    serviceTypeId,
+    mileage: 12000,
+    promisedAt: "2026-10-22T15:00:00.000Z",
+    complaints: [{ description: "Inspect engine noise" }],
+    warrantyAcknowledged: true,
+    acknowledgedCampaignIds: [],
+  },
+  requisition: {
+    branchId,
+    jobCardId: jobId,
+    chargeType: "CUSTOMER",
+    lines: [{ sparePartId: partId, quantityRequired: 3, quantityIssued: 2 }],
+  },
+  goodwill: {
+    branchId,
+    jobCardId: jobId,
+    chargeType: "GOODWILL",
+    goodwillReason: "Approved assistance",
+    lines: [
+      {
+        sparePartId: partId,
+        quantityRequired: 3,
+        quantityIssued: 2,
+        approvalPercent: 70,
+        customerPercent: 30,
+      },
+    ],
+  },
+  warranty: {
+    branchId,
+    jobCardId: jobId,
+    chargeType: "WARRANTY",
+    lines: [{ sparePartId: partId, quantityRequired: 1, quantityIssued: 1 }],
+  },
+  free: {
+    branchId,
+    jobCardId: jobId,
+    chargeType: "FREE",
+    campaignId: id,
+    lines: [{ sparePartId: partId, quantityRequired: 1, quantityIssued: 1 }],
+  },
+  returnSlip: {
+    requisitionId: id,
+    lines: [{ requisitionLineId: lineId, quantity: 1 }],
+  },
+  cancellation: { reason: "Entered against the wrong job" },
+  labour: {
+    branchId,
+    jobCardId: jobId,
+    lines: [
+      {
+        labourItemId: partId,
+        technicianId: advisorId,
+        chargeType: "CUSTOMER",
+        chargedHours: 2.5,
+      },
+    ],
+  },
+  employeeLabour: {
+    labourItemId: partId,
+    mechanicId: advisorId,
+    chargeType: "CUSTOMER",
+    chargedHours: 2,
+  },
+  remarks: { remarks: "Customer contacted; collection arranged." },
   clearRemarks: { remarks: null },
-  workDone: { workDone: 'Completed the approved repair.' },
-  ready: { status: 'READY' },
+  workDone: { workDone: "Completed the approved repair." },
+  ready: { status: "READY" },
 };
-const requestProperties = { complaintCodeId: uuid(), defectCode: text(50), description: text(), spare: amount, oil: amount, labour: amount };
-const bookingProperties = { customerId: uuid(), vehicleId: uuid(), branchName: { type: 'string', minLength: 1 }, serviceTypeId: uuid(), serviceId: uuid('Optional appointment catalogue service; distinct from workshop service type'), scheduledAt: { type: 'string', format: 'date-time' }, mileage: integer, acFitted: { type: 'boolean' }, followUpJobId: { ...uuid(), nullable: true }, durationMins: { type: 'integer', minimum: 1, maximum: 2147483647, description: 'Optional positive whole minutes; omit to leave unspecified.' }, notes: { type: 'string' }, requests: { description: 'Required customer request: simple text or the optional detailed request grid.', oneOf: [{ type: 'string', minLength: 1, maxLength: 2000 }, { type: 'array', minItems: 1, maxItems: 100, items: { type: 'object', additionalProperties: false, description: 'A nonblank description or valid active complaint/defect code is required.', properties: { complaintCodeId: uuid(), defectCode: text(50), description: text(2000), spare: amount, oil: amount, labour: amount } } }] } };
+const requestProperties = {
+  complaintCodeId: uuid(),
+  defectCode: text(50),
+  description: text(),
+  spare: amount,
+  oil: amount,
+  labour: amount,
+};
+const bookingProperties = {
+  customerId: uuid(),
+  vehicleId: uuid(),
+  branchName: { type: "string", minLength: 1 },
+  serviceTypeId: uuid(),
+  serviceId: uuid(
+    "Optional appointment catalogue service; distinct from workshop service type",
+  ),
+  scheduledAt: { type: "string", format: "date-time" },
+  mileage: integer,
+  acFitted: { type: "boolean" },
+  followUpJobId: { ...uuid(), nullable: true },
+  durationMins: {
+    type: "integer",
+    minimum: 1,
+    maximum: 2147483647,
+    description: "Optional positive whole minutes; omit to leave unspecified.",
+  },
+  notes: { type: "string" },
+  requests: {
+    description:
+      "Required customer request: simple text or the optional detailed request grid.",
+    oneOf: [
+      { type: "string", minLength: 1, maxLength: 2000 },
+      {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          description:
+            "A nonblank description or valid active complaint/defect code is required.",
+          properties: {
+            complaintCodeId: uuid(),
+            defectCode: text(50),
+            description: text(2000),
+            spare: amount,
+            oil: amount,
+            labour: amount,
+          },
+        },
+      },
+    ],
+  },
+};
 export const serviceTransactionSchemas = {
-  ServiceBookingRequest: { type: 'object', additionalProperties: false, properties: requestProperties, anyOf: [{ required: ['description'] }, { required: ['complaintCodeId'] }, { required: ['defectCode'] }], description: 'Enter a nonempty description or an active complaint/defect code. Estimates are optional; totals are calculated from these rows.' },
-  ServiceBookingCreate: { type: 'object', required: ['customerId', 'vehicleId', 'branchName', 'scheduledAt', 'requests'], properties: bookingProperties },
-  ServiceBookingUpdate: { type: 'object', properties: { scheduledAt: bookingProperties.scheduledAt, serviceId: uuid(), serviceTypeId: uuid(), durationMins: bookingProperties.durationMins, notes: bookingProperties.notes, requests: bookingProperties.requests, mileage: integer, acFitted: { type: 'boolean' }, followUpJobId: bookingProperties.followUpJobId, bookingStatus: { type: 'string', enum: ['BOOKED', 'CANCELLED', 'NO_SHOW'] }, cancelReason: { ...text(), minLength: 1 }, status: { type: 'string', description: 'Legacy appointment lifecycle status; Checked In with mileage runs the warranty/campaign acknowledgement gate.' }, warrantyAcknowledged: { type: 'boolean' }, acknowledgedCampaignIds: { type: 'array', maxItems: 50, items: uuid() } } },
-  ServiceBookingConversion: { type: 'object', required: ['bayId', 'serviceAdvisorId', 'promisedAt', 'openingConsent'], anyOf: [{ required: ['technicianId'] }, { required: ['teamId'] }], properties: { openingConsent: { type: 'object', required: ['accepted', 'termsHash'], additionalProperties: false, properties: { accepted: { type: 'boolean', enum: [true] }, termsHash: { type: 'string', pattern: '^[a-f0-9]{64}$', description: 'Hash returned by the appointment opening-consent endpoint; example hashes must be replaced' } } }, bayId: uuid(), serviceAdvisorId: uuid(), technicianId: uuid(), teamId: uuid(), engineerId: uuid(), promisedAt: { type: 'string', format: 'date-time' }, serviceTypeId: uuid('Required if the booking has no workshop service type'), mileage: integer, description: text(5000), complaints: { type: 'array', minItems: 1, maxItems: 100, items: ref('ServiceBookingRequest') }, warrantyAcknowledged: { type: 'boolean' }, acknowledgedCampaignIds: { type: 'array', maxItems: 50, items: uuid() }, odometerReplaced: { type: 'boolean' }, odometerReplacedReason: text(300) }, description: 'Normal job-opening fields are accepted. Customer/vehicle/branch and saved service/AC/requests come from the booking. Supply mileage if absent from the booking and at least one complaint if requests are empty. Technician and/or team is required.' },
-  ServiceRequisition: { type: 'object', additionalProperties: false, required: ['branchId', 'jobCardId', 'chargeType', 'lines'], properties: { branchId: uuid(), jobCardId: uuid(), chargeType, groupId: uuid(), engineerId: uuid(), campaignId: uuid(), goodwillReason: { ...text(), minLength: 1 }, lines: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'object', additionalProperties: false, required: ['sparePartId', 'quantityRequired', 'quantityIssued'], properties: { sparePartId: uuid(), quantityRequired: { ...integer, minimum: 1 }, quantityIssued: { ...integer, description: 'Cannot exceed quantityRequired or available branch stock (on hand minus reserved).' }, approvalPercent: { type: 'number', minimum: 0, maximum: 100 }, customerPercent: { type: 'number', minimum: 0, maximum: 100 } } } } } },
-  ServiceReturnSlip: { type: 'object', additionalProperties: false, required: ['requisitionId', 'lines'], properties: { requisitionId: uuid(), lines: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'object', additionalProperties: false, required: ['requisitionLineId', 'quantity'], properties: { requisitionLineId: uuid(), quantity: { ...integer, minimum: 1 } } } } } },
-  ServiceDocumentCancellation: { type: 'object', additionalProperties: false, required: ['reason'], properties: { reason: { ...text(), minLength: 1 } } },
-  ServiceLabourLine: { type: 'object', additionalProperties: false, required: ['labourItemId', 'chargeType'], oneOf: [{ required: ['technicianId'], not: { required: ['mechanicId'] } }, { required: ['mechanicId'], not: { required: ['technicianId'] } }], properties: { labourItemId: uuid(), chargeType, chargedHours: { type: 'number', exclusiveMinimum: true, minimum: 0, maximum: 1000000 }, technicianId: uuid(), mechanicId: uuid(), groupId: uuid(), campaignId: uuid(), reason: { ...text(), minLength: 1 } } },
-  ServiceLabourSlip: { type: 'object', additionalProperties: false, required: ['branchId', 'jobCardId', 'lines'], properties: { branchId: uuid(), jobCardId: uuid(), groupId: uuid(), engineerId: uuid(), lines: { type: 'array', minItems: 1, maxItems: 100, items: ref('ServiceLabourLine') } } },
-  ServiceDocumentRemarks: { type: 'object', additionalProperties: false, required: ['remarks'], properties: { remarks: { ...text(5000), nullable: true, description: 'Internal staff remarks; never published as a customer explanation.' }, customerRemarks: { ...text(5000), nullable: true, description: 'Explicit customer-visible explanation. Omit to preserve the previous value; null clears it.' } } },
+  ServiceBookingRequest: {
+    type: "object",
+    additionalProperties: false,
+    properties: requestProperties,
+    anyOf: [
+      { required: ["description"] },
+      { required: ["complaintCodeId"] },
+      { required: ["defectCode"] },
+    ],
+    description:
+      "Enter a nonempty description or an active complaint/defect code. Estimates are optional; totals are calculated from these rows.",
+  },
+  ServiceBookingCreate: {
+    type: "object",
+    required: [
+      "customerId",
+      "vehicleId",
+      "branchName",
+      "scheduledAt",
+      "requests",
+    ],
+    properties: bookingProperties,
+  },
+  ServiceBookingUpdate: {
+    type: "object",
+    properties: {
+      scheduledAt: bookingProperties.scheduledAt,
+      serviceId: uuid(),
+      serviceTypeId: uuid(),
+      durationMins: bookingProperties.durationMins,
+      notes: bookingProperties.notes,
+      requests: bookingProperties.requests,
+      mileage: integer,
+      acFitted: { type: "boolean" },
+      followUpJobId: bookingProperties.followUpJobId,
+      bookingStatus: {
+        type: "string",
+        enum: ["BOOKED", "CANCELLED", "NO_SHOW"],
+      },
+      cancelReason: { ...text(), minLength: 1 },
+      status: {
+        type: "string",
+        description:
+          "Legacy appointment lifecycle status; Checked In with mileage runs the warranty/campaign acknowledgement gate.",
+      },
+      warrantyAcknowledged: { type: "boolean" },
+      acknowledgedCampaignIds: { type: "array", maxItems: 50, items: uuid() },
+    },
+  },
+  ServiceBookingConversion: {
+    type: "object",
+    required: ["bayId", "serviceAdvisorId", "promisedAt", "openingConsent"],
+    anyOf: [{ required: ["technicianId"] }, { required: ["teamId"] }],
+    properties: {
+      openingConsent: {
+        type: "object",
+        required: ["accepted", "termsHash"],
+        additionalProperties: false,
+        properties: {
+          accepted: { type: "boolean", enum: [true] },
+          termsHash: {
+            type: "string",
+            pattern: "^[a-f0-9]{64}$",
+            description:
+              "Hash returned by the appointment opening-consent endpoint; example hashes must be replaced",
+          },
+        },
+      },
+      bayId: uuid(),
+      serviceAdvisorId: uuid(),
+      technicianId: uuid(),
+      teamId: uuid(),
+      engineerId: uuid(),
+      promisedAt: { type: "string", format: "date-time" },
+      serviceTypeId: uuid(
+        "Required if the booking has no workshop service type",
+      ),
+      mileage: integer,
+      description: text(5000),
+      complaints: {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: ref("ServiceBookingRequest"),
+      },
+      warrantyAcknowledged: { type: "boolean" },
+      acknowledgedCampaignIds: { type: "array", maxItems: 50, items: uuid() },
+      odometerReplaced: { type: "boolean" },
+      odometerReplacedReason: text(300),
+    },
+    description:
+      "Normal job-opening fields are accepted. Customer/vehicle/branch and saved service/AC/requests come from the booking. Supply mileage if absent from the booking and at least one complaint if requests are empty. Technician and/or team is required.",
+  },
+  ServiceRequisition: {
+    type: "object",
+    additionalProperties: false,
+    required: ["branchId", "jobCardId", "chargeType", "lines"],
+    properties: {
+      branchId: uuid(),
+      jobCardId: uuid(),
+      chargeType,
+      groupId: uuid(),
+      engineerId: uuid(),
+      campaignId: uuid(),
+      goodwillReason: { ...text(), minLength: 1 },
+      lines: {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["sparePartId", "quantityRequired", "quantityIssued"],
+          properties: {
+            sparePartId: uuid(),
+            quantityRequired: { ...integer, minimum: 1 },
+            quantityIssued: {
+              ...integer,
+              description:
+                "Cannot exceed quantityRequired or available branch stock (on hand minus reserved).",
+            },
+            approvalPercent: { type: "number", minimum: 0, maximum: 100 },
+            customerPercent: { type: "number", minimum: 0, maximum: 100 },
+          },
+        },
+      },
+    },
+  },
+  ServiceReturnSlip: {
+    type: "object",
+    additionalProperties: false,
+    required: ["requisitionId", "lines"],
+    properties: {
+      requisitionId: uuid(),
+      lines: {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["requisitionLineId", "quantity"],
+          properties: {
+            requisitionLineId: uuid(),
+            quantity: { ...integer, minimum: 1 },
+          },
+        },
+      },
+    },
+  },
+  ServiceDocumentCancellation: {
+    type: "object",
+    additionalProperties: false,
+    required: ["reason"],
+    properties: { reason: { ...text(), minLength: 1 } },
+  },
+  ServiceLabourLine: {
+    type: "object",
+    additionalProperties: false,
+    required: ["labourItemId", "chargeType"],
+    oneOf: [
+      { required: ["technicianId"], not: { required: ["mechanicId"] } },
+      { required: ["mechanicId"], not: { required: ["technicianId"] } },
+    ],
+    properties: {
+      labourItemId: uuid(),
+      chargeType,
+      chargedHours: {
+        type: "number",
+        exclusiveMinimum: true,
+        minimum: 0,
+        maximum: 1000000,
+      },
+      technicianId: uuid(),
+      mechanicId: uuid(),
+      groupId: uuid(),
+      campaignId: uuid(),
+      reason: { ...text(), minLength: 1 },
+    },
+  },
+  ServiceLabourSlip: {
+    type: "object",
+    additionalProperties: false,
+    required: ["branchId", "jobCardId", "lines"],
+    properties: {
+      branchId: uuid(),
+      jobCardId: uuid(),
+      groupId: uuid(),
+      engineerId: uuid(),
+      lines: {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: ref("ServiceLabourLine"),
+      },
+    },
+  },
+  ServiceDocumentRemarks: {
+    type: "object",
+    additionalProperties: false,
+    required: ["remarks"],
+    properties: {
+      remarks: {
+        ...text(5000),
+        nullable: true,
+        description:
+          "Internal staff remarks; never published as a customer explanation.",
+      },
+      customerRemarks: {
+        ...text(5000),
+        nullable: true,
+        description:
+          "Explicit customer-visible explanation. Omit to preserve the previous value; null clears it.",
+      },
+    },
+  },
 };
-const pathId = (name = 'id') => ({ in: 'path', name, required: true, schema: uuid() });
-const query = (name: string, schema: object) => ({ in: 'query', name, schema });
-const paging = [query('page', { type: 'integer', minimum: 1, default: 1 }), query('limit', { type: 'integer', minimum: 1, maximum: 100, default: 25 }), query('branchId', uuid()), query('jobCardId', uuid())];
-const response = (description: string, example?: unknown) => ({ description, content: { 'application/json': { schema: ref('StandardResponse'), ...(example ? { example: { status: 'success', data: example } } : {}) } } });
-function operation(summary: string, permission: string, description: string, schema?: string, examples?: Record<string, unknown>, created = false) {
-  return { tags: ['Service & Job Cards'], summary, description: `Requires ${permission}. Branch-scoped; foreign branches return 403 unless branch:all (SuperAdmin also has all-branch access). Dates use Africa/Lagos. ${description}`, security: [{ BearerAuth: [] }], ...(schema ? { requestBody: { required: true, content: { 'application/json': { schema: ref(schema), examples: Object.fromEntries(Object.entries(examples ?? {}).map(([name, value]) => [name, { value }])) } } } } : {}), responses: { [created ? '201' : '200']: response(description), '400': { description: 'Invalid fields, references, business rule or lifecycle transition. Validation errors include errors entries with field (dotted request path), message and code.', content: { 'application/json': { example: { status: 'error', statusCode: 400, message: 'Validation failed', code: 'FIELD_VALIDATION', errors: [{ field: 'body.complaints.0.description', message: 'Description is required', code: 'too_small' }] } } } }, '401': { description: 'Authentication required' }, '403': { description: 'Permission or branch access denied' }, '404': { description: 'Document or referenced record not found' }, '409': { description: 'Concurrent/stale change, protected history, or warranty/campaign acknowledgement required. WARRANTY_ACK_REQUIRED includes the current coverage/campaign check.' } } };
+const pathId = (name = "id") => ({
+  in: "path",
+  name,
+  required: true,
+  schema: uuid(),
+});
+const query = (name: string, schema: object) => ({ in: "query", name, schema });
+const paging = [
+  query("page", { type: "integer", minimum: 1, default: 1 }),
+  query("limit", { type: "integer", minimum: 1, maximum: 100, default: 25 }),
+  query("branchId", uuid()),
+  query("jobCardId", uuid()),
+];
+const response = (description: string, example?: unknown) => ({
+  description,
+  content: {
+    "application/json": {
+      schema: ref("StandardResponse"),
+      ...(example ? { example: { status: "success", data: example } } : {}),
+    },
+  },
+});
+function operation(
+  summary: string,
+  permission: string,
+  description: string,
+  schema?: string,
+  examples?: Record<string, unknown>,
+  created = false,
+) {
+  return {
+    tags: ["Service & Job Cards"],
+    summary,
+    description: `Requires ${permission}. Branch-scoped; foreign branches return 403 unless branch:all (SuperAdmin also has all-branch access). Dates use Africa/Lagos. ${description}`,
+    security: [{ BearerAuth: [] }],
+    ...(schema
+      ? {
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: ref(schema),
+                examples: Object.fromEntries(
+                  Object.entries(examples ?? {}).map(([name, value]) => [
+                    name,
+                    { value },
+                  ]),
+                ),
+              },
+            },
+          },
+        }
+      : {}),
+    responses: {
+      [created ? "201" : "200"]: response(description),
+      "400": {
+        description:
+          "Invalid fields, references, business rule or lifecycle transition. Validation errors include errors entries with field (dotted request path), message and code.",
+        content: {
+          "application/json": {
+            example: {
+              status: "error",
+              statusCode: 400,
+              message: "Validation failed",
+              code: "FIELD_VALIDATION",
+              errors: [
+                {
+                  field: "body.complaints.0.description",
+                  message: "Description is required",
+                  code: "too_small",
+                },
+              ],
+            },
+          },
+        },
+      },
+      "401": { description: "Authentication required" },
+      "403": { description: "Permission or branch access denied" },
+      "404": { description: "Document or referenced record not found" },
+      "409": {
+        description:
+          "Concurrent/stale change, protected history, or warranty/campaign acknowledgement required. WARRANTY_ACK_REQUIRED includes the current coverage/campaign check.",
+      },
+    },
+  };
 }
-export const serviceTransactionPaths: Record<string, Record<string, unknown>> = {
-  '/service/appointments': {
-    post: operation('Create a numbered service booking', 'appointment:create', 'Returns data.appointment with automatic bookingNumber, createdAt, BOOKED bookingStatus, saved request and calculated totals. Duplicate active customer/vehicle bookings are rejected; serviceId is optional; requests must be nonempty text or 1-100 validated detailed rows; amounts and codes use the existing request model.', 'ServiceBookingCreate', { detailed: transactionExamples.detailedBooking, minimal: transactionExamples.minimalBooking, withRequests: transactionExamples.booking }, true),
-    get: { ...operation('List service bookings', 'appointment:read', 'Returns data.appointments and data.meta. Search includes booking number; booked-for date filters use Lagos days. Legacy lifecycle status filters remain supported.'), parameters: [query('page', { type: 'integer', minimum: 1, default: 1 }), query('limit', { type: 'integer', minimum: 1, default: 10 }), query('branchId', uuid()), query('customerId', uuid()), query('search', { type: 'string' }), query('status', { type: 'string', description: 'BOOKED, CONVERTED, CANCELLED, NO_SHOW or a legacy appointment status' }), query('dateFrom', { type: 'string', format: 'date' }), query('dateTo', { type: 'string', format: 'date' })] },
+export const serviceTransactionPaths: Record<
+  string,
+  Record<string, unknown>
+> = {
+  "/service/appointments": {
+    post: operation(
+      "Create a numbered service booking",
+      "appointment:create",
+      "Returns data.appointment with automatic bookingNumber, createdAt, BOOKED bookingStatus, saved request and calculated totals. Duplicate active customer/vehicle bookings are rejected; serviceId is optional; requests must be nonempty text or 1-100 validated detailed rows; amounts and codes use the existing request model.",
+      "ServiceBookingCreate",
+      {
+        detailed: transactionExamples.detailedBooking,
+        minimal: transactionExamples.minimalBooking,
+        withRequests: transactionExamples.booking,
+      },
+      true,
+    ),
+    get: {
+      ...operation(
+        "List service bookings",
+        "appointment:read",
+        "Returns data.appointments and data.meta. Search includes booking number; booked-for date filters use Lagos days. Legacy lifecycle status filters remain supported.",
+      ),
+      parameters: [
+        query("page", { type: "integer", minimum: 1, default: 1 }),
+        query("limit", { type: "integer", minimum: 1, default: 10 }),
+        query("branchId", uuid()),
+        query("customerId", uuid()),
+        query("search", { type: "string" }),
+        query("status", {
+          type: "string",
+          description:
+            "BOOKED, CONVERTED, CANCELLED, NO_SHOW or a legacy appointment status",
+        }),
+        query("dateFrom", { type: "string", format: "date" }),
+        query("dateTo", { type: "string", format: "date" }),
+      ],
+    },
   },
-  '/service/appointments/{id}': { parameters: [pathId()],
-    get: operation('Read a booking and its linked jobs', 'appointment:read', 'Returns data.appointment, vehicle/customer, service type, requests, calculated totals and jobCards links.'),
-    put: operation('Edit, reschedule or cancel a booking', 'appointment:update', 'Returns data.appointment. Cancellation always needs cancelReason. NO_SHOW/cancellation release the active-booking restriction. Converted/linked/terminal bookings cannot be edited or reopened. Check-in mileage still runs warranty and campaign acknowledgement.', 'ServiceBookingUpdate', { reschedule: transactionExamples.reschedule, cancel: transactionExamples.cancelBooking, noShow: transactionExamples.noShow }),
-    delete: operation('Delete a legacy unnumbered unlinked booking', 'appointment:delete', 'Numbered, converted or linked bookings reject deletion with 409; cancel a numbered booking with a reason instead.'),
+  "/service/appointments/{id}": {
+    parameters: [pathId()],
+    get: operation(
+      "Read a booking and its linked jobs",
+      "appointment:read",
+      "Returns data.appointment, vehicle/customer, service type, requests, calculated totals and jobCards links.",
+    ),
+    put: operation(
+      "Edit, reschedule or cancel a booking",
+      "appointment:update",
+      "Returns data.appointment. Cancellation always needs cancelReason. NO_SHOW/cancellation release the active-booking restriction. Converted/linked/terminal bookings cannot be edited or reopened. Check-in mileage still runs warranty and campaign acknowledgement.",
+      "ServiceBookingUpdate",
+      {
+        reschedule: transactionExamples.reschedule,
+        cancel: transactionExamples.cancelBooking,
+        noShow: transactionExamples.noShow,
+      },
+    ),
+    delete: operation(
+      "Delete a legacy unnumbered unlinked booking",
+      "appointment:delete",
+      "Numbered, converted or linked bookings reject deletion with 409; cancel a numbered booking with a reason instead.",
+    ),
   },
-  '/service/appointments/{id}/convert': { parameters: [pathId()], post: operation('Convert a booking to exactly one job card', 'appointment:update AND jobcard:create', 'Returns data.jobCard. Opening consent is required separately from estimate approval. Fetch current JOB_CARD terms from opening-consent and submit accepted=true with its termsHash. The normal assignment, mileage, warranty/campaign and model-service rules apply. Locks serialize conversions; creation, numbering, link, CONVERTED status and audit are atomic. Saved requests override caller complaints; an empty booking needs caller complaints. Cancelling the job does not permit another conversion.', 'ServiceBookingConversion', { opening: transactionExamples.conversion }, true) },
+  "/service/appointments/{id}/convert": {
+    parameters: [pathId()],
+    post: operation(
+      "Convert a booking to exactly one job card",
+      "appointment:update AND jobcard:create",
+      "Returns data.jobCard. Opening consent is required separately from estimate approval. Fetch current JOB_CARD terms from opening-consent and submit accepted=true with its termsHash. The normal assignment, mileage, warranty/campaign and model-service rules apply. Locks serialize conversions; creation, numbering, link, CONVERTED status and audit are atomic. Saved requests override caller complaints; an empty booking needs caller complaints. Cancelling the job does not permit another conversion.",
+      "ServiceBookingConversion",
+      { opening: transactionExamples.conversion },
+      true,
+    ),
+  },
 };
 for (const [kind, key, listKey, schema, permission, examples] of [
-  ['requisitions', 'requisition', 'requisitions', 'ServiceRequisition', 'requisition:create', { customer: transactionExamples.requisition, warranty: transactionExamples.warranty, free: transactionExamples.free, goodwill: transactionExamples.goodwill }],
-  ['return-slips', 'returnSlip', 'returnSlips', 'ServiceReturnSlip', 'requisition:create', { returnParts: transactionExamples.returnSlip }],
+  [
+    "requisitions",
+    "requisition",
+    "requisitions",
+    "ServiceRequisition",
+    "requisition:create",
+    {
+      customer: transactionExamples.requisition,
+      warranty: transactionExamples.warranty,
+      free: transactionExamples.free,
+      goodwill: transactionExamples.goodwill,
+    },
+  ],
+  [
+    "return-slips",
+    "returnSlip",
+    "returnSlips",
+    "ServiceReturnSlip",
+    "requisition:create",
+    { returnParts: transactionExamples.returnSlip },
+  ],
 ] as const) {
   const base = `/inventory/${kind}`;
-  const rule = kind === 'requisitions' ? 'Issue quantity cannot exceed branch available stock after reservations. Rates are snapshotted. Goodwill requires requisition:goodwill and a reason; percentages total 100 and split approved/customer charge lines. Warranty is 100/0 and needs eligibility; FREE needs a linked campaign. Existing approved-estimate scope gates remain active.' : 'Return quantity cannot exceed issued minus active prior returns. Stock and split charges reverse proportionally using the original rates. No return after billing/delivery/cancellation.';
-  serviceTransactionPaths[base] = { get: { ...operation(`List ${kind}`, 'requisition:read', `Returns data.${listKey}.`), parameters: [...paging, query('chargeType', chargeType), ...(kind === 'return-slips' ? [query('requisitionId', uuid())] : [])] }, post: operation(`Create ${kind}`, permission, `Returns data.${key} with lines and totals. ${rule} Writes on billed/delivered/cancelled jobs are rejected. Ready-job work changes reopen QC.`, schema, examples, true) };
-  serviceTransactionPaths[`${base}/{id}`] = { parameters: [pathId()], get: operation(`Read ${kind} with snapshot rates and totals`, 'requisition:read', `Returns data.${key}; part rows include partNumber. Monetary Decimal snapshots are JSON strings.`) };
-  serviceTransactionPaths[`${base}/{id}/print`] = { parameters: [pathId()], get: operation(`Read internal ${kind} print data`, 'requisition:read', `Returns data.${key}, the same read projection as detail; no document/stock mutation.`) };
-  serviceTransactionPaths[`${base}/{id}/cancel`] = { parameters: [pathId()], post: operation(`Cancel ${kind} and reverse its stock effect`, 'requisition:cancel', `Returns data.${key}; reason, actor and old values are audited. No cancellation after billing/delivery/cancellation or while protected by bills/claims. Cancel active returns before cancelling their requisition.`, 'ServiceDocumentCancellation', { reason: transactionExamples.cancellation }) };
+  const rule =
+    kind === "requisitions"
+      ? "Issue quantity cannot exceed branch available stock after reservations. Rates are snapshotted. Goodwill requires requisition:goodwill and a reason; percentages total 100 and split approved/customer charge lines. Warranty is 100/0 and needs eligibility; FREE needs a linked campaign. Existing approved-estimate scope gates remain active."
+      : "Return quantity cannot exceed issued minus active prior returns. Stock and split charges reverse proportionally using the original rates. No return after billing/delivery/cancellation.";
+  serviceTransactionPaths[base] = {
+    get: {
+      ...operation(
+        `List ${kind}`,
+        "requisition:read",
+        `Returns data.${listKey}.`,
+      ),
+      parameters: [
+        ...paging,
+        query("chargeType", chargeType),
+        ...(kind === "return-slips" ? [query("requisitionId", uuid())] : []),
+      ],
+    },
+    post: operation(
+      `Create ${kind}`,
+      permission,
+      `Returns data.${key} with lines and totals. ${rule} Writes on billed/delivered/cancelled jobs are rejected. Ready-job work changes reopen QC.`,
+      schema,
+      examples,
+      true,
+    ),
+  };
+  serviceTransactionPaths[`${base}/{id}`] = {
+    parameters: [pathId()],
+    get: operation(
+      `Read ${kind} with snapshot rates and totals`,
+      "requisition:read",
+      `Returns data.${key}; part rows include partNumber. Monetary Decimal snapshots are JSON strings.`,
+    ),
+  };
+  serviceTransactionPaths[`${base}/{id}/print`] = {
+    parameters: [pathId()],
+    get: operation(
+      `Read internal ${kind} print data`,
+      "requisition:read",
+      `Returns data.${key}, the same read projection as detail; no document/stock mutation.`,
+    ),
+  };
+  serviceTransactionPaths[`${base}/{id}/cancel`] = {
+    parameters: [pathId()],
+    post: operation(
+      `Cancel ${kind} and reverse its stock effect`,
+      "requisition:cancel",
+      `Returns data.${key}; reason, actor and old values are audited. No cancellation after billing/delivery/cancellation or while protected by bills/claims. Cancel active returns before cancelling their requisition.`,
+      "ServiceDocumentCancellation",
+      { reason: transactionExamples.cancellation },
+    ),
+  };
 }
-serviceTransactionPaths['/service/labour-slips'] = { get: { ...operation('List labour slips', 'jobcard:read', 'Returns data.labourSlips.'), parameters: paging }, post: operation('Create a labour slip', 'jobcard:labour:update', 'Returns data.labourSlip. One technician login OR employee mechanic per line. Model standardHours/rate/pricing are snapshotted; chargedHours defaults to standard hours. TIME uses charged hours; FIXED preserves the fixed amount. Goodwill requires warranty:update/reason; warranty and free work require eligibility/linkage. Closed-job and approved-scope gates apply.', 'ServiceLabourSlip', { technician: transactionExamples.labour }, true) };
-for (const suffix of ['', '/print']) serviceTransactionPaths[`/service/labour-slips/{id}${suffix}`] = { parameters: [pathId()], get: operation(`Read labour slip${suffix ? ' internal print data' : ''}`, 'jobcard:read', 'Returns data.labourSlip with standardHours, chargedHours, snapshot rate/amount and warranty/nonWarranty/free/goodwill/totalAmount totals. Print reads have no stock or amount effect.') };
-serviceTransactionPaths['/service/labour-slips/{id}/lines'] = { parameters: [pathId()], post: operation('Add one labour line to a slip', 'jobcard:labour:update', 'Returns data.labourSlip. Same pricing, approval and lifecycle rules as slip creation.', 'ServiceLabourLine', { employee: transactionExamples.employeeLabour }) };
-serviceTransactionPaths['/service/labour-slips/{id}/lines/{lineId}'] = { parameters: [pathId(), pathId('lineId')], put: operation('Replace one labour line', 'jobcard:labour:update', 'Returns data.labourSlip. Same-operation edits preserve rate/standard-hour/pricing snapshots; changing operation resolves its model schedule. Protected bill/claim references reject edits. Work changes reset QC.', 'ServiceLabourLine', { employee: transactionExamples.employeeLabour }) };
-for (const [path, read] of [['job-cards', 'jobcard:read'], ['estimates', 'estimate:read']] as const) {
-  serviceTransactionPaths[`/service/${path}/{id}/remarks`] = { parameters: [pathId()], get: operation(`Read ${path} remarks`, read, 'Returns data.document with id, branchId, internal remarks, customerRemarks and read-only number/date/status/job/vehicle/service/customer-name context.'), put: operation(`Amend ${path} remarks in any status`, 'jobcard:remarks:update', 'Returns data.document. Only internal remarks and optional customerRemarks change, including on closed jobs and approved/superseded estimates. Customer explanations print on customer documents; internal text stays private. Omitting customerRemarks preserves it. Blank text becomes null; actual changes audit old/new values and actor atomically. No workDone, amount, signature, version, stock or status changes.', 'ServiceDocumentRemarks', { amend: transactionExamples.remarks, explanation: { remarks: null, customerRemarks: 'Additional labour was required to complete the repair.' }, clear: transactionExamples.clearRemarks }) };
-  serviceTransactionPaths[`/service/${path}/{id}/picking-list/print`] = { parameters: [pathId()], get: operation(`Read internal ${path} picking print data`, 'jobcard:picking-list:print', 'Returns data.pickingList: branch, job number/date/service code, saved checklist code/text, estimate/revision/status/currency, vehicle, planned PART/INCLUDED_PART lines, part flag/UOM, snapshot quantity/rate/amount, totals, remarks, printedAt and timeZone. Job action selects the latest estimate; estimate action selects that revision. No estimate returns 400. Checklist codes resolve only from exact saved CHECKLIST master codes; free text stays free text. Live checklist quantities are not added to the selected estimate. Audit event only: no stored picking list, number, stock change or STN interaction.') };
+serviceTransactionPaths["/service/labour-slips"] = {
+  get: {
+    ...operation(
+      "List labour slips",
+      "jobcard:read",
+      "Returns data.labourSlips.",
+    ),
+    parameters: paging,
+  },
+  post: operation(
+    "Create a labour slip",
+    "jobcard:labour:update",
+    "Returns data.labourSlip. One technician login OR employee mechanic per line. Model standardHours/rate/pricing are snapshotted; chargedHours defaults to standard hours. TIME uses charged hours; FIXED preserves the fixed amount. Goodwill requires warranty:update/reason; warranty and free work require eligibility/linkage. Closed-job and approved-scope gates apply.",
+    "ServiceLabourSlip",
+    { technician: transactionExamples.labour },
+    true,
+  ),
+};
+for (const suffix of ["", "/print"])
+  serviceTransactionPaths[`/service/labour-slips/{id}${suffix}`] = {
+    parameters: [pathId()],
+    get: operation(
+      `Read labour slip${suffix ? " internal print data" : ""}`,
+      "jobcard:read",
+      "Returns data.labourSlip with standardHours, chargedHours, snapshot rate/amount and warranty/nonWarranty/free/goodwill/totalAmount totals. Print reads have no stock or amount effect.",
+    ),
+  };
+serviceTransactionPaths["/service/labour-slips/{id}/lines"] = {
+  parameters: [pathId()],
+  post: operation(
+    "Add one labour line to a slip",
+    "jobcard:labour:update",
+    "Returns data.labourSlip. Same pricing, approval and lifecycle rules as slip creation.",
+    "ServiceLabourLine",
+    { employee: transactionExamples.employeeLabour },
+  ),
+};
+serviceTransactionPaths["/service/labour-slips/{id}/lines/{lineId}"] = {
+  parameters: [pathId(), pathId("lineId")],
+  put: operation(
+    "Replace one labour line",
+    "jobcard:labour:update",
+    "Returns data.labourSlip. Same-operation edits preserve rate/standard-hour/pricing snapshots; changing operation resolves its model schedule. Protected bill/claim references reject edits. Work changes reset QC.",
+    "ServiceLabourLine",
+    { employee: transactionExamples.employeeLabour },
+  ),
+};
+for (const [path, read] of [
+  ["job-cards", "jobcard:read"],
+  ["estimates", "estimate:read"],
+] as const) {
+  serviceTransactionPaths[`/service/${path}/{id}/remarks`] = {
+    parameters: [pathId()],
+    get: operation(
+      `Read ${path} remarks`,
+      read,
+      "Returns data.document with id, branchId, internal remarks, customerRemarks and read-only number/date/status/job/vehicle/service/customer-name context.",
+    ),
+    put: operation(
+      `Amend ${path} remarks in any status`,
+      "jobcard:remarks:update",
+      "Returns data.document. Only internal remarks and optional customerRemarks change, including on closed jobs and approved/superseded estimates. Customer explanations print on customer documents; internal text stays private. Omitting customerRemarks preserves it. Blank text becomes null; actual changes audit old/new values and actor atomically. No workDone, amount, signature, version, stock or status changes.",
+      "ServiceDocumentRemarks",
+      {
+        amend: transactionExamples.remarks,
+        explanation: {
+          remarks: null,
+          customerRemarks:
+            "Additional labour was required to complete the repair.",
+        },
+        clear: transactionExamples.clearRemarks,
+      },
+    ),
+  };
+  serviceTransactionPaths[`/service/${path}/{id}/picking-list/print`] = {
+    parameters: [pathId()],
+    get: operation(
+      `Read internal ${path} picking print data`,
+      "jobcard:picking-list:print",
+      "Returns data.pickingList: branch, job number/date/service code, saved checklist code/text, estimate/revision/status/currency, vehicle, planned PART/INCLUDED_PART lines, part flag/UOM, snapshot quantity/rate/amount, totals, remarks, printedAt and timeZone. Job action selects the latest estimate; estimate action selects that revision. No estimate returns 400. Checklist codes resolve only from exact saved CHECKLIST master codes; free text stays free text. Live checklist quantities are not added to the selected estimate. Audit event only: no stored picking list, number, stock change or STN interaction.",
+    ),
+  };
 }
 
-serviceTransactionPaths['/service/job-cards/{id}'] = { parameters: [pathId()], put: { ...operation('Update job work done or lifecycle', 'jobcard:update', 'Returns data.jobCard. Work done stays separate from document remarks. Every transition to IN_PROGRESS requires a positive active non-cheque advance; the estimate percentage is only a suggestion. READY requires QC status and a passed QC result, approved scope and recorded work. Normal transition, billing/delivery and cancellation-reason guards remain active.'), requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { workDone: text(10000), status: { type: 'string', enum: ['IN_PROGRESS', 'QC', 'READY', 'DELIVERED', 'CANCELLED'], description: 'Existing canonical job lifecycle status' }, remarks: { ...text(), description: 'Lifecycle transition reason; use the dedicated remarks endpoint to amend document remarks' }, serviceCharge: amount, deliveryAdvisorId: uuid(), description: text(5000), observations: text(10000), lateReasonIds: { type: 'array', maxItems: 6, uniqueItems: true, items: uuid() } } }, examples: { workDone: { value: transactionExamples.workDone }, ready: { value: transactionExamples.ready } } } } } } };
+serviceTransactionPaths["/service/job-cards/{id}"] = {
+  parameters: [pathId()],
+  put: {
+    ...operation(
+      "Update job work done or lifecycle",
+      "jobcard:update",
+      "Returns data.jobCard. Work done stays separate from document remarks. Every transition to IN_PROGRESS requires a positive active non-cheque advance; the estimate percentage is only a suggestion. READY requires QC status and a passed QC result, approved scope and recorded work. Normal transition, billing/delivery and cancellation-reason guards remain active.",
+    ),
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              workDone: text(10000),
+              status: {
+                type: "string",
+                enum: ["IN_PROGRESS", "QC", "READY", "DELIVERED", "CANCELLED"],
+                description: "Existing canonical job lifecycle status",
+              },
+              remarks: {
+                ...text(),
+                description:
+                  "Lifecycle transition reason; use the dedicated remarks endpoint to amend document remarks",
+              },
+              serviceCharge: amount,
+              deliveryAdvisorId: uuid(),
+              description: text(5000),
+              observations: text(10000),
+              lateReasonIds: {
+                type: "array",
+                maxItems: 6,
+                uniqueItems: true,
+                items: uuid(),
+              },
+              lateRemarks: {
+                ...text(1000),
+                description:
+                  "Delay remark kept with the late-delivery reasons (DELIVERED only)",
+              },
+            },
+          },
+          examples: {
+            workDone: { value: transactionExamples.workDone },
+            ready: { value: transactionExamples.ready },
+          },
+        },
+      },
+    },
+  },
+};
 
 // Synthetic response examples are deliberately partial; no real customer/account data.
-const bookingPost = serviceTransactionPaths['/service/appointments'].post as ReturnType<typeof operation>;
-bookingPost.responses['201'] = response('Booking created', { appointment: { id, bookingNumber: `${branchId}/2026000001`, bookingStatus: 'BOOKED', status: 'Pending', createdAt: '2026-10-21T09:00:00.000Z', scheduledAt: transactionExamples.booking.scheduledAt, requests: [{ description: 'Inspect engine noise', estimatedParts: '0', estimatedOil: '0', estimatedLabour: '0' }], totals: { estimatedParts: 0, estimatedOil: 0, estimatedLabour: 0, estimatedTotal: 0 } } });
-const requisitionRead = serviceTransactionPaths['/inventory/requisitions/{id}'].get as ReturnType<typeof operation>;
-requisitionRead.responses['200'] = response('Requisition detail (partial example)', { requisition: { id, requisitionNumber: '2026000001', status: 'ISSUED', chargeType: 'CUSTOMER', lines: [{ id: lineId, sparePartId: partId, partNumber: 'PART-EXAMPLE', partSource: 'O', description: 'Example filter', uom: 'UNIT', quantityRequired: 3, quantityIssued: 2, rate: '100.01', amount: '200.02' }], totals: { numberOfItems: 1, netQuantityIssued: 2, totalAmount: 200.02 } } });
-for (const suffix of ['', '/print']) {
-  const returnRead = serviceTransactionPaths[`/inventory/return-slips/{id}${suffix}`].get as ReturnType<typeof operation>;
-  returnRead.responses['200'] = response('Return detail with saved requisition context (partial example)', { returnSlip: { id, returnNumber: '2026000001', status: 'COMPLETED', requisition: { requisitionNumber: '2026000001', chargeType: 'GOODWILL' }, lines: [{ id: lineId, partNumber: 'PART-EXAMPLE', description: 'Example filter', partSource: 'O', uom: 'UNIT', quantityRequired: 3, quantityIssued: 3, quantity: 1, location: 'Rack A', binCard: 'BIN-A', warrantyRate: '80.00', rate: '100.01', amount: '100.01' }], totals: { numberOfItems: 1, netQuantityReturned: 1, totalAmount: 100.01 } } });
+const bookingPost = serviceTransactionPaths["/service/appointments"]
+  .post as ReturnType<typeof operation>;
+bookingPost.responses["201"] = response("Booking created", {
+  appointment: {
+    id,
+    bookingNumber: `${branchId}/2026000001`,
+    bookingStatus: "BOOKED",
+    status: "Pending",
+    createdAt: "2026-10-21T09:00:00.000Z",
+    scheduledAt: transactionExamples.booking.scheduledAt,
+    requests: [
+      {
+        description: "Inspect engine noise",
+        estimatedParts: "0",
+        estimatedOil: "0",
+        estimatedLabour: "0",
+      },
+    ],
+    totals: {
+      estimatedParts: 0,
+      estimatedOil: 0,
+      estimatedLabour: 0,
+      estimatedTotal: 0,
+    },
+  },
+});
+const requisitionRead = serviceTransactionPaths["/inventory/requisitions/{id}"]
+  .get as ReturnType<typeof operation>;
+requisitionRead.responses["200"] = response(
+  "Requisition detail (partial example)",
+  {
+    requisition: {
+      id,
+      requisitionNumber: "2026000001",
+      status: "ISSUED",
+      chargeType: "CUSTOMER",
+      lines: [
+        {
+          id: lineId,
+          sparePartId: partId,
+          partNumber: "PART-EXAMPLE",
+          partSource: "O",
+          description: "Example filter",
+          uom: "UNIT",
+          quantityRequired: 3,
+          quantityIssued: 2,
+          rate: "100.01",
+          amount: "200.02",
+        },
+      ],
+      totals: { numberOfItems: 1, netQuantityIssued: 2, totalAmount: 200.02 },
+    },
+  },
+);
+for (const suffix of ["", "/print"]) {
+  const returnRead = serviceTransactionPaths[
+    `/inventory/return-slips/{id}${suffix}`
+  ].get as ReturnType<typeof operation>;
+  returnRead.responses["200"] = response(
+    "Return detail with saved requisition context (partial example)",
+    {
+      returnSlip: {
+        id,
+        returnNumber: "2026000001",
+        status: "COMPLETED",
+        requisition: {
+          requisitionNumber: "2026000001",
+          chargeType: "GOODWILL",
+        },
+        lines: [
+          {
+            id: lineId,
+            partNumber: "PART-EXAMPLE",
+            description: "Example filter",
+            partSource: "O",
+            uom: "UNIT",
+            quantityRequired: 3,
+            quantityIssued: 3,
+            quantity: 1,
+            location: "Rack A",
+            binCard: "BIN-A",
+            warrantyRate: "80.00",
+            rate: "100.01",
+            amount: "100.01",
+          },
+        ],
+        totals: {
+          numberOfItems: 1,
+          netQuantityReturned: 1,
+          totalAmount: 100.01,
+        },
+      },
+    },
+  );
 }
-for (const suffix of ['', '/print']) {
-  const labourRead = serviceTransactionPaths[`/service/labour-slips/{id}${suffix}`].get as ReturnType<typeof operation>;
-  labourRead.responses['200'] = response('Saved labour context (partial example)', { labourSlip: { id, slipNumber: '2026000001', lines: [{ id: lineId, labourItemId: id, description: 'Example operation', standardHours: 3, chargedHours: 1.5, hours: 1.5, pricing: 'TIME', rate: 100.01, amount: 150.02, group: { code: 'TEAM-A', description: 'Example team' }, chargeLine: { chargeType: 'FREE', campaignId: id, chargeTypeReason: null } }], totals: { freeAmount: 150.02, goodwillAmount: 0, totalAmount: 150.02 } } });
+for (const suffix of ["", "/print"]) {
+  const labourRead = serviceTransactionPaths[
+    `/service/labour-slips/{id}${suffix}`
+  ].get as ReturnType<typeof operation>;
+  labourRead.responses["200"] = response(
+    "Saved labour context (partial example)",
+    {
+      labourSlip: {
+        id,
+        slipNumber: "2026000001",
+        lines: [
+          {
+            id: lineId,
+            labourItemId: id,
+            description: "Example operation",
+            standardHours: 3,
+            chargedHours: 1.5,
+            hours: 1.5,
+            pricing: "TIME",
+            rate: 100.01,
+            amount: 150.02,
+            group: { code: "TEAM-A", description: "Example team" },
+            chargeLine: {
+              chargeType: "FREE",
+              campaignId: id,
+              chargeTypeReason: null,
+            },
+          },
+        ],
+        totals: { freeAmount: 150.02, goodwillAmount: 0, totalAmount: 150.02 },
+      },
+    },
+  );
 }
-const remarksPut = serviceTransactionPaths['/service/job-cards/{id}/remarks'].put as ReturnType<typeof operation>;
-remarksPut.responses['200'] = response('Audited remarks saved', { document: { id, branchId, remarks: transactionExamples.remarks.remarks, customerRemarks: null } });
-const pickingRead = serviceTransactionPaths['/service/job-cards/{id}/picking-list/print'].get as ReturnType<typeof operation>;
-pickingRead.responses['200'] = response('Internal picking data (partial example)', { pickingList: { branch: { id: branchId, name: 'Example branch' }, checklist: { code: 'CHECK-EXAMPLE', description: 'Example checklist', text: 'CHECK-EXAMPLE' }, job: { id: jobId, number: '2026000001', remarks: 'Internal note' }, estimate: { id, number: '2026000001', version: 1, status: 'Approved', currency: 'NGN', remarks: null }, lines: [{ lineId, partId, partNumber: 'PART-EXAMPLE', flag: 'O', description: 'Example filter', uom: 'UNIT', quantityRequired: 2, rate: 100.01, amount: 200.02 }], totals: { numberOfItems: 1, quantityRequired: 2, totalAmount: 200.02 }, printedAt: '2026-10-21T09:00:00.000Z', timeZone: 'Africa/Lagos' } });
+const remarksPut = serviceTransactionPaths["/service/job-cards/{id}/remarks"]
+  .put as ReturnType<typeof operation>;
+remarksPut.responses["200"] = response("Audited remarks saved", {
+  document: {
+    id,
+    branchId,
+    remarks: transactionExamples.remarks.remarks,
+    customerRemarks: null,
+  },
+});
+const pickingRead = serviceTransactionPaths[
+  "/service/job-cards/{id}/picking-list/print"
+].get as ReturnType<typeof operation>;
+pickingRead.responses["200"] = response(
+  "Internal picking data (partial example)",
+  {
+    pickingList: {
+      branch: { id: branchId, name: "Example branch" },
+      checklist: {
+        code: "CHECK-EXAMPLE",
+        description: "Example checklist",
+        text: "CHECK-EXAMPLE",
+      },
+      job: { id: jobId, number: "2026000001", remarks: "Internal note" },
+      estimate: {
+        id,
+        number: "2026000001",
+        version: 1,
+        status: "Approved",
+        currency: "NGN",
+        remarks: null,
+      },
+      lines: [
+        {
+          lineId,
+          partId,
+          partNumber: "PART-EXAMPLE",
+          flag: "O",
+          description: "Example filter",
+          uom: "UNIT",
+          quantityRequired: 2,
+          rate: 100.01,
+          amount: 200.02,
+        },
+      ],
+      totals: { numberOfItems: 1, quantityRequired: 2, totalAmount: 200.02 },
+      printedAt: "2026-10-21T09:00:00.000Z",
+      timeZone: "Africa/Lagos",
+    },
+  },
+);
 
-serviceTransactionPaths['/service/appointments/{id}/opening-consent'] = { parameters: [pathId()], get: operation('Read terms for consent to open a job card', 'appointment:update AND jobcard:create', 'Returns data.consent with the JOB_CARD statement, effective branch/company terms and footer, appointment identity/version and termsHash. This is distinct from JOB_ESTIMATE signature approval. Changed terms or appointment invalidate the previous hash.') };
+serviceTransactionPaths["/service/appointments/{id}/opening-consent"] = {
+  parameters: [pathId()],
+  get: operation(
+    "Read terms for consent to open a job card",
+    "appointment:update AND jobcard:create",
+    "Returns data.consent with the JOB_CARD statement, effective branch/company terms and footer, appointment identity/version and termsHash. This is distinct from JOB_ESTIMATE signature approval. Changed terms or appointment invalidate the previous hash.",
+  ),
+};

@@ -12,7 +12,9 @@ export const requisitionBody = z
     engineerId: id.optional(),
     campaignId: id.optional(),
     goodwillReason: z.string().trim().min(1).max(2000).optional(),
-    lines: z
+    pickingListNumber: z.string().trim().min(1).max(50).optional(),
+  mileage: z.number().int().min(0).max(9_999_999).optional(),
+  lines: z
       .array(
         z
           .object({

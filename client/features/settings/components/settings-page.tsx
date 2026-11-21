@@ -26,6 +26,11 @@ const SETTINGS_CARDS = [
     href: "/settings/workshop-masters",
   },
   {
+    title: "PDI Settings",
+    description: "Pre-delivery inspection: freeze dates and print rules, bill titles and rounding, default PDI customer, history and Tally.",
+    href: "/settings/pdi",
+  },
+  {
     title: "Books Closed",
     description: "Year end: the date up to which finance and stock entries are locked, per company or branch.",
     href: "/settings/books-closed",

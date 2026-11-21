@@ -97,14 +97,9 @@ export const createJobCardSchema = z
         path: ["promisedTime"],
         message: "Promised delivery must be in the future",
       });
+    // The reason is recorded at review; the opening note (repeatReason) is optional.
     if (v.isRepeat && !v.previousJobId)
-      ctx.addIssue({ code: "custom", path: ["previousJobId"], message: "Choose a previous job" });
-    if (v.isRepeat && !v.repeatReason?.trim())
-      ctx.addIssue({
-        code: "custom",
-        path: ["repeatReason"],
-        message: "Choose a previous job and enter the repeat reason",
-      });
+      ctx.addIssue({ code: "custom", path: ["previousJobId"], message: "Choose the job this visit repeats" });
     if (v.odometerReplaced && !v.odometerReplacedReason?.trim())
       ctx.addIssue({
         code: "custom",

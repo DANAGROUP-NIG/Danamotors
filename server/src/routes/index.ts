@@ -45,6 +45,10 @@ import serviceChecklistRoutes from '../modules/workshop/service-checklist.routes
 import documentTermsRoutes from '../modules/document-terms/document-terms.routes';
 import companySettingsRoutes from '../modules/company-settings/company-settings.routes';
 import booksClosedRoutes from '../modules/books-closed/books-closed.routes';
+import pdiRoutes from '../modules/pdi/pdi.routes';
+import repeatJobRoutes from '../modules/repeat-job/repeat-job.routes';
+import cscRoutes from '../modules/csc/csc.routes';
+import lateDeliveryRoutes from '../modules/late-delivery/late-delivery.routes';
 import { serviceTypeOptionsRouter, serviceTypeSettingsRouter } from '../modules/workshop/service-type.routes';
 
 const router = Router();
@@ -56,6 +60,10 @@ router.use('/service-checklists', serviceChecklistRoutes);
 router.use('/document-terms', documentTermsRoutes);
 router.use('/company-settings', companySettingsRoutes);
 router.use('/books-closed', booksClosedRoutes);
+router.use('/pdi', pdiRoutes);
+router.use('/repeat-jobs', repeatJobRoutes);
+router.use('/csc', cscRoutes);
+router.use('/late-deliveries', lateDeliveryRoutes);
 router.use('/job-cards', serviceTypeOptionsRouter);
 router.use('/service-type-model-settings', serviceTypeSettingsRouter);
 

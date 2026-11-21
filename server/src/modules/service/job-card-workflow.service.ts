@@ -17,7 +17,12 @@ import {
   assertRecordedScope,
 } from "./estimate-approval";
 import { getBranchSettings } from "../company-settings/company-settings.service";
-import { Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import { JobCardType, Prisma, WarrantyCoverageStatus } from "@prisma/client";
+import { nextSequenceNumber } from "../../shared/db/documentSequence";
+import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey } from "../pdi/pdi.logic";
+import { getPdiSettings } from "../pdi/pdi.settings.service";
+import { createRepeatRecord, resolveRepeatAtOpening, windowOf } from "../repeat-job/repeat-job.detect";
+import { matchCasesSafely } from "../csc/csc.match";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -117,12 +122,9 @@ export function repeatWindowStart(
 ) {
   if (!Number.isInteger(days) || days < 1 || days > 3650)
     throw new BadRequestError("Invalid repeat window days");
-
   return new Date(now.getTime() - days * 86400000);
 }
 
-// A previous job qualifies for a repeat when it is within the branch's repeat days, or within
-// its repeat km of the current reading (legacy: either limit is enough).
 export function repeatCandidateWhere(
   window: { repeatWindowDays: number; repeatWindowKm: number | null },
   mileage?: number,
@@ -218,23 +220,39 @@ async function requireStaff(
   return user;
 }
 
+export type JobOpeningOptions = {
+  /** Only the PDI module opens PDI job cards; the service routes always open SERVICE jobs. */
+  jobType?: JobCardType;
+  /** PDI registration; defaults to the last 6 characters of the VIN. */
+  pdiRegistration?: string;
+};
+
 export class JobCardWorkflowService {
   async open(
     input: z.infer<typeof jobOpeningBody> & {
       createdById?: string;
       bookingVersion?: string;
     },
+    options: JobOpeningOptions = {},
   ) {
     const { createdById, bookingVersion, ...body } = input;
 
     if (!createdById) throw new UnauthorizedError();
 
     const data = jobOpeningBody.parse(body);
+    const jobType = options.jobType ?? JobCardType.SERVICE;
+    const pdi = jobType === JobCardType.PDI;
+    if (pdi) {
+      if (data.appointmentId) throw new BadRequestError("PDI job cards are not opened from bookings").withCode("FIELD_VALIDATION", { field: "appointmentId" });
+      if (data.isRepeat) throw new BadRequestError("A PDI job card cannot be a repeat job").withCode("FIELD_VALIDATION", { field: "isRepeat" });
+      if (!data.engineerId) throw new BadRequestError("Select the engineer for the PDI").withCode("FIELD_VALIDATION", { field: "engineerId" });
+    }
     if (!data.appointmentId) assertPromisedDate(data.promisedAt, new Date());
 
     const result = await prisma.$transaction(
       async (tx) => {
-        const branch = await tx.branch.findFirst({
+        if (pdi) assertNotFrozen("job", (await getPdiSettings(tx)).jobFreezeDate, new Date());
+      const branch = await tx.branch.findFirst({
           where: {
             name: data.branchName,
             isActive: true,
@@ -286,8 +304,9 @@ export class JobCardWorkflowService {
         const unacknowledgedCampaigns = openCampaigns.filter(
           (c) => !acknowledged.has(c.campaignId),
         );
-        const coverageNeedsAck =
-          check.coverage.status === WarrantyCoverageStatus.ACTIVE &&
+        // A PDI is pre-sale work: no warranty acknowledgement or warranty case (open campaigns still apply).
+      const coverageNeedsAck =
+          !pdi && check.coverage.status === WarrantyCoverageStatus.ACTIVE &&
           !data.warrantyAcknowledged;
         if (coverageNeedsAck || unacknowledgedCampaigns.length > 0)
           throw new ConflictError(
@@ -362,24 +381,16 @@ export class JobCardWorkflowService {
 
         await openingField("bayId", () => requireMaster(tx, data.bayId, "BAY"));
 
-        const serviceType = await openingField("serviceTypeId", () =>
-          new ServiceTypeService().requireAvailable(
-            tx,
-            vehicle.id,
-            data.serviceTypeId,
-            new Date(),
-          ),
-        );
-        // Appointment services remain a separate catalogue and are never used
-        // to determine the opening dropdown or its model-specific charge.
-        if (
-          data.serviceId &&
-          !(await tx.service.findFirst({
-            where: { id: data.serviceId, isActive: true },
-            select: { id: true },
-          }))
-        )
-          throw new BadRequestError("Select an active appointment service");
+      const serviceType = await openingField("serviceTypeId", async () => {
+        const option = await new ServiceTypeService().requireAvailable(tx, vehicle.id, data.serviceTypeId, new Date(), jobType);
+        assertServiceTypeForJob(jobType, option);
+        return option;
+      });
+      // Appointment services remain a separate catalogue and are never used
+      // to determine the opening dropdown or its model-specific charge.
+      if (data.serviceId && !(await tx.service.findFirst({
+        where: { id: data.serviceId, isActive: true }, select: { id: true },
+      }))) throw new BadRequestError("Select an active appointment service");
 
         if (data.teamId)
           await openingField("teamId", () =>
@@ -404,29 +415,20 @@ export class JobCardWorkflowService {
             ROLES.TECHNICIAN,
           );
 
-        if (data.isRepeat) {
-          const previous = await tx.jobCard.findFirst({
-            where: {
-              id: data.previousJobId,
+        const repeatWindow = pdi ? null : windowOf(await getBranchSettings(branch.id, tx));
+        const repeat = repeatWindow
+          ? await resolveRepeatAtOpening(tx, {
               vehicleId: vehicle.id,
-              ...repeatCandidateWhere(
-                await getBranchSettings(branch.id, tx),
-                data.mileage,
-              ),
+              mileage: data.mileage ?? null,
+              at: new Date(),
+              window: repeatWindow,
+              actorId: createdById,
+              manualPreviousJobId: data.isRepeat ? data.previousJobId : undefined,
+            })
+          : null;
+        const repeatNote = repeat ? data.repeatReason?.trim() || null : null;
 
-              status: {
-                notIn: ["CANCELLED", "Cancelled"],
-              },
-            },
-          });
-
-          if (!previous)
-            throw new BadRequestError(
-              "Previous job must be for this vehicle within the repeat window",
-            );
-        }
-
-        const complaints = await resolveJobComplaints(tx, data.complaints);
+        const complaints = await resolveJobComplaints(tx, data.complaints, pdi ? "PDI_DEFECT" : "COMPLAINT");
 
         const tyres = data.tyres
           ? await Promise.all(
@@ -470,7 +472,10 @@ export class JobCardWorkflowService {
           acknowledgedCampaignIds: _acknowledgedCampaignIds,
           promisedAt,
           openingConsent: _openingConsentProof,
-          ...fields
+          isRepeat: _isRepeat,
+        previousJobId: _previousJobId,
+        repeatReason: _repeatReason,
+        ...fields
         } = data;
         const now = new Date();
 
@@ -479,7 +484,10 @@ export class JobCardWorkflowService {
           data: {
             ...fields,
             openingConsent,
-            serviceCharge,
+            isRepeat: Boolean(repeat),
+          previousJobId: repeat?.previous.id ?? null,
+          repeatReason: repeatNote,
+          serviceCharge,
             tyres,
             batteryMake,
             acFitted: data.acType ? data.acType !== "NONE" : data.acFitted,
@@ -503,7 +511,11 @@ export class JobCardWorkflowService {
             createdById,
             promisedAt: new Date(promisedAt),
             status: "OPEN",
-            jobNumber: await nextDocumentNumber(tx, "JOB_CARD"),
+            jobType,
+          pdiRegistration: pdi ? (options.pdiRegistration?.trim().toUpperCase() || pdiRegistrationFromVin(vehicle.vin)) : undefined,
+          jobNumber: pdi
+            ? pdiDocumentNumber("JOB_CARD", await nextSequenceNumber(tx, pdiSequenceKey("JOB_CARD")))
+            : await nextDocumentNumber(tx, "JOB_CARD"),
 
             complaints: {
               create: complaints,
@@ -546,6 +558,12 @@ export class JobCardWorkflowService {
           },
         });
 
+      if (repeat && repeatWindow)
+        await createRepeatRecord(tx, { jobCardId: card.id, branchId: branch.id, repeat, window: repeatWindow, note: repeatNote });
+
+      // A service job is the visit for the vehicle's open CSC cases (never blocks the opening).
+      if (!pdi) await matchCasesSafely(tx, { jobCardId: card.id, vehicleId: vehicle.id, at: card.createdAt, actorId: createdById });
+
         if (data.appointmentId) {
           await tx.serviceAppointment.update({
             where: { id: data.appointmentId },
@@ -585,7 +603,10 @@ export class JobCardWorkflowService {
               ? data.mileage
               : Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage),
             lastMileageAt: now,
-          },
+            // PDI tyres (up to five makes and numbers) are saved to the vehicle.
+          ...(pdi && tyres ? { tyres: tyres as unknown as Prisma.InputJsonValue } : {}),
+          ...(pdi && batteryMake !== undefined ? { batteryMake, batteryNumber: data.batteryNumber ?? null } : {}),
+        },
         });
 
         if (openCampaigns.length > 0) {
@@ -606,7 +627,7 @@ export class JobCardWorkflowService {
         }
 
         const warrantyCase =
-          check.coverage.status === WarrantyCoverageStatus.ACTIVE
+          !pdi && check.coverage.status === WarrantyCoverageStatus.ACTIVE
             ? await new WarrantyCaseService().openForJobCard(tx, {
                 jobCardId: card.id,
                 vehicleId: vehicle.id,
@@ -662,6 +683,9 @@ export class JobCardWorkflowService {
 
         if (!current) throw new NotFoundError("Job card not found");
         current.invoices.push(...(current.consolidatedInvoices ?? []));
+      // PDI jobs move through the PDI screens (work done, vehicle ready, bill); only delivery is shared.
+      if (current.jobType === JobCardType.PDI && (data.status !== "DELIVERED" || Object.entries(data).some(([key, value]) => value !== undefined && !["status", "deliveryAdvisorId", "lateReasonIds", "lateRemarks", "remarks"].includes(key))))
+        throw new BadRequestError("PDI job cards are updated from the PDI menu");
 
         const from = canonicalJobStatus(current.status);
 
@@ -804,7 +828,8 @@ export class JobCardWorkflowService {
             update.deliveredAt = now;
             update.deliveryAdvisorId = data.deliveryAdvisorId;
             update.lateReasonIds = data.lateReasonIds ?? [];
-            update.gatePassNumber = await nextDocumentNumber(
+            update.lateRemarks = data.lateRemarks?.trim() || null;
+          update.gatePassNumber = await nextDocumentNumber(
               tx,
               "GATE_PASS",
               now,

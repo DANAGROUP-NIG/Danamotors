@@ -14,6 +14,8 @@ export async function getJobCardsRequest(params?: {
   search?: string;
   status?: string;
   unassignedTechnician?: boolean;
+  /** SERVICE (server default), PDI, ALL, or HISTORY (PDI only when the PDI setting includes it). */
+  jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
   dateFrom?: string;
   dateTo?: string;
 }): Promise<JobCardListResponse> {
@@ -24,6 +26,7 @@ export async function getJobCardsRequest(params?: {
   if (params?.customerId) query.set("customerId", params.customerId);
   if (params?.search) query.set("search", params.search);
   if (params?.status) query.set("status", params.status);
+  if (params?.jobType) query.set("jobType", params.jobType);
   if (params?.unassignedTechnician) query.set("unassignedTechnician", "true");
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);

@@ -62,7 +62,19 @@ export interface ReportBody<Row extends ReportRow = ReportRow> {
   breakdown?: BreakdownItem[];
   /** Columns that depend on the data (months, service types, branches) for matrix reports. */
   columns?: ReportColumnDef[];
+  /** Summary tables shown after the detail (screen, print and Excel); left out in detail mode. */
+  sections?: ReportSection[];
   truncated?: boolean;
+}
+
+/** A small summary table with its own columns, e.g. late jobs by model, service type and reason. */
+export interface ReportSection {
+  key: string;
+  title: string;
+  columns: ReportColumnDef[];
+  rows: ReportRow[];
+  /** The section's total line (same keys as the rows); the first column holds its label. */
+  total?: ReportRow;
 }
 
 export interface ReportColumnDef {
@@ -117,6 +129,8 @@ export interface ReportDefinition<Q extends BaseReportQuery = BaseReportQuery> {
   /** Zod schema for req.query. */
   query: z.ZodType<Q, z.ZodTypeDef, unknown>;
   filterKeys: FilterKey[];
+  /** Report-specific names for shared filters (e.g. the advisor filter of the repeat reports). */
+  filterLabels?: Partial<Record<FilterKey, string>>;
   /** Report-specific query parameters for the API docs (shared ones are added automatically). */
   params?: ReportParamDoc[];
   example?: Record<string, unknown>;

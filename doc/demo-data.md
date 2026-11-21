@@ -26,6 +26,25 @@ Before running:
   Store and billing users are used when present; otherwise the service adviser stands in.
 - The two branches must exist and be active. The defaults are `Main Branch` and `Dana Motors Demo` (the Demo account's two branches). Pass other names with `-- --main-branch="…" --second-branch="…"`; for example, a local database built with `npm run prisma:seed` has `Abuja Branch` instead, so add `-- --second-branch="Abuja Branch"` there.
 
+Only the repeat job demo: `npm run prisma:seed:demo -- --repeat-only` (needs the repeat job migration). It sets
+the repeat window to 15 days / 500 km at the main branch and 45 days / 4,000 km at the second branch, adds customer
+`DEMO-C31` with vehicles `LSR-701RP`…`LSR-708RP`, earlier visits as finished history, and opens repeat visits
+today through the app (RPT-1…RPT-5: automatic pending, automatic by km, confirmed, not a repeat, manual).
+RPT-6…RPT-8 have no new job, for testing the opening form. See `doc/repeat-jobs-testing-guide.md`.
+
+Only the CSC demo: `npm run prisma:seed:demo -- --csc-only` (needs the CSC migration). It adds customer
+`DEMO-C41` with vehicles `LSC-101CS`…`LSC-114CS` (ABC-112CS at the second branch), earlier visits as finished
+history, generates the cases due from 45 days ago to 30 days ahead through the app, and records follow-ups
+through the app: a booking (CSC-5), a call before the vehicle went overdue (CSC-6), final closures (CSC-9 R0004,
+CSC-10 R0003) and a partial closure (CSC-11 R0001). CSC-8 is already visited; CSC-14 is left out. See
+`doc/csc-testing-guide.md`.
+
+Only the late delivery demo: `npm run prisma:seed:demo -- --late-only` (needs the late deliveries migration). It
+adds customers `DEMO-C51` (main branch) and `DEMO-C52` (second branch) with vehicles `LSL-801LD`…`LSL-809LD` and
+`ABJ-810LD`, and finished jobs `DM-LATE-1`…`DM-LATE-10` at fixed January 2026 dates: late by date (one just after
+midnight), late by time, on time, exactly on time, not delivered, and one at the second branch. Some have reasons and
+remarks, some none. See `doc/late-deliveries-testing-guide.md`.
+
 The run prints a summary at the end. It lists the job numbers, bills (with VAT and round-off), warranty case numbers, stock per branch, campaign VIN statuses and the warranty check result for each vehicle. Share it with the testers.
 
 ## Re-run

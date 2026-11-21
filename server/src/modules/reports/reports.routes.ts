@@ -1,3 +1,4 @@
+import { getPdiSettings } from '../pdi/pdi.settings.service';
 import { Router, Request } from 'express';
 import prisma from '../../prisma/client';
 import { authMiddleware } from '../../middleware/authMiddleware';
@@ -115,6 +116,9 @@ for (const slug of REPORT_SLUGS)
             const input: ReportInput = { ...req.query, branchId: reportBranch(req, req.query.branchId as string | undefined) };
             if (slug === 'vehicle-history-card' && input.includePdi === 'true' && req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.permissions.includes('pdi:read'))
                 throw new ForbiddenError('Including PDI requires pdi:read');
+            // Company setting "Include PDI in vehicle history" (default off) applies to the history card.
+            if (slug === 'vehicle-history-card' && req.query.includePdi === undefined && (await getPdiSettings()).includeInHistory)
+                input.includePdi = 'true';
             res.setHeader('Cache-Control', 'no-store');
             res.json({ status: 'success', statusCode: 200, data: await new ReportsService().report(slug, input) });
         }

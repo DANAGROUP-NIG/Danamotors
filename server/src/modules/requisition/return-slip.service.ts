@@ -1,5 +1,7 @@
 import { jobWorkUpdate } from "./requisition-work";
-import { ChargeType, Prisma } from "@prisma/client";
+import { ChargeType, JobCardType, Prisma } from "@prisma/client";
+import { assertJobTypeAccess, pdiDocumentNumber, pdiSequenceKey } from '../pdi/pdi.logic';
+import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
 import prisma from "../../prisma/client";
 import {
   BadRequestError,
@@ -208,7 +210,10 @@ export class ReturnSlipService {
           include: { invoices: { select: { status: true } } },
         });
         assertRequisitionJob(job);
-        const requisition = await tx.partRequisition.findUniqueOrThrow({
+        assertJobTypeAccess(job, actor);
+      const pdi = job.jobType === JobCardType.PDI;
+      if (pdi) await assertPdiDocumentChange(tx, 'return', new Date(), { create: true });
+      const requisition = await tx.partRequisition.findUniqueOrThrow({
           where: { id: initial.id },
           include: { lines: { include: lineInclude } },
         });
@@ -240,7 +245,9 @@ export class ReturnSlipService {
         for (const { line } of rows)
           await tx.$queryRaw`SELECT id FROM "InventoryStock" WHERE "branchId" = ${requisition.branchId} AND "partId" = ${line.sparePartId} FOR UPDATE`;
         const now = new Date();
-        const returnNumber = await nextSequenceNumber(
+        const returnNumber = pdi
+        ? pdiDocumentNumber('RETURN', await nextSequenceNumber(tx, pdiSequenceKey('RETURN', requisition.branchId), new Date(year, 6, 1)))
+        : await nextSequenceNumber(
           tx,
           `RETURN_${requisition.branchId}`,
           now,
@@ -347,7 +354,9 @@ export class ReturnSlipService {
           include: { invoices: { select: { status: true } } },
         });
         assertRequisitionJob(job);
-        const slip = await tx.partReturnSlip.findUniqueOrThrow({
+        assertJobTypeAccess(job, actor);
+      if (job.jobType === JobCardType.PDI) await assertPdiDocumentChange(tx, 'return', initial.returnDate, { printedAt: initial.printedAt });
+      const slip = await tx.partReturnSlip.findUniqueOrThrow({
           where: { id },
           include: {
             requisition: true,

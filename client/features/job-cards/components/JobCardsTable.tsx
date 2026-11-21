@@ -1,4 +1,5 @@
 "use client";
+import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 import {
   JOB_CARD_STATUS_LABELS,
   JOB_CARD_STATUS_TONES,
@@ -180,7 +181,12 @@ export function JobCardsTable() {
   const columns: Column<JobCard>[] = [
     {
       header: "Job #",
-      render: (jc) => <span className="font-medium">{jc.jobNumber}</span>,
+      render: (jc) => (
+        <div className="flex flex-col items-start gap-1">
+          <span className="font-medium">{jc.jobNumber}</span>
+          {jc.repeatRecord && <RepeatTag status={jc.repeatRecord.status} />}
+        </div>
+      ),
     },
     {
       header: "Vehicle Reg No",

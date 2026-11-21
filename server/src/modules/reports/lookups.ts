@@ -17,6 +17,7 @@ export const LOOKUP_SOURCES = [
   'serviceGroup',
   'partCategory',
   'freeService',
+  'cscReason',
 ] as const;
 export type LookupSource = (typeof LOOKUP_SOURCES)[number];
 
@@ -81,6 +82,12 @@ export async function listLookup(db: ReportDb, scope: ReportScope, source: Looku
       orderBy: [{ active: 'desc' }, { displayOrder: { sort: 'asc', nulls: 'last' } }, { code: 'asc' }],
     });
     return types.map((t) => ({ id: t.id, label: t.description, code: t.code, active: t.active }));
+  }
+
+  if (source === 'cscReason') {
+    // CSC closure reasons, deactivated ones flagged.
+    const reasons = await db.cscCloseReason.findMany({ select: { id: true, code: true, description: true, active: true }, orderBy: [{ active: 'desc' }, { code: 'asc' }] });
+    return reasons.map((r) => ({ id: r.id, label: `${r.code} · ${r.description}`, code: r.code, active: r.active }));
   }
 
   if (source === 'partCategory') {

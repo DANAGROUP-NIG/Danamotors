@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { seedServiceTypes } from './service-type-data';
+import { LATE_REASONS } from '../../src/modules/late-delivery/late-delivery.logic';
 
 export default async function seedWorkshop(prisma: PrismaClient) {
   const master = (
@@ -17,6 +18,8 @@ export default async function seedWorkshop(prisma: PrismaClient) {
       fuel?: string;
       gearbox?: string;
       acFitted?: boolean;
+      displayOrder?: number;
+      attributes?: { isNotRepeat: boolean };
     } = {},
   ) => prisma.workshopMaster.upsert({
     where: {
@@ -51,8 +54,15 @@ export default async function seedWorkshop(prisma: PrismaClient) {
   await master('COMPLAINT', 'SG', 'Service and general check-up');
   await master('COMPLAINT', 'BN', 'Brake noise');
   await master('TEAM', 'A', 'Workshop team A');
-  await master('LATE_REASON', 'PARTS', 'Awaiting parts');
-  await master('LATE_REASON', 'APPROVAL', 'Awaiting customer approval');
+  // Late-delivery reasons 1-6 (legacy legend); the late deliveries migration seeds the same rows.
+  for (const [index, description] of LATE_REASONS.entries())
+    await master('LATE_REASON', String(index + 1), description, { displayOrder: index + 1 });
+  // TODO(confirm): the earlier "Awaiting parts" / "Awaiting customer approval" overlap with 2 and 4; kept inactive.
+  await prisma.workshopMaster.updateMany({ where: { kind: 'LATE_REASON', code: { in: ['PARTS', 'APPROVAL'] }, active: true }, data: { active: false, displayOrder: 90 } });
+  // Repeat job reason codes (legacy legend); the migration seeds the same rows.
+  const repeatReasons = ['Not a repeat job', 'Component failure', 'Wrong diagnosis by supervisor', 'Road test not conducted', 'Workmanship problem', 'Engineer negligence', 'Spares unavailable'];
+  for (const [code, description] of repeatReasons.entries())
+    await master('REPEAT_REASON', String(code), description, { displayOrder: code, attributes: { isNotRepeat: code === 0 } });
   const make = await master('MAKE', 'KIA', 'Kia');
 
   const product = await master('PRODUCT', 'KIA-P', 'Passenger', {

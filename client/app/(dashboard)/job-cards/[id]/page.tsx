@@ -16,6 +16,9 @@ import {
   moneyText,
 } from "@/features/service-transactions/transaction.logic";
 import { WORKSPACE_COPY } from "@/features/job-cards/components/repair-workspace-copy";
+import { JobCardRepeatPanel } from "@/features/repeat-jobs/components/JobCardRepeatPanel";
+import { JobCardLatePanel } from "@/features/late-deliveries/components/JobCardLatePanel";
+import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -253,8 +256,9 @@ export default function JobCardDetailPage() {
         <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 print:border print:shadow-none">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-xl font-semibold text-slate-800">
+              <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold text-slate-800">
                 {jobCard.jobNumber}
+                {jobCard.repeatRecord && <RepeatTag status={jobCard.repeatRecord.status} className="text-xs" />}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
                 {jobCard.description}
@@ -301,6 +305,11 @@ export default function JobCardDetailPage() {
             />
           </div>
         </div>
+
+        {/* Repeat block: previous job, days/km since and the review; prints when the branch setting is on. */}
+        <JobCardRepeatPanel jobCardId={jobCard.id} enabled={Boolean(jobCard.repeatRecord || jobCard.isRepeat)} />
+        {/* Delivered after the promise: reasons, remark and a link to the late-delivery entry screen. */}
+        <JobCardLatePanel jobCard={jobCard} />
 
         <CampaignPrintBox jobCard={jobCard} />
 
@@ -579,21 +588,6 @@ export default function JobCardDetailPage() {
               {complaint.description}
             </p>
           ))}
-          {jobCard.isRepeat && (
-            <p>
-              Repeat job: {jobCard.repeatReason}{" "}
-              {jobCard.previousJob && (
-                <Link
-                  className="text-primary underline"
-                  href={`/job-cards/${jobCard.previousJob.id}`}
-                >
-                  {jobCard.previousJob.jobNumber} (
-                  {jobCard.previousJob.technician?.firstName}{" "}
-                  {jobCard.previousJob.technician?.lastName})
-                </Link>
-              )}
-            </p>
-          )}
           {jobCard.observations && (
             <div>
               <h3 className="text-sm font-semibold">Observations</h3>

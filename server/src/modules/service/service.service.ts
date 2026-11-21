@@ -1,3 +1,4 @@
+import { getPdiSettings } from "../pdi/pdi.settings.service";
 import { BookingFields, bookingRelations } from "./booking.persistence";
 import {
   assertBookable,
@@ -609,9 +610,16 @@ export class ServiceService {
     search?: string;
     status?: string;
     unassignedTechnician?: boolean;
+    jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
     dateFrom?: string;
     dateTo?: string;
   }) {
+    const jobType =
+      params?.jobType === "HISTORY"
+        ? (await getPdiSettings()).includeInHistory
+          ? "ALL"
+          : "SERVICE"
+        : params?.jobType;
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -621,6 +629,7 @@ export class ServiceService {
     if (params?.status) where.status = jobStatusFilter(params.status);
 
     if (params?.unassignedTechnician) where.technicianId = null;
+    if (jobType !== "ALL") where.jobType = jobType ?? "SERVICE";
 
     if (params?.search) {
       where.OR = [
@@ -682,6 +691,7 @@ export class ServiceService {
         search: params?.search,
         status: params?.status,
         unassignedTechnician: params?.unassignedTechnician,
+        jobType,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
       }),

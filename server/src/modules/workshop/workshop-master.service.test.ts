@@ -51,7 +51,7 @@ it('lets geography move to another parent but keeps catalogue parents fixed', as
 it('upserts a defect estimate only for a defect and an active model', async () => {
   const amounts = { partAmount: 42000, oilAmount: 5200, labourAmount: 50000 };
   await service.saveEstimate(id, parentId, amounts);
-  expect(prisma.workshopMaster.findFirst).toHaveBeenNthCalledWith(1, { where: { id, kind: 'COMPLAINT' } });
+  expect(prisma.workshopMaster.findFirst).toHaveBeenNthCalledWith(1, { where: { id, kind: { in: ['COMPLAINT', 'PDI_DEFECT'] } } });
   expect(prisma.workshopMaster.findFirst).toHaveBeenNthCalledWith(2, { where: { id: parentId, kind: 'MODEL', active: true } });
   expect(prisma.defectModelEstimate.upsert).toHaveBeenCalledWith(expect.objectContaining({
     where: { defectId_modelId: { defectId: id, modelId: parentId } }, update: amounts,

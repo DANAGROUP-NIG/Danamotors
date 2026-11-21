@@ -1,10 +1,12 @@
 import { jobWorkUpdate } from '../requisition/requisition-work';
-import { Prisma } from '@prisma/client';
+import { JobCardType, Prisma } from '@prisma/client';
+import { assertJobTypeAccess, pdiDocumentNumber, pdiSequenceKey } from '../pdi/pdi.logic';
+import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../shared/errors/appError';
 import { nextSequenceNumber } from '../../shared/db/documentSequence';
 import { assertChargeChange } from '../job-card-line/jobCardLine.logic';
-import { assertRequisitionBranch, assertRequisitionJob } from '../requisition/requisition.logic';
+import { assertRequisitionBranch, assertRequisitionJob, requisitionWorkUpdate } from '../requisition/requisition.logic';
 import { assertApprovedOperation } from './estimate-approval';
 import { LabourService } from './labour.service';
 import { LabourSlipActor, labourSlipFooter } from './labour-slip.logic';
@@ -46,6 +48,7 @@ export class LabourSlipService {
     if (!job) throw new NotFoundError('Job card not found');
     assertRequisitionBranch(actor, job.branchId, 'labour slips');
     assertRequisitionJob(job, 'Labour slips');
+    assertJobTypeAccess(job, actor);
     return job;
   }
 
@@ -62,7 +65,7 @@ export class LabourSlipService {
       if (!actor.goodwill) throw new ForbiddenError('Goodwill labour requires warranty:update');
       if (!reason?.trim()) throw new BadRequestError('Goodwill labour requires a reason');
     }
-    const { campaignId } = assertChargeChange({ to: input.chargeType, campaignId: input.campaignId, kind: 'LABOUR', coverageAtCreation: job.warrantyStatusAtCreation, hasWarrantyCase: !!job.warrantyCase, partWarrantyApplicable: null, linkedCampaignIds: job.campaigns.map(row => row.campaignId), canChargeGoodwill: actor.goodwill });
+    const { campaignId } = assertChargeChange({ to: input.chargeType, campaignId: input.campaignId, kind: 'LABOUR', coverageAtCreation: job.warrantyStatusAtCreation, hasWarrantyCase: !!job.warrantyCase, partWarrantyApplicable: null, linkedCampaignIds: job.campaigns.map(row => row.campaignId), canChargeGoodwill: actor.goodwill, pdi: job.jobType === JobCardType.PDI });
     const groupId = input.groupId ?? slip.groupId;
     await this.validateGroup(tx, groupId);
     const sameItem = existing?.labourItemId === input.labourItemId;
@@ -74,7 +77,8 @@ export class LabourSlipService {
     });
     const quantity = values.pricing === 'FIXED' ? 1 : values.hours;
     const previous = await tx.jobCardLabour.findMany({ where: { jobCardId: job.id, labourItemId: input.labourItemId, id: lineId ? { not: lineId } : undefined }, include: { chargeLine: true } });
-    await assertApprovedOperation(tx, job.id, job.customerId, [
+    // PDI: the defects grid is the internal estimate; no signed estimate gate (TODO(confirm)).
+    if (job.jobType !== JobCardType.PDI) await assertApprovedOperation(tx, job.id, job.customerId, [
       ...previous.map(row => ({ type: 'LABOUR', referenceId: row.labourItemId, description: row.description, quantity: row.labourSlipId ? row.chargeLine?.quantity ?? row.hours : row.hours, rate: row.rate, amount: row.amount })),
       { type: 'LABOUR', referenceId: values.labourItemId, description: values.description, quantity, rate: values.rate, amount: values.amount },
     ]);
@@ -96,10 +100,18 @@ export class LabourSlipService {
       if (job.branchId !== input.branchId) throw new BadRequestError('Job card must belong to the labour slip branch');
       await this.validateGroup(tx, input.groupId);
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
-      const slipNumber = await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`);
-      const slip = await tx.labourSlip.create({ data: { branchId: input.branchId, jobCardId: job.id, groupId: input.groupId, engineerId: input.engineerId, createdById: actor.userId, slipNumber } });
+      const now = new Date();
+      const pdi = job.jobType === JobCardType.PDI;
+      if (pdi) await assertPdiDocumentChange(tx, 'labour', now, { create: true });
+      const slipNumber = pdi
+        ? pdiDocumentNumber('LABOUR_SLIP', await nextSequenceNumber(tx, pdiSequenceKey('LABOUR_SLIP', input.branchId), now))
+        : await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, now);
+      const slip = await tx.labourSlip.create({ data: { branchId: input.branchId, jobCardId: job.id, groupId: input.groupId, engineerId: input.engineerId, mileage: input.mileage ?? (pdi ? job.mileage : undefined), createdById: actor.userId, slipNumber } });
       for (const line of input.lines) await this.saveLine(tx, slip, job, line, actor);
-      await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId, 'Labour slip') });
+      await tx.jobCard.update({
+        where: { id: job.id },
+        data: pdi ? requisitionWorkUpdate(job.status, actor.userId, 'Labour slip') : await jobWorkUpdate(tx, job, actor.userId, 'Labour slip'),
+      });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'LABOUR_SLIP_CREATED', details: JSON.stringify({ labourSlipId: slip.id, slipNumber, branchId: job.branchId, jobCardId: job.id }) } });
       return this.get(slip.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
@@ -113,9 +125,15 @@ export class LabourSlipService {
       if (!slip) throw new NotFoundError('Labour slip not found');
       assertRequisitionBranch(actor, slip.branchId, 'labour slips');
       const job = await this.lockJob(tx, slip.jobCardId, actor);
+      if (job.jobType === JobCardType.PDI) await assertPdiDocumentChange(tx, 'labour', slip.slipDate, { printedAt: slip.printedAt });
       await this.saveLine(tx, slip, job, parsed.data, actor, lineId);
       await tx.labourSlip.update({ where: { id }, data: { updatedAt: new Date() } });
-      await tx.jobCard.update({ where: { id: job.id }, data: await jobWorkUpdate(tx, job, actor.userId, 'Labour slip') });
+      await tx.jobCard.update({
+        where: { id: job.id },
+        data: job.jobType === JobCardType.PDI
+          ? requisitionWorkUpdate(job.status, actor.userId, 'Labour slip')
+          : await jobWorkUpdate(tx, job, actor.userId, 'Labour slip'),
+      });
       return this.get(id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
   }

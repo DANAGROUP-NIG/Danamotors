@@ -171,6 +171,8 @@ export class JobBillingService {
   private assertBillable(
     jobCard: Awaited<ReturnType<JobBillingService["loadJobCard"]>>,
   ) {
+    if (jobCard.jobType === "PDI")
+      throw new BadRequestError("PDI jobs are billed from the PDI menu");
     assertJobBillingReady(jobCard);
     if (
       jobCard.billedAt ||
@@ -329,6 +331,7 @@ export class JobBillingService {
           },
         ],
         billedAt: null,
+        jobType: "SERVICE",
         qcStatus: { equals: "PASSED", mode: "insensitive" },
         ...(branchId ? { branchId } : {}),
         invoices: {
@@ -708,7 +711,8 @@ export class JobBillingService {
     }
   }
 
-  async cancelJobBill(id: string, cancelledById: string, remark: string) {
+  // options.pdi: called from the PDI bill service. PDI and service bills are cancelled from their own menus.
+  async cancelJobBill(id: string, cancelledById: string, remark: string, options: { pdi?: boolean } = {}) {
     return prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw<Array<{ id: string }>>(
@@ -719,12 +723,15 @@ export class JobBillingService {
           include: { jobCards: { select: { id: true } } },
         });
         if (!invoice) throw new NotFoundError("Invoice not found");
-        if (!invoice.jobCardId)
-          throw new BadRequestError(
-            "Only job bills can be cancelled through this action",
-          );
-        if (!remark.trim())
-          throw new BadRequestError("A cancellation remark is required");
+        if (!invoice.jobCardId) throw new BadRequestError("Only job bills can be cancelled through this action");
+        const billedJob = await transaction.jobCard.findUnique({
+          where: { id: invoice.jobCardId },
+          select: { jobType: true, vehicleId: true },
+        });
+        const pdiBill = billedJob?.jobType === "PDI";
+        if (pdiBill !== Boolean(options.pdi))
+          throw new BadRequestError(pdiBill ? "Cancel PDI bills from the PDI menu" : "This is not a PDI bill");
+        if (!remark.trim()) throw new BadRequestError("A cancellation remark is required");
         if (!isActiveBillStatus(invoice.status))
           throw new BadRequestError("This bill is already cancelled");
         if (
@@ -803,6 +810,14 @@ export class JobBillingService {
             where: { id: linkedCard.id, billedAt: { not: null } },
             data: { billedAt: null, status: "READY" },
           });
+        }
+        // A cancelled PDI bill undoes "PDI done" unless another active PDI bill exists for the vehicle.
+        if (pdiBill && billedJob?.vehicleId) {
+          const otherPdiBill = await transaction.invoice.findFirst({
+            where: { id: { not: id }, jobCard: { vehicleId: billedJob.vehicleId, jobType: "PDI" }, status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
+            orderBy: { issuedDate: "desc" }, select: { issuedDate: true },
+          });
+          await transaction.vehicle.update({ where: { id: billedJob.vehicleId }, data: { pdiDone: !!otherPdiBill, pdiDate: otherPdiBill?.issuedDate ?? null } });
         }
         return cancelled;
       },

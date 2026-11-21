@@ -39,7 +39,7 @@ const responseSchema = (example?: Record<string, unknown>) => ({
     statusCode: { type: 'integer', example: 200 },
     data: {
       type: 'object',
-      description: `report, filters (query and applied labels), rows (omitted in summary mode, at most ${MAX_REPORT_ROWS}), groups with subtotals, totals, summary and meta.`,
+      description: `report, filters (query and applied labels), rows (omitted in summary mode, at most ${MAX_REPORT_ROWS}), groups with subtotals, totals, summary, sections (summary tables of some reports, omitted in detail mode) and meta.`,
       ...(example ? { example } : {}),
     },
   },

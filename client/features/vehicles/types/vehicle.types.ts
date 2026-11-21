@@ -39,7 +39,7 @@ export type Vehicle = VehicleLegacyFields & {
 
   catalogue?: { acFitted: boolean; description: string; parent?: { description: string } | null } | null;
   ownerships?: { id: string; purchaseDate: string; saleDate?: string | null; customer?: { firstName: string; lastName: string; companyName?: string | null } }[];
-  jobCards?: { id: string; jobNumber: string; createdAt: string; status: string; mileage?: number | null; description: string; workDone?: string | null }[];
+  jobCards?: { id: string; jobNumber: string; createdAt: string; status: string; mileage?: number | null; description: string; workDone?: string | null; isRepeat?: boolean; repeatRecord?: { id: string; status: "PENDING_REVIEW" | "CONFIRMED" | "NOT_REPEAT"; source: "AUTOMATIC" | "MANUAL" } | null }[];
   id: string;
   catalogueId?: string | null;
   colourId?: string | null;

@@ -124,6 +124,9 @@ export const listJobCardsSchema = z.object({
       search: z.string().optional(),
       status: z.string().optional(),
       unassignedTechnician: z.enum(["true", "false"]).optional(),
+      // SERVICE (default) lists service jobs only; PDI jobs have their own menu.
+      // HISTORY: a vehicle's history; includes PDI only when the PDI setting says so.
+      jobType: z.enum(["SERVICE", "PDI", "ALL", "HISTORY"]).optional(),
       dateFrom: jobCardDate.optional(),
       dateTo: jobCardDate.optional(),
     })
@@ -192,14 +195,15 @@ export const jobOpeningBody = z
   .strict()
   .superRefine((data, ctx) => {
     if (data.appointmentId && !data.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Accept the job opening terms before converting this appointment' });
-    if (data.isRepeat && (!data.previousJobId || !data.repeatReason))
+    // The reason is recorded at review; at opening the advisor may add a note (repeatReason).
+    if (data.isRepeat && !data.previousJobId)
       ctx.addIssue({
         code: "custom",
-        path: ["repeatReason"],
-        message: "A repeat requires a previous job and reason",
+        path: ["previousJobId"],
+        message: "Choose the previous job this visit repeats",
       });
 
-    if (!data.isRepeat && (data.previousJobId || data.repeatReason))
+    if (!data.isRepeat && data.previousJobId)
       ctx.addIssue({
         code: "custom",
         path: ["isRepeat"],
@@ -239,6 +243,8 @@ export const jobUpdateBody = z
         "Reasons must be distinct",
       )
       .optional(),
+    /** Delay remark recorded with the late-delivery reasons (internal). */
+    lateRemarks: z.string().trim().max(1000).optional(),
   })
   .strict();
 
