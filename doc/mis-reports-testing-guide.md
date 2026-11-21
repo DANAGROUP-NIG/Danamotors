@@ -164,7 +164,7 @@ resale date 10 days ago, recorded by the main branch admin. Vehicle `LSR-503MS` 
 ### S15. Management information report
 1. Period: the last 60 days, your branch. Run. Expected sections A (workshop), B, C, D, E, F/G, Purchases, Outstanding.
 2. A1 *Labour billed (net)* = S2 labour for the same period with no filters; A2 *Vehicles — total* = S2 vehicles;
-   A4 repeat jobs and A5 late deliveries match S5's counts; A6 reads *Not recorded*.
+   A4 repeat jobs and A5 late deliveries match S5's counts; A6 shows the PSF counts (contacted, satisfied, dissatisfied, not reachable, satisfaction %) from the follow-up entry screen.
 3. E *Workshop bills* + *Counter sale bills* = *Total billing*. Outstanding shows eight bands (up to 30 days … over
    240) and *Outstanding as % of billing*.
 4. As an admin: **Branch → All branches** → one column per branch plus **Total**; DM-MIS-07 appears in the second

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type PsfStatus } from '@prisma/client';
 import type { ServiceCategory } from '../../workshop/master-kinds';
 import { localDayRange } from '../core/dates';
 import { activeInvoiceSql, jobFilterSql, jobJoinsSql, type JobType } from '../core/sql';
@@ -67,6 +67,8 @@ export interface MisJob {
   serviceCharge: number;
   /** Labour net + spares and oil net of discount + service charge. */
   netValue: number;
+  /** Current post-service follow-up status (the last call), null when not followed up (#111). */
+  psfStatus?: PsfStatus | null;
 }
 
 interface MisJobRow extends Omit<MisJob, 'category' | 'labourNet' | 'sparesDiscount' | 'oilDiscount' | 'netValue'> {
@@ -164,7 +166,8 @@ export async function loadMisJobs(db: ReportDb, scope: ReportScope, query: MisJo
       ROUND(COALESCE(pt.accessories, 0), 2)::float8 AS "accessories",
       ROUND(COALESCE(pt.oil, 0), 2)::float8 AS "oil",
       ROUND(COALESCE(bl."partsDiscount", 0), 2)::float8 AS "partsDiscount",
-      ROUND(COALESCE(j."serviceCharge", 0)::numeric, 2)::float8 AS "serviceCharge"
+      ROUND(COALESCE(j."serviceCharge", 0)::numeric, 2)::float8 AS "serviceCharge",
+      (SELECT f."status" FROM "PsfFollowUp" f WHERE f."jobCardId" = j."id") AS "psfStatus"
     FROM jobs
     JOIN "JobCard" j ON j."id" = jobs."id"
     ${jobJoinsSql}

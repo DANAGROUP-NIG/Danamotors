@@ -160,6 +160,27 @@ detail mode, and in summary mode they replace the detail table.
 Grants: ServiceManager, WorkshopManager, Admin and SuperAdmin (reports and entry); Auditor (reports only).
 TODO(confirm) other roles with the business.
 
+## Service · Follow-up (PSF)
+
+Eight reports on post-service follow-up calls (#111; rules in `doc/psf.md`). The period filters the **delivery**
+date (Africa/Lagos days). Only delivered, not cancelled, non-PDI jobs count, each at its **current** status (its last
+call). Followed up = status 1–5; contacted = satisfied + dissatisfied; satisfaction % = satisfied ÷ contacted.
+
+| Report | Slug / permission | Width | Content |
+|---|---|---|---|
+| Post-service follow-up list | `psf-followup-list` / `psf:read` | 132 | Who to call: job, delivery date, registration, model, customer, every phone, address (*With address*), preferred day / time, service, labour codes (major highlighted), status, calls. Options: *100% follow-up* or *Major labour*; *Only labour marked for follow-up analysis*; *Include accidental vehicles*; customers not contacted *Include / Not include / Only* |
+| Customer follow-up analysis | `psf-analysis` / `report:psf-analysis` | 80 | Jobs at each status (1–5) and *Not followed up*, % of delivered and of followed up; with *Print labour-wise satisfaction*, a section per labour / service code from the last call's lines |
+| Customer follow-up analysis, model-wise | `psf-analysis-model` / `report:psf-analysis-model` | 80 | One row per model: delivered, followed up, each status, not followed, satisfaction %. *From model* / *To model* keep models whose names lie between the two; with neither, totals equal the plain analysis |
+| Follow-up list for dissatisfied customers | `psf-dissatisfied` / `report:psf-dissatisfied` | 132 | Current status 2: the lines marked dissatisfied, remark, who called, service advisor. Model filter, *With address* |
+| List of follow-up closed | `psf-closed` / `report:psf-closed` | 132 | Current status 5: status before closing, closing remark, closed by / on |
+| Vehicle follow-up history | `psf-history` / `report:psf-history` | 132 | Every call on one vehicle's jobs (registration required): attempt, date, caller, status, remark, booking; *With labour details* adds each line's status. *All delivery dates* ignores the period |
+| Customer follow-up letter | `psf-letter` / `psf:letter` | 80 | One row and one letter per customer in the chosen groups (*no phone*: status 3, or never followed up with no phone on record; *not available*: status 4; *not followed up*). Customers without a street address are listed but get no letter (counted). *Print list* / *Print letters* |
+| Mailing list | `psf-mailing-list` / `psf:letter` | 80 | Customers of the branch (not vendors, not merged) with a street address, by name; *City* (lookup `customerCity`) or all; *Print as* document or A4 labels (3 × 8). Customers without an address are counted. *Registration address* lists the same address: customers have one (TODO(confirm) #111 question 5) |
+
+Grants (TODO(confirm) #111 question 2): ServiceManager, CCUManager, Admin, SuperAdmin: all. CCUOfficer: `psf:read`,
+`psf:update`, `psf:letter`, dissatisfied and history. WorkshopManager and Auditor: `psf:read` and the five reports.
+The Service MIS management report's A6 lines read the same current status.
+
 ## Service · FPC reports (#98)
 
 Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) with a **Show** choice, plus the analysis
@@ -202,8 +223,9 @@ Legacy *Service → FPC Bulletin*: the five vehicle lists are one report (F1) wi
 
 ### Settings
 
-`GET /api/reports/settings` (any report permission) returns the FPC letter template and its placeholders.
-`PUT /api/reports/settings` (`report:settings`) saves it; `{ "fpcLetterTemplate": null }` resets it to the default.
+`GET /api/reports/settings` (any report permission) returns the FPC and the PSF follow-up letter templates and their
+placeholders. `PUT /api/reports/settings` (`report:settings`) saves either or both (`fpcLetterTemplate`,
+`psfLetterTemplate`; a template left out is not changed); `null` resets one to the default.
 Unknown `{{placeholders}}` are rejected. TODO(confirm): match the template to a printed legacy FPC letter (#98 question 5).
 
 ## Service MIS reports (#97)
@@ -284,7 +306,7 @@ Legacy *Service → MIS Reports*. The hub lists them under **Service MIS**. All 
   vendor MRNs, and outstanding from the age-wise party outstanding as on the end date in the legacy eight bands.
   C and D need `stock:read`, outstanding needs `report:party-outstanding-age`; a section the user may not see is left
   out. *All branches* needs `inventory:cross-branch` (or `branch:all`) and gives one column per branch plus a total.
-  A6 (PSF satisfaction) shows *not recorded* until a follow-up module exists.
+  A6 (PSF) reads each job's current post-service follow-up status (#111): customers contacted, satisfied, dissatisfied, not reachable and satisfaction % (satisfied ÷ contacted).
 
 ### Legacy screens merged or left out
 
