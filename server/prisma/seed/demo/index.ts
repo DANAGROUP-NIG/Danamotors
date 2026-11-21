@@ -8,6 +8,7 @@
  *   npm run prisma:seed:demo -- --repeat-only        only the repeat job demo (earlier visits, repeats at every review step)
  *   npm run prisma:seed:demo -- --csc-only           only the CSC demo (service due cases at every follow-up step)
  *   npm run prisma:seed:demo -- --late-only          only the late delivery demo (promised date / time discrepancies, January 2026)
+ *   npm run prisma:seed:demo -- --psf-only           only the post-service follow-up demo (delivered jobs and calls, February 2026)
  *
  * Options:
  *   --allow-database=<name>   required when the database name does not contain "demo"
@@ -32,14 +33,15 @@ import { seedPdi } from "./pdi";
 import { seedRepeat } from "./repeat";
 import { seedCsc } from "./csc";
 import { seedLate } from "./late";
+import { seedPsf } from "./psf";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS } from "./fixtures";
 
-const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
+const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
 function parseArgs(argv: string[]) {
-  const options = { resetTest: false, pdiOnly: false, repeatOnly: false, cscOnly: false, lateOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
+  const options = { resetTest: false, pdiOnly: false, repeatOnly: false, cscOnly: false, lateOnly: false, psfOnly: false, allowDatabase: undefined as string | undefined, mainBranch: "Main Branch", secondBranch: "Dana Motors Demo", help: false };
   for (const arg of argv) {
     const [name, ...rest] = arg.split("=");
     const value = rest.join("=");
@@ -48,6 +50,7 @@ function parseArgs(argv: string[]) {
     else if (name === "--repeat-only" && !value) options.repeatOnly = true;
     else if (name === "--csc-only" && !value) options.cscOnly = true;
     else if (name === "--late-only" && !value) options.lateOnly = true;
+    else if (name === "--psf-only" && !value) options.psfOnly = true;
     else if (name === "--help" || name === "-h") options.help = true;
     else if (name === "--allow-database" && value) options.allowDatabase = value;
     else if (name === "--main-branch" && value) options.mainBranch = value;
@@ -77,6 +80,11 @@ async function printCsc(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Await
 async function printLate(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
   console.log("Late deliveries (Lagos times):");
   for (const row of await seedLate(ctx, ref)) console.log(`  ${row.key} ${row.registration} ${row.jobNumber}: ${row.outcome}`);
+}
+
+async function printPsf(ctx: Awaited<ReturnType<typeof loadContext>>, ref: Awaited<ReturnType<typeof ensureReference>>) {
+  console.log("Post-service follow-up (Lagos times):");
+  for (const row of await seedPsf(ctx, ref)) console.log(`  ${row.key} ${row.registration} ${row.jobNumber}: ${row.outcome}`);
 }
 
 async function main() {
@@ -112,6 +120,11 @@ async function main() {
   if (options.lateOnly) {
     await printLate(ctx, ref);
     console.log(`\n${DEMO_TAG}: late delivery demo done. Running it again changes nothing.`);
+    return;
+  }
+  if (options.psfOnly) {
+    await printPsf(ctx, ref);
+    console.log(`\n${DEMO_TAG}: post-service follow-up demo done. Running it again changes nothing.`);
     return;
   }
   if (options.pdiOnly) {
@@ -154,6 +167,9 @@ async function main() {
 
   // Late deliveries: promised date / time discrepancies at fixed January 2026 dates.
   await printLate(ctx, ref);
+
+  // Post-service follow-up: delivered jobs and calls at fixed February 2026 dates.
+  await printPsf(ctx, ref);
 
   await printSummary(ctx);
   console.log(`\n${DEMO_TAG}: done. Running it again changes nothing; use --reset-test to reopen the TEST- warranty cases.`);
