@@ -14,6 +14,7 @@ export type LookupSource =
   | "engineer"
   | "serviceGroup"
   | "partCategory"
+  | "customerCity"
   | "freeService"
   | "cscReason";
 
@@ -31,13 +32,16 @@ export interface ReportSettings {
   fpcLetterTemplate: string;
   fpcLetterIsDefault: boolean;
   fpcLetterPlaceholders: string[];
+  psfLetterTemplate: string;
+  psfLetterIsDefault: boolean;
+  psfLetterPlaceholders: string[];
 }
 
 export function getReportSettingsRequest() {
   return apiGet<ReportSettings>("/reports/settings");
 }
 
-/** null resets the FPC letter to the default template. */
-export function saveReportSettingsRequest(body: { fpcLetterTemplate: string | null }) {
+/** null resets a letter to its default template; a letter left out is not changed. */
+export function saveReportSettingsRequest(body: { fpcLetterTemplate?: string | null; psfLetterTemplate?: string | null }) {
   return apiPut<ReportSettings>("/reports/settings", body);
 }
