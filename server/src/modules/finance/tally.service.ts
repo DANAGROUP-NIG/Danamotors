@@ -586,7 +586,7 @@ export class TallyService {
             }
             const entries: LedgerEntry[] = [
               {
-                name: invoice.customer.tallyLedger.name,
+                name: party,
                 amount: invoice.total,
                 bills: advanceBillReferences(
                   invoice.invoiceNumber,

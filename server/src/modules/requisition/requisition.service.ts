@@ -1,8 +1,3 @@
-import { jobWorkUpdate } from "./requisition-work";
-import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
-import { notifyWorkshopEvent } from "../notification/workshop-notifications";
-import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
-import { ChargeType, JobCardType, PartStatus, Prisma } from "@prisma/client";
 import {
   assertJobTypeAccess,
   pdiDocumentNumber,
@@ -10,6 +5,11 @@ import {
   pdiSequenceKey,
 } from "../pdi/pdi.logic";
 import { assertPdiDocumentChange } from "../pdi/pdi.settings.service";
+import { jobWorkUpdate } from "./requisition-work";
+import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
+import { notifyWorkshopEvent } from "../notification/workshop-notifications";
+import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
+import { ChargeType, JobCardType, PartStatus, Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import {
   BadRequestError,
@@ -27,6 +27,7 @@ import {
   RequisitionActor,
   requisitionAmounts,
   requisitionFooter,
+  requisitionWorkUpdate,
 } from "./requisition.logic";
 import {
   RequisitionInput,
@@ -153,11 +154,9 @@ export class RequisitionService {
         assertRequisitionJob(job);
         assertJobTypeAccess(job, actor);
         const pdi = job.jobType === JobCardType.PDI;
-        if (pdi)
-          await assertPdiDocumentChange(tx, "requisition", new Date(), {
-            create: true,
-          });
-        if (input.lines.some((line) => line.quantityIssued > 0))
+        const now = new Date();
+        if (pdi) await assertPdiDocumentChange(tx, "requisition", now, { create: true });
+        if (!pdi && input.lines.some((line) => line.quantityIssued > 0))
           assertPartsRequested(job);
         if (
           input.groupId &&
@@ -208,6 +207,7 @@ export class RequisitionService {
             partWarrantyApplicable: part.warrantyApplicable,
             linkedCampaignIds: job.campaigns.map((row) => row.campaignId),
             canChargeGoodwill: actor.goodwill,
+            pdi,
           });
           const rate = requisitionPartRate(part, input.chargeType);
           return {
@@ -257,7 +257,7 @@ export class RequisitionService {
             );
         }
         const issued = resolved.filter((item) => item.line.quantityIssued > 0);
-        if (issued.length) {
+        if (!pdi && issued.length) {
           const previous = await tx.partIssuance.findMany({
             where: {
               jobCardId: job.id,
@@ -313,12 +313,13 @@ export class RequisitionService {
             "parts issue",
           );
         }
-        const now = new Date();
-        const requisitionNumber = await nextSequenceNumber(
-          tx,
-          `REQUISITION_${input.branchId}`,
-          now,
-        );
+        const pdiDocument = pdiRequisitionDocument(input.chargeType);
+        const requisitionNumber = pdi
+          ? pdiDocumentNumber(
+              pdiDocument,
+              await nextSequenceNumber(tx, pdiSequenceKey(pdiDocument, input.branchId), now),
+            )
+          : await nextSequenceNumber(tx, `REQUISITION_${input.branchId}`, now);
         const document = await tx.partRequisition.create({
           data: {
             branchId: input.branchId,
@@ -327,6 +328,8 @@ export class RequisitionService {
             groupId: input.groupId,
             engineerId: input.engineerId,
             goodwillReason: input.goodwillReason,
+            pickingListNumber: input.pickingListNumber,
+            mileage: input.mileage ?? (pdi ? job.mileage : undefined),
             createdById: actor.userId,
             requisitionNumber,
             requisitionDate: now,
@@ -409,7 +412,9 @@ export class RequisitionService {
         if (issued.length)
           await tx.jobCard.update({
             where: { id: job.id },
-            data: await jobWorkUpdate(tx, job, actor.userId),
+            data: pdi
+              ? requisitionWorkUpdate(job.status, actor.userId)
+              : await jobWorkUpdate(tx, job, actor.userId),
           });
         await tx.auditLog.create({
           data: {
@@ -486,6 +491,8 @@ export class RequisitionService {
           include: { invoices: { select: { status: true } } },
         });
         assertRequisitionJob(job);
+        assertJobTypeAccess(job, actor);
+        const pdi = job.jobType === JobCardType.PDI;
         const document = await tx.partRequisition.findUniqueOrThrow({
           where: { id },
           include: {
@@ -499,6 +506,10 @@ export class RequisitionService {
             },
           },
         });
+        if (pdi)
+          await assertPdiDocumentChange(tx, "requisition", document.requisitionDate, {
+            printedAt: document.printedAt,
+          });
         if (document.status === "CANCELLED")
           throw new ConflictError("Requisition is already cancelled");
         // TODO(confirm): require returns to be cancelled first; this preserves their audit/stock history.
@@ -569,7 +580,9 @@ export class RequisitionService {
         if (document.lines.some((line) => line.quantityIssued > 0))
           await tx.jobCard.update({
             where: { id: job.id },
-            data: requisitionWorkUpdate(job.status, actor.userId),
+            data: pdi
+              ? requisitionWorkUpdate(job.status, actor.userId)
+              : await jobWorkUpdate(tx, job, actor.userId),
           });
         await tx.auditLog.create({
           data: {

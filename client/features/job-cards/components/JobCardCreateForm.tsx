@@ -258,7 +258,12 @@ export function JobCardCreateForm({
     enabled: !!vehicleId && hasPermission("jobcard:read"),
   });
   // Same query as the repeat check card below (deduplicated): drives the header tag.
-  const repeatPreview = useRepeatPreview(vehicleId, branchId, Number.isFinite(debouncedMileage) ? debouncedMileage : undefined, !!vehicleId && hasPermission("jobcard:read"));
+  const repeatPreview = useRepeatPreview(
+    vehicleId,
+    branchId,
+    Number.isFinite(debouncedMileage) ? debouncedMileage : undefined,
+    !!vehicleId && hasPermission("jobcard:read"),
+  );
   const repeatCandidate = repeatPreview.data?.candidate;
 
   useEffect(() => {
@@ -512,7 +517,9 @@ export function JobCardCreateForm({
           ).toISOString(),
           engineerId: values.engineerId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
-          repeatReason: values.isRepeat ? values.repeatReason?.trim() || undefined : undefined,
+          repeatReason: values.isRepeat
+            ? values.repeatReason?.trim() || undefined
+            : undefined,
           teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
@@ -1156,8 +1163,17 @@ export function JobCardCreateForm({
                     </div>
                   )}
                 </OpeningCard>
+              )}
               {vehicleId && hasPermission("jobcard:read") && (
-                <OpeningRepeatCheck vehicleId={vehicleId} branchId={branchId} mileage={Number.isFinite(debouncedMileage) ? debouncedMileage : undefined} />
+                <OpeningRepeatCheck
+                  vehicleId={vehicleId}
+                  branchId={branchId}
+                  mileage={
+                    Number.isFinite(debouncedMileage)
+                      ? debouncedMileage
+                      : undefined
+                  }
+                />
               )}
               <OpeningCard title="Job scheduling & estimate">
                 <div className={openingGrid}>
