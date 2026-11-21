@@ -113,6 +113,14 @@ export const FRAMEWORK_REPORT_PERMISSIONS = [
   "report:promise-date-analysis",
   "report:promise-time-analysis",
   "report:delayed-deliveries",
+  // Post-service follow-up (the follow-up list is gated by psf:read; letters and mailing list by psf:letter)
+  "psf:read",
+  "psf:letter",
+  "report:psf-analysis",
+  "report:psf-analysis-model",
+  "report:psf-dissatisfied",
+  "report:psf-closed",
+  "report:psf-history",
 ] as const;
 export const REPORT_SETTINGS_PERMISSION = "report:settings";
 
