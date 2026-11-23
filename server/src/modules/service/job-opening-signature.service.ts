@@ -183,6 +183,7 @@ export async function signJobOpening(
     const previous = await tx.jobOpeningSignature.findFirst({
       where: { jobCardId: id },
       orderBy: { revision: "desc" },
+      select: { revision: true },
     });
     const evidence = {
       documentHash: body.expectedHash,
@@ -220,7 +221,7 @@ export async function signJobOpening(
       },
     });
     return metadata(signature);
-  });
+  }, { timeout: 10000 });
 }
 
 /** New jobs require a valid signature for their current opening scope; historical jobs retain compatibility. */

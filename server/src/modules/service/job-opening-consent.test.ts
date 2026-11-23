@@ -41,10 +41,16 @@ it('rejects unchecked consent and stale terms or changed appointment identity/ve
 });
 
 it('loads JOB_CARD terms with the existing branch/company fallback inside the supplied transaction', async () => {
-  const findFirst = jest.fn().mockImplementation(({ where }: { where: { branchId: string | null } }) => Promise.resolve(where.branchId ? { terms: [], footer: 'Branch footer' } : terms));
-  const tx = { documentTerms: { findFirst } } as unknown as Prisma.TransactionClient;
+  const findMany = jest.fn().mockResolvedValue([
+    { branchId: null, ...terms },
+    { branchId: id, terms: [], footer: 'Branch footer' },
+  ]);
+  const tx = { documentTerms: { findMany } } as unknown as Prisma.TransactionClient;
   const document = await loadOpeningConsent(tx, booking);
   expect(document.terms).toEqual(terms.terms);
   expect(document.footer).toBe('Branch footer');
-  expect(findFirst).toHaveBeenCalledWith({ where: { documentType: 'JOB_CARD', branchId: id } });
+  expect(findMany).toHaveBeenCalledWith({
+    where: { documentType: 'JOB_CARD', OR: [{ branchId: null }, { branchId: id }] },
+    select: { branchId: true, terms: true, footer: true },
+  });
 });

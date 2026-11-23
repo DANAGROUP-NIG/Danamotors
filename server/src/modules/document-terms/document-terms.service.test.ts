@@ -1,7 +1,7 @@
 jest.mock('../../prisma/client', () => ({ __esModule: true, default: {
   $transaction: jest.fn(),
   branch: { findUnique: jest.fn() },
-  documentTerms: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+  documentTerms: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
 } }));
 import prisma from '../../prisma/client';
 import { DocumentTermsService, saveTermsSchema } from './document-terms.service';
@@ -15,9 +15,16 @@ beforeEach(() => {
 });
 
 it('prints the company terms unless the branch has its own', async () => {
-  (prisma.documentTerms.findFirst as jest.Mock).mockImplementation(({ where }) => Promise.resolve(where.branchId ? { id: 'b', terms: [], footer: 'Abuja footer' } : company));
+  const companyTerms = { ...company, branchId: null };
+  (prisma.documentTerms.findMany as jest.Mock).mockResolvedValueOnce([
+    { branchId, terms: [], footer: 'Abuja footer' }, companyTerms,
+  ]).mockResolvedValueOnce([companyTerms]);
   expect(await service.effective('JOB_ESTIMATE', branchId)).toEqual({ terms: company.terms, footer: 'Abuja footer' });
-  (prisma.documentTerms.findFirst as jest.Mock).mockImplementation(({ where }) => Promise.resolve(where.branchId ? null : company));
+  expect(prisma.documentTerms.findMany).toHaveBeenCalledTimes(1);
+  expect(prisma.documentTerms.findMany).toHaveBeenCalledWith({
+    where: { documentType: 'JOB_ESTIMATE', OR: [{ branchId: null }, { branchId }] },
+    select: { branchId: true, terms: true, footer: true },
+  });
   expect(await service.effective('JOB_ESTIMATE', branchId)).toEqual({ terms: company.terms, footer: company.footer });
 });
 

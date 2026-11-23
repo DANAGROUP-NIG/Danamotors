@@ -172,6 +172,12 @@ it("stores an independent immutable opening approval and image-free audit withou
   expect(audit.details).not.toContain(image);
   expect(audit.details).not.toContain("Test Customer");
   expect(prisma.customerApproval.create).not.toHaveBeenCalled();
+  expect(prisma.jobOpeningSignature.findFirst).toHaveBeenCalledWith({
+    where: { jobCardId: id },
+    orderBy: { revision: "desc" },
+    select: { revision: true },
+  });
+  expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { timeout: 10000 });
 });
 
 it("returns original metadata on an identical retry and rejects reuse with changed details", async () => {
