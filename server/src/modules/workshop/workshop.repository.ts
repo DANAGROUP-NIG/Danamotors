@@ -1,4 +1,4 @@
-import prisma from '../../prisma/client';
+import prisma from "../../prisma/client";
 
 export class WorkshopRepository {
   async findJobCardById(id: string) {
@@ -34,7 +34,12 @@ export class WorkshopRepository {
         partIssuances: {
           include: {
             sparePart: {
-              select: { id: true, partNumber: true, name: true, unitPrice: true },
+              select: {
+                id: true,
+                partNumber: true,
+                name: true,
+                unitPrice: true,
+              },
             },
             issuedBy: {
               select: { id: true, firstName: true, lastName: true },
@@ -52,7 +57,11 @@ export class WorkshopRepository {
     });
   }
 
-  async assignTechnician(id: string, technicianId: string, qualityInspectorId?: string) {
+  async assignTechnician(
+    id: string,
+    technicianId: string,
+    qualityInspectorId?: string,
+  ) {
     return prisma.jobCard.update({
       where: { id },
       data: {
@@ -87,9 +96,11 @@ export class WorkshopRepository {
     take?: number;
     branchId?: string;
     search?: string;
+    activeOnly?: boolean;
   }) {
     const where: Record<string, unknown> = {
-      role: { is: { name: 'Technician' } },
+      role: { is: { name: "Technician" } },
+      ...(params.activeOnly ? { isActive: true } : {}),
     };
 
     if (params.branchId) {
@@ -98,9 +109,9 @@ export class WorkshopRepository {
 
     if (params.search) {
       where.OR = [
-        { firstName: { contains: params.search, mode: 'insensitive' } },
-        { lastName: { contains: params.search, mode: 'insensitive' } },
-        { email: { contains: params.search, mode: 'insensitive' } },
+        { firstName: { contains: params.search, mode: "insensitive" } },
+        { lastName: { contains: params.search, mode: "insensitive" } },
+        { email: { contains: params.search, mode: "insensitive" } },
       ];
     }
 
@@ -121,12 +132,16 @@ export class WorkshopRepository {
         _count: {
           select: {
             technicianAssignments: {
-              where: { status: { notIn: ['Completed', 'Cancelled', 'DELIVERED', 'CANCELLED'] } },
+              where: {
+                status: {
+                  notIn: ["Completed", "Cancelled", "DELIVERED", "CANCELLED"],
+                },
+              },
             },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

@@ -44,13 +44,62 @@ function formatNaira(n: number) {
 
 // ─── Quick links shown on the minimal/limited dashboard ────────────────────────
 const QUICK_LINKS = [
-  { label: "Customers", href: "/customers", icon: Users, color: "bg-emerald-50", iconColor: "text-emerald-600", permission: "customer:read" },
-  { label: "Vehicles", href: "/vehicles", icon: Car, color: "bg-blue-50", iconColor: "text-blue-600", permission: "vehicle:read" },
-  { label: "Appointments", href: "/appointments", icon: CalendarDays, color: "bg-violet-50", iconColor: "text-violet-600", permission: "appointment:read" },
-  { label: "Job Cards", href: "/job-cards", icon: ClipboardList, color: "bg-orange-50", iconColor: "text-orange-600", permission: "jobcard:read" },
-  { label: "Inventory", href: "/inventory", icon: Package, color: "bg-amber-50", iconColor: "text-amber-600", permission: INVENTORY_PERMISSIONS.SPAREPART_READ },
-  { label: "Finance", href: "/finance", icon: FileText, color: "bg-rose-50", iconColor: "text-rose-600", permission: "invoice:read" },
-  { label: "Users", href: "/users", icon: Shield, color: "bg-slate-100", iconColor: "text-slate-600", permission: "user:read" },
+  {
+    label: "Customers",
+    href: "/customers",
+    icon: Users,
+    color: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    permission: "customer:read",
+  },
+  {
+    label: "Vehicles",
+    href: "/vehicles",
+    icon: Car,
+    color: "bg-blue-50",
+    iconColor: "text-blue-600",
+    permission: "vehicle:read",
+  },
+  {
+    label: "Appointments",
+    href: "/appointments",
+    icon: CalendarDays,
+    color: "bg-violet-50",
+    iconColor: "text-violet-600",
+    permission: "appointment:read",
+  },
+  {
+    label: "Job Cards",
+    href: "/job-cards",
+    icon: ClipboardList,
+    color: "bg-orange-50",
+    iconColor: "text-orange-600",
+    permission: "jobcard:read",
+  },
+  {
+    label: "Inventory",
+    href: "/inventory",
+    icon: Package,
+    color: "bg-amber-50",
+    iconColor: "text-amber-600",
+    permission: INVENTORY_PERMISSIONS.SPAREPART_READ,
+  },
+  {
+    label: "Finance",
+    href: "/finance",
+    icon: FileText,
+    color: "bg-rose-50",
+    iconColor: "text-rose-600",
+    permission: "invoice:read",
+  },
+  {
+    label: "Users",
+    href: "/users",
+    icon: Shield,
+    color: "bg-slate-100",
+    iconColor: "text-slate-600",
+    permission: "user:read",
+  },
 ];
 
 export default function DashboardPage() {
@@ -58,8 +107,8 @@ export default function DashboardPage() {
     user,
     hasPermission,
     hasAnyPermission,
-    isReceptionist,
-    isReceptionManager,
+    isCcuOfficer,
+    isCcuManager,
     isStoreManager,
   } = useAuth();
   const [showNewJobCard, setShowNewJobCard] = useState(false);
@@ -88,10 +137,10 @@ export default function DashboardPage() {
   const canSeeCustomers = hasPermission("customer:read");
 
   // Role-based routing — only redirect if the user has the matching permissions
-  if (isReceptionManager && canSeeAppointments) {
+  if (isCcuManager && canSeeAppointments) {
     return <ReceptionManagerDashboard />;
   }
-  if (isReceptionist && canSeeAppointments) {
+  if (isCcuOfficer && canSeeAppointments) {
     return <ReceptionistDashboard />;
   }
   if (isStoreManager && (canSeeInventory || canSeeWorkshop)) {
@@ -140,15 +189,20 @@ export default function DashboardPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <span className="inline-grid size-12 shrink-0 place-items-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
+              {user?.firstName?.[0]}
+              {user?.lastName?.[0]}
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-foreground">
                 {user?.firstName} {user?.lastName}
               </h2>
-              <p className="text-sm capitalize text-muted-foreground">{user?.role}</p>
+              <p className="text-sm capitalize text-muted-foreground">
+                {user?.role}
+              </p>
               {user?.email && (
-                <p className="mt-0.5 text-sm text-muted-foreground">{user.email}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {user.email}
+                </p>
               )}
             </div>
           </div>
@@ -218,7 +272,9 @@ export default function DashboardPage() {
         />
 
         {/* Inventory Alert Banner */}
-        {canSeeInventory && <InventoryAlertBanner alertsCount={stats.inventoryAlerts} />}
+        {canSeeInventory && (
+          <InventoryAlertBanner alertsCount={stats.inventoryAlerts} />
+        )}
 
         {/* KPI Grid */}
         {kpiCount > 0 && (
@@ -228,7 +284,7 @@ export default function DashboardPage() {
               kpiCount === 4 && "grid-cols-2 lg:grid-cols-4",
               kpiCount === 3 && "grid-cols-2 lg:grid-cols-3",
               kpiCount === 2 && "grid-cols-2",
-              kpiCount === 1 && "grid-cols-1 max-w-xs"
+              kpiCount === 1 && "grid-cols-1 max-w-xs",
             )}
           >
             {canSeeFinance && (
@@ -294,10 +350,10 @@ export default function DashboardPage() {
               canSeeFinance && canSeeWorkshop && canManage
                 ? "lg:grid-cols-[1.4fr_0.9fr_0.9fr]"
                 : canSeeFinance && canSeeWorkshop
-                ? "lg:grid-cols-2"
-                : canSeeWorkshop && canManage
-                ? "lg:grid-cols-[1.4fr_0.9fr]"
-                : "lg:grid-cols-1"
+                  ? "lg:grid-cols-2"
+                  : canSeeWorkshop && canManage
+                    ? "lg:grid-cols-[1.4fr_0.9fr]"
+                    : "lg:grid-cols-1",
             )}
           >
             {canSeeFinance && (
@@ -326,7 +382,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <JobCardOpeningModal isOpen={showNewJobCard} onClose={() => setShowNewJobCard(false)} />
+      <JobCardOpeningModal
+        isOpen={showNewJobCard}
+        onClose={() => setShowNewJobCard(false)}
+      />
     </>
   );
 }

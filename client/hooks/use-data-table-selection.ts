@@ -59,9 +59,12 @@ export function useDataTableSelection<T>({
     });
   }, [allIds]);
 
-  const selectItems = useCallback((items: T[]) => {
-    setSelectedIds(new Set(items.map((item) => String(rowKey(item)))));
-  }, [rowKey]);
+  const selectItems = useCallback(
+    (items: T[]) => {
+      setSelectedIds(new Set(items.map((item) => String(rowKey(item)))));
+    },
+    [rowKey],
+  );
 
   const clear = useCallback(() => setSelectedIds(new Set()), []);
 

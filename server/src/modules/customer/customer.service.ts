@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import prisma from '../../prisma/client';
 import { CustomerRepository } from './customer.repository';
-import { NotFoundError, ConflictError, BadRequestError } from '../../shared/errors/appError';
+import { NotFoundError, ConflictError, BadRequestError, ForbiddenError } from '../../shared/errors/appError';
 
 /** The anniversary (YYYY-MM-DD text on the API) as a date for the birthday / anniversary report (#97). */
 export function anniversaryOn(text: string | null | undefined): Date | null | undefined {
@@ -26,6 +26,7 @@ export class CustomerService {
       page: number;
       limit: number;
       search?: string;
+      category?: string;
       branchId?: string;
       createdById?: string;
     },
@@ -39,6 +40,7 @@ export class CustomerService {
       skip,
       take: params.limit,
       search: params.search,
+      category: params.category,
       branchId: params.branchId,
       createdById: params.createdById,
     });
@@ -234,6 +236,7 @@ export class CustomerService {
       return tx.customer.create({
         data: {
           ...data,
+          type: data.partyStatus === 'VENDOR' ? 'OTHERS' : data.type,
           code,
           createdById,
           email: data.email ?? null,
@@ -311,39 +314,55 @@ export class CustomerService {
       throw new NotFoundError('Organization customer not found');
   }
 
-  async updateCustomer(id: string, input: z.infer<ReturnType<typeof customerBody.partial>>) {
-    const existing = await prisma.customer.findUnique({
-      where: {
-        id,
-      },
-    });
+  async updateCustomer(id: string, input: z.infer<ReturnType<typeof customerBody.partial>>, actor?: { id: string; branchId?: string | null }) {
+    return withPartyTransaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${id} FOR UPDATE`;
+      const existing = await tx.customer.findUnique({ where: { id } });
 
-    if (!existing || existing.mergedIntoId)
-      throw new NotFoundError('Customer not found');
+      if (!existing || existing.mergedIntoId)
+        throw new NotFoundError('Customer not found');
+      if (actor?.branchId !== undefined && (!actor.branchId || existing.branchId !== actor.branchId || (input.branchId && input.branchId !== actor.branchId)))
+        throw new ForbiddenError('You can only update customers in your own branch');
 
-    const data = customerBody.superRefine(validateCustomerIdentity).parse({
-      ...Object.fromEntries(
-        Object.keys(customerBody.shape).map(key => [key, existing[key as keyof typeof existing] ?? undefined]),
-      ),
+      const data = customerBody.superRefine(validateCustomerIdentity).parse({
+        ...Object.fromEntries(
+          Object.keys(customerBody.shape).map(key => [key, existing[key as keyof typeof existing] ?? undefined]),
+        ),
 
-      ...input,
-      dateOfBirth: input.dateOfBirth ?? existing.dateOfBirth?.toISOString(),
-    });
+        ...input,
+        dateOfBirth: input.dateOfBirth ?? existing.dateOfBirth?.toISOString(),
+      });
 
-    if (data.organizationId !== existing.organizationId)
-      await this.assertOrganization(data.organizationId, id);
+      if (data.organizationId !== existing.organizationId)
+        await this.assertOrganization(data.organizationId, id);
 
-    return prisma.customer.update({
-      where: {
-        id,
-      },
+      const customer = await tx.customer.update({
+        where: {
+          id,
+        },
 
-      data: {
-        ...data,
-        salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        anniversaryOn: anniversaryOn(data.anniversaryDate),
-      },
+        data: {
+          ...data,
+          type: data.partyStatus === 'VENDOR' ? 'OTHERS' : data.type,
+          salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+          anniversaryOn: anniversaryOn(data.anniversaryDate),
+        },
+      });
+      if (actor && (existing.type !== customer.type || existing.partyStatus !== customer.partyStatus)) {
+        await tx.auditLog.create({
+          data: {
+            userId: actor.id,
+            action: 'CUSTOMER_CATEGORY_CHANGED',
+            details: JSON.stringify({
+              customerId: id,
+              before: { category: existing.type, partyStatus: existing.partyStatus },
+              after: { category: customer.type, partyStatus: customer.partyStatus },
+            }),
+          },
+        });
+      }
+      return customer;
     });
   }
 
@@ -432,11 +451,19 @@ export class CustomerService {
       // the schema, so a new relation fails the test until it is added here (or listed as deliberately kept).
       const where = { customerId: sourceId };
       const data = { customerId: targetId };
+      // The PSF delegate is available when this code is built with the PSF schema.
+      const { psfFollowUp } = tx as typeof tx & {
+        psfFollowUp?: {
+          updateMany(args: { where: typeof where; data: typeof data }): Promise<{ count: number }>;
+        };
+      };
 
       const moved = {
         vehicles: (await tx.vehicle.updateMany({ where, data })).count,
         vehicleOwnerships: (await tx.vehicleOwnership.updateMany({ where, data })).count,
         appointments: (await tx.serviceAppointment.updateMany({ where, data })).count,
+        cscCases: (await tx.cscCase.updateMany({ where, data })).count,
+        psfFollowUps: (await psfFollowUp?.updateMany({ where, data }))?.count ?? 0,
         jobCards: (await tx.jobCard.updateMany({ where, data })).count,
         estimates: (await tx.estimate.updateMany({ where, data })).count,
         customerApprovals: (await tx.customerApproval.updateMany({ where, data })).count,

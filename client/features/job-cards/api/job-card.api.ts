@@ -2,6 +2,10 @@ import { apiGet, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type { JobCard, JobCardListResponse } from "../types/job-card.types";
 
+export async function requestJobCardParts(id: string, requestId: string): Promise<void> {
+  await apiPost(API_ROUTES.service.jobCards.requestParts(id), { requestId });
+}
+
 export async function getJobCardsRequest(params?: {
   page?: number;
   limit?: number;
@@ -9,6 +13,7 @@ export async function getJobCardsRequest(params?: {
   customerId?: string;
   search?: string;
   status?: string;
+  unassignedTechnician?: boolean;
   /** SERVICE (server default), PDI, ALL, or HISTORY (PDI only when the PDI setting includes it). */
   jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
   dateFrom?: string;
@@ -22,6 +27,7 @@ export async function getJobCardsRequest(params?: {
   if (params?.search) query.set("search", params.search);
   if (params?.status) query.set("status", params.status);
   if (params?.jobType) query.set("jobType", params.jobType);
+  if (params?.unassignedTechnician) query.set("unassignedTechnician", "true");
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);
   const qs = query.toString();
@@ -61,6 +67,7 @@ export interface CreateJobCardPayload {
   repeatReason?: string;
   description: string;
   appointmentId?: string;
+  openingConsent?: { accepted: true; termsHash: string };
   customerId?: string;
   vehicleId?: string;
   tyres?: { makeId?: string; number?: string }[];

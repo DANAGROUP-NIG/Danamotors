@@ -142,6 +142,8 @@ export type CounterSale = {
     dueDate: string | null;
     customer: SaleCustomer;
     partsTotal: number;
+    kiaSpareTotal?: string | null;
+    nonKiaSpareTotal?: string | null;
     partsDiscountPercent: number;
     partsDiscountAmount: number;
     vatRate: number;

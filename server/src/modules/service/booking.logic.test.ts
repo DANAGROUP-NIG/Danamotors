@@ -1,32 +1,254 @@
-import { Prisma } from '@prisma/client';
-import { bookingView, bookingState, assertPromisedDate } from './booking.logic';
-import { bookingRequestBody, createAppointmentSchema, updateAppointmentSchema } from './service.validation';
+import { Prisma } from "@prisma/client";
+import {
+  bookingView,
+  bookingComplaints,
+  bookingState,
+  assertPromisedDate,
+  assertBookable,
+} from "./booking.logic";
+import {
+  bookingRequestBody,
+  createAppointmentSchema,
+  updateAppointmentSchema,
+} from "./service.validation";
 
-it('adds estimates using decimal arithmetic and returns zero for an empty booking', () => {
+it("carries every saved request code, description and amount into job complaints", () => {
+  const requests = [
+    {
+      id: "request",
+      appointmentId: "appointment",
+      createdAt: new Date(),
+      complaintCodeId: "complaint",
+      defectCode: "defect",
+      description: "Inspect brakes",
+      estimatedParts: new Prisma.Decimal("10.10"),
+      estimatedOil: new Prisma.Decimal("0.20"),
+      estimatedLabour: new Prisma.Decimal("12.35"),
+    },
+  ];
+  expect(bookingComplaints(requests)).toEqual([
+    {
+      complaintCodeId: "complaint",
+      defectCode: "defect",
+      description: "Inspect brakes",
+      spare: 10.1,
+      oil: 0.2,
+      labour: 12.35,
+    },
+  ]);
+  expect(
+    bookingComplaints([
+      { ...requests[0], complaintCodeId: null, defectCode: null },
+    ])[0],
+  ).toMatchObject({ complaintCodeId: undefined, defectCode: undefined });
+});
+
+it("adds estimates using decimal arithmetic and returns zero for an empty booking", () => {
   expect(bookingView({ requests: [] }).totals.estimatedTotal).toBe(0);
-  const row = { id: 'r', appointmentId: 'a', complaintCodeId: null, defectCode: null, description: 'Noise', createdAt: new Date(), estimatedParts: new Prisma.Decimal('0.10'), estimatedOil: new Prisma.Decimal('0.20'), estimatedLabour: new Prisma.Decimal('12.35') };
-  expect(bookingView({ requests: [row] }).totals).toEqual({ estimatedParts: 0.1, estimatedOil: 0.2, estimatedLabour: 12.35, estimatedTotal: 12.65 });
+  const row = {
+    id: "r",
+    appointmentId: "a",
+    complaintCodeId: null,
+    defectCode: null,
+    description: "Noise",
+    createdAt: new Date(),
+    estimatedParts: new Prisma.Decimal("0.10"),
+    estimatedOil: new Prisma.Decimal("0.20"),
+    estimatedLabour: new Prisma.Decimal("12.35"),
+  };
+  expect(bookingView({ requests: [row] }).totals).toEqual({
+    estimatedParts: 0.1,
+    estimatedOil: 0.2,
+    estimatedLabour: 12.35,
+    estimatedTotal: 12.65,
+  });
 });
-it('requires a reason on both cancellation paths and prevents reopening terminal bookings', () => {
-  const booked = { bookingStatus: 'BOOKED' as const, status: 'Pending' };
-  expect(() => bookingState(booked, 'Cancelled')).toThrow('reason');
-  expect(() => bookingState(booked, undefined, 'CANCELLED')).toThrow('reason');
-  expect(bookingState(booked, undefined, 'CANCELLED', 'Customer request')).toMatchObject({ bookingStatus: 'CANCELLED', status: 'Cancelled', cancelReason: 'Customer request' });
-  expect(() => bookingState({ bookingStatus: 'CONVERTED', status: 'Pending' }, undefined, 'BOOKED')).toThrow('no longer open');
-  expect(() => bookingState(booked, 'Cancelled', 'BOOKED', 'reason')).toThrow('disagree');
+it("requires a reason on both cancellation paths and prevents reopening terminal bookings", () => {
+  const booked = { bookingStatus: "BOOKED" as const, status: "Pending" };
+  expect(() => bookingState(booked, "Cancelled")).toThrow("reason");
+  expect(() => bookingState(booked, undefined, "CANCELLED")).toThrow("reason");
+  expect(
+    bookingState(booked, undefined, "CANCELLED", "Customer request"),
+  ).toMatchObject({
+    bookingStatus: "CANCELLED",
+    status: "Cancelled",
+    cancelReason: "Customer request",
+  });
+  expect(() =>
+    bookingState(
+      { bookingStatus: "CONVERTED", status: "Pending" },
+      undefined,
+      "BOOKED",
+    ),
+  ).toThrow("no longer open");
+  expect(() => bookingState(booked, "Cancelled", "BOOKED", "reason")).toThrow(
+    "disagree",
+  );
 });
-it('requires customer requests and allows an optional service catalogue while rejecting invalid request amounts', () => {
-  const id = '00000000-0000-4000-8000-000000000001';
-  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z', requests: [{ description: 'Noise' }] } }).success).toBe(true);
-  for (const spare of [-1, NaN, Infinity, 0.001, 1e13]) expect(bookingRequestBody.safeParse({ description: 'Noise', spare }).success).toBe(false);
+it("requires customer requests and allows an optional service catalogue while rejecting invalid request amounts", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  expect(
+    createAppointmentSchema.safeParse({
+      body: {
+        customerId: id,
+        vehicleId: id,
+        branchName: "Synthetic",
+        scheduledAt: "2026-11-01T09:00:00Z",
+        requests: "Noise",
+      },
+    }).success,
+  ).toBe(true);
+  for (const spare of [-1, NaN, Infinity, 0.001, 1e13])
+    expect(
+      bookingRequestBody.safeParse({ description: "Noise", spare }).success,
+    ).toBe(false);
   expect(bookingRequestBody.safeParse({}).success).toBe(false);
-  expect(updateAppointmentSchema.safeParse({ params: { id }, body: { bookingStatus: 'CONVERTED' } }).success).toBe(false);
-  expect(updateAppointmentSchema.safeParse({ params: { id }, body: { requests: [] } }).success).toBe(false);
-  expect(createAppointmentSchema.safeParse({ body: { customerId: id, vehicleId: id, branchName: 'Synthetic', scheduledAt: '2026-11-01T09:00:00Z' } }).success).toBe(false);
+  expect(
+    updateAppointmentSchema.safeParse({
+      params: { id },
+      body: { bookingStatus: "CONVERTED" },
+    }).success,
+  ).toBe(false);
+  expect(
+    updateAppointmentSchema.safeParse({
+      params: { id },
+      body: { requests: [] },
+    }).success,
+  ).toBe(false);
+  expect(
+    createAppointmentSchema.safeParse({
+      body: {
+        customerId: id,
+        vehicleId: id,
+        branchName: "Synthetic",
+        scheduledAt: "2026-11-01T09:00:00Z",
+      },
+    }).success,
+  ).toBe(false);
 });
 
-it('rejects the booked day in Lagos and accepts the following day', () => {
-  const booked = new Date('2026-11-01T23:30:00Z');
-  expect(() => assertPromisedDate('2026-11-02T12:00:00Z', booked)).toThrow('after the booked date');
-  expect(() => assertPromisedDate('2026-11-03T00:00:00Z', booked)).not.toThrow();
+it("accepts trimmed request text and rejects malformed, blank and oversized requests", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const body = {
+    customerId: id,
+    vehicleId: id,
+    branchName: "Synthetic",
+    scheduledAt: "2026-11-01T09:00:00Z",
+  };
+  expect(
+    createAppointmentSchema.parse({
+      body: { ...body, requests: "  Engine noise\nCheck brakes  " },
+    }).body.requests,
+  ).toEqual([{ description: "Engine noise\nCheck brakes" }]);
+  expect(
+    updateAppointmentSchema.parse({
+      params: { id },
+      body: { requests: "  Check brakes  " },
+    }).body.requests,
+  ).toEqual([{ description: "Check brakes" }]);
+  for (const requests of ["", "   ", "x".repeat(2001), ["Noise"], []]) {
+    expect(
+      createAppointmentSchema.safeParse({ body: { ...body, requests } })
+        .success,
+    ).toBe(false);
+    expect(
+      updateAppointmentSchema.safeParse({ params: { id }, body: { requests } })
+        .success,
+    ).toBe(false);
+  }
+});
+
+it("rejects the booked day in Lagos and accepts the following day", () => {
+  const booked = new Date("2026-11-01T23:30:00Z");
+  expect(() => assertPromisedDate("2026-11-02T12:00:00Z", booked)).toThrow(
+    "after the booked date",
+  );
+  expect(() =>
+    assertPromisedDate("2026-11-03T00:00:00Z", booked),
+  ).not.toThrow();
+});
+
+it.each([
+  "CANCELLED",
+  "canceled",
+  " cancelled ",
+  "COMPLETED",
+  "closed",
+  "NO_SHOW",
+  "no-show",
+])("keeps legacy terminal status %s closed", (status) => {
+  expect(() => assertBookable({ bookingStatus: "BOOKED", status })).toThrow(
+    "no longer open",
+  );
+});
+it.each(["CANCELLED", "canceled", " cancelled "])(
+  "requires a reason for legacy cancellation spelling %s",
+  (status) => {
+    const booking = { bookingStatus: "BOOKED" as const, status: "Pending" };
+    expect(() => bookingState(booking, status)).toThrow("reason");
+    expect(
+      bookingState(booking, status, undefined, "  Customer request  "),
+    ).toMatchObject({
+      bookingStatus: "CANCELLED",
+      status: "Cancelled",
+      cancelReason: "Customer request",
+    });
+  },
+);
+
+it.each([0, -1, 1.5, 2147483648])(
+  "rejects invalid booking duration %s at both API boundaries",
+  (durationMins) => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const body = {
+      customerId: id,
+      vehicleId: id,
+      branchName: "Synthetic",
+      scheduledAt: "2026-11-17T09:00:00Z",
+      requests: "Inspect brakes",
+      durationMins,
+    };
+    expect(createAppointmentSchema.safeParse({ body }).success).toBe(false);
+    expect(
+      updateAppointmentSchema.safeParse({
+        params: { id },
+        body: { durationMins },
+      }).success,
+    ).toBe(false);
+  },
+);
+
+it("accepts bounded structured request rows while rejecting invalid amounts and caller totals", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const body = {
+    customerId: id,
+    vehicleId: id,
+    branchName: "Synthetic",
+    scheduledAt: "2026-11-17T09:00:00Z",
+  };
+  const row = {
+    description: "  Inspect brakes  ",
+    spare: 0.1,
+    oil: 0.2,
+    labour: 12.35,
+  };
+  expect(
+    createAppointmentSchema.parse({ body: { ...body, requests: [row] } }).body
+      .requests,
+  ).toEqual([{ ...row, description: "Inspect brakes" }]);
+  expect(
+    updateAppointmentSchema.parse({ params: { id }, body: { requests: [row] } })
+      .body.requests,
+  ).toHaveLength(1);
+  for (const requests of [
+    Array.from({ length: 101 }, () => row),
+    [{ ...row, spare: -1 }],
+    [{ ...row, spare: 0.001 }],
+    [{ ...row, total: 12.65 }],
+  ]) {
+    expect(
+      createAppointmentSchema.safeParse({ body: { ...body, requests } })
+        .success,
+    ).toBe(false);
+  }
 });

@@ -12,8 +12,8 @@ export type AppRole =
   | "serviceadviser"
   | "technician"
   | "engineer"
-  | "receptionist"
-  | "receptionmanager"
+  | "ccuofficer"
+  | "ccumanager"
   | "warrantyofficer"
   | "auditor"
   | "customer";
@@ -75,8 +75,11 @@ export const BRANCH_ALL = "branch:all";
  * admin may grant them to a user.
  */
 export function isAdminLevelPermission(name: string): boolean {
-  return ["branch:all", "branch:create", "branch:update", "branch:delete"].includes(name)
-    || ["user:", "role:", "audit:"].some((prefix) => name.startsWith(prefix));
+  return (
+    ["branch:all", "branch:create", "branch:update", "branch:delete"].includes(
+      name,
+    ) || ["user:", "role:", "audit:"].some((prefix) => name.startsWith(prefix))
+  );
 }
 
 /** Framework reports (#75) and report settings. */
@@ -180,8 +183,8 @@ export const WORKSHOP_ROLES: AppRole[] = [
   "workshopmanager",
   "serviceadviser",
   "technician",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
   "generalstoremanager",
   "branchstoremanager",
 ];
@@ -199,8 +202,8 @@ export const CUSTOMER_ROLES: AppRole[] = [
   "admin",
   "billingofficer",
   "serviceadviser",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
   "generalstoremanager",
   "branchstoremanager",
 ];
@@ -208,14 +211,14 @@ export const CUSTOMER_CREATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "serviceadviser",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
 ];
 export const CUSTOMER_UPDATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "serviceadviser",
-  "receptionmanager",
+  "ccumanager",
 ];
 export const VEHICLE_ROLES: AppRole[] = [
   "superadmin",
@@ -223,8 +226,8 @@ export const VEHICLE_ROLES: AppRole[] = [
   "workshopmanager",
   "serviceadviser",
   "technician",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
   "generalstoremanager",
   "branchstoremanager",
 ];
@@ -233,15 +236,15 @@ export const VEHICLE_CREATE_ROLES: AppRole[] = [
   "admin",
   "workshopmanager",
   "serviceadviser",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
 ];
 export const VEHICLE_UPDATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "workshopmanager",
   "serviceadviser",
-  "receptionmanager",
+  "ccumanager",
 ];
 export const TECHNICIAN_ROLES: AppRole[] = [
   "superadmin",
@@ -281,16 +284,16 @@ export const APPOINTMENT_UPDATE_ROLES: AppRole[] = [
   "serviceadviser",
   "workshopmanager",
   "technician",
-  "receptionmanager",
+  "ccumanager",
 ];
 
-// Roles allowed to delete records (no delete for receptionist, viewer, etc.)
+// Roles allowed to delete records (no delete for ccuofficer, viewer, etc.)
 export const DELETE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "generalstoremanager",
   "workshopmanager",
-  "receptionmanager",
+  "ccumanager",
 ];
 
 export const INVENTORY_MANAGER_ROLES: AppRole[] = [
@@ -316,23 +319,23 @@ export const TRANSFER_ROLES: AppRole[] = [
 export const ENQUIRY_READ_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
 ];
 
 // Roles that can approve/reject enquiries (service:update)
 export const ENQUIRY_REVIEW_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "receptionmanager",
+  "ccumanager",
 ];
 
 // Roles that can create walk-in appointments (service:create)
 export const APPOINTMENT_CREATE_ROLES: AppRole[] = [
   "superadmin",
   "admin",
-  "receptionist",
-  "receptionmanager",
+  "ccuofficer",
+  "ccumanager",
   "serviceadviser",
 ];
 export const MONTHLY_REPORT_PERMISSIONS = [

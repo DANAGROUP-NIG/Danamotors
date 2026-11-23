@@ -6,6 +6,16 @@ import { PERMISSIONS } from '../../shared/constants/roles';
 
 type Layer = { route?: { path: string; stack: { handle: RequestHandler }[] } };
 const request = (permissions: string[], branchId: string | null = 'home') => ({ user: { userId: 'actor', role: 'Custom', permissions, branchId }, params: { id: 'booking' }, body: {} } as unknown as Request);
+it('requires booking update and job creation permission to fetch opening consent', () => {
+  const handlers = (router.stack as Layer[]).find(layer => layer.route?.path === '/appointments/:id/opening-consent')?.route?.stack;
+  if (!handlers) throw new Error('Missing opening consent route');
+  for (const [index, permission] of [PERMISSIONS.APPOINTMENT_UPDATE, PERMISSIONS.JOBCARD_CREATE].entries()) {
+    expect(() => handlers[index].handle(request([]), {} as Response, jest.fn())).toThrow('required permissions');
+    const next = jest.fn();
+    handlers[index].handle(request([permission]), {} as Response, next);
+    expect(next).toHaveBeenCalledTimes(1);
+  }
+});
 it('requires both booking update and job creation permission for conversion', () => {
   const handlers = (router.stack as Layer[]).find(layer => layer.route?.path === '/appointments/:id/convert')?.route?.stack;
   if (!handlers) throw new Error('Missing conversion route');

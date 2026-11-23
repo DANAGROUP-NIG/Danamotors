@@ -59,6 +59,7 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
 
   async function job(status = 'OPEN') {
     const card = await db.jobCard.create({ data: { branchId, customerId, vehicleId, jobNumber: `LAB-${run}-${++sequence}`, description: 'Labour test job', status, warrantyStatusAtCreation: 'ACTIVE' } });
+    await db.receipt.create({ data: { receiptNumber: `LAB-ADV-${run}-${sequence}`, branchId, customerId, advanceJobCardId: card.id, amount: 1, advanceAmount: 1 } });
     await db.estimate.create({ data: {
       branchId, jobCardId: card.id, customerId, description: 'Approved labour scope', amount: 60000, status: 'Approved',
       lines: { create: [{ type: 'LABOUR', referenceId: timeId, description: 'Time-priced operation', quantity: 100, rate: 100.01, amount: 10001 }, { type: 'LABOUR', referenceId: fixedId, description: 'Fixed-price operation', quantity: 100, rate: 500, amount: 50000 }] },
@@ -95,6 +96,23 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
     expect(await db.auditLog.count({ where: { action: 'LABOUR_SLIP_LINE_UPDATED', details: { contains: original.id } } })).toBe(1);
   });
 
+  it('edits employee-linked free and goodwill work without losing payer or model snapshots', async () => {
+    const card = await job();
+    const employee = await db.employee.create({ data: { code: `LAB-LOGIN-${run}`, name: 'Synthetic linked employee', branchId, userId: technicianId } });
+    const slip = await create(card.id, [
+      line({ chargeType: 'FREE', campaignId, technicianId: undefined, mechanicId: employee.id, chargedHours: 2 }),
+      line({ labourItemId: fixedId, chargeType: 'GOODWILL', reason: 'Saved contribution', chargedHours: 4 }),
+    ]);
+    const free = slip.lines.find(row => row.chargeLine?.chargeType === 'FREE')!;
+    const goodwill = slip.lines.find(row => row.chargeLine?.chargeType === 'GOODWILL')!;
+    expect(free).toMatchObject({ mechanicId: employee.id, technicianId, groupId });
+    await service.save(slip.id, line({ chargeType: 'FREE', campaignId: free.chargeLine!.campaignId!, technicianId: undefined, mechanicId: employee.id, chargedHours: 1.5 }), actor, free.id);
+    const saved = await service.save(slip.id, line({ labourItemId: fixedId, chargeType: 'GOODWILL', reason: goodwill.chargeLine!.chargeTypeReason!, chargedHours: 1.25 }), actor, goodwill.id);
+    expect(saved.lines.find(row => row.id === free.id)).toMatchObject({ standardHours: 3, chargedHours: 1.5, rate: 100.01, amount: 150.02, mechanicId: employee.id, technicianId, groupId, chargeLine: { chargeType: 'FREE', campaignId } });
+    expect(saved.lines.find(row => row.id === goodwill.id)).toMatchObject({ standardHours: 2, chargedHours: 1.25, pricing: 'FIXED', rate: 500, amount: 500, chargeLine: { chargeType: 'GOODWILL', chargeTypeReason: 'Saved contribution' } });
+    expect(saved.totals).toMatchObject({ freeAmount: 150.02, goodwillAmount: 500, totalAmount: 650.02 });
+  });
+
   it('keeps fixed pricing and standard-hour snapshots through catalogue changes, sync, QC and actual billing', async () => {
     const card = await job();
     const slip = await create(card.id, [line({ labourItemId: fixedId, chargedHours: 4 })]);
@@ -112,6 +130,7 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
       await expect(workflow.update(card.id, { status: 'READY' }, actor.userId)).rejects.toThrow('passed quality check');
       expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'QC', readyAt: null });
       await db.jobCard.update({ where: { id: card.id }, data: { qcStatus: 'PASSED' } });
+      await db.jobCardCampaign.updateMany({ where: { jobCardId: card.id }, data: { attended: false, notAttendedReason: 'Not part of the synthetic fixed-price operation' } });
       const ready = await workflow.update(card.id, { status: 'READY', workDone: 'Synthetic fixed-price operation completed' }, actor.userId);
       expect(ready.status).toBe('READY');
       expect(ready.readyAt).not.toBeNull();

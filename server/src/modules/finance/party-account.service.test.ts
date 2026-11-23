@@ -2,7 +2,7 @@ jest.mock('../../prisma/client', () => ({ __esModule:true,default:{
   $transaction:jest.fn(),$queryRaw:jest.fn(),customer:{findUnique:jest.fn()},branch:{findFirst:jest.fn()},
   partyAdjustmentBatch:{findUnique:jest.fn(),create:jest.fn(),update:jest.fn()},
   receiptAllocation:{createMany:jest.fn(),updateMany:jest.fn()},
-  invoice:{update:jest.fn(),count:jest.fn()},receipt:{update:jest.fn(),count:jest.fn()},
+  invoice:{update:jest.fn(),count:jest.fn()},receipt:{update:jest.fn(),count:jest.fn(),findFirst:jest.fn(),findMany:jest.fn()},
   partyNote:{update:jest.fn(),count:jest.fn(),findUnique:jest.fn(),create:jest.fn()},
   tallyPostingLog:{findFirst:jest.fn()},auditLog:{create:jest.fn()},documentSequence:{upsert:jest.fn()},payment:{deleteMany:jest.fn()},
 } }));
@@ -16,6 +16,8 @@ const receipt={id:receiptId,kind:'RECEIPT',number:'2026000002',date:new Date('20
 const batch={id:'batch',...input,amount:new Prisma.Decimal(40),reversedAt:null,tallyPostedAt:null,legacyPaymentId:null,allocations:[{invoiceId,receiptId,debitNoteId:null,creditNoteId:null,amount:40}]};
 beforeEach(()=>{
   jest.resetAllMocks();
+  jest.mocked(prisma.receipt.findFirst).mockResolvedValue(null);
+  jest.mocked(prisma.receipt.findMany).mockResolvedValue([]);
   (prisma.$transaction as jest.Mock).mockImplementation(callback=>callback(prisma));
   (prisma.$queryRaw as jest.Mock).mockImplementation(query=>(query.sql.startsWith('SELECT d.*,activity.') || query.sql.startsWith('SELECT * FROM (')) ? Promise.resolve(query.sql.includes('FROM "Invoice"') ? [invoice] : [receipt]) : Promise.resolve(query.sql.includes('AS amount') ? [{ amount:new Prisma.Decimal(50) }] : []));
   (prisma.customer.findUnique as jest.Mock).mockResolvedValue({id:customerId,branchId});

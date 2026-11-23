@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { canonicalJobStatus } from './job-card-workflow.service';
+import { setNotificationActor } from '../notification/jobcard-notification-router';
 import { ROLES } from '../../shared/constants/roles';
 import { currentEmployeeWhere } from '../employee/employee.service';
 import { labourSlipPricing } from './labour-slip.logic';
@@ -128,8 +129,9 @@ export class LabourService {
     };
   }
 
-  async addJobCardLine(jobCardId: string, input: { labourItemId: string; hours?: number; rate?: number; technicianId?: string; mechanicId?: string }) {
+  async addJobCardLine(jobCardId: string, input: { labourItemId: string; hours?: number; rate?: number; technicianId?: string; mechanicId?: string }, actorId?: string) {
     return prisma.$transaction(async (transaction) => {
+      await setNotificationActor(transaction, actorId);
       await this.lockJobCard(transaction, jobCardId);
       const jobCard = await this.assertJobCardOpen(jobCardId, transaction);
       const item = await transaction.labourItem.findUnique({ where: { id: input.labourItemId } });
@@ -150,8 +152,9 @@ export class LabourService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 
-  async updateJobCardLine(id: string, input: { labourItemId?: string; hours?: number; rate?: number; technicianId?: string | null; mechanicId?: string | null }) {
+  async updateJobCardLine(id: string, input: { labourItemId?: string; hours?: number; rate?: number; technicianId?: string | null; mechanicId?: string | null }, actorId?: string) {
     return prisma.$transaction(async (transaction) => {
+      await setNotificationActor(transaction, actorId);
       const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
       if (!existing) throw new NotFoundError('Job-card labour line not found');
       if (existing.labourSlipId) throw new ConflictError('Edit the labour slip to change this labour line');
@@ -182,8 +185,9 @@ export class LabourService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
 
-  async removeJobCardLine(id: string) {
+  async removeJobCardLine(id: string, actorId?: string) {
     await prisma.$transaction(async (transaction) => {
+      await setNotificationActor(transaction, actorId);
       const existing = await transaction.jobCardLabour.findUnique({ where: { id } });
       if (!existing) throw new NotFoundError('Job-card labour line not found');
       if (existing.labourSlipId) throw new ConflictError('Document-managed labour cannot be removed through the legacy labour endpoint');

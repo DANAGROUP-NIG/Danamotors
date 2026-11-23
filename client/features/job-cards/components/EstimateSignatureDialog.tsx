@@ -1,7 +1,8 @@
 "use client";
 import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
 import { signatureFieldsValid } from "./signature-fields";
-import { useRef, useState, type PointerEvent } from "react";
+import { useState } from "react";
+import { SignaturePad } from "./SignaturePad";
 import { apiPost } from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
 import type { Estimate } from "../types/job-card.types";
@@ -20,9 +21,7 @@ export function EstimateSignatureDialog({
   onSaved: () => Promise<void>;
   onClose: () => void;
 }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const [drawn, setDrawn] = useState(false);
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [name, setName] = useState(customerName);
   const [relationship, setRelationship] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
@@ -30,45 +29,22 @@ export function EstimateSignatureDialog({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  function point(event: PointerEvent<HTMLCanvasElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return [
-      ((event.clientX - rect.left) * 600) / rect.width,
-      ((event.clientY - rect.top) * 200) / rect.height,
-    ];
-  }
-  function start(event: PointerEvent<HTMLCanvasElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drawing.current = true;
-    const ctx = canvas.current!.getContext("2d")!;
-    ctx.beginPath();
-    const [x, y] = point(event);
-    ctx.moveTo(x, y);
-  }
-  function move(event: PointerEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
-    const ctx = canvas.current!.getContext("2d")!;
-    const [x, y] = point(event);
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    setDrawn(true);
-  }
-  const valid = (!approved || consentAccepted) && signatureFieldsValid({
-    drawn,
-    name,
-    customerName,
-    relationship,
-    approved,
-    reason,
-  });
+  const valid =
+    (!approved || consentAccepted) &&
+    signatureFieldsValid({
+      drawn: !!signatureImage,
+      name,
+      customerName,
+      relationship,
+      approved,
+      reason,
+    });
   async function save() {
+    if (!signatureImage) return;
     if (!valid || busy) return;
     setBusy(true);
     setError("");
     try {
-      const signatureImage = canvas.current!.toDataURL("image/png");
       if (signatureImage.length > 88000)
         throw new Error("Signature is too large; please clear and sign again.");
       await apiPost(`/service/estimates/${estimate.id}/approvals`, {
@@ -146,30 +122,11 @@ export function EstimateSignatureDialog({
         <p>
           By signing, I confirm the decision below for this revision and total.
         </p>
-        <canvas
-          ref={canvas}
-          width={600}
-          height={200}
-          aria-label="Draw customer signature"
-          className="w-full touch-none rounded border bg-white"
-          onPointerDown={start}
-          onPointerMove={move}
-          onPointerUp={() => {
-            drawing.current = false;
-          }}
-          onPointerCancel={() => {
-            drawing.current = false;
-          }}
+        <SignaturePad
+          label="Draw customer signature"
+          onChange={setSignatureImage}
+          disabled={busy}
         />
-        <Button
-          variant="outline"
-          onClick={() => {
-            canvas.current!.getContext("2d")!.clearRect(0, 0, 600, 200);
-            setDrawn(false);
-          }}
-        >
-          Clear signature
-        </Button>
         <label className="block">
           Decision
           <select
@@ -191,7 +148,16 @@ export function EstimateSignatureDialog({
           />
         </label>
         <DocumentTermsBlock documentType="JOB_ESTIMATE" branchId={branchId} />
-        {approved && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={consentAccepted} onChange={event => setConsentAccepted(event.target.checked)} />I approve the job card and estimate and accept the terms and conditions above.</label>}
+        {approved && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={consentAccepted}
+              onChange={(event) => setConsentAccepted(event.target.checked)}
+            />
+            I approve this estimate and accept its terms and conditions above.
+          </label>
+        )}
         {error && <p role="alert">{error}</p>}
         <div className="flex gap-2">
           <Button disabled={!valid || busy} onClick={save}>
