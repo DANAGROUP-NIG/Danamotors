@@ -451,12 +451,19 @@ export class CustomerService {
       // the schema, so a new relation fails the test until it is added here (or listed as deliberately kept).
       const where = { customerId: sourceId };
       const data = { customerId: targetId };
+      // The PSF delegate is available when this code is built with the PSF schema.
+      const { psfFollowUp } = tx as typeof tx & {
+        psfFollowUp?: {
+          updateMany(args: { where: typeof where; data: typeof data }): Promise<{ count: number }>;
+        };
+      };
 
       const moved = {
         vehicles: (await tx.vehicle.updateMany({ where, data })).count,
         vehicleOwnerships: (await tx.vehicleOwnership.updateMany({ where, data })).count,
         appointments: (await tx.serviceAppointment.updateMany({ where, data })).count,
         cscCases: (await tx.cscCase.updateMany({ where, data })).count,
+        psfFollowUps: (await psfFollowUp?.updateMany({ where, data }))?.count ?? 0,
         jobCards: (await tx.jobCard.updateMany({ where, data })).count,
         estimates: (await tx.estimate.updateMany({ where, data })).count,
         customerApprovals: (await tx.customerApproval.updateMany({ where, data })).count,
