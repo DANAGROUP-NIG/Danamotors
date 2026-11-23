@@ -7,13 +7,13 @@
     build\tests\HhdcTests.exe          unit tests; run after building unless -SkipTests
 
   The device app is compiled against the device's own .NET CF 3.5 libraries, which are not in this
-  repository. They are in dana_projects\hhdc_integration\tools\probe\refs (the CF libraries copied from
+  repository. They are in dana_projects\hhdc_integration\tools\probe\refs, two levels above this folder (the CF libraries copied from
   the device and renamed mscorlib.dll, System.dll ...). Pass -CfRefs if they are elsewhere.
 
   The compiler is csc.exe from .NET Framework 4 (C# 5): no ?. operator, no $"" strings, no nameof.
 #>
 param(
-    [string]$CfRefs = (Join-Path $PSScriptRoot '..\hhdc_integration\tools\probe\refs'),
+    [string]$CfRefs = (Join-Path $PSScriptRoot '..\..\hhdc_integration\tools\probe\refs'),
     [switch]$SkipTests,
     [switch]$DeviceOnly,
     [switch]$UiTest
@@ -47,15 +47,37 @@ for ($i = 0; $i -lt [BitConverter]::ToUInt16($ico, 4); $i++) {
     if ($ico[$at] -eq 0x89 -and $ico[$at + 1] -eq 0x50) { throw "res\kmhh-ce.ico holds a PNG image; the handheld (CE 6) cannot show it. Run python res\make_ce_icon.py." }
 }
 $logo = Join-Path $PSScriptRoot 'res\kia-logo.png'
-Compile 'Kia Motors Handheld (device)' (@('/noconfig', '/nostdlib', '/target:winexe', "/out:$out\device\KMHH.exe", "/win32icon:$ceIcon", "/resource:$logo,Kia.Logo.png") + $cf + (Sources 'shared', 'device\src'))
+# Every exe carries version information (publisher, product, version) and every PC exe a manifest (asInvoker): an
+# exe with neither looks like malware to heuristic antivirus (Avast "IDP.Generic" removed them, 2026-11-18). Signing
+# is the real cure: make_station_kit.ps1 -CertThumbprint.
+$manifest = Join-Path $PSScriptRoot 'res\app.manifest'
+$version = (Get-Date).ToString('yyyy.M.d.HHmm')
+New-Item -ItemType Directory -Force "$out\obj" | Out-Null
+function VersionInfo([string]$name, [string]$title) {
+    $file = "$out\obj\$name.AssemblyInfo.cs"
+    Set-Content $file -Encoding ASCII -Value @"
+[assembly: System.Reflection.AssemblyTitle("$title")]
+[assembly: System.Reflection.AssemblyDescription("$title")]
+[assembly: System.Reflection.AssemblyCompany("Dana Motors")]
+[assembly: System.Reflection.AssemblyProduct("Kia Motors Handheld")]
+[assembly: System.Reflection.AssemblyCopyright("Dana Motors")]
+[assembly: System.Reflection.AssemblyVersion("$version")]
+"@
+    return $file
+}
+
+Compile 'Kia Motors Handheld (device)' (@('/noconfig', '/nostdlib', '/target:winexe', "/out:$out\device\KMHH.exe", "/win32icon:$ceIcon", "/resource:$logo,Kia.Logo.png", (VersionInfo 'KMHH' 'Kia Motors Handheld')) + $cf + (Sources 'shared', 'device\src'))
 if ($DeviceOnly) { return }
 
 # PC tool and its command-line twin (shared logic in link\src\Core).
 $fw = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Web.Extensions.dll', 'System.Security.dll') | ForEach-Object { "/r:$_" }
-Compile 'HHDC Link' (@('/platform:x86', '/target:winexe', "/out:$out\link\HhdcLink.exe", "/win32icon:$icon") + $fw + (Sources 'shared', 'link\src'))
+Compile 'HHDC Link' (@('/platform:x86', '/target:winexe', "/out:$out\link\HhdcLink.exe", "/win32icon:$icon", "/win32manifest:$manifest", (VersionInfo 'HhdcLink' 'HHDC Link (handheld station)')) + $fw + (Sources 'shared', 'link\src'))
 # The CLI is a test and scripting aid; antivirus often locks or quarantines a freshly built copy. Do not fail the build for that.
-try { Compile 'HHDC Link CLI' (@('/platform:x86', '/target:exe', "/out:$out\link\HhdcLinkCli.exe") + $fw + (Sources 'shared', 'link\src\Core', 'link\cli')) }
+try { Compile 'HHDC Link CLI' (@('/platform:x86', '/target:exe', "/out:$out\link\HhdcLinkCli.exe", "/win32manifest:$manifest", (VersionInfo 'HhdcLinkCli' 'HHDC Link command line')) + $fw + (Sources 'shared', 'link\src\Core', 'link\cli')) }
 catch { Write-Warning 'HHDC Link CLI was not rebuilt (antivirus holding the old file? exclude hhdc\build). Continuing.' }
+# Station setup: one window that installs WMDC and HHDC Link and registers the station (make_station_kit.ps1 packs it).
+New-Item -ItemType Directory -Force "$out\setup" | Out-Null
+Compile 'Station setup' (@('/platform:anycpu', '/target:winexe', "/out:$out\setup\HHDC Station Setup.exe", "/win32icon:$icon", "/win32manifest:$manifest", (VersionInfo 'StationSetup' 'Kia Motors Handheld station setup'), '/r:System.ServiceProcess.dll') + $fw + (Sources 'shared', 'link\src\Core', 'setup\src'))
 
 Copy-Item "$out\device\KMHH.exe" "$out\link\KMHH.exe" -Force   # HHDC Link installs this on the device
 
