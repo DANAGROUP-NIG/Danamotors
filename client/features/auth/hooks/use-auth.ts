@@ -21,17 +21,19 @@ export function useAuth() {
   // Convenience booleans
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
-  const isStoreManager = role === "generalstoremanager" || role === "branchstoremanager";
+  const isStoreManager =
+    role === "generalstoremanager" || role === "branchstoremanager";
   const isGeneralStoreManager = role === "generalstoremanager";
   const isBranchStoreManager = role === "branchstoremanager";
   const isWorkshopManager = role === "workshopmanager";
   const isAdviser = role === "serviceadviser";
   const isTechnician = role === "technician";
-  const isReceptionist = role === "receptionist";
-  const isReceptionManager = role === "receptionmanager";
+  const isReceptionist = role === "ccuofficer";
+  const isReceptionManager = role === "ccumanager";
   const isAccountant = role === "accountant";
   const isCustomer = role === "customer";
   const customerId = user?.customerId || (isCustomer ? user?.id : undefined);
+  const isCCUManager = role === "";
 
   // Hierarchy shorthand: "admin or above"
   const isAdminOrAbove = isSuperAdmin || isAdmin;

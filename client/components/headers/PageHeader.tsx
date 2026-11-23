@@ -38,7 +38,7 @@ export default function PageHeader(props: IAppProps) {
           <Calendar className="size-4 text-muted-foreground" />
           {today}
         </Button>
-        {/* New Job Card — admin / manager / technician / receptionist */}
+        {/* New Job Card — admin / manager / technician / ccuofficer */}
         {/* {canCreateJob && (
           <button className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-primary/30 transition hover:bg-primary/90">
             <Plus className="size-4" />

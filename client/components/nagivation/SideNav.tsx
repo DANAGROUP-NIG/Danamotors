@@ -74,6 +74,7 @@ export default function SideNav({
     isHydrated,
     isSuperAdmin,
     isGeneralStoreManager,
+    isReceptionManager,
     hasAccess,
     hasAnyPermission,
   } = useAuth();
@@ -112,7 +113,7 @@ export default function SideNav({
   // For non-SuperAdmin: lock activeBranch to the user's assigned branch
   useEffect(() => {
     if (branchSource !== "store") return;
-    if (isSuperAdmin || isGeneralStoreManager || !branchesFetched || branches.length === 0) return;
+    if (isSuperAdmin || isGeneralStoreManager || isReceptionManager || !branchesFetched || branches.length === 0) return;
 
     const userBranchId = user?.branchId;
     if (!userBranchId) return;
@@ -133,6 +134,7 @@ export default function SideNav({
     setActiveBranch,
     isSuperAdmin,
     isGeneralStoreManager,
+    isReceptionManager,
   ]);
 
   // Resolve the branch config passed to the dropdown
@@ -142,8 +144,8 @@ export default function SideNav({
           branches,
           activeBranch,
           isLoading: branchLoading,
-          canSwitch: isSuperAdmin || isGeneralStoreManager,
-          canSeeAll: isSuperAdmin || isGeneralStoreManager,
+          canSwitch: isSuperAdmin || isGeneralStoreManager || isReceptionManager,
+          canSeeAll: isSuperAdmin || isGeneralStoreManager || isReceptionManager,
           onSelect: (b) => setActiveBranch(b),
           onAllSelect: () => setActiveBranch(null as any),
         }
