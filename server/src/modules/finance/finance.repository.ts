@@ -75,7 +75,7 @@ export class FinanceRepository {
     return prisma.invoice.findUnique({
       where: { id },
       include: {
-        jobCards: { select: { id: true, jobNumber: true } },
+        jobCards: { select: { id: true, jobNumber: true, customerRemarks: true } },
         customer: {
           select: {
             id: true,

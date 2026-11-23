@@ -5,6 +5,26 @@ import { calculateJobBillTotals } from './job-bill-calculator';
 const input = { partsTotal: 1750, labourTotal: 1000, serviceTotal: 100, partsDiscountPercent: 10, labourDiscountPercent: 20, vatRate: 7.5 };
 const parts = [{ category: 'SPARES', amount: 1000, taxable: true, customerPaid: true }, { category: 'OIL', amount: 500, taxable: true, customerPaid: true }, { category: 'ACCESSORIES', amount: 250, taxable: false, customerPaid: true }, { category: 'SPARES', amount: 9999, taxable: true, customerPaid: false }];
 describe('Flagged parts VAT', () => {
+    it('taxes all three categories and reconciles to the kobo after configured round-down', () => {
+        const taxableParts = parts.map(part => ({ ...part, taxable: true }));
+        const { totals, breakdown } = calculateBillWithPartsVat({ ...input, roundOffValue: 10 }, taxableParts, true);
+        expect(breakdown.map(row => row.vat)).toEqual([67.5, 33.75, 16.88, 67.5]);
+        expect(totals).toMatchObject({ total: 2660, roundOff: -0.63, vatAmount: 185.63 });
+        expect(sumMoney([totals.partsTotal, totals.labourTotal, totals.serviceTotal,
+            -totals.partsDiscountAmount, -totals.labourDiscountAmount, totals.vatAmount, totals.roundOff])).toBe(totals.total);
+    });
+
+    it('exempts government vehicle parts while retaining labour and service VAT', () => {
+        const { totals, breakdown } = calculateBillWithPartsVat(input, parts, true, defaultPartsVatRates, true);
+        expect(breakdown.map(row => row.vat)).toEqual([0, 0, 0, 67.5]);
+        expect(totals.vatAmount).toBe(67.5);
+    });
+
+    it('names an unclassified customer-paid part even when the part is exempt', () => {
+        const unclassified = [{ amount: 1750, category: 'UNCLASSIFIED', taxable: false, customerPaid: true, partNumber: 'P-123' }];
+        expect(() => calculateBillWithPartsVat(input, unclassified, true)).toThrow('Classify part P-123');
+    });
+
     it('posts the full enabled parts-and-labour VAT to the existing Tally mapping', () => {
         const { totals } = calculateBillWithPartsVat(input, parts, true);
         const mappings = jobBillMappingAmounts(totals);

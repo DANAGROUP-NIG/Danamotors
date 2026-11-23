@@ -12,12 +12,12 @@ const nameSql=Prisma.sql`COALESCE(NULLIF(c."companyName",''),TRIM(c."firstName" 
 
 export async function partyScope(tx:Prisma.TransactionClient,input:PartyReportInput) {
  const order=input.order==='code'?Prisma.sql`COALESCE(c.code,'')`:Prisma.sql`LOWER(${nameSql})`;
- const filters=[Prisma.sql`c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR'`];
+ const filters=[Prisma.sql`c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR' AND c."partyStatus"<>'VENDOR'`];
  if(input.customerId) filters.push(Prisma.sql`c.id=${input.customerId}`);
  if(input.partyStatus!=='ALL')filters.push(Prisma.sql`c."partyStatus"=${input.partyStatus}`);
  for(const [id,lower] of [[input.fromCustomerId,true],[input.toCustomerId,false]] as const){
   if(!id)continue;
-  const bounds=await tx.$queryRaw<Array<{value:string;id:string}>>(Prisma.sql`SELECT ${order} value,c.id FROM "Customer" c WHERE c.id=${id} AND c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR'
+  const bounds=await tx.$queryRaw<Array<{value:string;id:string}>>(Prisma.sql`SELECT ${order} value,c.id FROM "Customer" c WHERE c.id=${id} AND c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR' AND c."partyStatus"<>'VENDOR'
    ${input.branchId?Prisma.sql`AND (c."branchId"=${input.branchId} OR EXISTS(SELECT 1 FROM "PartyReportDocument" d WHERE d."customerId"=c.id AND d."branchId"=${input.branchId}))`:Prisma.empty}`);
   if(!bounds.length)throw new NotFoundError('Party range endpoint is unavailable in this branch');
   filters.push(lower?Prisma.sql`(${order},c.id)>=(${bounds[0].value},${id})`:Prisma.sql`(${order},c.id)<=(${bounds[0].value},${id})`);
@@ -72,7 +72,7 @@ export class PartyReportService {
  async search(branchId:string|undefined,search:string,order:'name'|'code',limit:number){
   const term='%'+search.replace(/[\\%_]/g,'\\$&')+'%';
   return prisma.$queryRaw<Array<{id:string;code:string|null;name:string}>>(Prisma.sql`SELECT c.id,c.code,${nameSql} name FROM "Customer" c
-   WHERE c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR' AND (${nameSql} ILIKE ${term} OR c.code ILIKE ${term})
+   WHERE c."mergedIntoId" IS NULL AND UPPER(c.type)<>'VENDOR' AND c."partyStatus"<>'VENDOR' AND (${nameSql} ILIKE ${term} OR c.code ILIKE ${term})
    ${branchId?Prisma.sql`AND (c."branchId"=${branchId} OR EXISTS(SELECT 1 FROM "PartyReportDocument" d WHERE d."customerId"=c.id AND d."branchId"=${branchId}))`:Prisma.empty}
    ORDER BY ${order==='code'?Prisma.sql`COALESCE(c.code,'')`:Prisma.sql`LOWER(${nameSql})`},c.id LIMIT ${limit}`);
  }

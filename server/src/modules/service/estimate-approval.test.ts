@@ -91,3 +91,13 @@ it('loads signature evidence through the operation gate without loading the imag
   estimate.lines = [{ ...service, description: 'Tampered' }, part, labour];
   await expect(assertApprovedOperation(tx, 'job', 'customer', [])).rejects.toThrow('Estimate signature is invalid');
 });
+
+it('identifies the blocked part and tells store staff how to resolve approval', async () => {
+  const tx = { estimate: { findMany: jest.fn().mockResolvedValue([signedEstimate()]) } } as unknown as Prisma.TransactionClient;
+  const unplannedPart = { ...part, referenceId: 'unplanned', description: 'P-42 (Oil filter)' };
+  await expect(assertApprovedOperation(tx, 'job', 'customer', [unplannedPart], 'parts issue')).rejects.toMatchObject({
+    statusCode: 400,
+    code: 'PARTS_ISSUE_ESTIMATE_APPROVAL_REQUIRED',
+    message: expect.stringMatching(/P-42 \(Oil filter\): Not in approved scope.*Ask the service advisor.*record customer approval.*retry/),
+  });
+});

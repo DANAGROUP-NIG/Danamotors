@@ -34,7 +34,7 @@ const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
  * /inventory/vendor-receipts/vendors:
  *   get:
  *     tags: [Vendor Receipts]
- *     summary: Search vendors (parties of type VENDOR)
+ *     summary: Search parties with Vendor status
  *     parameters:
  *       - { in: query, name: search, description: Name or code, schema: { type: string } }
  *     responses:

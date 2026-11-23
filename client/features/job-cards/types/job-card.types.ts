@@ -46,7 +46,14 @@ export type Estimate = {
 
 export type CustomerApproval = {
   signatureState?: "valid" | "invalid" | "legacy" | "override";
-  signature?: { imageReference: string; signerName: string; signedAt: string; estimateVersion: number; totalSigned: number; relationship?: string | null } | null;
+  signature?: {
+    imageReference: string;
+    signerName: string;
+    signedAt: string;
+    estimateVersion: number;
+    totalSigned: number;
+    relationship?: string | null;
+  } | null;
 
   id: string;
   estimateId: string;
@@ -71,6 +78,8 @@ export type JobCardBranch = {
 
 export type JobCardCustomer = {
   id: string;
+  type?: string | null;
+  partyStatus?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -91,6 +100,7 @@ export type JobCardVehicle = {
 };
 
 export type PartIssuance = {
+  requisitionLine?: { requisitionId: string; requisition: { status: string } } | null;
   receivedById?: string | null;
   receivedAt?: string | null;
   id: string;
@@ -138,15 +148,38 @@ export type JobCardInvoice = {
 };
 
 export type JobCard = {
+  openingSignatureRequired?: boolean;
+  openingSignatureCurrent?: boolean;
+  canStartWork?: boolean;
+  advanceSummary?: {
+    basis: "ESTIMATE" | "INVOICE";
+    hasEstimate: boolean;
+    total: number;
+    receivedAmount: number;
+    paidPercent: number | null;
+    balanceAmount: number;
+    excessAmount: number;
+    suggestedPercent: number;
+  };
+  advanceReceipts?: {
+    id: string;
+    receiptNumber: string;
+    amount: number;
+    advanceAmount: number;
+    status: string;
+    mode: string;
+    issuedAt: string;
+  }[];
   allowedTransitions?: string[];
   depositReceiptId?: string | null;
-  labourLines?: { labourItem: { description: string } }[];
+  labourLines?: { id: string; description: string; hours: number; rate?: number; amount?: number; labourSlipId?: string | null; labourItem: { code?: string; description: string }; technician?: { firstName: string; lastName: string } | null; mechanic?: { name: string } | null }[];
   tyres?: { make: string; number: string }[] | null;
   batteryMake?: string | null;
   batteryNumber?: string | null;
   customField1?: string | null;
   checklist?: string | null;
   remarks?: string | null;
+  customerRemarks?: string | null;
   serviceAdvisor?: { firstName: string; lastName: string } | null;
   deliveryAdvisor?: { firstName: string; lastName: string } | null;
   estimatedParts?: number | null;
@@ -166,7 +199,11 @@ export type JobCard = {
   lateRemarks?: string | null;
   gatePassNumber?: string | null;
   serviceTypeId?: string | null;
-  serviceType?: { description: string; code?: string; chargedTo?: string } | null;
+  serviceType?: {
+    description: string;
+    code?: string;
+    chargedTo?: string;
+  } | null;
   bay?: { description: string } | null;
   team?: { description: string } | null;
   serviceAdvisorId?: string | null;
@@ -220,6 +257,7 @@ export type JobCard = {
   createdAt: string;
   updatedAt: string;
   billedAt?: string | null;
+  partsRequestedAt?: string | null;
   serviceId?: string | null;
   service?: {
     id: string;
@@ -250,7 +288,11 @@ export type JobCard = {
     odometerReplacedReason?: string | null;
     previousMileage?: number | null;
   } | null;
-  warrantyAcknowledgedBy?: { id: string; firstName: string; lastName: string } | null;
+  warrantyAcknowledgedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
   warrantyAcknowledgedAt?: string | null;
   completedAt?: string | null;
   warrantyCase?: { id: string; caseNumber: string; status: CaseStatus } | null;
@@ -267,7 +309,11 @@ export type JobCard = {
     attendedBy: { id: string; firstName: string; lastName: string } | null;
     /** A FREE line is charged to this campaign, which pre-sets the answer to "done". */
     hasFreeLine: boolean;
-    campaign: { status: "DRAFT" | "ACTIVE" | "CLOSED"; jobCardText: string | null; printOnJobCard: boolean };
+    campaign: {
+      status: "DRAFT" | "ACTIVE" | "CLOSED";
+      jobCardText: string | null;
+      printOnJobCard: boolean;
+    };
   }[];
 };
 

@@ -1,0 +1,4 @@
+-- No automatic column removal: columns may predate this idempotent repair and
+-- contain catalogue data. Revert application code while retaining these nullable
+-- columns. Any later removal requires verified pre-migration schema evidence and
+-- an export of the affected values.

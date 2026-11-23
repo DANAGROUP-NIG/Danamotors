@@ -1,3 +1,4 @@
+import { jobWorkUpdate } from '../requisition/requisition-work';
 import { JobCardType, Prisma } from '@prisma/client';
 import { assertJobTypeAccess, pdiDocumentNumber, pdiSequenceKey } from '../pdi/pdi.logic';
 import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
@@ -99,15 +100,18 @@ export class LabourSlipService {
       if (job.branchId !== input.branchId) throw new BadRequestError('Job card must belong to the labour slip branch');
       await this.validateGroup(tx, input.groupId);
       if (input.engineerId && !await tx.user.findFirst({ where: { id: input.engineerId, branchId: input.branchId, isActive: true } })) throw new BadRequestError('Engineer must be active in this branch');
-      const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Africa/Lagos', year: 'numeric' }).format(new Date()));
+      const now = new Date();
       const pdi = job.jobType === JobCardType.PDI;
-      if (pdi) await assertPdiDocumentChange(tx, 'labour', new Date(), { create: true });
+      if (pdi) await assertPdiDocumentChange(tx, 'labour', now, { create: true });
       const slipNumber = pdi
-        ? pdiDocumentNumber('LABOUR_SLIP', await nextSequenceNumber(tx, pdiSequenceKey('LABOUR_SLIP', input.branchId), new Date(year, 6, 1)))
-        : await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, new Date(year, 6, 1));
+        ? pdiDocumentNumber('LABOUR_SLIP', await nextSequenceNumber(tx, pdiSequenceKey('LABOUR_SLIP', input.branchId), now))
+        : await nextSequenceNumber(tx, `LABOUR_SLIP_${input.branchId}`, now);
       const slip = await tx.labourSlip.create({ data: { branchId: input.branchId, jobCardId: job.id, groupId: input.groupId, engineerId: input.engineerId, mileage: input.mileage ?? (pdi ? job.mileage : undefined), createdById: actor.userId, slipNumber } });
       for (const line of input.lines) await this.saveLine(tx, slip, job, line, actor);
-      await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId, 'Labour slip') });
+      await tx.jobCard.update({
+        where: { id: job.id },
+        data: pdi ? requisitionWorkUpdate(job.status, actor.userId, 'Labour slip') : await jobWorkUpdate(tx, job, actor.userId, 'Labour slip'),
+      });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'LABOUR_SLIP_CREATED', details: JSON.stringify({ labourSlipId: slip.id, slipNumber, branchId: job.branchId, jobCardId: job.id }) } });
       return this.get(slip.id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
@@ -124,7 +128,12 @@ export class LabourSlipService {
       if (job.jobType === JobCardType.PDI) await assertPdiDocumentChange(tx, 'labour', slip.slipDate, { printedAt: slip.printedAt });
       await this.saveLine(tx, slip, job, parsed.data, actor, lineId);
       await tx.labourSlip.update({ where: { id }, data: { updatedAt: new Date() } });
-      await tx.jobCard.update({ where: { id: job.id }, data: requisitionWorkUpdate(job.status, actor.userId, 'Labour slip') });
+      await tx.jobCard.update({
+        where: { id: job.id },
+        data: job.jobType === JobCardType.PDI
+          ? requisitionWorkUpdate(job.status, actor.userId, 'Labour slip')
+          : await jobWorkUpdate(tx, job, actor.userId, 'Labour slip'),
+      });
       return this.get(id, actor, tx);
     }, { maxWait: 5000, timeout: 20000 });
   }

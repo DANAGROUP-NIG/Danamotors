@@ -11,46 +11,46 @@ authenticated workspace is in the `(dashboard)` group.
 
 ### Auth (`/`, `(auth)` group)
 
-| Route | Purpose |
-| --- | --- |
-| `/login` | Sign in |
-| `/register` | Self-registration (first user becomes SuperAdmin) |
+| Route              | Purpose                                                       |
+| ------------------ | ------------------------------------------------------------- |
+| `/login`           | Sign in                                                       |
+| `/register`        | Self-registration (first user becomes SuperAdmin)             |
 | `/forgot-password` | Ask an administrator to reset the password (no link is shown) |
-| `/reset-password` | Complete reset via `?token=` from the email/link |
+| `/reset-password`  | Complete reset via `?token=` from the email/link              |
 
 ### Dashboard (`(dashboard)` group)
 
-| Route | Purpose |
-| --- | --- |
-| `/dashboard` | KPIs, revenue chart, jobs by status, top technicians, inventory alerts |
-| `/appointments` | Service appointments list |
-| `/appointments/[id]` | Appointment detail + create job card |
-| `/job-cards` | Job cards list (filter/search/paginate) |
-| `/job-cards/[id]` | Job card detail: inspections, estimates, part issuances, invoices |
-| `/inspections` | Inspections list |
-| `/repairs` | Repairs list (backed by job cards) |
-| `/quotations` | Estimates/quotations list (links to job card) |
-| `/technicians` | Technicians list |
-| `/customers` | Customers list |
-| `/customers/[id]` | Customer detail |
-| `/vehicles` | Vehicles list |
-| `/vehicles/[id]` | Vehicle detail |
-| `/inventory` | Parts + branch stock |
-| `/inventory/[id]` | Part detail |
-| `/purchase-requests` | Purchase requests (not in the side menu) |
-| `/purchasing` | Purchasing list (backed by purchase requests; not in the side menu) |
-| `/transfers` | Inter-branch transfers |
-| `/invoices` | Invoices list (edit / record payment via row actions) |
-| `/invoices/new` | Create invoice |
-| `/payments` | Payments list + "Record payment" |
-| `/reports` | Reports |
-| `/finance` | Finance overview |
-| `/branches` | Branch management |
-| `/users` | User management |
-| `/users/[id]` | User detail |
-| `/notifications` | In-app notifications |
-| `/profile` | Current user profile |
-| `/settings` | Settings |
+| Route                | Purpose                                                                |
+| -------------------- | ---------------------------------------------------------------------- |
+| `/dashboard`         | KPIs, revenue chart, jobs by status, top technicians, inventory alerts |
+| `/appointments`      | Service appointments list                                              |
+| `/appointments/[id]` | Appointment detail + create job card                                   |
+| `/job-cards`         | Job cards list (filter/search/paginate)                                |
+| `/job-cards/[id]`    | Job card detail: inspections, estimates, part issuances, invoices      |
+| `/inspections`       | Inspections list                                                       |
+| `/repairs`           | Repairs list (backed by job cards)                                     |
+| `/quotations`        | Estimates/quotations list (links to job card)                          |
+| `/technicians`       | Technicians list                                                       |
+| `/customers`         | Customers list                                                         |
+| `/customers/[id]`    | Customer detail                                                        |
+| `/vehicles`          | Vehicles list                                                          |
+| `/vehicles/[id]`     | Vehicle detail                                                         |
+| `/inventory`         | Parts + branch stock                                                   |
+| `/inventory/[id]`    | Part detail                                                            |
+| `/purchase-requests` | Purchase requests (not in the side menu)                               |
+| `/purchasing`        | Purchasing list (backed by purchase requests; not in the side menu)    |
+| `/transfers`         | Inter-branch transfers                                                 |
+| `/invoices`          | Invoices list (edit / record payment via row actions)                  |
+| `/invoices/new`      | Create invoice                                                         |
+| `/payments`          | Payments list + "Record payment"                                       |
+| `/reports`           | Reports                                                                |
+| `/finance`           | Finance overview                                                       |
+| `/branches`          | Branch management                                                      |
+| `/users`             | User management                                                        |
+| `/users/[id]`        | User detail                                                            |
+| `/notifications`     | In-app notifications                                                   |
+| `/profile`           | Current user profile                                                   |
+| `/settings`          | Settings                                                               |
 
 ## Feature folder convention
 
@@ -106,7 +106,7 @@ Consistent patterns:
 
 Defined in `client/features/auth/roles.ts` (lowercased): `superadmin`, `admin`,
 `generalstoremanager`, `branchstoremanager`, `workshopmanager`, `accountant`,
-`serviceadviser`, `technician`, `receptionist`, `receptionmanager`.
+`serviceadviser`, `technician`, `ccuofficer`, `ccumanager`.
 
 ## Styling
 

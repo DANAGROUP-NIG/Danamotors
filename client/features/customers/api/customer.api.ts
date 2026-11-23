@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPut, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
+import type { CustomerCategory } from "../lib/customer-category";
 import type {
   CreateCustomerPayload,
   Customer,
@@ -17,12 +18,14 @@ export async function getCustomersRequest(params?: {
   page?: number;
   limit?: number;
   search?: string;
+  category?: CustomerCategory;
   branchId?: string;
 }): Promise<CustomerListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.search) query.set("search", params.search);
+  if (params?.category) query.set("category", params.category);
   if (params?.branchId) query.set("branchId", params.branchId);
   const qs = query.toString();
   return apiGet<CustomerListResponse>(

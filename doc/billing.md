@@ -4,7 +4,7 @@
 
 Job bills are created only from job cards in `Ready`, `Completed`, or credit-approved `Delivered` status. Part lines use issued quantity less recorded returns at the part's recorded `retailRate`; labour lines use the recorded job-card hours/rate. The service snapshots each line and calculates all totals on the server. The billing user may enter parts/labour discount percentages (0-100), a service advisor, and notes. A parts discount is rejected when no billable parts remain.
 
-The opening service charge is a separate SERVICE line, without a labour discount. VAT is applied to discounted labour plus the service charge. Configure its percentage with `JOB_BILL_VAT_RATE` (defaults to `7.5`); each invoice stores the rate and computed VAT. Round-off is to the nearest whole currency unit. Document numbers use `YYYY######` and the transactional `DocumentSequence` table. A partial unique index permits one active bill per job card. Cancellation requires a remark, refuses bills with receipts/payments or a Tally posting, and releases the job card for re-billing.
+The opening service charge is a separate SERVICE line, without a labour discount. Labour VAT is applied to discounted labour plus the service charge. Each invoice stores the rate and computed VAT. Round-off uses the branch's configured round-down step. Document numbers use `YYYY######` and the transactional `DocumentSequence` table. A partial unique index permits one active bill per job card. Cancellation requires a remark, refuses bills with receipts/payments or a Tally posting, and releases the job card for re-billing.
 
 ## Receipts
 
@@ -187,6 +187,34 @@ Automated validation and frontend acceptance steps are recorded in issue-77-prog
 # Parts VAT (issue #79)
 
 Parts VAT defaults OFF. `JOB_BILL_PARTS_VAT_ENABLED=true` in the environment or an explicitly true finance setting enables it for new bills; the environment true value overrides the stored switch. Admin/SuperAdmin can edit rates and the stored flag at Reports → Parts VAT settings. Do not enable it in production before business confirmation.
+
+### Issue 142 rollout and accounting decisions
+
+New job bills and counter sales store the gross Kia Spare and Non-Kia Spare heads as decimal amounts. Source O belongs to Kia Spare. Sources L, A, F, U and R belong to Non-Kia Spare. Job bills use the issued part source, or the linked part master when a legacy issuance lacks a source. Counter sales snapshot the billed part's master source on the invoice line. When a positive line has no recognized source, the bill retains its aggregate parts summary. Historical invoices keep their original measurements and summary with no backfill. The migration adds two nullable columns and a check that enforces their sum against gross parts on new writes. Application rollback can leave the columns in place so that recorded splits are retained.
+
+Job bills and counter sales share the final decimal reconciliation and round-down calculation. Counter sales retain line-level discount and VAT for agreement with returns. Job bills retain category and rate VAT allocation. Current Tally postings remain aggregate.
+
+- Job bills calculate discounts on gross parts and labour separately. Parts VAT uses the post-discount amount by category and rate, rounded to kobo in each bucket. Labour VAT still includes discounted labour and the full service charge. Both VAT modes apply the branch's configured round-down step after VAT. Without a step, the calculator rounds to the nearest naira.
+- The billing customer's government-vehicle flag sets parts VAT to 0%. The customer category has no effect on this rule. The current flag is customer-wide. Confirm the treatment of mixed fleets before activation. The invoice preserves the applied VAT rates and amounts in its breakdown.
+- Before activation, review the unclassified part list below, prioritizing parts on open customer-pay jobs at each branch. Classify each affected part from verified master data, including non-taxable parts. Preview regular, exempt and mixed-payer bills in test and staging. Confirm the configured rates, VAT breakdown, and round-off against reference bills before enabling production.
+- Prefer the audited finance setting for activation. Record any environment override in deployment history. To roll back for future bills, set the stored switch to false and remove any `true` environment override. Previously issued invoices retain their stored figures.
+
+Run this read-only count before activation. It matches billing's canonical category check and its supported legacy fallback. The null-link query further below checks migration completeness.
+
+```sql
+SELECT COUNT(*) AS unclassified_parts
+FROM "SparePart"
+WHERE COALESCE(
+  "reportTaxCategoryCode",
+  CASE UPPER("taxCategory")
+    WHEN 'A' THEN 'SPARES'
+    WHEN 'B' THEN 'OIL'
+    WHEN 'C' THEN 'ACCESSORIES'
+    ELSE UPPER("taxCategory")
+  END,
+  'UNCLASSIFIED'
+) NOT IN ('SPARES', 'OIL', 'ACCESSORIES');
+```
 
 Tax categories use the small `PartTaxCategory` master (SPARES/OIL/ACCESSORIES) linked through `SparePart.reportTaxCategoryCode`. Legacy free-text `taxCategory` remains intact. Migration maps A→SPARES, B→OIL, C→ACCESSORIES and canonical names; unmatched text including VAT remains unclassified. Review it with `SELECT "partNumber","taxCategory" FROM "SparePart" WHERE "reportTaxCategoryCode" IS NULL;`. Selecting a canonical category in Part Master updates the link. Unticking Taxable gives that part a 0% exempt rate.
 

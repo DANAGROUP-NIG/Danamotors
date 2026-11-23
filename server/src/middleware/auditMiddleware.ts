@@ -252,7 +252,9 @@ export const auditMiddleware = (req: Request, res: Response, next: NextFunction)
     'unknown';
   const userAgent = req.headers['user-agent'] || 'unknown';
   const action = deriveAction(method, req.originalUrl);
-  const details = sanitizeDetails(req.body);
+  const details = /^\/api\/customers(?:\/[^/?]+)?(?:\?|$)/.test(req.originalUrl)
+    ? undefined
+    : sanitizeDetails(req.body);
 
   // Log after the response has been fully sent and the status code is final
   res.on('finish', () => {

@@ -88,7 +88,10 @@ export async function bookingRelations(
   }));
 }
 
-export async function createBooking(data: BookingCreate, outer?: Prisma.TransactionClient) {
+export async function createBooking(
+  data: BookingCreate,
+  outer?: Prisma.TransactionClient,
+) {
   data = {
     ...data,
     requests: z
@@ -99,13 +102,6 @@ export async function createBooking(data: BookingCreate, outer?: Prisma.Transact
   if (data.status && data.status !== "Pending")
     throw new BadRequestError("New bookings must start as booked");
   const { requests: _requests, ...fields } = data;
-  const year = Number(
-    new Intl.DateTimeFormat("en", {
-      timeZone: "Africa/Lagos",
-      year: "numeric",
-    }).format(new Date()),
-  );
-  const sequenceDate = new Date(year, 6, 1);
   const write = async (tx: Prisma.TransactionClient) => {
     // The locking read also establishes existence; keep duplicate detection under this lock.
     const vehicles = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Vehicle" WHERE id = ${data.vehicleId} FOR UPDATE`;
@@ -149,7 +145,6 @@ export async function createBooking(data: BookingCreate, outer?: Prisma.Transact
     const number = await nextSequenceNumber(
       tx,
       `BOOKING_${data.branchId}`,
-      sequenceDate,
     );
     const booking = await tx.serviceAppointment.create({
       data: {
@@ -174,7 +169,8 @@ export async function createBooking(data: BookingCreate, outer?: Prisma.Transact
     });
     return booking;
   };
-  // Inside a caller's transaction (CSC follow-up) the booking commits or rolls back with it.
-  const booking = outer ? await write(outer) : await prisma.$transaction(write, { timeout: 10000 });
+  const booking = outer
+    ? await write(outer)
+    : await prisma.$transaction(write, { timeout: 10000 });
   return bookingView(booking);
 }

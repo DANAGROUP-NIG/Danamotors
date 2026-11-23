@@ -12,8 +12,8 @@ function scopedBranch(req: Request, selected?: string) {
 }
 
 async function assertPartyAccess(req: Request, customerId: string) {
-  const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { branchId: true, mergedIntoId: true, type: true } });
-  if (!customer || customer.mergedIntoId || customer.type?.toUpperCase() === 'VENDOR') throw new NotFoundError('Customer not found');
+  const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { branchId: true, mergedIntoId: true, type: true, partyStatus: true } });
+  if (!customer || customer.mergedIntoId || (customer.partyStatus === 'VENDOR' || customer.type?.toUpperCase() === 'VENDOR')) throw new NotFoundError('Customer not found');
   scopedBranch(req,customer.branchId);
 }
 

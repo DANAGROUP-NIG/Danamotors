@@ -1,3 +1,5 @@
+import type { CustomerCategory } from "../lib/customer-category";
+
 export type Customer = {
   residencePhone?: string | null;
   fax?: string | null;
@@ -8,8 +10,8 @@ export type Customer = {
   preferredFollowupTime?: string | null;
   code?: string | null;
   creditDays?: number | null;
-  partyStatus?: "CUSTOMER" | "DEALER" | "FA_PARTY";
-  type?: "INDIVIDUAL" | "CORPORATE" | "GOVERNMENT" | "VENDOR";
+  partyStatus?: "CUSTOMER" | "DEALER" | "FA_PARTY" | "VENDOR";
+  type?: CustomerCategory;
   salutation?: string | null;
   companyName?: string | null;
   contactPerson?: string | null;
@@ -61,7 +63,8 @@ export type Customer = {
 
 export type CreateCustomerPayload = {
   creditDays?: number | null;
-  partyStatus?: "CUSTOMER" | "DEALER" | "FA_PARTY";
+  partyStatus?: Customer["partyStatus"];
+  type?: CustomerCategory;
   firstName: string;
   lastName: string;
   email?: string;
