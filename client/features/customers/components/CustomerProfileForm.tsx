@@ -10,6 +10,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { createCustomerSchema, type CreateCustomerFormValues } from "../schemas/customer.schema";
 import type { Customer } from "../types/customer.types";
+import { customerCategories, customerCategoryLabels } from "../lib/customer-category";
 import { MasterOptions } from "@/components/forms/MasterOptions";
 import { useMasterCodes } from "@/hooks/use-master-codes";
 import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
@@ -68,6 +69,7 @@ export function CustomerProfileForm(
   });
 
   const type = watch("type");
+  const isVendor = watch("partyStatus") === "VENDOR";
   const [firstName, lastName, phoneNumber, companyName] = watch(["firstName", "lastName", "phoneNumber", "companyName"]);
 
   const duplicateQuery = new URLSearchParams({
@@ -107,9 +109,8 @@ export function CustomerProfileForm(
     ["zone", "Zone"],
     ["tallyPartyCode", "Tally party code"],
   ];
-  // Mirrors createCustomerSchema: individuals need both names, every other type needs a company name.
-  const individual = !type || type === "INDIVIDUAL";
-  const requiredFields: (keyof CreateCustomerFormValues)[] = ["phoneNumber", ...(individual ? ["firstName", "lastName"] as const : ["companyName"] as const)];
+  const individual = !isVendor && (!type || type === "INDIVIDUAL");
+  const requiredFields: (keyof CreateCustomerFormValues)[] = ["phoneNumber", ...(individual ? ["firstName", "lastName"] as const : isVendor || type !== "OTHERS" ? ["companyName"] as const : [])];
   // New customers always start on the company default credit days; only the edit form changes them.
   const creditLimitField = <Field label="Credit limit (optional)" error={errors.creditLimit?.message}><input className={inputCls} type="number" min="0" step="0.01" {...register("creditLimit", { setValueAs: value => value === "" || value === null ? null : Number(value) })} /></Field>;
 
@@ -128,11 +129,11 @@ export function CustomerProfileForm(
         organizationId: data.organizationId || null,
       }))}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Customer type"><select className={inputCls} {...register("type")}>{["INDIVIDUAL", "CORPORATE", "GOVERNMENT", "VENDOR"].map(value => <option key={value}>{value}</option>)}</select></Field>
+        {!isVendor && <Field label="Customer category" required error={errors.type?.message}><select aria-label="Customer category" className={inputCls} {...register("type")}>{customerCategories.map(value => <option key={value} value={value}>{customerCategoryLabels[value]}</option>)}</select></Field>}
         {customer
           ? <Field label="Credit days (blank uses company default)" error={errors.creditDays?.message}><input className={inputCls} type="number" min="0" max="3650" {...register("creditDays", { setValueAs: value => value === "" ? null : Number(value) })} /></Field>
           : creditLimitField}
-        <Field label="Party status" error={errors.partyStatus?.message}><select className={inputCls} {...register("partyStatus")}><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option><option value="FA_PARTY">FA party</option></select></Field>
+        <Field label="Party status" error={errors.partyStatus?.message}><select aria-label="Party status" className={inputCls} {...register("partyStatus")}><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option><option value="FA_PARTY">FA party</option><option value="VENDOR">Vendor</option></select></Field>
         <Field label="Salutation">{type === "CORPORATE" ? <input className={inputCls} value="M/S." readOnly /> : <select className={inputCls} {...register("salutation")}><option value="">Select salutation</option>{salutations.map(value => <option key={value}>{value}</option>)}</select>}</Field>
         {fields.map(
           ([key, label]) => <Field key={key} label={label} required={requiredFields.includes(key)} error={errors[key]?.message}><input className={inputCls} type={key === "email" ? "email" : "text"}
@@ -142,14 +143,13 @@ export function CustomerProfileForm(
         <Field label="Segment"><select className={inputCls} {...register("segment")}><option value="">Not set</option>{[...new Set([...(segments ?? []).map(row => row.code), ...(customer?.segment ? [customer.segment] : [])])].map(code => <option key={code} value={code}>{segments?.find(row => row.code === code)?.description ?? code}</option>)}</select></Field>
         <Field label="Company type code (optional)"><input className={inputCls} maxLength={10} {...register("companyType")} /></Field>
         {customer && creditLimitField}
-        {type === "VENDOR" && <>
+        {isVendor && <>
           <Field label="Vendor purchase source"><select className={inputCls} {...register("vendorType")}><option value="">Not set</option><option value="LOCAL">Local</option><option value="IMP">Imported</option></select></Field>
           <Field label="MRN rate"><select className={inputCls} {...register("mrnRateType")}><option value="">Not set</option><option value="D">Dealer rate</option><option value="R">Retail rate</option></select></Field>
         </>}
         <WorkshopPicker label="Organization (corporate group)" endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={watch("organizationId") ?? ""}
           onChange={id => setValue("organizationId", id, { shouldDirty: true })} />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("governmentVehicle")} />Government vehicle</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("ownCompanyVehicle")} />Own company vehicle</label>
         <Field label="Birth date"><input type="date" className={inputCls} {...register("dateOfBirth")} /></Field>
         <Field label="Anniversary date"><input type="date" className={inputCls} {...register("anniversaryDate")} /></Field>
         <Field label="Preferred follow-up day"><select className={inputCls} {...register("preferredFollowupDay")}><option value="">No preference</option>{["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => <option key={day}>{day}</option>)}</select></Field>

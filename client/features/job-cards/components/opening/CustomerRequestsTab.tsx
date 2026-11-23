@@ -34,8 +34,10 @@ export function requestTotals(rows: CreateJobCardFormValues["complaints"]) {
 export function CustomerRequestsTab(
   {
     lastJobId,
+    showLastVisit = true,
   }: {
     lastJobId?: string;
+    showLastVisit?: boolean;
   },
 ) {
   const {
@@ -185,7 +187,7 @@ export function CustomerRequestsTab(
             ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
           )}</div>
         {errors.complaints?.message && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints.message}</p>}
-      </OpeningCard><LastVisitCard id={lastJobId} /></div>
+      </OpeningCard>{showLastVisit && <LastVisitCard id={lastJobId} />}</div>
   );
 }
 

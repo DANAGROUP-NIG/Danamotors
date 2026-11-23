@@ -5,7 +5,8 @@ jest.mock('../../prisma/client', () => ({
 
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
-import { BookingCreate, createBooking } from './booking.persistence';
+import { BookingCreate, bookingRelations, createBooking } from './booking.persistence';
+import { createAppointmentSchema } from './service.validation';
 
 const input: BookingCreate = {
   customerId: 'customer', vehicleId: 'vehicle', branchId: 'branch',
@@ -15,6 +16,17 @@ const input: BookingCreate = {
 const transaction = jest.mocked(prisma.$transaction);
 
 beforeEach(() => transaction.mockReset());
+
+it('persists submitted request text as a single plain description', async () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  const { body } = createAppointmentSchema.parse({ body: {
+    customerId: id, vehicleId: id, branchName: 'Synthetic',
+    scheduledAt: '2026-11-01T09:00:00Z', requests: '  Engine noise\nCheck brakes  ',
+  } });
+  const rows = await bookingRelations({} as Prisma.TransactionClient, body, id, id);
+  expect(rows).toHaveLength(1);
+  expect(rows[0].description).toBe('Engine noise\nCheck brakes');
+});
 
 it('rejects invalid initial status before acquiring a connection or lock', async () => {
   await expect(createBooking({ ...input, status: 'Completed' })).rejects.toThrow('New bookings');

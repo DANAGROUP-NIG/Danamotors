@@ -104,7 +104,8 @@ export function DateTimeInput({
 
   // Keep a half-typed value while the parent holds "" for it.
   useEffect(() => {
-    if (displayToISO(typed.current.display, typed.current.meridiem) === value) return;
+    if (displayToISO(typed.current.display, typed.current.meridiem) === value)
+      return;
     const { display: d, meridiem: m } = formatToDisplay(value);
     setDisplay(d);
     setMeridiem(m);
@@ -150,8 +151,12 @@ export function DateTimeInput({
           aria-hidden="true"
           min={min}
           max={max}
-          value={/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? value.slice(0, 16) : ""}
-          onChange={event => onChange(event.target.value)}
+          value={
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)
+              ? value.slice(0, 16)
+              : ""
+          }
+          onChange={(event) => onChange(event.target.value)}
           className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
         />
       </div>

@@ -38,65 +38,65 @@ Branch ─┬─ User ── Role ──┬─ Permission
 
 ### Identity & access
 
-| Model | Notes |
-| --- | --- |
-| `Branch` | Workshop locations; `name` unique. Stock, customers, and service records hang off a branch. |
-| `User` | Staff account. `email` unique, `passwordHash`, `isActive`. Optional `branchId` (users can be branch-scoped). `resetTokenHash` + `resetTokenExpiry` for password resets. |
-| `Role` | Named role; name unique. |
-| `Permission` | Individual permissions. |
-| `RolePermission` | Many-to-many join between `Role` and `Permission`. |
-| `RefreshToken` | Hashed refresh tokens (SHA-256), `token` unique, with `expiresAt`. |
-| `AuditLog` | User actions (login, register, profile updates, password resets, etc.). |
-| `ChangeLog` | Field-level change trail written by Postgres triggers on masters and document heads: record, add/modify/delete, `[{field, old, new}]`, user, and whether the change was made in the app or directly in the database. Append-only. See [audit-log.md](./audit-log.md). |
+| Model            | Notes                                                                                                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Branch`         | Workshop locations; `name` unique. Stock, customers, and service records hang off a branch.                                                                                                                                                                           |
+| `User`           | Staff account. `email` unique, `passwordHash`, `isActive`. Optional `branchId` (users can be branch-scoped). `resetTokenHash` + `resetTokenExpiry` for password resets.                                                                                               |
+| `Role`           | Named role; name unique.                                                                                                                                                                                                                                              |
+| `Permission`     | Individual permissions.                                                                                                                                                                                                                                               |
+| `RolePermission` | Many-to-many join between `Role` and `Permission`.                                                                                                                                                                                                                    |
+| `RefreshToken`   | Hashed refresh tokens (SHA-256), `token` unique, with `expiresAt`.                                                                                                                                                                                                    |
+| `AuditLog`       | User actions (login, register, profile updates, password resets, etc.).                                                                                                                                                                                               |
+| `ChangeLog`      | Field-level change trail written by Postgres triggers on masters and document heads: record, add/modify/delete, `[{field, old, new}]`, user, and whether the change was made in the app or directly in the database. Append-only. See [audit-log.md](./audit-log.md). |
 
 ### Master data
 
-| Model | Notes |
-| --- | --- |
-| `Customer` | Vehicle owner. `email` unique, `branchId` required (branch scoping). |
-| `Vehicle` | Belongs to a customer via `Customer.vehicles`; `registrationNumber` added in the inventory/transfers migration. |
-| `VehicleImage` / `VehicleOwnership` | Vehicle photos and ownership history. |
-| `CustomerDocument` / `ServiceHistory` | Customer files and past-service log. |
+| Model                                 | Notes                                                                                                           |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `Customer`                            | Vehicle owner. `email` unique, `branchId` required (branch scoping).                                            |
+| `Vehicle`                             | Belongs to a customer via `Customer.vehicles`; `registrationNumber` added in the inventory/transfers migration. |
+| `VehicleImage` / `VehicleOwnership`   | Vehicle photos and ownership history.                                                                           |
+| `CustomerDocument` / `ServiceHistory` | Customer files and past-service log.                                                                            |
 
 ### Service pipeline
 
-| Model | Notes |
-| --- | --- |
-| `ServiceAppointment` | Booking (`scheduledAt`, status default `Pending`), created by a receptionist. |
-| `JobCard` | The repair work order: `jobNumber` unique, `status` (default `Open`), `estimatedHours/Cost`, `progress`, `qcStatus`, technician/quality-inspector assignments. |
-| `Inspection` | Vehicle inspection on a job card (`findings`, `passed`, `status`). |
-| `Estimate` | Quotation for a job card. |
-| `CustomerApproval` | Customer decision on an estimate (`approved`, `decisionDate`, `comments`). |
+| Model                | Notes                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ServiceAppointment` | Booking (`scheduledAt`, status default `Pending`), created by a ccuofficer.                                                                                    |
+| `JobCard`            | The repair work order: `jobNumber` unique, `status` (default `Open`), `estimatedHours/Cost`, `progress`, `qcStatus`, technician/quality-inspector assignments. |
+| `Inspection`         | Vehicle inspection on a job card (`findings`, `passed`, `status`).                                                                                             |
+| `Estimate`           | Quotation for a job card.                                                                                                                                      |
+| `CustomerApproval`   | Customer decision on an estimate (`approved`, `decisionDate`, `comments`).                                                                                     |
 
 ### Inventory
 
-| Model | Notes |
-| --- | --- |
-| `SparePart` | Part catalog (`partNumber`, `name`, `unitPrice`). Stock is NOT stored here anymore. |
-| `InventoryStock` | Per-branch part quantities: `quantity`, `reservedQuantity`, `minimumStock`, `maximumStock`, `rackLocation`. Drives the dashboard inventory alerts. |
-| `StockTransaction` | Ledger of every stock movement (`type`, `quantity`, `referenceId`, `recordedById`). |
-| `PartRateHistory` | Every dealer and retail rate set in Part Master (added, edited, deleted), with who and when. Deleted parts keep their number and description. Read by the Part Rate History report. |
-| `PartBinHistory` | Every change of a branch's `rackLocation` for a part. Read by the Part Bin Location History report. |
-| Line cancellation | `CustomerOrderLine` and `BranchIndentLine` record the latest cancellation (`cancelledAt`, `cancelledById`, `cancelRemark`); `BranchIndentLine.cancelledQuantity` holds what will no longer be supplied. See [data-management.md](./data-management.md). |
-| `StockTake` / `StockTakeLine` | Physical stock taking batch (annual or perpetual) and its parts: system stock, counted and damaged quantity, bins found, stock when counted, adjustment posted at S/E confirmation. A trigger on `InventoryStock` freezes stock of parts in an active annual count. Type `AUDIT` is a stock audit (audit level and auditors, report only). See [stock-taking.md](./stock-taking.md). |
-| `StockTakeSheet` / `StockTakeCount` | Count sheets given to checkers (handheld downloads) and every count or correction recorded against a line. |
-| `InterBranchTransfer` | Transfer of parts between branches: `requestingBranchId`, `sourceBranchId`, lifecycle `Pending → Approved → Dispatched → Received` (or `Rejected`/`Cancelled`). |
-| `InterBranchTransferItem` | Line items on a transfer. |
-| `PurchaseRequest` | Parts to procure (`status`). |
-| `PartIssuance` / `PartReturn` | Issue parts against a job card and return unused ones. |
+| Model                               | Notes                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SparePart`                         | Part catalog (`partNumber`, `name`, `unitPrice`). Stock is NOT stored here anymore.                                                                                                                                                                                                                                                                                                  |
+| `InventoryStock`                    | Per-branch part quantities: `quantity`, `reservedQuantity`, `minimumStock`, `maximumStock`, `rackLocation`. Drives the dashboard inventory alerts.                                                                                                                                                                                                                                   |
+| `StockTransaction`                  | Ledger of every stock movement (`type`, `quantity`, `referenceId`, `recordedById`).                                                                                                                                                                                                                                                                                                  |
+| `PartRateHistory`                   | Every dealer and retail rate set in Part Master (added, edited, deleted), with who and when. Deleted parts keep their number and description. Read by the Part Rate History report.                                                                                                                                                                                                  |
+| `PartBinHistory`                    | Every change of a branch's `rackLocation` for a part. Read by the Part Bin Location History report.                                                                                                                                                                                                                                                                                  |
+| Line cancellation                   | `CustomerOrderLine` and `BranchIndentLine` record the latest cancellation (`cancelledAt`, `cancelledById`, `cancelRemark`); `BranchIndentLine.cancelledQuantity` holds what will no longer be supplied. See [data-management.md](./data-management.md).                                                                                                                              |
+| `StockTake` / `StockTakeLine`       | Physical stock taking batch (annual or perpetual) and its parts: system stock, counted and damaged quantity, bins found, stock when counted, adjustment posted at S/E confirmation. A trigger on `InventoryStock` freezes stock of parts in an active annual count. Type `AUDIT` is a stock audit (audit level and auditors, report only). See [stock-taking.md](./stock-taking.md). |
+| `StockTakeSheet` / `StockTakeCount` | Count sheets given to checkers (handheld downloads) and every count or correction recorded against a line.                                                                                                                                                                                                                                                                           |
+| `InterBranchTransfer`               | Transfer of parts between branches: `requestingBranchId`, `sourceBranchId`, lifecycle `Pending → Approved → Dispatched → Received` (or `Rejected`/`Cancelled`).                                                                                                                                                                                                                      |
+| `InterBranchTransferItem`           | Line items on a transfer.                                                                                                                                                                                                                                                                                                                                                            |
+| `PurchaseRequest`                   | Parts to procure (`status`).                                                                                                                                                                                                                                                                                                                                                         |
+| `PartIssuance` / `PartReturn`       | Issue parts against a job card and return unused ones.                                                                                                                                                                                                                                                                                                                               |
 
 ### Finance
 
-| Model | Notes |
-| --- | --- |
-| `Invoice` | `invoiceNumber` unique, `subtotal/tax/total`, `status` (default `Unpaid`). Linked to a customer, optionally a job card. |
+| Model     | Notes                                                                                                                            |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `Invoice` | `invoiceNumber` unique, `subtotal/tax/total`, `status` (default `Unpaid`). Linked to a customer, optionally a job card.          |
 | `Payment` | `recordedById` (from JWT), `amount`, `method`, `paymentDate`. Recording updates the invoice status to `Partially Paid` / `Paid`. |
-| `Receipt` | `issuedById` (from JWT), `amount`, `issuedAt`. |
+| `Receipt` | `issuedById` (from JWT), `amount`, `issuedAt`.                                                                                   |
 
 ### Notifications
 
-| Model | Notes |
-| --- | --- |
+| Model          | Notes                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `Notification` | In-app notification, `isRead` flag, optional `link` and `type`. Sent per user or to an entire role in a branch (e.g. `INVOICE_PAID`). |
 
 ## Key design notes

@@ -1,4 +1,6 @@
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
+import { setNotificationActor } from '../notification/jobcard-notification-router';
+import { assertPartsRequested } from '../service/jobcard-parts-request.logic';
 import { assertApprovedOperation } from '../service/estimate-approval';
 import { defaultSourceCategory, sourceLabel, sourceRecordProblem } from './partSource';
 import prisma from "../../prisma/client";
@@ -1122,15 +1124,17 @@ export class InventoryService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await setNotificationActor(tx, data.issuedById);
       if (data.jobCardId) {
         await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
         const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });
         if (card.branchId !== data.branchId || card.billedAt || ['READY', 'COMPLETED', 'BILLED', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(card.status.toUpperCase())) throw new BadRequestError('Parts can only be issued to an open job in this branch');
+        assertPartsRequested(card);
         const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId, OR: [{ requisitionLine: null }, { requisitionLine: { requisition: { status: 'ISSUED' } } }] }, include: { returns: true } });
         const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => !['REJECTED', 'CANCELLED'].includes(r.status.toUpperCase())).reduce((n, r) => n + r.quantity, 0), 0);
         if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
         // Each source is its own part record: the approved estimate must name this exact record.
-        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: sparePart.name, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }]);
+        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: `${sparePart.partNumber} (${sparePart.name})`, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }], 'parts issue');
       }
       const updated = await tx.inventoryStock.updateMany({
         where: {

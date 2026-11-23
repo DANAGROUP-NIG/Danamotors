@@ -15,16 +15,18 @@ import { useCreateReceipt } from "../hooks/use-create-receipt";
 const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
 
-export function PaymentReceiptModal({ isOpen, onClose, invoiceId }: { isOpen: boolean; onClose: () => void; invoiceId?: string }) {
-  return isOpen ? <ReceiptSession onClose={onClose} invoiceId={invoiceId} /> : null;
+type AdvanceJob = { id: string; customerId: string; branchId: string; jobNumber: string };
+export function PaymentReceiptModal({ isOpen, onClose, invoiceId, job }: { isOpen: boolean; onClose: () => void; invoiceId?: string; job?: AdvanceJob }) {
+  return isOpen ? <ReceiptSession onClose={onClose} invoiceId={invoiceId} job={job} /> : null;
 }
 
-function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId?: string }) {
+function ReceiptSession({ onClose, invoiceId, job }: { onClose: () => void; invoiceId?: string; job?: AdvanceJob }) {
   const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((state) => state.activeBranch?.id);
   const create = useCreateReceipt();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(job?.customerId ?? "");
+  const [savedReceiptId, setSavedReceiptId] = useState<string>();
   const [mode, setMode] = useState<CreateReceiptPayload["mode"]>("BANK_TRANSFER");
   const [category, setCategory] = useState<CreateReceiptPayload["category"]>("SERVICE_PARTS");
   const [bankId, setBankId] = useState("");
@@ -38,8 +40,8 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
   const initialized = useRef(false);
   const linkedInvoice = useQuery({ queryKey: ["receipt-invoice", invoiceId], queryFn: () => getInvoiceRequest(invoiceId!), enabled: !!invoiceId, staleTime: 0, refetchOnMount: "always" });
   // Receipts are taken at the bill's own branch: the job card branch, or CPD for a counter sale.
-  const branchId = linkedInvoice.data?.reportBranchId ?? linkedInvoice.data?.jobCard?.branchId ?? activeBranch;
-  const invoiceQuery = useQuery({ queryKey: ["invoices", "receipt-customer", branchId, customerId], queryFn: () => getInvoicesRequest({ branchId, customerId }), enabled: !!customerId && !!branchId });
+  const branchId = job?.branchId ?? linkedInvoice.data?.reportBranchId ?? linkedInvoice.data?.jobCard?.branchId ?? activeBranch;
+  const invoiceQuery = useQuery({ queryKey: ["invoices", "receipt-customer", branchId, customerId], queryFn: () => getInvoicesRequest({ branchId, customerId }), enabled: !job && !!customerId && !!branchId });
   const banks = useQuery({ queryKey: ["finance", "banks"], queryFn: () => getBanksRequest() });
 
   useEffect(() => {
@@ -60,13 +62,13 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
   const invalidAllocation = Object.entries(allocations).some(([id, value]) => Number(value) < 0 || !Number.isFinite(Number(value)) || (Number(value) > 0 && (!customerInvoices.some((invoice) => invoice.id === id) || Number(value) > (customerInvoices.find((invoice) => invoice.id === id)?.outstandingAmount ?? 0))));
   // Job bills and counter-sale (parts) bills belong to the Service and parts register.
   const hasJobAllocation = customerInvoices.some((invoice) => (invoice.jobCardId || invoice.counterSale) && Number(allocations[invoice.id]) > 0);
-  const blocked = !customerId || !branchId || !Number.isFinite(receivedAmount) || receivedAmount <= 0 || (needsBank && !bankId) || overAllocated || invalidAllocation || invoiceQuery.isFetching || invoiceQuery.isError || (mode === "CHEQUE" && (!chequeNumber.trim() || !chequeDate)) || (!!invoiceId && (linkedInvoice.isPending || linkedInvoice.isError));
+  const blocked = !customerId || !branchId || !Number.isFinite(receivedAmount) || receivedAmount <= 0 || (needsBank && !bankId) || overAllocated || invalidAllocation || (!job && (invoiceQuery.isFetching || invoiceQuery.isError)) || (mode === "CHEQUE" && (!chequeNumber.trim() || !chequeDate)) || (!!invoiceId && (linkedInvoice.isPending || linkedInvoice.isError));
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (blocked || create.isPending) return;
     create.mutate({
-      customerId, branchId, idempotencyKey, mode,
+      customerId, branchId, idempotencyKey, mode, advanceJobCardId: job?.id,
       category: hasJobAllocation ? "SERVICE_PARTS" : category,
       bankId: needsBank ? bankId : undefined,
       amount: receivedAmount,
@@ -76,33 +78,33 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
       reference: reference.trim() || undefined,
       narration: narration.trim() || undefined,
       allocations: Object.entries(allocations).map(([invoiceId, value]) => ({ invoiceId, amount: Number(value) || 0 })).filter((allocation) => allocation.amount > 0),
-    }, { onSuccess: onClose });
+    }, { onSuccess: (result) => { if (job) setSavedReceiptId(result.receipt.id); else onClose(); } });
   }
 
-  return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title="Payment receipt">
-    <form className="grid gap-4" onSubmit={submit} inert={create.isPending}>
-      {invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
-      {customerId && hasPermission("receipt:adjust") && <Link className="text-sm font-medium text-primary hover:underline" href={"/finance/receipts/advance-adjustment?customerId="+customerId}>Use existing advances or credits</Link>}
+  return <ModalFame isOpen onClose={() => { if (!create.isPending) onClose(); }} title={job ? "Advance payment receipt" : "Payment receipt"}>
+    {savedReceiptId ? <div className="space-y-4"><p>Advance received and reserved for job {job?.jobNumber}.</p><Button asChild><Link href={`/finance/receipts/${savedReceiptId}/print`}>View and print receipt</Link></Button><Button type="button" variant="outline" onClick={onClose}>Done</Button></div> : <form className="grid gap-4" onSubmit={submit} inert={create.isPending}>
+      {job ? <p className="text-sm font-medium">Advance for job {job.jobNumber}. Confirm payment has been received before saving.</p> : invoiceId ? <div><p className="text-sm font-medium">Customer</p><p>{linkedInvoice.data?.customer.companyName || [linkedInvoice.data?.customer.firstName, linkedInvoice.data?.customer.lastName].filter(Boolean).join(" ")}</p>{linkedInvoice.isPending && <p role="status">Loading bill...</p>}{linkedInvoice.isError && <p role="alert">Could not load bill. <button type="button" onClick={() => linkedInvoice.refetch()}>Retry</button></p>}</div> : <WorkshopPicker label="Customer" required endpoint="/customers" collection="customers" formatLabel={customerLabel} renderOption={customerOption} value={customerId} onChange={(id) => { setCustomerId(id); setAllocations({}); }} />}
+      {!job && customerId && hasPermission("receipt:adjust") && <Link className="text-sm font-medium text-primary hover:underline" href={"/finance/receipts/advance-adjustment?customerId="+customerId}>Use existing advances or credits</Link>}
       {!branchId && <p role="alert" className="text-sm text-destructive">Select a receiving branch from the app header.</p>}
-      <section className="grid gap-2"><h3 className="text-sm font-semibold">Unpaid bills</h3>
+      {!job && <section className="grid gap-2"><h3 className="text-sm font-semibold">Unpaid bills</h3>
         {invoiceQuery.isFetching && <p role="status" className="text-sm">Loading balances...</p>}
         {invoiceQuery.isError && <p role="alert" className="text-sm text-destructive">Could not load balances. <button type="button" onClick={() => invoiceQuery.refetch()}>Retry</button></p>}
         {customerId && !invoiceQuery.isPending && !invoiceQuery.isError && !customerInvoices.length && <p className="text-sm text-muted-foreground">No unpaid bills in this branch. The receipt will be recorded as an advance.</p>}
         {customerInvoices.map((invoice) => <div key={invoice.id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b py-2"><label htmlFor={`allocation-${invoice.id}`}><span className="block text-sm font-medium">{invoice.invoiceNumber}</span><span className="text-sm text-muted-foreground">Outstanding {currency.format(invoice.outstandingAmount)}</span></label><input id={`allocation-${invoice.id}`} type="number" min="0" max={invoice.outstandingAmount} step="0.01" className={inputCls} value={allocations[invoice.id] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoice.id]: event.target.value }))} /></div>)}
-      </section>
+      </section>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Amount received (NGN)"><input type="number" min="0.01" max="1000000000000" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
         <Field label="Receipt date"><input type="date" className={inputCls} value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
-        <Field label="Mode"><select className={inputCls} value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="BANK_TRANSFER">Bank transfer</option><option value="POS">POS</option><option value="CHEQUE">Cheque</option><option value="CASH">Cash</option></select></Field>
+        <Field label="Mode"><select className={inputCls} value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="BANK_TRANSFER">Bank transfer</option><option value="POS">POS</option>{!job && <option value="CHEQUE">Cheque</option>}<option value="CASH">Cash</option></select></Field>
         {needsBank && <Field label="Receiving bank"><select className={inputCls} value={bankId} onChange={(event) => setBankId(event.target.value)} required><option value="">Select bank</option>{banks.data?.banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}</select>{banks.isError && <p role="alert">Could not load banks. <button type="button" onClick={() => banks.refetch()}>Retry</button></p>}</Field>}
         {mode === "CHEQUE" && <><Field label="Cheque number"><input className={inputCls} value={chequeNumber} maxLength={100} onChange={(event) => setChequeNumber(event.target.value)} required /></Field><Field label="Cheque date"><input type="date" className={inputCls} value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} required /></Field></>}
-        <Field label="Receipt category"><select className={inputCls} disabled={hasJobAllocation} value={hasJobAllocation ? "SERVICE_PARTS" : category} onChange={(event) => setCategory(event.target.value as typeof category)}><option value="SERVICE_PARTS">Service and parts</option><option value="SALES_ENQUIRY">Sales and enquiry</option></select></Field>
+        <Field label="Receipt category"><select className={inputCls} disabled={!!job || hasJobAllocation} value={hasJobAllocation ? "SERVICE_PARTS" : category} onChange={(event) => setCategory(event.target.value as typeof category)}><option value="SERVICE_PARTS">Service and parts</option><option value="SALES_ENQUIRY">Sales and enquiry</option></select></Field>
         <Field label="Payment reference"><input className={inputCls} maxLength={150} value={reference} onChange={(event) => setReference(event.target.value)} placeholder={mode === "POS" ? "POS" : mode === "BANK_TRANSFER" ? "0 (direct transfer)" : "Optional reference"} /></Field>
       </div>
       <Field label="Narration"><textarea className={inputCls} maxLength={1000} value={narration} onChange={(event) => setNarration(event.target.value)} /></Field>
       <div className="flex justify-between border-t pt-3 text-sm"><span>Advance</span><span>{currency.format(Math.max((Number.isFinite(receivedAmount) ? receivedAmount : 0) - allocatedCents / 100, 0))}</span></div>
       {(overAllocated || invalidAllocation) && <p role="alert" className="text-sm text-destructive">Review allocations: they must not exceed the receipt amount or current bill balances.</p>}
       <Button type="submit" disabled={create.isPending || blocked}>{create.isPending ? "Saving receipt..." : "Save receipt"}</Button>
-    </form>
+    </form>}
   </ModalFame>;
 }

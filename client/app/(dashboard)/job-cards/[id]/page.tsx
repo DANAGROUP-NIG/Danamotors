@@ -1,12 +1,21 @@
 "use client";
+import { CustomerExplanation } from "@/components/CustomerExplanation";
+import { customerCategoryLabel } from "@/features/customers/lib/customer-category";
 import {
   JOB_CARD_STATUS_TONES,
+  JOB_CARD_STATUS_LABELS,
   canonicalJobStatus,
   hasJobBill,
 } from "@/features/job-cards/types/job-card-status";
 import { JobCardPartsSection } from "@/features/job-cards/components/JobCardPartsSection";
 import { RepairWorkspacePage } from "@/features/job-cards/components/RepairWorkspacePage";
 import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
+import { JobOpeningConsentCard } from "@/features/job-cards/components/JobOpeningConsentCard";
+import {
+  lagosDate,
+  moneyText,
+} from "@/features/service-transactions/transaction.logic";
+import { WORKSPACE_COPY } from "@/features/job-cards/components/repair-workspace-copy";
 import { JobCardRepeatPanel } from "@/features/repeat-jobs/components/JobCardRepeatPanel";
 import { JobCardLatePanel } from "@/features/late-deliveries/components/JobCardLatePanel";
 import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
@@ -16,6 +25,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useJobCard } from "@/features/job-cards";
+import { useRequestJobCardParts } from "@/features/job-cards/hooks/use-request-job-card-parts";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   ArrowLeft,
@@ -54,20 +64,18 @@ import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  return lagosDate(iso);
 }
 
 function fmtCurrency(n: number) {
-  return `₦${n.toLocaleString()}`;
+  return moneyText(n);
 }
 
 export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: jobCard, isLoading, error } = useJobCard(id);
+  const requestParts = useRequestJobCardParts(id);
   const { hasPermission, isSuperAdmin } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -96,9 +104,7 @@ export default function JobCardDetailPage() {
   }
 
   function handleRequestParts() {
-    document
-      .getElementById("job-parts")
-      ?.scrollIntoView({ behavior: "smooth" });
+    if (!requestParts.isPending) requestParts.mutate(crypto.randomUUID());
   }
 
   if (isLoading || error || !jobCard)
@@ -112,12 +118,12 @@ export default function JobCardDetailPage() {
   const hasCampaigns = (jobCard.campaigns?.length ?? 0) > 0;
   const vehicleLabel = jobCard.vehicle
     ? `${jobCard.vehicle.year ?? ""} ${jobCard.vehicle.make ?? ""} ${jobCard.vehicle.model ?? ""}`.trim() ||
-      "—"
-    : "—";
+      "N/A"
+    : "N/A";
   const customerName = jobCard.customer
     ? jobCard.customer.companyName ||
       `${jobCard.customer.firstName} ${jobCard.customer.lastName}`.trim()
-    : "—";
+    : "N/A";
   const partIssuances = jobCard.partIssuances ?? [];
   const missingRetailRate = partIssuances.some((issuance) => {
     const returned = issuance.returns.reduce(
@@ -157,6 +163,15 @@ export default function JobCardDetailPage() {
 
   return (
     <div className="px-4 py-4 lg:px-5 print:px-0 print:py-0">
+      <JobOpeningConsentCard
+        jobCardId={id}
+        closed={
+          hasJobBill(jobCard) ||
+          ["DELIVERED", "CANCELLED"].includes(
+            canonicalJobStatus(jobCard.status),
+          )
+        }
+      />
       <RepairWorkspacePage id={id} />
       {/* Screen-only top bar */}
       <div className="mb-4 mt-8 flex flex-wrap items-center justify-between gap-2 print:hidden">
@@ -217,9 +232,17 @@ export default function JobCardDetailPage() {
                     size="sm"
                     variant="outline"
                     onClick={handleRequestParts}
+                    disabled={requestParts.isPending}
                     className="gap-1.5"
                   >
-                    <Package className="size-4" /> Request Parts
+                    {requestParts.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Package className="size-4" />
+                    )}
+                    {requestParts.isPending
+                      ? "Sending request"
+                      : "Request part"}
                   </Button>
                 )}
             </>
@@ -246,7 +269,10 @@ export default function JobCardDetailPage() {
                 Created {fmtDate(jobCard.createdAt)}
               </span>
               <StatusBadge
-                status={jobCard.status.replace("_", " ")}
+                status={
+                  JOB_CARD_STATUS_LABELS[jobCard.status as JobCardStatus] ??
+                  "Status unavailable"
+                }
                 tone={tone}
               />
             </div>
@@ -291,7 +317,15 @@ export default function JobCardDetailPage() {
         {jobCard.vehicleId && (canSeeWarranty || hasCampaigns) && (
           <div className={cn("grid gap-5", canSeeWarranty && "md:grid-cols-2")}>
             {canSeeWarranty && <WarrantySnapshotCard jobCard={jobCard} />}
-            <LinkedCampaignsCard jobCard={jobCard} canEdit={canManage && !["DELIVERED", "CANCELLED"].includes(canonicalJobStatus(jobCard.status))} />
+            <LinkedCampaignsCard
+              jobCard={jobCard}
+              canEdit={
+                canManage &&
+                !["DELIVERED", "CANCELLED"].includes(
+                  canonicalJobStatus(jobCard.status),
+                )
+              }
+            />
           </div>
         )}
 
@@ -300,6 +334,7 @@ export default function JobCardDetailPage() {
           <SectionCard icon={<User className="size-4" />} title="Customer">
             <div className="space-y-2 text-sm">
               <p className="font-medium text-slate-800">{customerName}</p>
+              <DetailField label="Customer category" value={customerCategoryLabel(jobCard.customer)} />
               <p className="text-slate-500">
                 {jobCard.customer?.phoneNumber ?? "No mobile recorded"}
               </p>
@@ -324,7 +359,7 @@ export default function JobCardDetailPage() {
                   Reg No
                 </p>
                 <p className="text-slate-800">
-                  {jobCard.vehicle?.registrationNumber ?? "—"}
+                  {jobCard.vehicle?.registrationNumber ?? "N/A"}
                 </p>
               </div>
               <div>
@@ -337,21 +372,25 @@ export default function JobCardDetailPage() {
                 <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                   VIN
                 </p>
-                <p className="text-slate-800">{jobCard.vehicle?.vin ?? "—"}</p>
+                <p className="text-slate-800">
+                  {jobCard.vehicle?.vin ?? "N/A"}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                   Color
                 </p>
                 <p className="text-slate-800">
-                  {jobCard.vehicle?.color ?? "—"}
+                  {jobCard.vehicle?.color ?? "N/A"}
                 </p>
               </div>
               <div>
                 <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
                   Year
                 </p>
-                <p className="text-slate-800">{jobCard.vehicle?.year ?? "—"}</p>
+                <p className="text-slate-800">
+                  {jobCard.vehicle?.year ?? "N/A"}
+                </p>
               </div>
             </div>
           </SectionCard>
@@ -365,7 +404,7 @@ export default function JobCardDetailPage() {
                 Estimated Hours
               </p>
               <p className="mt-0.5 text-sm text-slate-800">
-                {jobCard.estimatedHours ?? "—"}
+                {jobCard.estimatedHours ?? "N/A"}
               </p>
             </div>
             {jobCard.estimatedCost !== undefined && (
@@ -376,7 +415,7 @@ export default function JobCardDetailPage() {
                 <p className="mt-0.5 text-sm text-slate-800">
                   {jobCard.estimatedCost != null
                     ? fmtCurrency(jobCard.estimatedCost)
-                    : "—"}
+                    : "N/A"}
                 </p>
               </div>
             )}
@@ -385,7 +424,10 @@ export default function JobCardDetailPage() {
                 QC Status
               </p>
               <p className="mt-0.5 text-sm text-slate-800 capitalize">
-                {jobCard.qcStatus?.replace("_", " ") ?? ""}
+                {WORKSPACE_COPY.qcStates[
+                  (jobCard.qcStatus?.toUpperCase() ??
+                    "") as keyof typeof WORKSPACE_COPY.qcStates
+                ] ?? "Not recorded"}
               </p>
             </div>
             <div>
@@ -495,14 +537,16 @@ export default function JobCardDetailPage() {
             </div>
           )}
           {jobCard.remarks && (
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold">Remarks</h3>
+            <div className="mt-4 print:hidden">
+              <h3 className="text-sm font-semibold">Internal remarks</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
                 {jobCard.remarks}
               </p>
             </div>
           )}
         </SectionCard>
+
+        <CustomerExplanation text={jobCard.customerRemarks} />
 
         {canManage && <JobCardEditForm jobCard={jobCard} />}
         <section className="rounded-xl border bg-white p-5 space-y-2">
@@ -512,13 +556,13 @@ export default function JobCardDetailPage() {
             {jobCard.service?.name ??
               jobCard.serviceType?.description ??
               "Not recorded"}{" "}
-            · Bay: {jobCard.bay?.description ?? "Not recorded"} · Mileage:{" "}
+            , Bay: {jobCard.bay?.description ?? "Not recorded"}, Mileage:{" "}
             {jobCard.mileage ?? "Not recorded"} km
           </p>
           <p>
             Promised:{" "}
             {jobCard.promisedAt ? fmtDate(jobCard.promisedAt) : "Not recorded"}{" "}
-            · Ready:{" "}
+            , Ready:{" "}
             {jobCard.readyAt
               ? fmtDate(jobCard.readyAt)
               : "Awaiting quality check"}
@@ -530,7 +574,7 @@ export default function JobCardDetailPage() {
               : jobCard.acFitted
                 ? "Yes"
                 : "No"}{" "}
-            · In-house:{" "}
+            , In-house:{" "}
             {jobCard.inHouse == null
               ? "Not recorded"
               : jobCard.inHouse
@@ -540,7 +584,7 @@ export default function JobCardDetailPage() {
           <h3 className="text-sm font-semibold">Customer requests</h3>
           {jobCard.complaints?.map((complaint) => (
             <p key={complaint.id} className="whitespace-pre-wrap text-sm">
-              {complaint.defectCode ? `${complaint.defectCode} — ` : ""}
+              {complaint.defectCode ? `${complaint.defectCode} - ` : ""}
               {complaint.description}
             </p>
           ))}
@@ -562,9 +606,11 @@ export default function JobCardDetailPage() {
           )}
           {jobCard.statusHistory?.map((entry) => (
             <p className="text-sm text-slate-500" key={entry.id}>
-              {fmtDate(entry.createdAt)} · {entry.toStatus.replaceAll("_", " ")}{" "}
-              · {entry.actor.firstName} {entry.actor.lastName}
-              {entry.remarks ? ` · ${entry.remarks}` : ""}
+              {fmtDate(entry.createdAt)},{" "}
+              {JOB_CARD_STATUS_LABELS[entry.toStatus as JobCardStatus] ??
+                "Status unavailable"}{" "}
+              , {entry.actor.firstName} {entry.actor.lastName}
+              {entry.remarks ? `, ${entry.remarks}` : ""}
             </p>
           ))}
         </section>
@@ -604,12 +650,7 @@ export default function JobCardDetailPage() {
           </section>
         )}
         <JobCardPartsSection jobCard={jobCard} />
-        <JobCardLabourSection
-          jobCardId={jobCard.id}
-          status={jobCard.status}
-          branchId={jobCard.branchId}
-          billedAt={jobCard.billedAt}
-        />
+        <JobCardLabourSection jobCard={jobCard} />
 
         {/* ── Who pays for each part and labour line (warranty, goodwill, campaign, customer) ── */}
         <JobCardLinesCard jobCardId={jobCard.id} />
@@ -918,7 +959,7 @@ function DetailField({
       <p className="text-sm font-medium uppercase tracking-wider text-slate-400">
         {label}
       </p>
-      <p className="mt-0.5 text-sm text-slate-700">{value ?? "—"}</p>
+      <p className="mt-0.5 text-sm text-slate-700">{value ?? "N/A"}</p>
     </div>
   );
 }
@@ -962,10 +1003,10 @@ function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
         {retailRate == null ? "Not set" : fmtCurrency(retailRate)}
       </td>
       <td className="px-3 py-2 text-right font-medium text-slate-800">
-        {lineTotal == null ? "—" : fmtCurrency(lineTotal)}
+        {lineTotal == null ? "N/A" : fmtCurrency(lineTotal)}
       </td>
       <td className="px-3 py-2 text-slate-600">
-        {issuance.issuedBy?.firstName ?? "—"}
+        {issuance.issuedBy?.firstName ?? "N/A"}
       </td>
     </tr>
   );
@@ -1007,7 +1048,7 @@ function InvoiceRow({ invoice }: { invoice: JobCardInvoice }) {
         </span>
       </td>
       <td className="px-3 py-2 text-slate-600">
-        {totalPaid > 0 ? fmtCurrency(totalPaid) : "—"}
+        {totalPaid > 0 ? fmtCurrency(totalPaid) : "N/A"}
       </td>
     </tr>
   );

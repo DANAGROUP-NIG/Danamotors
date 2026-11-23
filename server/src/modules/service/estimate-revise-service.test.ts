@@ -2,6 +2,7 @@ jest.mock('../../prisma/client',()=>({__esModule:true,default:{
  $transaction:jest.fn(),$queryRaw:jest.fn(),jobCard:{findUnique:jest.fn(),update:jest.fn()},estimate:{findMany:jest.fn(),update:jest.fn(),create:jest.fn()},auditLog:{create:jest.fn()}
 }}));
 jest.mock('../finance/document-number',()=>({nextDocumentNumber:jest.fn(async()=> 'TEST-2')}));
+import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import {ServiceService} from './service.service';
 const previous={id:'old',version:1,description:'Original',amount:0,createdAt:new Date('2026-10-19'),lines:[{type:'COMPLAINT',description:'Original complaint',quantity:1,rate:0,amount:0}]};
@@ -21,7 +22,7 @@ test('revision supersedes source and creates unsigned N+1 with before/after audi
  const audit=(prisma.auditLog.create as jest.Mock).mock.calls[0][0].data;
  expect(audit.userId).toBe('actor');expect(audit.action).toBe('ESTIMATE_REVISED');
  expect(JSON.parse(audit.details)).toMatchObject({before:{description:'Original'},after:{description:'Revision'},version:2,supersedesId:'old'});
- expect((prisma.$queryRaw as jest.Mock).mock.calls[0][0].sql).toContain('FOR UPDATE');
+ expect(prisma.$queryRaw).toHaveBeenCalledWith(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${'job'} FOR UPDATE`);
 });
 test('create cannot create another estimate and stale revision cannot replace latest',async()=>{
  await expect(new ServiceService().addEstimate('job',input,'actor')).rejects.toThrow('Use revise');

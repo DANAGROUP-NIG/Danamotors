@@ -18,7 +18,8 @@ export type JobCardStatus = keyof typeof JOB_CARD_STATUS_TONES;
 export function canonicalJobStatus(status: string): string {
   const aliases: Record<string, string> = {
     Open: "OPEN", Pending: "OPEN", "In Progress": "IN_PROGRESS", "On Hold": "IN_PROGRESS",
-    "Quality Check": "QC", Ready: "READY", Completed: "READY", Billed: "BILLED", Closed: "DELIVERED", Cancelled: "CANCELLED",
+    "Quality Check": "QC", Ready: "READY", Completed: "READY", Billed: "BILLED", Closed: "DELIVERED",
+    CLOSED: "DELIVERED", Delivered: "DELIVERED", Cancelled: "CANCELLED", Canceled: "CANCELLED", CANCELED: "CANCELLED",
   };
   return aliases[status] ?? status;
 }

@@ -39,6 +39,7 @@ import { useJobCards } from "../hooks/use-job-cards";
 import type { JobCard, JobCardStatus } from "../types/job-card.types";
 
 const PAGE_SIZE = 10;
+const UNASSIGNED_TECHNICIAN = "unassigned-technician";
 
 const STATUS_LABELS = JOB_CARD_STATUS_LABELS;
 
@@ -107,7 +108,8 @@ export function JobCardsTable() {
     page,
     limit: PAGE_SIZE,
     branchId: activeBranch?.id,
-    status: statusFilter || undefined,
+    status: isJobCardStatus(statusFilter) ? statusFilter : undefined,
+    unassignedTechnician: statusFilter === UNASSIGNED_TECHNICIAN,
     search: committedSearch || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -168,7 +170,7 @@ export function JobCardsTable() {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <p className="text-sm text-red-500">
+          <p className="text-sm text-destructive">
             Failed to load job cards. Check the API connection and try again.
           </p>
         </CardContent>
@@ -190,7 +192,7 @@ export function JobCardsTable() {
       header: "Vehicle Reg No",
       render: (jc) => (
         <span className="font-medium text-muted-foreground">
-          {jc.vehicle?.registrationNumber ?? "—"}
+          {jc.vehicle?.registrationNumber ?? "Not provided"}
         </span>
       ),
     },
@@ -200,14 +202,14 @@ export function JobCardsTable() {
         <span className="text-muted-foreground">
           {jc.customer
             ? jc.customer.companyName || `${jc.customer.firstName} ${jc.customer.lastName}`
-            : "—"}
+            : "Not provided"}
         </span>
       ),
     },
     {
       header: "Branch",
       render: (jc) => (
-        <span className="text-muted-foreground">{jc.branch?.name ?? "—"}</span>
+        <span className="text-muted-foreground">{jc.branch?.name ?? "Not provided"}</span>
       ),
     },
     {
@@ -217,8 +219,18 @@ export function JobCardsTable() {
           {jc.createdBy ? (
             jc.createdBy.firstName
           ) : (
-            <span className="text-border">—</span>
+            <span className="text-muted-foreground">Not provided</span>
           )}
+        </span>
+      ),
+    },
+    {
+      header: "Technician",
+      render: (jc) => (
+        <span className="text-muted-foreground">
+          {jc.technician
+            ? `${jc.technician.firstName} ${jc.technician.lastName}`
+            : "Not assigned"}
         </span>
       ),
     },
@@ -282,7 +294,6 @@ export function JobCardsTable() {
               id: "copy-link",
               label: "Copy link",
               icon: <Link2 className="size-4" />,
-              shortcut: "⌘C",
               onClick: () =>
                 copyToClipboard(
                   `${window.location.origin}/job-cards/${jc.id}`,
@@ -306,7 +317,8 @@ export function JobCardsTable() {
           committedSearch ||
           (isJobCardStatus(statusFilter)
             ? STATUS_LABELS[statusFilter]
-            : undefined)
+            : undefined) ||
+          (statusFilter === UNASSIGNED_TECHNICIAN ? "Unassigned technician" : undefined)
         }
         rowKey={(jc) => jc.id}
         selection={selection}
@@ -346,6 +358,7 @@ export function JobCardsTable() {
             <DataTableFilterChips
               options={[
                 { label: "All", value: "" },
+                { label: "Unassigned technician", value: UNASSIGNED_TECHNICIAN },
                 ...ALL_STATUSES.map((status) => ({
                   label: STATUS_LABELS[status],
                   value: status,
