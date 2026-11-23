@@ -566,7 +566,9 @@ describe("JobCard workflow", () => {
     await new ServiceService().listJobCards({ branchId: id, unassignedTechnician: true });
 
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ branchId: id, unassignedTechnician: true }));
-    expect(prisma.jobCard.count).toHaveBeenCalledWith({ where: { branchId: id, technicianId: null } });
+    expect(prisma.jobCard.count).toHaveBeenCalledWith({
+      where: { branchId: id, jobType: "SERVICE", technicianId: null },
+    });
   });
 
   it("counts records through the end of the selected day", async () => {

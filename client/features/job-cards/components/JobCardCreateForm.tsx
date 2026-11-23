@@ -520,7 +520,6 @@ export function JobCardCreateForm({
           repeatReason: values.isRepeat
             ? values.repeatReason?.trim() || undefined
             : undefined,
-          teamId: values.teamId || undefined,
           estimatedParts: totals.spare,
           estimatedOil: totals.oil,
           estimatedLabour: totals.labour,

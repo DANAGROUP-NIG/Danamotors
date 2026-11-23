@@ -456,6 +456,7 @@ export class CustomerService {
         vehicles: (await tx.vehicle.updateMany({ where, data })).count,
         vehicleOwnerships: (await tx.vehicleOwnership.updateMany({ where, data })).count,
         appointments: (await tx.serviceAppointment.updateMany({ where, data })).count,
+        cscCases: (await tx.cscCase.updateMany({ where, data })).count,
         jobCards: (await tx.jobCard.updateMany({ where, data })).count,
         estimates: (await tx.estimate.updateMany({ where, data })).count,
         customerApprovals: (await tx.customerApproval.updateMany({ where, data })).count,
