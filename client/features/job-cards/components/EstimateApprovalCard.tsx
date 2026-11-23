@@ -68,6 +68,25 @@ export function EstimateApprovalCard({
               {estimate.description}
             </h3>
             <ApprovalCallout estimate={estimate} />
+            {estimate.suggestedAdvance && (
+              <div className="space-y-1 rounded-lg border border-border p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Suggested advance ({estimate.suggestedAdvance.percent}%)
+                  </span>
+                  <span className="text-right font-medium tabular-nums">
+                    {formatEstimateMoney(
+                      estimate.suggestedAdvance.amount,
+                      estimate.currency,
+                    )}
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  Recommendation only. Any positive eligible advance meets the
+                  payment requirement.
+                </p>
+              </div>
+            )}
             <EstimateLinesTable estimate={estimate} />
             <div className="flex items-center justify-between gap-4 border-t border-border pt-5 font-semibold">
               <span>{COPY.total}</span>

@@ -8,6 +8,7 @@ export type InvoiceCustomer = {
 };
 
 export type InvoiceJobCard = {
+  customerRemarks?: string | null;
   id: string;
   jobNumber: string;
   description: string;
@@ -52,7 +53,7 @@ export type InvoiceReceiptAllocation = {
 };
 
 export type Invoice = {
-  jobCards?: { id: string; jobNumber: string }[];
+  jobCards?: { id: string; jobNumber: string; customerRemarks?: string | null }[];
   billType?: string | null;
   vatBreakdown?: {category:string;rate:string|number;saleAmount:string|number;discount:string|number;taxableAmount:string|number;vat:string|number}[];
   id: string;
@@ -70,6 +71,8 @@ export type Invoice = {
   total: number;
   outstandingAmount: number;
   partsTotal: number;
+  kiaSpareTotal?: string | null;
+  nonKiaSpareTotal?: string | null;
   labourTotal: number;
   serviceTotal: number;
   partsDiscountPercent: number;

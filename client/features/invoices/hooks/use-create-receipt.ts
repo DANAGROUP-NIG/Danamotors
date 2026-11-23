@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { creditKeys } from "@/features/credit/api/credit.keys";
 import { invoiceKeys } from "../api/invoice.keys";
+import { jobCardKeys } from "@/features/job-cards/api/job-card.keys";
 import { createReceiptRequest, type CreateReceiptPayload } from "../api/invoice.api";
 
 export function useCreateReceipt() {
@@ -12,6 +13,7 @@ export function useCreateReceipt() {
   return useMutation({
     mutationFn: (payload: CreateReceiptPayload) => createReceiptRequest(payload),
     onSuccess: (_result, payload) => {
+      queryClient.invalidateQueries({ queryKey: jobCardKeys.all });
       queryClient.invalidateQueries({ queryKey: ["party-account", payload.customerId] });
       queryClient.invalidateQueries({ queryKey: creditKeys.customer(payload.customerId) });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

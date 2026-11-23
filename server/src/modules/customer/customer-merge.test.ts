@@ -67,6 +67,14 @@ describe('Customer merge', () => {
     }));
   });
 
+  it('moves PSF follow-ups when the transaction exposes the PSF delegate', () => {
+    expect(calls).toContainEqual({
+      model: 'psfFollowUp',
+      where: { customerId: SOURCE },
+      data: { customerId: TARGET },
+    });
+  });
+
   it('finds the relations it checks', () => {
     // Guards the schema parser: if it stopped matching, the per-relation checks above would pass vacuously.
     expect(customerRelations()).toEqual(expect.arrayContaining([

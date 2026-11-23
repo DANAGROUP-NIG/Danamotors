@@ -112,6 +112,7 @@ export const PERMISSIONS = {
 
   // ── Service — Job Cards ───────────────────────────────────────────────────
   JOBCARD_READ: "jobcard:read",
+  JOBCARD_MULTI_VEHICLE_READ: "jobcard:multi-vehicle:read",
   JOBCARD_CREATE: "jobcard:create",
   JOBCARD_UPDATE: "jobcard:update",
   JOBCARD_REMARKS_UPDATE: "jobcard:remarks:update",
@@ -695,6 +696,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.NOTIFICATION_UPDATE,
     PERMISSIONS.SEARCH_READ,
     PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_MULTI_VEHICLE_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.JOBCARD_UPDATE,
     PERMISSIONS.ESTIMATE_CREATE,
@@ -814,6 +816,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.TALLY_IMPORT,
     PERMISSIONS.CUSTOMER_TALLY_MAPPING,
     PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_MULTI_VEHICLE_READ,
   ],
 
   // Handles estimates, approvals, customer liaison during service
@@ -896,6 +899,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.APPOINTMENT_CREATE,
     PERMISSIONS.APPOINTMENT_UPDATE,
     PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.JOBCARD_MULTI_VEHICLE_READ,
     PERMISSIONS.JOBCARD_CREATE,
     PERMISSIONS.INSPECTION_READ,
     PERMISSIONS.ESTIMATE_READ,

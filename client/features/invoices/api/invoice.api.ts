@@ -59,6 +59,7 @@ export type JobBillPreview = {
 export type ServiceAdvisor = { id: string; firstName: string; lastName: string; email: string };
 export type ReceivingBank = { id: string; code: string; name: string; accountNumber?: string | null };
 export type CreateReceiptPayload = {
+  advanceJobCardId?: string;
   branchId?: string;
   idempotencyKey?: string;
   issuedAt?: string;
@@ -128,7 +129,7 @@ export async function getBanksRequest(): Promise<{ banks: ReceivingBank[] }> {
 }
 
 export async function createReceiptRequest(payload: CreateReceiptPayload) {
-  return apiPost(API_ROUTES.finance.receipts, payload);
+  return apiPost<{ receipt: { id: string; receiptNumber: string } }>(API_ROUTES.finance.receipts, payload);
 }
 
 export async function cancelInvoiceRequest(id: string, remark: string): Promise<Invoice> {

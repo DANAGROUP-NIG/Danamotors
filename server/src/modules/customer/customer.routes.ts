@@ -64,9 +64,13 @@ router.get('/:id/merge-history', requirePermission(PERMISSIONS.CUSTOMER_READ), v
  *     tags:
  *       - Customers
  *     summary: List all customers
+ *     description: Requires customer read permission. A category filter selects customer categories and excludes Vendor parties.
  *     security:
  *       - BearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema: { type: string, enum: [INDIVIDUAL, CORPORATE, GOVERNMENT, IN_HOUSE, OTHERS] }
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }

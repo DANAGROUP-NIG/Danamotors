@@ -72,6 +72,8 @@ describe('Requisition rules', () => {
     expect(requisitionBody.safeParse({ ...input, lines: [line, line] }).success).toBe(false);
     expect(requisitionBody.safeParse({ ...input, lines: [{ ...line, rate: 0 }] }).success).toBe(false);
     expect(requisitionBody.safeParse({ ...input, requisitionNumber: 'manual' }).success).toBe(false);
+    expect(requisitionBody.safeParse({ ...input, lines: [{ ...line, quantityIssued: 3 }] }).success).toBe(false);
+    expect(requisitionBody.safeParse({ ...input, lines: [{ ...line, quantityIssued: 0 }] }).success).toBe(true);
   });
 });
 

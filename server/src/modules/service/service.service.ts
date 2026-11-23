@@ -1,9 +1,24 @@
 import { getPdiSettings } from "../pdi/pdi.settings.service";
-import { BookingFields, bookingRelations } from './booking.persistence';
-import { assertBookable, bookingComplaints, bookingState, bookingView } from './booking.logic';
+import { BookingFields, bookingRelations } from "./booking.persistence";
+import {
+  assertBookable,
+  bookingComplaints,
+  bookingState,
+  bookingView,
+  isTerminalBookingStatus,
+} from "./booking.logic";
 import { allowedJobTransitions } from "./job-transitions";
+import { hasCurrentOpeningSignature } from "./job-opening-signature.service";
 import { upfrontAmount } from "./job-deposit.service";
-import { assertSignaturePng, estimateContentHash, signatureState } from "./estimate-signature";
+import {
+  advanceCoverage,
+  advanceReceiptDateLimit,
+} from "../finance/job-advance";
+import {
+  assertSignaturePng,
+  estimateContentHash,
+  signatureState,
+} from "./estimate-signature";
 import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
@@ -27,6 +42,7 @@ import {
 } from "./service.validation";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
 import prisma from "../../prisma/client";
+import { setNotificationActor } from "../notification/jobcard-notification-router";
 import { ServiceRepository } from "./service.repository";
 import {
   NotFoundError,
@@ -61,13 +77,19 @@ export const APPOINTMENT_STATUS_TRANSITIONS: Record<string, string[]> = {
 };
 
 // Legacy "Service Booking For Maximum N days": a booking cannot be made further ahead than the branch allows.
-export async function assertWithinBookingHorizon(branchId: string, scheduledAt: Date, now = new Date()) {
+export async function assertWithinBookingHorizon(
+  branchId: string,
+  scheduledAt: Date,
+  now = new Date(),
+) {
   const { bookingMaxDays } = await getBranchSettings(branchId);
   const latest = new Date(now);
   latest.setDate(latest.getDate() + bookingMaxDays);
   latest.setHours(23, 59, 59, 999);
   if (scheduledAt > latest)
-    throw new BadRequestError(`Bookings can be made up to ${bookingMaxDays} days ahead at this branch`);
+    throw new BadRequestError(
+      `Bookings can be made up to ${bookingMaxDays} days ahead at this branch`,
+    );
 }
 
 export class ServiceService {
@@ -77,18 +99,20 @@ export class ServiceService {
     this.serviceRepository = new ServiceRepository();
   }
 
-  async createAppointment(data: BookingFields & {
-    customerId: string;
-    vehicleId: string;
-    branchName: string;
-    scheduledAt: string;
-    serviceId?: string;
-    serviceTypeId?: string;
-    durationMins?: number;
-    notes?: string;
-    status?: string;
-    createdById?: string;
-  }) {
+  async createAppointment(
+    data: BookingFields & {
+      customerId: string;
+      vehicleId: string;
+      branchName: string;
+      scheduledAt: string;
+      serviceId?: string;
+      serviceTypeId?: string;
+      durationMins?: number;
+      notes?: string;
+      status?: string;
+      createdById?: string;
+    },
+  ) {
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
     });
@@ -106,8 +130,11 @@ export class ServiceService {
       throw new NotFoundError(`Branch '${data.branchName}' does not exist`);
 
     if (data.serviceTypeId) {
-      const type=await prisma.workshopMaster.findFirst({where:{id:data.serviceTypeId,kind:"SERVICE_TYPE",active:true}});
-      if(!type)throw new BadRequestError("Select an active workshop service type");
+      const type = await prisma.workshopMaster.findFirst({
+        where: { id: data.serviceTypeId, kind: "SERVICE_TYPE", active: true },
+      });
+      if (!type)
+        throw new BadRequestError("Select an active workshop service type");
     }
     if (data.serviceId) {
       const service = await prisma.service.findUnique({
@@ -251,8 +278,24 @@ export class ServiceService {
     }
     const isSuperAdmin = data.requestingUserRole === ROLES.SUPER_ADMIN;
 
+    if (data.status) {
+      data = {
+        ...data,
+        status: bookingState(
+          appointment,
+          data.status,
+          data.bookingStatus,
+          data.cancelReason,
+        ).status,
+      };
+    }
+
     // ── Status transition validation ──────────────────────────────────────────
-    if (data.status && data.status !== appointment.status && !["Cancelled", "No Show"].includes(data.status)) {
+    if (
+      data.status &&
+      data.status !== appointment.status &&
+      !["Cancelled", "No Show"].includes(data.status)
+    ) {
       const currentStatus = appointment.status;
       const allowedTransitions = APPOINTMENT_STATUS_TRANSITIONS[currentStatus];
 
@@ -279,7 +322,10 @@ export class ServiceService {
 
     const oldScheduledAt = appointment.scheduledAt;
     if (isRescheduled)
-      await assertWithinBookingHorizon(appointment.branchId, new Date(data.scheduledAt!));
+      await assertWithinBookingHorizon(
+        appointment.branchId,
+        new Date(data.scheduledAt!),
+      );
 
     // ── Persist update ────────────────────────────────────────────────────────
     // Check-in with an odometer reading records it and runs the warranty & campaign check;
@@ -288,18 +334,52 @@ export class ServiceService {
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Vehicle" WHERE id = ${appointment.vehicleId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${id} FOR UPDATE`;
-      const current = await tx.serviceAppointment.findUniqueOrThrow({ where: { id }, include: { requests: true, jobCards: { select: { id: true } } } });
-      const hasBookingEdit = data.requests !== undefined || data.serviceTypeId !== undefined || data.serviceId !== undefined || data.followUpJobId !== undefined || data.acFitted !== undefined || data.mileage !== undefined || data.scheduledAt !== undefined || data.bookingStatus !== undefined || data.cancelReason !== undefined || data.notes !== undefined || data.durationMins !== undefined || data.status === "Cancelled" || data.status === "No Show";
+      const current = await tx.serviceAppointment.findUniqueOrThrow({
+        where: { id },
+        include: { requests: true, jobCards: { select: { id: true } } },
+      });
+      const state = bookingState(
+        current,
+        data.status,
+        data.bookingStatus,
+        data.cancelReason,
+      );
+      const hasBookingEdit =
+        data.requests !== undefined ||
+        data.serviceTypeId !== undefined ||
+        data.serviceId !== undefined ||
+        data.followUpJobId !== undefined ||
+        data.acFitted !== undefined ||
+        data.mileage !== undefined ||
+        data.scheduledAt !== undefined ||
+        state.bookingStatus !== undefined ||
+        data.cancelReason !== undefined ||
+        data.notes !== undefined ||
+        data.durationMins !== undefined;
       if (hasBookingEdit) {
         assertBookable(current);
-        if (current.jobCards.length) throw new ConflictError("Linked bookings cannot be edited");
+        if (current.jobCards.length)
+          throw new ConflictError("Linked bookings cannot be edited");
       }
-      if (data.status && ["CANCELLED", "NO_SHOW"].includes(current.bookingStatus)) assertBookable(current);
-      if (data.status && current.status !== appointment.status) throw new ConflictError("Appointment changed; reload before updating");
-      const state = bookingState(current, data.status, data.bookingStatus, data.cancelReason);
+      if (
+        data.status &&
+        (["CANCELLED", "NO_SHOW"].includes(current.bookingStatus) ||
+          isTerminalBookingStatus(current.status))
+      )
+        assertBookable(current);
+      if (data.status && current.status !== appointment.status)
+        throw new ConflictError("Appointment changed; reload before updating");
       data.status = state.status;
-      const requests = await bookingRelations(tx, data, current.vehicleId, current.branchId);
-      if (data.requests !== undefined) await tx.appointmentRequest.deleteMany({ where: { appointmentId: id } });
+      const requests = await bookingRelations(
+        tx,
+        data,
+        current.vehicleId,
+        current.branchId,
+      );
+      if (data.requests !== undefined)
+        await tx.appointmentRequest.deleteMany({
+          where: { appointmentId: id },
+        });
       if (data.status === "Checked In" && data.mileage !== undefined) {
         const vehicle = await loadVehicleForWarranty(tx, appointment.vehicleId);
         assertMileage(data.mileage, vehicle.lastRecordedMileage);
@@ -344,11 +424,22 @@ export class ServiceService {
           serviceTypeId: data.serviceTypeId,
           acFitted: data.acFitted,
           followUpJobId: data.followUpJobId,
-          requests: data.requests !== undefined ? { create: requests } : undefined,
+          requests:
+            data.requests !== undefined ? { create: requests } : undefined,
         },
         include: { requests: true },
       });
-      await tx.auditLog.create({ data: { userId: data.actorId, action: 'BOOKING_UPDATED', details: JSON.stringify({ bookingId: id, oldValue: current, newValue: saved }) } });
+      await tx.auditLog.create({
+        data: {
+          userId: data.actorId,
+          action: "BOOKING_UPDATED",
+          details: JSON.stringify({
+            bookingId: id,
+            oldValue: current,
+            newValue: saved,
+          }),
+        },
+      });
       return bookingView(saved);
     });
 
@@ -461,16 +552,48 @@ export class ServiceService {
       throw new NotFoundError("Appointment not found");
     }
     // TODO(confirm): numbered bookings retain their audit trail; cancel them instead.
-    if (appointment.bookingNumber || appointment.jobCards.length || appointment.bookingStatus !== 'BOOKED') throw new ConflictError('Cancel this booking with a reason instead of deleting it');
+    if (
+      appointment.bookingNumber ||
+      appointment.jobCards.length ||
+      appointment.bookingStatus !== "BOOKED"
+    )
+      throw new ConflictError(
+        "Cancel this booking with a reason instead of deleting it",
+      );
     await this.serviceRepository.deleteAppointment(id);
   }
 
-  async convertAppointment(id: string, input: Record<string, unknown>, actorId: string) {
+  async convertAppointment(
+    id: string,
+    input: Record<string, unknown>,
+    actorId: string,
+  ) {
     const booking = await this.getAppointment(id);
     assertBookable(booking);
-    const complaints = booking.requests.length ? bookingComplaints(booking.requests) : input.complaints;
-    const data = jobOpeningBody.parse({ ...input, appointmentId: id, customerId: booking.customerId, vehicleId: booking.vehicleId, branchName: booking.branch.name, serviceId: booking.serviceId ?? undefined, serviceTypeId: booking.serviceTypeId ?? input.serviceTypeId, acFitted: booking.acFitted ?? undefined, mileage: input.mileage ?? booking.mileage ?? undefined, description: input.description ?? booking.notes ?? booking.requests.map(row => row.description).join('; '), complaints });
-    return new JobCardWorkflowService().open({ ...data, createdById: actorId, bookingVersion: booking.updatedAt.toISOString() });
+    const complaints = booking.requests.length
+      ? bookingComplaints(booking.requests)
+      : input.complaints;
+    const data = jobOpeningBody.parse({
+      ...input,
+      appointmentId: id,
+      customerId: booking.customerId,
+      vehicleId: booking.vehicleId,
+      branchName: booking.branch.name,
+      serviceId: booking.serviceId ?? undefined,
+      serviceTypeId: booking.serviceTypeId ?? input.serviceTypeId,
+      acFitted: booking.acFitted ?? undefined,
+      mileage: input.mileage ?? booking.mileage ?? undefined,
+      description:
+        input.description ??
+        booking.notes ??
+        booking.requests.map((row) => row.description).join("; "),
+      complaints,
+    });
+    return new JobCardWorkflowService().open({
+      ...data,
+      createdById: actorId,
+      bookingVersion: booking.updatedAt.toISOString(),
+    });
   }
 
   async createJobCard(
@@ -486,11 +609,17 @@ export class ServiceService {
     customerId?: string;
     search?: string;
     status?: string;
+    unassignedTechnician?: boolean;
     jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
     dateFrom?: string;
     dateTo?: string;
   }) {
-    const jobType = params?.jobType === "HISTORY" ? ((await getPdiSettings()).includeInHistory ? "ALL" : "SERVICE") : params?.jobType;
+    const jobType =
+      params?.jobType === "HISTORY"
+        ? (await getPdiSettings()).includeInHistory
+          ? "ALL"
+          : "SERVICE"
+        : params?.jobType;
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -498,6 +627,8 @@ export class ServiceService {
     if (params?.branchId) where.branchId = params.branchId;
     if (params?.customerId) where.customerId = params.customerId;
     if (params?.status) where.status = jobStatusFilter(params.status);
+
+    if (params?.unassignedTechnician) where.technicianId = null;
     if (jobType !== "ALL") where.jobType = jobType ?? "SERVICE";
 
     if (params?.search) {
@@ -559,6 +690,7 @@ export class ServiceService {
         customerId: params?.customerId,
         search: params?.search,
         status: params?.status,
+        unassignedTechnician: params?.unassignedTechnician,
         jobType,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
@@ -577,11 +709,20 @@ export class ServiceService {
     };
   }
 
-  async getJobCard(id: string, permissions: readonly string[] = [], role?: string) {
+  async getJobCard(
+    id: string,
+    permissions: readonly string[] = [],
+    role?: string,
+    actorId?: string,
+  ) {
     const card = await this.serviceRepository.findJobCardById(id);
     if (!card) {
       throw new NotFoundError("Job card not found");
     }
+    const openingSignatureCurrent = await hasCurrentOpeningSignature(
+      prisma,
+      card,
+    );
 
     // This vehicle's progress in each campaign the job card was opened for.
     const campaignVehicles =
@@ -606,26 +747,106 @@ export class ServiceService {
       card.campaigns.length > 0
         ? (
             await prisma.jobCardLine.findMany({
-              where: { jobCardId: id, chargeType: "FREE", campaignId: { in: card.campaigns.map((c) => c.campaignId) } },
+              where: {
+                jobCardId: id,
+                chargeType: "FREE",
+                campaignId: { in: card.campaigns.map((c) => c.campaignId) },
+              },
               select: { campaignId: true },
               distinct: ["campaignId"],
             })
           ).map((line) => line.campaignId)
         : [],
     );
-    return scopeJobCard({
-      ...card,
-      invoices: [...new Map([...card.invoices, ...(card.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
-      allowedTransitions: allowedJobTransitions(canonicalJobStatus(card.status), role),
-      estimates: card.estimates.map(estimate => ({ ...estimate, upfrontPaymentPercent: (estimate.upfrontPaymentPercent?.toNumber() ?? 60), upfrontAmount: upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent ?? 60), contentHash: estimateContentHash(estimate), approvals: estimate.approvals.map(approval => ({ ...approval, signatureState: signatureState(estimate, approval) })) })),
-      campaigns: card.campaigns.map((c) => ({
-        ...c,
-        vehicleStatus:
-          campaignVehicles.find((v) => v.campaignId === c.campaignId)?.status ??
-          null,
-        hasFreeLine: freeLineCampaigns.has(c.campaignId),
-      })),
-    }, permissions);
+    return scopeJobCard(
+      {
+        ...card,
+        openingSignatureCurrent,
+        canStartWork: card.advanceReceipts.some(
+          (receipt) =>
+            receipt.status === "ACTIVE" &&
+            receipt.mode !== "CHEQUE" &&
+            receipt.advanceAmount >= 0.01 &&
+            receipt.issuedAt <= advanceReceiptDateLimit(),
+        ),
+        advanceSummary: (() => {
+          const advances = card.advanceReceipts.filter(
+            (receipt) =>
+              receipt.status === "ACTIVE" &&
+              receipt.mode !== "CHEQUE" &&
+              receipt.issuedAt <= advanceReceiptDateLimit(),
+          );
+          const bills = [
+            ...new Map(
+              [...card.invoices, ...(card.consolidatedInvoices ?? [])].map(
+                (invoice) => [invoice.id, invoice],
+              ),
+            ).values(),
+          ].filter(
+            (invoice) =>
+              !["CANCELLED", "CANCELED", "VOID"].includes(
+                invoice.status.toUpperCase(),
+              ),
+          );
+          const total = bills.length
+            ? sumMoney(bills.map((invoice) => invoice.total))
+            : (card.estimates[0]?.amount ?? 0);
+          const received = bills.length
+            ? sumMoney(
+                bills.map((invoice) =>
+                  sumMoney([invoice.total, -invoice.outstandingAmount]),
+                ),
+              )
+            : sumMoney(advances.map((receipt) => receipt.advanceAmount));
+          const coverage = advanceCoverage(total, received);
+          return {
+            basis: bills.length ? "INVOICE" : "ESTIMATE",
+            hasEstimate: card.estimates.length > 0,
+            total,
+            ...coverage,
+            excessAmount: bills.length
+              ? sumMoney(advances.map((receipt) => receipt.advanceAmount))
+              : coverage.excessAmount,
+            suggestedPercent:
+              card.estimates[0]?.upfrontPaymentPercent.toNumber() ?? 60,
+          };
+        })(),
+        invoices: [
+          ...new Map(
+            [...card.invoices, ...(card.consolidatedInvoices ?? [])].map(
+              (invoice) => [invoice.id, invoice],
+            ),
+          ).values(),
+        ],
+        allowedTransitions: allowedJobTransitions(
+          canonicalJobStatus(card.status),
+          role,
+          actorId ? { actorId, technicianId: card.technicianId } : undefined,
+        ),
+        estimates: card.estimates.map((estimate) => ({
+          ...estimate,
+          upfrontPaymentPercent:
+            estimate.upfrontPaymentPercent?.toNumber() ?? 60,
+          upfrontAmount: upfrontAmount(
+            estimate.amount,
+            estimate.upfrontPaymentPercent ?? 60,
+          ),
+          contentHash: estimateContentHash(estimate),
+          approvals: estimate.approvals.map((approval) => ({
+            ...approval,
+            signatureState: signatureState(estimate, approval),
+          })),
+        })),
+        campaigns: card.campaigns.map((c) => ({
+          ...c,
+          vehicleStatus:
+            campaignVehicles.find((v) => v.campaignId === c.campaignId)
+              ?.status ?? null,
+          hasFreeLine: freeLineCampaigns.has(c.campaignId),
+        })),
+      },
+      permissions,
+    );
   }
 
   async updateJobCard(
@@ -670,6 +891,7 @@ export class ServiceService {
     const data = estimateBody.parse(input);
     return prisma.$transaction(
       async (tx) => {
+        await setNotificationActor(tx, actorId);
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${jobCardId} FOR UPDATE`,
         );
@@ -832,9 +1054,29 @@ export class ServiceService {
             include: { lines: true },
           })
         )?.[0];
-        const revision = planEstimateRevision(previous, supersedesId, { description: data.description, amount: sumMoney(lines.map(line => line.amount)), lines });
-        if (previous) await tx.estimate.update({ where: { id: previous.id }, data: { status: "SUPERSEDED" } });
-        if (actorId) await tx.auditLog.create({ data: { userId: actorId, action: previous ? "ESTIMATE_REVISED" : "ESTIMATE_CREATED", details: JSON.stringify({ jobCardId, supersedesId: revision.supersedesId, version: revision.version, ...revision.diff }) } });
+        const revision = planEstimateRevision(previous, supersedesId, {
+          description: data.description,
+          amount: sumMoney(lines.map((line) => line.amount)),
+          lines,
+        });
+        if (previous)
+          await tx.estimate.update({
+            where: { id: previous.id },
+            data: { status: "SUPERSEDED" },
+          });
+        if (actorId)
+          await tx.auditLog.create({
+            data: {
+              userId: actorId,
+              action: previous ? "ESTIMATE_REVISED" : "ESTIMATE_CREATED",
+              details: JSON.stringify({
+                jobCardId,
+                supersedesId: revision.supersedesId,
+                version: revision.version,
+                ...revision.diff,
+              }),
+            },
+          });
         // Strict ordering under the shared row lock, including transactions started earlier.
         const createdAt = new Date(
           Math.max(Date.now(), (previous?.createdAt?.getTime() ?? 0) + 1),
@@ -884,7 +1126,8 @@ export class ServiceService {
       where: { id: estimateId },
       select: { jobCardId: true },
     });
-    if (!identity?.jobCardId) throw new NotFoundError("Job-linked estimate not found");
+    if (!identity?.jobCardId)
+      throw new NotFoundError("Job-linked estimate not found");
     const approvalJobCardId = identity.jobCardId;
     return prisma.$transaction(
       async (tx) => {
@@ -920,18 +1163,42 @@ export class ServiceService {
           throw new ConflictError(
             "This revision already has a decision. Create a new revision to change scope.",
           );
-        if (!data.approved && !data.comments?.trim()) throw new BadRequestError("A decline reason is required");
+        if (!data.approved && !data.comments?.trim())
+          throw new BadRequestError("A decline reason is required");
         const hash = estimateContentHash(estimate);
-        if (data.expectedVersion !== estimate.version || data.expectedHash !== hash) throw new ConflictError("Estimate changed; reload the signature summary");
+        if (
+          data.expectedVersion !== estimate.version ||
+          data.expectedHash !== hash
+        )
+          throw new ConflictError(
+            "Estimate changed; reload the signature summary",
+          );
         const override = !!data.overrideReason?.trim();
-        if (override && !capture?.allowOverride) throw new BadRequestError("Only Admin may override with a reason");
+        if (override && !capture?.allowOverride)
+          throw new BadRequestError("Only Admin may override with a reason");
         if (!override) {
-          if (!data.signatureImage || !data.signerName?.trim() || !actorId) throw new BadRequestError("A customer signature and signer name are required; portal capture is not yet available");
+          if (!data.signatureImage || !data.signerName?.trim() || !actorId)
+            throw new BadRequestError(
+              "A customer signature and signer name are required; portal capture is not yet available",
+            );
           assertSignaturePng(data.signatureImage);
-          if (data.approved && !data.consentAccepted) throw new BadRequestError("Accept the job card terms before approving");
-          const customer = await tx.customer.findUniqueOrThrow({ where: { id: card.customerId! } });
-          const customerName = `${customer.firstName} ${customer.lastName}`.trim();
-          if (data.signerName.trim().toLowerCase() !== customerName.toLowerCase() && !data.relationship?.trim()) throw new BadRequestError("Relationship is required when signing for the customer");
+          if (data.approved && !data.consentAccepted)
+            throw new BadRequestError(
+              "Accept the estimate terms before approving",
+            );
+          const customer = await tx.customer.findUniqueOrThrow({
+            where: { id: card.customerId! },
+          });
+          const customerName =
+            `${customer.firstName} ${customer.lastName}`.trim();
+          if (
+            data.signerName.trim().toLowerCase() !==
+              customerName.toLowerCase() &&
+            !data.relationship?.trim()
+          )
+            throw new BadRequestError(
+              "Relationship is required when signing for the customer",
+            );
         }
         const status = data.approved ? "Approved" : "Declined";
         if (data.approved) {
@@ -986,13 +1253,37 @@ export class ServiceService {
             status,
           },
         });
-        const terms = data.approved && !override ? await tx.documentTerms.findFirst({ where: { type: 'JOB_ESTIMATE', OR: [{ branchId: card.branchId }, { branchId: null }] }, orderBy: { branchId: { sort: 'asc', nulls: 'last' } } }) : null;
-        if (!override) await tx.estimateSignature.create({ data: {
-          consentStatement: data.approved ? ['I approve this job card and estimate and accept the terms and conditions.', ...(terms?.terms ?? [])].join('\n') : null,
-          estimateId, approvalId: approval.id, imageReference: data.signatureImage!, signerName: data.signerName!.trim(),
-          relationship: data.relationship?.trim(), capturedByUserId: actorId, deviceOrIp: capture?.deviceOrIp ?? 'unknown',
-          estimateVersion: estimate.version, totalSigned: estimate.amount, contentHash: hash,
-        } });
+        const terms =
+          data.approved && !override
+            ? await tx.documentTerms.findFirst({
+                where: {
+                  type: "JOB_ESTIMATE",
+                  OR: [{ branchId: card.branchId }, { branchId: null }],
+                },
+                orderBy: { branchId: { sort: "asc", nulls: "last" } },
+              })
+            : null;
+        if (!override)
+          await tx.estimateSignature.create({
+            data: {
+              consentStatement: data.approved
+                ? [
+                    "I approve this estimate and accept its terms and conditions.",
+                    ...(terms?.terms ?? []),
+                  ].join("\n")
+                : null,
+              estimateId,
+              approvalId: approval.id,
+              imageReference: data.signatureImage!,
+              signerName: data.signerName!.trim(),
+              relationship: data.relationship?.trim(),
+              capturedByUserId: actorId,
+              deviceOrIp: capture?.deviceOrIp ?? "unknown",
+              estimateVersion: estimate.version,
+              totalSigned: estimate.amount,
+              contentHash: hash,
+            },
+          });
         return approval;
       },
       { maxWait: 5000, timeout: 15000 },
@@ -1084,7 +1375,7 @@ export class ServiceService {
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {jobCardId:{not:null}};
+    const where: Record<string, unknown> = { jobCardId: { not: null } };
     if (params?.branchId) where.jobCard = { branchId: params.branchId };
     if (params?.status) where.status = params.status;
 

@@ -1,18 +1,18 @@
-import { Router } from 'express';
-import { WorkshopController } from './workshop.controller';
-import { validateRequest } from '../../middleware/requestValidator';
-import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission } from '../../middleware/authorize';
-import { z } from 'zod';
-import prisma from '../../prisma/client';
-import { assertBranchOwnership } from '../../middleware/authorize';
-import { WorkshopService } from './workshop.service';
-import { PERMISSIONS } from '../../shared/constants/roles';
+import { Router } from "express";
+import { WorkshopController } from "./workshop.controller";
+import { validateRequest } from "../../middleware/requestValidator";
+import { authMiddleware } from "../../middleware/authMiddleware";
+import { requirePermission } from "../../middleware/authorize";
+import prisma from "../../prisma/client";
+import { assertBranchOwnership } from "../../middleware/authorize";
+import { WorkshopService } from "./workshop.service";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import {
   assignTechnicianSchema,
   updateJobProgressSchema,
   qcUpdateSchema,
-} from './workshop.validation';
+  receivePartsSchema,
+} from "./workshop.validation";
 const router = Router();
 const controller = new WorkshopController();
 
@@ -25,7 +25,9 @@ router.use(authMiddleware);
  *     tags:
  *       - Workshop
  *     summary: List all technicians
- *     description: Returns a list of all users with a TECHNICIAN role in the branch.
+ *     description: Requires workshop:read. Returns paginated branch technicians with openJobs and closedJobs. Set activeOnly=true for assignment choices; the default directory includes inactive users.
+ *     parameters:
+ *       - { in: query, name: activeOnly, schema: { type: boolean, default: false } }
  *     security:
  *       - BearerAuth: []
  *     responses:
@@ -48,6 +50,7 @@ router.use(authMiddleware);
  *     tags:
  *       - Workshop
  *     summary: Assign technician to a job card
+ *     description: Requires assignment:create and job branch access. The technician must be active and belong to the same branch. Closed or billed jobs cannot be reassigned. Records old/new assignment and actor in the audit log.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -110,6 +113,7 @@ router.use(authMiddleware);
  *     tags:
  *       - Workshop
  *     summary: Update quality control (QC) status
+ *     description: Requires qcstatus:update and job branch access. A changed pass or fail outcome is audited and queued for background notification.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -136,17 +140,80 @@ router.use(authMiddleware);
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.post('/parts/:id/receive', requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ confirmed: z.literal(true) }).strict() })), async (req, res, next) => {
-  try {
-    const issue = await prisma.partIssuance.findUniqueOrThrow({ where: { id: req.params.id } });
-    assertBranchOwnership(req, issue.branchId);
-    res.json({ status: 'success', data: await new WorkshopService().receiveParts(issue.id, req.user!.userId) });
-  } catch (error) { next(error); }
-});
-router.get('/technicians' , requirePermission(PERMISSIONS.WORKSHOP_READ), controller.listTechnicians);
-router.post('/assign/:id', requirePermission(PERMISSIONS.ASSIGNMENT_CREATE), validateRequest(assignTechnicianSchema), controller.assignTechnician);
-router.patch('/progress/:id', requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE), validateRequest(updateJobProgressSchema), controller.updateProgress);
-router.patch('/qc/:id', requirePermission(PERMISSIONS.QCSTATUS_UPDATE), validateRequest(qcUpdateSchema), controller.updateQC);
+/**
+ * @openapi
+ * /workshop/parts/{id}/receive:
+ *   post:
+ *     tags: [Workshop]
+ *     summary: Sign for issued parts
+ *     description: Requires jobprogress:update, branch access and the active assigned technician. A PNG signature is required for new requests. Stores immutable evidence with server timestamp; does not return the image. Repeated collection cannot replace existing evidence. Historical unsigned confirmations remain readable. After commit, the notification worker confirms collection to the signer and named service advisor when eligible.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [confirmed, signatureImage]
+ *             properties:
+ *               confirmed: { type: boolean, enum: [true] }
+ *               signatureImage: { type: string, maxLength: 88000, description: 'PNG data URL; decoded maximum 64 KiB, dimensions at most 2048 by 1024' }
+ *           example: { confirmed: true, signatureImage: 'data:image/png;base64,...' }
+ *     responses:
+ *       200: { description: Recorded or previously recorded collection; no signature image }
+ *       400: { description: 'Invalid PNG or closed/cancelled work. Validation errors contain field, message and code.' }
+ *       401: { description: Authentication required }
+ *       403: { description: Permission, branch or assigned-technician access denied }
+ *       404: { description: Issuance or job not found }
+ */
+router.post(
+  "/parts/:id/receive",
+  requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE),
+  validateRequest(receivePartsSchema),
+  async (req, res, next) => {
+    try {
+      const issue = await prisma.partIssuance.findUniqueOrThrow({
+        where: { id: req.params.id },
+      });
+      assertBranchOwnership(req, issue.branchId);
+      res.json({
+        status: "success",
+        data: await new WorkshopService().receiveParts(
+          issue.id,
+          req.user!.userId,
+          req.body.signatureImage,
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+router.get(
+  "/technicians",
+  requirePermission(PERMISSIONS.WORKSHOP_READ),
+  controller.listTechnicians,
+);
+router.post(
+  "/assign/:id",
+  requirePermission(PERMISSIONS.ASSIGNMENT_CREATE),
+  validateRequest(assignTechnicianSchema),
+  controller.assignTechnician,
+);
+router.patch(
+  "/progress/:id",
+  requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE),
+  validateRequest(updateJobProgressSchema),
+  controller.updateProgress,
+);
+router.patch(
+  "/qc/:id",
+  requirePermission(PERMISSIONS.QCSTATUS_UPDATE),
+  validateRequest(qcUpdateSchema),
+  controller.updateQC,
+);
 
 export default router;
-

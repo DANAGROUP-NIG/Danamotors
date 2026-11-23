@@ -1,10 +1,18 @@
 import { recordJobDeposit } from "./job-deposit.service";
+import { listMultiJobVehicles, multiJobBranch, multiJobVehiclesQuery } from "./multi-job-vehicles";
+import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
+import { loadOpeningConsent } from "./job-opening-consent";
+import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
 import { ConflictError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
-import { assertBranchOwnership, requireRole } from "../../middleware/authorize";
+import {
+  assertBranchOwnership,
+  requireRole,
+  requireAnyPermission,
+} from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
 import { RepeatJobService } from "../repeat-job/repeat-job.service";
@@ -42,6 +50,7 @@ const router = Router();
 const controller = new ServiceController();
 
 router.use(authMiddleware);
+router.use("/job-cards/:id/opening-consent", jobOpeningSignatureRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),
@@ -183,7 +192,11 @@ router.post(
         where: { id: req.params.id },
       });
       assertBranchOwnership(req, card.branchId);
-      const result = await new JobCardWorkflowService().approveCredit(card.id, req.user!.userId, req.body.remarks);
+      const result = await new JobCardWorkflowService().approveCredit(
+        card.id,
+        req.user!.userId,
+        req.body.remarks,
+      );
       res.json({ status: "success", data: result });
     } catch (error) {
       next(error);
@@ -231,10 +244,23 @@ router.put(
   validateRequest(campaignAttendanceSchema),
   async (req, res, next) => {
     try {
-      const card = await prisma.jobCard.findUnique({ where: { id: req.params.id }, select: { branchId: true } });
+      const card = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
       assertBranchOwnership(req, card?.branchId);
-      const data = await new JobCardWorkflowService().setCampaignAttendance(req.params.id, req.params.campaignId, req.body, req.user!.userId);
-      res.json({ status: "success", statusCode: 200, message: "Campaign work recorded", data });
+      const data = await new JobCardWorkflowService().setCampaignAttendance(
+        req.params.id,
+        req.params.campaignId,
+        req.body,
+        req.user!.userId,
+      );
+      res.json({
+        status: "success",
+        statusCode: 200,
+        message: "Campaign work recorded",
+        data,
+      });
     } catch (error) {
       next(error);
     }
@@ -466,7 +492,7 @@ router.delete(
  *     tags:
  *       - Service & Job Cards
  *     summary: Create a job card
- *     description: Opens a new job card to track a vehicle's repair workflow.
+ *     description: Requires jobcard:create and branch access. A technician and team are optional.
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -486,8 +512,8 @@ router.delete(
  *               serviceId: { type: string, format: uuid, description: Optional separate appointment service; does not set the opening charge }
  *               bayId: { type: string, format: uuid }
  *               serviceAdvisorId: { type: string, format: uuid }
- *               technicianId: { type: string, format: uuid, description: Required when teamId is absent }
- *               teamId: { type: string, format: uuid }
+ *               technicianId: { type: string, format: uuid, description: Optional legacy assignment input. Use the workshop assign endpoint for normal assignment. }
+ *               teamId: { type: string, format: uuid, description: Optional legacy team input }
  *               mileage: { type: integer, minimum: 0, example: 12500 }
  *               promisedAt: { type: string, format: date-time }
  *               checklist: { type: string, maxLength: 5000 }
@@ -542,6 +568,7 @@ router.delete(
  *     tags:
  *       - Service & Job Cards
  *     summary: List all job cards
+ *     description: Requires jobcard:read. Branch-scoped staff see jobs in their own branch.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -554,6 +581,10 @@ router.delete(
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [OPEN, IN_PROGRESS, QC, READY, BILLED, DELIVERED, CANCELLED] }
+ *       - in: query
+ *         name: unassignedTechnician
+ *         description: When true, return jobs without an individual technician, including team-only jobs.
+ *         schema: { type: boolean, example: true }
  *     responses:
  *       200:
  *         description: Paginated job card list
@@ -567,6 +598,7 @@ router.delete(
  *     tags:
  *       - Service & Job Cards
  *     summary: Get job card by ID
+ *     description: Requires jobcard:read and branch access. Visible estimates include upfrontPaymentPercent (default 60, range 0-100) and decimal-rounded upfrontAmount. These are recommendations only; any positive eligible advance satisfies the payment gate, independently of the percentage. Estimate/financial fields retain their separate permission checks.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -683,6 +715,7 @@ router.delete(
  *     tags:
  *       - Inspections & Estimates
  *     summary: Add estimate to job card
+ *     description: Requires estimate:create and job branch access. upfrontPaymentPercent is an advisory percentage, default 60. Any positive eligible advance satisfies the separate work-start payment requirement. Existing scope approval and status permissions still apply.
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -700,6 +733,7 @@ router.delete(
  *             required: [description, lines]
  *             properties:
  *               description: { type: string, example: Workshop estimate }
+ *               upfrontPaymentPercent: { type: number, minimum: 0, maximum: 100, multipleOf: 0.01, default: 60, example: 33.33, description: 'Suggested percentage only; presets include 20, 30 and 60, and custom values are accepted.' }
  *               lines:
  *                 type: array
  *                 items:
@@ -798,6 +832,27 @@ router.post(
   validateRequest(convertAppointmentSchema),
   controller.convertAppointment,
 );
+router.get(
+  "/appointments/:id/opening-consent",
+  requirePermission(PERMISSIONS.APPOINTMENT_UPDATE),
+  requirePermission(PERMISSIONS.JOBCARD_CREATE),
+  validateRequest(serviceIdParamSchema),
+  async (req, res, next) => {
+    try {
+      const booking = await prisma.serviceAppointment.findUniqueOrThrow({
+        where: { id: req.params.id },
+      });
+      assertBranchOwnership(req, booking.branchId);
+      assertBookable(booking);
+      res.json({
+        status: "success",
+        data: { consent: await loadOpeningConsent(prisma, booking) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 router.delete(
   "/appointments/:id",
   requirePermission(PERMISSIONS.APPOINTMENT_DELETE),
@@ -817,19 +872,116 @@ router.get(
   validateRequest(listJobCardsSchema),
   controller.listJobCards,
 );
+/**
+ * @openapi
+ * /service/job-cards/multi-job-vehicles:
+ *   get:
+ *     tags: [Service]
+ *     summary: List vehicles with at least two visible job cards
+ *     description: Requires jobcard:read and jobcard:multi-vehicle:read. Closed jobs use delivery dates in Africa/Lagos. Use nextCursor as after for the next page.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: branchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: after, schema: { type: string, format: uuid } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 50 } }
+ *       - { in: query, name: closedFrom, schema: { type: string, format: date } }
+ *       - { in: query, name: closedTo, schema: { type: string, format: date } }
+ *     responses:
+ *       200: { description: Vehicle IDs and registration and VIN with job IDs and details and nextCursor }
+ *       400: { description: Invalid cursor or closed date range }
+ *       403: { description: Branch or permission denied }
+ */
+router.get(
+  "/job-cards/multi-job-vehicles",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  requirePermission(PERMISSIONS.JOBCARD_MULTI_VEHICLE_READ),
+  validateRequest(z.object({ query: multiJobVehiclesQuery })),
+  async (req, res, next) => {
+    try {
+      const query = multiJobVehiclesQuery.parse(req.query);
+      const data = await listMultiJobVehicles(query, multiJobBranch(req.user, query.branchId));
+      res.json({ status: "success", statusCode: 200, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 router.get(
   "/job-cards/:id",
   requirePermission(PERMISSIONS.JOBCARD_READ),
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
 );
-router.post('/job-cards/:id/deposit', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ receiptId: z.string().uuid() }).strict() })), async (req, res, next) => {
-  try {
-    const card = await prisma.jobCard.findUniqueOrThrow({ where: { id: req.params.id } });
-    assertBranchOwnership(req, card.branchId);
-    res.json({ status: 'success', data: await recordJobDeposit(card.id, req.body.receiptId, req.user!.userId) });
-  } catch (error) { next(error); }
-});
+/**
+ * @openapi
+ * /service/job-cards/{id}/request-parts:
+ *   post:
+ *     tags: [Service & Job Cards]
+ *     summary: Queue a parts request for the branch store manager
+ *     description: Requires partissuance:create or partreturn:create and job branch access. An active non-actor branch store manager must exist. Stores an idempotent outbox event and the first-request timestamp atomically; no stock or requisition is created. Delivery happens after commit through the existing worker. A successful response confirms queuing, not completed delivery. Billed/delivered/cancelled jobs are rejected. The same requestId preserves dedupe keys on retries.
+ *     security: [{ BearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [requestId]
+ *             properties:
+ *               requestId: { type: string, format: uuid }
+ *           example: { requestId: '11111111-1111-4111-8111-111111111111' }
+ *     responses:
+ *       200: { description: 'Queued. Returns status=success, message=Parts request queued for the Branch Store Manager, data={}' }
+ *       400: { description: 'Invalid fields, closed/billed job, or no eligible store manager. Validation errors include field, message and code.' }
+ *       401: { description: Authentication required }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Job card not found }
+ */
+router.post(
+  "/job-cards/:id/request-parts",
+  requireAnyPermission(
+    PERMISSIONS.PARTISSUANCE_CREATE,
+    PERMISSIONS.PARTRETURN_CREATE,
+  ),
+  validateRequest(
+    z.object({
+      params: z.object({ id: z.string().uuid() }),
+      body: z.object({ requestId: z.string().uuid() }).strict(),
+    }),
+  ),
+  controller.requestParts,
+);
+router.post(
+  "/job-cards/:id/deposit",
+  requirePermission(PERMISSIONS.RECEIPT_CREATE),
+  validateRequest(
+    z.object({
+      params: z.object({ id: z.string().uuid() }),
+      body: z.object({ receiptId: z.string().uuid() }).strict(),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const card = await prisma.jobCard.findUniqueOrThrow({
+        where: { id: req.params.id },
+      });
+      assertBranchOwnership(req, card.branchId);
+      res.json({
+        status: "success",
+        data: await recordJobDeposit(
+          card.id,
+          req.body.receiptId,
+          req.user!.userId,
+        ),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 router.put(
   "/job-cards/:id",
   requirePermission(PERMISSIONS.JOBCARD_UPDATE),
@@ -874,15 +1026,33 @@ router.post(
  *       403: { description: Missing estimate revise permission }
  *       409: { description: Superseded source }
  */
-router.post('/estimates/:id/revisions', requirePermission(PERMISSIONS.ESTIMATE_REVISE), validateRequest(createEstimateSchema), async (req, res, next) => {
- try {
-  const source = await prisma.estimate.findUniqueOrThrow({ where: { id: req.params.id }, include: { jobCard: true } });
-  assertBranchOwnership(req, source.jobCard?.branchId ?? source.branchId);
-  if (!source.jobCardId) throw new ConflictError('Only job-linked estimates can be revised here');
-  const estimate = await new ServiceService().addEstimate(source.jobCardId, req.body, req.user!.userId, source.id);
-  res.status(201).json({ status: 'success', data: { estimate } });
- } catch(error) { next(error); }
-});
+router.post(
+  "/estimates/:id/revisions",
+  requirePermission(PERMISSIONS.ESTIMATE_REVISE),
+  validateRequest(createEstimateSchema),
+  async (req, res, next) => {
+    try {
+      const source = await prisma.estimate.findUniqueOrThrow({
+        where: { id: req.params.id },
+        include: { jobCard: true },
+      });
+      assertBranchOwnership(req, source.jobCard?.branchId ?? source.branchId);
+      if (!source.jobCardId)
+        throw new ConflictError(
+          "Only job-linked estimates can be revised here",
+        );
+      const estimate = await new ServiceService().addEstimate(
+        source.jobCardId,
+        req.body,
+        req.user!.userId,
+        source.id,
+      );
+      res.status(201).json({ status: "success", data: { estimate } });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 router.post(
   "/estimates/:id/approvals",
   requirePermission(PERMISSIONS.ESTIMATE_SIGN),
@@ -902,8 +1072,9 @@ router.get(
  *   get:
  *     tags: [Service & Job Cards]
  *     summary: Customer-facing single estimate print data (estimate:print)
+ *     description: Returns saved-revision upfrontPaymentPercent and upfrontAmount (two-decimal half-up rounding), alongside total and signature evidence. The percentage defaults to 60 and is advisory; payment need not equal this amount. No payment or signature is changed by printing.
  *     responses:
- *       200: { description: Header, job, customer, vehicle, scope, terms and signature }
+ *       200: { description: 'Header, job, customer, vehicle, scope, terms, signature and advisory advance. Example estimate fields: total=100.01, upfrontPaymentPercent=60, upfrontAmount=60.01.' }
  *       403: { description: Missing estimate print permission or wrong branch }
  * /service/estimates/{id}/approvals:
  *   post:
@@ -920,30 +1091,137 @@ router.get(
  *       403: { description: Missing estimate sign permission }
  *       409: { description: Estimate changed or already decided }
  */
-router.get('/job-cards/:id/estimates/:estimateId/print', requirePermission(PERMISSIONS.ESTIMATE_PRINT), validateRequest(z.object({params:z.object({id:z.string().uuid(),estimateId:z.string().uuid()})})), async (req,res,next)=>{
- try {
-  const estimate=await prisma.estimate.findFirstOrThrow({where:{id:req.params.estimateId,jobCardId:req.params.id},include:{lines:true,approvals:{include:{signature:true}},successor:{select:{version:true}},jobCard:{include:{branch:true,customer:true,vehicle:true,complaints:true,serviceType:true,service:true}}}});
-  const card=estimate.jobCard!;
-  assertBranchOwnership(req,card.branchId);
-  const [branchTerms,companyTerms,parts,labour]=await Promise.all([
-   prisma.documentTerms.findFirst({where:{type:'JOB_ESTIMATE',branchId:card.branchId}}),
-   prisma.documentTerms.findFirst({where:{type:'JOB_ESTIMATE',branchId:null}}),
-   prisma.sparePart.findMany({where:{id:{in:estimate.lines.filter(l=>l.type.endsWith('PART')).map(l=>l.referenceId!).filter(Boolean)}},select:{id:true,partNumber:true}}),
-   prisma.labourItem.findMany({where:{id:{in:estimate.lines.filter(l=>l.type.endsWith('LABOUR')).map(l=>l.referenceId!).filter(Boolean)}},select:{id:true,code:true}})
-  ]);
-  const terms=branchTerms ?? companyTerms;
-  const signedTerms=estimate.approvals.find(approval=>approval.approved && approval.signature?.consentStatement)?.signature?.consentStatement?.split("\n").slice(1);
-  const codes=new Map([...parts.map(p=>[p.id,p.partNumber] as [string,string]),...labour.map(l=>[l.id,l.code] as [string,string])]);
-  res.json({status:'success',data:{
-   estimate:projectEstimatePrint(estimate,codes),
-   company:{name:companyTerms?.companyName ?? 'Dana Motors',address:companyTerms?.companyAddress,phone:companyTerms?.companyPhone},
-   branch:{name:card.branch.name,address:card.branch.address,phone:card.branch.phoneNumber},
-   customer:card.customer ? {name:card.customer.companyName || `${card.customer.firstName} ${card.customer.lastName}`,address:[card.customer.address,card.customer.house,card.customer.street,card.customer.city,card.customer.state].filter(Boolean).join(', '),phone:card.customer.phoneNumber} : null,
-   vehicle:card.vehicle ? {registration:card.vehicle.registrationNumber,vin:card.vehicle.vin,make:card.vehicle.make,model:card.vehicle.model,variant:card.vehicle.trim,mileage:card.mileage} : null,
-   job:{number:card.jobNumber,date:card.createdAt,serviceType:card.serviceType?.description ?? card.service?.name,complaints:card.complaints.map(c=>c.description)},
-   terms:signedTerms ?? terms?.terms ?? [],footer:terms?.footer ?? null,printedAt:new Date().toISOString()
-  }});
- }catch(error){next(error);}
-});
+router.get(
+  "/job-cards/:id/estimates/:estimateId/print",
+  requirePermission(PERMISSIONS.ESTIMATE_PRINT),
+  validateRequest(
+    z.object({
+      params: z.object({
+        id: z.string().uuid(),
+        estimateId: z.string().uuid(),
+      }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      const estimate = await prisma.estimate.findFirstOrThrow({
+        where: { id: req.params.estimateId, jobCardId: req.params.id },
+        include: {
+          lines: true,
+          approvals: { include: { signature: true } },
+          successor: { select: { version: true } },
+          jobCard: {
+            include: {
+              branch: true,
+              customer: true,
+              vehicle: true,
+              complaints: true,
+              serviceType: true,
+              service: true,
+            },
+          },
+        },
+      });
+      const card = estimate.jobCard!;
+      assertBranchOwnership(req, card.branchId);
+      const [branchTerms, companyTerms, parts, labour] = await Promise.all([
+        prisma.documentTerms.findFirst({
+          where: { type: "JOB_ESTIMATE", branchId: card.branchId },
+        }),
+        prisma.documentTerms.findFirst({
+          where: { type: "JOB_ESTIMATE", branchId: null },
+        }),
+        prisma.sparePart.findMany({
+          where: {
+            id: {
+              in: estimate.lines
+                .filter((l) => l.type.endsWith("PART"))
+                .map((l) => l.referenceId!)
+                .filter(Boolean),
+            },
+          },
+          select: { id: true, partNumber: true },
+        }),
+        prisma.labourItem.findMany({
+          where: {
+            id: {
+              in: estimate.lines
+                .filter((l) => l.type.endsWith("LABOUR"))
+                .map((l) => l.referenceId!)
+                .filter(Boolean),
+            },
+          },
+          select: { id: true, code: true },
+        }),
+      ]);
+      const terms = branchTerms ?? companyTerms;
+      const signedTerms = estimate.approvals
+        .find(
+          (approval) =>
+            approval.approved && approval.signature?.consentStatement,
+        )
+        ?.signature?.consentStatement?.split("\n")
+        .slice(1);
+      const codes = new Map([
+        ...parts.map((p) => [p.id, p.partNumber] as [string, string]),
+        ...labour.map((l) => [l.id, l.code] as [string, string]),
+      ]);
+      res.json({
+        status: "success",
+        data: {
+          estimate: projectEstimatePrint(estimate, codes),
+          company: {
+            name: companyTerms?.companyName ?? "Dana Motors",
+            address: companyTerms?.companyAddress,
+            phone: companyTerms?.companyPhone,
+          },
+          branch: {
+            name: card.branch.name,
+            address: card.branch.address,
+            phone: card.branch.phoneNumber,
+          },
+          customer: card.customer
+            ? {
+                name:
+                  card.customer.companyName ||
+                  `${card.customer.firstName} ${card.customer.lastName}`,
+                address: [
+                  card.customer.address,
+                  card.customer.house,
+                  card.customer.street,
+                  card.customer.city,
+                  card.customer.state,
+                ]
+                  .filter(Boolean)
+                  .join(", "),
+                phone: card.customer.phoneNumber,
+              }
+            : null,
+          vehicle: card.vehicle
+            ? {
+                registration: card.vehicle.registrationNumber,
+                vin: card.vehicle.vin,
+                make: card.vehicle.make,
+                model: card.vehicle.model,
+                variant: card.vehicle.trim,
+                mileage: card.mileage,
+              }
+            : null,
+          job: {
+            number: card.jobNumber,
+            date: card.createdAt,
+            serviceType: card.serviceType?.description ?? card.service?.name,
+            complaints: card.complaints.map((c) => c.description),
+          },
+          terms: signedTerms ?? terms?.terms ?? [],
+          footer: terms?.footer ?? null,
+          printedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

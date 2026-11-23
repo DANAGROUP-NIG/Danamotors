@@ -40,7 +40,9 @@ export default function ReceptionManagerDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("Day");
   const router = useRouter();
 
-  const skeleton = <LoadingSkeleton variant="dashboard" label="Loading dashboard" />;
+  const skeleton = (
+    <LoadingSkeleton variant="dashboard" label="Loading dashboard" />
+  );
 
   if (isLoading || (isFetching && !data)) {
     return skeleton;
@@ -191,9 +193,7 @@ export default function ReceptionManagerDashboard() {
         {/* Pending */}
         <div className="flex flex-col gap-2 rounded-xl border border-[#e8edf3] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-muted-foreground">
-              Pending
-            </p>
+            <p className="text-sm font-medium text-muted-foreground">Pending</p>
             <span className="inline-grid size-8 place-items-center rounded-lg bg-amber-50">
               <Clock className="size-4 text-amber-500" />
             </span>
@@ -233,8 +233,7 @@ export default function ReceptionManagerDashboard() {
                   (sum, item) => sum + item.value,
                   0,
                 );
-                const pct =
-                  total > 0 ? Math.round((s.value / total) * 100) : 0;
+                const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
                 return (
                   <div key={s.name} className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
@@ -289,9 +288,7 @@ export default function ReceptionManagerDashboard() {
                     <th className="pb-2 font-medium">Name</th>
                     <th className="pb-2 font-medium">Branch</th>
                     <th className="pb-2 font-medium text-right">Bookings</th>
-                    <th className="pb-2 font-medium text-right">
-                      Completion
-                    </th>
+                    <th className="pb-2 font-medium text-right">Completion</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f1f5f9]">
@@ -329,7 +326,7 @@ export default function ReceptionManagerDashboard() {
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <Users className="size-8 text-slate-300" />
               <p className="text-sm text-muted-foreground">
-                No receptionist data yet
+                No ccuofficer data yet
               </p>
             </div>
           )}

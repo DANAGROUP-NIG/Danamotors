@@ -121,6 +121,7 @@ export function CustomersPage() {
 
       <ModalFame
         isOpen={showForm}
+        preventAccidentalClose
         onClose={() => setShowForm(false)}
         title="Add customer"
       >

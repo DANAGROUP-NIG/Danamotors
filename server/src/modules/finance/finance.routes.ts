@@ -1,18 +1,58 @@
-import { OutstandingController,requireOutstandingTools } from './outstanding.controller';
-import { repairSchema,maintenanceSettingsSchema,lettersPreviewSchema,lettersGenerateSchema,savedLettersSchema,letterPrintSchema } from './outstanding.validation';
-import { PartyNoteController, requireNoteCreate, requireNoteRegister, requireNoteRead, requireAnyNoteCreate } from './party-note.controller';
-import { createPartyNoteSchema, noteIdSchema, cancelPartyNoteSchema, noteRegisterSchema, noteReceiptQuerySchema, notePartyQuerySchema, noteLedgerQuerySchema } from './party-note.validation';
-import { z } from 'zod';
-import { PartyReportController, requirePartyReport, requireAnyPartyReport } from './party-report.controller';
-import { partyReportSchema, reportSettingsSchema, reportPartySearchSchema } from './party-report.validation';
-import { Router } from 'express';
-import { PartyAccountController } from './party-account.controller';
-import { partyAccountSchema, partySearchSchema, partyDocumentsSchema, fifoAdjustmentSchema, createAdjustmentSchema, reverseAdjustmentSchema, openingBalanceSchema } from './party-account.validation';
-import { FinanceController } from './finance.controller';
-import { validateRequest } from '../../middleware/requestValidator';
-import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission, requireRole } from '../../middleware/authorize';
-import { PERMISSIONS, ROLES } from '../../shared/constants/roles';
+import {
+  OutstandingController,
+  requireOutstandingTools,
+} from "./outstanding.controller";
+import {
+  repairSchema,
+  maintenanceSettingsSchema,
+  lettersPreviewSchema,
+  lettersGenerateSchema,
+  savedLettersSchema,
+  letterPrintSchema,
+} from "./outstanding.validation";
+import {
+  PartyNoteController,
+  requireNoteCreate,
+  requireNoteRegister,
+  requireNoteRead,
+  requireAnyNoteCreate,
+} from "./party-note.controller";
+import {
+  createPartyNoteSchema,
+  noteIdSchema,
+  cancelPartyNoteSchema,
+  noteRegisterSchema,
+  noteReceiptQuerySchema,
+  notePartyQuerySchema,
+  noteLedgerQuerySchema,
+} from "./party-note.validation";
+import { z } from "zod";
+import {
+  PartyReportController,
+  requirePartyReport,
+  requireAnyPartyReport,
+} from "./party-report.controller";
+import {
+  partyReportSchema,
+  reportSettingsSchema,
+  reportPartySearchSchema,
+} from "./party-report.validation";
+import { Router } from "express";
+import { PartyAccountController } from "./party-account.controller";
+import {
+  partyAccountSchema,
+  partySearchSchema,
+  partyDocumentsSchema,
+  fifoAdjustmentSchema,
+  createAdjustmentSchema,
+  reverseAdjustmentSchema,
+  openingBalanceSchema,
+} from "./party-account.validation";
+import { FinanceController } from "./finance.controller";
+import { validateRequest } from "../../middleware/requestValidator";
+import { authMiddleware } from "../../middleware/authMiddleware";
+import { requirePermission, requireRole } from "../../middleware/authorize";
+import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import {
   updateInvoiceSchema,
   invoiceIdParamSchema,
@@ -31,50 +71,186 @@ import {
   exportTallyBatchSchema,
   confirmTallyBatchSchema,
   tallyLedgerSearchSchema,
-} from './finance.validation';
+} from "./finance.validation";
 
 const router = Router();
 const controller = new FinanceController();
 
 router.use(authMiddleware);
-const outstanding=new OutstandingController();
+const outstanding = new OutstandingController();
 // const finance=new FinanceController();
-const repairAccess=[requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE)];
+const repairAccess = [
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE),
+];
 // router.get('/', requirePermission(PERMISSIONS.FINANCE_REPORT_READ), finance.getDashboardOverview);
-router.get('/outstanding-letters/parties', requireOutstandingTools, validateRequest(reportPartySearchSchema), outstanding.search);
-router.post('/outstanding/recalculate/preview',...repairAccess,validateRequest(repairSchema),outstanding.previewRepair);
-router.post('/outstanding/recalculate/apply',...repairAccess,validateRequest(repairSchema),outstanding.applyRepair);
-router.get('/settings/outstanding',requireOutstandingTools,validateRequest(z.object({query:z.object({}).strict()})),outstanding.settings);
-router.put('/settings/outstanding',requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN),requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE),validateRequest(maintenanceSettingsSchema),outstanding.saveSettings);
-router.post('/outstanding-letters/preview',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersPreviewSchema),outstanding.previewLetters);
-router.post('/outstanding-letters/generate',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(lettersGenerateSchema),outstanding.generate);
-router.get('/outstanding-letters',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(savedLettersSchema),outstanding.saved);
-router.post('/outstanding-letters/print',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.print);
-router.post('/outstanding-letters/printed',requirePermission(PERMISSIONS.OUTSTANDING_LETTER),validateRequest(letterPrintSchema),outstanding.markPrinted);
+router.get(
+  "/outstanding-letters/parties",
+  requireOutstandingTools,
+  validateRequest(reportPartySearchSchema),
+  outstanding.search,
+);
+router.post(
+  "/outstanding/recalculate/preview",
+  ...repairAccess,
+  validateRequest(repairSchema),
+  outstanding.previewRepair,
+);
+router.post(
+  "/outstanding/recalculate/apply",
+  ...repairAccess,
+  validateRequest(repairSchema),
+  outstanding.applyRepair,
+);
+router.get(
+  "/settings/outstanding",
+  requireOutstandingTools,
+  validateRequest(z.object({ query: z.object({}).strict() })),
+  outstanding.settings,
+);
+router.put(
+  "/settings/outstanding",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.OUTSTANDING_RECALCULATE),
+  validateRequest(maintenanceSettingsSchema),
+  outstanding.saveSettings,
+);
+router.post(
+  "/outstanding-letters/preview",
+  requirePermission(PERMISSIONS.OUTSTANDING_LETTER),
+  validateRequest(lettersPreviewSchema),
+  outstanding.previewLetters,
+);
+router.post(
+  "/outstanding-letters/generate",
+  requirePermission(PERMISSIONS.OUTSTANDING_LETTER),
+  validateRequest(lettersGenerateSchema),
+  outstanding.generate,
+);
+router.get(
+  "/outstanding-letters",
+  requirePermission(PERMISSIONS.OUTSTANDING_LETTER),
+  validateRequest(savedLettersSchema),
+  outstanding.saved,
+);
+router.post(
+  "/outstanding-letters/print",
+  requirePermission(PERMISSIONS.OUTSTANDING_LETTER),
+  validateRequest(letterPrintSchema),
+  outstanding.print,
+);
+router.post(
+  "/outstanding-letters/printed",
+  requirePermission(PERMISSIONS.OUTSTANDING_LETTER),
+  validateRequest(letterPrintSchema),
+  outstanding.markPrinted,
+);
 
-
-const partyNotes=new PartyNoteController();
-router.get('/party-notes/parties', requireAnyNoteCreate, validateRequest(notePartyQuerySchema), partyNotes.parties);
-router.get('/party-notes/customers/:id', requireAnyNoteCreate, validateRequest(noteIdSchema), partyNotes.customer);
-router.get('/party-notes/receipts', requireAnyNoteCreate, validateRequest(noteReceiptQuerySchema), partyNotes.receipts);
-router.get('/party-notes/ledgers', requireAnyNoteCreate, validateRequest(noteLedgerQuerySchema), partyNotes.ledgers);
-router.get('/party-notes/register/export', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.export);
-router.get('/party-notes/register/print', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.printRegister);
-router.get('/party-notes/register', requireNoteRegister, validateRequest(noteRegisterSchema), partyNotes.register);
-router.get('/party-notes', requireNoteRead, validateRequest(noteRegisterSchema), partyNotes.register);
-router.post('/party-notes', requireNoteCreate, validateRequest(createPartyNoteSchema), partyNotes.create);
-router.get('/party-notes/:id/print', validateRequest(noteIdSchema), partyNotes.print);
-router.post('/party-notes/:id/cancel', validateRequest(cancelPartyNoteSchema), partyNotes.cancel);
-router.get('/party-notes/:id', validateRequest(noteIdSchema), partyNotes.get);
+const partyNotes = new PartyNoteController();
+router.get(
+  "/party-notes/parties",
+  requireAnyNoteCreate,
+  validateRequest(notePartyQuerySchema),
+  partyNotes.parties,
+);
+router.get(
+  "/party-notes/customers/:id",
+  requireAnyNoteCreate,
+  validateRequest(noteIdSchema),
+  partyNotes.customer,
+);
+router.get(
+  "/party-notes/receipts",
+  requireAnyNoteCreate,
+  validateRequest(noteReceiptQuerySchema),
+  partyNotes.receipts,
+);
+router.get(
+  "/party-notes/ledgers",
+  requireAnyNoteCreate,
+  validateRequest(noteLedgerQuerySchema),
+  partyNotes.ledgers,
+);
+router.get(
+  "/party-notes/register/export",
+  requireNoteRegister,
+  validateRequest(noteRegisterSchema),
+  partyNotes.export,
+);
+router.get(
+  "/party-notes/register/print",
+  requireNoteRegister,
+  validateRequest(noteRegisterSchema),
+  partyNotes.printRegister,
+);
+router.get(
+  "/party-notes/register",
+  requireNoteRegister,
+  validateRequest(noteRegisterSchema),
+  partyNotes.register,
+);
+router.get(
+  "/party-notes",
+  requireNoteRead,
+  validateRequest(noteRegisterSchema),
+  partyNotes.register,
+);
+router.post(
+  "/party-notes",
+  requireNoteCreate,
+  validateRequest(createPartyNoteSchema),
+  partyNotes.create,
+);
+router.get(
+  "/party-notes/:id/print",
+  validateRequest(noteIdSchema),
+  partyNotes.print,
+);
+router.post(
+  "/party-notes/:id/cancel",
+  validateRequest(cancelPartyNoteSchema),
+  partyNotes.cancel,
+);
+router.get("/party-notes/:id", validateRequest(noteIdSchema), partyNotes.get);
 
 const partyReports = new PartyReportController();
-router.get('/party-reports/parties', requireAnyPartyReport, validateRequest(reportPartySearchSchema), partyReports.search);
-router.get('/party-reports/export', requirePartyReport, validateRequest(partyReportSchema), partyReports.export);
-router.get('/party-reports/print', requirePartyReport, validateRequest(partyReportSchema), partyReports.print);
-router.get('/party-reports', requirePartyReport, validateRequest(partyReportSchema), partyReports.report);
-router.get('/settings/party-reports', requireAnyPartyReport, validateRequest(z.object({query:z.object({}).strict()})), partyReports.settings);
-router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OUTSTANDING_AGE_READ), validateRequest(reportSettingsSchema), partyReports.saveSettings);
-
+router.get(
+  "/party-reports/parties",
+  requireAnyPartyReport,
+  validateRequest(reportPartySearchSchema),
+  partyReports.search,
+);
+router.get(
+  "/party-reports/export",
+  requirePartyReport,
+  validateRequest(partyReportSchema),
+  partyReports.export,
+);
+router.get(
+  "/party-reports/print",
+  requirePartyReport,
+  validateRequest(partyReportSchema),
+  partyReports.print,
+);
+router.get(
+  "/party-reports",
+  requirePartyReport,
+  validateRequest(partyReportSchema),
+  partyReports.report,
+);
+router.get(
+  "/settings/party-reports",
+  requireAnyPartyReport,
+  validateRequest(z.object({ query: z.object({}).strict() })),
+  partyReports.settings,
+);
+router.put(
+  "/settings/party-reports",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.PARTY_OUTSTANDING_AGE_READ),
+  validateRequest(reportSettingsSchema),
+  partyReports.saveSettings,
+);
 
 /**
  * @openapi
@@ -225,6 +401,8 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *             required: [customerId, mode, amount]
  *             properties:
  *               customerId: { type: string, format: uuid }
+ *               advanceJobCardId: { type: string, format: uuid, description: 'Optional job advance. Any positive amount; service receipt without invoice allocations. Cheques require a separate clearance workflow and are not accepted as job advances.' }
+ *               idempotencyKey: { type: string, format: uuid, description: 'Required for a job advance. Reuse the same key and details when retrying a payment request.' }
  *               mode: { type: string, enum: [POS, BANK_TRANSFER, CASH] }
  *               category: { type: string, enum: [SERVICE_PARTS, SALES_ENQUIRY] }
  *               bankId: { type: string, format: uuid, description: Required for POS and bank transfer }
@@ -313,6 +491,7 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *   post:
  *     tags: [Finance]
  *     summary: Preview server-calculated job-bill lines and totals
+ *     description: Every included job must be ready, or delivered on approved credit, with a passed QC and no active bill. Consolidation includes all open unbilled vehicle jobs and fails if any member is unfinished or belongs to another customer or branch. Review subtotals include every member.
  *     requestBody:
  *       required: true
  *       content:
@@ -322,16 +501,22 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *             required: [jobCardId]
  *             properties:
  *               jobCardId: { type: string, format: uuid }
+ *               consolidateVehicle: { type: boolean, default: false }
  *               partsDiscountPercent: { type: number, minimum: 0, maximum: 100 }
  *               labourDiscountPercent: { type: number, minimum: 0, maximum: 100 }
  *     responses:
  *       200: { description: Computed bill preview }
+ *       400: { description: "Job readiness, passed QC or consolidation requirements not met, or a customer-paid part needs classification. Example - Classify part P-123 as spares, oil or accessories before billing." }
+ *       409: { description: An included job already has an active bill }
  * /finance/job-bills:
  *   post:
  *     tags: [Finance]
  *     summary: Create a job bill from job-card lines
+ *     description: Rechecks every job's readiness, passed QC, active bill and approved estimate scope under transaction locks. A prior preview does not authorize billing unfinished work. A consolidated invoice and all job billing markers are written atomically.
  *     responses:
  *       201: { description: Bill created with generated invoice number }
+ *       400: { description: "Readiness, passed QC, approved scope or consolidation requirements not met, or a customer-paid part needs classification. Example - Classify part P-123 as spares, oil or accessories before billing." }
+ *       409: { description: Active bill or concurrent billing conflict }
  * /finance/invoices/{id}/cancel:
  *   patch:
  *     tags: [Finance]
@@ -427,40 +612,171 @@ router.put('/settings/party-reports', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN)
  *     responses:
  *       200: { description: Updated account mappings }
  */
-router.get('/job-cards/billable', requirePermission(PERMISSIONS.INVOICE_READ), controller.listBillableJobCards);
-router.post('/job-bills/preview', requirePermission(PERMISSIONS.INVOICE_READ), validateRequest(jobBillPreviewSchema), controller.previewJobBill);
-router.post('/job-bills', requirePermission(PERMISSIONS.JOB_BILL_CREATE), validateRequest(createJobBillSchema), controller.createJobBill);
-router.patch('/invoices/:id/cancel', requirePermission(PERMISSIONS.INVOICE_CANCEL), validateRequest(cancelDocumentSchema), controller.cancelJobBill);
+router.get(
+  "/job-cards/billable",
+  requirePermission(PERMISSIONS.INVOICE_READ),
+  controller.listBillableJobCards,
+);
+router.post(
+  "/job-bills/preview",
+  requirePermission(PERMISSIONS.INVOICE_READ),
+  validateRequest(jobBillPreviewSchema),
+  controller.previewJobBill,
+);
+router.post(
+  "/job-bills",
+  requirePermission(PERMISSIONS.JOB_BILL_CREATE),
+  validateRequest(createJobBillSchema),
+  controller.createJobBill,
+);
+router.patch(
+  "/invoices/:id/cancel",
+  requirePermission(PERMISSIONS.INVOICE_CANCEL),
+  validateRequest(cancelDocumentSchema),
+  controller.cancelJobBill,
+);
 
-router.get('/invoices', requirePermission(PERMISSIONS.INVOICE_READ), controller.listInvoices);
-router.get('/invoices/:id', requirePermission(PERMISSIONS.INVOICE_READ), validateRequest(invoiceIdParamSchema), controller.getInvoice);
-router.put('/invoices/:id', requirePermission(PERMISSIONS.INVOICE_UPDATE), validateRequest(updateInvoiceSchema), controller.updateInvoice);
+router.get(
+  "/invoices",
+  requirePermission(PERMISSIONS.INVOICE_READ),
+  controller.listInvoices,
+);
+router.get(
+  "/invoices/:id",
+  requirePermission(PERMISSIONS.INVOICE_READ),
+  validateRequest(invoiceIdParamSchema),
+  controller.getInvoice,
+);
+router.put(
+  "/invoices/:id",
+  requirePermission(PERMISSIONS.INVOICE_UPDATE),
+  validateRequest(updateInvoiceSchema),
+  controller.updateInvoice,
+);
 
-router.get('/payments', requirePermission(PERMISSIONS.PAYMENT_READ), controller.listPayments);
-router.get('/payments/:id', requirePermission(PERMISSIONS.PAYMENT_READ), validateRequest(paymentIdParamSchema), controller.getPayment);
+router.get(
+  "/payments",
+  requirePermission(PERMISSIONS.PAYMENT_READ),
+  controller.listPayments,
+);
+router.get(
+  "/payments/:id",
+  requirePermission(PERMISSIONS.PAYMENT_READ),
+  validateRequest(paymentIdParamSchema),
+  controller.getPayment,
+);
 
-router.post('/receipts', requirePermission(PERMISSIONS.RECEIPT_CREATE), validateRequest(createReceiptSchema), controller.createReceipt);
-router.get('/receipts', requirePermission(PERMISSIONS.RECEIPT_READ), validateRequest(receiptRegisterQuerySchema), controller.listReceipts);
-router.patch('/receipts/:id', requirePermission(PERMISSIONS.RECEIPT_UPDATE), validateRequest(updateReceiptSchema), controller.updateReceipt);
-router.patch('/receipts/:id/cancel', requirePermission(PERMISSIONS.RECEIPT_CANCEL), validateRequest(cancelDocumentSchema), controller.cancelReceipt);
-router.get('/receipts/:id', requirePermission(PERMISSIONS.RECEIPT_READ), validateRequest(receiptIdParamSchema), controller.getReceipt);
-router.get('/banks', requirePermission(PERMISSIONS.RECEIPT_READ), controller.listBanks);
-router.get('/service-advisors', requirePermission(PERMISSIONS.JOB_BILL_CREATE), controller.listServiceAdvisors);
+router.post(
+  "/receipts",
+  requirePermission(PERMISSIONS.RECEIPT_CREATE),
+  validateRequest(createReceiptSchema),
+  controller.createReceipt,
+);
+router.get(
+  "/receipts",
+  requirePermission(PERMISSIONS.RECEIPT_READ),
+  validateRequest(receiptRegisterQuerySchema),
+  controller.listReceipts,
+);
+router.patch(
+  "/receipts/:id",
+  requirePermission(PERMISSIONS.RECEIPT_UPDATE),
+  validateRequest(updateReceiptSchema),
+  controller.updateReceipt,
+);
+router.patch(
+  "/receipts/:id/cancel",
+  requirePermission(PERMISSIONS.RECEIPT_CANCEL),
+  validateRequest(cancelDocumentSchema),
+  controller.cancelReceipt,
+);
+router.get(
+  "/receipts/:id",
+  requirePermission(PERMISSIONS.RECEIPT_READ),
+  validateRequest(receiptIdParamSchema),
+  controller.getReceipt,
+);
+router.get(
+  "/banks",
+  requirePermission(PERMISSIONS.RECEIPT_READ),
+  controller.listBanks,
+);
+router.get(
+  "/service-advisors",
+  requirePermission(PERMISSIONS.JOB_BILL_CREATE),
+  controller.listServiceAdvisors,
+);
 
-router.get('/tally/ledgers', requirePermission(PERMISSIONS.TALLY_IMPORT), validateRequest(tallyLedgerSearchSchema), controller.listTallyLedgers);
-router.post('/tally/ledgers/import', requirePermission(PERMISSIONS.TALLY_IMPORT), validateRequest(importTallyLedgersSchema), controller.importTallyLedgers);
-router.get('/tally/account-mappings', requirePermission(PERMISSIONS.TALLY_IMPORT), controller.getTallyAccountMappings);
-router.put('/tally/account-mappings', requirePermission(PERMISSIONS.TALLY_IMPORT), validateRequest(saveTallyMappingsSchema), controller.saveTallyAccountMappings);
-router.get('/tally/batches', requirePermission(PERMISSIONS.TALLY_POST), controller.pendingTallyBatches);
-router.get('/tally/documents', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(tallyDocumentsQuerySchema), controller.listTallyDocuments);
-router.post('/tally/post', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(exportTallyBatchSchema), controller.exportTallyBatch);
-router.post('/tally/post/confirm', requirePermission(PERMISSIONS.TALLY_POST), validateRequest(confirmTallyBatchSchema), controller.confirmTallyBatch);
+router.get(
+  "/tally/ledgers",
+  requirePermission(PERMISSIONS.TALLY_IMPORT),
+  validateRequest(tallyLedgerSearchSchema),
+  controller.listTallyLedgers,
+);
+router.post(
+  "/tally/ledgers/import",
+  requirePermission(PERMISSIONS.TALLY_IMPORT),
+  validateRequest(importTallyLedgersSchema),
+  controller.importTallyLedgers,
+);
+router.get(
+  "/tally/account-mappings",
+  requirePermission(PERMISSIONS.TALLY_IMPORT),
+  controller.getTallyAccountMappings,
+);
+router.put(
+  "/tally/account-mappings",
+  requirePermission(PERMISSIONS.TALLY_IMPORT),
+  validateRequest(saveTallyMappingsSchema),
+  controller.saveTallyAccountMappings,
+);
+router.get(
+  "/tally/batches",
+  requirePermission(PERMISSIONS.TALLY_POST),
+  controller.pendingTallyBatches,
+);
+router.get(
+  "/tally/documents",
+  requirePermission(PERMISSIONS.TALLY_POST),
+  validateRequest(tallyDocumentsQuerySchema),
+  controller.listTallyDocuments,
+);
+router.post(
+  "/tally/post",
+  requirePermission(PERMISSIONS.TALLY_POST),
+  validateRequest(exportTallyBatchSchema),
+  controller.exportTallyBatch,
+);
+router.post(
+  "/tally/post/confirm",
+  requirePermission(PERMISSIONS.TALLY_POST),
+  validateRequest(confirmTallyBatchSchema),
+  controller.confirmTallyBatch,
+);
 
-router.get('/reports/summary', requirePermission(PERMISSIONS.FINANCE_REPORT_READ), validateRequest(reportQuerySchema), controller.getSummaryReport);
-router.get('/reports/invoices', requirePermission(PERMISSIONS.FINANCE_REPORT_READ), validateRequest(reportQuerySchema), controller.getInvoiceReport);
-router.get('/reports/receipt-register', requirePermission(PERMISSIONS.RECEIPT_REGISTER_READ), validateRequest(receiptRegisterQuerySchema), controller.listReceipts);
-router.get('/dashboard/overview', requirePermission(PERMISSIONS.INVOICE_READ), controller.getDashboardOverview);
-
+router.get(
+  "/reports/summary",
+  requirePermission(PERMISSIONS.FINANCE_REPORT_READ),
+  validateRequest(reportQuerySchema),
+  controller.getSummaryReport,
+);
+router.get(
+  "/reports/invoices",
+  requirePermission(PERMISSIONS.FINANCE_REPORT_READ),
+  validateRequest(reportQuerySchema),
+  controller.getInvoiceReport,
+);
+router.get(
+  "/reports/receipt-register",
+  requirePermission(PERMISSIONS.RECEIPT_REGISTER_READ),
+  validateRequest(receiptRegisterQuerySchema),
+  controller.listReceipts,
+);
+router.get(
+  "/dashboard/overview",
+  requirePermission(PERMISSIONS.INVOICE_READ),
+  controller.getDashboardOverview,
+);
 
 /**
  * @openapi
@@ -619,17 +935,58 @@ router.get('/dashboard/overview', requirePermission(PERMISSIONS.INVOICE_READ), c
  *           amount: { type: number, minimum: 0.01, maximum: 1000000000000, multipleOf: 0.01 }
  */
 const partyAccount = new PartyAccountController();
-router.get('/parties', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partySearchSchema), partyAccount.search);
-router.get('/parties/:customerId/account', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(partyAccountSchema), partyAccount.account);
-router.get('/parties/:customerId/documents', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyDocumentsSchema), partyAccount.documents);
-router.get('/parties/:customerId/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(partyAccountSchema), partyAccount.batches);
-router.post('/adjustments/fifo-preview', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(fifoAdjustmentSchema), partyAccount.fifo);
-router.post('/adjustments', requirePermission(PERMISSIONS.RECEIPT_ADJUST), validateRequest(createAdjustmentSchema), partyAccount.create);
-router.post('/adjustments/:id/reverse', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.RECEIPT_ADJUST_REVERSE), validateRequest(reverseAdjustmentSchema), partyAccount.reverse);
-router.post('/opening-balances', requireRole(ROLES.ADMIN,ROLES.SUPER_ADMIN), requirePermission(PERMISSIONS.PARTY_OPENING_CREATE), validateRequest(openingBalanceSchema), partyAccount.opening);
+router.get(
+  "/parties",
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST),
+  validateRequest(partySearchSchema),
+  partyAccount.search,
+);
+router.get(
+  "/parties/:customerId/account",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(partyAccountSchema),
+  partyAccount.account,
+);
+router.get(
+  "/parties/:customerId/documents",
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST),
+  validateRequest(partyDocumentsSchema),
+  partyAccount.documents,
+);
+router.get(
+  "/parties/:customerId/adjustments",
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST),
+  validateRequest(partyAccountSchema),
+  partyAccount.batches,
+);
+router.post(
+  "/adjustments/fifo-preview",
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST),
+  validateRequest(fifoAdjustmentSchema),
+  partyAccount.fifo,
+);
+router.post(
+  "/adjustments",
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST),
+  validateRequest(createAdjustmentSchema),
+  partyAccount.create,
+);
+router.post(
+  "/adjustments/:id/reverse",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.RECEIPT_ADJUST_REVERSE),
+  validateRequest(reverseAdjustmentSchema),
+  partyAccount.reverse,
+);
+router.post(
+  "/opening-balances",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  requirePermission(PERMISSIONS.PARTY_OPENING_CREATE),
+  validateRequest(openingBalanceSchema),
+  partyAccount.opening,
+);
 
 export default router;
-
 
 /**
  * @openapi

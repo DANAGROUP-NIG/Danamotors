@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import type { ReactNode } from "react";
+import { CustomerExplanation } from "@/components/CustomerExplanation";
 // import { Check, Clock, CircleCheck, CircleAlert, Wrench } from "lucide-react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -9,13 +9,17 @@ import { apiGet } from "@/lib/api/apiClient";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { moneyText } from "@/features/service-transactions/transaction.logic";
 type PrintData = {
   estimate: {
     version: number;
     estimateNumber: string | null;
+    customerRemarks?: string | null;
     estimateDate: string;
     currency: string;
     total: number;
+    upfrontPaymentPercent?: number;
+    upfrontAmount?: number;
     supersededBy: number | null;
     signatureState: string | null;
     lines: {
@@ -77,14 +81,10 @@ export default function EstimatePrintPage() {
   if (isError || !data)
     return <p role="alert">Estimate could not be loaded.</p>;
   const { estimate, company, branch, customer, vehicle, job } = data;
-  const money = (value: number) =>
-    new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: estimate.currency,
-    }).format(value);
+  const money = (value: number) => moneyText(value, estimate.currency);
   return (
     <article className="estimate-print mx-auto max-w-4xl space-y-5 bg-white p-6 text-black print:p-0">
-      <style>{`@page {size:A4 portrait;margin:15mm 12mm 18mm;@bottom-left {content:"Printed ${date(data.printedAt).replaceAll('"', "")} · Africa/Lagos";font-size:8pt;}@bottom-right {content:"Page " counter(page) " of " counter(pages);font-size:8pt;}} @media print {body {background:white;}body * {visibility:hidden;} .estimate-print,.estimate-print * {visibility:visible;} .estimate-print {position:absolute;left:0;top:0;width:100%;max-width:none;font-size:10pt;} .estimate-print .print-controls {display:none;} .estimate-print tr,.signature-block {break-inside:avoid;} .estimate-print thead {display:table-header-group;}}`}</style>
+      <style>{`@page {size:A4 portrait;margin:15mm 12mm 18mm;@bottom-left {content:"Printed ${date(data.printedAt).replaceAll('"', "")}, Africa/Lagos";font-size:8pt;}@bottom-right {content:"Page " counter(page) " of " counter(pages);font-size:8pt;}} @media print {body {background:white;}body * {visibility:hidden;} .estimate-print,.estimate-print * {visibility:visible;} .estimate-print {position:absolute;left:0;top:0;width:100%;max-width:none;font-size:10pt;} .estimate-print .print-controls {display:none;} .estimate-print tr,.signature-block {break-inside:avoid;} .estimate-print thead {display:table-header-group;}}`}</style>
       <div className="print-controls flex gap-3">
         <Button onClick={() => window.print()}>Print estimate</Button>
         <a className="underline" href={`/job-cards/${id}`}>
@@ -103,10 +103,10 @@ export default function EstimatePrintPage() {
       </header>
       <div>
         <h2 className="text-xl font-bold">
-          Job estimate · Revision {estimate.version}
+          Job estimate, Revision {estimate.version}
         </h2>
         <p>
-          {estimate.estimateNumber ?? "Legacy estimate"} ·{" "}
+          {estimate.estimateNumber ?? "Legacy estimate"},{" "}
           {date(estimate.estimateDate)}
         </p>
         <strong>Not a bill</strong>
@@ -126,17 +126,17 @@ export default function EstimatePrintPage() {
         <div>
           <h3 className="font-semibold">Vehicle</h3>
           <p>
-            {vehicle?.registration} · {vehicle?.make} {vehicle?.model}{" "}
+            {vehicle?.registration}, {vehicle?.make} {vehicle?.model}{" "}
             {vehicle?.variant}
           </p>
           <p>VIN: {vehicle?.vin}</p>
-          <p>Mileage: {vehicle?.mileage ?? "—"}</p>
+          <p>Mileage: {vehicle?.mileage ?? "N/A"}</p>
         </div>
       </section>
       <section>
         <h3 className="font-semibold">Job {job.number}</h3>
         <p>
-          {date(job.date)} · {job.serviceType}
+          {date(job.date)}, {job.serviceType}
         </p>
         <h4>Customer complaints</h4>
         <ul>
@@ -181,6 +181,20 @@ export default function EstimatePrintPage() {
       <p className="text-right text-lg font-bold">
         Total: {money(estimate.total)}
       </p>
+      {typeof estimate.upfrontAmount === "number" &&
+        Number.isFinite(estimate.upfrontAmount) && (
+          <section className="space-y-1 text-right text-sm">
+            <p>
+              Suggested advance ({estimate.upfrontPaymentPercent ?? 60}%):{" "}
+              {money(estimate.upfrontAmount)}
+            </p>
+            <p>
+              Recommendation only. Any positive eligible advance meets the
+              payment requirement.
+            </p>
+          </section>
+        )}
+      <CustomerExplanation text={estimate.customerRemarks} />
       {data.terms.length > 0 && (
         <section>
           <h3 className="font-semibold">Terms</h3>
@@ -196,7 +210,7 @@ export default function EstimatePrintPage() {
           <>
             <p>
               {estimate.signatureState === "invalid"
-                ? "INVALID SIGNATURE · obtain a new signed revision"
+                ? "Invalid signature, obtain a new signed revision"
                 : "Customer signature"}
             </p>
             <Image
@@ -211,10 +225,14 @@ export default function EstimatePrintPage() {
                 ? ` for ${customer?.name} (${estimate.signature.relationship})`
                 : ""}
             </p>
-            {estimate.signature.consentStatement && <p className="whitespace-pre-line">{estimate.signature.consentStatement}</p>}
-            <p>{date(estimate.signature.signedAt)} · Africa/Lagos</p>
+            {estimate.signature.consentStatement && (
+              <p className="whitespace-pre-line">
+                {estimate.signature.consentStatement}
+              </p>
+            )}
+            <p>{date(estimate.signature.signedAt)}, Africa/Lagos</p>
             <p>
-              Revision {estimate.signature.estimateVersion} · Total signed{" "}
+              Revision {estimate.signature.estimateVersion}, Total signed{" "}
               {money(estimate.signature.totalSigned)}
             </p>
           </>
@@ -233,7 +251,7 @@ export default function EstimatePrintPage() {
       </section>
       <footer className="border-t pt-3 text-sm">
         <p>{data.footer}</p>
-        <p>Printed {date(data.printedAt)} · Africa/Lagos</p>
+        <p>Printed {date(data.printedAt)}, Africa/Lagos</p>
       </footer>
     </article>
   );
