@@ -28,12 +28,11 @@ export function useAuth() {
   const isWorkshopManager = role === "workshopmanager";
   const isAdviser = role === "serviceadviser";
   const isTechnician = role === "technician";
-  const isReceptionist = role === "ccuofficer";
-  const isReceptionManager = role === "ccumanager";
+  const isCcuOfficer = role === "ccuofficer";
+  const isCcuManager = role === "ccumanager";
   const isAccountant = role === "accountant";
   const isCustomer = role === "customer";
   const customerId = user?.customerId || (isCustomer ? user?.id : undefined);
-  const isCCUManager = role === "";
 
   // Hierarchy shorthand: "admin or above"
   const isAdminOrAbove = isSuperAdmin || isAdmin;
@@ -92,8 +91,8 @@ export function useAuth() {
     isWorkshopManager,
     isAdviser,
     isTechnician,
-    isReceptionist,
-    isReceptionManager,
+    isCcuOfficer,
+    isCcuManager,
     isAccountant,
     isCustomer,
     customerId,
