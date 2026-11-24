@@ -116,6 +116,8 @@ export const NAV_GROUPS: NavGroup[] = [
       "csc:case:read",
       "csc:master:read",
       "csi:master:read",
+      "csi:card:generate",
+      "csi:response:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -207,10 +209,25 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
-        label: "CSI masters",
+        label: "CSI",
         icon: ListChecks,
-        permissions: ["csi:master:read"],
+        permissions: ["csi:master:read", "csi:card:generate", "csi:response:read", "report:csi", "report:csi-attribute", "report:csi-checklist"],
         children: [
+          { label: "CSI report", href: "/reports/csi", icon: ClipboardList, permissions: ["report:csi"] },
+          { label: "Attribute-wise CSI analysis", href: "/reports/csi-attribute", icon: ClipboardList, permissions: ["report:csi-attribute"] },
+          { label: "CSI customer checklist", href: "/reports/csi-checklist", icon: ClipboardList, permissions: ["report:csi-checklist"] },
+          {
+            label: "CSI card responses",
+            href: "/csi/response-entry",
+            icon: ClipboardList,
+            permissions: ["csi:response:read"],
+          },
+          {
+            label: "CSI card generation",
+            href: "/csi/generate",
+            icon: ClipboardCheck,
+            permissions: ["csi:card:generate"],
+          },
           {
             label: "CSI attribute master",
             href: "/csi/attributes",

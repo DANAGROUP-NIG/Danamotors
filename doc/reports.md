@@ -299,3 +299,15 @@ Legacy *Service → MIS Reports*. The hub lists them under **Service MIS**. All 
 WorkshopManager and ServiceManager: all but S15. ServiceAdviser: S9–S14. StoreOfficer and GeneralStoreManager: S6 and
 S7. Admin and SuperAdmin: all. TODO(confirm): #97 names WorkshopManager; ServiceManager gets the same set.
 
+## Customer satisfaction index
+
+The framework registers `csi`, `csi-attribute` and `csi-checklist`, each protected by its own report permission. The same report data drives the screen, print view and Excel export. Reports include only responded surveys and retain existing branch scope resolution.
+
+- **CSI report:** one row per survey with job/vehicle/service details, response date, stored weighted score and percentage. Summary averages use the included surveys. Optional formula sections show original weights, marks and products.
+- **Attribute-wise CSI analysis:** counts and percentages for each snapshotted response, including zero-count choices, with average marks/weights and weighted contribution. Different question wording is kept separate.
+- **Customer checklist:** customer, phone, registration, job, response date, attribute, response and comments, filtered by card, attribute and rating.
+
+Response dates can be All or an inclusive Africa/Lagos range. Card, attribute and response lookups include inactive masters for historical filtering. Summary filters also support job-number bounds, service type, model, dependent variant and exact registration, using issuance snapshots. More than 2,000 matching surveys is rejected; narrow dates/card rather than receive truncated averages.
+
+TODO(confirm): proposed score is sum(weight x marks), with percentage normalized to the issued card's maximum. Every attribute must be answered. Business confirmation of the legacy formula and satisfaction bands is pending; bands are not fabricated. Verified legacy master exports are also required before business seeding. See [CSI operations and rollout](./csi.md).
+

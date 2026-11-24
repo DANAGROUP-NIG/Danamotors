@@ -136,6 +136,7 @@ model CsiCard {
 }
 
 model CsiCardRevision {
+  surveys       CsiSurvey[]
   id            String @id @default(uuid())
   branchId      String
   cardId        String
@@ -182,6 +183,50 @@ model CsiCardResponse {
   @@id([revisionId, responseId])
   @@unique([revisionId, sequence])
   @@index([branchId, responseId])
+}
+
+enum CsiSurveyStatus {
+  ISSUED
+  RESPONDED
+}
+
+model CsiSurvey {
+  id            String @id @default(uuid())
+  branchId      String
+  jobCardId     String @unique
+  jobCard       JobCard @relation(fields: [branchId, jobCardId], references: [branchId, id], onDelete: Restrict)
+  revisionId    String
+  revision      CsiCardRevision @relation(fields: [branchId, revisionId], references: [branchId, id], onDelete: Restrict)
+  generatedAt   DateTime @default(now())
+  generatedById String
+  status        CsiSurveyStatus @default(ISSUED)
+  jobSnapshot   Json
+  responseDate  DateTime? @db.Date
+  comments      String?
+  enteredById   String?
+  score         Decimal? @db.Decimal(12, 6)
+  scorePercent  Decimal? @db.Decimal(9, 6)
+  version       Int @default(0)
+  answers       CsiSurveyAnswer[]
+
+  @@unique([branchId, jobCardId])
+  @@unique([branchId, id])
+  @@index([branchId, generatedAt, id])
+  @@index([branchId, responseDate, id])
+}
+
+model CsiSurveyAnswer {
+  surveyId            String
+  survey              CsiSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  attributeId         String
+  responseId          String
+  attributeDescription String
+  weightage           Decimal @db.Decimal(7, 6)
+  responseDescription String
+  marks               Decimal @db.Decimal(12, 6)
+
+  @@id([surveyId, attributeId])
+  @@index([attributeId, responseId])
 }
 
 // ============================================================
@@ -646,6 +691,8 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
+  csiSurvey CsiSurvey?
+  @@unique([branchId, id])
   /// SERVICE (default) or PDI. PDI jobs have their own number series and stay out of service history.
   jobType              JobCardType          @default(SERVICE)
   /// PDI only: the temporary registration (default: last 6 of the VIN). Never the vehicle's real plate.

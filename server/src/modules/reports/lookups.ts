@@ -1,23 +1,27 @@
-import { z } from 'zod';
-import { ROLES } from '../../shared/constants/roles';
-import { branchParam } from './core/filters';
-import type { ReportDb, ReportScope } from './core/types';
+import { z } from "zod";
+import { ROLES } from "../../shared/constants/roles";
+import { branchParam } from "./core/filters";
+import type { ReportDb, ReportScope } from "./core/types";
+import { ForbiddenError, BadRequestError } from "../../shared/errors/appError";
 
 export const LOOKUP_SOURCES = [
-  'model',
-  'variant',
-  'serviceType',
-  'team',
-  'complaint',
-  'labourOperation',
-  'serviceAdvisor',
-  'technician',
-  'campaign',
-  'engineer',
-  'serviceGroup',
-  'partCategory',
-  'freeService',
-  'cscReason',
+  "model",
+  "variant",
+  "serviceType",
+  "team",
+  "complaint",
+  "labourOperation",
+  "serviceAdvisor",
+  "technician",
+  "campaign",
+  "engineer",
+  "serviceGroup",
+  "partCategory",
+  "freeService",
+  "cscReason",
+  "csiCard",
+  "csiAttribute",
+  "csiResponse",
 ] as const;
 export type LookupSource = (typeof LOOKUP_SOURCES)[number];
 
@@ -36,12 +40,12 @@ export interface LookupOption {
 }
 
 const MASTER_KIND: Partial<Record<LookupSource, string>> = {
-  model: 'MODEL',
-  variant: 'VARIANT',
-  serviceType: 'SERVICE_TYPE',
-  team: 'TEAM',
-  complaint: 'COMPLAINT',
-  serviceGroup: 'VEHICLE_GROUP',
+  model: "MODEL",
+  variant: "VARIANT",
+  serviceType: "SERVICE_TYPE",
+  team: "TEAM",
+  complaint: "COMPLAINT",
+  serviceGroup: "VEHICLE_GROUP",
 };
 
 const STAFF_ROLE: Partial<Record<LookupSource, string>> = {
@@ -54,61 +58,171 @@ const STAFF_ROLE: Partial<Record<LookupSource, string>> = {
  * Dropdown options for the report filters. Inactive masters and staff are included (and
  * flagged) because old jobs still refer to them.
  */
-export async function listLookup(db: ReportDb, scope: ReportScope, source: LookupSource): Promise<LookupOption[]> {
+export async function listLookup(
+  db: ReportDb,
+  scope: ReportScope,
+  source: LookupSource,
+): Promise<LookupOption[]> {
+  if (
+    source === "csiCard" ||
+    source === "csiAttribute" ||
+    source === "csiResponse"
+  ) {
+    if (
+      !scope.permissions.some((permission) =>
+        [
+          "report:csi",
+          "report:csi-attribute",
+          "report:csi-checklist",
+          "csi:master:read",
+        ].includes(permission),
+      )
+    )
+      throw new ForbiddenError(
+        "CSI report permission is required to view these filter options",
+      );
+    const where = scope.branchIds ? { branchId: { in: scope.branchIds } } : {};
+    const settings = {
+      where,
+      orderBy: [{ code: "asc" as const }, { id: "asc" as const }],
+      take: 2001,
+    };
+    const rows =
+      source === "csiCard"
+        ? await db.csiCard.findMany({
+            ...settings,
+            include: { revisions: { orderBy: { version: "desc" }, take: 1 } },
+          })
+        : source === "csiAttribute"
+          ? await db.csiAttribute.findMany(settings)
+          : await db.csiResponse.findMany(settings);
+    if (rows.length > 2000)
+      throw new BadRequestError(
+        "Too many CSI filter options. Select a single workshop branch.",
+      );
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      label:
+        "description" in row
+          ? row.description
+          : (row.revisions[0]?.description ?? row.code),
+      active: row.active,
+    }));
+  }
   const kind = MASTER_KIND[source];
   if (kind) {
     const masters = await db.workshopMaster.findMany({
       where: { kind },
-      select: { id: true, code: true, description: true, parentId: true, active: true },
-      orderBy: [{ active: 'desc' }, { description: 'asc' }],
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        parentId: true,
+        active: true,
+      },
+      orderBy: [{ active: "desc" }, { description: "asc" }],
     });
-    return masters.map((m) => ({ id: m.id, label: m.description, code: m.code, parentId: m.parentId, active: m.active }));
+    return masters.map((m) => ({
+      id: m.id,
+      label: m.description,
+      code: m.code,
+      parentId: m.parentId,
+      active: m.active,
+    }));
   }
 
-  if (source === 'campaign') {
+  if (source === "campaign") {
     // Campaigns are not branch-scoped. Closed ones are listed (and flagged) for history.
     const campaigns = await db.campaign.findMany({
       select: { id: true, code: true, title: true, type: true, status: true },
-      orderBy: [{ status: 'asc' }, { code: 'asc' }],
+      orderBy: [{ status: "asc" }, { code: "asc" }],
     });
-    return campaigns.map((c) => ({ id: c.id, label: `${c.code} · ${c.title}`, code: c.code, parentId: c.type, active: c.status !== 'CLOSED' }));
+    return campaigns.map((c) => ({
+      id: c.id,
+      label: `${c.code} · ${c.title}`,
+      code: c.code,
+      parentId: c.type,
+      active: c.status !== "CLOSED",
+    }));
   }
 
-  if (source === 'freeService') {
+  if (source === "freeService") {
     // Service types in the FREE category, in their service order (1F, 2F, 3F…).
     const types = await db.workshopMaster.findMany({
-      where: { kind: 'SERVICE_TYPE', category: 'FREE' },
+      where: { kind: "SERVICE_TYPE", category: "FREE" },
       select: { id: true, code: true, description: true, active: true },
-      orderBy: [{ active: 'desc' }, { displayOrder: { sort: 'asc', nulls: 'last' } }, { code: 'asc' }],
+      orderBy: [
+        { active: "desc" },
+        { displayOrder: { sort: "asc", nulls: "last" } },
+        { code: "asc" },
+      ],
     });
-    return types.map((t) => ({ id: t.id, label: t.description, code: t.code, active: t.active }));
+    return types.map((t) => ({
+      id: t.id,
+      label: t.description,
+      code: t.code,
+      active: t.active,
+    }));
   }
 
-  if (source === 'cscReason') {
+  if (source === "cscReason") {
     // CSC closure reasons, deactivated ones flagged.
-    const reasons = await db.cscCloseReason.findMany({ select: { id: true, code: true, description: true, active: true }, orderBy: [{ active: 'desc' }, { code: 'asc' }] });
-    return reasons.map((r) => ({ id: r.id, label: `${r.code} · ${r.description}`, code: r.code, active: r.active }));
+    const reasons = await db.cscCloseReason.findMany({
+      select: { id: true, code: true, description: true, active: true },
+      orderBy: [{ active: "desc" }, { code: "asc" }],
+    });
+    return reasons.map((r) => ({
+      id: r.id,
+      label: `${r.code} · ${r.description}`,
+      code: r.code,
+      active: r.active,
+    }));
   }
 
-  if (source === 'partCategory') {
+  if (source === "partCategory") {
     // Price categories are keyed by their code (e.g. O for oil).
-    const categories = await db.partCategory.findMany({ select: { code: true, description: true, isActive: true }, orderBy: [{ isActive: 'desc' }, { code: 'asc' }] });
-    return categories.map((c) => ({ id: c.code, label: c.description, code: c.code, active: c.isActive }));
+    const categories = await db.partCategory.findMany({
+      select: { code: true, description: true, isActive: true },
+      orderBy: [{ isActive: "desc" }, { code: "asc" }],
+    });
+    return categories.map((c) => ({
+      id: c.code,
+      label: c.description,
+      code: c.code,
+      active: c.isActive,
+    }));
   }
 
   const role = STAFF_ROLE[source];
   if (role) {
     const users = await db.user.findMany({
-      where: { role: { name: role }, ...(scope.branchIds ? { branchId: { in: scope.branchIds } } : {}) },
+      where: {
+        role: { name: role },
+        ...(scope.branchIds ? { branchId: { in: scope.branchIds } } : {}),
+      },
       select: { id: true, firstName: true, lastName: true, isActive: true },
-      orderBy: [{ isActive: 'desc' }, { firstName: 'asc' }, { lastName: 'asc' }],
+      orderBy: [
+        { isActive: "desc" },
+        { firstName: "asc" },
+        { lastName: "asc" },
+      ],
     });
-    return users.map((u) => ({ id: u.id, label: `${u.firstName} ${u.lastName}`.trim(), active: u.isActive }));
+    return users.map((u) => ({
+      id: u.id,
+      label: `${u.firstName} ${u.lastName}`.trim(),
+      active: u.isActive,
+    }));
   }
 
   const items = await db.labourItem.findMany({
     select: { id: true, code: true, description: true, active: true },
-    orderBy: [{ active: 'desc' }, { code: 'asc' }],
+    orderBy: [{ active: "desc" }, { code: "asc" }],
   });
-  return items.map((l) => ({ id: l.id, label: l.description, code: l.code, active: l.active }));
+  return items.map((l) => ({
+    id: l.id,
+    label: l.description,
+    code: l.code,
+    active: l.active,
+  }));
 }

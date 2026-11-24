@@ -21,10 +21,14 @@ import {
   responseBody,
 } from "./csi.validation";
 import { z } from "zod";
+import issuanceRoutes from "./csi-issuance.routes";
+import responseRoutes from "./csi-response.routes";
 
 const router = Router();
 const service = new CsiMasterService();
 router.use(authMiddleware);
+router.use("/surveys", responseRoutes);
+router.use("/surveys", issuanceRoutes);
 const read = requirePermission(PERMISSIONS.CSI_MASTER_READ);
 const update = requirePermission(PERMISSIONS.CSI_MASTER_UPDATE);
 

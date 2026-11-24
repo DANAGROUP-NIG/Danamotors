@@ -13,6 +13,8 @@ import { repeatJobPaths } from "../modules/repeat-job/repeat-job.openapi";
 import { lateDeliveryPaths } from "../modules/late-delivery/late-delivery.openapi";
 import { cscPaths } from "../modules/csc/csc.openapi";
 import { csiPaths } from "../modules/csi/csi.openapi";
+import { csiIssuancePaths } from "../modules/csi/csi-issuance.openapi";
+import { csiResponsePaths } from "../modules/csi/csi-response.openapi";
 import { buildReportPaths } from "../modules/reports/framework.openapi";
 import { REPORTS } from "../modules/reports/reports.registry";
 
@@ -744,6 +746,8 @@ const paths: Record<string, unknown> = {
   ...repeatJobPaths,
   ...cscPaths,
   ...csiPaths,
+  ...csiIssuancePaths,
+  ...csiResponsePaths,
   ...lateDeliveryPaths,
 };
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {

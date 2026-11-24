@@ -317,6 +317,12 @@ export const PERMISSIONS = {
   CSC_MASTER_READ: "csc:master:read",
   CSI_MASTER_READ: "csi:master:read",
   CSI_MASTER_UPDATE: "csi:master:update",
+  CSI_CARD_GENERATE: "csi:card:generate",
+  CSI_RESPONSE_READ: "csi:response:read",
+  CSI_RESPONSE_UPDATE: "csi:response:update",
+  CSI_REPORT: "report:csi",
+  CSI_ATTRIBUTE_REPORT: "report:csi-attribute",
+  CSI_CHECKLIST_REPORT: "report:csi-checklist",
   CSC_MASTER_UPDATE: "csc:master:update",
   CSC_CASE_READ: "csc:case:read",
   CSC_CASE_GENERATE: "csc:case:generate",
@@ -690,6 +696,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions
   [ROLES.WORKSHOP_MANAGER]: [
+    PERMISSIONS.CSI_RESPONSE_READ,
+    PERMISSIONS.CSI_REPORT,
+    PERMISSIONS.CSI_ATTRIBUTE_REPORT,
+    PERMISSIONS.CSI_CHECKLIST_REPORT,
     PERMISSIONS.CSI_MASTER_READ,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
@@ -893,6 +903,12 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    PERMISSIONS.CSI_RESPONSE_READ,
+    PERMISSIONS.CSI_RESPONSE_UPDATE,
+    PERMISSIONS.CSI_REPORT,
+    PERMISSIONS.CSI_ATTRIBUTE_REPORT,
+    PERMISSIONS.CSI_CHECKLIST_REPORT,
+    PERMISSIONS.CSI_CARD_GENERATE,
     PERMISSIONS.CSI_MASTER_READ,
     PERMISSIONS.CSI_MASTER_UPDATE,
     ...CSC_PERMISSIONS,
@@ -966,6 +982,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.CCU_OFFICER]: [
+    PERMISSIONS.CSI_RESPONSE_READ,
+    PERMISSIONS.CSI_RESPONSE_UPDATE,
+    PERMISSIONS.CSI_CARD_GENERATE,
     ...CSC_CALLER_PERMISSIONS,
     PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
     PERMISSIONS.DASHBOARD_READ,
@@ -992,6 +1011,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
+    PERMISSIONS.CSI_RESPONSE_READ,
+    PERMISSIONS.CSI_RESPONSE_UPDATE,
+    PERMISSIONS.CSI_CARD_GENERATE,
     ...CSC_SUPERVISOR_PERMISSIONS,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,

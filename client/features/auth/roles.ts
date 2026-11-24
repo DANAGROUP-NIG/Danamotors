@@ -84,6 +84,9 @@ export function isAdminLevelPermission(name: string): boolean {
 
 /** Framework reports (#75) and report settings. */
 export const FRAMEWORK_REPORT_PERMISSIONS = [
+  "report:csi",
+  "report:csi-attribute",
+  "report:csi-checklist",
   "report:fpc-vehicles",
   "report:fpc-analysis",
   // Service MIS (#97)

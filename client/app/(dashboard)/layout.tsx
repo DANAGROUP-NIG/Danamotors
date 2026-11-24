@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { usePathname } from 'next/navigation';
 
 //components
 import SideNav from "@/components/nagivation/SideNav";
@@ -45,6 +46,8 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/csc/follow-up": ["csc:case:read"],
   "/csc/not-visited": ["csc:case:read"],
   "/csc": ["csc:case:read"],
+  "/csi/generate": ["csi:card:generate"],
+  "/csi/response-entry": ["csi:response:read"],
   "/csi": ["csi:master:read"],
   "/invoices": ["invoice:read"],
   "/labour-catalogue": ["labour-item:read"],
@@ -147,6 +150,10 @@ export default function DashboardLayout({
 }) {
   // // Mobile drawer state
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const csiDeniedMessage = pathname.startsWith('/csi') || pathname.startsWith('/reports/csi')
+    ? 'You do not have permission to open this CSI screen. Ask your service manager to review your CSI access.'
+    : undefined;
 
   return (
     // Printing: the page content alone, on white, flowing over as many pages as it needs.
@@ -181,7 +188,7 @@ export default function DashboardLayout({
           className="flex-1 overflow-y-auto print:overflow-visible"
           id="main-content"
         >
-          <RouteGuard routePermissions={ROUTE_PERMISSIONS}>
+          <RouteGuard routePermissions={ROUTE_PERMISSIONS} deniedMessage={csiDeniedMessage}>
             {children}
           </RouteGuard>
         </main>

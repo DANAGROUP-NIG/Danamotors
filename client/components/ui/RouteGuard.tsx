@@ -12,6 +12,8 @@ interface RouteGuardProps {
   routeRoles?: Record<string, AppRole[]>;
   children: React.ReactNode;
   fallbackRoute?: string;
+  /** Optional in-place access message for screens that must not redirect on denial. */
+  deniedMessage?: string;
 }
 
 export function RouteGuard({
@@ -19,6 +21,7 @@ export function RouteGuard({
   routeRoles,
   children,
   fallbackRoute = "/dashboard",
+  deniedMessage,
 }: RouteGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -45,33 +48,23 @@ export function RouteGuard({
     }
   }
 
+  const allowed = !requiredAccess || (requiredAccess.kind === 'permission'
+    ? hasAnyPermission(requiredAccess.values)
+    : hasAccess(requiredAccess.values as AppRole[]));
+
   useEffect(() => {
-    if (!isHydrated) return;
-    if (!requiredAccess) return;
-
-    const allowed =
-      requiredAccess.kind === "permission"
-        ? hasAnyPermission(requiredAccess.values)
-        : hasAccess(requiredAccess.values as AppRole[]);
-
-    if (allowed) return;
+    if (!isHydrated || allowed || deniedMessage) return;
 
     if (window.history.length > 1) {
       router.back();
     } else {
       router.replace(fallbackRoute);
     }
-  }, [isHydrated, pathname]);
+  }, [isHydrated, pathname, allowed, deniedMessage, fallbackRoute, router]);
 
   if (!isHydrated || !user) return null;
 
-  if (requiredAccess) {
-    const allowed =
-      requiredAccess.kind === "permission"
-        ? hasAnyPermission(requiredAccess.values)
-        : hasAccess(requiredAccess.values as AppRole[]);
-    if (!allowed) return null;
-  }
+  if (!allowed) return deniedMessage ? <p role="alert" className="p-4 text-sm">{deniedMessage}</p> : null;
 
   return <>{children}</>;
 }
