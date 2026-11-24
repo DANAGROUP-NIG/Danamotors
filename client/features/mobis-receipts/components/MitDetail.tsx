@@ -23,6 +23,7 @@ import {
 import type { MobisMit } from "../types/mobis.types";
 import { HandheldCard, useHandheldDocuments, type HandheldDocument } from "@/features/handheld";
 import { DiscrepancyPanel } from "@/features/stock-discrepancy/components/DiscrepancyPanel";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -137,8 +138,7 @@ function MrnDialog({ mit, verified, onClose }: { mit: MobisMit; verified?: Handh
                   <td className={cn(tdCls, "text-right")}>{line.quantity}</td>
                   {(["received", "damaged"] as const).map((field) => (
                     <td key={field} className={cn(tdCls, "text-right")}>
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={cn(numCls, !ok && "border-red-400")}
                         value={rows[line.id]?.[field] ?? ""}

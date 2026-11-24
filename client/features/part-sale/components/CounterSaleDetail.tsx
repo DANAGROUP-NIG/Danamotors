@@ -7,6 +7,7 @@ import { ArrowLeft, Ban, FileText, Printer, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -78,14 +79,13 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
                   <td className={cn(tdCls, "text-right")}>{line.quantity}</td>
                   <td className={cn(tdCls, "text-right text-slate-500")}>{line.returnedQuantity}</td>
                   <td className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       max={left}
                       className={cn(inputCls, "ml-auto h-9 w-20 text-right", !ok && "border-red-400")}
-                      value={qty[line.id] ?? ""}
+                      value={qty[line.id] ? Number(qty[line.id]) : null}
                       placeholder="0"
-                      onChange={(e) => setQty((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                      onValueChange={(v) => setQty((prev) => ({ ...prev, [line.id]: v == null ? "" : String(v) }))}
                     />
                   </td>
                   <td className={cn(tdCls, "text-right")}>{fmtCurrency(line.rate)}</td>

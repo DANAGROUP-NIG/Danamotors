@@ -143,6 +143,15 @@ export class PartSaleService {
     return new StockTransferService().searchParts({ search, sourceBranchId: branchId });
   }
 
+  /** Legacy Counter Sale "Sales Executive" dropdown: the active staff of the selling branch. */
+  async listSalesExecutives(branchId: string) {
+    return prisma.user.findMany({
+      where: { isActive: true, branchId },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      ...userSelect,
+    });
+  }
+
   // ── Customer purchase orders ──────────────────────────────────────────────
 
   async createOrder(input: CreateOrderInput, actorId: string) {

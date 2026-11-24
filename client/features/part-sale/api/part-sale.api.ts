@@ -11,6 +11,7 @@ import type {
   CustomerOrderStatus,
   CustomerSearchResult,
   SaleReturnListItem,
+  SalesExecutive,
 } from "../types/part-sale.types";
 
 const BASE = "/part-sale";
@@ -24,6 +25,7 @@ export const partSaleKeys = {
   returns: (params: Record<string, unknown>) => [...partSaleKeys.all, "returns", params] as const,
   customers: (search: string) => [...partSaleKeys.all, "customers", search] as const,
   parts: (search: string, branchId: string) => [...partSaleKeys.all, "parts", search, branchId] as const,
+  executives: (branchId: string) => [...partSaleKeys.all, "executives", branchId] as const,
 };
 
 function qs(params: Record<string, string | boolean | undefined>) {
@@ -37,6 +39,10 @@ function qs(params: Record<string, string | boolean | undefined>) {
 
 export async function searchSaleCustomersRequest(search: string) {
   return (await apiGet<{ customers: CustomerSearchResult[] }>(`${BASE}/customers${qs({ search })}`)).customers;
+}
+
+export async function listSalesExecutivesRequest(branchId: string) {
+  return (await apiGet<{ executives: SalesExecutive[] }>(`${BASE}/sales-executives${qs({ branchId })}`)).executives;
 }
 
 export async function searchSalePartsRequest(search: string, branchId: string) {

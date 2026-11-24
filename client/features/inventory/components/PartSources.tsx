@@ -11,6 +11,7 @@ import { useCreateSourceRecord } from "../hooks/use-part-mutations";
 import { PART_SOURCE_CODES, partSourceLabel } from "../lib/part-codes";
 import { PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster } from "../types/inventory.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 // Local, used and repaired records are priced like legacy local purchases (category L, 1.5x).
 const BRANCH_BOUGHT = ["L", "U", "R"];
@@ -76,7 +77,7 @@ function AddSourceForm({ main, usedSources, onDone }: { main: PartMaster; usedSo
           <input className={`${inputCls} font-mono`} value={partNumber} onChange={(event) => setPartNumber(event.target.value)} />
         </Field>
         <Field label="Dealer rate (cost)">
-          <input type="number" min="0.01" step="0.01" className={inputCls} value={dealerRate} onChange={(event) => setDealerRate(event.target.value)} />
+          <NumberInput min="0.01" step="0.01" className={inputCls} value={dealerRate} onChange={(event) => setDealerRate(event.target.value)} />
         </Field>
         <Field label="Part category">
           <select className={inputCls} value={category} onChange={(event) => setCategory(event.target.value)}>

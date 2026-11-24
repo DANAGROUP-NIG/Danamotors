@@ -18,6 +18,7 @@ import {
   type UpdateAppointmentFormValues,
 } from "../schemas/appointment.schema";
 import type { Appointment } from "../types/appointment.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const STATUS_OPTIONS = [
   { value: "Pending", label: "Pending" },
@@ -110,8 +111,7 @@ function LegacyAppointmentEditForm({
           )}
         </Field>
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
-          <input
-            type="number"
+          <NumberInput
             className={inputCls}
             placeholder="e.g. 60"
             {...register("durationMins")}

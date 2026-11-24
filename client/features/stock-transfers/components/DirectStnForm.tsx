@@ -17,6 +17,7 @@ import { useIndentAbilities } from "../hooks/use-indent-abilities";
 import { useDirectStn } from "../hooks/use-stns";
 import { fmtCurrency } from "../lib/indent-status";
 import type { PartSearchResult } from "../types/indent.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const toInt = (v: string) => {
   const n = Number(v);
@@ -154,8 +155,7 @@ export function DirectStnForm() {
                   </td>
                   <td className="px-3 py-2 text-right">{l.part.sourceAvailable}</td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       className={cn(inputCls, "ml-auto h-9 w-24 text-right", toInt(l.quantity) > l.part.sourceAvailable && "border-red-400")}
                       value={l.quantity}

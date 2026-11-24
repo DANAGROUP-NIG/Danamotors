@@ -15,6 +15,11 @@ export const partSearchSchema = z.object({
   query: z.object({ search: z.string().trim().min(2).max(50), branchId: uuid("branch ID") }),
 });
 
+/** Legacy Counter Sale "Sales Executive" dropdown. */
+export const salesExecutivesSchema = z.object({
+  query: z.object({ branchId: uuid("branch ID") }),
+});
+
 // ── Customer purchase orders ────────────────────────────────────────────────
 
 export const createOrderSchema = z.object({

@@ -11,6 +11,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { jobCardKeys } from "../api/job-card.keys";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type LabourItem = {
   id: string;
@@ -177,8 +178,7 @@ export function JobCardLabourSection({
               </p>
             </div>
             <Field label="Hours">
-              <input
-                type="number"
+              <NumberInput
                 min="0.01"
                 step="0.01"
                 className={inputCls}
@@ -193,8 +193,7 @@ export function JobCardLabourSection({
               />
             </Field>
             {canSeeAmounts && <Field label="Rate">
-              <input
-                type="number"
+              <NumberInput
                 min="0"
                 step="0.01"
                 className={inputCls}
@@ -293,8 +292,7 @@ export function JobCardLabourSection({
             )}
           </Field>
           <Field label="Hours">
-            <input
-              type="number"
+            <NumberInput
               min="0.01"
               step="0.01"
               className={inputCls}

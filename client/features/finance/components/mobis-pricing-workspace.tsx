@@ -26,6 +26,7 @@ import {
   type MobisPricing,
   type PriceAdjustment,
 } from "../api/mobis-pricing.api";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const RUNS_KEY = ["mobis-pricing", "adjustments"] as const;
 const thCls = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500 whitespace-nowrap";
@@ -138,10 +139,10 @@ function RateModal({ pricing, onClose }: { pricing: MobisPricing; onClose: () =>
       <div className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="₦ per US$">
-            <input type="number" min={0} step="0.01" className={inputCls} value={rate} onChange={(e) => setRate(e.target.value)} />
+            <NumberInput min={0} step="0.01" className={inputCls} value={rate} onChange={(e) => setRate(e.target.value)} />
           </Field>
           <Field label="Dealer factor">
-            <input type="number" min={0} max={1} step="0.001" className={inputCls} value={factor} onChange={(e) => setFactor(e.target.value)} />
+            <NumberInput min={0} max={1} step="0.001" className={inputCls} value={factor} onChange={(e) => setFactor(e.target.value)} />
           </Field>
         </div>
         <p className="text-xs text-slate-500">

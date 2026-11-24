@@ -10,6 +10,7 @@ import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { applyLabourToModels, errorMessage, labourRateKeys, type Pricing, type RateModelOption, type SpreadResult } from "../api";
 import { ModelChecklist } from "./model-checklist";
 import { SpreadPreview } from "./spread-preview";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 /**
  * Adds one labour to many models at once, as ABJ added labours to 42 models in one go. Models that already
@@ -85,10 +86,10 @@ export function ApplyToModelsModal({ isOpen, onClose, models }: { isOpen: boolea
             </select>
           </Field>
           <Field label="Hours">
-            <input type="number" min="0.01" step="0.01" className={inputCls} value={hours} onChange={(e) => changed(setHours)(e.target.value)} />
+            <NumberInput min="0.01" step="0.01" className={inputCls} value={hours} onChange={(e) => changed(setHours)(e.target.value)} />
           </Field>
           <Field label={pricing === "FIXED" ? "Fixed amount (₦)" : "Hourly rate (₦)"}>
-            <input type="number" min="0" step="0.01" className={inputCls} value={rate} onChange={(e) => changed(setRate)(e.target.value)} />
+            <NumberInput min="0" step="0.01" className={inputCls} value={rate} onChange={(e) => changed(setRate)(e.target.value)} />
           </Field>
         </div>
         <Field label="Models">

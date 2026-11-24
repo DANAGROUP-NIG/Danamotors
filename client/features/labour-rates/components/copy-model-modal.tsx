@@ -10,6 +10,7 @@ import { copyModelRates, errorMessage, labourRateKeys, type RateModelOption, typ
 import { ModelChecklist } from "./model-checklist";
 import { SpreadPreview } from "./spread-preview";
 import { ROUNDING } from "./bulk-change-modal";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 /** Copies every rate of one model to others, e.g. for a new model, optionally a percentage dearer or cheaper. */
 export function CopyModelModal({ isOpen, onClose, models }: { isOpen: boolean; onClose: () => void; models: RateModelOption[] }) {
@@ -76,7 +77,7 @@ export function CopyModelModal({ isOpen, onClose, models }: { isOpen: boolean; o
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Change the copied rates by % (optional)">
-            <input type="number" step="0.01" className={inputCls} placeholder="e.g. 5" value={percent} onChange={(e) => changed(setPercent)(e.target.value)} />
+            <NumberInput step="0.01" className={inputCls} placeholder="e.g. 5" value={percent} onChange={(e) => changed(setPercent)(e.target.value)} />
           </Field>
           <Field label="Round the result to">
             <select className={inputCls} value={roundTo} disabled={!pct} onChange={(e) => changed(setRoundTo)(Number(e.target.value))}>

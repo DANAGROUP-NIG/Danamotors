@@ -17,6 +17,7 @@ import {
 import { useReceiveStn } from "../hooks/use-stns";
 import { TRANSPORT_MODE_LABELS } from "../lib/indent-status";
 import type { DispatchIndentPayload, Indent, IndentLine, Stn, TransportMode } from "../types/indent.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const textareaCls =
   "min-h-20 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -91,8 +92,7 @@ function ApproveRow({
         {isLoading ? <Loader2 className="ml-auto size-4 animate-spin text-slate-400" /> : available}
       </td>
       <td data-label="Approve" className={cn(tdCls, "text-right")}>
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={line.requestedQuantity}
           className={cn(numCls, "ml-auto", !valid && "border-red-400")}
@@ -312,8 +312,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                   <td data-label="Bin" className={cn(tdCls, "text-xs text-slate-500")}>{l.binLocation ?? "—"}</td>
                   <td data-label="Picked" className={cn(tdCls, "text-right")}>{l.pickedQuantity}</td>
                   <td data-label="Ship" className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       max={l.pickedQuantity}
                       className={cn(numCls, "ml-auto", (shipQty(l.id) > l.pickedQuantity || !Number.isFinite(shipQty(l.id))) && "border-red-400")}
@@ -405,8 +404,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                           <td className={cn(tdCls, "font-mono text-sm")}>{l.part.partNumber}</td>
                           {Array.from({ length: caseCount }, (_, c) => (
                             <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
-                              <input
-                                type="number"
+                              <NumberInput
                                 min={0}
                                 className={cn(numCls, "ml-auto w-16")}
                                 value={cell(l.id, c)}
@@ -424,8 +422,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                       <td className={cn(tdCls, "text-sm text-slate-500")}>Weight (kg)</td>
                       {Array.from({ length: caseCount }, (_, c) => (
                         <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
-                          <input
-                            type="number"
+                          <NumberInput
                             min={0}
                             step="0.1"
                             className={cn(numCls, "ml-auto w-16")}
@@ -565,8 +562,7 @@ export function ReceiveStnForm({
                 <td data-label="Outstanding" className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
                 {(["received", "damaged"] as const).map((field) => (
                   <td key={field} data-label={field === "received" ? "Received good" : "Damaged"} className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       className={cn(numCls, "ml-auto", !ok && "border-red-400")}
                       value={rows[line.id]?.[field] ?? ""}

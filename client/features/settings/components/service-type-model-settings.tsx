@@ -7,6 +7,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table-components/DataTable";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type ModelSetting = {
   id: string;
@@ -109,13 +110,13 @@ export function ServiceTypeModelSettings({ serviceTypeId }: { serviceTypeId: str
       <WorkshopPicker required label="Model" endpoint="/workshop-masters?kind=MODEL" collection="items"
         value={form.modelId} selectedRecord={form.model} disabled={!!form.id}
         onChange={modelId => setForm({ ...form, modelId })} />
-      <Field label="Service charge"><input className={inputCls} required type="number" min="0" max="1000000000000" step="0.01"
+      <Field label="Service charge"><NumberInput className={inputCls} required min="0" max="1000000000000" step="0.01"
         value={form.serviceCharge} onChange={event => setForm({ ...form, serviceCharge: event.target.value })} /></Field>
-      <Field label="Previous charge"><input className={inputCls} type="number" min="0" max="1000000000000" step="0.01"
+      <Field label="Previous charge"><NumberInput className={inputCls} min="0" max="1000000000000" step="0.01"
         value={form.previousCharge} onChange={event => setForm({ ...form, previousCharge: event.target.value })} /></Field>
       <Field label="Effective from"><input className={inputCls} type="date" value={form.effectiveFrom}
         onChange={event => setForm({ ...form, effectiveFrom: event.target.value })} /></Field>
-      {limits.map(([key, label, step]) => <Field key={key} label={label}><input className={inputCls} type="number" min="0" step={step}
+      {limits.map(([key, label, step]) => <Field key={key} label={label}><NumberInput className={inputCls} min="0" step={step}
         value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} /></Field>)}
       <label className="flex gap-2"><input type="checkbox" checked={form.checklistFollowed} onChange={event => setForm({ ...form, checklistFollowed: event.target.checked })} />Service checklist to be followed</label>
       <label className="flex gap-2"><input type="checkbox" checked={form.active} onChange={event => setForm({ ...form, active: event.target.checked })} />Active setting</label>

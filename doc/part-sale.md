@@ -57,6 +57,8 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
 ## Rules
 
 - **One customer and one selling branch per bill.** A bill may combine lines from several CPOs.
+- **Sales executive** (legacy Counter Sale dropdown, filled on most CPD bills): chosen from the
+  active staff of the selling branch. It defaults to the user who bills.
 - **No overselling.** A line can be billed only up to its picked quantity plus free stock.
   Database checks stop a CPO line from picking, billing or cancelling more than was ordered,
   and stop a bill line from being returned more than once.
@@ -80,7 +82,7 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
 
 ## API
 
-All endpoints are under `/api/part-sale`: `GET /customers`, `GET /parts`,
+All endpoints are under `/api/part-sale`: `GET /customers`, `GET /parts`, `GET /sales-executives`,
 `GET|POST /orders`, `GET /orders/:id`, `PATCH /orders/:id/pick|release|cancel`,
 `GET|POST /counter-sales`, `GET /counter-sales/:id`, `PATCH /counter-sales/:id/cancel`,
 `POST /counter-sales/:id/returns` and `GET /returns`. Request examples are in Swagger under

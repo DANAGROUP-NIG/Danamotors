@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { jobCardKeys } from "../api/job-card.keys";
 import { WorkshopPicker } from "./WorkshopPicker";
 import type { JobCard } from "../types/job-card.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const queryClient = useQueryClient();
@@ -137,7 +138,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       </ol>
       {!billed && (
         <>
-          <Field label="Service charge (NGN)"><input type="number" min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
+          <Field label="Service charge (NGN)"><NumberInput min="0" max="1000000000000" step="0.01" required className={inputCls} value={serviceCharge} onChange={(event) => setServiceCharge(event.target.value)} /><p className="text-xs text-muted-foreground">Saved as a separate bill line. Confirm this amount before billing; 0 means no service charge.</p></Field>
           <WorkshopPicker
             label="Engineer (optional)"
             endpoint={`/service/staff?role=Engineer&branchId=${jobCard.branchId}`}

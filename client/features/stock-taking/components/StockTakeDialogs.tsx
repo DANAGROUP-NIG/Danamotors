@@ -21,6 +21,7 @@ import {
 } from "../hooks/use-stock-taking";
 import { BIN_LIMIT, KINDS, fmtCurrency, kindOf, toCount } from "../lib/stock-taking-format";
 import type { Basis, StockTake, StockTakeLine } from "../types/stock-taking.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type Close = { onClose: () => void };
 
@@ -181,10 +182,10 @@ export function AddCountDialog({ take, onClose }: Close & { take: StockTake }) {
             <input className={inputCls} maxLength={40} value={bin} onChange={(e) => setBin(e.target.value)} />
           </Field>
           <Field label="Good qty">
-            <input type="number" min={0} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="Damaged qty">
-            <input type="number" min={0} className={inputCls} value={damaged} onChange={(e) => setDamaged(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={damaged} onChange={(e) => setDamaged(e.target.value)} />
           </Field>
         </div>
         <Field label="Remarks (optional)">
@@ -234,10 +235,10 @@ export function CorrectLineDialog({ take, line, onClose }: Close & { take: Stock
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Good qty">
-            <input type="number" min={0} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={qty} onChange={(e) => setQty(e.target.value)} />
           </Field>
           <Field label="Damaged qty">
-            <input type="number" min={0} className={inputCls} value={damaged} onChange={(e) => setDamaged(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={damaged} onChange={(e) => setDamaged(e.target.value)} />
           </Field>
         </div>
         <Field label="Remarks">

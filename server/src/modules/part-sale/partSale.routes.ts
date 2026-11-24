@@ -17,6 +17,7 @@ import {
   partSearchSchema,
   pendingOrderLinesSchema,
   pickOrderSchema,
+  salesExecutivesSchema,
 } from "./partSale.validation";
 
 const router = Router();
@@ -173,8 +174,15 @@ const returns = requirePermission(PERMISSIONS.PART_SALE_RETURN);
  *     tags: [Part Sale]
  *     summary: List sale returns
  *     responses: { 200: { description: Returns } }
+ * /part-sale/sales-executives:
+ *   get:
+ *     tags: [Part Sale]
+ *     summary: Active staff of the selling branch, for the counter sale's Sales Executive
+ *     parameters: [{ in: query, name: branchId, required: true, schema: { type: string, format: uuid } }]
+ *     responses: { 200: { description: "{ executives: [{ id, firstName, lastName }] }" } }
  */
 router.get("/customers", read, validateRequest(customerSearchSchema), controller.searchCustomers);
+router.get("/sales-executives", read, validateRequest(salesExecutivesSchema), controller.listSalesExecutives);
 router.get("/parts", read, validateRequest(partSearchSchema), controller.searchParts);
 
 router.get("/orders", read, validateRequest(listOrdersSchema), controller.listOrders);

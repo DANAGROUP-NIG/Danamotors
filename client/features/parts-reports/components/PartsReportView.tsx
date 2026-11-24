@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Download, Loader2, Maximize2, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { PageHeader } from "@/components/headers/page-header";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -467,27 +468,25 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
         )}
         {has("topN") && (
           <Field label="Top N consumed parts">
-            <input
-              type="number"
+            <NumberInput
               min={1}
               max={1000}
               placeholder="10"
               className={inputCls}
-              value={params.topN ?? ""}
-              onChange={(e) => set({ topN: Number(e.target.value) || undefined })}
+              value={params.topN}
+              onValueChange={(v) => set({ topN: v || undefined })}
             />
           </Field>
         )}
         {has("days") && (
           <Field label={definition.labels?.days ?? "Not issued for (days)"}>
-            <input
-              type="number"
+            <NumberInput
               min={1}
               max={3650}
               placeholder="90"
               className={inputCls}
-              value={params.days ?? ""}
-              onChange={(e) => set({ days: Number(e.target.value) || undefined })}
+              value={params.days}
+              onValueChange={(v) => set({ days: v || undefined })}
             />
           </Field>
         )}

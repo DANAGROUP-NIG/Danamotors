@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranchStore } from "@/store/branch.store";
 import { useFetchBranches } from "@/features/branches/hooks/useFetchBranches";
@@ -239,25 +240,23 @@ export function VendorReceiptForm() {
                     </td>
                     <td className="px-3 py-2 text-slate-600">{line.part.sourceLabel}</td>
                     <td className="px-3 py-2">
-                      <input
-                        type="number"
+                      <NumberInput
                         min="1"
                         step="1"
                         aria-label={`Quantity of ${line.part.partNumber}`}
                         className={`${inputCls} h-8 w-20`}
                         value={line.quantity}
-                        onChange={(e) => setLine(index, { quantity: Number(e.target.value) })}
+                        onValueChange={(v) => setLine(index, { quantity: v ?? 0 })}
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        type="number"
+                      <NumberInput
                         min="0.01"
                         step="0.01"
                         aria-label={`Unit cost of ${line.part.partNumber}`}
                         className={`${inputCls} h-8 w-32`}
                         value={line.unitCost}
-                        onChange={(e) => setLine(index, { unitCost: Number(e.target.value) })}
+                        onValueChange={(v) => setLine(index, { unitCost: v ?? 0 })}
                       />
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtNaira(round2(line.quantity * line.unitCost))}</td>

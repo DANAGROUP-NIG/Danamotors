@@ -23,6 +23,7 @@ import {
   type CreateVehicleFormValues,
 } from "@/features/vehicles/schemas/vehicle.schema";
 import type { Vehicle } from "@/features/vehicles/types/vehicle.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface VehicleSelectWithCreateProps {
   value?: string;
@@ -452,7 +453,7 @@ export function VehicleSelectWithCreate({
                   <input className={inputCls} placeholder="Vehicle identification number" {...registerVehicle("vin")} />
                 </Field>
                 <Field label="Year" error={vehicleErrors.year?.message}>
-                  <input type="number" className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
+                  <NumberInput className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
                 </Field>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-border mt-2">

@@ -177,9 +177,12 @@ export type CounterSaleListItem = {
   _count: { returns: number };
 };
 
+export type SalesExecutive = { id: string; firstName: string; lastName: string };
+
 export type CreateCounterSalePayload = {
   branchId: string;
   customerId: string;
+  salesExecutiveId?: string;
   cashDiscountPercent?: number;
   cashDiscountAmount?: number;
   transportMode?: TransportMode;

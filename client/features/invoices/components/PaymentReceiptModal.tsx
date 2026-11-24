@@ -11,6 +11,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
 import { getBanksRequest, getInvoiceRequest, getInvoicesRequest, type CreateReceiptPayload } from "../api/invoice.api";
 import { useCreateReceipt } from "../hooks/use-create-receipt";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
 const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
@@ -88,10 +89,10 @@ function ReceiptSession({ onClose, invoiceId }: { onClose: () => void; invoiceId
         {invoiceQuery.isFetching && <p role="status" className="text-sm">Loading balances...</p>}
         {invoiceQuery.isError && <p role="alert" className="text-sm text-destructive">Could not load balances. <button type="button" onClick={() => invoiceQuery.refetch()}>Retry</button></p>}
         {customerId && !invoiceQuery.isPending && !invoiceQuery.isError && !customerInvoices.length && <p className="text-sm text-muted-foreground">No unpaid bills in this branch. The receipt will be recorded as an advance.</p>}
-        {customerInvoices.map((invoice) => <div key={invoice.id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b py-2"><label htmlFor={`allocation-${invoice.id}`}><span className="block text-sm font-medium">{invoice.invoiceNumber}</span><span className="text-sm text-muted-foreground">Outstanding {currency.format(invoice.outstandingAmount)}</span></label><input id={`allocation-${invoice.id}`} type="number" min="0" max={invoice.outstandingAmount} step="0.01" className={inputCls} value={allocations[invoice.id] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoice.id]: event.target.value }))} /></div>)}
+        {customerInvoices.map((invoice) => <div key={invoice.id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b py-2"><label htmlFor={`allocation-${invoice.id}`}><span className="block text-sm font-medium">{invoice.invoiceNumber}</span><span className="text-sm text-muted-foreground">Outstanding {currency.format(invoice.outstandingAmount)}</span></label><NumberInput id={`allocation-${invoice.id}`} min="0" max={invoice.outstandingAmount} step="0.01" className={inputCls} value={allocations[invoice.id] ?? ""} onChange={(event) => setAllocations((current) => ({ ...current, [invoice.id]: event.target.value }))} /></div>)}
       </section>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Amount received (NGN)"><input type="number" min="0.01" max="1000000000000" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
+        <Field label="Amount received (NGN)"><NumberInput min="0.01" max="1000000000000" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
         <Field label="Receipt date"><input type="date" className={inputCls} value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
         <Field label="Mode"><select className={inputCls} value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="BANK_TRANSFER">Bank transfer</option><option value="POS">POS</option><option value="CHEQUE">Cheque</option><option value="CASH">Cash</option></select></Field>
         {needsBank && <Field label="Receiving bank"><select className={inputCls} value={bankId} onChange={(event) => setBankId(event.target.value)} required><option value="">Select bank</option>{banks.data?.banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}</select>{banks.isError && <p role="alert">Could not load banks. <button type="button" onClick={() => banks.refetch()}>Retry</button></p>}</Field>}

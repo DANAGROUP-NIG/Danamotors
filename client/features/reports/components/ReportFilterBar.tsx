@@ -15,6 +15,7 @@ import type { FilterKey, ReportConfig } from "../types";
 import { AllToggleMultiSelect } from "./AllToggleMultiSelect";
 import { periodLabel } from "./ReportPrintLayout";
 import { SegmentedControl } from "./SegmentedControl";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const FILTERS: Record<FilterKey, { label: string; all: string; source: LookupSource; followsOption?: string }> = {
   model: { label: "Model", all: "All models", source: "model" },
@@ -163,8 +164,8 @@ function RangeField({ label, unit, valueType = "number", from, to, onChange }: {
         )
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <input type="number" min={0} disabled={all} aria-label={`${label} from`} placeholder={all ? "Any" : `From${unit ? ` (${unit})` : ""}`} className={box} value={from} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""), to)} />
-          <input type="number" min={0} disabled={all} aria-label={`${label} to`} placeholder={all ? "Any" : `To${unit ? ` (${unit})` : ""}`} className={box} value={to} onChange={(event) => onChange(from, event.target.value.replace(/\D/g, ""))} />
+          <NumberInput min={0} disabled={all} aria-label={`${label} from`} placeholder={all ? "Any" : `From${unit ? ` (${unit})` : ""}`} className={box} value={from} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""), to)} />
+          <NumberInput min={0} disabled={all} aria-label={`${label} to`} placeholder={all ? "Any" : `To${unit ? ` (${unit})` : ""}`} className={box} value={to} onChange={(event) => onChange(from, event.target.value.replace(/\D/g, ""))} />
         </div>
       )}
     </div>
@@ -412,8 +413,7 @@ export function ReportFilterBar({ config, draft, onChange, onRun, onReset, isRun
             return (
               <label key={option.key} className="inline-flex items-center gap-2 text-sm">
                 <span>{option.label}</span>
-                <input
-                  type="number"
+                <NumberInput
                   min={option.min}
                   max={option.max}
                   className={cn(inputCls, "w-20")}

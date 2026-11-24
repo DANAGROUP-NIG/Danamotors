@@ -23,6 +23,7 @@ import { previewPartsRequest } from "../api/stock-taking.api";
 import { useCreateStockTake } from "../hooks/use-stock-taking";
 import { AUDIT_LEVEL_LABELS, KINDS, PART_FLAG_LABELS, fmtCurrency } from "../lib/stock-taking-format";
 import type { Basis, CandidatePart, Kind, PartSelection, StockAuditLevel, StockTakeType } from "../types/stock-taking.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const PAGE_SIZE = 50;
 
@@ -319,18 +320,18 @@ export function StockTakeCreateForm({ kind = "COUNT" }: { kind?: Kind }) {
             </select>
           </Field>
           <Field label="Dealer rate (₦) from">
-            <input type="number" min={0} className={inputCls} value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={rateFrom} onChange={(e) => setRateFrom(e.target.value)} />
           </Field>
           <Field label="To">
-            <input type="number" min={0} className={inputCls} value={rateTo} onChange={(e) => setRateTo(e.target.value)} />
+            <NumberInput min={0} className={inputCls} value={rateTo} onChange={(e) => setRateTo(e.target.value)} />
           </Field>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-700">
           <span className="flex items-center gap-2">
             Top
-            <input type="number" min={1} className={cn(inputCls, "h-9 w-20")} value={topCount} onChange={(e) => setTopCount(e.target.value)} />
+            <NumberInput min={1} className={cn(inputCls, "h-9 w-20")} value={topCount} onChange={(e) => setTopCount(e.target.value)} />
             consumed parts during the last
-            <input type="number" min={1} max={12} className={cn(inputCls, "h-9 w-16")} value={topMonths} onChange={(e) => setTopMonths(e.target.value)} />
+            <NumberInput min={1} max={12} className={cn(inputCls, "h-9 w-16")} value={topMonths} onChange={(e) => setTopMonths(e.target.value)} />
             months
           </span>
           <label className="flex items-center gap-2">

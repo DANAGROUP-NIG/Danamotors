@@ -10,6 +10,7 @@ import {
   createReturnRequest,
   getCounterSaleRequest,
   getCounterSalesRequest,
+  listSalesExecutivesRequest,
   getOrderRequest,
   getOrdersRequest,
   getReturnsRequest,
@@ -26,6 +27,15 @@ export function partSaleErrorMessage(error: unknown, fallback: string) {
     ?.response?.data;
   const first = data?.errors?.[0];
   return first ? `${first.field ? `${first.field}: ` : ""}${first.message}` : (data?.message ?? fallback);
+}
+
+export function useSalesExecutives(branchId: string) {
+  return useQuery({
+    queryKey: partSaleKeys.executives(branchId),
+    queryFn: () => listSalesExecutivesRequest(branchId),
+    enabled: !!branchId,
+    staleTime: 5 * 60_000,
+  });
 }
 
 export function useSaleCustomers(search: string) {

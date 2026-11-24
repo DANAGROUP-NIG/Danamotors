@@ -237,4 +237,47 @@ describeDb("CPD part sale (database)", () => {
     // Receipted bills can no longer be cancelled.
     await expect(service.cancelCounterSale(sale.id, "late", user.id)).rejects.toThrow(/receipts/);
   });
+
+  it("lists the selling branch's active staff as sales executives and records the one chosen", async () => {
+    const role = await prisma.role.findUniqueOrThrow({ where: { name: "GeneralStoreManager" } });
+    const other = await prisma.branch.create({ data: { name: `Other Sale ${run}` } });
+    const staff = (first: string, branchId: string, isActive = true) =>
+      prisma.user.create({
+        data: { email: `${first.toLowerCase()}.${run}@test.local`, passwordHash: "x", firstName: first, lastName: "Exec", roleId: role.id, branchId, isActive },
+      });
+    const clerk = await staff("Christopher", cpd.id);
+    const left = await staff("Leaver", cpd.id, false);
+    const elsewhere = await staff("Elsewhere", other.id);
+
+    const ids = (await service.listSalesExecutives(cpd.id)).map((e) => e.id);
+    expect(ids).toEqual(expect.arrayContaining([user.id, clerk.id]));
+    expect(ids).not.toContain(left.id);
+    expect(ids).not.toContain(elsewhere.id);
+
+    const part = await prisma.sparePart.create({
+      data: { partCode: `EXE${run}`, partNumber: `EXE${run}`, name: "WIPER BLADE", unitPrice: 2000, retailRate: 3000, taxable: true },
+    });
+    await prisma.inventoryStock.create({ data: { branchId: cpd.id, partId: part.id, quantity: 2 } });
+    const order = await service.createOrder(
+      { branchId: cpd.id, customerId: customer.id, pick: true, lines: [{ partId: part.id, quantity: 2 }] },
+      user.id,
+    );
+    const chosen = await service.createCounterSale(
+      { branchId: cpd.id, customerId: customer.id, salesExecutiveId: clerk.id, lines: [{ orderLineId: order.lines[0].id, quantity: 1 }] },
+      user.id,
+    );
+    expect(chosen.salesExecutive?.id).toBe(clerk.id);
+    // Without a choice, the user who bills is the sales executive.
+    const defaulted = await service.createCounterSale(
+      { branchId: cpd.id, customerId: customer.id, lines: [{ orderLineId: order.lines[0].id, quantity: 1 }] },
+      user.id,
+    );
+    expect(defaulted.salesExecutive?.id).toBe(user.id);
+    await expect(
+      service.createCounterSale(
+        { branchId: cpd.id, customerId: customer.id, salesExecutiveId: left.id, lines: [{ orderLineId: order.lines[0].id, quantity: 1 }] },
+        user.id,
+      ),
+    ).rejects.toThrow(/active sales executive/);
+  });
 });

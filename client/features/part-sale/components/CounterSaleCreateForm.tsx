@@ -7,11 +7,13 @@ import { useQueries } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { PageHeader } from "@/components/headers/page-header";
 import { cn } from "@/lib/utils";
 import { CustomerPicker } from "./CustomerPicker";
 import { getOrderRequest, partSaleKeys } from "../api/part-sale.api";
-import { useCreateCounterSale, useCustomerOrder, useCustomerOrders } from "../hooks/use-part-sale";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useCreateCounterSale, useCustomerOrder, useCustomerOrders, useSalesExecutives } from "../hooks/use-part-sale";
 import {
   TRANSPORT_MODE_LABELS,
   VAT_RATE,
@@ -39,6 +41,7 @@ export function CounterSaleCreateForm() {
   const params = useSearchParams();
   const startOrderId = params.get("orderId") ?? "";
   const create = useCreateCounterSale();
+  const { user } = useAuth();
 
   const { data: startOrder } = useCustomerOrder(startOrderId);
   const [customer, setCustomer] = useState<SaleCustomer | null>(null);
@@ -52,6 +55,8 @@ export function CounterSaleCreateForm() {
   const [grDate, setGrDate] = useState("");
   const [numberOfCases, setNumberOfCases] = useState("");
   const [notes, setNotes] = useState("");
+  // "" = the user who bills (the server's default), as legacy CPD usually recorded the store clerk.
+  const [salesExecutiveId, setSalesExecutiveId] = useState("");
   const [error, setError] = useState("");
 
   // Opened from a CPO: bill that customer, with the CPO's lines ticked.
@@ -94,6 +99,11 @@ export function CounterSaleCreateForm() {
   );
   const chosen = rows.filter((r) => selected[r.line.id]);
   const branchIds = new Set(chosen.map((r) => r.order.branchId));
+  const sellingBranchId = chosen[0]?.order.branchId ?? orders[0]?.branchId ?? "";
+  const { data: executives = [] } = useSalesExecutives(sellingBranchId);
+  const others = executives.filter((e) => e.id !== user?.id);
+  // A choice from another branch's list no longer applies once the lines change branch.
+  const executiveId = others.some((e) => e.id === salesExecutiveId) ? salesExecutiveId : "";
 
   const preview = useMemo(() => {
     const lines = chosen.map((r) => ({
@@ -128,6 +138,7 @@ export function CounterSaleCreateForm() {
       {
         branchId: chosen[0].order.branchId,
         customerId: customer.id,
+        salesExecutiveId: executiveId || undefined,
         ...(discountMode === "percent" ? { cashDiscountPercent: value } : { cashDiscountAmount: value }),
         transportMode: transportMode || undefined,
         transporter: transporter.trim() || undefined,
@@ -160,6 +171,7 @@ export function CounterSaleCreateForm() {
                 setCustomer(c);
                 setQty({});
                 setSelected({});
+                setSalesExecutiveId("");
               }}
               disabled={!!startOrderId && !!startOrder}
             />
@@ -175,8 +187,18 @@ export function CounterSaleCreateForm() {
                   <option value="percent">%</option>
                   <option value="amount">Amount</option>
                 </select>
-                <input type="number" min={0} className={inputCls} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                <NumberInput min={0} className={inputCls} value={discount === "" ? null : Number(discount)} onValueChange={(v) => setDiscount(v == null ? "" : String(v))} />
               </div>
+            </Field>
+            <Field label="Sales executive">
+              <select className={inputCls} value={executiveId} onChange={(e) => setSalesExecutiveId(e.target.value)}>
+                <option value="">{user ? `${user.firstName} ${user.lastName} (me)` : "Me"}</option>
+                {others.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.firstName} {e.lastName}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Despatch mode">
               <select className={inputCls} value={transportMode} onChange={(e) => setTransportMode(e.target.value as TransportMode | "")}>
@@ -192,7 +214,7 @@ export function CounterSaleCreateForm() {
               <input className={inputCls} maxLength={100} value={transporter} onChange={(e) => setTransporter(e.target.value)} />
             </Field>
             <Field label="No. of cases (optional)">
-              <input type="number" min={0} className={inputCls} value={numberOfCases} onChange={(e) => setNumberOfCases(e.target.value)} />
+              <NumberInput min={0} className={inputCls} value={numberOfCases === "" ? null : Number(numberOfCases)} onValueChange={(v) => setNumberOfCases(v == null ? "" : String(v))} />
             </Field>
             <Field label="GR no. (optional)">
               <input className={inputCls} maxLength={40} value={grNumber} onChange={(e) => setGrNumber(e.target.value)} />
@@ -273,13 +295,12 @@ export function CounterSaleCreateForm() {
                       <td className={cn(tdCls, "text-right")}>{line.pickedQuantity}</td>
                       <td className={cn(tdCls, "text-right")}>{line.freeStock}</td>
                       <td className={cn(tdCls, "text-right")}>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           disabled={!on}
                           className={cn(inputCls, "ml-auto h-9 w-20 text-right", problem && "border-red-400")}
-                          value={qty[line.id] ?? ""}
-                          onChange={(e) => setQty((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                          value={qty[line.id] ? Number(qty[line.id]) : null}
+                          onValueChange={(v) => setQty((prev) => ({ ...prev, [line.id]: v == null ? "" : String(v) }))}
                         />
                       </td>
                       <td className={cn(tdCls, "text-right")}>{fmtCurrency(line.retailRate)}</td>

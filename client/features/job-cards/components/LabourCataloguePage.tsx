@@ -12,6 +12,7 @@ import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import ModalFame from "@/components/modals/ModalFame";
 import { WorkshopPicker } from "./WorkshopPicker";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 // Legacy labour master flags.
 const FLAGS = [
@@ -176,8 +177,7 @@ export function LabourCataloguePage() {
             onChange={(code) => setForm({ ...form, group: code })}
           />
           <Field label="Default hours">
-            <input
-              type="number"
+            <NumberInput
               min="0.01"
               step="0.25"
               className={inputCls}
@@ -189,8 +189,7 @@ export function LabourCataloguePage() {
             />
           </Field>
           <Field label="Rate (NGN)">
-            <input
-              type="number"
+            <NumberInput
               min="0"
               step="0.01"
               className={inputCls}
@@ -310,8 +309,7 @@ export function LabourCataloguePage() {
                       />
                     </td>
                     <td className="px-3 py-3">
-                      <input
-                        type="number"
+                      <NumberInput
                         min="0.01"
                         step="0.25"
                         className={`${inputCls} text-right`}
@@ -329,8 +327,7 @@ export function LabourCataloguePage() {
                       />
                     </td>
                     <td className="px-3 py-3">
-                      <input
-                        type="number"
+                      <NumberInput
                         min="0"
                         step="0.01"
                         className={`${inputCls} text-right`}

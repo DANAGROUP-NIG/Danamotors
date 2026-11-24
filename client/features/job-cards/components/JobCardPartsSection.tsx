@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { apiGet, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -206,14 +207,13 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
             </div>
           </Field>
           <Field label="Qty">
-            <input
-              type="number"
+            <NumberInput
               min="1"
               max={selectedPart?.availableQuantity}
               step="1"
               className={`${inputCls} h-9 tabular-nums`}
               value={quantity}
-              onChange={(event) => setQuantity(Number(event.target.value))}
+              onValueChange={(v) => setQuantity(v ?? 0)}
             />
           </Field>
           <Button
@@ -360,16 +360,13 @@ export function JobCardPartsSection({ jobCard }: { jobCard: JobCard }) {
             </select>
           </Field>
           <Field label="Qty">
-            <input
-              type="number"
+            <NumberInput
               min="1"
               max={remainingReturn}
               step="1"
               className={`${inputCls} h-9 tabular-nums`}
               value={returnQuantity}
-              onChange={(event) =>
-                setReturnQuantity(Number(event.target.value))
-              }
+              onValueChange={(v) => setReturnQuantity(v ?? 0)}
             />
           </Field>
           <Field label="Reason">
