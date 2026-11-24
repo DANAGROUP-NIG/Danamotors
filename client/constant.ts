@@ -1,4 +1,7 @@
-import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import {
+  FRAMEWORK_REPORT_PERMISSIONS,
+  MONTHLY_REPORT_PERMISSIONS,
+} from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
 import {
   CAMPAIGN_PERMISSIONS,
@@ -112,6 +115,7 @@ export const NAV_GROUPS: NavGroup[] = [
       "jobcard:late-reason:update",
       "csc:case:read",
       "csc:master:read",
+      "csi:master:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -139,12 +143,42 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ClipboardCheck,
         permissions: ["pdi:read"],
         children: [
-          { label: "PDI Job Cards", href: "/pdi", icon: ClipboardCheck, permissions: ["pdi:read"] },
-          { label: "Open PDI", href: "/pdi/new", icon: ClipboardList, permissions: ["pdi:create"] },
-          { label: "PDI Requisitions", href: "/pdi/requisitions", icon: Package, permissions: ["pdi:read"] },
-          { label: "PDI Returns", href: "/pdi/returns", icon: Package, permissions: ["pdi:read"] },
-          { label: "PDI Labour", href: "/pdi/labour-slips", icon: ListChecks, permissions: ["pdi:read"] },
-          { label: "PDI Bills", href: "/pdi/bills", icon: FileText, permissions: ["pdi:read", "pdi:bill"] },
+          {
+            label: "PDI Job Cards",
+            href: "/pdi",
+            icon: ClipboardCheck,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "Open PDI",
+            href: "/pdi/new",
+            icon: ClipboardList,
+            permissions: ["pdi:create"],
+          },
+          {
+            label: "PDI Requisitions",
+            href: "/pdi/requisitions",
+            icon: Package,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Returns",
+            href: "/pdi/returns",
+            icon: Package,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Labour",
+            href: "/pdi/labour-slips",
+            icon: ListChecks,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Bills",
+            href: "/pdi/bills",
+            icon: FileText,
+            permissions: ["pdi:read", "pdi:bill"],
+          },
         ],
       },
       {
@@ -158,8 +192,43 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: CalendarClock,
         permissions: ["jobcard:late-reason:update"],
         children: [
-          { label: "Promise Date Entry", href: "/late-deliveries/date", icon: CalendarClock, permissions: ["jobcard:late-reason:update"] },
-          { label: "Promise Time Entry", href: "/late-deliveries/time", icon: Clock3, permissions: ["jobcard:late-reason:update"] },
+          {
+            label: "Promise Date Entry",
+            href: "/late-deliveries/date",
+            icon: CalendarClock,
+            permissions: ["jobcard:late-reason:update"],
+          },
+          {
+            label: "Promise Time Entry",
+            href: "/late-deliveries/time",
+            icon: Clock3,
+            permissions: ["jobcard:late-reason:update"],
+          },
+        ],
+      },
+      {
+        label: "CSI masters",
+        icon: ListChecks,
+        permissions: ["csi:master:read"],
+        children: [
+          {
+            label: "CSI attribute master",
+            href: "/csi/attributes",
+            icon: ListChecks,
+            permissions: ["csi:master:read"],
+          },
+          {
+            label: "CSI response master",
+            href: "/csi/responses",
+            icon: ClipboardList,
+            permissions: ["csi:master:read"],
+          },
+          {
+            label: "CSI card master",
+            href: "/csi/cards",
+            icon: ClipboardCheck,
+            permissions: ["csi:master:read"],
+          },
         ],
       },
       {
@@ -167,12 +236,42 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: PhoneCall,
         permissions: ["csc:case:read", "csc:master:read"],
         children: [
-          { label: "1st Follow-up", href: "/csc/follow-up/first", icon: PhoneCall, permissions: ["csc:case:read"] },
-          { label: "2nd Follow-up", href: "/csc/follow-up/second", icon: PhoneCall, permissions: ["csc:case:read"] },
-          { label: "Not Visited", href: "/csc/not-visited", icon: CalendarDays, permissions: ["csc:case:read"] },
-          { label: "Generate Cases", href: "/csc/generate", icon: ListChecks, permissions: ["csc:case:generate"] },
-          { label: "CSC Master", href: "/csc/schedule", icon: Settings, permissions: ["csc:master:read"] },
-          { label: "Closure Reasons", href: "/csc/close-reasons", icon: ClipboardList, permissions: ["csc:master:read"] },
+          {
+            label: "1st Follow-up",
+            href: "/csc/follow-up/first",
+            icon: PhoneCall,
+            permissions: ["csc:case:read"],
+          },
+          {
+            label: "2nd Follow-up",
+            href: "/csc/follow-up/second",
+            icon: PhoneCall,
+            permissions: ["csc:case:read"],
+          },
+          {
+            label: "Not Visited",
+            href: "/csc/not-visited",
+            icon: CalendarDays,
+            permissions: ["csc:case:read"],
+          },
+          {
+            label: "Generate Cases",
+            href: "/csc/generate",
+            icon: ListChecks,
+            permissions: ["csc:case:generate"],
+          },
+          {
+            label: "CSC Master",
+            href: "/csc/schedule",
+            icon: Settings,
+            permissions: ["csc:master:read"],
+          },
+          {
+            label: "Closure Reasons",
+            href: "/csc/close-reasons",
+            icon: ClipboardList,
+            permissions: ["csc:master:read"],
+          },
         ],
       },
       {

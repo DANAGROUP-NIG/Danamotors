@@ -9,9 +9,20 @@ import { RouteGuard } from "@/components/ui/RouteGuard";
 
 //constants
 import { NAV_GROUPS } from "@/constant";
-import { CAMPAIGN_PERMISSIONS, INVENTORY_PERMISSIONS, LABEL_PERMISSIONS, PART_SALE_PERMISSIONS, STOCK_AUDIT_PERMISSIONS, STOCK_TAKE_PERMISSIONS, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import {
+  CAMPAIGN_PERMISSIONS,
+  INVENTORY_PERMISSIONS,
+  LABEL_PERMISSIONS,
+  PART_SALE_PERMISSIONS,
+  STOCK_AUDIT_PERMISSIONS,
+  STOCK_TAKE_PERMISSIONS,
+  WARRANTY_PERMISSIONS,
+} from "@/features/auth/roles";
 
-import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import {
+  FRAMEWORK_REPORT_PERMISSIONS,
+  MONTHLY_REPORT_PERMISSIONS,
+} from "@/features/auth/roles";
 import { MONTHLY_REPORTS } from "@/features/reports/monthly-config";
 import { REPORT_CONFIGS } from "@/features/reports/configs";
 
@@ -34,6 +45,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/csc/follow-up": ["csc:case:read"],
   "/csc/not-visited": ["csc:case:read"],
   "/csc": ["csc:case:read"],
+  "/csi": ["csi:master:read"],
   "/invoices": ["invoice:read"],
   "/labour-catalogue": ["labour-item:read"],
   "/inspections": ["inspection:read"],
@@ -61,7 +73,11 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/transfers": [INVENTORY_PERMISSIONS.TRANSFER_READ],
   "/data-management/cpo-cancellation": [PART_SALE_PERMISSIONS.ORDER],
   "/data-management/indent-": [INVENTORY_PERMISSIONS.TRANSFER_CANCEL],
-  "/data-management": [PART_SALE_PERMISSIONS.ORDER, INVENTORY_PERMISSIONS.TRANSFER_CANCEL, INVENTORY_PERMISSIONS.STOCK_READ],
+  "/data-management": [
+    PART_SALE_PERMISSIONS.ORDER,
+    INVENTORY_PERMISSIONS.TRANSFER_CANCEL,
+    INVENTORY_PERMISSIONS.STOCK_READ,
+  ],
   "/purchase-requests": [INVENTORY_PERMISSIONS.PURCHASEREQUEST_READ],
   "/purchasing": ["invoice:read", "payment:read"],
   "/finance/receipts/update-outstanding": ["outstanding:recalculate"],
@@ -70,12 +86,27 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/finance/receipts/credit-notes": ["creditnote:read", "creditnote:create"],
   "/finance/receipts/advance-adjustment": ["receipt:adjust"],
   "/finance/tally": ["tally:post", "tally:import"],
-  "/finance": ["invoice:read","payment:read","receipt:create","receipt:adjust","outstanding:recalculate","letter:outstanding","debitnote:read","creditnote:read","debitnote:create","creditnote:create"],
+  "/finance": [
+    "invoice:read",
+    "payment:read",
+    "receipt:create",
+    "receipt:adjust",
+    "outstanding:recalculate",
+    "letter:outstanding",
+    "debitnote:read",
+    "creditnote:read",
+    "debitnote:create",
+    "creditnote:create",
+  ],
   "/credit-applications": ["credit:application:create"],
   "/reports/billing-settings": ["role:permission:update"],
   "/reports/corporate-groups": ["corporate:manage"],
-  ...Object.fromEntries(MONTHLY_REPORTS.map(r=>["/reports/"+r.slug,["report:"+r.slug]])),
-  ...Object.fromEntries(REPORT_CONFIGS.map((r) => ["/reports/" + r.slug, [r.permission]])),
+  ...Object.fromEntries(
+    MONTHLY_REPORTS.map((r) => ["/reports/" + r.slug, ["report:" + r.slug]]),
+  ),
+  ...Object.fromEntries(
+    REPORT_CONFIGS.map((r) => ["/reports/" + r.slug, [r.permission]]),
+  ),
   "/reports/finance/receipt-register": ["report:receipt-register"],
   "/reports/finance/debit-note-register": ["report:debit-note-register"],
   "/reports/finance/credit-note-register": ["report:credit-note-register"],
@@ -83,7 +114,19 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/reports/finance/party-outstanding-age": ["report:party-outstanding-age"],
   "/reports/finance/party-outstanding-bill": ["report:party-outstanding-bill"],
   "/reports/finance/party-outstanding": ["report:party-outstanding"],
-  "/reports": [...MONTHLY_REPORT_PERMISSIONS, ...FRAMEWORK_REPORT_PERMISSIONS, "corporate:manage", "financereport:read", "report:receipt-register", "report:party-ledger", "report:party-outstanding", "report:party-outstanding-age", "report:party-outstanding-bill", "report:debit-note-register", "report:credit-note-register"],
+  "/reports": [
+    ...MONTHLY_REPORT_PERMISSIONS,
+    ...FRAMEWORK_REPORT_PERMISSIONS,
+    "corporate:manage",
+    "financereport:read",
+    "report:receipt-register",
+    "report:party-ledger",
+    "report:party-outstanding",
+    "report:party-outstanding-age",
+    "report:party-outstanding-bill",
+    "report:debit-note-register",
+    "report:credit-note-register",
+  ],
   "/payments": ["payment:read"],
   "/quotations": ["jobcard:read"],
   "/services": ["services:read"],
@@ -134,8 +177,13 @@ export default function DashboardLayout({
         </div>
 
         {/* ── Page content ────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto print:overflow-visible" id="main-content">
-          <RouteGuard routePermissions={ROUTE_PERMISSIONS}>{children}</RouteGuard>
+        <main
+          className="flex-1 overflow-y-auto print:overflow-visible"
+          id="main-content"
+        >
+          <RouteGuard routePermissions={ROUTE_PERMISSIONS}>
+            {children}
+          </RouteGuard>
         </main>
 
         {/* ── Mobile bottom nav ───────────────────────────────────── */}
