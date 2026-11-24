@@ -1,4 +1,5 @@
 "use client";
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
 import { useState, type FormEvent } from "react";
 import Link from 'next/link';
 import { DataTableEmptyState } from '@/components/ui/table-components/DataTableEmptyState';
@@ -23,7 +24,7 @@ import { CsiResponseForm } from "./CsiResponseForm";
 export function CsiResponsesPage() {
   const { user, hasPermission } = useAuth();
   const branch = useBranchStore((state) => state.activeBranch);
-  if (!hasPermission("csi:response:read"))
+  if (!hasPermission(CSI_PERMISSIONS.RESPONSE_READ))
     return (
       <p role="alert" className="p-4 text-sm">
         You do not have permission to view CSI responses. Ask the service
@@ -42,8 +43,8 @@ export function CsiResponsesPage() {
     <ResponseList
       key={branchId}
       branchId={branchId}
-      canEdit={hasPermission("csi:response:update")}
-      canGenerate={hasPermission('csi:card:generate')}
+      canEdit={hasPermission(CSI_PERMISSIONS.RESPONSE_UPDATE)}
+      canGenerate={hasPermission(CSI_PERMISSIONS.CARD_GENERATE)}
     />
   );
 }

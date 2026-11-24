@@ -639,7 +639,10 @@ export class AdminService {
     const groupsMap = new Map<string, typeof permissions>();
     for (const permission of permissions) {
       const prefix = permission.name.split(':')[0];
-      const module = MODULE_LABELS[prefix] || `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Management`;
+      const isCsi = prefix === 'csi' || /^report:csi(?:-|$)/.test(permission.name);
+      const module = isCsi
+        ? 'Customer satisfaction (CSI)'
+        : MODULE_LABELS[prefix] || `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Management`;
       if (!groupsMap.has(module)) {
         groupsMap.set(module, []);
       }

@@ -1,4 +1,5 @@
 "use client";
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
 import { useState } from "react";
 import { usePathname } from 'next/navigation';
 
@@ -46,9 +47,9 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/csc/follow-up": ["csc:case:read"],
   "/csc/not-visited": ["csc:case:read"],
   "/csc": ["csc:case:read"],
-  "/csi/generate": ["csi:card:generate"],
-  "/csi/response-entry": ["csi:response:read"],
-  "/csi": ["csi:master:read"],
+  "/csi/generate": [CSI_PERMISSIONS.CARD_GENERATE],
+  "/csi/response-entry": [CSI_PERMISSIONS.RESPONSE_READ],
+  "/csi": [CSI_PERMISSIONS.MASTER_READ],
   "/invoices": ["invoice:read"],
   "/labour-catalogue": ["labour-item:read"],
   "/inspections": ["inspection:read"],

@@ -31,15 +31,29 @@ TODO(confirm): the implemented proposed weighted formula is sum(weight x marks),
 
 The existing reports framework supplies the CSI report, attribute-wise CSI analysis and customer checklist, including print and Excel export. Only responded surveys are included. Optional response-date ranges use Lagos days; card, attribute and response choices include inactive masters for historical use. Summary reports also support job bounds, registration, model, variant and service type from issuance snapshots. Formula sections use stored weights and marks and are included in print/export data. Attribute analysis includes zero-count rating choices and distinguishes changed question wording. Reports reject more than 2,000 matching surveys rather than return incomplete averages.
 
-Generation/printing requires `csi:card:generate`. Response reading and updating require `csi:response:read` and `csi:response:update`. The three reports have separate permissions: `report:csi`, `report:csi-attribute`, `report:csi-checklist`. Grants are maintained in ROLE_PERMISSIONS for the role seed. Service managers receive all CSI permissions; workshop managers receive read/report access; CCU staff receive generation and response access. TODO(confirm): review these grants with the business. Every operation and lookup retains the existing branch/cross-branch checks.
+Generation/printing requires `csi:card:generate`. Response reading and updating require `csi:response:read` and `csi:response:update`. The three reports have separate permissions: `report:csi`, `report:csi-attribute`, `report:csi-checklist`. Grants are maintained in ROLE_PERMISSIONS for the role seed; the frontend mirrors the eight identifiers in CSI_PERMISSIONS. Existing branch and cross-branch checks are retained.
+
+| Role | Masters | Generate / print | Responses | Reports |
+| --- | --- | --- | --- | --- |
+| SuperAdmin | Read and update | Yes | Read and update | All three |
+| Admin | Read and update | Yes | Read and update | All three |
+| ServiceManager | Read and update | Yes | Read and update | All three |
+| WorkshopManager | Read only | No | Read only | All three |
+| Auditor | Read only | No | Read only | All three |
+| CCUManager | No | Yes | Read and update | No |
+| CCUOfficer | No | Yes | Read and update | No |
+
+Other built-in roles receive no CSI grants. TODO(confirm): review this issue's role matrix with the business before rollout. Migration `20261124140000_csi_permissions` registers all eight assignable actions and adds the default grants to existing built-in roles without resetting any assignments. Deploy the pending migrations in the approved environment, then refresh staff sessions. The canonical defaults remain in `ROLE_PERMISSIONS` for future seeds. No non-local database is updated by changing these files.
+
+In Settings > Roles, expand **Customer satisfaction (CSI)** to assign masters, questionnaire generation, response entry and the three report permissions. Each action has a distinct label. This section appears after the permission migration is applied; updating source constants alone does not populate the database permission catalog.
 
 ## Migration and rollback
 
 The additive migration `20261123120000_csi_masters` creates the three branch-scoped masters, card revisions and ordered detail rows. Branch/code unique indexes prevent duplicate codes. Composite foreign keys enforce branch consistency. The revision branch/applicability/effective-date index supports later card selection. No existing records are backfilled.
 
-The role seed applies `csi:master:read` and `csi:master:update` to the service manager and `csi:master:read` to the workshop manager.
+The role seed applies the CSI role matrix above, rebuilding built-in role grants from ROLE_PERMISSIONS on every run. Admin receives explicit CSI grants; only SuperAdmin has the frontend permission bypass. ServiceManager is included in the frontend's normalized role type and legacy workshop role list.
 
-The additive migrations `20261124120000_csi_survey_issuance` and `20261124130000_csi_survey_responses` add issued surveys, branch-consistent job/revision foreign keys, unique job issuance, versioned response fields and answer snapshots. Both applied successfully with the complete migration chain in a fresh disposable localhost database. A transactional rollback rehearsal preserved the survey and answer data. The configured application database was not changed. Apply both and run the role seed in the intended environment before enabling the new screens. To disable operations, remove their grants/navigation and preserve issued surveys and their answers; do not drop populated tables.
+The additive migrations `20261124120000_csi_survey_issuance` and `20261124130000_csi_survey_responses` add issued surveys, branch-consistent job/revision foreign keys, unique job issuance, versioned response fields and answer snapshots. Both applied successfully with the complete migration chain in a fresh disposable localhost database. A transactional rollback rehearsal preserved the survey and answer data. The configured application database was not changed. Apply these migrations and `20261124140000_csi_permissions` in the intended environment before enabling the new screens. A full role reseed is not required for this rollout. To disable operations, remove their grants/navigation and preserve issued surveys and their answers; do not drop populated tables.
 
 Local API and browser verification evidence is recorded in [the verification summary](./progress/issue-112-visual/README.md). Report summaries and the screen/Excel total row now show average scores. Mobile empty results wrap without requiring horizontal scrolling; disabled filters are visibly muted. CSI access denial uses an in-place message while other dashboard routes retain their normal guard behavior.
 

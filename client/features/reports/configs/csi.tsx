@@ -1,3 +1,4 @@
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
 import { ClipboardList } from "lucide-react";
 import { fmtNumber } from '../lib/report-format';
 import type { ReportColumn, ReportConfig, OptionDef } from "../types";
@@ -74,7 +75,7 @@ export const CSI_CONFIGS: ReportConfig[] = [
     slug: "csi",
     title: "CSI report",
     description: "Weighted satisfaction scores from completed questionnaires.",
-    permission: "report:csi",
+    permission: CSI_PERMISSIONS.REPORT,
     noun: ["survey", "surveys"] as [string, string],
   },
   {
@@ -82,7 +83,7 @@ export const CSI_CONFIGS: ReportConfig[] = [
     title: "Attribute-wise CSI analysis",
     description:
       "Response counts, percentages and weighted contribution for each question.",
-    permission: "report:csi-attribute",
+    permission: CSI_PERMISSIONS.ATTRIBUTE_REPORT,
     noun: ["attribute response", "attribute responses"] as [string, string],
   },
   {
@@ -90,7 +91,7 @@ export const CSI_CONFIGS: ReportConfig[] = [
     title: "CSI customer checklist",
     description:
       "Customer contact details and feedback for the selected questions and responses.",
-    permission: "report:csi-checklist",
+    permission: CSI_PERMISSIONS.CHECKLIST_REPORT,
     noun: ["customer answer", "customer answers"] as [string, string],
   },
 ].map((config) => ({

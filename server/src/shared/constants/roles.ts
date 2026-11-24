@@ -412,6 +412,29 @@ const CSC_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.CSC_MASTER_UPDATE,
 ];
 
+// CSI is branch-scoped; these grants never add cross-branch access.
+const CSI_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_REPORT,
+  PERMISSIONS.CSI_ATTRIBUTE_REPORT,
+  PERMISSIONS.CSI_CHECKLIST_REPORT,
+];
+const CSI_READ_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_MASTER_READ,
+  PERMISSIONS.CSI_RESPONSE_READ,
+  ...CSI_REPORT_PERMISSIONS,
+];
+const CSI_OPERATOR_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_CARD_GENERATE,
+  PERMISSIONS.CSI_RESPONSE_READ,
+  PERMISSIONS.CSI_RESPONSE_UPDATE,
+];
+const CSI_PERMISSIONS: PermissionType[] = [
+  ...CSI_READ_PERMISSIONS,
+  PERMISSIONS.CSI_MASTER_UPDATE,
+  PERMISSIONS.CSI_CARD_GENERATE,
+  PERMISSIONS.CSI_RESPONSE_UPDATE,
+];
+
 // Late deliveries: the service and workshop managers correct reasons and run the reports.
 // TODO(confirm): issue names ServiceManager and WorkshopManager; Admin added as for the other workshop reports.
 const LATE_DELIVERY_REPORT_PERMISSIONS: PermissionType[] = [
@@ -455,6 +478,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    ...CSI_PERMISSIONS,
     PERMISSIONS.SPAREPART_COST_READ,
     PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_WORKSHOP_REPORTS,
@@ -696,11 +720,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
   //TODo: verify this role permissions
   [ROLES.WORKSHOP_MANAGER]: [
-    PERMISSIONS.CSI_RESPONSE_READ,
-    PERMISSIONS.CSI_REPORT,
-    PERMISSIONS.CSI_ATTRIBUTE_REPORT,
-    PERMISSIONS.CSI_CHECKLIST_REPORT,
-    PERMISSIONS.CSI_MASTER_READ,
+    ...CSI_READ_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
     ...LATE_DELIVERY_PERMISSIONS,
@@ -903,14 +923,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
-    PERMISSIONS.CSI_RESPONSE_READ,
-    PERMISSIONS.CSI_RESPONSE_UPDATE,
-    PERMISSIONS.CSI_REPORT,
-    PERMISSIONS.CSI_ATTRIBUTE_REPORT,
-    PERMISSIONS.CSI_CHECKLIST_REPORT,
-    PERMISSIONS.CSI_CARD_GENERATE,
-    PERMISSIONS.CSI_MASTER_READ,
-    PERMISSIONS.CSI_MASTER_UPDATE,
+    ...CSI_PERMISSIONS,
     ...CSC_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
@@ -982,9 +995,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.CCU_OFFICER]: [
-    PERMISSIONS.CSI_RESPONSE_READ,
-    PERMISSIONS.CSI_RESPONSE_UPDATE,
-    PERMISSIONS.CSI_CARD_GENERATE,
+    ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_CALLER_PERMISSIONS,
     PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
     PERMISSIONS.DASHBOARD_READ,
@@ -1011,9 +1022,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
-    PERMISSIONS.CSI_RESPONSE_READ,
-    PERMISSIONS.CSI_RESPONSE_UPDATE,
-    PERMISSIONS.CSI_CARD_GENERATE,
+    ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_SUPERVISOR_PERMISSIONS,
     PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,

@@ -1,4 +1,5 @@
 "use client";
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
 
 import { useState } from "react";
 import { Eye, Pencil, Plus } from "lucide-react";
@@ -76,7 +77,7 @@ export function CsiMastersPage({ kind }: { kind: MasterKind }) {
       key={kind + branchId}
       kind={kind}
       branchId={branchId}
-      canEdit={hasPermission("csi:master:update")}
+      canEdit={hasPermission(CSI_PERMISSIONS.MASTER_UPDATE)}
     />
   );
 }

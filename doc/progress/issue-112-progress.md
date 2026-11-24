@@ -36,6 +36,24 @@ Recon: existing CSI masters already use the shared table, fields, badges, toasts
 - All five new routes compiled and returned HTTP 200 on the existing local frontend: generation, response entry and the three reports. This is a compile/HTTP smoke check, not an authenticated workflow or visual verification.
 - Visual limitations: desktop/mobile layout, focus/keyboard behavior, contrast, paper/PDF pagination and Excel appearance remain unverified. No claim of completed visual QA. Currency is not displayed by these CSI screens; Unicode database round-trip/print checks are included in the pending local integration/visual work.
 
+## Permission follow-up, 24 November 2026
+
+- First committed the completed CSI implementation and evidence as `ed4bc08` as requested. The permission follow-up is separate from that commit.
+- Added the missing explicit Admin grants. Consolidated canonical CSI full/read/operator groups in ROLE_PERMISSIONS while retaining WorkshopManager/Auditor read-only and CCU generation/response access. No new cross-branch grants.
+- Added the missing normalized ServiceManager frontend role and workshop fallback entry. Centralized eight CSI identifiers and reused them in navigation, route guards, feature access and report registrations.
+- Added focused API-guard/seed-idempotency and frontend/backend parity tests. Existing live role records are not updated automatically; role seeding and session refresh are deployment steps. No database writes are part of this follow-up.
+- Validation: 16 role/seed checks, 129 existing role/workflow regression checks and two frontend parity tests passed. Backend/frontend typechecks, scoped frontend ESLint and whitespace checks passed. Frontend changes replace existing identifiers with shared constants and recognize ServiceManager; no labels or layouts were changed.
+
+### Roles settings catalog correction
+
+- Root cause: Roles settings reads persisted Permission rows. Source constants and seed defaults did not register CSI actions on an existing database. The earlier seed-only deployment guidance is superseded by the additive permission migration.
+- Added `20261124140000_csi_permissions`: registers eight actions and adds the canonical grants to existing built-in roles. It preserves existing IDs, descriptions and custom role assignments; it does not reset roles or grant access to unrelated built-in roles.
+- Grouped all eight actions under Customer satisfaction (CSI). Fixed nested permission labels so read and update actions are distinct. Reused the existing PermissionGrid checkboxes, loading skeleton, Lucide expand control and Tailwind tokens; no new UI components or dependencies. Existing loading, error, selected/disabled and permission-denied behavior is unchanged.
+- Validation: 17 focused backend tests and three frontend tests passed, both TypeScript checks and scoped ESLint passed. Executed the SQL twice against disposable localhost tables in a rolled-back transaction: all 15 built-in role grant sets match ROLE_PERMISSIONS and custom grants/permission metadata survive. Stopped the disposable database afterwards.
+- Deployment remains pending for the configured application database. Apply pending migrations, reload Roles settings, then refresh staff sessions after assignments change. No non-local database was written. No commit or push performed for this correction.
+- No browser run for this label/catalog correction. Desktop/mobile wrapping, keyboard interaction and rendered settings states were not visually reverified; the existing layout and controls are reused.
+- Final added-source scan passed all eight checks for pictographs, replacement characters, mojibake, long dashes, hard-coded colors/pixel utilities, browser dialogs and missing-value placeholders.
+
 ## Follow-up verification, 24 November 2026
 
 This milestone supersedes the earlier skipped-database and unavailable-browser results above.

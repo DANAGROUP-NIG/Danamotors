@@ -1,4 +1,5 @@
 "use client";
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -35,7 +36,7 @@ const statuses = {
 export function CsiGenerationPage() {
   const { user, hasPermission } = useAuth();
   const active = useBranchStore((state) => state.activeBranch);
-  if (!hasPermission("csi:card:generate"))
+  if (!hasPermission(CSI_PERMISSIONS.CARD_GENERATE))
     return (
       <p role="alert" className="p-4 text-sm">
         You do not have permission to generate or print CSI cards. Ask your
@@ -54,7 +55,7 @@ export function CsiGenerationPage() {
     <GenerationSession
       key={branchId}
       branchId={branchId}
-      canReadMasters={hasPermission("csi:master:read")}
+      canReadMasters={hasPermission(CSI_PERMISSIONS.MASTER_READ)}
     />
   );
 }
