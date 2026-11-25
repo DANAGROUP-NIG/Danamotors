@@ -1,11 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { config } from '../config';
-import prisma from '../prisma/client';
-import { UnauthorizedError } from '../shared/errors/appError';
-import { JWTPayload } from '../shared/types';
-import { setRequestUser } from '../shared/requestContext';
-import { effectivePermissions, PERMISSION_SOURCES_SELECT } from '../shared/effectivePermissions';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { config } from "../config";
+import prisma from "../prisma/client";
+import { UnauthorizedError } from "../shared/errors/appError";
+import { JWTPayload } from "../shared/types";
+import { setRequestUser } from "../shared/requestContext";
+import {
+  effectivePermissions,
+  PERMISSION_SOURCES_SELECT,
+} from "../shared/effectivePermissions";
+import { ownBranchScope } from "./authorize";
 
 // Permissions are deliberately not embedded in the access token: a role with
 // many permissions (e.g. super_admin) pushes the JWT past the browser's 4KB
@@ -13,7 +17,9 @@ import { effectivePermissions, PERMISSION_SOURCES_SELECT } from '../shared/effec
 // Role, branch and permissions are loaded fresh here instead, which also means
 // role changes take effect without waiting for the token to be refreshed. Permissions are the role's
 // plus the user's own grants minus their denials (effectivePermissions.ts).
-export async function loadStaffUser(userId: string): Promise<JWTPayload | null> {
+export async function loadStaffUser(
+  userId: string,
+): Promise<JWTPayload | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -27,13 +33,15 @@ export async function loadStaffUser(userId: string): Promise<JWTPayload | null> 
 
   if (!user || !user.isActive) return null;
 
-  return {
+  const actor = {
     userId: user.id,
     email: user.email,
     role: user.role.name,
     permissions: effectivePermissions(user),
     branchId: user.branchId ?? null,
   };
+  ownBranchScope(actor);
+  return actor;
 }
 
 export const authMiddleware = async (
@@ -43,29 +51,33 @@ export const authMiddleware = async (
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new UnauthorizedError('Authentication token missing or invalid'));
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next(
+      new UnauthorizedError("Authentication token missing or invalid"),
+    );
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
 
   let decoded: JWTPayload;
   try {
     decoded = jwt.verify(token, config.JWT_SECRET) as JWTPayload;
   } catch (error) {
-    return next(new UnauthorizedError('Invalid or expired authentication token'));
+    return next(
+      new UnauthorizedError("Invalid or expired authentication token"),
+    );
   }
 
   // Customer portal tokens are not valid for staff-only endpoints.
-  if ('customerId' in decoded && !('userId' in decoded)) {
-    return next(new UnauthorizedError('Staff authentication required'));
+  if ("customerId" in decoded && !("userId" in decoded)) {
+    return next(new UnauthorizedError("Staff authentication required"));
   }
 
   try {
     const user = await loadStaffUser(decoded.userId);
 
     if (!user) {
-      return next(new UnauthorizedError('Your account has been deactivated'));
+      return next(new UnauthorizedError("Your account has been deactivated"));
     }
 
     req.user = user;

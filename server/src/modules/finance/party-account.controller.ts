@@ -1,3 +1,4 @@
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
@@ -5,6 +6,7 @@ import { ForbiddenError, NotFoundError } from '../../shared/errors/appError';
 import { PartyAccountService } from './party-account.service';
 
 function scopedBranch(req: Request, selected?: string) {
+  if (isGeneralDepartmentManager(req.user)) return selected;
   if (req.user?.role === ROLES.SUPER_ADMIN || req.user?.role === ROLES.ADMIN) return selected;
   if (!req.user?.branchId) throw new ForbiddenError('Your account must be assigned to a branch');
   if (selected && selected !== req.user.branchId) throw new ForbiddenError('You can only access your own branch');
