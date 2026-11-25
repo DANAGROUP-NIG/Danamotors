@@ -53,6 +53,10 @@ import {
   Barcode,
   Repeat2,
   PhoneCall,
+  Frown,
+  Mail,
+  SmilePlus,
+  Tags,
 } from "lucide-react";
 
 // ─── Nav structure ─────────────────────────────────────────────────────────────
@@ -119,6 +123,7 @@ export const NAV_GROUPS: NavGroup[] = [
       CSI_PERMISSIONS.MASTER_READ,
       CSI_PERMISSIONS.CARD_GENERATE,
       CSI_PERMISSIONS.RESPONSE_READ,
+      "psf:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
       CAMPAIGN_PERMISSIONS.READ,
@@ -254,42 +259,12 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: PhoneCall,
         permissions: ["csc:case:read", "csc:master:read"],
         children: [
-          {
-            label: "1st Follow-up",
-            href: "/csc/follow-up/first",
-            icon: PhoneCall,
-            permissions: ["csc:case:read"],
-          },
-          {
-            label: "2nd Follow-up",
-            href: "/csc/follow-up/second",
-            icon: PhoneCall,
-            permissions: ["csc:case:read"],
-          },
-          {
-            label: "Not Visited",
-            href: "/csc/not-visited",
-            icon: CalendarDays,
-            permissions: ["csc:case:read"],
-          },
-          {
-            label: "Generate Cases",
-            href: "/csc/generate",
-            icon: ListChecks,
-            permissions: ["csc:case:generate"],
-          },
-          {
-            label: "CSC Master",
-            href: "/csc/schedule",
-            icon: Settings,
-            permissions: ["csc:master:read"],
-          },
-          {
-            label: "Closure Reasons",
-            href: "/csc/close-reasons",
-            icon: ClipboardList,
-            permissions: ["csc:master:read"],
-          },
+          { label: "1st Follow-up", href: "/csc/follow-up/first", icon: PhoneCall, permissions: ["csc:case:read"] },
+          { label: "2nd Follow-up", href: "/csc/follow-up/second", icon: PhoneCall, permissions: ["csc:case:read"] },
+          { label: "Not Visited", href: "/csc/not-visited", icon: CalendarDays, permissions: ["csc:case:read"] },
+          { label: "Generate Cases", href: "/csc/generate", icon: ListChecks, permissions: ["csc:case:generate"] },
+          { label: "CSC Master", href: "/csc/schedule", icon: Settings, permissions: ["csc:master:read"] },
+          { label: "Closure Reasons", href: "/csc/close-reasons", icon: ClipboardList, permissions: ["csc:master:read"] },
         ],
       },
       {

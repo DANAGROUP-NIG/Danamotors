@@ -367,6 +367,16 @@ export const PERMISSIONS = {
   PROMISE_DATE_ANALYSIS_READ: "report:promise-date-analysis",
   PROMISE_TIME_ANALYSIS_READ: "report:promise-time-analysis",
   DELAYED_DELIVERIES_READ: "report:delayed-deliveries",
+
+  // ── PSF: post-service follow-up (legacy Service → Follow-up) ──────────────
+  PSF_READ: "psf:read",
+  PSF_UPDATE: "psf:update",
+  PSF_LETTER: "psf:letter",
+  PSF_ANALYSIS_READ: "report:psf-analysis",
+  PSF_ANALYSIS_MODEL_READ: "report:psf-analysis-model",
+  PSF_DISSATISFIED_READ: "report:psf-dissatisfied",
+  PSF_CLOSED_READ: "report:psf-closed",
+  PSF_HISTORY_READ: "report:psf-history",
 } as const;
 
 export type PermissionType = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -478,6 +488,32 @@ const LATE_DELIVERY_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.LATE_REASON_UPDATE,
 ];
 
+// PSF: the CCU makes the calls; the service manager owns the module; the workshop manager reads and reports.
+// TODO(confirm) grants with the business (#111 open question 2).
+const PSF_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_ANALYSIS_READ,
+  PERMISSIONS.PSF_ANALYSIS_MODEL_READ,
+  PERMISSIONS.PSF_DISSATISFIED_READ,
+  PERMISSIONS.PSF_CLOSED_READ,
+  PERMISSIONS.PSF_HISTORY_READ,
+];
+const PSF_READ_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_READ,
+  ...PSF_REPORT_PERMISSIONS,
+];
+const PSF_CALLER_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_READ,
+  PERMISSIONS.PSF_UPDATE,
+  PERMISSIONS.PSF_LETTER,
+  PERMISSIONS.PSF_DISSATISFIED_READ,
+  PERMISSIONS.PSF_HISTORY_READ,
+];
+const PSF_PERMISSIONS: PermissionType[] = [
+  ...PSF_READ_PERMISSIONS,
+  PERMISSIONS.PSF_UPDATE,
+  PERMISSIONS.PSF_LETTER,
+];
+
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
 const PDI_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.PDI_READ,
@@ -522,6 +558,7 @@ const existingRolePermissions = {
     ...REPEAT_JOB_PERMISSIONS,
     ...LATE_DELIVERY_PERMISSIONS,
     ...CSC_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.BOOKED_VS_AVAILED_READ,
     PERMISSIONS.ESTIMATE_VS_JOB_READ,
@@ -750,6 +787,7 @@ const existingRolePermissions = {
   //TODo: verify this role permissions
   [ROLES.WORKSHOP_MANAGER]: [
     ...CSI_READ_PERMISSIONS,
+    ...PSF_READ_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
     ...LATE_DELIVERY_PERMISSIONS,
@@ -953,6 +991,7 @@ const existingRolePermissions = {
   [ROLES.SERVICE_MANAGER]: [
     ...CSI_PERMISSIONS,
     ...CSC_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     // TODO(confirm): the repeat job issue names WorkshopManager for review; the service manager reads and reports.
     ...REPEAT_JOB_READ_PERMISSIONS,
@@ -1025,6 +1064,7 @@ const existingRolePermissions = {
   [ROLES.CCU_OFFICER]: [
     ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_CALLER_PERMISSIONS,
+    ...PSF_CALLER_PERMISSIONS,
     PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
@@ -1052,6 +1092,7 @@ const existingRolePermissions = {
   [ROLES.CCU_MANAGER]: [
     ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_SUPERVISOR_PERMISSIONS,
+    ...PSF_PERMISSIONS,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,

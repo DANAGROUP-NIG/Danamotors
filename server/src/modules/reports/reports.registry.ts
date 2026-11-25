@@ -8,6 +8,7 @@ import { REPEAT_REPORTS } from "./repeat/repeat.reports";
 import { CSC_REPORTS } from "./csc/csc.reports";
 import { LATE_DELIVERY_REPORTS } from "./late-delivery/late.reports";
 import { CSI_REPORTS } from "./csi.reports";
+import { PSF_REPORTS } from "./psf/psf.reports";
 
 /**
  * Every framework report (#75). Routes, permission checks, validation and the API docs are
@@ -22,5 +23,6 @@ export const REPORTS: ReportDefinition[] = [
   ...REPEAT_REPORTS,
   ...CSC_REPORTS,
   ...LATE_DELIVERY_REPORTS,
+  ...PSF_REPORTS,
   ...CSI_REPORTS,
 ];

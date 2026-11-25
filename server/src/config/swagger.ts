@@ -11,6 +11,7 @@ import {
 import { pdiPaths } from "../modules/pdi/pdi.openapi";
 import { repeatJobPaths } from "../modules/repeat-job/repeat-job.openapi";
 import { lateDeliveryPaths } from "../modules/late-delivery/late-delivery.openapi";
+import { psfPaths } from "../modules/psf/psf.openapi";
 import { cscPaths } from "../modules/csc/csc.openapi";
 import { csiPaths } from "../modules/csi/csi.openapi";
 import { csiIssuancePaths } from "../modules/csi/csi-issuance.openapi";
@@ -749,6 +750,7 @@ const paths: Record<string, unknown> = {
   ...csiIssuancePaths,
   ...csiResponsePaths,
   ...lateDeliveryPaths,
+  ...psfPaths,
 };
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
   paths[route] = {

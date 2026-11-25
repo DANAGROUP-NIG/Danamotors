@@ -14,6 +14,7 @@ model Branch {
   requisitions           PartRequisition[]
   repeatJobRecords       RepeatJob[]            @relation("RepeatJobBranch")
   cscCases               CscCase[]              @relation("CscCaseBranch")
+  psfFollowUps           PsfFollowUp[]          @relation("PsfFollowUpBranch")
   handheldDocuments      HandheldDocument[]     @relation("HandheldDocumentBranch")
   handheldStations       HandheldStation[]      @relation("HandheldStationBranch")
   labelPrintJobs         LabelPrintJob[]        @relation("LabelPrintJobBranch")
@@ -241,6 +242,9 @@ model User {
   cscCasesClosed                 CscCase[]              @relation("CscCaseClosedBy")
   cscCasesGenerated              CscCase[]              @relation("CscCaseGeneratedBy")
   cscContacts                    CscContact[]           @relation("CscContactDoneBy")
+  psfLastCalls                   PsfFollowUp[]          @relation("PsfLastCalledBy")
+  psfClosed                      PsfFollowUp[]          @relation("PsfClosedBy")
+  psfCalls                       PsfCall[]              @relation("PsfCalledBy")
   cscStageClosures               CscStageClosure[]      @relation("CscStageClosedBy")
   handheldDocumentsSent          HandheldDocument[]     @relation("HandheldDocumentSentBy")
   handheldDocumentsUploaded      HandheldDocument[]     @relation("HandheldDocumentUploadedBy")
@@ -561,6 +565,7 @@ model Customer {
   appointments      ServiceAppointment[]
   jobCards          JobCard[]
   cscCases          CscCase[]
+  psfFollowUps      PsfFollowUp[]
   approvals         CustomerApproval[]
   invoices          Invoice[]
   receipts          Receipt[]
@@ -677,6 +682,7 @@ model ServiceAppointment {
 
   campaignVehicles CampaignVehicle[]
   cscCases         CscCase[]         @relation("CscCaseBooking")
+  psfCalls         PsfCall[]
 
   @@index([followUpJobId])
   @@index([branchId, bookingStatus, scheduledAt])
@@ -757,6 +763,7 @@ model JobCard {
   repeatedBy         RepeatJob[]            @relation("RepeatJobPrevious")
   cscCasesLastVisit  CscCase[]              @relation("CscCaseLastVisit")
   cscCasesVisited    CscCase[]              @relation("CscCaseVisit")
+  psfFollowUp        PsfFollowUp?
   repeatReason       String?
   readyAt            DateTime?
   deliveredAt        DateTime?
@@ -1059,6 +1066,7 @@ model Vehicle {
   warrantyCases    WarrantyCase[]
   campaignVehicles CampaignVehicle[]
   cscCases         CscCase[]
+  psfFollowUps     PsfFollowUp[]
 
   @@index([customerId])
   @@index([modelId])
@@ -1801,7 +1809,8 @@ model JobCardLabour {
   invoiceLines InvoiceLine[]
 
   // Who pays for this labour line (warranty / goodwill / free / customer).
-  chargeLine JobCardLine?
+  chargeLine   JobCardLine?
+  psfCallLines PsfCallLine[]
 
   @@index([labourSlipId])
   @@index([groupId])
@@ -2332,6 +2341,7 @@ model WorkshopMaster {
   cscRulesForModel         CscRule[]                 @relation("CscRuleModel")
   cscRulesForService       CscRule[]                 @relation("CscRuleServiceType")
   cscCases                 CscCase[]                 @relation("CscCaseServiceType")
+  psfBookingCalls          PsfCall[]                 @relation("PsfBookingServiceType")
   modelDefectEstimates     DefectModelEstimate[]     @relation("ModelDefectEstimates")
   checklistLines           ServiceChecklistLine[]    @relation("ChecklistLines")
   modelChecklistLines      ServiceChecklistLine[]    @relation("ChecklistLineModel")
@@ -5025,4 +5035,97 @@ model CscStageClosure {
 
   @@unique([caseId, stage])
   @@index([reasonId])
+}
+
+// ============================================================
+// PSF: post-service follow-up (legacy Service → Follow-up, #111)
+// ============================================================
+
+/// Legacy follow-up status codes 1-5 (the legend on the entry screen). Fixed: the reports depend on it.
+enum PsfStatus {
+  SATISFIED
+  DISSATISFIED
+  NO_PHONE
+  NOT_AVAILABLE
+  CLOSED
+}
+
+enum PsfLineKind {
+  SERVICE
+  LABOUR
+}
+
+/// The follow-up of one delivered job: its current status (the last call). Created by the first call.
+model PsfFollowUp {
+  id             String    @id @default(uuid())
+  jobCardId      String    @unique
+  jobCard        JobCard   @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch    @relation("PsfFollowUpBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  vehicleId      String?
+  vehicle        Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  status         PsfStatus
+  remark         String?
+  /// The latest PsfCall (its lines are the job's current line statuses).
+  lastCallId     String?   @unique
+  lastCalledAt   DateTime
+  lastCalledById String?
+  lastCalledBy   User?     @relation("PsfLastCalledBy", fields: [lastCalledById], references: [id], onDelete: SetNull)
+  callCount      Int       @default(0)
+  closedAt       DateTime?
+  closedById     String?
+  closedBy       User?     @relation("PsfClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  calls          PsfCall[]
+
+  @@index([branchId, status])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([lastCalledById])
+  @@index([closedById])
+}
+
+/// One call attempt on a follow-up. Every attempt is kept.
+model PsfCall {
+  id                   String              @id @default(uuid())
+  followUpId           String
+  followUp             PsfFollowUp         @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  status               PsfStatus
+  remark               String?
+  calledAt             DateTime            @default(now())
+  calledById           String?
+  calledBy             User?               @relation("PsfCalledBy", fields: [calledById], references: [id], onDelete: SetNull)
+  bookingAt            DateTime?
+  bookingServiceTypeId String?
+  bookingServiceType   WorkshopMaster?     @relation("PsfBookingServiceType", fields: [bookingServiceTypeId], references: [id], onDelete: SetNull)
+  appointmentId        String?
+  appointment          ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  createdAt            DateTime            @default(now())
+  lines                PsfCallLine[]
+
+  @@index([followUpId, calledAt])
+  @@index([calledById])
+  @@index([bookingServiceTypeId])
+  @@index([appointmentId])
+}
+
+/// The status of one followed-up line (the job's service type, or a labour line) on a call.
+/// Code and description are a snapshot, so old follow-ups stay readable after a master is renamed.
+model PsfCallLine {
+  id              String         @id @default(uuid())
+  callId          String
+  call            PsfCall        @relation(fields: [callId], references: [id], onDelete: Cascade)
+  kind            PsfLineKind
+  jobCardLabourId String?
+  jobCardLabour   JobCardLabour? @relation(fields: [jobCardLabourId], references: [id], onDelete: SetNull)
+  code            String
+  description     String
+  status          PsfStatus
+  position        Int            @default(0)
+
+  @@index([callId])
+  @@index([jobCardLabourId])
 }

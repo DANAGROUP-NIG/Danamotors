@@ -40,6 +40,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/job-cards": ["jobcard:read"],
   "/repeat-jobs": ["repeatjob:read"],
   "/late-deliveries": ["jobcard:late-reason:update"],
+  "/psf": ["psf:read"],
   // CSC: the more specific paths first (the guard uses the first prefix that matches).
   "/csc/generate": ["csc:case:generate"],
   "/csc/schedule": ["csc:master:read"],

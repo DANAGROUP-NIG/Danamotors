@@ -3,6 +3,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { branchParam } from "./core/filters";
 import type { ReportDb, ReportScope } from "./core/types";
 import { ForbiddenError, BadRequestError } from "../../shared/errors/appError";
+import { loadCustomerCities } from "./psf/psf.data";
 
 export const LOOKUP_SOURCES = [
   "model",
@@ -22,6 +23,7 @@ export const LOOKUP_SOURCES = [
   "csiCard",
   "csiAttribute",
   "csiResponse",
+  "customerCity",
 ] as const;
 export type LookupSource = (typeof LOOKUP_SOURCES)[number];
 
@@ -178,6 +180,12 @@ export async function listLookup(
       code: r.code,
       active: r.active,
     }));
+  }
+
+  if (source === "customerCity") {
+    // Cities on the branch's customer records (PSF mailing list); the city is its own id.
+    const cities = await loadCustomerCities(db, scope);
+    return cities.map((city) => ({ id: city, label: city, active: true }));
   }
 
   if (source === "partCategory") {

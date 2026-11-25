@@ -8,6 +8,7 @@ import { REPEAT_CONFIGS } from "./repeat";
 import { CSC_CONFIGS } from "./csc";
 import { LATE_DELIVERY_CONFIGS } from "./late-delivery";
 import { CSI_CONFIGS } from "./csi";
+import { PSF_CONFIGS } from "./psf";
 
 /** Every framework report screen (#75), keyed by slug (= route /reports/<slug> = API /reports/<slug>). */
 export const REPORT_CONFIGS: ReportConfig[] = [
@@ -19,6 +20,7 @@ export const REPORT_CONFIGS: ReportConfig[] = [
   ...REPEAT_CONFIGS,
   ...CSC_CONFIGS,
   ...LATE_DELIVERY_CONFIGS,
+  ...PSF_CONFIGS,
   ...CSI_CONFIGS,
 ];
 

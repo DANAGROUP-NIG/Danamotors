@@ -53,6 +53,7 @@ import repeatJobRoutes from "../modules/repeat-job/repeat-job.routes";
 import cscRoutes from "../modules/csc/csc.routes";
 import csiRoutes from "../modules/csi/csi.routes";
 import lateDeliveryRoutes from "../modules/late-delivery/late-delivery.routes";
+import psfRoutes from "../modules/psf/psf.routes";
 import {
   serviceTypeOptionsRouter,
   serviceTypeSettingsRouter,
@@ -72,6 +73,7 @@ router.use("/repeat-jobs", repeatJobRoutes);
 router.use("/csc", cscRoutes);
 router.use("/csi", csiRoutes);
 router.use("/late-deliveries", lateDeliveryRoutes);
+router.use("/psf", psfRoutes);
 router.use("/job-cards", serviceTypeOptionsRouter);
 router.use("/service-type-model-settings", serviceTypeSettingsRouter);
 
