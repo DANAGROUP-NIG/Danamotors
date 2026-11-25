@@ -1,5 +1,9 @@
-import { PermissionEffect, Prisma } from '@prisma/client';
-import { PERMISSIONS } from './constants/roles';
+import { PermissionEffect, Prisma } from "@prisma/client";
+import {
+  GENERAL_DEPARTMENT_ROLES,
+  OWN_BRANCH_DEPARTMENT_ROLES,
+  PERMISSIONS,
+} from "./constants/roles";
 
 /**
  * A user's permissions are their role's, plus the permissions granted to them, minus the role permissions
@@ -13,24 +17,43 @@ type Override = { effect: PermissionEffect; permission: { name: string } };
 
 /** Prisma `include` for everything `effectivePermissions` needs. */
 export const PERMISSION_SOURCES_INCLUDE = {
-  role: { include: { permissions: { include: { permission: { select: { name: true } } } } } },
+  role: {
+    include: {
+      permissions: { include: { permission: { select: { name: true } } } },
+    },
+  },
   permissionOverrides: { include: { permission: { select: { name: true } } } },
 } as const;
 
 /** Prisma `select` for the same, for queries that select fields. */
 export const PERMISSION_SOURCES_SELECT = {
-  role: { select: { name: true, permissions: { select: { permission: { select: { name: true } } } } } },
-  permissionOverrides: { select: { effect: true, permission: { select: { name: true } } } },
+  role: {
+    select: {
+      name: true,
+      permissions: { select: { permission: { select: { name: true } } } },
+    },
+  },
+  permissionOverrides: {
+    select: { effect: true, permission: { select: { name: true } } },
+  },
 } as const;
 
 export function effectivePermissions(user: {
-  role: { permissions: PermissionLink[] };
+  role: { name?: string; permissions: PermissionLink[] };
   permissionOverrides?: Override[] | null;
 }): string[] {
   const result = new Set(user.role.permissions.map((p) => p.permission.name));
   for (const override of user.permissionOverrides ?? []) {
-    if (override.effect === PermissionEffect.GRANT) result.add(override.permission.name);
+    if (override.effect === PermissionEffect.GRANT)
+      result.add(override.permission.name);
     else result.delete(override.permission.name);
+  }
+  if (user.role.name && OWN_BRANCH_DEPARTMENT_ROLES.has(user.role.name)) {
+    result.delete(PERMISSIONS.BRANCH_ALL);
+    result.delete(PERMISSIONS.INVENTORY_CROSS_BRANCH);
+  } else if (user.role.name && GENERAL_DEPARTMENT_ROLES.has(user.role.name)) {
+    result.add(PERMISSIONS.BRANCH_ALL);
+    result.add(PERMISSIONS.INVENTORY_CROSS_BRANCH);
   }
   return [...result].sort();
 }
@@ -41,9 +64,15 @@ export function holdsPermission(name: string): Prisma.UserWhereInput {
     OR: [
       {
         role: { permissions: { some: { permission: { name } } } },
-        permissionOverrides: { none: { effect: PermissionEffect.DENY, permission: { name } } },
+        permissionOverrides: {
+          none: { effect: PermissionEffect.DENY, permission: { name } },
+        },
       },
-      { permissionOverrides: { some: { effect: PermissionEffect.GRANT, permission: { name } } } },
+      {
+        permissionOverrides: {
+          some: { effect: PermissionEffect.GRANT, permission: { name } },
+        },
+      },
     ],
   };
 }
@@ -54,7 +83,7 @@ export function holdsPermission(name: string): Prisma.UserWhereInput {
  * `assertCanChangeUser`: a role that manages access counts as admin-level, while the built-in operational
  * roles that carry `branch:all` stay assignable, because only a super admin edits role permissions.
  */
-const ACCESS_PREFIXES = ['user:', 'role:', 'audit:'];
+const ACCESS_PREFIXES = ["user:", "role:", "audit:"];
 const ADMIN_LEVEL_NAMES: string[] = [
   PERMISSIONS.BRANCH_ALL,
   PERMISSIONS.BRANCH_CREATE,

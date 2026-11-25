@@ -100,14 +100,23 @@ async function statusCounts(where: Prisma.CampaignVehicleWhereInput) {
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
+function campaignVehicleBranch(
+  branchId?: string,
+): Prisma.CampaignVehicleWhereInput {
+  return branchId ? { vehicle: { customer: { branchId } } } : {};
+}
+
 export class CampaignService {
-  async list(params: {
-    type?: CampaignType;
-    status?: CampaignStatus;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async list(
+    params: {
+      type?: CampaignType;
+      status?: CampaignStatus;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
+    branchId?: string,
+  ) {
     const page = params.page ?? 1;
     const limit = params.limit ?? 10;
     const q = params.search
@@ -140,7 +149,10 @@ export class CampaignService {
     ]);
     const counts = await prisma.campaignVehicle.groupBy({
       by: ["campaignId", "status"],
-      where: { campaignId: { in: items.map((c) => c.id) } },
+      where: {
+        campaignId: { in: items.map((c) => c.id) },
+        ...campaignVehicleBranch(branchId),
+      },
       _count: { _all: true },
     });
     return {
@@ -159,15 +171,18 @@ export class CampaignService {
   }
 
   /** KPIs across active campaigns. */
-  async summary() {
+  async summary(branchId?: string) {
     const [activeCampaigns, counts] = await Promise.all([
       prisma.campaign.count({ where: { status: CampaignStatus.ACTIVE } }),
-      statusCounts({ campaign: { status: CampaignStatus.ACTIVE } }),
+      statusCounts({
+        campaign: { status: CampaignStatus.ACTIVE },
+        ...campaignVehicleBranch(branchId),
+      }),
     ]);
     return { activeCampaigns, ...buildProgress(counts) };
   }
 
-  async get(id: string) {
+  async get(id: string, branchId?: string) {
     const campaign = await prisma.campaign.findUnique({
       where: { id },
       include: {
@@ -188,11 +203,13 @@ export class CampaignService {
     });
     if (!campaign) throw new NotFoundError("Campaign not found");
     const [counts, byBranch, unmatched] = await Promise.all([
-      statusCounts({ campaignId: id }),
-      this.progressByBranch(id),
-      prisma.campaignVehicle.count({
-        where: { campaignId: id, vehicleId: null },
-      }),
+      statusCounts({ campaignId: id, ...campaignVehicleBranch(branchId) }),
+      this.progressByBranch(id, branchId),
+      branchId
+        ? 0
+        : prisma.campaignVehicle.count({
+            where: { campaignId: id, vehicleId: null },
+          }),
     ]);
     return {
       ...campaign,
@@ -202,7 +219,7 @@ export class CampaignService {
     };
   }
 
-  private async progressByBranch(campaignId: string) {
+  private async progressByBranch(campaignId: string, branchId?: string) {
     const rows = await prisma.$queryRaw<
       {
         branchId: string | null;
@@ -216,7 +233,7 @@ export class CampaignService {
       LEFT JOIN "Vehicle" v ON v."id" = cv."vehicleId"
       LEFT JOIN "Customer" c ON c."id" = v."customerId"
       LEFT JOIN "Branch" b ON b."id" = c."branchId"
-      WHERE cv."campaignId" = ${campaignId}
+      WHERE cv."campaignId" = ${campaignId} ${branchId ? Prisma.sql`AND c."branchId" = ${branchId}` : Prisma.empty}
       GROUP BY b."id", b."name", cv."status"`;
     const branches = new Map<
       string,
@@ -338,9 +355,15 @@ export class CampaignService {
           }),
           ...(input.startDate && { startDate: input.startDate }),
           ...(input.endDate !== undefined && { endDate: input.endDate }),
-          ...(input.bulletinDate !== undefined && { bulletinDate: input.bulletinDate }),
-          ...(input.jobCardText !== undefined && { jobCardText: input.jobCardText?.trim() || null }),
-          ...(input.printOnJobCard !== undefined && { printOnJobCard: input.printOnJobCard }),
+          ...(input.bulletinDate !== undefined && {
+            bulletinDate: input.bulletinDate,
+          }),
+          ...(input.jobCardText !== undefined && {
+            jobCardText: input.jobCardText?.trim() || null,
+          }),
+          ...(input.printOnJobCard !== undefined && {
+            printOnJobCard: input.printOnJobCard,
+          }),
           ...(input.labourCovered !== undefined && {
             labourCovered: input.labourCovered,
           }),
@@ -534,14 +557,26 @@ export class CampaignService {
 
   /** VINs of vehicles in the system inside any of the ranges. */
   private async vinsInRanges(ranges: VinRange[]): Promise<string[]> {
-    const prefixes = [...new Set(ranges.map((r) => r.vinFrom.slice(0, VIN_RANGE_PREFIX_LENGTH)))];
+    const prefixes = [
+      ...new Set(
+        ranges.map((r) => r.vinFrom.slice(0, VIN_RANGE_PREFIX_LENGTH)),
+      ),
+    ];
     if (prefixes.length === 0) return [];
     const vehicles = await prisma.vehicle.findMany({
-      where: { OR: prefixes.map((prefix) => ({ vin: { startsWith: prefix, mode: "insensitive" as const } })) },
+      where: {
+        OR: prefixes.map((prefix) => ({
+          vin: { startsWith: prefix, mode: "insensitive" as const },
+        })),
+      },
       select: { vin: true },
     });
     const vins = vehicles.map((v) => normalizeVin(v.vin));
-    return [...new Set(vins.filter((vin) => ranges.some((range) => vinInRange(vin, range))))];
+    return [
+      ...new Set(
+        vins.filter((vin) => ranges.some((range) => vinInRange(vin, range))),
+      ),
+    ];
   }
 
   /**
@@ -549,17 +584,33 @@ export class CampaignService {
    * With `dryRun` nothing is saved and the response is the summary shown before confirming.
    * Vehicles registered later inside an active campaign's range are added on registration.
    */
-  async addVinRanges(id: string, input: { ranges: VinRange[]; dryRun?: boolean }, actorId: string) {
-    const campaign = await prisma.campaign.findUnique({ where: { id }, select: { status: true } });
+  async addVinRanges(
+    id: string,
+    input: { ranges: VinRange[]; dryRun?: boolean },
+    actorId: string,
+  ) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id },
+      select: { status: true },
+    });
     if (!campaign) throw new NotFoundError("Campaign not found");
-    if (campaign.status === CampaignStatus.CLOSED) throw new BadRequestError("VIN ranges cannot be added to a closed campaign");
+    if (campaign.status === CampaignStatus.CLOSED)
+      throw new BadRequestError(
+        "VIN ranges cannot be added to a closed campaign",
+      );
 
-    const ranges = input.ranges.map((r) => ({ vinFrom: normalizeVin(r.vinFrom), vinTo: normalizeVin(r.vinTo) }));
+    const ranges = input.ranges.map((r) => ({
+      vinFrom: normalizeVin(r.vinFrom),
+      vinTo: normalizeVin(r.vinTo),
+    }));
     ranges.forEach((range, index) => {
       const error = vinRangeError(range);
       if (error) throw new BadRequestError(`Range ${index + 1}: ${error}`);
     });
-    const existing = await prisma.campaignVinRange.findMany({ where: { campaignId: id }, select: { vinFrom: true, vinTo: true } });
+    const existing = await prisma.campaignVinRange.findMany({
+      where: { campaignId: id },
+      select: { vinFrom: true, vinTo: true },
+    });
     const key = (r: VinRange) => `${r.vinFrom}:${r.vinTo}`;
     const known = new Set(existing.map(key));
     const unique = [...new Map(ranges.map((r) => [key(r), r])).values()];
@@ -579,7 +630,11 @@ export class CampaignService {
     };
     if (input.dryRun || newRanges.length === 0) return summary;
     const saved = await prisma.campaignVinRange.createMany({
-      data: newRanges.map((r) => ({ campaignId: id, ...r, createdById: actorId })),
+      data: newRanges.map((r) => ({
+        campaignId: id,
+        ...r,
+        createdById: actorId,
+      })),
       skipDuplicates: true,
     });
     return { ...summary, saved: saved.count };
@@ -587,14 +642,19 @@ export class CampaignService {
 
   /** Removes a range. Vehicles it added stay in the campaign (mark them not applicable by hand). */
   async removeVinRange(id: string, rangeId: string) {
-    const result = await prisma.campaignVinRange.deleteMany({ where: { id: rangeId, campaignId: id } });
+    const result = await prisma.campaignVinRange.deleteMany({
+      where: { id: rangeId, campaignId: id },
+    });
     if (result.count === 0) throw new NotFoundError("VIN range not found");
     return this.get(id);
   }
 
   /** Adds vehicles in the system inside the campaign's saved ranges that are not in it yet. */
   private async addRangeVehicles(id: string) {
-    const ranges = await prisma.campaignVinRange.findMany({ where: { campaignId: id }, select: { vinFrom: true, vinTo: true } });
+    const ranges = await prisma.campaignVinRange.findMany({
+      where: { campaignId: id },
+      select: { vinFrom: true, vinTo: true },
+    });
     const vins = await this.vinsInRanges(ranges);
     if (vins.length > 0) await this.addVehicles(id, { vins });
   }
@@ -668,9 +728,13 @@ export class CampaignService {
     return { items, total, page, limit, counts: buildProgress(counts) };
   }
 
-  async getVehicle(id: string, campaignVehicleId: string) {
+  async getVehicle(id: string, campaignVehicleId: string, branchId?: string) {
     const row = await prisma.campaignVehicle.findFirst({
-      where: { id: campaignVehicleId, campaignId: id },
+      where: {
+        id: campaignVehicleId,
+        campaignId: id,
+        ...campaignVehicleBranch(branchId),
+      },
       include: {
         campaign: { select: { id: true, code: true, title: true, type: true } },
         vehicle: {
@@ -713,10 +777,15 @@ export class CampaignService {
       notes?: string | null;
       jobCardId?: string | null;
     },
+    branchId?: string,
   ) {
     return prisma.$transaction(async (tx) => {
       const rows = await tx.campaignVehicle.findMany({
-        where: { id: { in: campaignVehicleIds }, campaignId: id },
+        where: {
+          id: { in: campaignVehicleIds },
+          campaignId: id,
+          ...campaignVehicleBranch(branchId),
+        },
       });
       if (rows.length !== campaignVehicleIds.length)
         throw new NotFoundError(
@@ -724,7 +793,7 @@ export class CampaignService {
         );
       if (input.jobCardId) {
         const jc = await tx.jobCard.findUnique({
-          where: { id: input.jobCardId },
+          where: { id: input.jobCardId, ...(branchId ? { branchId } : {}) },
           select: { id: true },
         });
         if (!jc) throw new NotFoundError("Job card not found");
@@ -769,11 +838,16 @@ export class CampaignService {
       nextFollowUpAt?: Date | null;
     },
     actorId: string,
+    branchId?: string,
   ) {
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "CampaignVehicle" WHERE "id" = ${campaignVehicleId} FOR UPDATE`;
       const row = await tx.campaignVehicle.findFirst({
-        where: { id: campaignVehicleId, campaignId: id },
+        where: {
+          id: campaignVehicleId,
+          campaignId: id,
+          ...campaignVehicleBranch(branchId),
+        },
       });
       if (!row) throw new NotFoundError("Vehicle is not in this campaign");
       if (row.status === "COMPLETED")
@@ -797,7 +871,7 @@ export class CampaignService {
         },
       });
     });
-    return this.getVehicle(id, campaignVehicleId);
+    return this.getVehicle(id, campaignVehicleId, branchId);
   }
 
   /**
@@ -805,34 +879,56 @@ export class CampaignService {
    * outcome SENT (counts as called, the customer was not reached, so the status is unchanged).
    * Completed and not-applicable vehicles are skipped.
    */
-  async recordPrintedContacts(input: PrintedContactsInput, actorId: string) {
+  async recordPrintedContacts(
+    input: PrintedContactsInput,
+    actorId: string,
+    branchId?: string,
+  ) {
     const now = new Date();
     return prisma.$transaction(async (tx) => {
       const rows = await tx.campaignVehicle.findMany({
         where: {
           id: { in: input.campaignVehicleIds },
-          status: { notIn: [CampaignVehicleStatus.COMPLETED, CampaignVehicleStatus.NOT_APPLICABLE] },
+          ...campaignVehicleBranch(branchId),
+          status: {
+            notIn: [
+              CampaignVehicleStatus.COMPLETED,
+              CampaignVehicleStatus.NOT_APPLICABLE,
+            ],
+          },
           campaign: { status: CampaignStatus.ACTIVE },
         },
         select: { id: true },
       });
       const ids = rows.map((r) => r.id);
-      if (ids.length === 0) return { recorded: 0, skipped: input.campaignVehicleIds.length };
+      if (ids.length === 0)
+        return { recorded: 0, skipped: input.campaignVehicleIds.length };
       await tx.campaignContactLog.createMany({
         data: ids.map((campaignVehicleId) => ({
           campaignVehicleId,
           channel: input.channel as ContactChannel,
           outcome: ContactOutcome.SENT,
-          notes: input.notes ?? (input.channel === "LETTER" ? "FPC letter printed" : "On a printed FPC call list"),
+          notes:
+            input.notes ??
+            (input.channel === "LETTER"
+              ? "FPC letter printed"
+              : "On a printed FPC call list"),
           actorId,
           createdAt: now,
         })),
       });
       await tx.campaignVehicle.updateMany({
         where: { id: { in: ids } },
-        data: { contactAttempts: { increment: 1 }, lastContactAt: now, lastContactOutcome: ContactOutcome.SENT },
+        data: {
+          contactAttempts: { increment: 1 },
+          lastContactAt: now,
+          lastContactOutcome: ContactOutcome.SENT,
+        },
       });
-      return { recorded: ids.length, skipped: input.campaignVehicleIds.length - ids.length };
+      return {
+        recorded: ids.length,
+        skipped: input.campaignVehicleIds.length - ids.length,
+      };
     });
   }
 
@@ -847,9 +943,14 @@ export class CampaignService {
       serviceId?: string | null;
     },
     actorId: string,
+    branchId?: string,
   ) {
     const row = await prisma.campaignVehicle.findFirst({
-      where: { id: campaignVehicleId, campaignId: id },
+      where: {
+        id: campaignVehicleId,
+        campaignId: id,
+        ...campaignVehicleBranch(branchId),
+      },
       include: {
         campaign: { select: { code: true, title: true, status: true } },
         vehicle: { select: { id: true, customerId: true } },

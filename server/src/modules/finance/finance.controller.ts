@@ -1,3 +1,4 @@
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import { assertNotePermission,noteScope } from './party-note.controller';
 import type { TallyDocumentType } from './tally-xml';
 import { Request, Response, NextFunction } from 'express';
@@ -25,8 +26,8 @@ export class FinanceController {
 
   listBillableJobCards = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const jobCards = await this.jobBillingService.listBillableJobCards(branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { jobCards } });
     } catch (error) {
@@ -80,7 +81,7 @@ export class FinanceController {
     try {
       let branchId = req.query.branchId as string | undefined;
       const customerId = req.query.customerId as string | undefined;
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (req.user && !canChooseBillingBranch(req)) {
         branchId = req.user.branchId ?? undefined;
         if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
@@ -119,7 +120,7 @@ export class FinanceController {
   listPayments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       let branchId = req.query.branchId as string | undefined;
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (req.user && !canChooseBillingBranch(req)) {
         branchId = req.user.branchId ?? undefined;
         if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
@@ -143,7 +144,7 @@ export class FinanceController {
 
   createReceipt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.body.branchId : req.user?.branchId;
+      const branchId = canChooseBillingBranch(req) ? req.body.branchId : req.user?.branchId;
       assertBillingBranch(req, branchId);
       if (!branchId) throw new ForbiddenError('Select the receiving branch');
       for (const allocation of req.body.allocations as Array<{ invoiceId: string }>) {
@@ -167,7 +168,7 @@ export class FinanceController {
   listReceipts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       let branchId = req.query.branchId as string | undefined;
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (req.user && !canChooseBillingBranch(req)) {
         branchId = req.user.branchId ?? undefined;
         if (!branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       }
@@ -240,8 +241,8 @@ export class FinanceController {
 
   listServiceAdvisors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const advisors = await prisma.user.findMany({
         where: { isActive: true, role: { name: ROLES.SERVICE_ADVISOR }, ...(branchId ? { branchId } : {}) },
         select: { id: true, firstName: true, lastName: true, email: true, branchId: true },
@@ -264,8 +265,8 @@ export class FinanceController {
 
   pendingTallyBatches = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const noteDirections: Array<'DEBIT'|'CREDIT'>=[];
       if(req.user?.permissions?.includes(PERMISSIONS.DEBIT_NOTE_READ))noteDirections.push('DEBIT');
       if(req.user?.permissions?.includes(PERMISSIONS.CREDIT_NOTE_READ))noteDirections.push('CREDIT');
@@ -278,8 +279,8 @@ export class FinanceController {
     try {
       const noteType=req.query.type==='DEBIT_NOTE'||req.query.type==='CREDIT_NOTE';
       if(noteType)assertNotePermission(req,req.query.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
-      const branchId = noteType?noteScope(req,req.query.branchId as string|undefined):req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (!noteType && req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = noteType?noteScope(req,req.query.branchId as string|undefined):canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!noteType && !canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const documents = await this.tallyService.listDocuments({
         date: req.query.date as string,
         type: req.query.type as TallyDocumentType,
@@ -297,7 +298,7 @@ export class FinanceController {
       for (const document of documents) {
         if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')assertNotePermission(req,document.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
       }
-      if (req.user?.role !== ROLES.SUPER_ADMIN) {
+      if (!canChooseBillingBranch(req)) {
         for (const document of documents) {
           const branchId = document.type === 'JOB_BILL'
             ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
@@ -328,7 +329,7 @@ export class FinanceController {
       for (const document of documents) {
         if(document.type==='DEBIT_NOTE'||document.type==='CREDIT_NOTE')assertNotePermission(req,document.type==='DEBIT_NOTE'?'DEBIT':'CREDIT','read');
       }
-      if (req.user?.role !== ROLES.SUPER_ADMIN) {
+      if (!canChooseBillingBranch(req)) {
         for (const document of documents) {
           const branchId = document.type === 'JOB_BILL'
             ? (await prisma.invoice.findUnique({ where: { id: document.id }, select: { jobCard: { select: { branchId: true } }, customer: { select: { branchId: true } } } }))?.jobCard?.branchId
@@ -364,8 +365,8 @@ export class FinanceController {
 
   getSummaryReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const result = await this.financeService.getSummaryReport({ ...(req.query as any), branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { summary: result } });
     } catch (error) {
@@ -375,8 +376,8 @@ export class FinanceController {
 
   getInvoiceReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const result = await this.financeService.getInvoiceReport({ ...(req.query as any), branchId });
       res.status(200).json({ status: 'success', statusCode: 200, data: { report: result } });
     } catch (error) {
@@ -386,8 +387,8 @@ export class FinanceController {
 
   getDashboardOverview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branchId = req.user?.role === ROLES.SUPER_ADMIN ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
+      const branchId = canChooseBillingBranch(req) ? req.query.branchId as string | undefined : req.user?.branchId ?? undefined;
+      if (!canChooseBillingBranch(req) && !branchId) throw new ForbiddenError('Your account must be assigned to a branch');
       const result = await this.financeService.getDashboardOverview(branchId);
       res.status(200).json({ status: 'success', statusCode: 200, data: { overview: result } });
     } catch (error) {
@@ -396,9 +397,13 @@ export class FinanceController {
   };
 }
 
+function canChooseBillingBranch(req: Request): boolean {
+  return req.user?.role === ROLES.SUPER_ADMIN || isGeneralDepartmentManager(req.user);
+}
+
 function assertBillingBranch(req: Request, branchId?: string | null): void {
   if (!req.user) throw new ForbiddenError('Authentication is required');
-  if (req.user.role === ROLES.SUPER_ADMIN) return;
+  if (canChooseBillingBranch(req)) return;
   if (!req.user.branchId || !branchId || req.user.branchId !== branchId) {
     throw new ForbiddenError('Billing access is restricted to your assigned branch');
   }

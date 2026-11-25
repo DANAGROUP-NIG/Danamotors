@@ -1,5 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { SearchService } from './search.service';
+import { Request, Response, NextFunction } from "express";
+import { SearchService } from "./search.service";
+import { ownBranchScope } from "../../middleware/authorize";
 
 export class SearchController {
   private searchService: SearchService;
@@ -8,13 +9,17 @@ export class SearchController {
     this.searchService = new SearchService();
   }
 
-  search = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  search = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const q = req.query.q as string | undefined;
 
       if (!q || q.trim().length < 2) {
         res.status(200).json({
-          status: 'success',
+          status: "success",
           statusCode: 200,
           data: {
             results: {
@@ -29,10 +34,14 @@ export class SearchController {
         return;
       }
 
-      const results = await this.searchService.search(q, req.user?.permissions ?? []);
+      const results = await this.searchService.search(
+        q,
+        req.user?.permissions ?? [],
+        ownBranchScope(req.user),
+      );
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: { results },
       });
