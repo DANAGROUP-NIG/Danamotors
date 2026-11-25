@@ -1,7 +1,9 @@
 "use client";
 
 import { Field, inputCls } from "@/components/forms/FormField";
-import { TRANSPORT_MODE_LABELS } from "../lib/indent-status";
+import { NumberInput } from "@/components/forms/NumberInput";
+import { StaffNameInput } from "./CaseSplitter";
+import { DEFAULT_STN_TAX_FORM, STN_TAX_FORMS, TRANSPORT_MODE_LABELS } from "../lib/indent-status";
 import type { TransportMode } from "../types/indent.types";
 
 export type DespatchValues = {
@@ -10,6 +12,9 @@ export type DespatchValues = {
   courierName: string;
   packerName: string;
   taxForm: string;
+  /** Legacy Courier Date; blank = the dispatch date. */
+  courierDate: string;
+  consignmentWeight: string;
 };
 
 // Legacy STNs between branches use tax form X and go by road.
@@ -18,7 +23,9 @@ export const DEFAULT_DESPATCH: DespatchValues = {
   waybillNumber: "",
   courierName: "",
   packerName: "",
-  taxForm: "X",
+  taxForm: DEFAULT_STN_TAX_FORM,
+  courierDate: "",
+  consignmentWeight: "",
 };
 
 export function despatchPayload(v: DespatchValues) {
@@ -29,11 +36,35 @@ export function despatchPayload(v: DespatchValues) {
     courierName: opt(v.courierName),
     packerName: opt(v.packerName),
     taxForm: opt(v.taxForm),
+    courierDate: opt(v.courierDate),
+    consignmentWeight: v.consignmentWeight.trim() ? Number(v.consignmentWeight) : undefined,
   };
 }
 
+/** Legacy tax form for an STN; L and Z add 7.5% VAT on taxable parts. */
+export function TaxFormSelect({ value, onChange }: { value: string; onChange: (form: string) => void }) {
+  return (
+    <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
+      {Object.entries(STN_TAX_FORMS).map(([code, label]) => (
+        <option key={code} value={code}>
+          {label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** Packing list cum gate pass details shared by every way of dispatching an STN. */
-export function StnDespatchFields({ value, onChange }: { value: DespatchValues; onChange: (v: DespatchValues) => void }) {
+export function StnDespatchFields({
+  value,
+  onChange,
+  branchId,
+}: {
+  value: DespatchValues;
+  onChange: (v: DespatchValues) => void;
+  /** Supplying branch, whose employees are offered as the packer. */
+  branchId?: string;
+}) {
   const set = (patch: Partial<DespatchValues>) => onChange({ ...value, ...patch });
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -53,10 +84,22 @@ export function StnDespatchFields({ value, onChange }: { value: DespatchValues; 
         <input className={inputCls} maxLength={60} value={value.courierName} onChange={(e) => set({ courierName: e.target.value })} />
       </Field>
       <Field label="Packer (optional)">
-        <input className={inputCls} maxLength={60} value={value.packerName} onChange={(e) => set({ packerName: e.target.value })} />
+        <StaffNameInput branchId={branchId} value={value.packerName} onChange={(packerName) => set({ packerName })} />
+      </Field>
+      <Field label="Courier date (blank = today)">
+        <input type="date" className={inputCls} value={value.courierDate} onChange={(e) => set({ courierDate: e.target.value })} />
+      </Field>
+      <Field label="Consignment weight, kg (optional)">
+        <NumberInput
+          min={0}
+          step="0.1"
+          className={inputCls}
+          value={value.consignmentWeight}
+          onChange={(e) => set({ consignmentWeight: e.target.value })}
+        />
       </Field>
       <Field label="Tax form">
-        <input className={inputCls} maxLength={2} value={value.taxForm} onChange={(e) => set({ taxForm: e.target.value.toUpperCase() })} />
+        <TaxFormSelect value={value.taxForm} onChange={(taxForm) => set({ taxForm })} />
       </Field>
     </div>
   );

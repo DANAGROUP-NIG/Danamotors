@@ -186,6 +186,8 @@ model User {
   pickingListsDone         PickingList[]           @relation("PickingListCompletedBy")
   stnsCreated              StockTransferNote[]     @relation("StnCreatedBy")
   stnsDispatched           StockTransferNote[]     @relation("StnDispatchedBy")
+  stnsCancelled            StockTransferNote[]     @relation("StnCancelledBy")
+  stnEdits                 StockTransferNoteEdit[] @relation("StnEditedBy")
   transferCasesCreated     TransferCase[]          @relation("TransferCaseCreatedBy")
   packingListsCreated      PackingList[]           @relation("PackingListCreatedBy")
   mitsCreated              MaterialInTransit[]     @relation("MitCreatedBy")
@@ -2361,11 +2363,13 @@ enum TransferCaseStatus {
   PACKED
   DISPATCHED
   RECEIVED
+  CANCELLED
 }
 
 enum PackingListStatus {
   PACKED
   DISPATCHED
+  CANCELLED
 }
 
 enum TransportMode {
@@ -2685,7 +2689,16 @@ model StockTransferNote {
   // Guards the single stock deduction for this STN.
   stockDeducted Boolean @default(false)
   totalQuantity Int     @default(0)
+  // Goods at the dealer rate, without VAT: what the receiving branch books.
   totalValue    Float   @default(0)
+  // VAT on the sender's STN: legacy charged 7.5% on taxable parts under tax forms L and Z only.
+  taxAmount     Float   @default(0)
+
+  // Cancelled before any MRN (legacy STN cancel): stock went back to the sender.
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancelledBy        User?     @relation("StnCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancellationReason String?
 
   createdById    String?
   createdBy      User?     @relation("StnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -2701,6 +2714,7 @@ model StockTransferNote {
   packingList PackingList?
   // Goods received notes raised by the receiving branch; more than one when received in parts.
   mrns        MaterialReceiptNote[]
+  edits       StockTransferNoteEdit[]
 
   @@index([sourceBranchId])
   @@index([destinationBranchId])
@@ -2724,9 +2738,11 @@ model StockTransferNoteLine {
   part            SparePart @relation("StnSuppliedPart", fields: [partId], references: [id], onDelete: Restrict)
   isAlternate     Boolean   @default(false)
 
-  quantity Int
-  unitRate Float
-  amount   Float
+  quantity   Int
+  unitRate   Float
+  amount     Float
+  vatPercent Float @default(0)
+  taxAmount  Float @default(0)
 
   // Running receipt tallies, updated by each MRN the receiving branch posts against this line.
   receivedQuantity Int @default(0)
@@ -2740,6 +2756,30 @@ model StockTransferNoteLine {
 
   @@index([stnId])
   @@index([partId])
+}
+
+/**
+ * Legacy CSSTNEditLog: a change to a dispatched STN before any MRN (issued quantity or tax form).
+ */
+model StockTransferNoteEdit {
+  id    String            @id @default(uuid())
+  stnId String
+  stn   StockTransferNote @relation(fields: [stnId], references: [id], onDelete: Cascade)
+
+  // Set for a quantity change; empty for a tax form change.
+  partId      String?
+  partNumber  String?
+  oldQuantity Int?
+  newQuantity Int?
+  oldTaxForm  String?
+  newTaxForm  String?
+  reason      String
+
+  editedById String?
+  editedBy   User?    @relation("StnEditedBy", fields: [editedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([stnId])
 }
 
 model TransferCase {
@@ -2803,6 +2843,8 @@ model PackingList {
   waybillNumber     String?
   courierName       String?
   consignmentWeight Float?
+  // Legacy CourierDate: the day the courier took the consignment (the packing date on 98% of CPD's).
+  courierDate       DateTime?
   packingDate       DateTime          @default(now())
   dispatchedAt      DateTime?
   remarks           String?

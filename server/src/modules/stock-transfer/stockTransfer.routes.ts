@@ -25,6 +25,8 @@ import {
   directStnSchema,
   dispatchStnSchema,
   receiveStnSchema,
+  cancelStnSchema,
+  editStnSchema,
 } from "./stockTransfer.validation";
 
 const router = Router();
@@ -536,10 +538,35 @@ router.get("/picking-lists/:id", read, validateRequest(idParamSchema), controlle
  *     description: Empty body receives everything outstanding in good condition. Every indent on the STN is updated.
  *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
  *     responses: { 201: { description: STN with its MRNs } }
+ * /inventory/stn/{id}/cancel:
+ *   patch:
+ *     tags: [Stock Transfer]
+ *     summary: Cancel a dispatched STN before any MRN
+ *     description: |
+ *       Legacy STN cancel. The stock goes back to the sending branch, indent lines go back on back order, and the
+ *       cases, packing list and gate pass become void. Refused once the receiving branch has generated an MRN.
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+ *     requestBody: { content: { application/json: { example: { reason: Sent to the wrong branch } } } }
+ *     responses: { 200: { description: STN } }
+ * /inventory/stn/{id}/edit:
+ *   patch:
+ *     tags: [Stock Transfer]
+ *     summary: Change the issued quantities or tax form of a dispatched STN before any MRN
+ *     description: |
+ *       Legacy STN edit. More units come from the indent's back order (or free stock on a direct STN); fewer go back
+ *       to it. A line set to 0 leaves the STN. VAT is worked out again for the tax form (L and Z carry 7.5%).
+ *     parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { reason: One unit damaged in the store, lines: [{ stnLineId: 5d6e7f8a-9b0c-4d1e-8f2a-3b4c5d6e7f8a, quantity: 2 }] }
+ *     responses: { 200: { description: STN } }
  */
 router.patch("/indents/:id/close", requirePermission(PERMISSIONS.TRANSFER_CANCEL), validateRequest(closeIndentSchema), controller.closeIndent);
 router.post("/stn/dispatch", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(dispatchStnSchema), controller.dispatchStn);
 router.post("/stn/direct", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(directStnSchema), controller.createDirectStn);
+router.patch("/stn/:id/cancel", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(cancelStnSchema), controller.cancelStn);
+router.patch("/stn/:id/edit", requirePermission(PERMISSIONS.TRANSFER_DISPATCH), validateRequest(editStnSchema), controller.editStn);
 router.post("/stn/:id/receive", requirePermission(PERMISSIONS.TRANSFER_RECEIVE), validateRequest(receiveStnSchema), controller.receiveStn);
 router.get("/stn", read, validateRequest(listStnsSchema), controller.listStns);
 router.get("/stn/:id", read, validateRequest(idParamSchema), controller.getStn);

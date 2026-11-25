@@ -53,6 +53,13 @@ const STATUS_FILTER_OPTIONS = [
   ...INDENT_FILTER_STATUSES.map((s) => ({ label: INDENT_STATUS_LABELS[s], value: s })),
 ];
 
+/** Legacy kept the supplier's view (Branch Indent From Other Branches) apart from the branch's own indents. */
+const DIRECTION_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "To supply", value: "SUPPLY" },
+  { label: "Requested", value: "REQUESTED" },
+];
+
 const EXPORT_COLUMNS = [
   { key: "indentNumber", label: "Indent #" },
   { key: "orderDate", label: "Order Date" },
@@ -81,6 +88,7 @@ export function IndentsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [direction, setDirection] = useState<string>("");
   const [search, setSearch] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const { canCreate, abilities, myBranchId, crossBranch } = useIndentAbilities();
@@ -90,6 +98,8 @@ export function IndentsPage() {
 
   const { data, isLoading, isFetching, isError } = useIndents({
     status: (statusFilter || undefined) as IndentStatus | undefined,
+    ...(myBranchId && direction === "SUPPLY" && { sourceBranchId: myBranchId }),
+    ...(myBranchId && direction === "REQUESTED" && { requestingBranchId: myBranchId }),
     search: committedSearch || undefined,
     page,
     limit: PAGE_SIZE,
@@ -358,7 +368,19 @@ export function IndentsPage() {
             onClearSearch={clearSearch}
             placeholder="Search by indent #, STN #, part # or reg no…"
             filters={
-              <DataTableFilterChips options={STATUS_FILTER_OPTIONS} selected={statusFilter} onChange={changeStatus} />
+              <div className="flex flex-col gap-2">
+                {myBranchId && (
+                  <DataTableFilterChips
+                    options={DIRECTION_OPTIONS}
+                    selected={direction}
+                    onChange={(v) => {
+                      setDirection(v);
+                      setPage(1);
+                    }}
+                  />
+                )}
+                <DataTableFilterChips options={STATUS_FILTER_OPTIONS} selected={statusFilter} onChange={changeStatus} />
+              </div>
             }
           />
           <DataTableBulkToolbar

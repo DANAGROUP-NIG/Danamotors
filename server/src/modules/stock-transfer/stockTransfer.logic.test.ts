@@ -12,6 +12,9 @@ import {
   planReceipt,
   resolveDispatchQuantities,
   TransitLine,
+  checkStnLineEdit,
+  resizeCaseLines,
+  stnLineVat,
 } from "./stockTransfer.logic";
 
 describe("formatDocumentNumber", () => {
@@ -284,5 +287,61 @@ describe("buildProgress", () => {
     expect(progress.find((p) => p.key === "SUBMITTED")?.completed).toBe(true);
     expect(progress.find((p) => p.key === "APPROVED")?.remarks).toBe("ok");
     expect(progress.find((p) => p.key === "PICKED")?.completed).toBe(false);
+  });
+});
+
+describe("stnLineVat", () => {
+  it("charges 7.5% on taxable parts under forms L and Z, as legacy did", () => {
+    // ABJ STN 2025000027 (form L): 583022KA10 x 1 at 78,477.11 carried 5,885.78 VAT.
+    expect(stnLineVat("L", true, 78477.11, 7.5)).toEqual({ vatPercent: 7.5, taxAmount: 5885.78 });
+    // CPD STN 2023000616 (form Z): 423,470.13 of parts carried 31,760.26.
+    expect(stnLineVat("Z", true, 423470.13, 7.5).taxAmount).toBe(31760.26);
+  });
+
+  it("charges nothing under X, Y and P, on non-taxable parts, or with no form", () => {
+    for (const form of ["X", "Y", "P", null, undefined]) expect(stnLineVat(form, true, 1000, 7.5)).toEqual({ vatPercent: 0, taxAmount: 0 });
+    expect(stnLineVat("L", false, 1000, 7.5)).toEqual({ vatPercent: 0, taxAmount: 0 });
+  });
+});
+
+describe("resizeCaseLines", () => {
+  const lines = [
+    { id: "a", caseId: "c1", quantity: 3 },
+    { id: "b", caseId: "c2", quantity: 2 },
+  ];
+
+  it("adds extra units to the first case", () => {
+    expect(resizeCaseLines(lines, 7).map((l) => l.quantity)).toEqual([5, 2]);
+  });
+
+  it("takes units out of the last case first, emptying it if needed", () => {
+    expect(resizeCaseLines(lines, 4).map((l) => l.quantity)).toEqual([3, 1]);
+    expect(resizeCaseLines(lines, 2).map((l) => l.quantity)).toEqual([2, 0]);
+    expect(resizeCaseLines(lines, 0).map((l) => l.quantity)).toEqual([0, 0]);
+  });
+
+  it("refuses a negative quantity or an unpacked line", () => {
+    expect(() => resizeCaseLines(lines, -1)).toThrow(BadRequestError);
+    expect(() => resizeCaseLines([], 1)).toThrow(BadRequestError);
+  });
+});
+
+describe("checkStnLineEdit", () => {
+  const line = { partNumber: "P1", quantity: 5, accounted: 0 };
+
+  it("returns the change in quantity", () => {
+    expect(checkStnLineEdit(line, 3, 0)).toBe(-2);
+    expect(checkStnLineEdit(line, 8, 3)).toBe(3);
+    // A direct STN has no back order; free stock is checked when the stock row is locked.
+    expect(checkStnLineEdit(line, 20, null)).toBe(15);
+  });
+
+  it("limits an increase to the indent's back order", () => {
+    expect(() => checkStnLineEdit(line, 9, 3)).toThrow(/at most/);
+  });
+
+  it("refuses a line already received or a bad quantity", () => {
+    expect(() => checkStnLineEdit({ ...line, accounted: 1 }, 4, 0)).toThrow(ConflictError);
+    expect(() => checkStnLineEdit(line, 1.5, 0)).toThrow(BadRequestError);
   });
 });

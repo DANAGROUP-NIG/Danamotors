@@ -68,6 +68,21 @@ export const MOBIS_ORDER_MODE_LABELS: Record<MobisOrderMode, string> = {
   COURIER: "Courier",
 };
 
+/**
+ * Legacy tax forms on an STN (the `taxform` master). X is on 99.8% of legacy STNs. Under L and Z the
+ * STN carries 7.5% VAT on taxable parts; the receiving branch books the goods without it.
+ */
+export const STN_TAX_FORMS = {
+  X: "X: transfer without VAT",
+  L: "L: sale with VAT",
+  Z: "Z: purchase local (VAT)",
+  Y: "Y: purchase local with VAT (no VAT on STN)",
+  P: "P: purchase imported",
+} as const;
+export type StnTaxForm = keyof typeof STN_TAX_FORMS;
+export const DEFAULT_STN_TAX_FORM: StnTaxForm = "X";
+export const STN_VAT_FORMS: string[] = ["L", "Z"];
+
 export const STN_STATUS_LABELS = {
   CREATED: "Created",
   DISPATCHED: "In transit",

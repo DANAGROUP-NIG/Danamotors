@@ -33,13 +33,63 @@ CPD works this way in the legacy data (CPDAutoEnhancer, 2024 to 2026), and the w
 - **Several indents on one STN.** 30% of CPD STNs carry two or more indents of the same branch (legacy
   Pick List "Fill Orders"). **Dispatch to branch** ships every picked indent you tick on one STN, in one
   case, with one gate pass.
-- **Direct STN.** 10% of CPD STNs have no indent, such as the monthly Microcat Live recharge.
-  `POST /api/inventory/stn/direct` sends free stock to a branch with a stated purpose. The branch is
-  notified and receives it with an MRN like any other STN.
+- **Direct STN.** 10% of CPD STNs have no indent, such as the monthly Microcat Live recharge, and Kia Plaza
+  and Abuja send direct STNs only. `POST /api/inventory/stn/direct` sends free stock from any branch to any
+  branch with a stated purpose. The branch is notified and receives it with an MRN like any other STN.
+  **Any part source can go on a direct STN**, including local (L), used (U) and repaired (R) records: Kia Plaza
+  sent 1,996 local-part lines on direct STNs since 2021 (to VI, QS, UG and CPD). The direct STN part search
+  passes `allSources=true`; indents to CPD still refuse branch-bought sources (CPD supplies Mobis parts).
+- **Cases.** Every dispatch (single indent, Dispatch to branch, Direct STN) can split the goods into several
+  cases with a weight each (legacy Case Creation; 23 of 4,776 CPD STNs since 2021). Left alone, everything
+  goes in one case. The packer is chosen from the supplying branch's current employees (the handheld picker
+  list, `GET /api/handheld/pickers`), or typed.
+
+## Tax form and VAT
+
+Each STN carries a legacy tax form, chosen per STN from a dropdown: **X** (transfer without VAT, the default;
+99.8% of legacy STNs), **L**, **Z**, **Y** or **P**. Under **L** and **Z** the STN charges 7.5% VAT on taxable
+parts, as legacy did (ABJ 2021000132 and 2025000027, CPD 2023000616); X, Y and P carry none. The STN keeps
+`totalValue` (goods at the dealer rate) and `taxAmount` separately, and prints the net amount. The receiving
+branch's MRN books the goods **without** the VAT, as legacy did: CPD received ABJ's VAT STN 2025000027 at
+₦78,477.11 on form X. The rule matches legacy's tax master (`ctaxmast`) in all three databases. STN VAT is printed
+only; nothing posts it to accounts yet (Tally is deferred).
+
+## Cancel or change an STN (before any MRN)
+
+Legacy let the sending branch cancel or edit an STN until it was received (cancelled: CPD 2022 and 2024, Lagos
+2022, Abuja 2021; edited: Lagos 13 times in 2025). Both need `transfer:dispatch` at the sending branch, and
+both are refused once the receiving branch has generated any MRN.
+
+- **Cancel** (`PATCH /api/inventory/stn/:id/cancel`, `{ reason }`): the stock goes back to the sender, indent
+  lines go back on back order (the indent returns to Approved and can be picked again), and the cases, packing
+  list and gate pass become void. The STN keeps its number with status Cancelled. A positive `TRANSFER_OUT`
+  movement offsets the dispatch, so stock and consumption reports net to zero. The receiving branch and the
+  requesters are notified.
+- **Change** (`PATCH /api/inventory/stn/:id/edit`, `{ reason, taxForm?, lines?: [{ stnLineId, quantity }] }`):
+  the legacy edit of the issued quantity and tax form. Extra units come from the indent line's back order (or
+  free stock on a direct STN); fewer go back to it. A line set to 0 leaves the STN; every line at 0 is refused
+  (cancel instead). Cases follow: extra units go into the first case holding the part, removed units come out
+  of the last case first, and an emptied case is removed. VAT is worked out again. Each change is kept in
+  `StockTransferNoteEdit` (legacy `CSSTNEditLog`) and shown on the STN.
+- After a **closed back order**, cancelling or reducing the STN puts those units back on back order (the indent
+  reopens); the units written off when the back order was closed stay closed.
+- An edit and a handheld pick of the same indent lock the indent row and run one after the other.
+
+## Printed documents
+
+The STN page prints the **STN** (the paper that travels at Kia Plaza and Abuja: both branches with addresses,
+indents, tax form, lines at the dealer rate, VAT, net amount in words, signatures) and the **packing list cum
+gate pass** (CPD: gate pass number, courier, waybill, courier date, weight, and each case with its packer and
+contents). The indent page prints the **pick list** in bin order with a blank Picked column, the paper fallback
+when the handheld is not used. A cancelled STN prints as cancelled and its gate pass as void. All three use the
+shared print pieces in `client/components/print/`.
 
 Every request body is optional except the indent itself and a rejection reason. An empty
 approve, dispatch or receive call handles the common case: approve everything, ship
 everything in one case, and receive everything in good condition.
+
+On the Stock Transfers list, **To supply** shows the indents other branches raised on your branch (legacy
+Branch Indent From Other Branches) and **Requested** the ones your branch raised.
 
 ## Statuses
 
@@ -91,7 +141,8 @@ main-and-alternate family. The picking list and STN lines both keep
 Documents are created only by the actions above. These endpoints are read-only:
 `/picking-lists`, `/stn`, `/stn/:id`, `/cases/:id`, `/packing-lists/:id` and `/transfer-mrns`.
 Each packing list carries a gate pass number from the shared gate pass series (legacy "Packing
-List cum Gate Pass"). The picking list records the picker's name.
+List cum Gate Pass"), the courier, waybill, consignment weight and courier date (legacy Courier Date; the
+dispatch date when left blank). The picking list records the picker's name.
 A transfer MRN has `source = BRANCH_TRANSFER` and points to the STN and the supplying branch;
 a Mobis MRN has `source = MOBIS` and points to its MIT. A database check keeps the two apart.
 
@@ -118,6 +169,7 @@ one notification per event, even if they qualify through more than one role.
 | MRN generated or transfer received | Supplying branch store managers, general store managers |
 | Damaged or short quantities | Users who may approve the shortage (see [Shortage / damage approval](#shortage--damage-approval-legacy-se-approval)) |
 | Indent cancelled | Requester, and supplying branch store managers if it was already submitted |
+| STN cancelled or changed before receipt | Requesters, receiving branch store managers |
 
 ## Shortage / damage approval (legacy S/E approval)
 
@@ -164,7 +216,8 @@ parts, so they are not part of this mapping.
 
 `stockTransfer.logic.test.ts` covers the business rules without a database. The database
 tests in `stockTransfer.integration.test.ts` run the full flow, including races and partial
-receipts. They are skipped unless `TEST_DATABASE_URL` points at a separate, migrated
+receipts. `stnChanges.integration.test.ts` covers VAT (reproducing ABJ STN 2025000027), local parts on a
+direct STN, cancel and change before receipt, split cases on a direct STN and the courier date. They are skipped unless `TEST_DATABASE_URL` points at a separate, migrated
 database:
 
 ```bash

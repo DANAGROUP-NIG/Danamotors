@@ -294,6 +294,81 @@ export function planCases(
   return plans;
 }
 
+// ── STN tax form and VAT ─────────────────────────────────────────────────────
+
+/** Legacy `taxform` master, the same five codes in all three databases. */
+export const STN_TAX_FORMS = {
+  X: "Transfer without VAT",
+  L: "Sale (VAT)",
+  Z: "Purchase local",
+  Y: "Purchase local with VAT",
+  P: "Purchase imported",
+} as const;
+export type StnTaxForm = keyof typeof STN_TAX_FORMS;
+export const STN_TAX_FORM_CODES = Object.keys(STN_TAX_FORMS) as [StnTaxForm, ...StnTaxForm[]];
+/** X on 99.8% of legacy STNs since 2021. */
+export const DEFAULT_STN_TAX_FORM: StnTaxForm = "X";
+/**
+ * Legacy charged VAT on an STN only under forms L and Z (ABJ 2021000132 and 2025000027, CPD 2023000616);
+ * X, Y and P never carried VAT. The receiving branch booked those goods without the VAT.
+ */
+export const STN_VAT_FORMS: StnTaxForm[] = ["L", "Z"];
+
+/** VAT on one STN line: the rate applies to taxable parts under a VAT form. */
+export function stnLineVat(taxForm: string | null | undefined, taxable: boolean, amount: number, vatRate: number) {
+  const vatPercent = taxable && STN_VAT_FORMS.includes((taxForm ?? DEFAULT_STN_TAX_FORM) as StnTaxForm) ? vatRate : 0;
+  return { vatPercent, taxAmount: roundMoney((amount * vatPercent) / 100) };
+}
+
+// ── STN edit ─────────────────────────────────────────────────────────────────
+
+export interface CaseLineQty {
+  id: string;
+  caseId: string;
+  quantity: number;
+}
+
+/**
+ * New case quantities for one STN line whose quantity is edited from the sum of `caseLines` to
+ * `newTotal`. Extra units go into the first case holding the part; units taken off come out of
+ * the last case first. A case line left at 0 is to be deleted.
+ */
+export function resizeCaseLines(caseLines: CaseLineQty[], newTotal: number): CaseLineQty[] {
+  if (!caseLines.length) throw new BadRequestError("The STN line is not packed in any case");
+  if (!Number.isInteger(newTotal) || newTotal < 0) throw new BadRequestError("Quantity must be a whole number, 0 or more");
+  const result = caseLines.map((l) => ({ ...l }));
+  let diff = newTotal - result.reduce((s, l) => s + l.quantity, 0);
+  if (diff > 0) result[0].quantity += diff;
+  for (let i = result.length - 1; diff < 0 && i >= 0; i--) {
+    const take = Math.min(result[i].quantity, -diff);
+    result[i].quantity -= take;
+    diff += take;
+  }
+  return result;
+}
+
+/**
+ * Checks a quantity change on a dispatched STN line. More units come out of the indent line's back
+ * order (or, on a direct STN, free stock, checked when the stock is locked); fewer units go back to it.
+ */
+export function checkStnLineEdit(
+  line: { partNumber: string; quantity: number; accounted: number },
+  newQuantity: number,
+  indentBackOrder: number | null,
+) {
+  if (!Number.isInteger(newQuantity) || newQuantity < 0) {
+    throw new BadRequestError(`${line.partNumber}: quantity must be a whole number, 0 or more`);
+  }
+  if (line.accounted > 0) throw new ConflictError(`${line.partNumber} has already been received; the STN cannot change`);
+  const delta = newQuantity - line.quantity;
+  if (delta > 0 && indentBackOrder !== null && delta > indentBackOrder) {
+    throw new BadRequestError(
+      `${line.partNumber}: only ${indentBackOrder} more unit(s) are on the indent's back order; the STN can carry ${line.quantity + indentBackOrder} at most`,
+    );
+  }
+  return delta;
+}
+
 // ── Receipt ──────────────────────────────────────────────────────────────────
 
 /** A line that was sent and is being received: an STN line (transfer) or a Mobis MIT line. */

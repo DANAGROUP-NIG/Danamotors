@@ -60,7 +60,13 @@ export class StockTransferController {
   });
 
   searchParts = handle(async (req, res) => {
-    const q = req.query as unknown as { search: string; requestingBranchId?: string; sourceBranchId?: string; limit?: number };
+    const q = req.query as unknown as {
+      search: string;
+      requestingBranchId?: string;
+      sourceBranchId?: string;
+      limit?: number;
+      allSources?: boolean;
+    };
     ok(res, { parts: await this.service.searchParts(q) });
   });
 
@@ -165,6 +171,20 @@ export class StockTransferController {
     assertInventoryBranchAccess(req, [req.body.sourceBranchId]);
     const stn = await this.service.createDirectStn(req.body, req.user!.userId);
     ok(res, { stn }, `Direct STN ${stn.stnNumber} dispatched`, 201);
+  });
+
+  cancelStn = handle(async (req, res) => {
+    const branches = await this.service.getStnBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const stn = await this.service.cancelStn(req.params.id, req.user!.userId, req.body.reason);
+    ok(res, { stn }, `STN ${stn.stnNumber} cancelled; the stock is back at ${stn.sourceBranch.name}`);
+  });
+
+  editStn = handle(async (req, res) => {
+    const branches = await this.service.getStnBranches(req.params.id);
+    assertInventoryBranchAccess(req, [branches.sourceBranchId]);
+    const stn = await this.service.editStn(req.params.id, req.user!.userId, req.body);
+    ok(res, { stn }, `STN ${stn.stnNumber} changed`);
   });
 
   receiveStn = handle(async (req, res) => {
