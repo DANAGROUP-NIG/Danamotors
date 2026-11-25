@@ -176,6 +176,8 @@ export class EnquiryService {
       scheduledAt: new Date(data.scheduledAt!),
       durationMins: data.durationMins,
       notes: data.notes ?? enquiry.serviceDescription,
+      // A booking needs at least one customer request; the enquiry's service description is it.
+      requests: [{ description: enquiry.serviceDescription.trim() }],
       status: "Pending",
       source: "OnlineBooking",
     });
