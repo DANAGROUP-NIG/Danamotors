@@ -648,3 +648,12 @@ export function stageSummaries(stage: JobStage, events: StageEventFact[]): Stage
     return { stage: step, state: "COMPLETED", by: left?.actorName ?? null, at: left?.createdAt ?? null };
   });
 }
+
+/**
+ * The header's Warranty or Non-warranty tag, as on the paper job card: the vehicle was under
+ * warranty when the job opened, or the job has a warranty case. Campaigns alone do not make it a
+ * warranty job. TODO(confirm): whether goodwill-only jobs should also show "Warranty".
+ */
+export function isWarrantyJob(coverageAtOpening: string | null | undefined, hasWarrantyCase: boolean): boolean {
+  return coverageAtOpening === "ACTIVE" || hasWarrantyCase;
+}

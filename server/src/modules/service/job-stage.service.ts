@@ -21,6 +21,7 @@ import {
   currentSubStep,
   normaliseJobStatus,
   stageAlerts,
+  isWarrantyJob,
   stageSummaries,
   type StageAction,
   type StageActor,
@@ -35,6 +36,8 @@ const workspaceJob = {
   branchId: true,
   jobType: true,
   customerId: true,
+  vehicleId: true,
+  createdAt: true,
   stage: true,
   status: true,
   qcStatus: true,
@@ -110,8 +113,13 @@ export interface StageActionInput {
 export class JobStageService {
   private readonly workflow = new JobCardWorkflowService();
 
-  /** Everything the staged job card needs to show the current step to this person. */
-  async workspace(id: string, actor: StageActor, now = new Date()) {
+  /**
+   * Everything the staged job card needs to show the current step to this person. Someone who
+   * cannot update job cards (no jobcard:update) sees every step read-only, with no actions.
+   */
+  async workspace(id: string, actor: StageActor, options: { now?: Date; canUpdate?: boolean } = {}) {
+    const now = options.now ?? new Date();
+    const canUpdate = options.canUpdate ?? true;
     return prisma.$transaction(
       async (tx) => {
         const job = await tx.jobCard.findUnique({ where: { id }, select: workspaceJob });
@@ -121,17 +129,21 @@ export class JobStageService {
           where: { jobCardId: id },
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           select: {
+            id: true,
             fromStage: true,
             toStage: true,
+            action: true,
             note: true,
+            ownerRole: true,
             createdAt: true,
             actor: { select: { firstName: true, lastName: true } },
+            owner: { select: { firstName: true, lastName: true } },
           },
         });
         const eventFacts = events.map((event) => ({ ...event, actorName: fullName(event.actor) }));
         const pdi = job.jobType === JobCardType.PDI;
         // PDI jobs keep their own screens; the staged actions do not apply to them.
-        const actions = pdi ? [] : availableActions(facts, actor);
+        const actions = pdi || !canUpdate ? [] : availableActions(facts, actor);
         return {
           jobCardId: job.id,
           jobNumber: job.jobNumber,
@@ -143,11 +155,25 @@ export class JobStageService {
             ? { id: job.stageOwner?.id ?? null, name: fullName(job.stageOwner), role: job.stageOwnerRole }
             : null,
           enteredAt: job.stageEnteredAt,
-          readOnly: pdi || !canWorkStage(job.stage, actor, job.technicianId),
+          readOnly: pdi || !canUpdate || !canWorkStage(job.stage, actor, job.technicianId),
           actions,
           alerts: stageAlerts({ ...facts, promisedAt: job.promisedAt }, now),
           summaries: stageSummaries(job.stage, eventFacts),
           cancellation: job.stage === "CANCELLED" ? await cancellation(tx, id, eventFacts) : null,
+          warrantyJob: isWarrantyJob(job.warrantyStatusAtCreation, !!job.warrantyCase),
+          // Newest first, for the Activity tab of the Job file.
+          activity: [...eventFacts].reverse().map((event) => ({
+            id: event.id,
+            at: event.createdAt,
+            fromStage: event.fromStage,
+            toStage: event.toStage,
+            action: event.action,
+            by: event.actorName,
+            ownerName: fullName(event.owner),
+            ownerRole: event.ownerRole,
+            note: event.note,
+          })),
+          previousVisits: await previousVisits(tx, job),
         };
       },
       { maxWait: 5000, timeout: 15000 },
@@ -231,4 +257,48 @@ async function cancellation(
     select: { remarks: true, createdAt: true, actor: { select: { firstName: true, lastName: true } } },
   });
   return history ? { by: fullName(history.actor), at: history.createdAt, reason: history.remarks } : { by: null, at: null, reason: null };
+}
+
+/**
+ * The vehicle's last two visits before this job, for the Visit history tab (the paper card's
+ * "last two visits"). Any branch, as service history is shared; cancelled and PDI jobs are not visits.
+ */
+async function previousVisits(tx: Prisma.TransactionClient, job: Pick<WorkspaceJob, "id" | "vehicleId" | "createdAt">) {
+  if (!job.vehicleId) return [];
+  const visits = await tx.jobCard.findMany({
+    where: {
+      vehicleId: job.vehicleId,
+      id: { not: job.id },
+      createdAt: { lt: job.createdAt },
+      jobType: JobCardType.SERVICE,
+      stage: { not: "CANCELLED" },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 2,
+    select: {
+      id: true,
+      jobNumber: true,
+      createdAt: true,
+      deliveredAt: true,
+      mileage: true,
+      stage: true,
+      workDone: true,
+      branch: { select: { name: true } },
+      serviceType: { select: { description: true } },
+      service: { select: { name: true } },
+      complaints: { select: { description: true }, orderBy: { id: "asc" }, take: 5 },
+    },
+  });
+  return visits.map((visit) => ({
+    id: visit.id,
+    jobNumber: visit.jobNumber,
+    openedAt: visit.createdAt,
+    deliveredAt: visit.deliveredAt,
+    mileage: visit.mileage,
+    stage: visit.stage,
+    branchName: visit.branch.name,
+    service: visit.serviceType?.description ?? visit.service?.name ?? null,
+    requests: visit.complaints.map((complaint) => complaint.description),
+    workDone: visit.workDone,
+  }));
 }

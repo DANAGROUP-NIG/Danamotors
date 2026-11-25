@@ -59,6 +59,13 @@ export function formatDateTime(value: DateValue): string {
   return parsed ? dateTime.format(parsed) : NOT_PROVIDED;
 }
 
+const whole = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 });
+
+/** 48,250 km. Missing or unreadable readings show NOT_PROVIDED. */
+export function formatKm(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${whole.format(value)} km` : NOT_PROVIDED;
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;

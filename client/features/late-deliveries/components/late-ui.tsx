@@ -31,8 +31,8 @@ export function LateReasonChips({ reasons, empty, dense }: { reasons: ReasonChip
   return (
     <ul className={cn("flex flex-wrap gap-1", dense && "max-w-64")}>
       {reasons.map((reason) => (
-        <li key={reason.id} className="inline-flex items-center gap-1 rounded-md bg-slate-100 py-0.5 pl-0.5 pr-1.5 text-xs text-slate-700 print:bg-transparent">
-          <span className="grid size-4 place-items-center rounded bg-white font-mono text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">{reason.code.length <= 2 ? reason.code : "•"}</span>
+        <li key={reason.id} className="inline-flex items-center gap-1 rounded-md bg-muted py-0.5 pl-0.5 pr-1.5 text-xs text-foreground print:bg-transparent">
+          {reason.code && reason.code.length <= 2 && <span className="grid size-4 place-items-center rounded bg-card font-mono text-[10px] font-semibold text-muted-foreground ring-1 ring-border">{reason.code}</span>}
           {reason.description}
         </li>
       ))}

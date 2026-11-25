@@ -930,7 +930,7 @@ const stageActor = (req: Request) => ({ id: req.user!.userId, role: req.user!.ro
  *   get:
  *     tags: [Service]
  *     summary: The staged job card for the signed-in user
- *     description: Stage, owner and since when, the current sub-step, the actions this user can take (each with an enabled flag and plain-English reasons), up to 3 alerts, summaries of completed steps, a read-only flag and, for a cancelled job, who cancelled it and why.
+ *     description: Stage, owner and since when, the current sub-step, the actions this user can take (each with an enabled flag and plain-English reasons), up to 3 alerts, summaries of completed steps, a read-only flag, the Warranty or Non-warranty tag (warrantyJob), the step activity log (newest first), the vehicle's last two earlier visits and, for a cancelled job, who cancelled it and why.
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
@@ -946,7 +946,11 @@ router.get(
   async (req, res, next) => {
     try {
       await assertStageJobAccess(req, req.params.id);
-      const data = await stageService.workspace(req.params.id, stageActor(req));
+      const user = req.user!;
+      const data = await stageService.workspace(req.params.id, stageActor(req), {
+        // Matches the POST /stage check, so the screen never offers an action the server refuses.
+        canUpdate: user.role === ROLES.SUPER_ADMIN || user.permissions.includes(PERMISSIONS.JOBCARD_UPDATE),
+      });
       res.json({ status: "success", statusCode: 200, data });
     } catch (error) {
       next(error);

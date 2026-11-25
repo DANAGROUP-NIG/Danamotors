@@ -1,6 +1,7 @@
 import { ROLES } from "../../shared/constants/roles";
 import { JOB_TRANSITION_ROLES } from "./job-transitions";
 import {
+  isWarrantyJob,
   ACTION_RULES,
   CHECK_IN_SIGNATURE,
   ALL_STAGES,
@@ -364,5 +365,15 @@ describe("sub-step, alerts and summaries", () => {
     expect(stageSummaries("CLOSED", [])).toHaveLength(8);
     const cancelled = [...events, { fromStage: "ESTIMATE" as const, toStage: "CANCELLED" as const, actorName: "Tunde Bakare", createdAt: at(11) }];
     expect(stageSummaries("CANCELLED", cancelled).map((row) => row.stage)).toEqual(["CHECK_IN", "DIAGNOSIS", "WARRANTY"]);
+  });
+});
+
+describe("isWarrantyJob", () => {
+  it("tags the job Warranty when the vehicle was covered at opening or a warranty case exists", () => {
+    expect(isWarrantyJob("ACTIVE", false)).toBe(true);
+    expect(isWarrantyJob("EXPIRED", true)).toBe(true);
+    expect(isWarrantyJob("EXPIRED", false)).toBe(false);
+    expect(isWarrantyJob(null, false)).toBe(false);
+    expect(isWarrantyJob(undefined, false)).toBe(false);
   });
 });

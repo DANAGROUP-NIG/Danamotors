@@ -1,4 +1,5 @@
 "use client";
+import { NOT_PROVIDED, formatKm } from '@/lib/format';
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -28,16 +29,16 @@ function RemarksContext({ document }: { document: RemarksDocument }) {
   const fields = [
     ['Document', context.documentNumber ?? 'Legacy document'],
     ['Date (Lagos)', lagosDate(context.documentDate)],
-    ['Status', context.status],
+    ['Status', /^[A-Z_]+$/.test(context.status ?? '') ? context.status.charAt(0) + context.status.slice(1).toLowerCase().replaceAll('_', ' ') : context.status || NOT_PROVIDED],
     ['Job', context.jobNumber ?? 'Standalone estimate'],
-    ['Job date (Lagos)', context.jobDate ? lagosDate(context.jobDate) : '?'],
-    ['Customer', context.customerName ?? '?'],
-    ['Registration', context.vehicle?.registrationNumber ?? '?'],
-    ['VIN', context.vehicle?.vin ?? '?'],
-    ['Model', context.vehicle?.model ?? '?'],
-    ['Variant', context.vehicle?.trim ?? '?'],
-    ['Mileage', context.mileage ?? '?'],
-    ['Service', context.service ? `${context.service.code} ? ${context.service.description}` : '?'],
+    ['Job date (Lagos)', context.jobDate ? lagosDate(context.jobDate) : NOT_PROVIDED],
+    ['Customer', context.customerName ?? NOT_PROVIDED],
+    ['Registration', context.vehicle?.registrationNumber ?? NOT_PROVIDED],
+    ['VIN', context.vehicle?.vin ?? NOT_PROVIDED],
+    ['Model', context.vehicle?.model ?? NOT_PROVIDED],
+    ['Variant', context.vehicle?.trim ?? NOT_PROVIDED],
+    ['Mileage', formatKm(context.mileage)],
+    ['Service', context.service ? `${context.service.code}: ${context.service.description}` : NOT_PROVIDED],
   ];
   return <dl className="grid gap-3 text-sm sm:grid-cols-3">{fields.map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>)}</dl>;
 }

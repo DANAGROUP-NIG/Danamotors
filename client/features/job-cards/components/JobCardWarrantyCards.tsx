@@ -1,4 +1,5 @@
 "use client";
+import { formatDate, formatDateTime, formatKm } from "@/lib/format";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -23,14 +24,11 @@ import {
   CASE_STATUS_TONES,
   COVERAGE_LABELS,
   COVERAGE_TONES,
-  fmtDate,
-  fmtDateTime,
-  fmtKm,
   personName,
 } from "@/features/warranty/lib/warranty-format";
 import type { JobCard } from "../types/job-card.types";
 
-/** Screen 04 — coverage snapshotted when the job card was created, and its warranty case. */
+/** Screen 04: coverage snapshotted when the job card was created, and its warranty case. */
 export function WarrantySnapshotCard({ jobCard }: { jobCard: JobCard }) {
   const { hasPermission, isSuperAdmin } = useAuth();
   const canOpen = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.CLAIM);
@@ -48,24 +46,24 @@ export function WarrantySnapshotCard({ jobCard }: { jobCard: JobCard }) {
       className="h-full"
     >
       {!status ? (
-        <p className="text-sm text-slate-400">This job card was opened before warranty checks, or without a vehicle.</p>
+        <p className="text-sm text-muted-foreground">This job card was opened before warranty checks, or without a vehicle.</p>
       ) : (
         <div className="space-y-3 text-sm">
-          <p className="text-base text-slate-800">
+          <p className="text-base text-foreground">
             {status === "ACTIVE"
-              ? [jobCard.warrantyExpiresOnAtCreation && `Expires ${fmtDate(jobCard.warrantyExpiresOnAtCreation.slice(0, 10))}`, coverage?.remainingKm != null && `${fmtKm(coverage.remainingKm)} remaining`]
+              ? [jobCard.warrantyExpiresOnAtCreation && `Expires ${formatDate(jobCard.warrantyExpiresOnAtCreation)}`, coverage?.remainingKm != null && `${formatKm(coverage.remainingKm)} remaining`]
                   .filter(Boolean)
-                  .join(" · ")
+                  .join(", ")
               : (snapshot?.reasonText ?? []).join(". ") || COVERAGE_LABELS[status]}
           </p>
-          <p className="text-xs text-slate-400">Snapshot taken when the job card was created — later changes do not alter it.</p>
+          <p className="text-xs text-muted-foreground">Snapshot taken when the job card was created. Later changes do not alter it.</p>
           {snapshot?.odometerReplaced && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Odometer replaced (previous reading {fmtKm(snapshot.previousMileage)}): {snapshot.odometerReplacedReason}
+              Odometer replaced (previous reading {formatKm(snapshot.previousMileage)}): {snapshot.odometerReplacedReason}
             </p>
           )}
           {jobCard.warrantyAcknowledgedBy && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Acknowledged by {jobCard.warrantyAcknowledgedBy.firstName} {jobCard.warrantyAcknowledgedBy.lastName}
             </p>
           )}
@@ -121,10 +119,10 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
     );
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+    <div className="mt-3 rounded-lg border border-border bg-muted/70 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-slate-700">Campaign work done on this job?</p>
-        <div role="group" aria-label={`Campaign work done for ${campaign.campaignCode}`} className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white">
+        <p className="text-sm font-medium text-foreground">Campaign work done on this job?</p>
+        <div role="group" aria-label={`Campaign work done for ${campaign.campaignCode}`} className="inline-flex overflow-hidden rounded-md border border-border bg-white">
           <button
             type="button"
             disabled={!canEdit || pending}
@@ -132,7 +130,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
             onClick={done}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
-              campaign.attended === true && !notDone ? "bg-emerald-600 text-white" : "text-slate-700 hover:bg-slate-50 disabled:text-slate-400",
+              campaign.attended === true && !notDone ? "bg-emerald-600 text-white" : "text-foreground hover:bg-muted disabled:text-muted-foreground",
             )}
           >
             {pending && !notDone ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} Done
@@ -143,8 +141,8 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
             aria-pressed={campaign.attended === false || notDone}
             onClick={() => setNotDone(true)}
             className={cn(
-              "inline-flex items-center gap-1.5 border-l border-slate-300 px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
-              campaign.attended === false || notDone ? "bg-amber-500 text-white" : "text-slate-700 hover:bg-slate-50 disabled:text-slate-400",
+              "inline-flex items-center gap-1.5 border-l border-border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+              campaign.attended === false || notDone ? "bg-amber-500 text-white" : "text-foreground hover:bg-muted disabled:text-muted-foreground",
             )}
           >
             <X className="size-3.5" /> Not done
@@ -154,7 +152,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
 
       {editing ? (
         <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <label className="grid gap-1 text-xs font-medium text-slate-600">
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
             Reason
             <select className={cn(inputCls, "h-9")} value={reason} onChange={(e) => setReason(e.target.value as NotAttendedReason | "")} autoFocus>
               <option value="">Choose a reason…</option>
@@ -163,7 +161,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-medium text-slate-600">
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
             {reason === "OTHER" ? "Describe the reason" : "Note (optional)"}
             <input className={cn(inputCls, "h-9")} value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder={reason === "PARTS_NOT_AVAILABLE" ? "e.g. part on back order" : ""} />
           </label>
@@ -175,10 +173,10 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
           </div>
         </div>
       ) : (
-        <p className={cn("mt-2 flex items-start gap-1.5 text-xs", answered ? "text-slate-500" : campaign.hasFreeLine ? "text-blue-700" : "text-amber-700")}>
+        <p className={cn("mt-2 flex items-start gap-1.5 text-xs", answered ? "text-muted-foreground" : campaign.hasFreeLine ? "text-blue-700" : "text-amber-700")}>
           {answered ? <Check className="mt-px size-3.5 shrink-0" /> : campaign.hasFreeLine ? <Info className="mt-px size-3.5 shrink-0" /> : <Clock className="mt-px size-3.5 shrink-0" />}
           {answered
-            ? `${campaign.attended ? "Done" : `Not done: ${campaign.notAttendedReason ?? "no reason"}`} · recorded by ${personName(campaign.attendedBy)} on ${fmtDateTime(campaign.attendedAt)}`
+            ? `${campaign.attended ? "Done" : `Not done: ${campaign.notAttendedReason ?? "no reason"}`}, recorded by ${personName(campaign.attendedBy)} on ${formatDateTime(campaign.attendedAt)}`
             : campaign.hasFreeLine
               ? "Pre-set to done: a free line is charged to this campaign. Change it if the work was not done."
               : "Answer before the job is marked ready. Not done returns the vehicle to the outstanding list."}
@@ -189,7 +187,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
 }
 
 /**
- * Screen 04 — campaigns the job card was opened for, with this vehicle's progress and the
+ * Screen 04: campaigns the job card was opened for, with this vehicle's progress and the
  * "work done" answer. Shown to every job card user: the answer needs jobcard:update, not warranty:read.
  */
 export function LinkedCampaignsCard({ jobCard, canEdit }: { jobCard: JobCard; canEdit: boolean }) {
@@ -205,21 +203,21 @@ export function LinkedCampaignsCard({ jobCard, canEdit }: { jobCard: JobCard; ca
       className="h-full print:hidden"
     >
       {campaigns.length === 0 ? (
-        <p className="text-sm text-slate-400">No recall, FPC or campaign work on this job card.</p>
+        <p className="text-sm text-muted-foreground">No recall, FPC or campaign work on this job card.</p>
       ) : (
         <ul className="space-y-3">
           {campaigns.map((c) => (
-            <li key={c.campaignId} className="rounded-lg border border-slate-200 p-3 text-sm">
+            <li key={c.campaignId} className="rounded-lg border border-border p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 {canOpenCampaign ? (
-                  <Link href={`/campaigns/${c.campaignId}`} className="font-mono text-xs font-semibold text-slate-800 hover:underline">
+                  <Link href={`/campaigns/${c.campaignId}`} className="font-mono text-xs font-semibold text-foreground hover:underline">
                     {c.campaignCode}
                   </Link>
                 ) : (
-                  <span className="font-mono text-xs font-semibold text-slate-800">{c.campaignCode}</span>
+                  <span className="font-mono text-xs font-semibold text-foreground">{c.campaignCode}</span>
                 )}
-                <span className="min-w-0 flex-1 text-slate-600">
-                  {CAMPAIGN_TYPE_LABELS[c.campaignType]} — {c.campaignTitle}
+                <span className="min-w-0 flex-1 text-muted-foreground">
+                  {CAMPAIGN_TYPE_LABELS[c.campaignType]}: {c.campaignTitle}
                 </span>
                 {c.vehicleStatus && <Pill status={CAMPAIGN_VEHICLE_LABELS[c.vehicleStatus]} tone={CAMPAIGN_VEHICLE_TONES[c.vehicleStatus]} />}
               </div>

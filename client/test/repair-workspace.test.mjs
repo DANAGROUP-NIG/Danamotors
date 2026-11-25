@@ -124,34 +124,6 @@ function loader(stubs = {}) {
 const helpers = loader()(component + "repair-workspace-helpers.ts");
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
-test("stepper maps canonical and legacy statuses without inventing a cancelled stage", () => {
-  for (const [status, index] of [
-    ["OPEN", 0],
-    ["Pending", 0],
-    ["In Progress", 1],
-    ["On Hold", 1],
-    ["QC", 2],
-    ["Quality Check", 2],
-    ["Completed", 3],
-    ["Billed", 4],
-    ["Closed", 5],
-    ["DELIVERED", 5],
-  ]) {
-    const steps = helpers.getStepperState(status);
-    assert.equal(steps[index].state, "current");
-    assert.ok(
-      steps.slice(0, index).every((step) => step.state === "completed"),
-    );
-    assert.ok(
-      steps.slice(index + 1).every((step) => step.state === "upcoming"),
-    );
-  }
-  assert.ok(
-    helpers
-      .getStepperState("CANCELLED")
-      .every((step) => step.state === "upcoming"),
-  );
-});
 test("view model uses backend total and only customer-facing line fields", () => {
   const estimate = structuredClone(fixture.estimates[0]);
   estimate.amount = 123.45;
@@ -202,17 +174,10 @@ test("money splits retain backend precision and render zero as naira zero", () =
 export function renderWorkspaceFixture({
   card = fixture,
   permissions = ["estimate:print", "estimate:sign", "estimate:revise"],
-  loading = false,
-  error = null,
 } = {}) {
   const load = loader({
     [path.join(root, "features/job-cards/hooks/use-job-card.ts")]: {
-      useJobCard: () => ({
-        data: card,
-        isLoading: loading,
-        error,
-        refetch: () => {},
-      }),
+      useJobCard: () => ({ data: card, isLoading: false, error: null, refetch: () => {} }),
     },
     "@/features/auth/hooks/use-auth": {
       useAuth: () => ({
@@ -242,10 +207,8 @@ export function renderWorkspaceFixture({
         React.createElement("img", { src, alt, width, height, className }),
     },
   });
-  const Page = load(component + "RepairWorkspacePage.tsx").RepairWorkspacePage;
-  return renderToStaticMarkup(
-    React.createElement(Page, { id: card?.id ?? "test" }),
-  );
+  const Section = load(component + "JobCardEstimateSection.tsx").JobCardEstimateSection;
+  return renderToStaticMarkup(React.createElement(Section, { jobCard: card }));
 }
 
 test("saved estimates show the server-calculated advisory amount without a mandatory percentage", () => {
@@ -276,10 +239,9 @@ test("saved estimates show the server-calculated advisory amount without a manda
   );
 });
 
-test("workspace renders latest backend data, semantic stepper/table and allowed actions", () => {
+test("estimate section renders latest backend data, a semantic table and allowed actions", () => {
   const html = renderWorkspaceFixture();
   for (const label of [
-    "Repair workspace",
     "85,800",
     "Awaiting approval",
     "Get customer signature",
@@ -287,7 +249,6 @@ test("workspace renders latest backend data, semantic stepper/table and allowed 
     "Print estimate",
   ])
     assert.ok(html.includes(label));
-  assert.ok(html.includes('aria-current="step"'));
   assert.ok(html.includes("<table"));
   assert.ok(html.includes("overflow-x-auto"));
   assert.equal(html.includes("SECRET-SOURCE"), false);
@@ -302,7 +263,7 @@ test("workspace renders latest backend data, semantic stepper/table and allowed 
   ])
     assert.equal(denied.includes(label), false);
 });
-test("workspace handles empty, inaccessible, loading, failed, declined and legacy states", () => {
+test("estimate section handles empty, declined and legacy states", () => {
   const card = structuredClone(fixture);
   card.estimates = [];
   assert.ok(
@@ -315,18 +276,6 @@ test("workspace handles empty, inaccessible, loading, failed, declined and legac
       "Create estimate",
     ),
     false,
-  );
-  delete card.estimates;
-  assert.ok(
-    renderWorkspaceFixture({ card }).includes(
-      "not available with your permissions",
-    ),
-  );
-  assert.ok(
-    renderWorkspaceFixture({ loading: true }).includes('aria-busy="true"'),
-  );
-  assert.ok(
-    renderWorkspaceFixture({ error: new Error("test") }).includes("Retry"),
   );
   const declined = structuredClone(fixture);
   declined.estimates[0].status = "Declined";

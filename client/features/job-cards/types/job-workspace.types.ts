@@ -81,6 +81,37 @@ export interface JobWorkspace {
   alerts: StageAlert[];
   summaries: StageSummary[];
   cancellation: { by: string | null; at: string | null; reason: string | null } | null;
+  /** The header's Warranty or Non-warranty tag. */
+  warrantyJob: boolean;
+  /** Step moves and handoffs, newest first. */
+  activity: StageActivity[];
+  /** The vehicle's last two earlier visits (any branch), newest first. */
+  previousVisits: PreviousVisit[];
+}
+
+export interface StageActivity {
+  id: string;
+  at: string;
+  fromStage: JobStage | null;
+  toStage: JobStage;
+  action: string | null;
+  by: string | null;
+  ownerName: string | null;
+  ownerRole: string | null;
+  note: string | null;
+}
+
+export interface PreviousVisit {
+  id: string;
+  jobNumber: string;
+  openedAt: string;
+  deliveredAt: string | null;
+  mileage: number | null;
+  stage: JobStage;
+  branchName: string;
+  service: string | null;
+  requests: string[];
+  workDone: string | null;
 }
 
 export interface StageActionInput {

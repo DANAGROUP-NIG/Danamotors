@@ -1,5 +1,6 @@
 "use client";
-import { ReactNode, useEffect, useId, useRef } from "react";
+import { ReactNode, useId, useRef } from "react";
+import { useFocusTrap } from "@/components/ui/use-focus-trap";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -25,72 +26,7 @@ export default function ModalFame({
 }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
-
-  useEffect(() => {
-    close.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-
-    const focusable = () =>
-      Array.from(
-        panel.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
-        ) ?? [],
-      ).filter(
-        (element) =>
-          element.offsetParent !== null && !element.closest("[inert]"),
-      );
-
-    panel.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-
-      if (event.key === "Escape" && !preventAccidentalClose) close.current();
-
-      if (event.key !== "Tab") return;
-
-      const elements = focusable();
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-
-      if (!first) {
-        event.preventDefault();
-        return;
-      }
-
-      if (
-        event.shiftKey &&
-        (document.activeElement === first ||
-          document.activeElement === panel.current)
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (
-        !event.shiftKey &&
-        (document.activeElement === last ||
-          document.activeElement === panel.current)
-      ) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = overflow;
-      previous?.focus();
-    };
-  }, [isOpen, preventAccidentalClose]);
+  useFocusTrap(panel, isOpen, onClose, !preventAccidentalClose);
 
   if (!isOpen) return null;
 

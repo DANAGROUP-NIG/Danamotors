@@ -2,7 +2,7 @@
 
 ## Staged job card (job card revamp, phase 0)
 
-The job card is being rebuilt as "one job, one step, one owner" (`doc/plans/jobcard-ux-revamp-prompts.md`). Phase 0 adds the model underneath. The screens change from phase 1.
+The job card is being rebuilt as "one job, one step, one owner" (`doc/plans/jobcard-ux-revamp-prompts.md`). Phase 0 added the model underneath. Phase 1 replaced the job card page with the staged frame described below.
 
 ### Stage model
 
@@ -60,6 +60,38 @@ Moves that change the status are announced by the existing status notification r
 
 `client/lib/format.ts` (`formatMoney`, `formatDate`, `formatDateTime`, `formatRelative`, `NOT_PROVIDED`) and `client/features/job-cards/lib/job-stage.logic.ts` (step labels, badges, phone label "Step N of 8: Label", action and owner wording) are the single mappings for new code. The job card list shows a **Step** column.
 
+
+### The job card page (phase 1)
+
+`/job-cards/[id]` renders `JobWorkspace` (`client/features/job-cards/components/workspace/`). The old long page, its duplicated status list, the Job specs, Opening details, Workshop record, Technician and Quality inspector cards and the separate repair workspace are gone. Every job, at any step, uses this frame:
+
+- **Header**, sticky at the top: job number, plate, vehicle ("Kia Sportage 2023, white"), customer and mobile, the step badge, a Warranty or Non-warranty tag, the repeat tag, "With: name (role) since date", and the promised delivery with a countdown (amber under 4 hours, red "Overdue by ..." once passed). **Job file** and **Print** buttons on the right. Phones show the plate, model, badge and owner line only.
+- **Stepper**: the 8 steps, completed (tick, who and when), current, upcoming and skipped ("Skipped"). Completed steps are buttons that open their read-only summary. Phones show "Step N of 8: Label" with a progress bar that opens the list. A cancelled job's stepper is greyed.
+- **Alerts**: up to 3 from the server, each with an icon, a sentence and, where the person can act, a link (assign a technician, view parts, open campaigns).
+- **Finished steps**: one line each ("Check-in completed by Chidi Eze, 25 Nov 2026, 09:40."). A line opens the step's recorded facts, read only. Anything a job never recorded, such as on jobs from before phase 0, reads "Not provided".
+- **Waiting banner**: shown to anyone who can see the step but does not own it, for example "Waiting for Musa Abdullahi (Technician). You can view this step but only the technician can update it."
+- **Current step**: the heading "Step N of 8: Label", the sub-step sentence, and the step's content. Steps not rebuilt yet show the existing sections that serve them (each marked `TODO(phase N)` in `StageContent.tsx`):
+
+| Step | Content until its phase replaces it |
+|---|---|
+| Check-in, Estimate | Job-opening approval, estimate, advance |
+| Diagnosis | Technician assignment, findings and work done, then opening approval, estimate, advance |
+| Warranty | Warranty at creation, who pays for each line |
+| Repair | Request part, Service transactions, issued parts and collection, recorded labour, technician |
+| Quality check | Record QC pass or failure, inspections, findings |
+| Billing | Bill (create job bill, bills table), delivery on credit |
+| Delivery | Deliver the vehicle (delivery advisor, late reasons), bill, delivery on credit |
+| Closed | Delivered panel with gate pass print, bills |
+
+- **Action bar**, sticky at the bottom: one primary handoff from the server's actions, with the blocking reason written beside it when disabled; other enabled actions as outline buttons; a **More** menu with **Cancel job**. Save draft appears only for steps with drafts (none yet). Each click sends a new request ID and blocks double clicks. Success shows a toast naming the job and the new owner ("Job 2026000127 sent to Tunde Bakare").
+- **Cancel job** asks for a reason in a dialog that names the job and plate. It closes only on Keep job, the close button or success; Esc and outside clicks do not close it. The cancelled job shows a red Cancelled badge and a panel "Cancelled by name, date. Reason: ..." with View activity.
+- **Job file** drawer (480 px, full screen on phones, focus kept inside, Esc closes), tabs: Customer and vehicle (customer, vehicle, this visit's details including the opening estimate, tyres, battery, checklist and internal remarks), Visit history (last two earlier visits at any branch, and the repeat block), Warranty and campaigns (warranty at creation, linked campaigns, who pays), Documents and prints (opening approval, estimate revisions, bills, gate pass, picking list, customer explanation), Activity (late delivery, step changes, status changes).
+- **Page states**: a skeleton shaped like the frame while loading; "Could not load job N" with Try again; "Job card not found"; "You cannot open this job card" for another branch's job, saying who can open it.
+- **Print menu**: estimate, signed job-opening approval, picking list and gate pass. The printed job card itself comes in phase 11. When printing, only the gate pass prints.
+
+The old "Workshop actions" form was split into the step sections above. Its status dropdown no longer offers Start work, Send for QC, Wait for parts, Mark ready or Cancel, because the action bar does these through the stage service; that stops a job skipping steps. Delivery (status DELIVERED with late reasons) stays in the Deliver the vehicle section until phase 9.
+
+API additions to `GET /service/job-cards/:id/workspace`: `warrantyJob` (vehicle covered when the job opened, or a warranty case exists; `TODO(confirm)` goodwill-only jobs), `activity` (step changes, newest first, with actor, new owner and note) and `previousVisits` (the vehicle's last two earlier service jobs at any branch, not cancelled and not PDI). A user without `jobcard:update` gets no actions and a read-only step, matching the check on `POST /stage`.
 
 ### Vehicles with multiple job cards (issue 142)
 

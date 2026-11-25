@@ -173,6 +173,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     const card = await job('DIAGNOSIS', 'OPEN', { warrantyStatusAtCreation: 'ACTIVE' });
     const view = await stages.workspace(card.id, users.technician);
     expect(view.actions.map(a => a.action)).toEqual(['SEND_TO_WARRANTY']);
+    expect(view.warrantyJob).toBe(true);
     await expect(act(card.id, 'SEND_TO_ADVISOR', 'technician')).rejects.toMatchObject({ statusCode: 409, code: 'STAGE_ACTION_BLOCKED' });
 
     await act(card.id, 'SEND_TO_WARRANTY', 'technician');
@@ -218,12 +219,39 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await expect(act(repair.id, 'CANCEL', 'advisor')).rejects.toMatchObject({ statusCode: 400, details: { field: 'note' } });
   });
 
+  it('offers no actions and shows the step read-only to someone who cannot update job cards', async () => {
+    const card = await job('ESTIMATE', 'OPEN');
+    const view = await stages.workspace(card.id, users.advisor, { canUpdate: false });
+    expect(view).toMatchObject({ readOnly: true, actions: [] });
+    expect((await stages.workspace(card.id, users.advisor)).actions.map(a => a.action)).toContain('CANCEL');
+  });
+
   it('cancels with a reason and shows who cancelled it', async () => {
     const card = await job('ESTIMATE', 'OPEN');
     const view = await act(card.id, 'CANCEL', 'advisor', 'Customer took the vehicle elsewhere');
     expect(view).toMatchObject({ stage: 'CANCELLED', readOnly: true, actions: [] });
     expect(view.cancellation).toMatchObject({ by: 'Advisor Synthetic', reason: 'Customer took the vehicle elsewhere' });
+    expect(view.warrantyJob).toBe(false);
+    // The Activity tab lists the newest step change first, with who did it and the note.
+    expect(view.activity[0]).toMatchObject({ fromStage: 'ESTIMATE', toStage: 'CANCELLED', action: 'CANCEL', by: 'Advisor Synthetic', note: 'Customer took the vehicle elsewhere' });
     await expectAt(card.id, 'CANCELLED', 'CANCELLED');
+  });
+
+  it('lists the last two earlier visits of the vehicle, leaving out cancelled and PDI jobs', async () => {
+    const own = (await db.vehicle.create({ data: { vin: `STGVISIT${run}`, customModel: 'Synthetic Sportage', customerId } })).id;
+    const at = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000);
+    const oldest = await job('CLOSED', 'DELIVERED', { vehicleId: own, createdAt: at(90), mileage: 30_000 });
+    const older = await job('CLOSED', 'DELIVERED', { vehicleId: own, createdAt: at(60), mileage: 35_000, workDone: 'Front brake pads replaced.' });
+    await job('CANCELLED', 'CANCELLED', { vehicleId: own, createdAt: at(30) });
+    await job('CLOSED', 'DELIVERED', { vehicleId: own, createdAt: at(20), jobType: 'PDI' });
+    const recent = await job('CLOSED', 'DELIVERED', { vehicleId: own, createdAt: at(10), mileage: 40_000 });
+    const card = await job('CHECK_IN', 'OPEN', { vehicleId: own });
+
+    const visits = (await stages.workspace(card.id, users.advisor)).previousVisits;
+    expect(visits.map(v => v.id)).toEqual([recent.id, older.id]);
+    expect(visits[1]).toMatchObject({ jobNumber: older.jobNumber, mileage: 35_000, workDone: 'Front brake pads replaced.', requests: ['Noise from front left wheel when braking'] });
+    expect(visits.map(v => v.id)).not.toContain(oldest.id);
+    expect((await stages.workspace(oldest.id, users.advisor)).previousVisits).toEqual([]);
   });
 
   it('keeps the stage in step when the existing paths change status or QC', async () => {
