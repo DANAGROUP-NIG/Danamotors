@@ -117,7 +117,8 @@ namespace Danamotors.Hhdc.Link
                 {
                     PortReader reader = new PortReader(port);
                     // Throw away answers to earlier requests still in the printer's buffer.
-                    while (reader.Read(150) != null) { }
+                    string old;
+                    while ((old = reader.Read(150)) != null && old.Length > 0) { }
                     byte[] ask = Encoding.ASCII.GetBytes("~HI~HS");
                     port.Write(ask, 0, ask.Length);
                     port.Flush();
@@ -127,6 +128,9 @@ namespace Danamotors.Hhdc.Link
                     {
                         string chunk = reader.Read((int)Math.Max(50, (until - DateTime.UtcNow).TotalMilliseconds));
                         if (chunk == null) break;
+                        // The USB printer driver completes a read with no data when the printer has not
+                        // answered yet (2026-11-23: most status checks failed in ~60 ms): wait, read again.
+                        if (chunk.Length == 0) { System.Threading.Thread.Sleep(50); continue; }
                         reply.Append(chunk);
                         PrinterState s = ZebraReply.Parse(reply.ToString());
                         if (s != null && ZebraReply.Frames(reply.ToString()).Count >= 4) return s;
@@ -180,14 +184,14 @@ namespace Danamotors.Hhdc.Link
 
             public PortReader(FileStream port) { this.port = port; }
 
-            /// <summary>What arrives within the time, or null for nothing.</summary>
+            /// <summary>What arrives within the time; "" when the driver completed the read empty; null when nothing came in time.</summary>
             public string Read(int ms)
             {
                 if (pending == null) pending = port.BeginRead(buf, 0, buf.Length, null, null);
                 if (!pending.AsyncWaitHandle.WaitOne(ms)) return null;
                 int n = port.EndRead(pending);
                 pending = null;
-                return n <= 0 ? null : Encoding.ASCII.GetString(buf, 0, n);
+                return n <= 0 ? "" : Encoding.ASCII.GetString(buf, 0, n);
             }
         }
 

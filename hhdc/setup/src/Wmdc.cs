@@ -44,12 +44,32 @@ namespace Danamotors.Hhdc.Setup
             }
         }
 
-        /// <summary>Anything left to do: not installed, services not created yet, or not fixed.</summary>
+        /// <summary>
+        /// The service fix is for Windows 10/11, where the sync services share one svchost and stop working. Windows 7
+        /// (still on some store PCs, 2026-11-24) runs WMDC as it was made to: install it and the drivers, nothing more.
+        /// </summary>
+        public static bool SplitFixNeeded { get { return Environment.OSVersion.Version.Major >= 10; } }
+
+        static bool Windows10Drivers { get { return Environment.OSVersion.Version.Major >= 10; } }
+
+        /// <summary>
+        /// The WMDC in the kit (wmupdate.msi and the drivers) is the 64-bit one, from the Windows 10 store PC. On 32-bit
+        /// Windows (some Windows 7 PCs) Windows Update installs WMDC when a handheld is first docked with internet on.
+        /// </summary>
+        public static bool CanInstall { get { return Environment.Is64BitOperatingSystem; } }
+
+        public const string Install32BitHelp = "This is 32-bit Windows and the WMDC in this setup is 64-bit. Dock the handheld " +
+            "with the internet on: Windows 7 installs Windows Mobile Device Center from Windows Update by itself. Or ask IT for " +
+            "WMDC 6.1 for 32-bit Windows (drvupdate-x86). Then run this setup again.";
+
+        /// <summary>Anything left to do (and possible here): not installed, services not created yet, or not fixed.</summary>
         public static bool NeedsWork
         {
             get
             {
-                if (!Installed || !ServicesExist) return true;
+                if (!Installed) return CanInstall;
+                if (!SplitFixNeeded) return false;
+                if (!ServicesExist) return true;
                 foreach (string s in Services) if (!ServiceFixed(s)) return true;
                 return false;
             }
@@ -60,6 +80,11 @@ namespace Danamotors.Hhdc.Setup
         public static void Install(Progress p, string skipFile)
         {
             bool fresh = false;
+            if (!Installed && !CanInstall)
+            {
+                p.Warn(Install32BitHelp);
+                return;
+            }
             if (!Installed)
             {
                 string msi = Path.Combine(Kit.WmdcPayload, "wmupdate.msi");
@@ -79,9 +104,15 @@ namespace Danamotors.Hhdc.Setup
                 {
                     string path = Path.Combine(Path.Combine(Kit.WmdcPayload, "Drivers"), inf);
                     if (!File.Exists(path)) { p.Warn("Driver " + inf + " is missing from the kit"); continue; }
-                    Run(pnputil, "/add-driver \"" + path + "\" /install");   // non-zero when already installed: fine
+                    // Windows 7 and 8 know only the old syntax. Non-zero when already installed: fine.
+                    Run(pnputil, Windows10Drivers ? "/add-driver \"" + path + "\" /install" : "-i -a \"" + path + "\"");
                 }
                 p.Ok("Drivers added");
+            }
+            if (!SplitFixNeeded)
+            {
+                p.Ok("WMDC ready (Windows " + Environment.OSVersion.Version.Major + "." + Environment.OSVersion.Version.Minor + ": no service fix needed)");
+                return;
             }
             if (!ServicesExist)
             {

@@ -8,7 +8,7 @@ using Danamotors.Hhdc.Link;
 /// HHDC Link on a command line: the same logic as the window, for scripts and the end-to-end test.
 ///   HhdcLinkCli [options] list | device | send SHEET | receive SHEET ZERO|RELEASE | install EXE
 ///                         sources TYPE | senddoc TYPE NUMBER PICKERCODE | receivedoc NUMBER
-///                         station key KEY | station once | station run | printer status | printer test
+///                         station key KEY | station once | station run | printer status | printer test | printer file ZPLFILE
 /// TYPE is INDENT_PICK, CPO_PICK or MIT_RECEIVE; NUMBER is the indent, CPO or MIT number.
 /// Options: --server URL  --email E  --password P (or HHDC_PASSWORD)  --folder DIR (stand-in device)
 ///          --data DIR (settings and upload record)  --all-branches
@@ -16,7 +16,7 @@ using Danamotors.Hhdc.Link;
 /// station: the PC's handheld station (no user sign-in): "key" saves the key issued on the web, "once" makes one
 /// pass (heartbeat, deliver, collect), "run" loops as the tray station does until Ctrl+C. --app EXE installs that
 /// device app on a handheld that differs. The station also prints barcode labels on a Zebra on USB; --printer-file DIR
-/// writes them to files there instead. printer: "status" shows the USB Zebra's state, "test" prints one test label.
+/// writes them to files there instead. printer: "status" shows the USB Zebra's state, "test" prints one test label, "file" sends a ZPL file (proofing a layout).
 /// </summary>
 public static class Cli
 {
@@ -183,7 +183,16 @@ public static class Cli
             Console.WriteLine("Test label sent.");
             return 0;
         }
-        throw new LinkException("printer status | printer test");
+        if (sub == "file")
+        {
+            // Proofing a label layout: send a ZPL file as it is (e.g. one the server rendered).
+            if (words.Count < 3) throw new LinkException("printer file ZPLFILE");
+            if (state == null || !state.Ready) return 2;
+            zebra.Print(File.ReadAllBytes(words[2]));
+            Console.WriteLine("Sent " + words[2] + ".");
+            return 0;
+        }
+        throw new LinkException("printer status | printer test | printer file ZPLFILE");
     }
 
     static WorkItem Find(List<WorkItem> items, string number)

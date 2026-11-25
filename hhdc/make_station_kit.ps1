@@ -31,6 +31,13 @@ $pcSetup = Join-Path $root '..\..\hhdc_integration\pc_setup'
 if (-not (Test-Path "$pcSetup\wmupdate.msi")) { throw "WMDC files not found at $pcSetup (wmupdate.msi, Drivers)." }
 Copy-Item "$pcSetup\wmupdate.msi" "$kit\payload\wmdc\"
 Copy-Item "$pcSetup\Drivers" "$kit\payload\wmdc\Drivers" -Recurse
+# Windows 7 only: .NET Framework 4.8 (Windows 10/11 have it) and the starter that installs it, then opens the setup.
+$dotnet = Join-Path $pcSetup 'dotnet\ndp48-x86-x64-allos-enu.exe'
+if (-not (Test-Path $dotnet)) { throw "$dotnet not found (Microsoft's offline installer: https://go.microsoft.com/fwlink/?linkid=2088631)." }
+if ((Get-AuthenticodeSignature $dotnet).Status -ne 'Valid') { throw "$dotnet is not validly signed: download it again from Microsoft." }
+New-Item -ItemType Directory -Force "$kit\payload\dotnet" | Out-Null
+Copy-Item $dotnet "$kit\payload\dotnet\"
+Copy-Item (Join-Path $root 'setup\Windows 7 - Start here.cmd') $kit
 Set-Content "$kit\setup.ini" "server=$Server" -Encoding ASCII
 
 if ($CertThumbprint) {

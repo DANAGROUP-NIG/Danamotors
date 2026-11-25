@@ -154,7 +154,8 @@ namespace Danamotors.Hhdc.Setup
                 keyHint.Text = "Copy the key on the web; it is filled in here by itself.";
 
             Info("Windows user: " + Environment.UserName + " on " + Environment.MachineName);
-            Info("Windows Mobile Device Center: " + (Wmdc.Installed ? (Wmdc.NeedsWork ? "installed, will be finished" : "ready") : "not installed, will be installed"));
+            Info("Windows Mobile Device Center: " + (Wmdc.Installed ? (Wmdc.NeedsWork ? "installed, will be finished" : "ready")
+                : Wmdc.CanInstall ? "not installed, will be installed" : "not installed (32-bit Windows: see below)"));
             bool programs;
             try { programs = Kit.ProgramsCurrent(); } catch (Exception) { programs = false; }
             Info("Programs: " + (programs ? "up to date" : "will be installed to " + Kit.InstallDir));
@@ -221,6 +222,7 @@ namespace Danamotors.Hhdc.Setup
 
                 if (!Kit.NetFramework48()) Warn(".NET Framework 4.8 is not installed. If the station does not start, install it from Windows Update.");
 
+                if (!Wmdc.Installed && !Wmdc.CanInstall) Warn(Wmdc.Install32BitHelp);
                 bool files = !Kit.ProgramsCurrent(), wmdc = Wmdc.NeedsWork;
                 if (files || wmdc) Elevated(files, wmdc);
                 else Ok("Programs and Windows Mobile Device Center are up to date");
@@ -261,7 +263,16 @@ namespace Danamotors.Hhdc.Setup
                     throw new StopException("The server refused this station key. Copy it again from Settings > HHDC (or press New key there), and check this is the server where the station was registered.");
                 throw new StopException("The server answered: " + e.Message);
             }
-            catch (LinkException e) { throw new StopException(e.Message); }
+            catch (LinkException e)
+            {
+                string m = e.Message;
+                bool secure = m.IndexOf("SSL", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("TLS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                              m.IndexOf("trust", StringComparison.OrdinalIgnoreCase) >= 0 || m.IndexOf("certificate", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (secure && Environment.OSVersion.Version.Major < 10)
+                    m += " This Windows could not make a secure connection to the server. On Windows 7: install the latest Windows updates " +
+                         "(root certificates and TLS 1.2 support), restart, and run the setup again; or ask IT.";
+                throw new StopException(m);
+            }
         }
 
         void Elevated(bool files, bool wmdc)
