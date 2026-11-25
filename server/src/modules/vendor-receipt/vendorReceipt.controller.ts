@@ -16,10 +16,14 @@ const handle =
 const ok = (res: Response, data: unknown, message?: string, statusCode = 200) =>
   res.status(statusCode).json({ status: "success", statusCode, ...(message && { message }), data });
 
+/** Branch to list: cross-branch users get the branch they picked (all when none); others only their own. */
 function scope(req: Request): string | undefined {
   const cross =
     req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(PERMISSIONS.INVENTORY_CROSS_BRANCH) === true;
-  if (cross) return undefined;
+  if (cross) {
+    const requested = req.query.branchId;
+    return typeof requested === "string" && requested ? requested : undefined;
+  }
   assertInventoryBranchAccess(req, [req.user?.branchId]);
   return req.user!.branchId ?? undefined;
 }

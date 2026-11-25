@@ -79,5 +79,6 @@ export const listMobisMitsSchema = z.object({
   query: z.object({
     status: z.nativeEnum(MitStatus).optional(),
     search: z.string().trim().max(50).optional(),
+    branchId: z.string().uuid().optional(),
   }),
 });

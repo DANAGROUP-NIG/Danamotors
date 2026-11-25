@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "sonner";
 import { inventoryKeys } from "@/features/inventory/api/inventory.keys";
 import { notificationKeys } from "@/features/notification/api/notification.keys";
+import { useBranchStore } from "@/store/branch.store";
 import {
   cancelMitRequest,
   createMrnRequest,
@@ -19,10 +20,13 @@ export function mobisErrorMessage(error: unknown, fallback: string) {
   return first ? `${first.field ? `${first.field}: ` : ""}${first.message}` : (data?.message ?? fallback);
 }
 
+/** MITs at the branch picked in the branch switcher. */
 export function useMobisMits(params: { status?: MitStatus; search?: string } = {}) {
+  const branchId = useBranchStore((s) => s.activeBranch?.id);
+  const scoped = { ...params, branchId };
   return useQuery({
-    queryKey: mobisKeys.list(params),
-    queryFn: () => getMobisMitsRequest(params),
+    queryKey: mobisKeys.list(scoped),
+    queryFn: () => getMobisMitsRequest(scoped),
     placeholderData: keepPreviousData,
   });
 }

@@ -58,8 +58,8 @@ export function VendorReceiptDetail({ id }: { id: string }) {
   return (
     <div className="grid gap-5 px-4 py-6 lg:px-6 print:p-0">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href="/inventory/vendor-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft className="size-4" /> Back to vendor receipts
+        <Link href="/inventory/mrn" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to MRNs
         </Link>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setLabels(null); setPrinting(true); }}>

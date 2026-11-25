@@ -68,7 +68,7 @@ Swagger under "Mobis Purchase".
 
 ## Vendor receipts (non-Mobis purchases)
 
-**Inventory → Vendor Receipts** (`/inventory/vendor-receipts`) receives parts bought from any vendor other than
+**Inventory → MRN** (material receipt note, `/inventory/mrn`) receives parts bought from any vendor other than
 Mobis: the local, second-hand and repaired parts the branches buy (legacy: about 600–850 local-vendor MRNs a year
 per branch), and CPD's direct non-Mobis purchases. Each receipt is an MRN with source `VENDOR` for one vendor
 invoice, numbered like every MRN.

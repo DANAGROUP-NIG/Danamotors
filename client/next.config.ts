@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Vendor receipts moved to /inventory/mrn; keep old links and bookmarks working.
+  async redirects() {
+    return [
+      { source: "/inventory/vendor-receipts", destination: "/inventory/mrn", permanent: true },
+      { source: "/inventory/vendor-receipts/:path*", destination: "/inventory/mrn/:path*", permanent: true },
+    ];
+  },
   async rewrites() {
     // Proxy /api/* to the backend so the frontend always calls a same-origin
     // URL (no CORS in the browser). The destination comes from

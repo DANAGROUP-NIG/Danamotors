@@ -11,14 +11,19 @@ const BASE = "/inventory/vendor-receipts";
 
 export const vendorReceiptKeys = {
   all: ["vendor-receipts"] as const,
-  list: (search: string) => [...vendorReceiptKeys.all, "list", search] as const,
+  list: (search: string, branchId?: string) => [...vendorReceiptKeys.all, "list", search, branchId ?? "all"] as const,
   detail: (id: string) => [...vendorReceiptKeys.all, "detail", id] as const,
   vendors: (search: string) => [...vendorReceiptKeys.all, "vendors", search] as const,
   parts: (branchId: string, search: string) => [...vendorReceiptKeys.all, "parts", branchId, search] as const,
 };
 
-export async function getVendorReceiptsRequest(search?: string) {
-  const data = await apiGet<{ receipts: VendorReceiptListItem[] }>(`${BASE}${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+/** `branchId` narrows the list for cross-branch users; the server keeps everyone else to their own branch. */
+export async function getVendorReceiptsRequest(search?: string, branchId?: string) {
+  const q = new URLSearchParams();
+  if (search) q.set("search", search);
+  if (branchId) q.set("branchId", branchId);
+  const qs = q.toString();
+  const data = await apiGet<{ receipts: VendorReceiptListItem[] }>(`${BASE}${qs ? `?${qs}` : ""}`);
   return data.receipts;
 }
 

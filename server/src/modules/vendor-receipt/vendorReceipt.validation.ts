@@ -30,7 +30,7 @@ export const createVendorReceiptSchema = z.object({
 });
 
 export const listVendorReceiptsSchema = z.object({
-  query: z.object({ search: z.string().trim().max(50).optional() }),
+  query: z.object({ search: z.string().trim().max(50).optional(), branchId: z.string().uuid().optional() }),
 });
 
 export const vendorSearchSchema = z.object({

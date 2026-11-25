@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { inventoryKeys } from "@/features/inventory/api/inventory.keys";
+import { useBranchStore } from "@/store/branch.store";
 import { mobisErrorMessage } from "@/features/mobis-receipts/hooks/use-mobis";
 import {
   createVendorReceiptRequest,
@@ -12,10 +13,12 @@ import {
 } from "../api/vendor-receipt.api";
 import type { CreateVendorReceiptPayload } from "../types/vendor-receipt.types";
 
+/** Receipts at the branch picked in the branch switcher. */
 export function useVendorReceipts(search = "") {
+  const branchId = useBranchStore((s) => s.activeBranch?.id);
   return useQuery({
-    queryKey: vendorReceiptKeys.list(search),
-    queryFn: () => getVendorReceiptsRequest(search || undefined),
+    queryKey: vendorReceiptKeys.list(search, branchId),
+    queryFn: () => getVendorReceiptsRequest(search || undefined, branchId),
     placeholderData: keepPreviousData,
   });
 }

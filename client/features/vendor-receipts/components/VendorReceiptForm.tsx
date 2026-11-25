@@ -169,14 +169,14 @@ export function VendorReceiptForm() {
         remarks: remarks.trim() || undefined,
         lines: lines.map((line) => ({ partId: line.part.id, quantity: line.quantity, unitCost: line.unitCost })),
       },
-      { onSuccess: (receipt) => router.push(`/inventory/vendor-receipts/${receipt.id}`) },
+      { onSuccess: (receipt) => router.push(`/inventory/mrn/${receipt.id}`) },
     );
   }
 
   return (
     <div className="grid gap-5 px-4 py-6 lg:px-6">
-      <Link href="/inventory/vendor-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-        <ArrowLeft className="size-4" /> Back to vendor receipts
+      <Link href="/inventory/mrn" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <ArrowLeft className="size-4" /> Back to MRNs
       </Link>
       <div className="grid gap-4 rounded-xl border bg-white p-5">
         <h1 className="text-lg font-semibold">New vendor receipt</h1>

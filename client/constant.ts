@@ -285,8 +285,8 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
-        label: "Vendor Receipts",
-        href: "/inventory/vendor-receipts",
+        label: "MRN",
+        href: "/inventory/mrn",
         icon: Truck,
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
