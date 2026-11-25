@@ -1,4 +1,4 @@
-import prisma from '../../prisma/client';
+import prisma from "../../prisma/client";
 
 const TAKE_PER_CATEGORY = 5;
 
@@ -11,43 +11,68 @@ export interface SearchResult {
 }
 
 const CATEGORY_PERMISSIONS: Record<keyof SearchResult, string> = {
-  customers: 'customer:read',
-  vehicles: 'vehicle:read',
-  jobCards: 'jobcard:read',
-  spareParts: 'sparepart:read',
-  users: 'user:read',
+  customers: "customer:read",
+  vehicles: "vehicle:read",
+  jobCards: "jobcard:read",
+  spareParts: "sparepart:read",
+  users: "user:read",
 };
 
 export class SearchService {
-  async search(query: string, permissions: string[]): Promise<SearchResult> {
+  async search(
+    query: string,
+    permissions: string[],
+    branchId?: string,
+  ): Promise<SearchResult> {
     const q = query.trim();
 
     const allowed = (cat: keyof SearchResult) =>
       permissions.includes(CATEGORY_PERMISSIONS[cat]);
 
-    const [customers, vehicles, jobCards, spareParts, users] = await Promise.all([
-      allowed('customers') ? this.searchCustomers(q) : Promise.resolve([]),
-      allowed('vehicles') ? this.searchVehicles(q) : Promise.resolve([]),
-      allowed('jobCards') ? this.searchJobCards(q) : Promise.resolve([]),
-      allowed('spareParts') ? this.searchSpareParts(q) : Promise.resolve([]),
-      allowed('users') ? this.searchUsers(q) : Promise.resolve([]),
-    ]);
+    const [customers, vehicles, jobCards, spareParts, users] =
+      await Promise.all([
+        allowed("customers")
+          ? this.searchCustomers(q, branchId)
+          : Promise.resolve([]),
+        allowed("vehicles")
+          ? this.searchVehicles(q, branchId)
+          : Promise.resolve([]),
+        allowed("jobCards")
+          ? this.searchJobCards(q, branchId)
+          : Promise.resolve([]),
+        allowed("spareParts") ? this.searchSpareParts(q) : Promise.resolve([]),
+        allowed("users") ? this.searchUsers(q, branchId) : Promise.resolve([]),
+      ]);
 
     return { customers, vehicles, jobCards, spareParts, users };
   }
 
-  private async searchCustomers(q: string) {
+  private async searchCustomers(q: string, branchId?: string) {
     const nameParts = q.split(/\s+/);
     const rows = await prisma.customer.findMany({
       where: {
         mergedIntoId: null,
+        branchId,
         OR: [
-          ...(nameParts.length > 1 ? [{ firstName: { contains: nameParts[0], mode: 'insensitive' as const }, lastName: { contains: nameParts.slice(1).join(' '), mode: 'insensitive' as const } }] : []),
-          { code: { contains: q, mode: 'insensitive' } },
-          { companyName: { contains: q, mode: 'insensitive' } },
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
+          ...(nameParts.length > 1
+            ? [
+                {
+                  firstName: {
+                    contains: nameParts[0],
+                    mode: "insensitive" as const,
+                  },
+                  lastName: {
+                    contains: nameParts.slice(1).join(" "),
+                    mode: "insensitive" as const,
+                  },
+                },
+              ]
+            : []),
+          { code: { contains: q, mode: "insensitive" } },
+          { companyName: { contains: q, mode: "insensitive" } },
+          { firstName: { contains: q, mode: "insensitive" } },
+          { lastName: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
           { phoneNumber: { contains: q } },
         ],
       },
@@ -57,20 +82,23 @@ export class SearchService {
     // Customer code leads, as in every customer picker.
     return rows.map((c) => ({
       id: c.id,
-      name: [c.code, c.companyName || `${c.firstName} ${c.lastName}`.trim()].filter(Boolean).join(' · '),
+      name: [c.code, c.companyName || `${c.firstName} ${c.lastName}`.trim()]
+        .filter(Boolean)
+        .join(" · "),
       email: c.email,
     }));
   }
 
-  private async searchVehicles(q: string) {
+  private async searchVehicles(q: string, branchId?: string) {
     const rows = await prisma.vehicle.findMany({
       where: {
+        ...(branchId ? { customer: { branchId } } : {}),
         OR: [
-          { vin: { contains: q, mode: 'insensitive' } },
-          { registrationNumber: { contains: q, mode: 'insensitive' } },
-          { make: { contains: q, mode: 'insensitive' } },
-          { model: { contains: q, mode: 'insensitive' } },
-          { color: { contains: q, mode: 'insensitive' } },
+          { vin: { contains: q, mode: "insensitive" } },
+          { registrationNumber: { contains: q, mode: "insensitive" } },
+          { make: { contains: q, mode: "insensitive" } },
+          { model: { contains: q, mode: "insensitive" } },
+          { color: { contains: q, mode: "insensitive" } },
         ],
       },
       take: TAKE_PER_CATEGORY,
@@ -78,17 +106,18 @@ export class SearchService {
 
     return rows.map((v) => ({
       id: v.id,
-      label: `${v.make ?? ''} ${v.model ?? ''}`.trim() || 'Unknown Vehicle',
+      label: `${v.make ?? ""} ${v.model ?? ""}`.trim() || "Unknown Vehicle",
       sublabel: `VIN: ${v.vin}`,
     }));
   }
 
-  private async searchJobCards(q: string) {
+  private async searchJobCards(q: string, branchId?: string) {
     const rows = await prisma.jobCard.findMany({
       where: {
+        branchId,
         OR: [
-          { jobNumber: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
+          { jobNumber: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
         ],
       },
       take: TAKE_PER_CATEGORY,
@@ -105,8 +134,8 @@ export class SearchService {
     const rows = await prisma.sparePart.findMany({
       where: {
         OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { partNumber: { contains: q, mode: 'insensitive' } },
+          { name: { contains: q, mode: "insensitive" } },
+          { partNumber: { contains: q, mode: "insensitive" } },
         ],
       },
       take: TAKE_PER_CATEGORY,
@@ -119,13 +148,14 @@ export class SearchService {
     }));
   }
 
-  private async searchUsers(q: string) {
+  private async searchUsers(q: string, branchId?: string) {
     const rows = await prisma.user.findMany({
       where: {
+        branchId,
         OR: [
-          { firstName: { contains: q, mode: 'insensitive' } },
-          { lastName: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
+          { firstName: { contains: q, mode: "insensitive" } },
+          { lastName: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
         ],
       },
       include: { role: true },

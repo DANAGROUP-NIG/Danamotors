@@ -1,3 +1,4 @@
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import type {Request,Response,NextFunction,RequestHandler} from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
@@ -9,7 +10,7 @@ import { noteRegisterQuery } from './party-note.validation';
 import { escapeReportText,writeReport } from './party-report.controller';
 
 export function noteScope(req:Request,branchId?:string){
- if(req.user?.role===ROLES.ADMIN||req.user?.role===ROLES.SUPER_ADMIN)return branchId;
+ if(isGeneralDepartmentManager(req.user)||req.user?.role===ROLES.ADMIN||req.user?.role===ROLES.SUPER_ADMIN)return branchId;
  if(!req.user?.branchId)throw new ForbiddenError('Your account must be assigned to a branch');
  if(branchId&&branchId!==req.user.branchId)throw new ForbiddenError('You can only access your own branch');
  return req.user.branchId;

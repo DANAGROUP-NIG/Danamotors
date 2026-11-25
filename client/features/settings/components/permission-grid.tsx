@@ -6,14 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAdminPermissions } from "../hooks/use-admin-roles";
 import { PermissionGroup } from "../api/role.api";
-
-function humanize(name: string): string {
-  const action = name.split(":")[1] ?? name;
-  return action
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { getPermissionLabel } from "../lib/permission-label";
 
 export function PermissionGrid({
   selectedPermissions,
@@ -139,7 +132,7 @@ export function PermissionGrid({
                       className="h-4 w-4 rounded border-slate-300 text-primary shadow-sm focus:ring-primary"
                     />
                     <span className="flex flex-col">
-                      <span>{humanize(perm.name)}</span>
+                      <span>{getPermissionLabel(perm.name)}</span>
                       {perm.description && (
                         <span className="text-[11px] text-muted-foreground">
                           {perm.description}

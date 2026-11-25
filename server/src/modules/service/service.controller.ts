@@ -4,6 +4,7 @@ import { ServiceService } from "./service.service";
 import {
   assertBranchOwnership,
   canAccessAllBranches,
+  isGeneralDepartmentManager,
 } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import prisma from "../../prisma/client";
@@ -85,13 +86,11 @@ export class ServiceController {
       const labourLines = await this.labourService.listJobCardLines(
         req.params.id,
       );
-      res
-        .status(200)
-        .json({
-          status: "success",
-          statusCode: 200,
-          data: scopeJobCard({ labourLines }, req.user?.permissions ?? []),
-        });
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: scopeJobCard({ labourLines }, req.user?.permissions ?? []),
+      });
     } catch (error) {
       next(error);
     }
@@ -323,13 +322,11 @@ export class ServiceController {
         req.body,
         req.user!.userId,
       );
-      res
-        .status(201)
-        .json({
-          status: "success",
-          statusCode: 201,
-          data: { jobCard: result },
-        });
+      res.status(201).json({
+        status: "success",
+        statusCode: 201,
+        data: { jobCard: result },
+      });
     } catch (error) {
       next(error);
     }
@@ -372,7 +369,11 @@ export class ServiceController {
         where: { name: req.body.branchName },
         select: { id: true },
       });
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId)
+      if (
+        req.user?.role !== ROLES.SUPER_ADMIN &&
+        !isGeneralDepartmentManager(req.user) &&
+        !req.user?.branchId
+      )
         throw new ForbiddenError("Your account is not assigned to a branch");
       assertBranchOwnership(req, branch?.id);
       const result = await this.serviceService.createJobCard({
@@ -401,7 +402,12 @@ export class ServiceController {
       const customerId = req.query.customerId as string | undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      const jobType = req.query.jobType as "SERVICE" | "PDI" | "ALL" | "HISTORY" | undefined;
+      const jobType = req.query.jobType as
+        | "SERVICE"
+        | "PDI"
+        | "ALL"
+        | "HISTORY"
+        | undefined;
       const dateFrom = req.query.dateFrom as string | undefined;
       const dateTo = req.query.dateTo as string | undefined;
       let branchId = req.query.branchId as string | undefined;
@@ -450,13 +456,11 @@ export class ServiceController {
         req.user!.userId,
         req.body.requestId,
       );
-      res
-        .status(200)
-        .json({
-          status: "success",
-          message: "Parts request queued for the Branch Store Manager",
-          data: {},
-        });
+      res.status(200).json({
+        status: "success",
+        message: "Parts request queued for the Branch Store Manager",
+        data: {},
+      });
     } catch (error) {
       next(error);
     }

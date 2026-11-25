@@ -4,31 +4,60 @@ export const ROLES = {
   GENERAL_STORE_MANAGER: "GeneralStoreManager",
   BRANCH_STORE_MANAGER: "StoreOfficer",
   WORKSHOP_MANAGER: "WorkshopManager",
+  GENERAL_WORKSHOP_MANAGER: "GeneralWorkshopManager",
   ACCOUNTANT: "Accountant",
+  ACCOUNT_OFFICER: "AccountOfficer",
+  ACCOUNT_MANAGER: "AccountManager",
+  GENERAL_ACCOUNT_MANAGER: "GeneralAccountManager",
   BILLING_OFFICER: "BillingOfficer",
+  BILLING_MANAGER: "BillingManager",
+  GENERAL_BILLING_MANAGER: "GeneralBillingManager",
   SERVICE_ADVISOR: "ServiceAdviser",
   TECHNICIAN: "Technician",
   ENGINEER: "Engineer",
   WARRANTY_OFFICER: "WarrantyOfficer",
   CCU_MANAGER: "CCUManager",
+  GENERAL_CCU_MANAGER: "GeneralCCUManager",
   CCU_OFFICER: "CCUOfficer",
   SERVICE_MANAGER: "ServiceManager",
   /** Read-only: every module and report, no writes (legacy Auditormast). */
   AUDITOR: "Auditor",
+  AUDIT_OFFICER: "AuditOfficer",
+  AUDIT_MANAGER: "AuditManager",
+  GENERAL_AUDIT_MANAGER: "GeneralAuditManager",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
+
+export const GENERAL_DEPARTMENT_ROLES = new Set<string>([
+  ROLES.GENERAL_WORKSHOP_MANAGER,
+  ROLES.GENERAL_ACCOUNT_MANAGER,
+  ROLES.GENERAL_BILLING_MANAGER,
+  ROLES.GENERAL_CCU_MANAGER,
+  ROLES.GENERAL_AUDIT_MANAGER,
+]);
+
+export const OWN_BRANCH_DEPARTMENT_ROLES = new Set<string>([
+  ROLES.WORKSHOP_MANAGER,
+  ROLES.ACCOUNT_OFFICER,
+  ROLES.ACCOUNT_MANAGER,
+  ROLES.BILLING_OFFICER,
+  ROLES.BILLING_MANAGER,
+  ROLES.CCU_MANAGER,
+  ROLES.AUDIT_OFFICER,
+  ROLES.AUDIT_MANAGER,
+]);
 
 export const PERMISSIONS = {
   REQUISITION_READ: "requisition:read",
   REQUISITION_CREATE: "requisition:create",
   REQUISITION_CANCEL: "requisition:cancel",
   REQUISITION_GOODWILL: "requisition:goodwill",
-  PDI_READ: 'pdi:read',
-  PDI_CREATE: 'pdi:create',
-  PDI_UPDATE: 'pdi:update',
-  PDI_BILL: 'pdi:bill',
-  PDI_SETTINGS: 'pdi:settings',
+  PDI_READ: "pdi:read",
+  PDI_CREATE: "pdi:create",
+  PDI_UPDATE: "pdi:update",
+  PDI_BILL: "pdi:bill",
+  PDI_SETTINGS: "pdi:settings",
   TAX_REGISTER_READ: "report:tax-register",
   BOOKED_VS_AVAILED_READ: "report:booked-vs-availed",
   ESTIMATE_VS_JOB_READ: "report:estimate-vs-job",
@@ -315,6 +344,14 @@ export const PERMISSIONS = {
 
   // ── CSC: service due reminders and follow-up (legacy Service → CSC) ──────
   CSC_MASTER_READ: "csc:master:read",
+  CSI_MASTER_READ: "csi:master:read",
+  CSI_MASTER_UPDATE: "csi:master:update",
+  CSI_CARD_GENERATE: "csi:card:generate",
+  CSI_RESPONSE_READ: "csi:response:read",
+  CSI_RESPONSE_UPDATE: "csi:response:update",
+  CSI_REPORT: "report:csi",
+  CSI_ATTRIBUTE_REPORT: "report:csi-attribute",
+  CSI_CHECKLIST_REPORT: "report:csi-checklist",
   CSC_MASTER_UPDATE: "csc:master:update",
   CSC_CASE_READ: "csc:case:read",
   CSC_CASE_GENERATE: "csc:case:generate",
@@ -355,7 +392,10 @@ const MIS_FRONT_OFFICE_REPORTS: PermissionType[] = [
 ];
 
 /** MIS reports that read part issues and returns, for the stores. */
-const MIS_STORE_REPORTS: PermissionType[] = [PERMISSIONS.REQUISITION_RETURN_REGISTER_READ, PERMISSIONS.ENGINEER_PART_CONSUMPTION_READ];
+const MIS_STORE_REPORTS: PermissionType[] = [
+  PERMISSIONS.REQUISITION_RETURN_REGISTER_READ,
+  PERMISSIONS.ENGINEER_PART_CONSUMPTION_READ,
+];
 
 /** Every MIS report except the management information report. */
 const MIS_WORKSHOP_REPORTS: PermissionType[] = [
@@ -370,8 +410,12 @@ const MIS_WORKSHOP_REPORTS: PermissionType[] = [
 ];
 
 /** The Auditor role: every read permission and every report, never a write (report settings are a write). */
-export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(PERMISSIONS).filter(
-  (name) => (name.endsWith(":read") || name.startsWith("report:")) && name !== PERMISSIONS.REPORT_SETTINGS,
+export const AUDITOR_PERMISSIONS: PermissionType[] = Object.values(
+  PERMISSIONS,
+).filter(
+  (name) =>
+    (name.endsWith(":read") || name.startsWith("report:")) &&
+    name !== PERMISSIONS.REPORT_SETTINGS,
 );
 
 // Repeat jobs: everyone who follows the workshop's quality sees them; the workshop manager reviews them.
@@ -381,7 +425,10 @@ const REPEAT_JOB_READ_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.REPEAT_ANALYSIS_READ,
   PERMISSIONS.REPEAT_SUMMARY_READ,
 ];
-const REPEAT_JOB_PERMISSIONS: PermissionType[] = [...REPEAT_JOB_READ_PERMISSIONS, PERMISSIONS.REPEAT_JOB_REVIEW];
+const REPEAT_JOB_PERMISSIONS: PermissionType[] = [
+  ...REPEAT_JOB_READ_PERMISSIONS,
+  PERMISSIONS.REPEAT_JOB_REVIEW,
+];
 
 // CSC: the CCU makes the calls; the service manager owns the master. TODO(confirm) grants with the business.
 const CSC_REPORT_PERMISSIONS: PermissionType[] = [
@@ -389,9 +436,43 @@ const CSC_REPORT_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.CSC_NOT_VISITED_REPORT_READ,
   PERMISSIONS.CSC_NO_SHOW_REPORT_READ,
 ];
-const CSC_CALLER_PERMISSIONS: PermissionType[] = [PERMISSIONS.CSC_MASTER_READ, PERMISSIONS.CSC_CASE_READ, PERMISSIONS.CSC_FOLLOWUP_UPDATE];
-const CSC_SUPERVISOR_PERMISSIONS: PermissionType[] = [...CSC_CALLER_PERMISSIONS, PERMISSIONS.CSC_CASE_GENERATE, ...CSC_REPORT_PERMISSIONS];
-const CSC_PERMISSIONS: PermissionType[] = [...CSC_SUPERVISOR_PERMISSIONS, PERMISSIONS.CSC_MASTER_UPDATE];
+const CSC_CALLER_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSC_MASTER_READ,
+  PERMISSIONS.CSC_CASE_READ,
+  PERMISSIONS.CSC_FOLLOWUP_UPDATE,
+];
+const CSC_SUPERVISOR_PERMISSIONS: PermissionType[] = [
+  ...CSC_CALLER_PERMISSIONS,
+  PERMISSIONS.CSC_CASE_GENERATE,
+  ...CSC_REPORT_PERMISSIONS,
+];
+const CSC_PERMISSIONS: PermissionType[] = [
+  ...CSC_SUPERVISOR_PERMISSIONS,
+  PERMISSIONS.CSC_MASTER_UPDATE,
+];
+
+// CSI is branch-scoped; these grants never add cross-branch access.
+const CSI_REPORT_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_REPORT,
+  PERMISSIONS.CSI_ATTRIBUTE_REPORT,
+  PERMISSIONS.CSI_CHECKLIST_REPORT,
+];
+const CSI_READ_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_MASTER_READ,
+  PERMISSIONS.CSI_RESPONSE_READ,
+  ...CSI_REPORT_PERMISSIONS,
+];
+const CSI_OPERATOR_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.CSI_CARD_GENERATE,
+  PERMISSIONS.CSI_RESPONSE_READ,
+  PERMISSIONS.CSI_RESPONSE_UPDATE,
+];
+const CSI_PERMISSIONS: PermissionType[] = [
+  ...CSI_READ_PERMISSIONS,
+  PERMISSIONS.CSI_MASTER_UPDATE,
+  PERMISSIONS.CSI_CARD_GENERATE,
+  PERMISSIONS.CSI_RESPONSE_UPDATE,
+];
 
 // Late deliveries: the service and workshop managers correct reasons and run the reports.
 // TODO(confirm): issue names ServiceManager and WorkshopManager; Admin added as for the other workshop reports.
@@ -402,7 +483,10 @@ const LATE_DELIVERY_REPORT_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.PROMISE_TIME_ANALYSIS_READ,
   PERMISSIONS.DELAYED_DELIVERIES_READ,
 ];
-const LATE_DELIVERY_PERMISSIONS: PermissionType[] = [...LATE_DELIVERY_REPORT_PERMISSIONS, PERMISSIONS.LATE_REASON_UPDATE];
+const LATE_DELIVERY_PERMISSIONS: PermissionType[] = [
+  ...LATE_DELIVERY_REPORT_PERMISSIONS,
+  PERMISSIONS.LATE_REASON_UPDATE,
+];
 
 // PSF: the CCU makes the calls; the service manager owns the module; the workshop manager reads and reports.
 // TODO(confirm) grants with the business (#111 open question 2).
@@ -413,17 +497,45 @@ const PSF_REPORT_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.PSF_CLOSED_READ,
   PERMISSIONS.PSF_HISTORY_READ,
 ];
-const PSF_READ_PERMISSIONS: PermissionType[] = [PERMISSIONS.PSF_READ, ...PSF_REPORT_PERMISSIONS];
-const PSF_CALLER_PERMISSIONS: PermissionType[] = [PERMISSIONS.PSF_READ, PERMISSIONS.PSF_UPDATE, PERMISSIONS.PSF_LETTER, PERMISSIONS.PSF_DISSATISFIED_READ, PERMISSIONS.PSF_HISTORY_READ];
-const PSF_PERMISSIONS: PermissionType[] = [...PSF_READ_PERMISSIONS, PERMISSIONS.PSF_UPDATE, PERMISSIONS.PSF_LETTER];
+const PSF_READ_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_READ,
+  ...PSF_REPORT_PERMISSIONS,
+];
+const PSF_CALLER_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PSF_READ,
+  PERMISSIONS.PSF_UPDATE,
+  PERMISSIONS.PSF_LETTER,
+  PERMISSIONS.PSF_DISSATISFIED_READ,
+  PERMISSIONS.PSF_HISTORY_READ,
+];
+const PSF_PERMISSIONS: PermissionType[] = [
+  ...PSF_READ_PERMISSIONS,
+  PERMISSIONS.PSF_UPDATE,
+  PERMISSIONS.PSF_LETTER,
+];
 
 // PDI: advisers and the workshop open and work PDI jobs; the billing officer bills them.
-const PDI_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE, PERMISSIONS.PDI_BILL, PERMISSIONS.PDI_SETTINGS];
-const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [PERMISSIONS.PDI_READ, PERMISSIONS.PDI_CREATE, PERMISSIONS.PDI_UPDATE];
+const PDI_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PDI_READ,
+  PERMISSIONS.PDI_CREATE,
+  PERMISSIONS.PDI_UPDATE,
+  PERMISSIONS.PDI_BILL,
+  PERMISSIONS.PDI_SETTINGS,
+];
+const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [
+  PERMISSIONS.PDI_READ,
+  PERMISSIONS.PDI_CREATE,
+  PERMISSIONS.PDI_UPDATE,
+];
 
 // Mapping roles to their default initial permissions for seeding
-export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
-  [ROLES.ENGINEER]: [PERMISSIONS.JOBCARD_READ, PERMISSIONS.WORKSHOP_READ, PERMISSIONS.PDI_READ, PERMISSIONS.PDI_UPDATE],
+const existingRolePermissions = {
+  [ROLES.ENGINEER]: [
+    PERMISSIONS.JOBCARD_READ,
+    PERMISSIONS.WORKSHOP_READ,
+    PERMISSIONS.PDI_READ,
+    PERMISSIONS.PDI_UPDATE,
+  ],
   // Full access
   [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
 
@@ -431,6 +543,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Branch/user/system admin
   [ROLES.ADMIN]: [
+    ...CSI_PERMISSIONS,
     PERMISSIONS.SPAREPART_COST_READ,
     PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
     ...MIS_WORKSHOP_REPORTS,
@@ -446,11 +559,16 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     ...LATE_DELIVERY_PERMISSIONS,
     ...CSC_PERMISSIONS,
     ...PSF_PERMISSIONS,
-    PERMISSIONS.TAX_REGISTER_READ, PERMISSIONS.BOOKED_VS_AVAILED_READ,
-    PERMISSIONS.ESTIMATE_VS_JOB_READ, PERMISSIONS.UNBILLED_PARTS_READ,
-    PERMISSIONS.CORPORATE_BILLS_READ, PERMISSIONS.DELIVERED_MODEL_READ,
-    PERMISSIONS.DELIVERED_SERVICE_READ, PERMISSIONS.WARRANTY_ATTENDED_READ,
-    PERMISSIONS.WARRANTY_PARTS_READ, PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
+    PERMISSIONS.TAX_REGISTER_READ,
+    PERMISSIONS.BOOKED_VS_AVAILED_READ,
+    PERMISSIONS.ESTIMATE_VS_JOB_READ,
+    PERMISSIONS.UNBILLED_PARTS_READ,
+    PERMISSIONS.CORPORATE_BILLS_READ,
+    PERMISSIONS.DELIVERED_MODEL_READ,
+    PERMISSIONS.DELIVERED_SERVICE_READ,
+    PERMISSIONS.WARRANTY_ATTENDED_READ,
+    PERMISSIONS.WARRANTY_PARTS_READ,
+    PERMISSIONS.VEHICLE_HISTORY_CARD_READ,
     PERMISSIONS.CORPORATE_MANAGE,
     PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.EMPLOYEE_MANAGE,
@@ -666,8 +784,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   // Oversees workshop floor: job cards, technician assignments, QC, inventory
-  //TODo: verify this role permissions 
+  //TODo: verify this role permissions
   [ROLES.WORKSHOP_MANAGER]: [
+    ...CSI_READ_PERMISSIONS,
     ...PSF_READ_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_PERMISSIONS,
@@ -690,7 +809,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
     PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.EMPLOYEE_MANAGE,
-    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -785,7 +903,8 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ],
 
   [ROLES.BILLING_OFFICER]: [
-    PERMISSIONS.PDI_READ, PERMISSIONS.PDI_BILL,
+    PERMISSIONS.PDI_READ,
+    PERMISSIONS.PDI_BILL,
     PERMISSIONS.TAX_REGISTER_READ,
     PERMISSIONS.UNBILLED_PARTS_READ,
     PERMISSIONS.CORPORATE_BILLS_READ,
@@ -870,6 +989,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages service operations, oversees service advisors and technicians
   [ROLES.SERVICE_MANAGER]: [
+    ...CSI_PERMISSIONS,
     ...CSC_PERMISSIONS,
     ...PSF_PERMISSIONS,
     ...PDI_WORKSHOP_PERMISSIONS,
@@ -942,6 +1062,7 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Front-desk: registers customers, books appointments, manages vehicles
   [ROLES.CCU_OFFICER]: [
+    ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_CALLER_PERMISSIONS,
     ...PSF_CALLER_PERMISSIONS,
     PERMISSIONS.CSC_FOLLOWUP_REPORT_READ,
@@ -969,9 +1090,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
   // Manages receptionists across all branches; full CRUD on customers, vehicles, appointments
   [ROLES.CCU_MANAGER]: [
+    ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_SUPERVISOR_PERMISSIONS,
     ...PSF_PERMISSIONS,
-    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -1037,6 +1158,32 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.FPC_ANALYSIS_READ,
     PERMISSIONS.REPORT_SETTINGS,
   ],
+} satisfies Partial<Record<RoleType, PermissionType[]>>;
 
+export const NEW_DEPARTMENT_ROLE_BASES = {
+  [ROLES.GENERAL_WORKSHOP_MANAGER]: ROLES.WORKSHOP_MANAGER,
+  [ROLES.ACCOUNT_OFFICER]: ROLES.ACCOUNTANT,
+  [ROLES.ACCOUNT_MANAGER]: ROLES.ACCOUNTANT,
+  [ROLES.GENERAL_ACCOUNT_MANAGER]: ROLES.ACCOUNTANT,
+  [ROLES.BILLING_MANAGER]: ROLES.BILLING_OFFICER,
+  [ROLES.GENERAL_BILLING_MANAGER]: ROLES.BILLING_OFFICER,
+  [ROLES.GENERAL_CCU_MANAGER]: ROLES.CCU_MANAGER,
+  [ROLES.AUDIT_OFFICER]: ROLES.AUDITOR,
+  [ROLES.AUDIT_MANAGER]: ROLES.AUDITOR,
+  [ROLES.GENERAL_AUDIT_MANAGER]: ROLES.AUDITOR,
+} as const;
 
+const newRolePermissions = Object.fromEntries(
+  Object.entries(NEW_DEPARTMENT_ROLE_BASES).map(([role, base]) => [
+    role,
+    [
+      ...existingRolePermissions[base],
+      ...(GENERAL_DEPARTMENT_ROLES.has(role) ? [PERMISSIONS.BRANCH_ALL] : []),
+    ],
+  ]),
+) as Record<keyof typeof NEW_DEPARTMENT_ROLE_BASES, PermissionType[]>;
+
+export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
+  ...existingRolePermissions,
+  ...newRolePermissions,
 };

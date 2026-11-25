@@ -1,5 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { ROLES, ROLE_PERMISSIONS, PERMISSIONS } from "../../src/shared/constants/roles";
+import {
+  NEW_DEPARTMENT_ROLE_BASES,
+  ROLES,
+  ROLE_PERMISSIONS,
+  PERMISSIONS,
+} from "../../src/shared/constants/roles";
+import { seedDepartmentRoles } from "../../src/prisma/seed-department-roles";
 
 export default async function seedPermissionsAndRoles(prisma: PrismaClient) {
   const permissionEntries = Object.values(PERMISSIONS);
@@ -16,6 +22,7 @@ export default async function seedPermissionsAndRoles(prisma: PrismaClient) {
   console.log(`✅ Seeded ${permissionEntries.length} permissions`);
 
   for (const roleName of Object.values(ROLES)) {
+    if (Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, roleName)) continue;
     const dbRole = await prisma.role.upsert({
       where: { name: roleName },
       update: {},
@@ -36,16 +43,15 @@ export default async function seedPermissionsAndRoles(prisma: PrismaClient) {
     }
     console.log(`  👤 Role '${roleName}' → ${permRecords.length} permissions`);
   }
+  await seedDepartmentRoles(prisma);
 }
 
-// Self-execute when run directly: `npx ts-node prisma/seed/roles.ts`
-// if (require.main === module) {
-//   (async () => {
-//     const prisma = new PrismaClient();
-//     try {
-//       await seedPermissionsAndRoles(prisma);
-//     } finally {
-//       await prisma.$disconnect();
-//     }
-//   })();
-// }
+if (require.main === module) {
+  const prisma = new PrismaClient();
+  seedDepartmentRoles(prisma)
+    .catch((error: unknown) => {
+      process.stderr.write(`${String(error)}\n`);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}
