@@ -2,6 +2,7 @@ import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/feat
 import { NavGroup, NavItem } from "./type";
 import {
   CAMPAIGN_PERMISSIONS,
+  CHALLAN_PERMISSIONS,
   INVENTORY_PERMISSIONS,
   LABEL_PERMISSIONS,
   PART_SALE_PERMISSIONS,
@@ -43,6 +44,8 @@ import {
   ShoppingCart,
   FileBarChart,
   Undo2,
+  Fuel,
+  RotateCcw,
   FileSearch,
   Database,
   Ban,
@@ -309,7 +312,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Part Sale",
         href: "/part-sale/orders",
         icon: ShoppingCart,
-        permissions: [PART_SALE_PERMISSIONS.READ],
+        permissions: [PART_SALE_PERMISSIONS.READ, CHALLAN_PERMISSIONS.READ],
         children: [
           {
             label: "Customer Orders",
@@ -328,6 +331,18 @@ export const NAV_GROUPS: NavGroup[] = [
             href: "/part-sale/returns",
             icon: Undo2,
             permissions: [PART_SALE_PERMISSIONS.READ],
+          },
+          {
+            label: "Dispatch Challans",
+            href: "/part-sale/challans",
+            icon: Fuel,
+            permissions: [CHALLAN_PERMISSIONS.READ],
+          },
+          {
+            label: "Challan Returns",
+            href: "/part-sale/challan-returns",
+            icon: RotateCcw,
+            permissions: [CHALLAN_PERMISSIONS.READ],
           },
         ],
       },

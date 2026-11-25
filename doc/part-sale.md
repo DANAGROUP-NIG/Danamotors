@@ -102,13 +102,39 @@ The rest of the legacy data is covered elsewhere or not included:
 
 - OrderType `I` CPOs and counter-sale trantypes `M` and `R` are branch orders and STNs. The
   [stock transfer](./stock-transfers.md) workflow covers them.
-- **Dispatch Challan** and **Challan Return** are not part of CPD part sale. In AutoEnhancer
-  they record unbilled issues of fuel and consumables (petrol, diesel, gloves) to internal
-  group cost centres. They will be built separately as an internal issue.
-  The legacy **Dispatch Challan Register** to rebuild with them: filters date range, **Spare / Oil /
-  Both** and **Pending / All**; one challan per heading (date, challan number, customer code and name
-  as the cost centre, gate pass issued) with its lines (part number, description, UOM, quantity, rate,
-  amount) and a sub total per challan.
+- **Dispatch Challan** and **Challan Return** are built as their own module; see
+  [Dispatch challans](#dispatch-challans) below.
+
+## Dispatch challans
+
+Legacy AutoEnhancer **Dispatch Challan** and **Dispatch Challan Return** (`challanhead`/`challandetail`,
+`ChallanRetHead`/`ChallanRetDetail`). A challan is an unbilled issue of fuel and consumables to an
+internal cost centre. Kia Plaza issues about 1,100 a year from stores A and QS: petrol and diesel
+make up 90% of them, then software, cotton waste, oil and gloves. They go to the KP associate vehicles,
+customer vehicles, PDI, KP1 admin, Allen 5, VI showroom, the workshop groups, UVAL, Dana Air and the gensets.
+In all three legacy databases, one challan was ever billed (CPD, 2016).
+
+Group units that Lagos used to "bill" on a counter sale without VAT (tax form X: diesel engine oil
+to Allen 5, Ilupeju and Dana Air) are issued on a dispatch challan instead. Counter sales stay
+customer sales with VAT.
+
+| Step | Screen | What happens |
+| --- | --- | --- |
+| Issue | Part Sale → Dispatch Challans → **New challan** | Choose the cost centre (a party, searched by code or name) and the parts. Each line takes free stock (on hand less reserved) out of the branch at the part's retail rate. The challan gets a number (`2026000001`) and a gate pass from the shared series. |
+| Return | Challan detail → **Challan return** | Return chosen quantities, or **Full return** for everything still out. The stock goes back at the challan's rate. |
+
+- **API**: `/api/dispatch-challans`: `GET|POST /`, `GET /:id`, `POST /:id/returns`, `GET /returns`,
+  and the pickers `GET /cost-centres` and `GET /parts`.
+- **Permissions**: `challan:read` (Admin, store managers, Accountant, Auditor), `challan:issue` and
+  `challan:return` (Admin, General and Branch Store Managers).
+- **Stock**: the challan writes `ISSUED` stock transactions and the return `RETURNED`, with the
+  challan or return id as the reference. A database check stops a line returning more than it issued.
+- **Reports**: the **Dispatch Challan Register**; a **Challans** section on the Checklist for Issues
+  (legacy CHALLAN section); the Consumption Report's consumable issue column, at the challan's rate.
+- **Migration**: no challan history is migrated. The cost centres on challans from the last five
+  years are migrated as parties, so they can be chosen at go-live.
+- **Not built**: cancelling a challan (legacy never cancelled one; a full return undoes it), the
+  pick list for challans, and a printed challan layout (Print prints the screen).
 
 ## Not yet built
 

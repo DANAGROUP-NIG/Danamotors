@@ -70,6 +70,9 @@ model Branch {
   counterSales   CounterSale[]
   saleReturns    CounterSaleReturn[]
 
+  dispatchChallans       DispatchChallan[]
+  dispatchChallanReturns DispatchChallanReturn[]
+
   notifications Notification[]
 
   warrantyCases WarrantyCase[]
@@ -212,10 +215,12 @@ model User {
   campaignVinRangesCreated     CampaignVinRange[]          @relation("CampaignVinRangeCreatedBy")
   jobCardCampaignsAttended     JobCardCampaign[]           @relation("JobCardCampaignAttendedBy")
 
-  customerOrdersCreated       CustomerOrder[]     @relation("CustomerOrderCreatedBy")
-  customerOrderLinesCancelled CustomerOrderLine[] @relation("CustomerOrderLineCancelledBy")
-  counterSalesExecuted        CounterSale[]       @relation("CounterSaleExecutive")
-  saleReturnsCreated          CounterSaleReturn[] @relation("SaleReturnCreatedBy")
+  customerOrdersCreated       CustomerOrder[]         @relation("CustomerOrderCreatedBy")
+  customerOrderLinesCancelled CustomerOrderLine[]     @relation("CustomerOrderLineCancelledBy")
+  counterSalesExecuted        CounterSale[]           @relation("CounterSaleExecutive")
+  saleReturnsCreated          CounterSaleReturn[]     @relation("SaleReturnCreatedBy")
+  dispatchChallansCreated     DispatchChallan[]       @relation("DispatchChallanCreatedBy")
+  challanReturnsCreated       DispatchChallanReturn[] @relation("DispatchChallanReturnCreatedBy")
 
   stockTakesCreated       StockTake[]      @relation("StockTakeCreatedBy")
   stockTakesCompleted     StockTake[]      @relation("StockTakeCompletedBy")
@@ -432,8 +437,10 @@ model Customer {
 
   warrantyCases WarrantyCase[]
 
-  customerOrders CustomerOrder[]
-  saleReturns    CounterSaleReturn[]
+  customerOrders   CustomerOrder[]
+  saleReturns      CounterSaleReturn[]
+  // Cost centres: internal issues on dispatch challans.
+  dispatchChallans DispatchChallan[]
 
   // Vendors: material receipt notes for parts bought from them.
   vendorReceipts MaterialReceiptNote[] @relation("MrnVendor")
@@ -1035,6 +1042,8 @@ model SparePart {
 
   customerOrderLines CustomerOrderLine[]
   saleReturnLines    CounterSaleReturnLine[]
+  challanLines       DispatchChallanLine[]
+  challanReturnLines DispatchChallanReturnLine[]
 
   rateHistory PartRateHistory[]
   binHistory  PartBinHistory[]
@@ -3714,6 +3723,100 @@ model CounterSaleReturnLine {
 
   @@index([returnId])
   @@index([invoiceLineId])
+}
+
+// ============================================================
+// DISPATCH CHALLANS (legacy challanhead/challandetail, ChallanRetHead/ChallanRetDetail)
+// Unbilled issues of fuel and consumables to internal cost centres (Kia Plaza: petrol and
+// diesel to the KP associate vehicles, PDI, Allen 5, gensets…). Never billed; stock only.
+// ============================================================
+
+model DispatchChallan {
+  id            String   @id @default(uuid())
+  challanNumber String   @unique
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  // The cost centre, a party (legacy challanhead.customer).
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  challanDate    DateTime @default(now())
+  // From the gate pass series job cards, STNs and counter sales share.
+  gatePassNumber String   @unique
+  remarks        String?
+
+  // Valued at the part's retail rate when issued (legacy challandetail.retailrate).
+  totalQuantity Int
+  totalAmount   Float
+
+  createdById String?
+  createdBy   User?    @relation("DispatchChallanCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  lines   DispatchChallanLine[]
+  returns DispatchChallanReturn[]
+
+  @@index([branchId, challanDate])
+  @@index([customerId])
+}
+
+model DispatchChallanLine {
+  id               String          @id @default(uuid())
+  challanId        String
+  challan          DispatchChallan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  partId           String
+  part             SparePart       @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity         Int
+  returnedQuantity Int             @default(0)
+  rate             Float
+  amount           Float
+
+  returnLines DispatchChallanReturnLine[]
+
+  @@index([challanId])
+  @@index([partId])
+}
+
+model DispatchChallanReturn {
+  id           String          @id @default(uuid())
+  returnNumber String          @unique
+  challanId    String
+  challan      DispatchChallan @relation(fields: [challanId], references: [id], onDelete: Restrict)
+  branchId     String
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  returnDate DateTime @default(now())
+  // Legacy ChallanRetHead.FullReturn: every unit still out on the challan came back.
+  fullReturn Boolean  @default(false)
+  reason     String?
+
+  totalQuantity Int
+  totalAmount   Float
+
+  createdById String?
+  createdBy   User?    @relation("DispatchChallanReturnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  lines DispatchChallanReturnLine[]
+
+  @@index([challanId])
+  @@index([branchId, returnDate])
+}
+
+model DispatchChallanReturnLine {
+  id            String                @id @default(uuid())
+  returnId      String
+  challanReturn DispatchChallanReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  challanLineId String
+  challanLine   DispatchChallanLine   @relation(fields: [challanLineId], references: [id], onDelete: Restrict)
+  partId        String
+  part          SparePart             @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity      Int
+  rate          Float
+  amount        Float
+
+  @@index([returnId])
+  @@index([challanLineId])
 }
 
 // ============================================================

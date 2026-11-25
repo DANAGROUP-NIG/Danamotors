@@ -160,6 +160,8 @@ export class PartsReportService {
         return this.consumption(f);
       case "issue-checklist":
         return this.issueChecklist(f);
+      case "dispatch-challan-register":
+        return this.challanRegister(f);
       case "stock-adjustments":
         return this.adjustments(f);
       case "physical-stock":
@@ -542,6 +544,45 @@ export class PartsReportService {
         value: l.amount,
         status: statusLabel(l.order.status),
       }));
+  }
+
+  /**
+   * Legacy Dispatch Challan Register: a heading per challan (number, date, cost centre code and
+   * name, gate pass), its lines at the rate they were issued at, and a subtotal. It covers every
+   * store of the branch (the legacy printout covered store A only, so it disagreed with the
+   * Checklist for Issues). Legacy's Pending / All choice is left out: no challan is ever billed.
+   */
+  private async challanRegister(f: ReportFilters): Promise<Row[]> {
+    const lines = await prisma.dispatchChallanLine.findMany({
+      where: {
+        part: partWhere(f),
+        challan: {
+          challanDate: dateRange(f),
+          ...(f.branchId && { branchId: f.branchId }),
+          ...(f.customerId && { customerId: f.customerId }),
+          ...(f.search && { challanNumber: { contains: f.search } }),
+        },
+      },
+      include: {
+        part: partSelect,
+        challan: { select: { challanNumber: true, challanDate: true, gatePassNumber: true, customer: customerSelect } },
+      },
+      orderBy: [{ challan: { challanDate: "asc" } }, { challan: { challanNumber: "asc" } }, { part: { partNumber: "asc" } }],
+    });
+    return lines.map((l) => {
+      const [y, m, d] = LAGOS_DAY.format(l.challan.challanDate).split("-");
+      const costCentre = [l.challan.customer.code, partyName(l.challan.customer)].filter(Boolean).join(" ");
+      return {
+        group: `Challan ${l.challan.challanNumber} · ${d}/${m}/${y} · ${costCentre} · Gate pass ${l.challan.gatePassNumber}`,
+        partNumber: l.part.partNumber,
+        description: l.part.name,
+        unit: l.part.uom,
+        quantity: l.quantity,
+        returned: l.returnedQuantity,
+        rate: l.rate,
+        amount: l.amount,
+      };
+    });
   }
 
   // ── Purchase ──────────────────────────────────────────────────────────────
@@ -975,7 +1016,7 @@ export class PartsReportService {
   /**
    * Legacy Consumption Report (Consolidated): what each part was issued for in the period. Workshop
    * issues are split by job type (PDI or not) and who pays the job card line; an issue with no job
-   * card is a consumable issue; sample parts (flag F) have their own column at no value. Returns
+   * card, and a dispatch challan (at its issue rate), is a consumable issue; sample parts (flag F) have their own column at no value. Returns
    * (optional) come off the column of the issue they undo. Valued at the retail rate on each line
    * (job card line, bill line, return line); STNs and consumable issues carry no retail rate, so the
    * part's. Cancelled bills are left out altogether, as on legacy. SAN is the stock taken out by SAN
@@ -985,7 +1026,7 @@ export class PartsReportService {
     const includeReturns = f.includeReturns !== false;
     const txns = (await this.stockTransactions(f, ["ISSUED", "TRANSFER_OUT", "RETURNED", "ADJUSTMENT"])).filter((t) => includeReturns || t.type !== "RETURNED");
     const refs = [...new Set(txns.filter((t) => t.type !== "TRANSFER_OUT" && t.referenceId).map((t) => t.referenceId!))];
-    const [issuances, billLines, returnLines] = await Promise.all([
+    const [issuances, billLines, returnLines, challanLines, challanReturnLines] = await Promise.all([
       prisma.partIssuance.findMany({
         where: { id: { in: refs } },
         select: { id: true, jobCard: { select: { serviceType: { select: { preDelivery: true } } } }, jobCardLine: { select: { chargeType: true, rate: true } } },
@@ -995,6 +1036,8 @@ export class PartsReportService {
         select: { invoiceId: true, partId: true, quantity: true, rate: true, invoice: { select: { cancelledAt: true } } },
       }),
       prisma.counterSaleReturnLine.findMany({ where: { returnId: { in: refs } }, select: { returnId: true, partId: true, quantity: true, rate: true } }),
+      prisma.dispatchChallanLine.findMany({ where: { challanId: { in: refs } }, select: { challanId: true, partId: true, quantity: true, rate: true } }),
+      prisma.dispatchChallanReturnLine.findMany({ where: { returnId: { in: refs } }, select: { returnId: true, partId: true, quantity: true, rate: true } }),
     ]);
     const jobs = new Map(issuances.map((i) => [i.id, i]));
     const cancelledBills = new Set(billLines.filter((l) => l.invoice.cancelledAt).map((l) => l.invoiceId));
@@ -1004,6 +1047,11 @@ export class PartsReportService {
       const key = `${l.doc}:${l.partId}`;
       const sofar = lineRates.get(key) ?? { quantity: 0, value: 0 };
       lineRates.set(key, { quantity: sofar.quantity + l.quantity, value: sofar.value + l.quantity * l.rate });
+    }
+    // Dispatch challans (and their returns) are consumable issues, at the rate the challan issued at.
+    const challanRates = new Map<string, number>();
+    for (const l of [...challanLines.map((c) => ({ doc: c.challanId, ...c })), ...challanReturnLines.map((r) => ({ doc: r.returnId, ...r }))]) {
+      challanRates.set(`${l.doc}:${l.partId}`, l.rate);
     }
 
     const byPart = new Map<string, Row>();
@@ -1034,6 +1082,7 @@ export class PartsReportService {
       }
       const job = jobs.get(ref);
       const line = lineRates.get(`${ref}:${t.partId}`);
+      const challanRate = challanRates.get(`${ref}:${t.partId}`);
       const chargeType = job?.jobCardLine?.chargeType ?? "CUSTOMER";
       const pdi = !!job?.jobCard?.serviceType?.preDelivery && (chargeType === "CUSTOMER" || chargeType === "WARRANTY");
       const [column, rate] =
@@ -1041,7 +1090,7 @@ export class PartsReportService {
         : t.part.partFlag === SAMPLE_FLAG ? ["samples", 0]
         : job?.jobCard ? [pdi ? (chargeType === "WARRANTY" ? "pdiWarranty" : "pdi") : CHARGE_COLUMN[chargeType], job.jobCardLine?.rate ?? retailRate]
         : line ? ["counterSale", line.quantity ? line.value / line.quantity : retailRate]
-        : ["consumable", retailRate];
+        : ["consumable", challanRate ?? retailRate];
       row[column] = Number(row[column]) + consumed;
       row.quantity = Number(row.quantity) + consumed;
       row.value = money(Number(row.value) + consumed * rate);
@@ -1078,7 +1127,7 @@ export class PartsReportService {
    * Cancelled bills and STNs are left out: their stock went back.
    */
   private async issueChecklist(f: ReportFilters): Promise<Row[]> {
-    const [stnLines, saleLines, issuances] = await Promise.all([
+    const [stnLines, saleLines, issuances, challanLines] = await Promise.all([
       prisma.stockTransferNoteLine.findMany({
         where: {
           part: partWhere(f),
@@ -1105,6 +1154,10 @@ export class PartsReportService {
           jobCard: { select: { jobNumber: true, customer: customerSelect } },
           jobCardLine: { select: { amount: true } },
         },
+      }),
+      prisma.dispatchChallanLine.findMany({
+        where: { part: partWhere(f), challan: { challanDate: dateRange(f), ...(f.branchId && { branchId: f.branchId }) } },
+        include: { part: partSelect, challan: { select: { challanNumber: true, challanDate: true, customer: customerSelect } } },
       }),
     ]);
     const sections: Row[][] = [
@@ -1135,6 +1188,21 @@ export class PartsReportService {
         required: l.customerOrderLine?.orderedQuantity ?? l.quantity,
         quantity: l.quantity,
         amount: lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent).net,
+      })),
+      // Legacy CHALLAN section: dispatch challans to cost centres, at the rate they were issued at.
+      challanLines.map((l) => ({
+        group: "Challans",
+        voucher: l.challan.challanNumber,
+        date: l.challan.challanDate.toISOString(),
+        code: l.challan.customer.code,
+        issuedTo: partyName(l.challan.customer),
+        partNumber: l.part.partNumber,
+        partFlag: l.part.partFlag,
+        description: l.part.name,
+        unit: l.part.uom,
+        required: l.quantity,
+        quantity: l.quantity,
+        amount: l.amount,
       })),
       ...[true, false].map((toJob) =>
         issuances

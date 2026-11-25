@@ -1,21 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search, X } from "lucide-react";
 import { inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
-import { useSaleCustomers } from "../hooks/use-part-sale";
+import { partSaleKeys, searchSaleCustomersRequest } from "../api/part-sale.api";
 import { customerAddress, customerName, fmtCurrency } from "../lib/part-sale-format";
 import type { CustomerSearchResult, SaleCustomer } from "../types/part-sale.types";
+
+/** Where the picker searches: by default the part-sale customer search. */
+export type CustomerSearchQuery = (search: string) => {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<CustomerSearchResult[]>;
+};
+
+const saleCustomerSearch: CustomerSearchQuery = (search) => ({
+  queryKey: partSaleKeys.customers(search),
+  queryFn: () => searchSaleCustomersRequest(search),
+});
 
 interface CustomerPickerProps {
   value: SaleCustomer | null;
   onChange: (customer: CustomerSearchResult | null) => void;
   disabled?: boolean;
+  searchQuery?: CustomerSearchQuery;
+  placeholder?: string;
 }
 
 /** Search any party by code, name or phone. Shows the address and current outstanding, like the legacy form. */
-export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProps) {
+export function CustomerPicker({ value, onChange, disabled, searchQuery = saleCustomerSearch, placeholder }: CustomerPickerProps) {
   const [text, setText] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -34,7 +48,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const { data, isFetching } = useSaleCustomers(debounced);
+  const { data, isFetching } = useQuery({ ...searchQuery(debounced), enabled: debounced.length >= 2, staleTime: 30_000 });
   const results = debounced.length >= 2 ? (data ?? []) : [];
 
   if (value) {
@@ -70,7 +84,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
           className={cn(inputCls, "pl-9")}
           value={text}
           disabled={disabled}
-          placeholder="Search customer code, name or phone…"
+          placeholder={placeholder ?? "Search customer code, name or phone…"}
           onChange={(e) => {
             setText(e.target.value);
             setOpen(true);
