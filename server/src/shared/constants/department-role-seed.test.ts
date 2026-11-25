@@ -10,11 +10,20 @@ it("deploys the same department permissions as the seed", () => {
     ([, template, permissions]) => [template, [...permissions.matchAll(/'([^']+)'/g)].map(([, permission]) => permission)],
   ));
   const roles = [...sql.matchAll(/\('([A-Za-z]+)', '([A-Za-z]+)', (true|false)\)/g)];
+  const psfSql = readFileSync(resolve(__dirname, "../../../prisma/migrations/20261125130000_department_role_psf_grants/migration.sql"), "utf8");
+  const psfGrants = [...psfSql.matchAll(/\('([A-Za-z]+)', '([^']+)'\)/g)];
   expect(roles.map(([, role]) => role).sort()).toEqual(Object.keys(NEW_DEPARTMENT_ROLE_BASES).sort());
+  expect([...new Set(psfGrants.map(([, role]) => role))].every(
+    role => Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role),
+  )).toBe(true);
   for (const [, role, template, allBranches] of roles) {
     const roleName = role as keyof typeof NEW_DEPARTMENT_ROLE_BASES;
     expect(template).toBe(NEW_DEPARTMENT_ROLE_BASES[roleName]);
-    const grants = [...templates.get(template)!, ...(allBranches === "true" ? [PERMISSIONS.BRANCH_ALL] : [])];
+    const grants = [
+      ...templates.get(template)!,
+      ...(allBranches === "true" ? [PERMISSIONS.BRANCH_ALL] : []),
+      ...psfGrants.filter(([, target]) => target === role).map(([, , permission]) => permission),
+    ];
     expect(grants.sort()).toEqual([...new Set(ROLE_PERMISSIONS[roleName])].sort());
   }
 });
