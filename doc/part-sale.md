@@ -134,13 +134,25 @@ customer sales with VAT.
 - **Migration**: no challan history is migrated. The cost centres on challans from the last five
   years are migrated as parties, so they can be chosen at go-live.
 - **Not built**: cancelling a challan (legacy never cancelled one; a full return undoes it), the
-  pick list for challans, and a printed challan layout (Print prints the screen).
+  and the pick list for challans.
+- **Print**: the challan prints as a formal document (company and branch header, challan number,
+  date and gate pass, the cost centre, lines, returns so far, and signature lines for the store,
+  the receiver and security). `ChallanPrint.tsx`.
+
+## Printing
+
+Print on a counter sale prints the bill (`CounterSalePrint.tsx`): company name, TIN and RC number
+(Settings → Company) with the branch address and phone; bill number, date, gate pass and due date;
+the customer; CPO, customer reference, sales executive and despatch details; the lines with VAT %;
+gross, cash discount, VAT, round-off and net amount, with the amount in words; the COUNTER_SALE terms
+(Settings → Terms & Conditions); and signature lines. A cancelled bill prints as cancelled. On screen
+the page is unchanged; the print layout shows only on paper. The header, amount in words and
+signatures are shared in `client/components/print/`.
 
 ## Not yet built
 
 - Tally export of sale-return credit notes. Someone in accounts needs to decide which ledger
   a sale return posts to.
-- A printed bill layout. The detail pages print the screen view for now.
 
 ## Tests
 

@@ -1,7 +1,15 @@
 import type { SaleCustomer } from "@/features/part-sale/types/part-sale.types";
 
 type UserRef = { id: string; firstName: string; lastName: string } | null;
-type BranchRef = { id: string; name: string; code?: string | null };
+type BranchRef = {
+  id: string;
+  name: string;
+  code?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phoneNumber?: string | null;
+};
 type PartRef = { id: string; partNumber: string; name: string; uom: string | null; partFlag: string | null };
 
 export type ChallanLine = {

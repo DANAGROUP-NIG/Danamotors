@@ -73,7 +73,8 @@ export interface CreateReturnInput {
 }
 
 const userSelect = { select: { id: true, firstName: true, lastName: true } } as const;
-const branchSelect = { select: { id: true, name: true, code: true } } as const;
+// Address and phone print in the document header.
+const branchSelect = { select: { id: true, name: true, code: true, address: true, city: true, state: true, phoneNumber: true } } as const;
 const customerSelect = {
   select: {
     id: true,

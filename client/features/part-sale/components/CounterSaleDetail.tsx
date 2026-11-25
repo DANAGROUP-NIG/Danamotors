@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { PART_SALE_PERMISSIONS } from "@/features/auth/roles";
 import { DetailField } from "./OrderDetail";
+import { CounterSalePrint } from "./CounterSalePrint";
 import { useCancelCounterSale, useCounterSale, useCreateReturn } from "../hooks/use-part-sale";
 import {
   BILL_STATUS_TONES,
@@ -224,7 +225,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="space-y-5">
+      {/* On paper the formal bill (CounterSalePrint) replaces the screen view. */}
+      <div className="space-y-5 print:hidden">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -362,6 +364,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
         )}
         <DocumentTermsBlock documentType="COUNTER_SALE" branchId={sale.branchId} />
       </div>
+      <CounterSalePrint sale={sale} />
 
       {dialog === "return" && <ReturnDialog sale={sale} onClose={() => setDialog(null)} />}
       {dialog === "cancel" && <CancelDialog sale={sale} onClose={() => setDialog(null)} />}

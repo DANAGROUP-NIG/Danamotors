@@ -16,6 +16,7 @@ import { customerAddress, customerName, fmtCurrency, fmtDate } from "@/features/
 import { cn } from "@/lib/utils";
 import { useChallan, useCreateChallanReturn } from "../hooks/use-challans";
 import type { Challan } from "../types/challan.types";
+import { ChallanPrint } from "./ChallanPrint";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -163,7 +164,8 @@ export function ChallanDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="space-y-5">
+      {/* On paper the formal challan (ChallanPrint) replaces the screen view. */}
+      <div className="space-y-5 print:hidden">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -266,6 +268,8 @@ export function ChallanDetail({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      <ChallanPrint challan={challan} />
 
       {returning && <ReturnDialog challan={challan} onClose={() => setReturning(false)} />}
     </div>

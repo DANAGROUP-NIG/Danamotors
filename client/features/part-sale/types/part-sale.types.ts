@@ -4,7 +4,16 @@ export type CustomerOrderStatus = "OPEN" | "PARTLY_BILLED" | "BILLED" | "CANCELL
 export type TransportMode = "ROAD" | "AIR" | "SEA" | "COURIER" | "HAND_DELIVERY" | "DOOR_DELIVERY";
 
 type UserRef = { id: string; firstName: string; lastName: string } | null;
-type BranchRef = { id: string; name: string; code?: string | null };
+type BranchRef = {
+  id: string;
+  name: string;
+  code?: string | null;
+  // Printed in the document header.
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phoneNumber?: string | null;
+};
 
 export type SaleCustomer = {
   id: string;
