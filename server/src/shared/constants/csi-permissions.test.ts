@@ -7,6 +7,10 @@ import {
   type RoleType,
 } from "./roles";
 import type { PrismaClient } from "@prisma/client";
+jest.mock("../../prisma/seed-department-roles", () => ({
+  seedDepartmentRoles: jest.fn(),
+}));
+
 const seedRoles = (
   require("../../../prisma/seed/roles") as {
     default: (client: PrismaClient) => Promise<void>;
@@ -40,8 +44,13 @@ const expected = new Map<RoleType, string[]>([
   [R.ADMIN, all],
   [R.SERVICE_MANAGER, all],
   [R.WORKSHOP_MANAGER, read],
+  [R.GENERAL_WORKSHOP_MANAGER, read],
   [R.AUDITOR, read],
+  [R.AUDIT_OFFICER, read],
+  [R.AUDIT_MANAGER, read],
+  [R.GENERAL_AUDIT_MANAGER, read],
   [R.CCU_MANAGER, operate],
+  [R.GENERAL_CCU_MANAGER, operate],
   [R.CCU_OFFICER, operate],
 ]);
 
@@ -104,13 +113,13 @@ it("repeated role seeding restores the same CSI grants from ROLE_PERMISSIONS", a
     saved.set(R.ADMIN, []);
     await seedRoles(db as unknown as Parameters<typeof seedRoles>[0]);
     expect(JSON.stringify([...saved])).toBe(initial);
-    for (const role of Object.values(R))
+    for (const role of saved.keys())
       expect(
         saved
           .get(role)!
           .filter((permission) => all.includes(permission))
           .sort(),
-      ).toEqual([...(expected.get(role) ?? [])].sort());
+      ).toEqual([...(expected.get(role as RoleType) ?? [])].sort());
   } finally {
     log.mockRestore();
   }

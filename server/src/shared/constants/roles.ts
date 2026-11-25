@@ -4,20 +4,49 @@ export const ROLES = {
   GENERAL_STORE_MANAGER: "GeneralStoreManager",
   BRANCH_STORE_MANAGER: "StoreOfficer",
   WORKSHOP_MANAGER: "WorkshopManager",
+  GENERAL_WORKSHOP_MANAGER: "GeneralWorkshopManager",
   ACCOUNTANT: "Accountant",
+  ACCOUNT_OFFICER: "AccountOfficer",
+  ACCOUNT_MANAGER: "AccountManager",
+  GENERAL_ACCOUNT_MANAGER: "GeneralAccountManager",
   BILLING_OFFICER: "BillingOfficer",
+  BILLING_MANAGER: "BillingManager",
+  GENERAL_BILLING_MANAGER: "GeneralBillingManager",
   SERVICE_ADVISOR: "ServiceAdviser",
   TECHNICIAN: "Technician",
   ENGINEER: "Engineer",
   WARRANTY_OFFICER: "WarrantyOfficer",
   CCU_MANAGER: "CCUManager",
+  GENERAL_CCU_MANAGER: "GeneralCCUManager",
   CCU_OFFICER: "CCUOfficer",
   SERVICE_MANAGER: "ServiceManager",
   /** Read-only: every module and report, no writes (legacy Auditormast). */
   AUDITOR: "Auditor",
+  AUDIT_OFFICER: "AuditOfficer",
+  AUDIT_MANAGER: "AuditManager",
+  GENERAL_AUDIT_MANAGER: "GeneralAuditManager",
 } as const;
 
 export type RoleType = (typeof ROLES)[keyof typeof ROLES];
+
+export const GENERAL_DEPARTMENT_ROLES = new Set<string>([
+  ROLES.GENERAL_WORKSHOP_MANAGER,
+  ROLES.GENERAL_ACCOUNT_MANAGER,
+  ROLES.GENERAL_BILLING_MANAGER,
+  ROLES.GENERAL_CCU_MANAGER,
+  ROLES.GENERAL_AUDIT_MANAGER,
+]);
+
+export const OWN_BRANCH_DEPARTMENT_ROLES = new Set<string>([
+  ROLES.WORKSHOP_MANAGER,
+  ROLES.ACCOUNT_OFFICER,
+  ROLES.ACCOUNT_MANAGER,
+  ROLES.BILLING_OFFICER,
+  ROLES.BILLING_MANAGER,
+  ROLES.CCU_MANAGER,
+  ROLES.AUDIT_OFFICER,
+  ROLES.AUDIT_MANAGER,
+]);
 
 export const PERMISSIONS = {
   REQUISITION_READ: "requisition:read",
@@ -464,7 +493,7 @@ const PDI_WORKSHOP_PERMISSIONS: PermissionType[] = [
 ];
 
 // Mapping roles to their default initial permissions for seeding
-export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
+const existingRolePermissions = {
   [ROLES.ENGINEER]: [
     PERMISSIONS.JOBCARD_READ,
     PERMISSIONS.WORKSHOP_READ,
@@ -742,7 +771,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
 
     PERMISSIONS.EMPLOYEE_READ,
     PERMISSIONS.EMPLOYEE_MANAGE,
-    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -1024,7 +1052,6 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   [ROLES.CCU_MANAGER]: [
     ...CSI_OPERATOR_PERMISSIONS,
     ...CSC_SUPERVISOR_PERMISSIONS,
-    PERMISSIONS.BRANCH_ALL,
     PERMISSIONS.DASHBOARD_READ,
     PERMISSIONS.NOTIFICATION_READ,
     PERMISSIONS.NOTIFICATION_UPDATE,
@@ -1090,4 +1117,32 @@ export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
     PERMISSIONS.FPC_ANALYSIS_READ,
     PERMISSIONS.REPORT_SETTINGS,
   ],
+} satisfies Partial<Record<RoleType, PermissionType[]>>;
+
+export const NEW_DEPARTMENT_ROLE_BASES = {
+  [ROLES.GENERAL_WORKSHOP_MANAGER]: ROLES.WORKSHOP_MANAGER,
+  [ROLES.ACCOUNT_OFFICER]: ROLES.ACCOUNTANT,
+  [ROLES.ACCOUNT_MANAGER]: ROLES.ACCOUNTANT,
+  [ROLES.GENERAL_ACCOUNT_MANAGER]: ROLES.ACCOUNTANT,
+  [ROLES.BILLING_MANAGER]: ROLES.BILLING_OFFICER,
+  [ROLES.GENERAL_BILLING_MANAGER]: ROLES.BILLING_OFFICER,
+  [ROLES.GENERAL_CCU_MANAGER]: ROLES.CCU_MANAGER,
+  [ROLES.AUDIT_OFFICER]: ROLES.AUDITOR,
+  [ROLES.AUDIT_MANAGER]: ROLES.AUDITOR,
+  [ROLES.GENERAL_AUDIT_MANAGER]: ROLES.AUDITOR,
+} as const;
+
+const newRolePermissions = Object.fromEntries(
+  Object.entries(NEW_DEPARTMENT_ROLE_BASES).map(([role, base]) => [
+    role,
+    [
+      ...existingRolePermissions[base],
+      ...(GENERAL_DEPARTMENT_ROLES.has(role) ? [PERMISSIONS.BRANCH_ALL] : []),
+    ],
+  ]),
+) as Record<keyof typeof NEW_DEPARTMENT_ROLE_BASES, PermissionType[]>;
+
+export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
+  ...existingRolePermissions,
+  ...newRolePermissions,
 };

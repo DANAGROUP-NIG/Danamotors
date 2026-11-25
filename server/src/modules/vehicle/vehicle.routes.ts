@@ -3,7 +3,8 @@ import { Router } from 'express';
 import { VehicleController } from './vehicle.controller';
 import { validateRequest } from '../../middleware/requestValidator';
 import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission } from '../../middleware/authorize';
+import { assertScopedResource, requiresOwnBranch, requirePermission } from '../../middleware/authorize';
+import prisma from '../../prisma/client';
 import { PERMISSIONS } from '../../shared/constants/roles';
 import {
   createVehicleSchema,
@@ -17,6 +18,31 @@ const router = Router();
 const controller = new VehicleController();
 
 router.use(authMiddleware);
+router.param('id', async (req, _res, next, id: string) => {
+  try {
+    if (!requiresOwnBranch(req.user)) return next();
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id },
+      select: { customer: { select: { branchId: true } } },
+    });
+    assertScopedResource(req, vehicle?.customer?.branchId);
+    next();
+  } catch (error) { next(error); }
+});
+
+router.use(async (req, _res, next) => {
+  try {
+    if (!requiresOwnBranch(req.user) || req.method !== 'POST') return next();
+    const customerId: unknown = req.body?.customerId;
+    if (typeof customerId === 'string') {
+      const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { branchId: true } });
+      assertScopedResource(req, customer?.branchId);
+    } else if (req.path === '/') {
+      assertScopedResource(req);
+    }
+    next();
+  } catch (error) { next(error); }
+});
 
 /**
  * @openapi
