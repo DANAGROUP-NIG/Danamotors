@@ -29,7 +29,7 @@ interface VehicleSelectWithCreateProps {
   value?: string;
   onChange: (vehicleId: string) => void;
   onVehicleSelect?: (vehicle: Vehicle) => void;
-  initialVehicle?: Pick<CreateVehicleFormValues, "registrationNumber" | "make" | "model" | "year">;
+  initialVehicle?: Partial<Pick<CreateVehicleFormValues, "vin" | "registrationNumber" | "make" | "model" | "year">>;
   customerId?: string;
   branchId?: string;
   error?: string;
@@ -159,7 +159,7 @@ export function VehicleSelectWithCreate({
     if (!showInlineCreate) return;
     resetVehicleForm({
       customerId: customerId || "",
-      vin: "",
+      vin: initialVehicle?.vin ?? "",
       registrationNumber: initialVehicle?.registrationNumber ?? searchQuery.trim() ?? "",
       make: initialVehicle?.make ?? searchQuery.split(" ")[0] ?? "",
       model: initialVehicle?.model ?? "",
@@ -171,7 +171,7 @@ export function VehicleSelectWithCreate({
       vehicleModelId: "",
       ownershipStatus: "",
     });
-  }, [customerId, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
+  }, [customerId, initialVehicle?.vin, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineVehicle(values: CreateVehicleFormValues) {
     if (!customerId || values.customerId !== customerId) return;

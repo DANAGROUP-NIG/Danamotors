@@ -13,10 +13,13 @@ export const createEnquirySchema = z.object({
     .min(1, 'Last name is required')
     .max(60, 'Last name is too long'),
 
+  // Optional: phone is the contact we must have. Blank is allowed; anything typed must be a valid email.
   email: z
     .string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+    .trim()
+    .email('Please enter a valid email address')
+    .optional()
+    .or(z.literal('')),
 
   phoneNumber: z
     .string()
@@ -28,6 +31,7 @@ export const createEnquirySchema = z.object({
 
   vehicleModel: z.string().max(50).optional(),
 
+  // Year of manufacture (model year), not the year the vehicle was sold.
   vehicleYear: z
     .number({ invalid_type_error: 'Enter a valid year' })
     .int()
@@ -35,13 +39,18 @@ export const createEnquirySchema = z.object({
     .max(currentYear + 1, `Year cannot be later than ${currentYear + 1}`)
     .optional(),
 
-  vehicleRegNumber: z.string().max(20).optional(),
+  vehicleRegNumber: z
+    .string()
+    .max(20)
+    .optional()
+    .transform(val => val?.trim().toUpperCase()),
+
   vin: z
     .string()
     .max(17, 'VIN must be 17 characters or less')
     .optional()
-    .transform(val => val?.toUpperCase()),
-    
+    .transform(val => val?.trim().toUpperCase()),
+
   serviceDescription: z
     .string()
     .min(10, 'Please describe the service you need (at least 10 characters)')

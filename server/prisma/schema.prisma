@@ -2057,13 +2057,14 @@ model Enquiry {
   firstName String
   lastName  String
 
-  email       String
+  email       String? // optional on the public form; phone is the contact that must be given
   phoneNumber String
 
   vehicleMake      String?
   vehicleModel     String?
-  vehicleYear      Int?
+  vehicleYear      Int? // year of manufacture (model year), not the year of sale
   vehicleRegNumber String?
+  vin              String?
 
   serviceDescription String
 

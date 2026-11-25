@@ -4,12 +4,13 @@ import prisma from '../../prisma/client';
 export interface CreateEnquiryData {
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   phoneNumber: string;
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleYear?: number;
   vehicleRegNumber?: string;
+  vin?: string;
   serviceDescription: string;
   preferredDate?: Date;
   branchId: string;
@@ -25,6 +26,7 @@ const ENQUIRY_SELECT = {
   vehicleModel: true,
   vehicleYear: true,
   vehicleRegNumber: true,
+  vin: true,
   serviceDescription: true,
   preferredDate: true,
   status: true,
