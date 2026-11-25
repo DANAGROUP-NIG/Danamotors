@@ -280,4 +280,97 @@ describeDb("CPD part sale (database)", () => {
       ),
     ).rejects.toThrow(/active sales executive/);
   });
+
+  it("bills parts without a CPO on tax form X (transfer without VAT), as Lagos billed group units", async () => {
+    // Legacy Lagos bill 2025000012: 20 x DIESEL ENGINE OIL 15W40 at 7,050 to Allen 5, form X, no VAT = 141,000.
+    const dieselOil = await prisma.sparePart.create({
+      data: { partCode: `DEO${run}`, partNumber: `DEO${run}`, name: "DIESEL ENGINE OIL - 15W40", unitPrice: 5000, retailRate: 7050, taxable: true, partType: "O" },
+    });
+    await prisma.inventoryStock.create({ data: { branchId: cpd.id, partId: dieselOil.id, quantity: 25, reservedQuantity: 2 } });
+
+    // 25 on hand, 2 reserved for someone else: only 23 free.
+    await expect(
+      service.createCounterSale({ branchId: cpd.id, customerId: customer.id, parts: [{ partId: dieselOil.id, quantity: 24 }] }, user.id),
+    ).rejects.toThrow(/Only 23 of/);
+
+    const sale = await service.createCounterSale(
+      { branchId: cpd.id, customerId: customer.id, taxForm: "TRANSFER_WITHOUT_VAT", parts: [{ partId: dieselOil.id, quantity: 20 }] },
+      user.id,
+    );
+    expect(sale.taxForm).toBe("TRANSFER_WITHOUT_VAT");
+    expect(sale.invoice).toMatchObject({ partsTotal: 141000, vatAmount: 0, total: 141000, outstandingAmount: 141000, notes: "Counter sale" });
+    expect(sale.invoice.lines.map((l) => [l.quantity, l.rate, l.vatPercent, l.customerOrderLine])).toEqual([[20, 7050, 0, null]]);
+    expect(await stockOf(dieselOil.id)).toMatchObject({ quantity: 5, reservedQuantity: 2 });
+
+    // The same taxable part on a VAT sale (form L, the default) carries 7.5% VAT.
+    const vatSale = await service.createCounterSale({ branchId: cpd.id, customerId: customer.id, parts: [{ partId: dieselOil.id, quantity: 1 }] }, user.id);
+    expect(vatSale.taxForm).toBe("VAT_SALE");
+    expect(vatSale.invoice).toMatchObject({ partsTotal: 7050, vatAmount: 528.75, total: 7570 });
+
+    // Datewise register and annexure: a block per tax form, VAT sales first.
+    const { PartsReportService } = require("../parts-report/partsReport.service");
+    const reports = new PartsReportService();
+    const today = new Date().toISOString().slice(0, 10);
+    const filters = { from: today, to: today, branchId: cpd.id };
+    const daily = await reports.run("counter-sales-summary", { ...filters, option: "DAY" });
+    expect(daily.rows.map((r: { group: string }) => r.group)).toEqual(["Sales (VAT)", "Transfers without VAT (TRNSFR WO/V)"]);
+    expect(daily.rows[1]).toMatchObject({ bills: 1, gross: 141000, vat: 0, net: 141000 });
+    const annexure = await reports.run("counter-sales-tax-annexure", filters);
+    const transfers = annexure.rows.filter((r: { group: string }) => r.group.startsWith("Transfers"));
+    expect(transfers.map((r: { billNumber: string }) => r.billNumber)).toEqual([sale.invoice.invoiceNumber]);
+    expect(annexure.rows[annexure.rows.length - 1].group).toBe("Transfers without VAT (TRNSFR WO/V)");
+
+    // Cancelling a bill with no CPO puts the stock back and touches no order.
+    const cancelled = await service.cancelCounterSale(sale.id, "Raised in error", user.id);
+    expect(cancelled.invoice.status).toBe("Cancelled");
+    expect(await stockOf(dieselOil.id)).toMatchObject({ quantity: 24, reservedQuantity: 2 });
+  });
+
+  it("charges legacy trade discount and handling on the bill, its return and the reports", async () => {
+    // Handling default: the branch's Part Category Master handling % (Lagos: 9% on category C).
+    const category = await prisma.partCategory.create({ data: { code: `H${run}`.slice(0, 10), description: "GENERAL PARTS" } });
+    await prisma.partCategoryBranchSetting.create({ data: { categoryCode: category.code, branchId: cpd.id, handlingPercent: 9, discountPercent: 50 } });
+    expect((await service.handlingRates(cpd.id))[category.code]).toBe(9);
+
+    // Legacy Lagos bill 2024000016: 1 x 674,397.51, trade discount 8%, cash discount 22.2%, handling 9% = 565,610.
+    const brake = await prisma.sparePart.create({
+      data: { partCode: `954${run}`, partNumber: `954${run}`, name: "BRAKE ACTUATOR ASSY", unitPrice: 400000, retailRate: 674397.51, taxable: true, priceCategoryCode: category.code },
+    });
+    await prisma.inventoryStock.create({ data: { branchId: cpd.id, partId: brake.id, quantity: 1 } });
+    const sale = await service.createCounterSale(
+      {
+        branchId: cpd.id,
+        customerId: customer.id,
+        cashDiscountPercent: 22.2,
+        parts: [{ partId: brake.id, quantity: 1, tradeDiscountPercent: 8, handlingPercent: 9 }],
+      },
+      user.id,
+    );
+    expect(sale.invoice).toMatchObject({
+      partsTotal: 674397.51,
+      tradeDiscountAmount: 53951.8,
+      partsDiscountAmount: 137738.95,
+      handlingAmount: 43443.61,
+      vatAmount: 39461.28,
+      total: 565610,
+    });
+    expect(sale.invoice.lines[0]).toMatchObject({ tradeDiscountPercent: 8, handlingPercent: 9, amount: 674397.51 });
+
+    // Registers carry the same amounts (no longer zero placeholders).
+    const { PartsReportService } = require("../parts-report/partsReport.service");
+    const reports = new PartsReportService();
+    const today = new Date().toISOString().slice(0, 10);
+    const bills = await reports.run("counter-sales", { from: today, to: today, branchId: cpd.id, option: "BILLS" });
+    expect(bills.rows.find((r: { billNumber: string }) => r.billNumber === sale.invoice.invoiceNumber)).toMatchObject({
+      tradeDiscount: 53951.8,
+      discount: 137738.95,
+      handling: 43443.61,
+      vat: 39461.28,
+      net: 565610,
+    });
+
+    // The return reverses the line with the same percentages: the full credit.
+    const returned = await service.createReturn(sale.id, { lines: [{ invoiceLineId: sale.invoice.lines[0].id, quantity: 1 }] }, user.id);
+    expect(returned.returns[0]).toMatchObject({ tradeDiscountAmount: 53951.8, handlingAmount: 43443.61, total: 565610 });
+  });
 });

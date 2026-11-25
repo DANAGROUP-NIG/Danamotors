@@ -17,9 +17,13 @@ const td = "border border-black px-1.5 py-0.5 align-top";
 export function CounterSalePrint({ sale }: { sale: CounterSale }) {
   const { invoice } = sale;
   const cancelled = !!invoice.cancelledAt;
+  // Legacy form X "TRNSFR WO/V": a transfer without VAT.
+  const transfer = sale.taxForm === "TRANSFER_WITHOUT_VAT";
   const cpos = [...new Set(invoice.lines.map((l) => l.customerOrderLine?.order.cpoNumber).filter(Boolean))];
   const refs = [...new Set(invoice.lines.map((l) => l.customerOrderLine?.order.customerRefNo).filter(Boolean))];
   const quantity = invoice.lines.reduce((s, l) => s + l.quantity, 0);
+  // Legacy line trade discount / handling columns, printed only when a line carries them.
+  const hasCharges = invoice.lines.some((l) => l.tradeDiscountPercent || l.handlingPercent);
   const despatch = [
     sale.transportMode && TRANSPORT_MODE_LABELS[sale.transportMode],
     sale.transporter,
@@ -31,7 +35,7 @@ export function CounterSalePrint({ sale }: { sale: CounterSale }) {
     <PrintDocument>
       <DocumentPrintHeader
         branch={sale.branch}
-        title={cancelled ? "Invoice (cancelled)" : "Invoice"}
+        title={`${transfer ? "Transfer invoice" : "Invoice"}${cancelled ? " (cancelled)" : ""}`}
         fields={[
           { label: "Bill no.", value: invoice.invoiceNumber },
           { label: "Date", value: printDate(invoice.issuedDate) },
@@ -87,6 +91,8 @@ export function CounterSalePrint({ sale }: { sale: CounterSale }) {
             <th className={th}>UOM</th>
             <th className={`${th} text-right`}>Qty</th>
             <th className={`${th} text-right`}>Rate</th>
+            {hasCharges && <th className={`${th} text-right`}>Disc %</th>}
+            {hasCharges && <th className={`${th} text-right`}>Hdl %</th>}
             <th className={`${th} text-right`}>VAT %</th>
             <th className={`${th} text-right`}>Amount</th>
           </tr>
@@ -100,6 +106,8 @@ export function CounterSalePrint({ sale }: { sale: CounterSale }) {
               <td className={td}>{l.part?.uom ?? ""}</td>
               <td className={`${td} text-right`}>{l.quantity}</td>
               <td className={`${td} text-right`}>{printMoney(l.rate)}</td>
+              {hasCharges && <td className={`${td} text-right`}>{l.tradeDiscountPercent || "—"}</td>}
+              {hasCharges && <td className={`${td} text-right`}>{l.handlingPercent || "—"}</td>}
               <td className={`${td} text-right`}>{l.vatPercent ? l.vatPercent : "—"}</td>
               <td className={`${td} text-right`}>{printMoney(l.amount)}</td>
             </tr>
@@ -109,7 +117,7 @@ export function CounterSalePrint({ sale }: { sale: CounterSale }) {
               Total: {invoice.lines.length} item(s)
             </td>
             <td className={`${td} text-right`}>{quantity}</td>
-            <td className={td} colSpan={2} />
+            <td className={td} colSpan={hasCharges ? 4 : 2} />
             <td className={`${td} text-right`}>{printMoney(invoice.partsTotal)}</td>
           </tr>
         </tbody>
@@ -127,16 +135,36 @@ export function CounterSalePrint({ sale }: { sale: CounterSale }) {
               <td className="pr-6">Gross amount</td>
               <td className="text-right">{printMoney(invoice.partsTotal)}</td>
             </tr>
+            {invoice.tradeDiscountAmount > 0 && (
+              <tr>
+                <td className="pr-6">Trade discount</td>
+                <td className="text-right">-{printMoney(invoice.tradeDiscountAmount)}</td>
+              </tr>
+            )}
             {invoice.partsDiscountAmount > 0 && (
               <tr>
                 <td className="pr-6">Cash discount ({Number(invoice.partsDiscountPercent.toFixed(4))}%)</td>
                 <td className="text-right">-{printMoney(invoice.partsDiscountAmount)}</td>
               </tr>
             )}
-            <tr>
-              <td className="pr-6">VAT ({invoice.vatRate}%)</td>
-              <td className="text-right">{printMoney(invoice.vatAmount)}</td>
-            </tr>
+            {invoice.handlingAmount > 0 && (
+              <tr>
+                <td className="pr-6">Handling</td>
+                <td className="text-right">{printMoney(invoice.handlingAmount)}</td>
+              </tr>
+            )}
+            {transfer ? (
+              <tr>
+                <td className="pr-6" colSpan={2}>
+                  Transfer without VAT (TRNSFR WO/V)
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <td className="pr-6">VAT ({invoice.vatRate}%)</td>
+                <td className="text-right">{printMoney(invoice.vatAmount)}</td>
+              </tr>
+            )}
             {invoice.roundOff !== 0 && (
               <tr>
                 <td className="pr-6">Round off</td>

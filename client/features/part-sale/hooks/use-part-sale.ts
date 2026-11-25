@@ -11,6 +11,7 @@ import {
   getCounterSaleRequest,
   getCounterSalesRequest,
   listSalesExecutivesRequest,
+  getHandlingRatesRequest,
   getOrderRequest,
   getOrdersRequest,
   getReturnsRequest,
@@ -27,6 +28,15 @@ export function partSaleErrorMessage(error: unknown, fallback: string) {
     ?.response?.data;
   const first = data?.errors?.[0];
   return first ? `${first.field ? `${first.field}: ` : ""}${first.message}` : (data?.message ?? fallback);
+}
+
+export function useHandlingRates(branchId: string) {
+  return useQuery({
+    queryKey: partSaleKeys.handlingRates(branchId),
+    queryFn: () => getHandlingRatesRequest(branchId),
+    enabled: !!branchId,
+    staleTime: 5 * 60_000,
+  });
 }
 
 export function useSalesExecutives(branchId: string) {

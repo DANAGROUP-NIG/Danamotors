@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CustomerOrderStatus, TransportMode } from "@prisma/client";
+import { CustomerOrderStatus, SaleTaxForm, TransportMode } from "@prisma/client";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
@@ -85,6 +85,10 @@ export const cancelOrderLinesSchema = z.object({
 
 // ── Counter sales ───────────────────────────────────────────────────────────
 
+const percent = (label: string) => z.number().min(0, `${label} cannot be negative`).max(100, `${label} cannot exceed 100%`).optional();
+/** Legacy line trade discount % (csissue.discountper) and handling % (csissue.handlingper). */
+const lineCharges = { tradeDiscountPercent: percent("Trade discount"), handlingPercent: percent("Handling") };
+
 export const createCounterSaleSchema = z.object({
   body: z
     .object({
@@ -99,12 +103,23 @@ export const createCounterSaleSchema = z.object({
       grDate: z.coerce.date().optional(),
       numberOfCases: z.number().int().nonnegative().optional(),
       notes: optionalText(500),
+      // Legacy tax form: L (VAT sale, the default) or X (transfer without VAT).
+      taxForm: z.nativeEnum(SaleTaxForm).optional(),
+      // Lines from the customer's open CPOs.
       lines: z
-        .array(z.object({ orderLineId: uuid("CPO line ID"), quantity }))
-        .min(1, "Select at least one order line to bill")
+        .array(z.object({ orderLineId: uuid("CPO line ID"), quantity, ...lineCharges }))
         .max(500)
-        .refine((lines) => new Set(lines.map((l) => l.orderLineId)).size === lines.length, "Each order line can appear only once"),
+        .refine((lines) => new Set(lines.map((l) => l.orderLineId)).size === lines.length, "Each order line can appear only once")
+        .default([]),
+      // Parts billed without a CPO (legacy counter sale with no customer order, as Lagos billed).
+      parts: z
+        .array(z.object({ partId: uuid("part ID"), quantity, ...lineCharges }))
+        .max(500)
+        .refine((parts) => new Set(parts.map((p) => p.partId)).size === parts.length, "Each part can appear only once")
+        .default([]),
     })
+    .refine((b) => b.lines.length + b.parts.length > 0, { message: "Add at least one order line or part to bill", path: ["lines"] })
+    .refine((b) => b.lines.length + b.parts.length <= 500, { message: "A bill can have at most 500 lines", path: ["lines"] })
     .refine((b) => b.cashDiscountPercent === undefined || b.cashDiscountAmount === undefined, {
       message: "Enter the cash discount as a percentage or an amount, not both",
       path: ["cashDiscountAmount"],

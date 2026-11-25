@@ -1522,6 +1522,9 @@ model Invoice {
   partsDiscountPercent  Float @default(0)
   labourDiscountPercent Float @default(0)
   partsDiscountAmount   Float @default(0)
+  // Counter sale: legacy trade discount (line %) and handling (line %), in naira.
+  tradeDiscountAmount   Float @default(0)
+  handlingAmount        Float @default(0)
   labourDiscountAmount  Float @default(0)
   vatRate               Float @default(7.5)
   vatAmount             Float @default(0)
@@ -1664,13 +1667,17 @@ model InvoiceLine {
   createdAt       DateTime       @default(now())
 
   // Counter-sale lines: the CPO line billed, the VAT applied, and units returned so far.
-  customerOrderLineId String?
-  customerOrderLine   CustomerOrderLine?      @relation(fields: [customerOrderLineId], references: [id], onDelete: Restrict)
-  vatPercent          Float?
+  customerOrderLineId  String?
+  customerOrderLine    CustomerOrderLine?      @relation(fields: [customerOrderLineId], references: [id], onDelete: Restrict)
+  vatPercent           Float?
+  // Counter sale (legacy csissue.discountper / handlingper): line trade discount before the cash
+  // discount, and handling on the value after both discounts.
+  tradeDiscountPercent Float?
+  handlingPercent      Float?
   // Dealer rate when billed, so revenue and margin reports do not move with later price changes.
-  unitCost            Float?
-  returnedQuantity    Int                     @default(0)
-  returnLines         CounterSaleReturnLine[]
+  unitCost             Float?
+  returnedQuantity     Int                     @default(0)
+  returnLines          CounterSaleReturnLine[]
 
   @@index([invoiceId])
   @@index([customerOrderLineId])
@@ -2368,6 +2375,14 @@ enum TransportMode {
   COURIER
   HAND_DELIVERY
   DOOR_DELIVERY
+}
+
+/// Legacy counter-sale tax form (countersale.taxform / csfatax.form).
+enum SaleTaxForm {
+  /// Form L "SALE": VAT on taxable parts.
+  VAT_SALE
+  /// Form X "TRNSFR WO/V": transfer without VAT (oil to group units, Lagos to 2026).
+  TRANSFER_WITHOUT_VAT
 }
 
 enum MobisOrderMode {
@@ -3668,6 +3683,7 @@ model CounterSale {
   numberOfCases    Int?
   // Legacy countersale.gatepass: issued with the bill, from the gate pass series job cards and STNs share.
   gatePassNumber   String?        @unique
+  taxForm          SaleTaxForm    @default(VAT_SALE)
 
   createdAt DateTime @default(now())
 
@@ -3689,11 +3705,14 @@ model CounterSaleReturn {
   returnDate DateTime @default(now())
   reason     String?
 
-  grossAmount    Float
-  discountAmount Float
-  vatAmount      Float
-  roundOff       Float
-  total          Float
+  grossAmount         Float
+  discountAmount      Float
+  // Trade discount and handling reversed with the returned lines.
+  tradeDiscountAmount Float @default(0)
+  handlingAmount      Float @default(0)
+  vatAmount           Float
+  roundOff            Float
+  total               Float
 
   // The credit note raised for the return; it is set off against the bill first.
   creditNoteId String?    @unique

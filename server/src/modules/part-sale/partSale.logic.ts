@@ -3,12 +3,15 @@
  *   customer purchase order (CPO) -> pick -> counter-sale bill -> sale return.
  * Database-free so it can be unit tested directly.
  *
- * Pricing follows the legacy CPD counter sale (countersale/csissue, trantype C):
- *   line gross = quantity x retail rate
- *   cash discount = gross x cash discount %
- *   VAT = (gross - discount) x VAT % (only on taxable parts)
- *   total = sum of (gross - discount + VAT), rounded DOWN to the nearest 10 naira.
- * Returns are priced with the same discount and VAT as the bill line they reverse.
+ * Pricing follows the legacy counter sale (countersale/csissue/csfatax, trantype C), per line:
+ *   gross          = quantity x retail rate
+ *   trade discount = gross x line trade discount %          (csissue.discountper; ABJ, Lagos)
+ *   cash discount  = (gross - trade) x bill cash discount %  (countersale.CashDiscPer)
+ *   handling       = (gross - trade - cash) x line handling % (csissue.handlingper; Lagos 9%)
+ *   VAT            = (gross - trade - cash + handling) x VAT % (taxable parts on a VAT sale)
+ *   total = sum of (gross - trade - cash + handling + VAT), rounded DOWN to the nearest 10 naira.
+ * Checked against legacy Lagos bill 2024000016 (8% trade, 22.2% cash, 9% handling) to the kobo.
+ * Returns are priced with the same percentages as the bill line they reverse.
  */
 import { CustomerOrderStatus, Prisma } from "@prisma/client";
 import { BadRequestError } from "../../shared/errors/appError";
@@ -18,17 +21,29 @@ export interface PriceLineInput {
   quantity: number;
   rate: number;
   vatPercent: number;
+  /** Legacy line discount (csissue.discountper), before the cash discount. */
+  tradeDiscountPercent?: number;
+  /** Legacy line handling (csissue.handlingper), on the value after both discounts. */
+  handlingPercent?: number;
 }
 
 export interface PricedLine extends PriceLineInput {
   gross: number;
+  tradeDiscount: number;
+  /** Cash discount. */
   discount: number;
+  handling: number;
   vat: number;
+  /** gross - trade - cash + handling + VAT, before the bill's round-off. */
+  net: number;
 }
 
 export interface SaleTotals {
   gross: number;
+  tradeDiscount: number;
+  /** Cash discount. */
   discount: number;
+  handling: number;
   vat: number;
   roundOff: number;
   total: number;
@@ -57,22 +72,31 @@ export function priceSale(lines: PriceLineInput[], cashDiscountPercent: number):
     }
     if (!Number.isFinite(line.rate) || line.rate < 0) throw new BadRequestError("Rates must be zero or more");
     assertPercent(line.vatPercent, "VAT");
+    assertPercent(line.tradeDiscountPercent ?? 0, "Trade discount");
+    assertPercent(line.handlingPercent ?? 0, "Handling");
     const gross = money(new Prisma.Decimal(line.quantity).times(line.rate).toNumber());
-    const discount = percentOf(gross, cashDiscountPercent);
-    const vat = percentOf(money(gross - discount), line.vatPercent);
-    return { ...line, gross, discount, vat };
+    const tradeDiscount = percentOf(gross, line.tradeDiscountPercent ?? 0);
+    const afterTrade = money(gross - tradeDiscount);
+    const discount = percentOf(afterTrade, cashDiscountPercent);
+    const afterCash = money(afterTrade - discount);
+    const handling = percentOf(afterCash, line.handlingPercent ?? 0);
+    const vat = percentOf(money(afterCash + handling), line.vatPercent);
+    return { ...line, gross, tradeDiscount, discount, handling, vat, net: money(afterCash + handling + vat) };
   });
   const gross = sumMoney(priced.map((l) => l.gross));
+  const tradeDiscount = sumMoney(priced.map((l) => l.tradeDiscount));
   const discount = sumMoney(priced.map((l) => l.discount));
+  const handling = sumMoney(priced.map((l) => l.handling));
   const vat = sumMoney(priced.map((l) => l.vat));
-  const beforeRoundOff = money(gross - discount + vat);
+  const beforeRoundOff = money(gross - tradeDiscount - discount + handling + vat);
   const total = floorToTen(beforeRoundOff);
-  return { lines: priced, totals: { gross, discount, vat, roundOff: money(total - beforeRoundOff), total } };
+  return { lines: priced, totals: { gross, tradeDiscount, discount, handling, vat, roundOff: money(total - beforeRoundOff), total } };
 }
 
 /**
  * Legacy CashDiscAmtorPer: the discount may be entered as an amount (a negotiated
- * price) instead of a percentage. Convert it to the percentage of the gross it represents.
+ * price) instead of a percentage. Convert it to the percentage of the value it applies to:
+ * the gross after any trade discount (legacy ABJ bill 2026000002: 2,000 on 10,271,627.33).
  */
 export function discountPercentFromAmount(gross: number, amount: number): number {
   if (!Number.isFinite(amount) || amount < 0) throw new BadRequestError("Cash discount amount must be zero or more");

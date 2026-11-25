@@ -10,7 +10,7 @@
  * against the bill's outstanding first; anything left stays as party credit.
  */
 import { randomUUID } from "crypto";
-import { CustomerOrderStatus, PartStatus, Prisma, TransportMode } from "@prisma/client";
+import { CustomerOrderStatus, PartStatus, Prisma, SaleTaxForm, TransportMode } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { config } from "../../config";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
@@ -64,7 +64,18 @@ export interface CreateCounterSaleInput {
   grDate?: Date;
   numberOfCases?: number;
   notes?: string;
-  lines: { orderLineId: string; quantity: number }[];
+  /** Legacy tax form L (VAT sale, default) or X (transfer without VAT). */
+  taxForm?: SaleTaxForm;
+  /** Lines from the customer's open CPOs. */
+  lines?: ({ orderLineId: string; quantity: number } & LineCharges)[];
+  /** Parts billed without a CPO, at the Part Master retail rate (legacy counter sale with no customer order). */
+  parts?: ({ partId: string; quantity: number } & LineCharges)[];
+}
+
+/** Legacy line trade discount % (csissue.discountper) and handling % (csissue.handlingper). */
+export interface LineCharges {
+  tradeDiscountPercent?: number;
+  handlingPercent?: number;
 }
 
 export interface CreateReturnInput {
@@ -93,8 +104,15 @@ const customerSelect = {
   },
 } as const;
 const partSelect = {
-  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, taxable: true, unitPrice: true },
+  select: { id: true, partNumber: true, name: true, uom: true, partFlag: true, taxable: true, unitPrice: true, priceCategoryCode: true },
 } as const;
+
+/** A bill line's quantity and legacy charges, the percentages defaulting to none. */
+const charges = (l: { quantity: number } & LineCharges) => ({
+  quantity: l.quantity,
+  tradeDiscountPercent: l.tradeDiscountPercent ?? 0,
+  handlingPercent: l.handlingPercent ?? 0,
+});
 
 const customerName = (c: { companyName: string | null; firstName: string; lastName: string }) =>
   c.companyName || `${c.firstName} ${c.lastName}`.trim();
@@ -141,7 +159,7 @@ export class PartSaleService {
 
   /** Part search with free stock at the selling branch and the retail rate the CPO will use. */
   async searchParts(search: string, branchId: string) {
-    return new StockTransferService().searchParts({ search, sourceBranchId: branchId });
+    return new StockTransferService().searchParts({ search, sourceBranchId: branchId, allSources: true });
   }
 
   /** Legacy Counter Sale "Sales Executive" dropdown: the active staff of the selling branch. */
@@ -151,6 +169,15 @@ export class PartSaleService {
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       ...userSelect,
     });
+  }
+
+  /**
+   * Legacy Part Category Master handling % at the selling branch, by part category: the default
+   * handling on a counter-sale line when the bill charges handling (Lagos 9% on spare parts).
+   */
+  async handlingRates(branchId: string) {
+    const settings = await prisma.partCategoryBranchSetting.findMany({ where: { branchId }, select: { categoryCode: true, handlingPercent: true } });
+    return Object.fromEntries(settings.map((s) => [s.categoryCode, s.handlingPercent]));
   }
 
   // ── Customer purchase orders ──────────────────────────────────────────────
@@ -511,11 +538,17 @@ export class PartSaleService {
         if (!executive?.isActive) throw new BadRequestError("Select an active sales executive");
       }
 
-      const requested = await tx.customerOrderLine.findMany({
-        where: { id: { in: input.lines.map((l) => l.orderLineId) } },
-        select: { id: true, orderId: true },
-      });
-      if (requested.length !== input.lines.length) throw new NotFoundError("One or more order lines were not found");
+      const orderInput = input.lines ?? [];
+      const partInput = input.parts ?? [];
+      if (orderInput.length + partInput.length === 0) throw new BadRequestError("Add at least one order line or part to bill");
+
+      const requested = orderInput.length
+        ? await tx.customerOrderLine.findMany({
+            where: { id: { in: orderInput.map((l) => l.orderLineId) } },
+            select: { id: true, orderId: true },
+          })
+        : [];
+      if (requested.length !== orderInput.length) throw new NotFoundError("One or more order lines were not found");
       const orderIds = [...new Set(requested.map((l) => l.orderId))].sort();
       // Lock every order first (in id order) so nothing else picks or bills these lines meanwhile.
       const orders = [];
@@ -524,45 +557,91 @@ export class PartSaleService {
         if (order.customerId !== customer.id) throw new BadRequestError(`CPO ${order.cpoNumber} belongs to another customer`);
         if (order.branchId !== branch.id) throw new BadRequestError(`CPO ${order.cpoNumber} belongs to another branch`);
       }
-      const orderLines = await tx.customerOrderLine.findMany({
-        where: { id: { in: input.lines.map((l) => l.orderLineId) } },
-        include: { part: partSelect, order: { select: { cpoNumber: true } } },
-        orderBy: { partId: "asc" },
-      });
+      const orderLines = orderInput.length
+        ? await tx.customerOrderLine.findMany({
+            where: { id: { in: orderInput.map((l) => l.orderLineId) } },
+            include: { part: partSelect, order: { select: { cpoNumber: true } } },
+          })
+        : [];
+      // Parts billed without a CPO (legacy counter sale with no customer order), at the Part Master retail rate.
+      const directParts = partInput.length
+        ? await tx.sparePart.findMany({
+            where: { id: { in: partInput.map((p) => p.partId) } },
+            select: { ...partSelect.select, retailRate: true },
+          })
+        : [];
+      if (directParts.length !== partInput.length) throw new NotFoundError("One or more parts were not found");
+      for (const part of directParts) {
+        if (part.retailRate == null) throw new BadRequestError(`${part.partNumber} has no retail rate. Set it in Part Master first.`);
+      }
 
-      const quantityOf = (lineId: string) => input.lines.find((l) => l.orderLineId === lineId)!.quantity;
-      const gross = sumMoney(orderLines.map((l) => money(quantityOf(l.id) * l.retailRate)));
+      // One list of bill lines, in part order so stock rows are always locked in the same order.
+      const entries = [
+        ...orderLines.map((line) => ({
+          partId: line.partId,
+          part: line.part,
+          ...charges(orderInput.find((l) => l.orderLineId === line.id)!),
+          rate: line.retailRate,
+          orderLine: line,
+        })),
+        ...directParts.map((part) => ({
+          partId: part.id,
+          part,
+          ...charges(partInput.find((p) => p.partId === part.id)!),
+          rate: part.retailRate!,
+          orderLine: null,
+        })),
+      ].sort((a, b) => a.partId.localeCompare(b.partId));
+
+      // Legacy form X ("TRNSFR WO/V") charges no VAT; form L charges VAT on taxable parts.
+      const taxForm = input.taxForm ?? SaleTaxForm.VAT_SALE;
+      const vatFor = (taxable: boolean) => (taxForm === SaleTaxForm.TRANSFER_WITHOUT_VAT || !taxable ? 0 : VAT_RATE);
+      const toPrice = entries.map((e) => ({
+        quantity: e.quantity,
+        rate: e.rate,
+        vatPercent: vatFor(e.part.taxable),
+        tradeDiscountPercent: e.tradeDiscountPercent,
+        handlingPercent: e.handlingPercent,
+      }));
+      // A cash discount entered as an amount is a % of the value after the trade discount (legacy CashDiscAmtorPer).
+      const beforeCash = priceSale(toPrice, 0).totals;
       const discountPercent =
         input.cashDiscountAmount !== undefined
-          ? discountPercentFromAmount(gross, input.cashDiscountAmount)
+          ? discountPercentFromAmount(money(beforeCash.gross - beforeCash.tradeDiscount), input.cashDiscountAmount)
           : (input.cashDiscountPercent ?? 0);
-      const priced = priceSale(
-        orderLines.map((l) => ({ quantity: quantityOf(l.id), rate: l.retailRate, vatPercent: l.part.taxable ? VAT_RATE : 0 })),
-        discountPercent,
-      );
+      const priced = priceSale(toPrice, discountPercent);
 
-      await cancelSentHandheldDocuments(
-        tx,
-        orderIds.map((customerOrderId) => ({ customerOrderId })),
-        "Billed before the handheld result was uploaded",
-        actorId,
-      );
+      if (orderIds.length) {
+        await cancelSentHandheldDocuments(
+          tx,
+          orderIds.map((customerOrderId) => ({ customerOrderId })),
+          "Billed before the handheld result was uploaded",
+          actorId,
+        );
+      }
 
-      // Issue stock: picked (reserved) units first, then free stock.
+      // Issue stock. CPO lines: picked (reserved) units first, then free stock. Other parts: free stock only.
       const issues: { partId: string; quantity: number; note: string }[] = [];
-      for (const line of orderLines) {
-        const quantity = quantityOf(line.id);
-        const stock = await lockStock(tx, branch.id, line.partId);
+      for (const { partId, part, quantity, orderLine: line } of entries) {
+        const stock = await lockStock(tx, branch.id, partId);
         const free = stock ? stock.quantity - stock.reservedQuantity : 0;
+        if (!line) {
+          if (!stock || free < quantity) {
+            throw new ConflictError(`Only ${Math.max(0, free)} of ${part.partNumber} free at ${branch.name}; nothing was posted`);
+          }
+          await tx.inventoryStock.update({ where: { id: stock.id }, data: { quantity: { decrement: quantity } } });
+          issues.push({ partId, quantity, note: "no CPO" });
+          continue;
+        }
         let plan;
         try {
           plan = planIssue(line, quantity, free);
         } catch (error) {
-          if (error instanceof BadRequestError) throw new BadRequestError(`${line.part.partNumber}: ${error.message}`);
+          if (error instanceof BadRequestError) throw new BadRequestError(`${part.partNumber}: ${error.message}`);
           throw error;
         }
         if (!stock || stock.reservedQuantity < plan.fromPicked || stock.quantity < quantity) {
-          throw new ConflictError(`Stock for ${line.part.partNumber} no longer covers this bill; nothing was posted`);
+          throw new ConflictError(`Stock for ${part.partNumber} no longer covers this bill; nothing was posted`);
         }
         await tx.inventoryStock.update({
           where: { id: stock.id },
@@ -577,7 +656,7 @@ export class PartSaleService {
             billedQuantity: { increment: quantity },
           },
         });
-        issues.push({ partId: line.partId, quantity, note: `CPO ${line.order.cpoNumber}` });
+        issues.push({ partId, quantity, note: `CPO ${line.order.cpoNumber}` });
       }
 
       const now = new Date();
@@ -594,6 +673,8 @@ export class PartSaleService {
           partsTotal: totals.gross,
           partsDiscountPercent: discountPercent,
           partsDiscountAmount: totals.discount,
+          tradeDiscountAmount: totals.tradeDiscount,
+          handlingAmount: totals.handling,
           vatRate: VAT_RATE,
           vatAmount: totals.vat,
           tax: totals.vat,
@@ -601,19 +682,21 @@ export class PartSaleService {
           total: totals.total,
           outstandingAmount: totals.total,
           status: totals.total === 0 ? "Paid" : "Unpaid",
-          notes: input.notes ?? `Counter sale against CPO ${orders.map((o) => o.cpoNumber).join(", ")}`,
+          notes: input.notes ?? (orders.length ? `Counter sale against CPO ${orders.map((o) => o.cpoNumber).join(", ")}` : "Counter sale"),
           lines: {
             createMany: {
-              data: orderLines.map((line, index) => ({
+              data: entries.map((entry, index) => ({
                 type: "PART",
-                partId: line.partId,
-                description: line.part.name,
-                quantity: quantityOf(line.id),
-                rate: line.retailRate,
+                partId: entry.partId,
+                description: entry.part.name,
+                quantity: entry.quantity,
+                rate: entry.rate,
                 amount: priced.lines[index].gross,
-                customerOrderLineId: line.id,
+                customerOrderLineId: entry.orderLine?.id ?? null,
                 vatPercent: priced.lines[index].vatPercent,
-                unitCost: line.part.unitPrice,
+                tradeDiscountPercent: entry.tradeDiscountPercent,
+                handlingPercent: entry.handlingPercent,
+                unitCost: entry.part.unitPrice,
               })),
             },
           },
@@ -627,6 +710,7 @@ export class PartSaleService {
               grDate: input.grDate,
               numberOfCases: input.numberOfCases,
               gatePassNumber: await nextDocumentNumber(tx, DOC_TYPES.GATE_PASS, now),
+              taxForm,
             },
           },
         },
@@ -814,7 +898,14 @@ export class PartSaleService {
         return { line, partId: line.partId, quantity: request.quantity };
       });
       const priced = priceSale(
-        lines.map(({ line, quantity }) => ({ quantity, rate: line.rate, vatPercent: line.vatPercent ?? 0 })),
+        // Priced like the bill line it reverses: same trade discount, cash discount, handling and VAT.
+        lines.map(({ line, quantity }) => ({
+          quantity,
+          rate: line.rate,
+          vatPercent: line.vatPercent ?? 0,
+          tradeDiscountPercent: line.tradeDiscountPercent ?? 0,
+          handlingPercent: line.handlingPercent ?? 0,
+        })),
         invoice.partsDiscountPercent,
       );
       const { totals } = priced;
@@ -896,6 +987,8 @@ export class PartSaleService {
           reason: input.reason,
           grossAmount: totals.gross,
           discountAmount: totals.discount,
+          tradeDiscountAmount: totals.tradeDiscount,
+          handlingAmount: totals.handling,
           vatAmount: totals.vat,
           roundOff: totals.roundOff,
           total: totals.total,

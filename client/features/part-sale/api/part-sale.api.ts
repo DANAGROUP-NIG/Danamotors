@@ -26,6 +26,7 @@ export const partSaleKeys = {
   customers: (search: string) => [...partSaleKeys.all, "customers", search] as const,
   parts: (search: string, branchId: string) => [...partSaleKeys.all, "parts", search, branchId] as const,
   executives: (branchId: string) => [...partSaleKeys.all, "executives", branchId] as const,
+  handlingRates: (branchId: string) => [...partSaleKeys.all, "handling-rates", branchId] as const,
 };
 
 function qs(params: Record<string, string | boolean | undefined>) {
@@ -39,6 +40,11 @@ function qs(params: Record<string, string | boolean | undefined>) {
 
 export async function searchSaleCustomersRequest(search: string) {
   return (await apiGet<{ customers: CustomerSearchResult[] }>(`${BASE}/customers${qs({ search })}`)).customers;
+}
+
+/** Handling % by part category at the branch (Part Category Master). */
+export async function getHandlingRatesRequest(branchId: string) {
+  return (await apiGet<{ rates: Record<string, number> }>(`${BASE}/handling-rates${qs({ branchId })}`)).rates;
 }
 
 export async function listSalesExecutivesRequest(branchId: string) {

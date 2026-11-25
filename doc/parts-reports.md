@@ -99,16 +99,17 @@ Counter-sale reports merged or left out, so that no report repeats another:
 - **Handling** and the trade **Discount** (legacy DISCOUNT, apart from CASH DISCOUNT) are kept on the
   register, the summary and the annexure. CPD charged handling in 2011 and 2013. Lagos charged it every
   year from 2011 to 2025, and ABJ from 2011 to 2016 and in 2021. A trade discount was given at Lagos
-  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. A bill here can carry only a cash
-  discount, so both columns show zero until bills can record them.
+  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. Bills record both per line
+  (see [part-sale.md](./part-sale.md#pricing)), and the reports show the amounts charged. Sales values on
+  the revenue and MIS reports are after both discounts, with handling, before VAT.
 - **Entry tax, LST surcharge and other charges** are left out: they are zero on every counter-sale bill,
   in every year, in all three databases.
-- **Tax form is not covered yet.** Legacy gave each bill a tax form: L (VAT, a local sale), X
-  (TRNSFR WO/V, a transfer without VAT), or P, Y or Z (purchase forms). The datewise register's
-  "Local sales" and "Central sales" blocks split bills by form, and the annexure groups them under the
-  form's name. CPD billed form X up to 2024 (15 non-VAT-form bills since 2010, one of ₦19.3m in 2022),
-  and Lagos billed form X in 2026. Our bills have no tax form, so a bill without VAT cannot be told
-  apart from a bill of VAT-exempt parts.
+- **Tax form.** Legacy gave each bill a tax form: L (VAT, a local sale), X (TRNSFR WO/V, a transfer
+  without VAT), or P, Y or Z (purchase forms). Bills record it as the **Tax type** (Sale (VAT) or
+  Transfer without VAT). The datewise register shows a block per form ("Sales (VAT)", then "Transfers
+  without VAT (TRNSFR WO/V)", the legacy "Central sales" block), each with a subtotal, and the annexure
+  lists bills under a heading per form. CPD billed form X up to 2024 and Lagos up to 2026. The rare
+  purchase forms P, Y and Z (Lagos 2018–2021, all at 0%) count as transfers without VAT.
 
 Stock reports merged or left out, so that no report repeats another:
 

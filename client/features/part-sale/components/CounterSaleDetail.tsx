@@ -17,6 +17,7 @@ import { CounterSalePrint } from "./CounterSalePrint";
 import { useCancelCounterSale, useCounterSale, useCreateReturn } from "../hooks/use-part-sale";
 import {
   BILL_STATUS_TONES,
+  TAX_FORM_LABELS,
   TRANSPORT_MODE_LABELS,
   customerAddress,
   customerName,
@@ -48,7 +49,13 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
   const invalid = values.some((v) => !v.ok);
   const chosen = values.filter((v) => v.ok && v.q > 0);
   const preview = previewSale(
-    chosen.map((v) => ({ quantity: v.q, rate: v.line.rate, vatPercent: v.line.vatPercent ?? 0 })),
+    chosen.map((v) => ({
+      quantity: v.q,
+      rate: v.line.rate,
+      vatPercent: v.line.vatPercent ?? 0,
+      tradeDiscountPercent: v.line.tradeDiscountPercent ?? 0,
+      handlingPercent: v.line.handlingPercent ?? 0,
+    })),
     sale.invoice.partsDiscountPercent,
   );
 
@@ -112,7 +119,8 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
               Credit {fmtCurrency(preview.total)}
               <span className="text-slate-400">
                 {" "}
-                (gross {fmtCurrency(preview.gross)} − discount {fmtCurrency(preview.discount)} + VAT {fmtCurrency(preview.vat)})
+                (gross {fmtCurrency(preview.gross)} − discount {fmtCurrency(preview.tradeDiscount + preview.discount)}
+                {preview.handling ? ` + handling ${fmtCurrency(preview.handling)}` : ""} + VAT {fmtCurrency(preview.vat)})
               </span>
             </p>
           </div>
@@ -196,6 +204,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
     !cancelled && hasPermission(PART_SALE_PERMISSIONS.RETURN) && invoice.lines.some((l) => l.quantity > l.returnedQuantity);
   const canCancel = !cancelled && hasPermission(PART_SALE_PERMISSIONS.BILL) && sale.returns.length === 0;
   const totalQty = invoice.lines.reduce((s, l) => s + l.quantity, 0);
+  // Legacy trade discount / handling columns, shown only when a line carries them.
+  const hasCharges = invoice.lines.some((l) => l.tradeDiscountPercent || l.handlingPercent);
 
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
@@ -243,6 +253,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
             <DetailField label="Invoice date" value={fmtDate(invoice.issuedDate)} />
             <DetailField label="Due date" value={fmtDate(invoice.dueDate)} />
             <DetailField label="Gate pass" value={sale.gatePassNumber} />
+            <DetailField label="Tax type" value={TAX_FORM_LABELS[sale.taxForm]} />
             <DetailField wide label="Address" value={customerAddress(invoice.customer) || null} />
             <DetailField
               label="Sales executive"
@@ -279,6 +290,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
                   <th className={cn(thCls, "text-right")}>Qty</th>
                   <th className={cn(thCls, "text-right")}>Returned</th>
                   <th className={cn(thCls, "text-right")}>Rate</th>
+                  {hasCharges && <th className={cn(thCls, "text-right")}>Disc %</th>}
+                  {hasCharges && <th className={cn(thCls, "text-right")}>Hdl %</th>}
                   <th className={cn(thCls, "text-right")}>VAT</th>
                   <th className={cn(thCls, "text-right")}>Amount</th>
                 </tr>
@@ -302,6 +315,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
                       <td className={cn(tdCls, "text-right")}>{l.quantity}</td>
                       <td className={cn(tdCls, "text-right", l.returnedQuantity ? "text-red-600" : "text-slate-300")}>{l.returnedQuantity}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtCurrency(l.rate)}</td>
+                      {hasCharges && <td className={cn(tdCls, "text-right")}>{l.tradeDiscountPercent ? `${l.tradeDiscountPercent}%` : "—"}</td>}
+                      {hasCharges && <td className={cn(tdCls, "text-right")}>{l.handlingPercent ? `${l.handlingPercent}%` : "—"}</td>}
                       <td className={cn(tdCls, "text-right")}>{l.vatPercent ? `${l.vatPercent}%` : "—"}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtCurrency(l.amount)}</td>
                     </tr>
@@ -317,8 +332,20 @@ export function CounterSaleDetail({ id }: { id: string }) {
             </dd>
             <dt className="text-slate-500">Gross</dt>
             <dd className="text-right">{fmtCurrency(invoice.partsTotal)}</dd>
+            {invoice.tradeDiscountAmount > 0 && (
+              <>
+                <dt className="text-slate-500">Trade discount</dt>
+                <dd className="text-right">− {fmtCurrency(invoice.tradeDiscountAmount)}</dd>
+              </>
+            )}
             <dt className="text-slate-500">Cash discount ({Number(invoice.partsDiscountPercent.toFixed(4))}%)</dt>
             <dd className="text-right">− {fmtCurrency(invoice.partsDiscountAmount)}</dd>
+            {invoice.handlingAmount > 0 && (
+              <>
+                <dt className="text-slate-500">Handling</dt>
+                <dd className="text-right">{fmtCurrency(invoice.handlingAmount)}</dd>
+              </>
+            )}
             <dt className="text-slate-500">VAT</dt>
             <dd className="text-right">{fmtCurrency(invoice.vatAmount)}</dd>
             <dt className="text-slate-500">Round off</dt>

@@ -7,12 +7,12 @@
  * (ledger, summary, balances, ageing…) are built in stockReport.service.ts, and the MIS
  * reports in misReport.service.ts.
  */
-import { ChargeType, IndentStatus, MitStatus, MrnSource, Prisma, StnStatus } from "@prisma/client";
+import { ChargeType, IndentStatus, MitStatus, MrnSource, Prisma, SaleTaxForm, StnStatus } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, NotFoundError } from "../../shared/errors/appError";
 import { money, sumMoney } from "../finance/money";
 import { columnsFor, reportByKind, ReportColumn, ReportDefinition } from "./partsReport.definitions";
-import { dateRange, lineValues, partWhere, partyName, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
+import { dateRange, lineValues, LineCharges, partWhere, partyName, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
 import { MisReportService } from "./misReport.service";
 import { StockReportService } from "./stockReport.service";
 import { STOCK_MOVEMENTS } from "./stockReport.logic";
@@ -46,6 +46,13 @@ export function withoutCostColumns(report: ReportResult): ReportResult {
   };
 }
 
+/** Legacy tax form headings on the datewise register and the annexure (L, then X). */
+const TAX_FORM_HEADINGS: Record<SaleTaxForm, string> = {
+  VAT_SALE: "Sales (VAT)",
+  TRANSFER_WITHOUT_VAT: "Transfers without VAT (TRNSFR WO/V)",
+};
+const TAX_FORM_ORDER: Record<SaleTaxForm, number> = { VAT_SALE: 0, TRANSFER_WITHOUT_VAT: 1 };
+
 const MAX_ROWS = 5000;
 /** The Excel file asks for every line; this only guards against a runaway query. */
 const MAX_EXPORT_ROWS = 200_000;
@@ -65,8 +72,6 @@ const CHARGE_COLUMN: Record<ChargeType, string> = { CUSTOMER: "job", WARRANTY: "
 const CONSUMPTION_AMOUNTS: Record<string, string> = { job: "jobAmount", counterSale: "counterSaleAmount" };
 /** Legacy part flag F: samples, issued at no value. */
 const SAMPLE_FLAG = "F";
-/** Legacy counter-sale handling and trade discount: bills cannot carry them yet (see SALE_HANDLING). */
-const NO_SALE_CHARGES = { handling: 0, tradeDiscount: 0 };
 
 /**
  * Taxable for the sales registers' taxable / non-taxable columns: the part's tax status (legacy partmast.taxable,
@@ -203,14 +208,16 @@ export class PartsReportService {
     });
     const wanted = filtered ? new Set((await prisma.sparePart.findMany({ where: partFilter, select: { id: true } })).map((p) => p.id)) : null;
     return invoices.map((i) => {
-      const row = { sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, discount: 0, vat: 0 };
+      const row = { sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, tradeDiscount: 0, discount: 0, handling: 0, vat: 0 };
       for (const l of i.lines) {
         if (wanted && !(l.partId && wanted.has(l.partId))) continue;
-        const v = lineValues(l.quantity, l.rate, i.partsDiscountPercent, l.vatPercent);
+        const v = lineValues(l.quantity, l.rate, i.partsDiscountPercent, l.vatPercent, l);
         // Legacy columns: spares/kit (accessories included) and oil, each split into taxable and non-taxable value before discount.
         const column = `${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as keyof typeof row;
         row[column] = money(row[column] + v.gross);
+        row.tradeDiscount = money(row.tradeDiscount + v.tradeDiscount);
         row.discount = money(row.discount + v.discount);
+        row.handling = money(row.handling + v.handling);
         row.vat = money(row.vat + v.vat);
       }
       // The ₦10 round-off belongs to the whole bill, so it is shown only when every line is listed.
@@ -222,9 +229,8 @@ export class PartsReportService {
         customerCode: i.customer.code,
         customer: partyName(i.customer),
         ...row,
-        ...NO_SALE_CHARGES,
         roundOff,
-        net: money(row.sparesTaxable + row.sparesExempt + row.oilTaxable + row.oilExempt - row.discount + row.vat + roundOff),
+        net: money(row.sparesTaxable + row.sparesExempt + row.oilTaxable + row.oilExempt - row.tradeDiscount - row.discount + row.handling + row.vat + roundOff),
       };
     });
   }
@@ -249,7 +255,7 @@ export class PartsReportService {
       description: l.description,
       quantity: l.quantity,
       rate: l.rate,
-      ...lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent),
+      ...lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent, l),
     }));
   }
 
@@ -259,21 +265,23 @@ export class PartsReportService {
       include: {
         customer: customerSelect,
         cancelledBy: { select: { firstName: true, lastName: true } },
-        counterSale: { select: { branch: { select: { name: true } }, salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
-        lines: { select: { quantity: true, rate: true, vatPercent: true, part: { select: { partType: true, taxable: true } } } },
+        counterSale: { select: { taxForm: true, branch: { select: { name: true } }, salesExecutive: { select: { id: true, firstName: true, lastName: true } } } },
+        lines: {
+          select: { quantity: true, rate: true, vatPercent: true, tradeDiscountPercent: true, handlingPercent: true, part: { select: { partType: true, taxable: true } } },
+        },
       },
       orderBy: [{ issuedDate: "asc" }, { invoiceNumber: "asc" }],
     });
   }
 
-  /** Splits a bill into taxable and exempt value after the cash discount. */
-  private taxSplit(invoice: { partsDiscountPercent: number; lines: { quantity: number; rate: number; vatPercent: number | null }[] }) {
+  /** Splits a bill into taxable and exempt value: after the discounts, with handling (what VAT is charged on). */
+  private taxSplit(invoice: { partsDiscountPercent: number; lines: ({ quantity: number; rate: number; vatPercent: number | null } & LineCharges)[] }) {
     let taxable = 0;
     let exempt = 0;
     for (const line of invoice.lines) {
-      const v = lineValues(line.quantity, line.rate, invoice.partsDiscountPercent, line.vatPercent);
-      if ((line.vatPercent ?? 0) > 0) taxable += v.gross - v.discount;
-      else exempt += v.gross - v.discount;
+      const v = lineValues(line.quantity, line.rate, invoice.partsDiscountPercent, line.vatPercent, line);
+      if ((line.vatPercent ?? 0) > 0) taxable += v.beforeVat;
+      else exempt += v.beforeVat;
     }
     return { taxable: money(taxable), exempt: money(exempt) };
   }
@@ -299,7 +307,8 @@ export class PartsReportService {
         billNumber: i.invoiceNumber,
         customer: partyName(i.customer),
         ...byType,
-        ...NO_SALE_CHARGES,
+        handling: i.handlingAmount,
+        tradeDiscount: i.tradeDiscountAmount,
         discount: i.partsDiscountAmount,
         vat: i.vatAmount,
         roundOff: i.roundOff,
@@ -317,16 +326,18 @@ export class PartsReportService {
    */
   private async saleTotal(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f);
-    const branches = new Map<string, { bills: number; sparesTaxable: number; sparesExempt: number; oilTaxable: number; oilExempt: number; accessories: number; discount: number; vat: number; roundOff: number; net: number }>();
+    const branches = new Map<string, { bills: number; sparesTaxable: number; sparesExempt: number; oilTaxable: number; oilExempt: number; accessories: number; handling: number; tradeDiscount: number; discount: number; vat: number; roundOff: number; net: number }>();
     for (const i of invoices) {
       const branch = i.counterSale?.branch.name ?? "";
-      const row = branches.get(branch) ?? { bills: 0, sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
+      const row = branches.get(branch) ?? { bills: 0, sparesTaxable: 0, sparesExempt: 0, oilTaxable: 0, oilExempt: 0, accessories: 0, handling: 0, tradeDiscount: 0, discount: 0, vat: 0, roundOff: 0, net: 0 };
       row.bills += 1;
       for (const l of i.lines) {
         const { gross } = lineValues(l.quantity, l.rate, 0, null);
         const column = l.part?.partType === "A" ? "accessories" : (`${l.part?.partType === "O" ? "oil" : "spares"}${taxableLine(l) ? "Taxable" : "Exempt"}` as const);
         row[column] = money(row[column] + gross);
       }
+      row.handling = money(row.handling + i.handlingAmount);
+      row.tradeDiscount = money(row.tradeDiscount + i.tradeDiscountAmount);
       row.discount = money(row.discount + i.partsDiscountAmount);
       row.vat = money(row.vat + i.vatAmount);
       row.roundOff = money(row.roundOff + i.roundOff);
@@ -336,19 +347,27 @@ export class PartsReportService {
     // Every bill is on credit (legacy printed a CASH and a CREDIT line; no cash bill since mid-2009, CPD never).
     return [...branches]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([branch, row]) => ({ group: branch, section: "Credit", ...row, ...NO_SALE_CHARGES }));
+      .map(([branch, row]) => ({ group: branch, section: "Credit", ...row }));
   }
 
+  /**
+   * Legacy Tax Register (Datewise): one line per day, in a block per tax form (legacy local sales,
+   * form L, then "Central sales", form X transfers without VAT), each with a subtotal.
+   */
   private async taxDatewise(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f);
     const days = new Map<string, Row>();
     for (const i of invoices) {
       const day = LAGOS_DAY.format(i.issuedDate);
-      const row = days.get(day) ?? { date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, ...NO_SALE_CHARGES, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
+      const form = i.counterSale?.taxForm ?? SaleTaxForm.VAT_SALE;
+      const key = `${TAX_FORM_ORDER[form]}|${day}`;
+      const row = days.get(key) ?? { group: TAX_FORM_HEADINGS[form], date: `${day}T12:00:00+01:00`, bills: 0, gross: 0, handling: 0, tradeDiscount: 0, discount: 0, taxable: 0, exempt: 0, vat: 0, roundOff: 0, net: 0 };
       const split = this.taxSplit(i);
       row.bills = Number(row.bills) + 1;
       for (const [key, value] of Object.entries({
         gross: i.partsTotal,
+        handling: i.handlingAmount,
+        tradeDiscount: i.tradeDiscountAmount,
         discount: i.partsDiscountAmount,
         taxable: split.taxable,
         exempt: split.exempt,
@@ -358,21 +377,26 @@ export class PartsReportService {
       })) {
         row[key] = money(Number(row[key]) + value);
       }
-      days.set(day, row);
+      days.set(key, row);
     }
-    return [...days.values()];
+    return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, row]) => row);
   }
 
   private async taxAnnexure(f: ReportFilters): Promise<Row[]> {
     const invoices = await this.saleInvoices(f, f.includeCancelled);
-    return invoices.map((i) => ({
+    // Legacy annexure: a heading per tax form (VAT sales, then TRNSFR WO/V).
+    const form = (i: (typeof invoices)[number]) => i.counterSale?.taxForm ?? SaleTaxForm.VAT_SALE;
+    const sorted = [...invoices].sort((a, b) => TAX_FORM_ORDER[form(a)] - TAX_FORM_ORDER[form(b)]);
+    return sorted.map((i) => ({
+      group: TAX_FORM_HEADINGS[form(i)],
       billNumber: i.invoiceNumber,
       date: i.issuedDate.toISOString(),
       customerCode: i.customer.code,
       customer: partyName(i.customer),
       address: [i.customer.house, i.customer.street, i.customer.address, i.customer.city, i.customer.state].filter(Boolean).join(", "),
       gross: i.partsTotal,
-      ...NO_SALE_CHARGES,
+      handling: i.handlingAmount,
+      tradeDiscount: i.tradeDiscountAmount,
       discount: i.partsDiscountAmount,
       ...this.taxSplit(i),
       vat: i.vatAmount,
@@ -393,7 +417,7 @@ export class PartsReportService {
       },
       include: {
         part: partSelect,
-        invoiceLine: { select: { vatPercent: true, description: true } },
+        invoiceLine: { select: { vatPercent: true, description: true, tradeDiscountPercent: true, handlingPercent: true } },
         saleReturn: {
           select: {
             returnNumber: true,
@@ -415,7 +439,7 @@ export class PartsReportService {
       description: l.invoiceLine.description,
       quantity: l.quantity,
       rate: l.rate,
-      ...lineValues(l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent, l.invoiceLine.vatPercent),
+      ...lineValues(l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent, l.invoiceLine.vatPercent, l.invoiceLine),
       creditNote: l.saleReturn.creditNote?.number ?? null,
     }));
   }
@@ -453,7 +477,7 @@ export class PartsReportService {
         where: { saleReturn: { returnDate: dateRange(f), ...(f.branchId && { branchId: f.branchId }) } },
         include: {
           part: partSelect,
-          invoiceLine: { select: { unitCost: true } },
+          invoiceLine: { select: { unitCost: true, tradeDiscountPercent: true, handlingPercent: true } },
           saleReturn: { select: { customer: customerSelect, counterSale: { select: { invoice: { select: { partsDiscountPercent: true } } } } } },
         },
       }),
@@ -483,16 +507,16 @@ export class PartsReportService {
     };
     for (const l of lines) {
       const row = bucket(l.invoice.customer, l.part);
-      const v = lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, 0);
+      const v = lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, 0, l);
       row.quantity = Number(row.quantity) + l.quantity;
-      row.sales = money(Number(row.sales) + v.gross - v.discount);
+      row.sales = money(Number(row.sales) + v.beforeVat);
       row.cost = money(Number(row.cost) + l.quantity * (l.unitCost ?? l.part?.unitPrice ?? 0));
     }
     for (const r of returned) {
       const row = bucket(r.saleReturn.customer, r.part);
-      const v = lineValues(r.quantity, r.rate, r.saleReturn.counterSale.invoice.partsDiscountPercent, 0);
+      const v = lineValues(r.quantity, r.rate, r.saleReturn.counterSale.invoice.partsDiscountPercent, 0, r.invoiceLine);
       row.quantity = Number(row.quantity) - r.quantity;
-      row.returns = money(Number(row.returns) + v.gross - v.discount);
+      row.returns = money(Number(row.returns) + v.beforeVat);
       row.cost = money(Number(row.cost) - r.quantity * (r.invoiceLine.unitCost ?? r.part.unitPrice));
     }
     const rows = [...buckets.values()].map((row): Row => {
@@ -1187,7 +1211,7 @@ export class PartsReportService {
         unit: l.part?.uom ?? "",
         required: l.customerOrderLine?.orderedQuantity ?? l.quantity,
         quantity: l.quantity,
-        amount: lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent).net,
+        amount: lineValues(l.quantity, l.rate, l.invoice.partsDiscountPercent, l.vatPercent, l).net,
       })),
       // Legacy CHALLAN section: dispatch challans to cost centres, at the rate they were issued at.
       challanLines.map((l) => ({

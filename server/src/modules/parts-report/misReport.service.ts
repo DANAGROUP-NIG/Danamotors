@@ -11,7 +11,7 @@ import { CustomerOrderStatus, IndentStatus, PartChangeAction } from "@prisma/cli
 import prisma from "../../prisma/client";
 import { reportEnd } from "../finance/party-report";
 import { money } from "../finance/money";
-import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
+import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, LineCharges, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
 import { bandOf, Basis, ISSUE_MOVEMENTS } from "./stockReport.logic";
 import { Holding, Movement, partColumns, StockReportService } from "./stockReport.service";
 
@@ -263,11 +263,15 @@ export class MisReportService {
     const [billLines, returnLines, issuances, stnLines] = await Promise.all([
       prisma.invoiceLine.findMany({
         where: { invoiceId: { in: ids("ISSUED", "RETURNED") }, partId: { not: null } },
-        select: { invoiceId: true, partId: true, quantity: true, rate: true, invoice: { select: { partsDiscountPercent: true } } },
+        select: { invoiceId: true, partId: true, quantity: true, rate: true, tradeDiscountPercent: true, handlingPercent: true, invoice: { select: { partsDiscountPercent: true } } },
       }),
       prisma.counterSaleReturnLine.findMany({
         where: { returnId: { in: ids("RETURNED") } },
-        select: { returnId: true, partId: true, quantity: true, rate: true, saleReturn: { select: { counterSale: { select: { invoice: { select: { partsDiscountPercent: true } } } } } } },
+        select: {
+          returnId: true, partId: true, quantity: true, rate: true,
+          invoiceLine: { select: { tradeDiscountPercent: true, handlingPercent: true } },
+          saleReturn: { select: { counterSale: { select: { invoice: { select: { partsDiscountPercent: true } } } } } },
+        },
       }),
       prisma.partIssuance.findMany({
         where: { id: { in: ids("ISSUED", "RETURNED") } },
@@ -277,13 +281,13 @@ export class MisReportService {
     ]);
     // A bill can carry a part on more than one line: its average net rate. FOC bills are 100% discount.
     const bills = new Map<string, { quantity: number; value: number; foc: boolean }>();
-    const take = (doc: string, partId: string, quantity: number, rate: number, discountPercent: number) => {
-      const v = lineValues(quantity, rate, discountPercent, 0);
+    const take = (doc: string, partId: string, quantity: number, rate: number, discountPercent: number, charges: LineCharges) => {
+      const v = lineValues(quantity, rate, discountPercent, 0, charges);
       const bill = bills.get(`${doc}:${partId}`) ?? { quantity: 0, value: 0, foc: discountPercent >= 100 };
-      bills.set(`${doc}:${partId}`, { ...bill, quantity: bill.quantity + quantity, value: bill.value + v.gross - v.discount });
+      bills.set(`${doc}:${partId}`, { ...bill, quantity: bill.quantity + quantity, value: bill.value + v.beforeVat });
     };
-    billLines.forEach((l) => take(l.invoiceId, l.partId!, l.quantity, l.rate, l.invoice.partsDiscountPercent));
-    returnLines.forEach((l) => take(l.returnId, l.partId, l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent));
+    billLines.forEach((l) => take(l.invoiceId, l.partId!, l.quantity, l.rate, l.invoice.partsDiscountPercent, l));
+    returnLines.forEach((l) => take(l.returnId, l.partId, l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent, l.invoiceLine));
     const jobs = new Map(issuances.map((i) => [i.id, i]));
     const stnRates = new Map(stnLines.map((l) => [`${l.stnId}:${l.partId}`, l.unitRate]));
     return (m, partId) => {

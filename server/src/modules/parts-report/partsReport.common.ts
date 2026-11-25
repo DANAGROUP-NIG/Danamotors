@@ -73,10 +73,27 @@ export function partWhere(f: ReportFilters): Prisma.SparePartWhereInput {
 
 export const statusLabel = (status: string) => status.replace("_", " ").toLowerCase();
 
-/** Bill line values, priced exactly as the bill was (discount first, then VAT). */
-export function lineValues(quantity: number, rate: number, discountPercent: number, vatPercent: number | null) {
-  const [line] = priceSale([{ quantity, rate, vatPercent: vatPercent ?? 0 }], Math.min(100, Math.max(0, discountPercent))).lines;
-  return { gross: line.gross, discount: line.discount, vat: line.vat, net: money(line.gross - line.discount + line.vat) };
+/** A counter-sale line's legacy trade discount and handling percentages. */
+export type LineCharges = { tradeDiscountPercent?: number | null; handlingPercent?: number | null };
+
+/**
+ * Bill line values, priced exactly as the bill was: trade discount, cash discount, handling, then VAT.
+ * `beforeVat` is the line's sale value (gross - trade - cash + handling).
+ */
+export function lineValues(quantity: number, rate: number, discountPercent: number, vatPercent: number | null, charges: LineCharges = {}) {
+  const [line] = priceSale(
+    [{ quantity, rate, vatPercent: vatPercent ?? 0, tradeDiscountPercent: charges.tradeDiscountPercent ?? 0, handlingPercent: charges.handlingPercent ?? 0 }],
+    Math.min(100, Math.max(0, discountPercent)),
+  ).lines;
+  return {
+    gross: line.gross,
+    tradeDiscount: line.tradeDiscount,
+    discount: line.discount,
+    handling: line.handling,
+    vat: line.vat,
+    net: line.net,
+    beforeVat: money(line.net - line.vat),
+  };
 }
 
 export const userName = (u?: { firstName: string; lastName: string } | null) => (u ? `${u.firstName} ${u.lastName}`.trim() : "");

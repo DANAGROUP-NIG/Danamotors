@@ -447,7 +447,7 @@ export const REPORTS: ReportDefinition[] = [
     title: "Counter Sales Register Summary",
     group: "Part sales",
     description:
-      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
+      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day in a block per tax form, VAT sales then transfers without VAT (legacy Tax Register (Datewise) and its Central sales block). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", "executive"],
     labels: { option: "Group by" },
@@ -498,9 +498,11 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales-tax-annexure",
     title: "Counter Sales Tax Register (Annexure)",
     group: "Part sales",
-    description: "Bill-wise VAT annexure with customer address. Cancelled bills can be listed but are not totalled.",
+    description:
+      "Bill-wise VAT annexure with customer address, under a heading per tax form (VAT sales, then transfers without VAT, legacy TRNSFR WO/V). Cancelled bills can be listed but are not totalled.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["includeCancelled"],
+    grouped: true,
     columns: [
       text("billNumber", "Bill No"),
       date(),

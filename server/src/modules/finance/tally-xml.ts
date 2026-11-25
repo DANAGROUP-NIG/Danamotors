@@ -1,13 +1,16 @@
 import { Prisma } from '@prisma/client';
 import type { JobBillTotals } from './job-bill-calculator';
 export type TallyDocumentType = 'JOB_BILL' | 'RECEIPT' | 'DEBIT_NOTE' | 'CREDIT_NOTE';
-export function jobBillMappingAmounts(invoice: JobBillTotals) {
+/** Counter-sale bills also carry the legacy trade discount and handling (zero on job bills). */
+export function jobBillMappingAmounts(invoice: JobBillTotals & { tradeDiscountAmount?: number; handlingAmount?: number }) {
   const negative = (value: number) => new Prisma.Decimal(value).negated().toNumber();
   return [
     ['PARTS_SALES', negative(invoice.partsTotal)],
     ['LABOUR_SALES', negative(invoice.labourTotal)],
     ['SERVICE_SALES', negative(invoice.serviceTotal ?? 0)],
-    ['PARTS_DISCOUNT', invoice.partsDiscountAmount],
+    // Trade (line) discount and cash discount both reduce parts sales.
+    ['PARTS_DISCOUNT', new Prisma.Decimal(invoice.partsDiscountAmount).plus(invoice.tradeDiscountAmount ?? 0).toNumber()],
+    ['PARTS_HANDLING', negative(invoice.handlingAmount ?? 0)],
     ['LABOUR_DISCOUNT', invoice.labourDiscountAmount],
     ['VAT', negative(invoice.vatAmount)],
     ['ROUND_OFF', negative(invoice.roundOff)],

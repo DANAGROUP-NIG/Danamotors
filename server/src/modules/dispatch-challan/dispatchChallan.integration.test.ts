@@ -74,6 +74,20 @@ describeDb("Dispatch challans (database)", () => {
     expect(txns.map((t) => [t.type, t.quantity]).sort()).toEqual([["ISSUED", -12], ["ISSUED", -40]]);
   });
 
+  it("finds local-purchase parts (petrol, diesel) for challans and sales, but not for branch transfers", async () => {
+    // Legacy Lagos 2025: 921 of 943 challan lines were local parts (flag L).
+    const diesel = await prisma.sparePart.create({
+      data: { partCode: `AGO${run}`, partNumber: `AGO${run}`, name: "DIESEL-AGO", unitPrice: 3000, retailRate: 3450, partFlag: "L" },
+    });
+    await prisma.inventoryStock.create({ data: { branchId: kp.id, partId: diesel.id, quantity: 500 } });
+    const { PartSaleService } = require("../part-sale/partSale.service");
+    const { StockTransferService } = require("../stock-transfer/stockTransfer.service");
+    const forSale = await new PartSaleService().searchParts(`AGO${run}`, kp.id);
+    expect(forSale.map((p: { id: string; sourceAvailable: number }) => [p.id, p.sourceAvailable])).toEqual([[diesel.id, 500]]);
+    const forTransfer = await new StockTransferService().searchParts({ search: `AGO${run}`, sourceBranchId: kp.id });
+    expect(forTransfer).toEqual([]);
+  });
+
   it("refuses to issue reserved or missing stock, and leaves stock untouched", async () => {
     // 60 on hand, 10 reserved for a job: 50 free.
     await expect(

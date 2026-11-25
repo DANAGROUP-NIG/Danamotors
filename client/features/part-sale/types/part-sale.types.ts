@@ -2,6 +2,8 @@
 
 export type CustomerOrderStatus = "OPEN" | "PARTLY_BILLED" | "BILLED" | "CANCELLED";
 export type TransportMode = "ROAD" | "AIR" | "SEA" | "COURIER" | "HAND_DELIVERY" | "DOOR_DELIVERY";
+/** Legacy tax form: L (VAT sale) or X "TRNSFR WO/V" (transfer without VAT). */
+export type SaleTaxForm = "VAT_SALE" | "TRANSFER_WITHOUT_VAT";
 
 type UserRef = { id: string; firstName: string; lastName: string } | null;
 type BranchRef = {
@@ -40,6 +42,7 @@ export type SalePart = {
   uom: string;
   partFlag: string;
   taxable: boolean;
+  priceCategoryCode?: string | null;
 };
 
 export type OrderLineCounts = {
@@ -113,6 +116,8 @@ export type SaleInvoiceLine = {
   rate: number;
   amount: number;
   vatPercent: number | null;
+  tradeDiscountPercent: number | null;
+  handlingPercent: number | null;
   returnedQuantity: number;
   customerOrderLine: { order: { id: string; cpoNumber: string; customerRefNo: string | null } } | null;
 };
@@ -124,6 +129,8 @@ export type SaleReturn = {
   reason: string | null;
   grossAmount: number;
   discountAmount: number;
+  tradeDiscountAmount: number;
+  handlingAmount: number;
   vatAmount: number;
   roundOff: number;
   total: number;
@@ -143,6 +150,7 @@ export type CounterSale = {
   grDate: string | null;
   numberOfCases: number | null;
   gatePassNumber: string | null;
+  taxForm: SaleTaxForm;
   createdAt: string;
   invoice: {
     id: string;
@@ -153,6 +161,8 @@ export type CounterSale = {
     partsTotal: number;
     partsDiscountPercent: number;
     partsDiscountAmount: number;
+    tradeDiscountAmount: number;
+    handlingAmount: number;
     vatRate: number;
     vatAmount: number;
     roundOff: number;
@@ -186,6 +196,9 @@ export type CounterSaleListItem = {
   _count: { returns: number };
 };
 
+/** Legacy line trade discount % and handling % on a counter-sale line. */
+export type LineCharges = { tradeDiscountPercent?: number; handlingPercent?: number };
+
 export type SalesExecutive = { id: string; firstName: string; lastName: string };
 
 export type CreateCounterSalePayload = {
@@ -200,7 +213,11 @@ export type CreateCounterSalePayload = {
   grDate?: string;
   numberOfCases?: number;
   notes?: string;
-  lines: { orderLineId: string; quantity: number }[];
+  taxForm?: SaleTaxForm;
+  /** Lines from the customer's open CPOs. */
+  lines?: ({ orderLineId: string; quantity: number } & LineCharges)[];
+  /** Parts billed without a CPO, at the Part Master retail rate. */
+  parts?: ({ partId: string; quantity: number } & LineCharges)[];
 };
 
 export type CreateReturnPayload = {

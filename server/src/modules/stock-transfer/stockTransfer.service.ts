@@ -561,12 +561,15 @@ export class StockTransferService {
     requestingBranchId?: string;
     sourceBranchId?: string;
     limit?: number;
+    /** Every part source, for selling or issuing from the branch's own stock (counter sales, CPOs, challans). */
+    allSources?: boolean;
   }) {
     const parts = await prisma.sparePart.findMany({
       where: {
         partStatus: PartStatus.ACTIVE,
-        // Local, used and repaired records are bought by the branch, never transferred.
-        ...indentablePartWhere,
+        // Local, used and repaired records are bought by the branch, never transferred. A branch still
+        // sells and issues them: legacy Lagos challans are almost all local parts (petrol, diesel).
+        ...(params.allSources ? {} : indentablePartWhere),
         OR: [
           { partNumber: { contains: params.search, mode: "insensitive" } },
           { name: { contains: params.search, mode: "insensitive" } },
