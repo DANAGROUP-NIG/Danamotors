@@ -24,8 +24,8 @@ export function needsRetime(createdAt: Date, window: JobWindow, now = new Date()
 
 /**
  * The seed builds each job card through the app's services, so every record is stamped
- * "now". This moves the whole job (status history, estimates and decisions, labour, part
- * issues and their stock movements, charge lines, bill and receipt, warranty case and
+ * "now". This moves the whole job (status and stage history, estimates and decisions, labour, part
+ * issues and their stock movements, charge lines, bill, advance and receipt, warranty case and
  * history, campaign completion) onto a window `startDaysAgo` days before the run, spread
  * over `spanHours`, keeping the order of events. Amounts and links are not touched.
  */
@@ -56,7 +56,7 @@ export async function retimeJob(jobCardId: string, window: JobWindow, promiseHou
     prisma.$executeRaw`UPDATE "StockTransaction" SET ${set(["createdAt"])} WHERE "referenceId" IN (${issuanceIds})`,
     prisma.$executeRaw`UPDATE "PartIssuance" SET ${set(["issuedAt", "createdAt", "updatedAt"])} WHERE "jobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "InvoiceLine" SET ${set(["createdAt"])} WHERE "invoiceId" IN (${invoiceIds})`,
-    prisma.$executeRaw`UPDATE "Receipt" SET ${set(["issuedAt", "createdAt", "updatedAt"])} WHERE id IN (SELECT "receiptId" FROM "ReceiptAllocation" WHERE "invoiceId" IN (${invoiceIds}))`,
+    prisma.$executeRaw`UPDATE "Receipt" SET ${set(["issuedAt", "createdAt", "updatedAt"])} WHERE id IN (SELECT "receiptId" FROM "ReceiptAllocation" WHERE "invoiceId" IN (${invoiceIds})) OR "advanceJobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "ReceiptAllocation" SET ${set(["adjustedAt", "createdAt"])} WHERE "invoiceId" IN (${invoiceIds})`,
     // The due date keeps its distance from the bill date (credit days).
     prisma.$executeRaw`UPDATE "Invoice" SET "dueDate" = "dueDate" + (${mapped("issuedDate")} - "issuedDate"), ${set(["issuedDate", "createdAt", "updatedAt"])} WHERE "jobCardId" = ${jobCardId}`,
@@ -65,7 +65,8 @@ export async function retimeJob(jobCardId: string, window: JobWindow, promiseHou
     prisma.$executeRaw`UPDATE "WarrantyCase" SET ${set(["createdAt", "updatedAt", "submittedAt", "decisionAt", "manufacturerClaimDate"])} WHERE "jobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "JobCardCampaign" SET ${set(["createdAt"])} WHERE "jobCardId" = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "CampaignVehicle" SET ${set(["scheduledAt", "completedAt"])} WHERE "completedJobCardId" = ${jobCardId}`,
-    prisma.$executeRaw`UPDATE "JobCard" SET ${set(["createdAt", "updatedAt", "readyAt", "deliveredAt", "billedAt", "warrantyAcknowledgedAt"])} WHERE id = ${jobCardId}`,
+    prisma.$executeRaw`UPDATE "JobStageEvent" SET ${set(["createdAt"])} WHERE "jobCardId" = ${jobCardId}`,
+    prisma.$executeRaw`UPDATE "JobCard" SET ${set(["createdAt", "updatedAt", "readyAt", "deliveredAt", "billedAt", "warrantyAcknowledgedAt", "stageEnteredAt"])} WHERE id = ${jobCardId}`,
     prisma.$executeRaw`UPDATE "RepeatJob" SET ${set(["createdAt", "updatedAt", "reviewedAt"])} WHERE "jobCardId" = ${jobCardId}`,
   ]);
   // A repeat's day difference follows the moved job date (Lagos calendar days from the previous job).

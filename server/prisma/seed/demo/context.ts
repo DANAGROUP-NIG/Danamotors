@@ -30,6 +30,8 @@ export interface BranchStaff {
   store: Staff;
   /** Creates bills and receipts: a billing officer at the branch, else the advisor. */
   billing: Staff;
+  /** Workshop supervisor (WorkshopManager) at the branch, else the admin. Passes QC to the advisor. */
+  supervisor: Staff;
 }
 
 export interface DemoContext {
@@ -81,6 +83,8 @@ export async function loadContext(branchNames: Record<BranchKey, string>): Promi
     if (!user) missing.push(who);
     return user as Staff;
   };
+  const warrantyOfficer = need(ROLES.WARRANTY_OFFICER, await findStaff([ROLES.WARRANTY_OFFICER]));
+  const admin = need(`${ROLES.ADMIN} or ${ROLES.SUPER_ADMIN}`, (await findStaff([ROLES.ADMIN], branches.main.id)) ?? (await findStaff([ROLES.SUPER_ADMIN])));
   const staff = {} as DemoContext["staff"];
   for (const key of ["main", "second"] as const) {
     const { id, name } = branches[key];
@@ -91,10 +95,10 @@ export async function loadContext(branchNames: Record<BranchKey, string>): Promi
       (await findStaff([ROLES.GENERAL_STORE_MANAGER])) ??
       advisor;
     const billing = (await findStaff([ROLES.BILLING_OFFICER], id)) ?? advisor;
-    staff[key] = { advisor, technician, store, billing };
+    // TODO(confirm): the workshop supervisor is the WorkshopManager role (doc/plans/jobcard-revamp-implementation.md).
+    const supervisor = (await findStaff([ROLES.WORKSHOP_MANAGER], id)) ?? admin;
+    staff[key] = { advisor, technician, store, billing, supervisor };
   }
-  const warrantyOfficer = need(ROLES.WARRANTY_OFFICER, await findStaff([ROLES.WARRANTY_OFFICER]));
-  const admin = need(`${ROLES.ADMIN} or ${ROLES.SUPER_ADMIN}`, (await findStaff([ROLES.ADMIN], branches.main.id)) ?? (await findStaff([ROLES.SUPER_ADMIN])));
   if (missing.length) {
     throw new Error(`The demo seed acts as existing staff and never creates users. Missing active users: ${missing.join("; ")}.`);
   }

@@ -15,6 +15,7 @@
  *   PSF-10  Sportage (LSL-902PF)  RG, AC regas              delivered 12 Feb → satisfied
  *   PSF-11  Rio (LSL-911PF)       RR                        delivered 13 Feb → not followed up (no phone, no address)
  */
+import { stageColumns } from "./stage";
 import type { PsfStatus } from "@prisma/client";
 import { WarrantyCoverageStatus } from "@prisma/client";
 import prisma from "../../../src/prisma/client";
@@ -184,6 +185,7 @@ export async function seedPsf(ctx: DemoContext, ref: Reference): Promise<PsfSeed
           jobNumber: `DM-${scenario.key}`,
           description: `${DEMO_TAG} Post-service follow-up demo (${scenario.key})`,
           status: deliveredAt ? "DELIVERED" : "READY",
+          ...stageColumns(deliveredAt ? "DELIVERED" : "READY"),
           customField1: key,
           branchId: ctx.branches[scenario.branch].id,
           customerId: customers[scenario.customer],

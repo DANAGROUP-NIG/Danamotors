@@ -23,7 +23,7 @@ export async function printSummary(ctx: DemoContext) {
     const estimates = j.estimates.map((e) => (e.status === "Declined" ? "Sent back" : e.status)).join(" > ") || "-";
     const bill = j.invoices.map((i) => `${i.invoiceNumber} ${i.status} ₦${i.total.toLocaleString("en-NG")} (VAT ${i.vatAmount}, round-off ${i.roundOff}, due ₦${i.outstandingAmount})`).join("; ") || "unbilled";
     const wc = j.warrantyCase ? `${j.warrantyCase.caseNumber} ${j.warrantyCase.status}` : "-";
-    console.log(`  ${key.padEnd(8)} ${j.jobNumber}  ${j.status.padEnd(11)} ${j.vehicle?.registrationNumber?.padEnd(12)} ${branchName.get(j.branchId) ?? ""}${j.isRepeat ? " (repeat)" : ""}`);
+    console.log(`  ${key.padEnd(8)} ${j.jobNumber}  ${j.status.padEnd(13)} step ${j.stage.padEnd(13)} ${j.vehicle?.registrationNumber?.padEnd(12)} ${branchName.get(j.branchId) ?? ""}${j.isRepeat ? " (repeat)" : ""}`);
     console.log(`           estimates: ${estimates} | bill: ${bill} | warranty case: ${wc}`);
   }
 

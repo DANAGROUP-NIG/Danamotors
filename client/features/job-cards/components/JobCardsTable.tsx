@@ -6,6 +6,8 @@ import {
   canonicalJobStatus,
 } from "@/features/job-cards/types/job-card-status";
 
+import { jobStepBadge } from "@/features/job-cards/lib/job-stage.logic";
+import { NOT_PROVIDED } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -242,6 +244,17 @@ export function JobCardsTable() {
           tone={STATUS_TONES[jc.status]}
         />
       ),
+    },
+    {
+      header: "Step",
+      render: (jc) => {
+        const step = jc.stage ? jobStepBadge(jc.stage, jc.status) : null;
+        return step ? (
+          <StatusBadge status={step.label} tone={step.tone} />
+        ) : (
+          <span className="text-muted-foreground">{NOT_PROVIDED}</span>
+        );
+      },
     },
     {
       header: "Actions",

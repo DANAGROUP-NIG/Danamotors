@@ -51,6 +51,7 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
+import { syncStage } from "./job-stage.writer";
 import { assertMileage } from "../warranty/warranty.logic";
 import {
   buildCheck,
@@ -1046,6 +1047,8 @@ export class ServiceService {
               : {}),
           },
         });
+        // A ready job reopened for approval and QC goes back to the quality check step.
+        await syncStage(tx, jobCardId, actorId ?? card.createdById ?? null);
         const previous = (
           await tx.estimate.findMany({
             where: { jobCardId },

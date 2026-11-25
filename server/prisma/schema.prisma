@@ -95,14 +95,14 @@ enum CsiApplicability {
 }
 
 model CsiAttribute {
-  id               String @id @default(uuid())
+  id               String             @id @default(uuid())
   branchId         String
-  branch           Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch           Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
   code             String
   description      String
   shortDescription String
-  weightage        Decimal @db.Decimal(7, 6)
-  active           Boolean @default(true)
+  weightage        Decimal            @db.Decimal(7, 6)
+  active           Boolean            @default(true)
   cardRows         CsiCardAttribute[]
 
   @@unique([branchId, code])
@@ -110,13 +110,13 @@ model CsiAttribute {
 }
 
 model CsiResponse {
-  id          String @id @default(uuid())
+  id          String            @id @default(uuid())
   branchId    String
-  branch      Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch      Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   code        String
   description String
-  marks       Decimal @db.Decimal(12, 6)
-  active      Boolean @default(true)
+  marks       Decimal           @db.Decimal(12, 6)
+  active      Boolean           @default(true)
   cardRows    CsiCardResponse[]
 
   @@unique([branchId, code])
@@ -124,12 +124,12 @@ model CsiResponse {
 }
 
 model CsiCard {
-  id        String @id @default(uuid())
+  id        String            @id @default(uuid())
   branchId  String
-  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch    Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   code      String
-  active    Boolean @default(true)
-  version   Int @default(1)
+  active    Boolean           @default(true)
+  version   Int               @default(1)
   revisions CsiCardRevision[]
 
   @@unique([branchId, code])
@@ -138,15 +138,15 @@ model CsiCard {
 
 model CsiCardRevision {
   surveys       CsiSurvey[]
-  id            String @id @default(uuid())
+  id            String             @id @default(uuid())
   branchId      String
   cardId        String
-  card          CsiCard @relation(fields: [branchId, cardId], references: [branchId, id], onDelete: Restrict)
+  card          CsiCard            @relation(fields: [branchId, cardId], references: [branchId, id], onDelete: Restrict)
   version       Int
   code          String
   description   String
-  cardDate      DateTime @db.Date
-  effectiveDate DateTime @db.Date
+  cardDate      DateTime           @db.Date
+  effectiveDate DateTime           @db.Date
   appliesTo     CsiApplicability
   attributes    CsiCardAttribute[]
   responses     CsiCardResponse[]
@@ -161,10 +161,10 @@ model CsiCardAttribute {
   revisionId  String
   revision    CsiCardRevision @relation(fields: [branchId, revisionId], references: [branchId, id], onDelete: Restrict)
   attributeId String
-  attribute   CsiAttribute @relation(fields: [branchId, attributeId], references: [branchId, id], onDelete: Restrict)
+  attribute   CsiAttribute    @relation(fields: [branchId, attributeId], references: [branchId, id], onDelete: Restrict)
   sequence    Int
   description String
-  weightage   Decimal @db.Decimal(7, 6)
+  weightage   Decimal         @db.Decimal(7, 6)
 
   @@id([revisionId, attributeId])
   @@unique([revisionId, sequence])
@@ -176,10 +176,10 @@ model CsiCardResponse {
   revisionId  String
   revision    CsiCardRevision @relation(fields: [branchId, revisionId], references: [branchId, id], onDelete: Restrict)
   responseId  String
-  response    CsiResponse @relation(fields: [branchId, responseId], references: [branchId, id], onDelete: Restrict)
+  response    CsiResponse     @relation(fields: [branchId, responseId], references: [branchId, id], onDelete: Restrict)
   sequence    Int
   description String
-  marks       Decimal @db.Decimal(12, 6)
+  marks       Decimal         @db.Decimal(12, 6)
 
   @@id([revisionId, responseId])
   @@unique([revisionId, sequence])
@@ -192,22 +192,22 @@ enum CsiSurveyStatus {
 }
 
 model CsiSurvey {
-  id            String @id @default(uuid())
+  id            String            @id @default(uuid())
   branchId      String
-  jobCardId     String @unique
-  jobCard       JobCard @relation(fields: [branchId, jobCardId], references: [branchId, id], onDelete: Restrict)
+  jobCardId     String            @unique
+  jobCard       JobCard           @relation(fields: [branchId, jobCardId], references: [branchId, id], onDelete: Restrict)
   revisionId    String
-  revision      CsiCardRevision @relation(fields: [branchId, revisionId], references: [branchId, id], onDelete: Restrict)
-  generatedAt   DateTime @default(now())
+  revision      CsiCardRevision   @relation(fields: [branchId, revisionId], references: [branchId, id], onDelete: Restrict)
+  generatedAt   DateTime          @default(now())
   generatedById String
-  status        CsiSurveyStatus @default(ISSUED)
+  status        CsiSurveyStatus   @default(ISSUED)
   jobSnapshot   Json
-  responseDate  DateTime? @db.Date
+  responseDate  DateTime?         @db.Date
   comments      String?
   enteredById   String?
-  score         Decimal? @db.Decimal(12, 6)
-  scorePercent  Decimal? @db.Decimal(9, 6)
-  version       Int @default(0)
+  score         Decimal?          @db.Decimal(12, 6)
+  scorePercent  Decimal?          @db.Decimal(9, 6)
+  version       Int               @default(0)
   answers       CsiSurveyAnswer[]
 
   @@unique([branchId, jobCardId])
@@ -217,14 +217,14 @@ model CsiSurvey {
 }
 
 model CsiSurveyAnswer {
-  surveyId            String
-  survey              CsiSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
-  attributeId         String
-  responseId          String
+  surveyId             String
+  survey               CsiSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  attributeId          String
+  responseId           String
   attributeDescription String
-  weightage           Decimal @db.Decimal(7, 6)
-  responseDescription String
-  marks               Decimal @db.Decimal(12, 6)
+  weightage            Decimal   @db.Decimal(7, 6)
+  responseDescription  String
+  marks                Decimal   @db.Decimal(12, 6)
 
   @@id([surveyId, attributeId])
   @@index([attributeId, responseId])
@@ -295,8 +295,11 @@ model User {
   jobStatusChanges    JobCardStatusHistory[]
   createdJobCards     JobCard[]              @relation("CreatedJobCards")
 
-  technicianAssignments       JobCard[] @relation("TechnicianAssignments")
-  qualityInspectorAssignments JobCard[] @relation("QualityInspectorAssignments")
+  technicianAssignments       JobCard[]       @relation("TechnicianAssignments")
+  stageOwnedJobs              JobCard[]       @relation("JobStageOwner")
+  jobStageEventsActed         JobStageEvent[] @relation("JobStageEventActor")
+  jobStageEventsOwned         JobStageEvent[] @relation("JobStageEventOwner")
+  qualityInspectorAssignments JobCard[]       @relation("QualityInspectorAssignments")
 
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
 
@@ -697,28 +700,27 @@ model ServiceAppointment {
 // ============================================================
 
 model JobCard {
-  csiSurvey CsiSurvey?
-  @@unique([branchId, id])
+  csiSurvey                CsiSurvey?
   /// SERVICE (default) or PDI. PDI jobs have their own number series and stay out of service history.
-  jobType              JobCardType          @default(SERVICE)
+  jobType                  JobCardType           @default(SERVICE)
   /// PDI only: the temporary registration (default: last 6 of the VIN). Never the vehicle's real plate.
-  pdiRegistration      String?
+  pdiRegistration          String?
   /// First print of the job card; edit-after-print rules (PDI settings) apply from then.
-  printedAt            DateTime?
-  openingSignatureRequired Boolean @default(true)
-  openingSignatures JobOpeningSignature[]
-  openingConsent Json?
-  advanceReceipts Receipt[] @relation("JobAdvances")
-  consolidatedInvoices Invoice[] @relation("WarrantyJobBills")
-  depositReceiptId String? @unique
-  depositReceipt Receipt? @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
-  followUpAppointments ServiceAppointment[] @relation("BookingFollowUp")
-  requisitions         PartRequisition[]
-  returnSlips          PartReturnSlip[]
-  labourSlips          LabourSlip[]
-  engineerId           String?
-  engineer             User?                @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
-  id                   String               @id @default(uuid())
+  printedAt                DateTime?
+  openingSignatureRequired Boolean               @default(true)
+  openingSignatures        JobOpeningSignature[]
+  openingConsent           Json?
+  advanceReceipts          Receipt[]             @relation("JobAdvances")
+  consolidatedInvoices     Invoice[]             @relation("WarrantyJobBills")
+  depositReceiptId         String?               @unique
+  depositReceipt           Receipt?              @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
+  followUpAppointments     ServiceAppointment[]  @relation("BookingFollowUp")
+  requisitions             PartRequisition[]
+  returnSlips              PartReturnSlip[]
+  labourSlips              LabourSlip[]
+  engineerId               String?
+  engineer                 User?                 @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
+  id                       String                @id @default(uuid())
 
   appointmentId String?
   appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
@@ -780,7 +782,14 @@ model JobCard {
   jobNumber   String @unique
   description String
 
-  status          String  @default("Open")
+  status          String          @default("OPEN")
+  // Where the job is in the staged job card. Written only by the stage service (job-stage.service.ts).
+  stage           JobStage        @default(CHECK_IN)
+  stageOwnerId    String?
+  stageOwner      User?           @relation("JobStageOwner", fields: [stageOwnerId], references: [id], onDelete: SetNull)
+  stageOwnerRole  String?
+  stageEnteredAt  DateTime        @default(now())
+  stageEvents     JobStageEvent[]
   estimatedHours  Float?
   tyres           Json?
   batteryMake     String?
@@ -838,6 +847,7 @@ model JobCard {
   warrantyCase              WarrantyCase?
   completedCampaignVehicles CampaignVehicle[] @relation("CampaignVehicleCompletedBy")
 
+  @@unique([branchId, id])
   @@index([branchId])
   @@index([customerId])
   @@index([vehicleId])
@@ -854,6 +864,7 @@ model JobCard {
   @@index([customerId, createdAt, id])
   @@index([jobType, branchId, createdAt])
   @@index([vehicleId, jobType])
+  @@index([branchId, stage])
 }
 
 enum JobCardType {
@@ -862,20 +873,21 @@ enum JobCardType {
 }
 
 model JobOpeningSignature {
-  id String @id @default(uuid())
-  jobCardId String
-  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
-  revision Int
-  idempotencyKey String @unique
-  documentHash String @db.Char(64)
-  scopeHash String @db.Char(64)
-  evidenceHash String @db.Char(64)
-  snapshot Json
-  signerName String
-  relationship String?
-  capturedById String
-  signedAt DateTime @default(now())
-  signatureImage String @db.Text
+  id             String   @id @default(uuid())
+  jobCardId      String
+  jobCard        JobCard  @relation(fields: [jobCardId], references: [id], onDelete: Restrict)
+  revision       Int
+  idempotencyKey String   @unique
+  documentHash   String   @db.Char(64)
+  scopeHash      String   @db.Char(64)
+  evidenceHash   String   @db.Char(64)
+  snapshot       Json
+  signerName     String
+  relationship   String?
+  capturedById   String
+  signedAt       DateTime @default(now())
+  signatureImage String   @db.Text
+
   @@unique([jobCardId, revision])
 }
 
@@ -907,14 +919,14 @@ model Inspection {
 // ============================================================
 
 model Estimate {
-  customerRemarks String?
-  upfrontPaymentPercent Decimal @default(60) @db.Decimal(5, 2)
-  remarks String?
-  version Int @default(1)
-  supersedesId String? @unique
-  supersedes Estimate? @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)
-  successor Estimate? @relation("EstimateVersions")
-  signatures EstimateSignature[]
+  customerRemarks       String?
+  upfrontPaymentPercent Decimal             @default(60) @db.Decimal(5, 2)
+  remarks               String?
+  version               Int                 @default(1)
+  supersedesId          String?             @unique
+  supersedes            Estimate?           @relation("EstimateVersions", fields: [supersedesId], references: [id], onDelete: Restrict)
+  successor             Estimate?           @relation("EstimateVersions")
+  signatures            EstimateSignature[]
 
   estimateNumber String?   @unique
   estimateDate   DateTime?
@@ -1172,10 +1184,10 @@ model SparePart {
   underAmc         Boolean   @default(false)
 
   // --- new: main/alternate relationship ---
-  role           PartRole    @default(MAIN)
-  mainPartId     String?
-  mainPart       SparePart?  @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
-  alternateParts SparePart[] @relation("PartAlternates")
+  role                      PartRole              @default(MAIN)
+  mainPartId                String?
+  mainPart                  SparePart?            @relation("PartAlternates", fields: [mainPartId], references: [id], onDelete: Restrict)
+  alternateParts            SparePart[]           @relation("PartAlternates")
   requestedRequisitionLines PartRequisitionLine[] @relation("RequisitionRequestedPart")
 
   // Part source records: a local, used or repaired version of a part is its own record, with its
@@ -1497,10 +1509,10 @@ model PurchaseRequest {
 
 model PartIssuance {
   collectionSignature PartCollectionSignature?
-  receivedById String?
-  receivedAt DateTime?
-  requisitionLine PartRequisitionLine?
-  id              String               @id @default(uuid())
+  receivedById        String?
+  receivedAt          DateTime?
+  requisitionLine     PartRequisitionLine?
+  id                  String                   @id @default(uuid())
 
   // The branch whose inventory is being reduced
   branchId String
@@ -1540,12 +1552,12 @@ model PartIssuance {
 }
 
 model PartCollectionSignature {
-  issuanceId String @id
-  issuance PartIssuance @relation(fields: [issuanceId], references: [id], onDelete: Restrict)
-  signerId String
-  signedAt DateTime @default(now())
-  contentHash String @db.Char(64)
-  signatureImage String @db.Text
+  issuanceId     String       @id
+  issuance       PartIssuance @relation(fields: [issuanceId], references: [id], onDelete: Restrict)
+  signerId       String
+  signedAt       DateTime     @default(now())
+  contentHash    String       @db.Char(64)
+  signatureImage String       @db.Text
 }
 
 // ============================================================
@@ -1691,18 +1703,18 @@ model Invoice {
   tax      Float @default(0)
   total    Float
 
-  partsTotal            Float @default(0)
+  partsTotal            Float    @default(0)
   kiaSpareTotal         Decimal? @db.Decimal(18, 2)
   nonKiaSpareTotal      Decimal? @db.Decimal(18, 2)
-  labourTotal           Float @default(0)
-  partsDiscountPercent  Float @default(0)
-  labourDiscountPercent Float @default(0)
-  partsDiscountAmount   Float @default(0)
-  labourDiscountAmount  Float @default(0)
-  vatRate               Float @default(7.5)
-  vatAmount             Float @default(0)
-  roundOff              Float @default(0)
-  outstandingAmount     Float @default(0)
+  labourTotal           Float    @default(0)
+  partsDiscountPercent  Float    @default(0)
+  labourDiscountPercent Float    @default(0)
+  partsDiscountAmount   Float    @default(0)
+  labourDiscountAmount  Float    @default(0)
+  vatRate               Float    @default(7.5)
+  vatAmount             Float    @default(0)
+  roundOff              Float    @default(0)
+  outstandingAmount     Float    @default(0)
 
   serviceAdvisorId String?
   serviceAdvisor   User?   @relation("InvoiceServiceAdvisor", fields: [serviceAdvisorId], references: [id], onDelete: SetNull)
@@ -1895,15 +1907,14 @@ model Payment {
 
 model Receipt {
   advanceJobCardId String?
-  advanceJobCard JobCard? @relation("JobAdvances", fields: [advanceJobCardId], references: [id], onDelete: Restrict)
-  advanceSnapshot Json?
-  @@index([advanceJobCardId, status])
-  depositJobCard JobCard? @relation("JobDeposit")
-  id             String   @id @default(uuid())
-  branchId       String?
-  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  idempotencyKey String?  @unique
-  requestHash    String?
+  advanceJobCard   JobCard? @relation("JobAdvances", fields: [advanceJobCardId], references: [id], onDelete: Restrict)
+  advanceSnapshot  Json?
+  depositJobCard   JobCard? @relation("JobDeposit")
+  id               String   @id @default(uuid())
+  branchId         String?
+  branch           Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  idempotencyKey   String?  @unique
+  requestHash      String?
 
   receiptNumber String   @unique
   customerId    String
@@ -1945,6 +1956,7 @@ model Receipt {
   editLogs       ReceiptEditLog[]
   payments       Payment[]              @relation("PaymentReceiptLink")
 
+  @@index([advanceJobCardId, status])
   @@index([invoiceId])
   @@index([customerId, issuedAt])
   @@index([branchId, issuedAt])
@@ -1965,21 +1977,21 @@ model Bank {
 
 model ReceiptAllocation {
   advanceReference String?
-  id           String                @id @default(uuid())
-  receiptId    String?
-  receipt      Receipt?              @relation(fields: [receiptId], references: [id], onDelete: Restrict)
-  invoiceId    String?
-  invoice      Invoice?              @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
-  debitNoteId  String?
-  debitNote    PartyNote?            @relation("DebitNoteAdjustments", fields: [debitNoteId], references: [id], onDelete: Restrict)
-  creditNoteId String?
-  creditNote   PartyNote?            @relation("CreditNoteAdjustments", fields: [creditNoteId], references: [id], onDelete: Restrict)
-  batchId      String?
-  batch        PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
-  amount       Float
-  adjustedAt   DateTime              @default(now())
-  reversedAt   DateTime?
-  createdAt    DateTime              @default(now())
+  id               String                @id @default(uuid())
+  receiptId        String?
+  receipt          Receipt?              @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  invoiceId        String?
+  invoice          Invoice?              @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  debitNoteId      String?
+  debitNote        PartyNote?            @relation("DebitNoteAdjustments", fields: [debitNoteId], references: [id], onDelete: Restrict)
+  creditNoteId     String?
+  creditNote       PartyNote?            @relation("CreditNoteAdjustments", fields: [creditNoteId], references: [id], onDelete: Restrict)
+  batchId          String?
+  batch            PartyAdjustmentBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  amount           Float
+  adjustedAt       DateTime              @default(now())
+  reversedAt       DateTime?
+  createdAt        DateTime              @default(now())
 
   @@index([invoiceId])
   @@index([invoiceId, adjustedAt])
@@ -2183,39 +2195,42 @@ model CustomerCreditApplication {
 // ============================================================
 
 model JobcardNotificationEvent {
-  id String @id @default(uuid())
-  jobCardId String
-  actorId String?
-  before Json?
-  after Json
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  jobCardId   String
+  actorId     String?
+  before      Json?
+  after       Json
+  createdAt   DateTime  @default(now())
   processedAt DateTime?
+
   @@index([processedAt, createdAt], map: "jobcard_notification_events_pending")
   @@index([jobCardId, createdAt], map: "jobcard_notification_events_job")
   @@map("jobcard_notification_events")
 }
 
 model JobcardNotificationAudit {
-  id String @id @default(uuid())
-  jobCardId String
-  eventId String
-  eventType String
+  id          String   @id @default(uuid())
+  jobCardId   String
+  eventId     String
+  eventType   String
   recipientId String
-  channel String @default("in-app")
-  status String
-  createdAt DateTime @default(now())
+  channel     String   @default("in-app")
+  status      String
+  createdAt   DateTime @default(now())
+
   @@unique([eventId, eventType, recipientId, channel], map: "jobcard_notification_audit_eventId_eventType_recipientId_ch_key")
   @@index([jobCardId, createdAt], map: "jobcard_notification_audit_job")
   @@map("jobcard_notification_audit")
 }
 
 model NotificationFailure {
-  id String @id @default(uuid())
+  id        String   @id @default(uuid())
   jobCardId String
-  eventId String @unique
-  reason String
-  attempts Int
+  eventId   String   @unique
+  reason    String
+  attempts  Int
   createdAt DateTime @default(now())
+
   @@map("notification_failures")
 }
 
@@ -2410,6 +2425,40 @@ model JobComplaint {
   labour          Float           @default(0)
 
   @@index([jobCardId])
+}
+
+enum JobStage {
+  CHECK_IN
+  DIAGNOSIS
+  WARRANTY
+  ESTIMATE
+  REPAIR
+  QUALITY_CHECK
+  BILLING
+  DELIVERY
+  CLOSED
+  CANCELLED
+}
+
+/// One row per stage move or owner handoff on a job card. requestId makes client retries idempotent.
+model JobStageEvent {
+  id        String    @id @default(uuid())
+  jobCardId String
+  jobCard   JobCard   @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  fromStage JobStage?
+  toStage   JobStage
+  action    String?
+  actorId   String?
+  actor     User?     @relation("JobStageEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+  ownerId   String?
+  owner     User?     @relation("JobStageEventOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerRole String?
+  note      String?
+  requestId String?
+  createdAt DateTime  @default(now())
+
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, createdAt])
 }
 
 model JobCardStatusHistory {
@@ -4732,33 +4781,33 @@ model PartRequisition {
 
 model PartRequisitionLine {
   requestedSparePartId String?
-  requestedSparePart SparePart? @relation("RequisitionRequestedPart", fields: [requestedSparePartId], references: [id], onDelete: Restrict)
-  substitutionReason String?
-  id String @id @default(uuid())
-  requisitionId String
-  requisition PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
-  sparePartId String
-  sparePart SparePart @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
-  partIssuanceId String? @unique
-  partIssuance PartIssuance? @relation(fields: [partIssuanceId], references: [id], onDelete: Restrict)
-  partSource String
-  description String
-  uom String?
-  location String?
-  binCard String?
-  quantityRequired Int
-  quantityIssued   Int             @default(0)
-  rate             Decimal         @db.Decimal(18, 2)
-  warrantyRate     Decimal?        @db.Decimal(18, 2)
-  amount           Decimal         @db.Decimal(18, 2)
+  requestedSparePart   SparePart?      @relation("RequisitionRequestedPart", fields: [requestedSparePartId], references: [id], onDelete: Restrict)
+  substitutionReason   String?
+  id                   String          @id @default(uuid())
+  requisitionId        String
+  requisition          PartRequisition @relation(fields: [requisitionId], references: [id], onDelete: Restrict)
+  sparePartId          String
+  sparePart            SparePart       @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+  partIssuanceId       String?         @unique
+  partIssuance         PartIssuance?   @relation(fields: [partIssuanceId], references: [id], onDelete: Restrict)
+  partSource           String
+  description          String
+  uom                  String?
+  location             String?
+  binCard              String?
+  quantityRequired     Int
+  quantityIssued       Int             @default(0)
+  rate                 Decimal         @db.Decimal(18, 2)
+  warrantyRate         Decimal?        @db.Decimal(18, 2)
+  amount               Decimal         @db.Decimal(18, 2)
   // Null for CUSTOMER/FREE; WARRANTY is 100/0, GOODWILL may split.
-  approvalPercent  Decimal?        @db.Decimal(5, 2)
-  customerPercent  Decimal?        @db.Decimal(5, 2)
-  approvedAmount   Decimal         @default(0) @db.Decimal(18, 2)
-  customerAmount   Decimal         @default(0) @db.Decimal(18, 2)
-  createdAt        DateTime        @default(now())
-  jobCardLines     JobCardLine[]
-  returns          PartReturn[]
+  approvalPercent      Decimal?        @db.Decimal(5, 2)
+  customerPercent      Decimal?        @db.Decimal(5, 2)
+  approvedAmount       Decimal         @default(0) @db.Decimal(18, 2)
+  customerAmount       Decimal         @default(0) @db.Decimal(18, 2)
+  createdAt            DateTime        @default(now())
+  jobCardLines         JobCardLine[]
+  returns              PartReturn[]
 
   @@index([requisitionId])
   @@index([sparePartId])

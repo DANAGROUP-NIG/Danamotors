@@ -14,6 +14,7 @@
  *   LATE-9  promised 21 Jan 17:00, delivered 23 Jan 09:00  → late by date, 2 days, reason 2 (free service)
  *   LATE-10 second branch, promised 06 Jan, delivered 09 Jan → late by date: only that branch sees it
  */
+import { stageColumns } from "./stage";
 import { WarrantyCoverageStatus } from "@prisma/client";
 import prisma from "../../../src/prisma/client";
 import { CustomerService } from "../../../src/modules/customer/customer.service";
@@ -115,6 +116,7 @@ export async function seedLate(ctx: DemoContext, ref: Reference): Promise<LateSe
           jobNumber: `DM-${scenario.key}`,
           description: `${DEMO_TAG} Late delivery demo (${scenario.key})`,
           status: deliveredAt ? "DELIVERED" : "READY",
+          ...stageColumns(deliveredAt ? "DELIVERED" : "READY"),
           customField1: key,
           branchId: ctx.branches[scenario.branch].id,
           customerId: customers[scenario.branch],

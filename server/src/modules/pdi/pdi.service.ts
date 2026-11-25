@@ -7,6 +7,7 @@ import { NotificationService } from '../notification/notification.service';
 import { assertCampaignAttendance, completeCampaignVehiclesForJobCard } from '../campaign/campaign.hooks';
 import { canonicalJobStatus, jobStatusFilter, JobCardWorkflowService } from '../service/job-card-workflow.service';
 import { resolveJobComplaints } from '../service/job-card-complaints';
+import { syncStage } from '../service/job-stage.writer';
 import { requireMaster } from '../workshop/workshop-master.service';
 import { resolveVehicleWorkshopModel } from '../workshop/service-type.repository';
 import { ServiceTypeService } from '../workshop/service-type.service';
@@ -331,6 +332,8 @@ export class PdiService {
     history.push({ jobCardId: job.id, fromStatus: from === 'OPEN' ? 'IN_PROGRESS' : from, toStatus: 'QC', actorId, remarks: 'PDI work done' });
     await tx.jobCardStatusHistory.createMany({ data: history });
     await tx.jobCard.update({ where: { id: job.id }, data: { status: 'QC', qcStatus: 'PENDING', workDone: workDone?.trim() || job.workDone || 'PDI work done', completedAt: new Date() } });
+    // PDI keeps its own screens; its stage still follows its status.
+    await syncStage(tx, job.id, actorId);
     const last = await tx.jobCardStatusHistory.findFirst({ where: { jobCardId: job.id, toStatus: 'QC' }, orderBy: { createdAt: 'desc' }, select: { id: true } });
     return last?.id ?? null;
   }
@@ -345,7 +348,9 @@ export class PdiService {
       await completeCampaignVehiclesForJobCard(tx, id);
       const now = new Date();
       await tx.jobCardStatusHistory.create({ data: { jobCardId: id, fromStatus: 'QC', toStatus: 'READY', actorId: actor.userId, remarks: remarks?.trim() || 'PDI vehicle ready' } });
-      return tx.jobCard.update({ where: { id }, data: { status: 'READY', qcStatus: 'PASSED', qcNotes: remarks?.trim() || 'PDI inspection passed', readyAt: now } });
+      const ready = await tx.jobCard.update({ where: { id }, data: { status: 'READY', qcStatus: 'PASSED', qcNotes: remarks?.trim() || 'PDI inspection passed', readyAt: now } });
+      await syncStage(tx, id, actor.userId);
+      return ready;
     }, { maxWait: 5000, timeout: 15000 });
     const last = await prisma.jobCardStatusHistory.findFirst({ where: { jobCardId: id, toStatus: 'READY' }, orderBy: { createdAt: 'desc' }, select: { id: true } });
     if (last) await notifyWorkshopEvent('JOB_READY', id, last.id);
@@ -369,6 +374,7 @@ export class PdiService {
       const from = canonicalJobStatus(job.status);
       await tx.jobCardStatusHistory.create({ data: { jobCardId: id, fromStatus: from, toStatus: 'CANCELLED', actorId: actor.userId, remarks: reason.trim() } });
       await tx.jobCard.update({ where: { id }, data: { status: 'CANCELLED' } });
+      await syncStage(tx, id, actor.userId, { note: reason });
       await tx.auditLog.create({ data: { userId: actor.userId, action: 'PDI_JOB_CANCELLED', details: JSON.stringify({ jobCardId: id, from, reason: reason.trim() }) } });
     }, { maxWait: 5000, timeout: 15000 });
     return this.get(id, actor);

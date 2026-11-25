@@ -1,5 +1,66 @@
 # JobCard database and workflow
 
+## Staged job card (job card revamp, phase 0)
+
+The job card is being rebuilt as "one job, one step, one owner" (`doc/plans/jobcard-ux-revamp-prompts.md`). Phase 0 adds the model underneath. The screens change from phase 1.
+
+### Stage model
+
+`JobCard.stage` (enum `JobStage`) is where the job is: `CHECK_IN`, `DIAGNOSIS`, `WARRANTY`, `ESTIMATE`, `REPAIR`, `QUALITY_CHECK`, `BILLING`, `DELIVERY`, then `CLOSED`, or `CANCELLED`. The 8 working steps run in that order. The warranty step is used only when the vehicle is in warranty, has an open campaign or a warranty case; otherwise diagnosis hands straight to the estimate and the warranty step shows as skipped. A failed quality check returns the job to repair. A supplementary estimate during repair does not change the step.
+
+`stageOwnerId` and `stageOwnerRole` say who holds the job, and `stageEnteredAt` since when. Owners follow "Default business decisions" in `doc/plans/jobcard-revamp-implementation.md` (`TODO(confirm)`):
+
+| Step | Owner |
+|---|---|
+| Check-in, estimate | The job's service advisor |
+| Diagnosis, repair | The assigned technician; the workshop supervisor (WorkshopManager role) until one is assigned |
+| Warranty | Warranty officers |
+| Quality check | The quality inspector if set, else the workshop supervisor |
+| Billing | The service advisor until the job is marked ready, then billing officers |
+| Delivery | The delivery advisor, else the service advisor |
+
+`JobStageEvent` records every step move or owner change: from and to step, action, actor, new owner, note and the client request ID (unique per job). Each one also writes a `JOB_STAGE_CHANGED` audit entry.
+
+### Stage and status
+
+`JobCard.status` stays, because reports, billing, late deliveries, PSF, MIS and repeat jobs read it. The stage and status always agree:
+
+| Step | Status |
+|---|---|
+| Check-in, diagnosis, warranty, estimate | OPEN |
+| Repair | IN_PROGRESS, or WAITING_PARTS when paused for parts |
+| Quality check | QC |
+| Billing | QC until the advisor marks the job ready, then READY |
+| Delivery | BILLED, or READY on approved credit |
+| Closed | DELIVERED |
+| Cancelled | CANCELLED |
+
+Migration `20261125195032_jobcard_stage_model` normalised the old status spellings (Open, Pending, In Progress, On Hold, Quality Check, Ready, Completed, Billed, Closed, Delivered, Cancelled, Canceled) to the values above and set each existing job's step from its status: OPEN to Estimate, IN_PROGRESS and WAITING_PARTS to Repair, QC to Quality check, READY to Billing, BILLED to Delivery, DELIVERED to Closed. Existing jobs have no step history, so their finished steps show "Not provided". The status alias code (`canonicalJobStatus`, `jobStatusFilter`, report SQL aliases) is kept for now (`TODO(confirm)`: remove in phase 12).
+
+### One path for status changes
+
+Only `server/src/modules/service/job-stage.writer.ts` writes the stage columns. Every path that changes the status or the QC result calls `syncStage` in the same transaction, under the same job row lock: the lifecycle update (`PUT /service/job-cards/:id`), billing and bill cancellation, QC recording, technician assignment, estimate revision, requisitions, labour and return slips, labour line edits, part issues and PDI. `doc/progress/jobcard-revamp.md` lists every call site. A billed job moves to Delivery; a cancelled bill returns it to Billing unless credit was approved and it had already been sent to Delivery.
+
+### API
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/:id/workspace` | `jobcard:read`, job branch | Step, owner and since when, current sub-step, the actions this user can take (each enabled or with plain-English reasons), up to 3 alerts, one line per finished step, read-only flag, cancellation details |
+| `POST /service/job-cards/:id/stage` | `jobcard:update`, job branch | `{ action, note?, requestId }`. Runs one action under the job lock |
+
+Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs a customer request and the check-in signature), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (diagnosis onward, workshop roles; needs an assigned technician), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
+
+Actions that change the status run through `JobCardWorkflowService.updateInTx`, so the estimate approval and advance gates, QC checks, billing readiness, status history and status notifications all still apply. A blocked move returns 409 `STAGE_ACTION_BLOCKED` with `details.reasons`; the wrong role or another technician gets 403 `STAGE_ACTION_FORBIDDEN`; a missing job 404; invalid input 400 naming the field. Repeating a request ID returns the current workspace without acting again; reusing it for another action returns 409 `STAGE_REQUEST_REUSED`. PDI jobs keep their own screens and refuse stage actions.
+
+### Notifications
+
+Moves that change the status are announced by the existing status notification router. Step-only handoffs (check-in to diagnosis, diagnosis to warranty or estimate, warranty to estimate, QC passed to billing, billing to delivery) queue a `STAGE_HANDOFF` in-app notice ("Job sent to you ... Step: Warranty check") to the new owner through the durable workshop outbox. A notice is dropped if the job has moved on before delivery.
+
+### Client building blocks
+
+`client/lib/format.ts` (`formatMoney`, `formatDate`, `formatDateTime`, `formatRelative`, `NOT_PROVIDED`) and `client/features/job-cards/lib/job-stage.logic.ts` (step labels, badges, phone label "Step N of 8: Label", action and owner wording) are the single mappings for new code. The job card list shows a **Step** column.
+
+
 ### Vehicles with multiple job cards (issue 142)
 
 Open **Vehicles with multiple jobs** from Job cards. The default view groups vehicles with at least two visible, open and unbilled jobs. A closed date range adds delivered jobs based on their recorded delivery date in Africa/Lagos. The range can span up to 366 days. Cancelled jobs and historical jobs without a delivery date do not enter the closed results.

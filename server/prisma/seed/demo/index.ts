@@ -36,7 +36,7 @@ import { seedLate } from "./late";
 import { seedPsf } from "./psf";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
-import { CAMPAIGNS, DEMO_TAG, JOBS } from "./fixtures";
+import { CAMPAIGNS, DEMO_TAG, JOBS, STAGE_JOBS } from "./fixtures";
 
 const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
@@ -152,6 +152,14 @@ async function main() {
 
   // FPC bulletin (#98): VIN range, letter and call, and job cards for every FPC list.
   await seedFpc(ctx, ref, parties, done);
+
+  // Staged job card (job card revamp): one job at every step.
+  for (const job of STAGE_JOBS) {
+    process.stdout.write(`  ${job.id} ... `);
+    const result = await seedJob(ctx, ref, parties, job, done);
+    done.set(job.id, result);
+    console.log(`job card ${result.jobNumber}`);
+  }
 
   // Service MIS reports (#97): finished job history across every service category.
   await seedMis(ctx, ref);

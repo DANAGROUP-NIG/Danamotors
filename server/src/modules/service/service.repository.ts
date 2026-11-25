@@ -3,9 +3,7 @@ import { BookingCreate, createBooking } from "./booking.persistence";
 import prisma from "../../prisma/client";
 import { jobStatusFilter } from "./job-card-workflow.service";
 import {
-  Prisma,
   ServiceAppointment,
-  JobCard,
   Inspection,
   Estimate,
   CustomerApproval,
@@ -224,22 +222,6 @@ export class ServiceRepository {
         );
       await tx.serviceAppointment.delete({ where: { id } });
     });
-  }
-
-  async createJobCard(data: {
-    appointmentId?: string;
-    customerId?: string;
-    vehicleId?: string;
-    branchId: string;
-    jobNumber: string;
-    description: string;
-    status?: string;
-    estimatedHours?: number;
-    estimatedCost?: number;
-    assignedTo?: string;
-    createdById?: string;
-  }): Promise<JobCard> {
-    return prisma.jobCard.create({ data });
   }
 
   async listJobCards(params?: {
@@ -505,15 +487,6 @@ export class ServiceRepository {
     });
   }
 
-  async updateJobCard(
-    id: string,
-    data: Prisma.JobCardUncheckedUpdateInput,
-  ): Promise<JobCard> {
-    return prisma.jobCard.update({
-      where: { id },
-      data,
-    });
-  }
 
   async addInspection(data: {
     jobCardId: string;

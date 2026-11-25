@@ -1,4 +1,4 @@
-import { jobWorkUpdate } from "./requisition-work";
+import { applyJobWorkChange } from "./requisition-work";
 import { ChargeType, JobCardType, Prisma } from "@prisma/client";
 import { assertJobTypeAccess, pdiDocumentNumber, pdiSequenceKey } from '../pdi/pdi.logic';
 import { assertPdiDocumentChange } from '../pdi/pdi.settings.service';
@@ -305,10 +305,7 @@ export class ReturnSlipService {
             returned + request.quantity,
           );
         }
-        await tx.jobCard.update({
-          where: { id: job.id },
-          data: await jobWorkUpdate(tx, job, actor.userId),
-        });
+        await applyJobWorkChange(tx, job, actor.userId);
         await tx.auditLog.create({
           data: {
             userId: actor.userId,
@@ -442,10 +439,7 @@ export class ReturnSlipService {
             cancelReason: reason.trim(),
           },
         });
-        await tx.jobCard.update({
-          where: { id: job.id },
-          data: await jobWorkUpdate(tx, job, actor.userId),
-        });
+        await applyJobWorkChange(tx, job, actor.userId);
         await tx.auditLog.create({
           data: {
             userId: actor.userId,

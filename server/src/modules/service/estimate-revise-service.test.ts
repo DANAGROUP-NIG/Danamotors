@@ -1,3 +1,5 @@
+// Stage bookkeeping is covered by the job-stage tests; these tests check the calling code only.
+jest.mock("./job-stage.writer", () => ({ syncStage: jest.fn(async () => null), resetQualityCheck: jest.fn(async () => undefined) }));
 jest.mock('../../prisma/client',()=>({__esModule:true,default:{
  $transaction:jest.fn(),$queryRaw:jest.fn(),jobCard:{findUnique:jest.fn(),update:jest.fn()},estimate:{findMany:jest.fn(),update:jest.fn(),create:jest.fn()},auditLog:{create:jest.fn()}
 }}));

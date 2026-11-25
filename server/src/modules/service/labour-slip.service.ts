@@ -1,4 +1,4 @@
-import { jobWorkUpdate } from "../requisition/requisition-work";
+import { applyJobWorkChange } from "../requisition/requisition-work";
 import { JobCardType, Prisma } from "@prisma/client";
 import {
   assertJobTypeAccess,
@@ -18,7 +18,6 @@ import { assertChargeChange } from "../job-card-line/jobCardLine.logic";
 import {
   assertRequisitionBranch,
   assertRequisitionJob,
-  requisitionWorkUpdate,
 } from "../requisition/requisition.logic";
 import { assertApprovedOperation } from "./estimate-approval";
 import { LabourService } from "./labour.service";
@@ -372,12 +371,7 @@ export class LabourSlipService {
         });
         for (const line of input.lines)
           await this.saveLine(tx, slip, job, line, actor);
-        await tx.jobCard.update({
-          where: { id: job.id },
-          data: pdi
-            ? requisitionWorkUpdate(job.status, actor.userId, "Labour slip")
-            : await jobWorkUpdate(tx, job, actor.userId, "Labour slip"),
-        });
+        await applyJobWorkChange(tx, job, actor.userId, { label: "Labour slip", pdi });
         await tx.auditLog.create({
           data: {
             userId: actor.userId,
@@ -422,12 +416,9 @@ export class LabourSlipService {
           where: { id },
           data: { updatedAt: new Date() },
         });
-        await tx.jobCard.update({
-          where: { id: job.id },
-          data:
-            job.jobType === JobCardType.PDI
-              ? requisitionWorkUpdate(job.status, actor.userId, "Labour slip")
-              : await jobWorkUpdate(tx, job, actor.userId, "Labour slip"),
+        await applyJobWorkChange(tx, job, actor.userId, {
+          label: "Labour slip",
+          pdi: job.jobType === JobCardType.PDI,
         });
         return this.get(id, actor, tx);
       },

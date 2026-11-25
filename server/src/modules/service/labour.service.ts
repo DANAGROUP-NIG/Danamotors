@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { canonicalJobStatus } from './job-card-workflow.service';
+import { resetQualityCheck } from './job-stage.writer';
 import { setNotificationActor } from '../notification/jobcard-notification-router';
 import { ROLES } from '../../shared/constants/roles';
 import { currentEmployeeWhere } from '../employee/employee.service';
@@ -144,7 +145,7 @@ export class LabourService {
       });
       const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId, labourItemId: values.labourItemId } });
       await assertApprovedOperation(transaction, jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.pricing === 'FIXED' ? 1 : line.hours, rate: line.rate, amount: line.amount })));
-      await transaction.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: 'PENDING' } });
+      await resetQualityCheck(transaction, jobCardId, actorId ?? null);
       return transaction.jobCardLabour.create({
         data: { jobCardId: jobCard.id, ...values },
         include: { labourItem: true, technician: { select: { id: true, firstName: true, lastName: true } }, mechanic: { select: { id: true, code: true, name: true } } },
@@ -176,7 +177,7 @@ export class LabourService {
       });
       const previous = await transaction.jobCardLabour.findMany({ where: { jobCardId: existing.jobCardId, labourItemId: values.labourItemId, id: { not: id } } });
       await assertApprovedOperation(transaction, existing.jobCardId, jobCard.customerId, [...previous, values].map(line => ({ type: 'LABOUR', referenceId: line.labourItemId, description: line.description, quantity: line.pricing === 'FIXED' ? 1 : line.hours, rate: line.rate, amount: line.amount })));
-      await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });
+      await resetQualityCheck(transaction, existing.jobCardId, actorId ?? null);
       return transaction.jobCardLabour.update({
         where: { id },
         data: values,
@@ -193,7 +194,7 @@ export class LabourService {
       if (existing.labourSlipId) throw new ConflictError('Document-managed labour cannot be removed through the legacy labour endpoint');
       await this.lockJobCard(transaction, existing.jobCardId);
       await this.assertJobCardOpen(existing.jobCardId, transaction);
-      await transaction.jobCard.update({ where: { id: existing.jobCardId }, data: { qcStatus: 'PENDING' } });
+      await resetQualityCheck(transaction, existing.jobCardId, actorId ?? null);
       await transaction.jobCardLabour.delete({ where: { id } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
   }
