@@ -38,6 +38,7 @@ export type ReportFilterKey =
   | "includeReturns"
   | "includeCancelled"
   | "includeAlternates"
+  | "includeStn"
   | "onlyTransacted"
   | "days"
   | "ageLimits"
@@ -1253,8 +1254,8 @@ export const REPORTS: ReportDefinition[] = [
       "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or the re-order quantity worked out from consumption against the one entered.",
     permission: PERMISSIONS.STOCK_READ,
     period: "asOn",
-    filters: [...STOCK_PART_FILTERS, "option", "days"],
-    labels: { option: "Show", days: "Re-order: consumption over (days)" },
+    filters: [...STOCK_PART_FILTERS, "option", "days", "includeStn"],
+    labels: { option: "Show", days: "Re-order: consumption period (days; 90 = 3 months)" },
     options: [
       { value: "MIN_MAX", label: "Minimum / maximum level" },
       { value: "BELOW_MIN", label: "Items falling below minimum level" },
@@ -1285,8 +1286,8 @@ export const REPORTS: ReportDefinition[] = [
       REORDER: [
         ...PART_COLUMNS,
         qty("quantity", "Stock"),
-        qty("monthly", "Consumed per month", false),
-        qty("calculated", "Calculated re-order"),
+        qty("consumed", "Consumed in period"),
+        qty("calculated", "Calculated re-order (per month)"),
         qty("entered", "Entered re-order"),
         qty("difference", "Entered − calculated"),
       ],

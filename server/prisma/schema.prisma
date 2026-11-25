@@ -40,6 +40,9 @@ model Branch {
   phoneNumber            String?
   email                  String?
   isActive               Boolean                @default(true)
+  // Legacy control1.roundmrn: vendor MRN and MRN return totals are rounded to the naira
+  // (on at CPD and Abuja, off at Kia Plaza). A location follows its parent branch.
+  roundMrnTotal          Boolean                @default(false)
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
 
@@ -65,6 +68,7 @@ model Branch {
   mitsIn         MaterialInTransit[]   @relation("MitDestinationBranch")
   mrnsReceived   MaterialReceiptNote[] @relation("MrnReceivingBranch")
   mrnsSourced    MaterialReceiptNote[] @relation("MrnSourceBranch")
+  vendorReturns  VendorReturn[]        @relation("VendorReturnBranch")
 
   customerOrders CustomerOrder[]
   counterSales   CounterSale[]
@@ -176,23 +180,25 @@ model User {
   transferDispatches InterBranchTransfer[] @relation("TransferDispatchedBy")
   transferReceives   InterBranchTransfer[] @relation("TransferReceivedBy")
 
-  indentsRequested         BranchIndent[]          @relation("IndentRequestedBy")
-  indentsApproved          BranchIndent[]          @relation("IndentApprovedBy")
-  indentsRejected          BranchIndent[]          @relation("IndentRejectedBy")
-  indentsCancelled         BranchIndent[]          @relation("IndentCancelledBy")
-  indentLinesCancelled     BranchIndentLine[]      @relation("IndentLineCancelledBy")
-  transferStatusEvents     TransferStatusHistory[] @relation("TransferStatusActor")
-  pickingListsCreated      PickingList[]           @relation("PickingListCreatedBy")
-  pickingListsDone         PickingList[]           @relation("PickingListCompletedBy")
-  stnsCreated              StockTransferNote[]     @relation("StnCreatedBy")
-  stnsDispatched           StockTransferNote[]     @relation("StnDispatchedBy")
-  stnsCancelled            StockTransferNote[]     @relation("StnCancelledBy")
-  stnEdits                 StockTransferNoteEdit[] @relation("StnEditedBy")
-  transferCasesCreated     TransferCase[]          @relation("TransferCaseCreatedBy")
-  packingListsCreated      PackingList[]           @relation("PackingListCreatedBy")
-  mitsCreated              MaterialInTransit[]     @relation("MitCreatedBy")
-  mrnsReceived             MaterialReceiptNote[]   @relation("MrnReceivedBy")
-  mrnDiscrepanciesApproved MaterialReceiptNote[]   @relation("MrnDiscrepancyApprovedBy")
+  indentsRequested         BranchIndent[]            @relation("IndentRequestedBy")
+  indentsApproved          BranchIndent[]            @relation("IndentApprovedBy")
+  indentsRejected          BranchIndent[]            @relation("IndentRejectedBy")
+  indentsCancelled         BranchIndent[]            @relation("IndentCancelledBy")
+  indentLinesCancelled     BranchIndentLine[]        @relation("IndentLineCancelledBy")
+  transferStatusEvents     TransferStatusHistory[]   @relation("TransferStatusActor")
+  pickingListsCreated      PickingList[]             @relation("PickingListCreatedBy")
+  pickingListsDone         PickingList[]             @relation("PickingListCompletedBy")
+  stnsCreated              StockTransferNote[]       @relation("StnCreatedBy")
+  stnsDispatched           StockTransferNote[]       @relation("StnDispatchedBy")
+  stnsCancelled            StockTransferNote[]       @relation("StnCancelledBy")
+  stnEdits                 StockTransferNoteEdit[]   @relation("StnEditedBy")
+  transferCasesCreated     TransferCase[]            @relation("TransferCaseCreatedBy")
+  packingListsCreated      PackingList[]             @relation("PackingListCreatedBy")
+  mitsCreated              MaterialInTransit[]       @relation("MitCreatedBy")
+  mrnsReceived             MaterialReceiptNote[]     @relation("MrnReceivedBy")
+  mrnDiscrepanciesApproved MaterialReceiptNote[]     @relation("MrnDiscrepancyApprovedBy")
+  mrnEdits                 MaterialReceiptNoteEdit[] @relation("MrnEditedBy")
+  vendorReturnsCreated     VendorReturn[]            @relation("VendorReturnCreatedBy")
 
   recordedStockTransactions StockTransaction[]    @relation("UserStockTransactions")
   partRateChanges           PartRateHistory[]     @relation("PartRateChangedBy")
@@ -446,6 +452,7 @@ model Customer {
 
   // Vendors: material receipt notes for parts bought from them.
   vendorReceipts MaterialReceiptNote[] @relation("MrnVendor")
+  vendorReturns  VendorReturn[]        @relation("VendorReturnVendor")
 
   @@index([branchId])
   @@index([branchId, partyStatus, code])
@@ -1031,13 +1038,14 @@ model SparePart {
   transferItems     InterBranchTransferItem[]
   invoiceLines      InvoiceLine[]
 
-  indentLines      BranchIndentLine[]      @relation("IndentLinePart")
-  pickingRequested PickingListLine[]       @relation("PickingRequestedPart")
-  pickingSupplied  PickingListLine[]       @relation("PickingSuppliedPart")
-  stnRequested     StockTransferNoteLine[] @relation("StnRequestedPart")
-  stnSupplied      StockTransferNoteLine[] @relation("StnSuppliedPart")
-  mitLines         MaterialInTransitLine[] @relation("MitLinePart")
-  mrnLines         MaterialReceiptLine[]   @relation("MrnLinePart")
+  indentLines       BranchIndentLine[]      @relation("IndentLinePart")
+  pickingRequested  PickingListLine[]       @relation("PickingRequestedPart")
+  pickingSupplied   PickingListLine[]       @relation("PickingSuppliedPart")
+  stnRequested      StockTransferNoteLine[] @relation("StnRequestedPart")
+  stnSupplied       StockTransferNoteLine[] @relation("StnSuppliedPart")
+  mitLines          MaterialInTransitLine[] @relation("MitLinePart")
+  mrnLines          MaterialReceiptLine[]   @relation("MrnLinePart")
+  vendorReturnLines VendorReturnLine[]      @relation("VendorReturnLinePart")
 
   jobCardLines      JobCardLine[]
   warrantyCaseLines WarrantyCaseLine[]
@@ -2981,11 +2989,19 @@ model MaterialReceiptNote {
   receiptDate    DateTime  @default(now())
   remarks        String?
 
-  totalReceived Int   @default(0)
-  totalDamaged  Int   @default(0)
-  totalShort    Int   @default(0)
+  totalReceived   Int       @default(0)
+  totalDamaged    Int       @default(0)
+  totalShort      Int       @default(0)
   // Value of accepted stock in local currency (unit price x conversion rate).
-  totalValue    Float @default(0)
+  totalValue      Float     @default(0)
+  // Vendor MRNs: VAT under tax form Z (legacy charged 7.5% on taxable parts only under Z), the
+  // round-off to the naira (branch setting roundMrnTotal) and the amount payable to the vendor.
+  taxAmount       Float     @default(0)
+  roundOff        Float     @default(0)
+  netAmount       Float     @default(0)
+  // Set when the same vendor invoice was received again on purpose (why).
+  duplicateReason String?
+  editedAt        DateTime?
 
   receivedById String?
   receivedBy   User?   @relation("MrnReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
@@ -3000,7 +3016,9 @@ model MaterialReceiptNote {
 
   createdAt DateTime @default(now())
 
-  lines MaterialReceiptLine[]
+  lines   MaterialReceiptLine[]
+  edits   MaterialReceiptNoteEdit[]
+  returns VendorReturn[]
 
   @@index([receivingBranchId])
   @@index([discrepancyStatus])
@@ -3028,15 +3046,97 @@ model MaterialReceiptLine {
   shortQuantity    Int @default(0)
 
   // Unit price as sent (Mobis: invoice currency; transfer: naira) and its naira cost.
-  unitPrice Float
-  unitCost  Float
-  amount    Float
+  unitPrice        Float
+  unitCost         Float
+  amount           Float
+  // Vendor MRNs: VAT on this line (tax form Z, taxable part) and units returned to the vendor so far.
+  vatPercent       Float @default(0)
+  taxAmount        Float @default(0)
+  returnedQuantity Int   @default(0)
 
   remarks String?
+
+  returnLines VendorReturnLine[]
 
   @@index([mrnId])
   @@index([mitLineId])
   @@index([stnLineId])
+}
+
+/// Correction of a posted vendor MRN (legacy users changed MRN lines after saving). One row per change.
+model MaterialReceiptNoteEdit {
+  id    String              @id @default(uuid())
+  mrnId String
+  mrn   MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Cascade)
+
+  // What changed: "line", "invoice", "tax form", "conversion rate", "remarks".
+  field      String
+  partNumber String?
+  oldValue   String?
+  newValue   String?
+  reason     String
+
+  editedById String?
+  editedBy   User?    @relation("MrnEditedBy", fields: [editedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([mrnId])
+}
+
+/// Parts sent back to the vendor against a vendor MRN (legacy MRN Return, MrnRetHead/MrnRetDetail).
+model VendorReturn {
+  id           String @id @default(uuid())
+  returnNumber String @unique
+
+  mrnId    String
+  mrn      MaterialReceiptNote @relation(fields: [mrnId], references: [id], onDelete: Restrict)
+  branchId String
+  branch   Branch              @relation("VendorReturnBranch", fields: [branchId], references: [id], onDelete: Restrict)
+  // Defaults to the MRN's vendor; legacy let the store return to another vendor (Lagos: Royal Iyke MRNs to Seun Nigeria).
+  vendorId String
+  vendor   Customer            @relation("VendorReturnVendor", fields: [vendorId], references: [id], onDelete: Restrict)
+
+  returnDate DateTime @default(now())
+  // Copied from the MRN.
+  taxForm    String?
+  fullReturn Boolean  @default(false)
+  remarks    String?
+
+  totalQuantity Int   @default(0)
+  totalValue    Float @default(0)
+  taxAmount     Float @default(0)
+  roundOff      Float @default(0)
+  netAmount     Float @default(0)
+
+  createdById String?
+  createdBy   User?    @relation("VendorReturnCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  lines VendorReturnLine[]
+
+  @@index([mrnId])
+  @@index([branchId])
+  @@index([vendorId])
+}
+
+model VendorReturnLine {
+  id        String              @id @default(uuid())
+  returnId  String
+  return    VendorReturn        @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  mrnLineId String
+  mrnLine   MaterialReceiptLine @relation(fields: [mrnLineId], references: [id], onDelete: Restrict)
+  partId    String
+  part      SparePart           @relation("VendorReturnLinePart", fields: [partId], references: [id], onDelete: Restrict)
+
+  quantity   Int
+  // The MRN line's naira cost.
+  unitCost   Float
+  amount     Float
+  vatPercent Float @default(0)
+  taxAmount  Float @default(0)
+
+  @@index([returnId])
+  @@index([mrnLineId])
 }
 
 // ============================================================

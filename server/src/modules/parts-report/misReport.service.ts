@@ -12,7 +12,7 @@ import prisma from "../../prisma/client";
 import { reportEnd } from "../finance/party-report";
 import { money } from "../finance/money";
 import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, LineCharges, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
-import { bandOf, Basis, ISSUE_MOVEMENTS } from "./stockReport.logic";
+import { bandOf, Basis, ISSUE_MOVEMENTS, reorderFromConsumption } from "./stockReport.logic";
 import { Holding, Movement, partColumns, StockReportService } from "./stockReport.service";
 
 const DAY_MS = 86_400_000;
@@ -82,7 +82,9 @@ export class MisReportService {
     const holdings = await this.stock.holdings(f);
     return holdings.flatMap((h): Row[] => {
       let consumed = 0;
+      // Legacy counts sales and workshop issues less returns; STNs only with "Include STN".
       const { closing } = this.stock.walk(h, "DEALER", new Map(), since, end, (m) => {
+        if (m.type === "TRANSFER_OUT" && !f.includeStn) return;
         if (ISSUE_MOVEMENTS.includes(m.type) || m.type === "RETURNED") consumed -= m.quantity;
       });
       const stock = closing.quantity;
@@ -91,10 +93,13 @@ export class MisReportService {
       const reorder = h.part.reorderQty || 0;
       const head = { ...(!f.branchId && { group: h.branch }), ...partColumns(h.part) };
       if (f.option === "REORDER") {
-        // The re-order quantity is what the period consumed (legacy: three months' consumption).
-        const calculated = Math.max(consumed, 0);
-        if (!calculated && !reorder) return [];
-        return [{ ...head, quantity: stock, monthly: money((calculated / days) * 30), calculated, entered: reorder, difference: reorder - calculated }];
+        // Legacy formula (checked against Abuja's reorder work table, 79 of 83 parts): average monthly
+        // consumption over the period (control1.reordermonth: 3 months at Lagos and CPD, 12 at Abuja),
+        // rounded up, at least 1 for a part on the list.
+        const used = Math.max(consumed, 0);
+        if (!used && !reorder) return [];
+        const calculated = reorderFromConsumption(used, days);
+        return [{ ...head, quantity: stock, consumed: used, calculated, entered: reorder, difference: reorder - calculated }];
       }
       if (f.option === "BELOW_MIN") {
         if (!min || stock >= min) return [];

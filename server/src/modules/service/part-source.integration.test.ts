@@ -91,8 +91,8 @@ describeDb("Part source records (database)", () => {
         invoiceNumber: `INV-${run}`,
         invoiceDate: new Date(),
         lines: [
-          { partId: used.id, quantity: 3, unitCost: 6000 },
-          { partId: local.id, quantity: 2, unitCost: 9000 },
+          { partId: used.id, quantity: 3, unitPrice: 6000 },
+          { partId: local.id, quantity: 2, unitPrice: 9000 },
         ],
       },
       user.id,
@@ -109,10 +109,10 @@ describeDb("Part source records (database)", () => {
     const txns = await prisma.stockTransaction.findMany({ where: { referenceId: receipt.id } });
     expect(txns.map((t) => [t.type, t.quantity]).sort()).toEqual([["RECEIVED", 2], ["RECEIVED", 3]]);
     await expect(
-      receipts.createReceipt({ receivingBranchId: branch.id, vendorId: vendor.id, invoiceNumber: `inv-${run}`, invoiceDate: new Date(), lines: [{ partId: used.id, quantity: 1, unitCost: 1 }] }, user.id),
+      receipts.createReceipt({ receivingBranchId: branch.id, vendorId: vendor.id, invoiceNumber: `inv-${run}`, invoiceDate: new Date(), lines: [{ partId: used.id, quantity: 1, unitPrice: 1 }] }, user.id),
     ).rejects.toThrow("already received");
     await expect(
-      receipts.createReceipt({ receivingBranchId: branch.id, vendorId: customer.id, invoiceNumber: "X", invoiceDate: new Date(), lines: [{ partId: used.id, quantity: 1, unitCost: 1 }] }, user.id),
+      receipts.createReceipt({ receivingBranchId: branch.id, vendorId: customer.id, invoiceNumber: "X", invoiceDate: new Date(), lines: [{ partId: used.id, quantity: 1, unitPrice: 1 }] }, user.id),
     ).rejects.toThrow("Choose a vendor");
 
     const sources = await inventory.listPartSources(used.id, branch.id);

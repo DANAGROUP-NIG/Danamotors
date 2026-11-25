@@ -30,6 +30,8 @@ export interface ReportFilters {
   fullyExecuted?: boolean;
   includeReturns?: boolean;
   includeCancelled?: boolean;
+  /** Re-order report: count STNs as consumption (legacy "Include STN", off by default). */
+  includeStn?: boolean;
   /** Stock reports: only parts with a movement in the period. */
   onlyTransacted?: boolean;
   /** Slow-moving items: not issued for this many days. */

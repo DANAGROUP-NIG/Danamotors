@@ -24,7 +24,7 @@ export interface Piece {
 }
 
 /** Movement types that change a branch's stock quantity. RESERVED/UNRESERVED do not. */
-export const STOCK_MOVEMENTS = ["STOCKED", "RECEIVED", "TRANSFER_IN", "RETURNED", "ADJUSTMENT", "ISSUED", "TRANSFER_OUT"];
+export const STOCK_MOVEMENTS = ["STOCKED", "RECEIVED", "TRANSFER_IN", "RETURNED", "ADJUSTMENT", "ISSUED", "TRANSFER_OUT", "VENDOR_RETURN"];
 /** Movement types that consume stock (issues, for slow-moving and consumption). */
 export const ISSUE_MOVEMENTS = ["ISSUED", "TRANSFER_OUT"];
 
@@ -113,4 +113,13 @@ export function bandLabels(limits: number[], unit = "days") {
 export function bandOf(value: number, limits: number[]) {
   const i = limits.findIndex((limit) => value <= limit);
   return i < 0 ? limits.length : i;
+}
+
+/**
+ * Legacy re-order quantity: average monthly consumption over the period, rounded up, never below 1.
+ * The period is in days and counted in whole months (90 days = 3, 365 = 12).
+ */
+export function reorderFromConsumption(consumed: number, days: number) {
+  const months = Math.max(1, Math.round(days / 30));
+  return Math.max(1, Math.ceil(consumed / months));
 }

@@ -291,6 +291,12 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
       },
       {
+        label: "MRN Returns",
+        href: "/inventory/mrn-returns",
+        icon: Undo2,
+        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+      },
+      {
         label: "Shortage Approvals",
         href: "/inventory/discrepancies",
         icon: ShieldAlert,

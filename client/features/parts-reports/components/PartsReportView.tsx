@@ -64,7 +64,7 @@ const DEFAULT_MILEAGE_LIMITS = "10000,20000,40000,60000,100000";
 const day = (d?: string) => formatCell({ key: "", label: "", type: "date" }, d);
 
 /** On/off choices, shown together in one row under the other filters. */
-const CHECKBOXES: ReportFilterKey[] = ["includeReturns", "onlyTransacted", "summary", "onlyRemarks", "includeNotRequired", "includeCancelled"];
+const CHECKBOXES: ReportFilterKey[] = ["includeReturns", "onlyTransacted", "summary", "onlyRemarks", "includeNotRequired", "includeCancelled", "includeStn"];
 /** Filters beyond the option, period and branch, counted in the folded summary. */
 const EXTRA_FILTERS: (keyof ReportParams)[] = [
   "otherBranchId",
@@ -554,6 +554,12 @@ export function PartsReportView({ kind, initial }: { kind: string; initial?: { s
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!params.includeCancelled} onChange={(e) => set({ includeCancelled: e.target.checked || undefined })} />
                 Show cancelled records
+              </label>
+            )}
+            {has("includeStn") && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!params.includeStn} onChange={(e) => set({ includeStn: e.target.checked || undefined })} />
+                Include STN (re-order)
               </label>
             )}
           </div>

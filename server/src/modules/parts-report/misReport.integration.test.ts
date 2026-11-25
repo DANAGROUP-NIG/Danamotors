@@ -130,11 +130,18 @@ describeDb("MIS reports (database)", () => {
   });
 
   it("works out the re-order quantity from consumption and compares the one entered", async () => {
+    // Legacy: average monthly consumption over the period (90 days = 3 months), rounded up, at least 1.
+    // Ball joints: counter sale 1 + job 2 − returned 1 = 2 (the STN of 3 counts only with Include STN).
+    // Bolts: one to the PDI job (SANs are not consumption).
     const r = await report("stock-levels", { option: "REORDER", days: 90 });
-    // Ball joints: STN 3 + counter sale 1 + job 2 − returned 1. Bolts: one to the PDI job (SANs are not consumption).
-    expect(pick(r.rows, "partNumber", "calculated", "entered", "difference", "monthly")).toEqual([
-      [bolt.partNumber, 1, 0, -1, 0.33],
-      [joint.partNumber, 5, 2, -3, 1.67],
+    expect(pick(r.rows, "partNumber", "consumed", "calculated", "entered", "difference")).toEqual([
+      [bolt.partNumber, 1, 1, 0, -1],
+      [joint.partNumber, 2, 1, 2, 1],
+    ]);
+    const withStn = await report("stock-levels", { option: "REORDER", days: 90, includeStn: true });
+    expect(pick(withStn.rows, "partNumber", "consumed", "calculated", "difference")).toEqual([
+      [bolt.partNumber, 1, 1, -1],
+      [joint.partNumber, 5, 2, 0],
     ]);
   });
 

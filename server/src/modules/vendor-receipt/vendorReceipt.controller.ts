@@ -2,6 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from "express";
 import { assertInventoryBranchAccess } from "../../middleware/authorize";
 import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
 import { VendorReceiptService } from "./vendorReceipt.service";
+import { VendorReturnService } from "./vendorReturn.service";
 
 const handle =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
@@ -30,6 +31,7 @@ function scope(req: Request): string | undefined {
 
 export class VendorReceiptController {
   private service = new VendorReceiptService();
+  private returns = new VendorReturnService();
 
   searchVendors = handle(async (req, res) => {
     ok(res, { vendors: await this.service.searchVendors(req.query.search as string | undefined) });
@@ -55,5 +57,35 @@ export class VendorReceiptController {
     const receipt = await this.service.getReceipt(req.params.id);
     assertInventoryBranchAccess(req, [receipt.receivingBranchId]);
     ok(res, { receipt });
+  });
+
+  branchSettings = handle(async (req, res) => {
+    const branchId = req.query.branchId as string;
+    assertInventoryBranchAccess(req, [branchId]);
+    ok(res, { settings: await this.service.branchSettings(branchId) });
+  });
+
+  editReceipt = handle(async (req, res) => {
+    const current = await this.service.getReceipt(req.params.id);
+    assertInventoryBranchAccess(req, [current.receivingBranchId]);
+    const receipt = await this.service.editReceipt(req.params.id, req.body, req.user!.userId);
+    ok(res, { receipt }, `MRN ${receipt.mrnNumber} corrected`);
+  });
+
+  createReturn = handle(async (req, res) => {
+    const mrn = await this.service.getReceipt(req.params.id);
+    assertInventoryBranchAccess(req, [mrn.receivingBranchId]);
+    const ret = await this.returns.createReturn(req.params.id, req.body, req.user!.userId);
+    ok(res, { return: ret }, `MRN return ${ret.returnNumber} posted`, 201);
+  });
+
+  listReturns = handle(async (req, res) => {
+    ok(res, { returns: await this.returns.listReturns({ branchId: scope(req), search: req.query.search as string | undefined }) });
+  });
+
+  getReturn = handle(async (req, res) => {
+    const ret = await this.returns.getReturn(req.params.id);
+    assertInventoryBranchAccess(req, [ret.branchId]);
+    ok(res, { return: ret });
   });
 }

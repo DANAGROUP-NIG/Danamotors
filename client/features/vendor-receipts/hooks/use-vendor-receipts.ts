@@ -5,13 +5,18 @@ import { useBranchStore } from "@/store/branch.store";
 import { mobisErrorMessage } from "@/features/mobis-receipts/hooks/use-mobis";
 import {
   createVendorReceiptRequest,
+  createVendorReturnRequest,
+  editVendorReceiptRequest,
+  getMrnSettingsRequest,
+  getVendorReturnRequest,
+  getVendorReturnsRequest,
   getVendorReceiptRequest,
   getVendorReceiptsRequest,
   searchReceivablePartsRequest,
   searchVendorsRequest,
   vendorReceiptKeys,
 } from "../api/vendor-receipt.api";
-import type { CreateVendorReceiptPayload } from "../types/vendor-receipt.types";
+import type { CreateVendorReceiptPayload, CreateVendorReturnPayload, EditVendorReceiptPayload } from "../types/vendor-receipt.types";
 
 /** Receipts at the branch picked in the branch switcher. */
 export function useVendorReceipts(search = "") {
@@ -55,6 +60,57 @@ export function useCreateVendorReceipt() {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
       toast.success(`MRN ${receipt.mrnNumber} posted. Stock added to ${receipt.receivingBranch.name}`);
     },
-    onError: (error) => toast.error(mobisErrorMessage(error, "Failed to post the vendor receipt")),
+    onError: (error) => {
+      // A duplicate invoice (409) is handled by the form, which asks for a reason.
+      if (errorStatus(error) !== 409) toast.error(mobisErrorMessage(error, "Failed to post the vendor receipt"));
+    },
   });
+}
+
+/** HTTP status of a failed request. */
+export const errorStatus = (error: unknown) => (error as { response?: { status?: number } })?.response?.status;
+
+export function useMrnSettings(branchId: string) {
+  return useQuery({ queryKey: vendorReceiptKeys.settings(branchId), queryFn: () => getMrnSettingsRequest(branchId), enabled: !!branchId, staleTime: 300_000 });
+}
+
+export function useEditVendorReceipt(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: EditVendorReceiptPayload) => editVendorReceiptRequest(id, payload),
+    onSuccess: (receipt) => {
+      queryClient.setQueryData(vendorReceiptKeys.detail(receipt.id), receipt);
+      queryClient.invalidateQueries({ queryKey: vendorReceiptKeys.all });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      toast.success(`MRN ${receipt.mrnNumber} corrected`);
+    },
+    onError: (error) => toast.error(mobisErrorMessage(error, "Failed to correct the MRN")),
+  });
+}
+
+export function useCreateVendorReturn(mrnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateVendorReturnPayload) => createVendorReturnRequest(mrnId, payload),
+    onSuccess: (ret) => {
+      queryClient.invalidateQueries({ queryKey: vendorReceiptKeys.all });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      toast.success(`MRN return ${ret.returnNumber} posted: ${ret.totalQuantity} unit(s) out of stock`);
+    },
+    onError: (error) => toast.error(mobisErrorMessage(error, "Failed to post the MRN return")),
+  });
+}
+
+/** MRN returns at the branch picked in the branch switcher. */
+export function useVendorReturns(search = "") {
+  const branchId = useBranchStore((s) => s.activeBranch?.id);
+  return useQuery({
+    queryKey: vendorReceiptKeys.returns(search, branchId),
+    queryFn: () => getVendorReturnsRequest(search || undefined, branchId),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useVendorReturn(id: string) {
+  return useQuery({ queryKey: vendorReceiptKeys.returnDetail(id), queryFn: () => getVendorReturnRequest(id), enabled: !!id });
 }
