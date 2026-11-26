@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../../middleware/authMiddleware";
-import { requirePermission } from "../../middleware/authorize";
+import { requireAnyPermission, requirePermission } from "../../middleware/authorize";
 import { validateRequest } from "../../middleware/requestValidator";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { CampaignController } from "./campaign.controller";
@@ -9,15 +9,19 @@ import {
   addVehiclesSchema,
   addVinRangesSchema,
   bulkUpdateCampaignVehiclesSchema,
+  campaignDocumentFileSchema,
+  campaignDocumentParamsSchema,
   campaignIdSchema,
   campaignVehicleParamsSchema,
   createCampaignSchema,
   listCampaignVehiclesSchema,
   listCampaignsSchema,
+  openForVehicleSchema,
   printedContactsSchema,
   scheduleSchema,
   updateCampaignSchema,
   updateCampaignVehicleSchema,
+  uploadCampaignDocumentSchema,
   vinRangeParamsSchema,
 } from "./campaign.validation";
 
@@ -32,7 +36,7 @@ router.use(authMiddleware);
  * tags:
  *   - name: Campaigns
  *     description: |
- *       Recall (`RECALL`), free fix (`FREE_FIX`), service (`SERVICE_CAMPAIGN`) campaigns and FPC bulletins (`FPC`) targeted by VIN.
+ *       Recall (`RECALL`), field fix (`FREE_FIX`), service (`SERVICE_CAMPAIGN`) campaigns and FPC bulletins (`FPC`) targeted by VIN.
  *
  *       Campaign status: `DRAFT → ACTIVE → CLOSED` (a draft can also be closed). Affected vehicles are kept
  *       by VIN, so manufacturer lists may include vehicles that are not in the system yet; they link
@@ -102,8 +106,33 @@ router.use(authMiddleware);
  *       201: { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Campaign' } } } }
  *       409: { description: Code already used }
  */
-router.get("/summary", requirePermission(P.CAMPAIGN_READ), controller.summary);
-router.get("/", requirePermission(P.CAMPAIGN_READ), validateRequest(listCampaignsSchema), controller.list);
+// Every role can view campaigns, open their manuals and download the affected VIN list.
+const canView = requireAnyPermission(P.CAMPAIGN_READ, P.CAMPAIGN_MANUAL_READ);
+
+router.get("/summary", canView, controller.summary);
+router.get("/", canView, validateRequest(listCampaignsSchema), controller.list);
+
+/**
+ * @openapi
+ * /campaigns/open-for-vehicle:
+ *   get:
+ *     tags: [Campaigns]
+ *     summary: Open campaigns for a vehicle or VIN, with their manuals (campaign:read or campaign:manual:read)
+ *     description: |
+ *       Drives the affected-VIN pop-up when a vehicle is picked for a job card or opened.
+ *       Pass `vehicleId`, or `vin` for a vehicle not yet registered. Only active, in-date campaigns
+ *       where the vehicle's work is still outstanding are returned. No customer details.
+ *     parameters:
+ *       - { in: query, name: vehicleId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: vin, schema: { type: string, minLength: 11, maxLength: 17 } }
+ *     responses:
+ *       200:
+ *         description: Open campaigns
+ *         content:
+ *           application/json:
+ *             example: { status: success, statusCode: 200, data: { vin: KNAB2512AET123456, campaigns: [{ campaignId: "…", code: SC-215, title: Fuel pump replacement, type: RECALL, documents: [{ id: "…", title: Service procedure, fileName: SC-215 procedure.pdf }] }] } }
+ */
+router.get("/open-for-vehicle", canView, validateRequest(openForVehicleSchema), controller.openForVehicle);
 router.post("/", requirePermission(P.CAMPAIGN_CREATE), validateRequest(createCampaignSchema), controller.create);
 
 /**
@@ -169,7 +198,71 @@ router.post("/", requirePermission(P.CAMPAIGN_CREATE), validateRequest(createCam
  */
 router.post("/contacts/printed", requirePermission(P.CAMPAIGN_VEHICLE_UPDATE), validateRequest(printedContactsSchema), controller.recordPrintedContacts);
 
-router.get("/:id", requirePermission(P.CAMPAIGN_READ), validateRequest(campaignIdSchema), controller.get);
+router.get("/:id", canView, validateRequest(campaignIdSchema), controller.get);
+
+/**
+ * @openapi
+ * /campaigns/{id}/documents:
+ *   get:
+ *     tags: [Campaigns]
+ *     summary: List a campaign's manuals (campaign:read or campaign:manual:read)
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: "data.documents: id, title, fileName, contentType, sizeBytes, createdAt, uploadedBy" }
+ *   post:
+ *     tags: [Campaigns]
+ *     summary: Import a campaign manual (campaign:update)
+ *     description: |
+ *       JSON body with the file as base64. PDF, PNG or JPEG, checked by content, up to 10 MB and
+ *       20 manuals per campaign. The same file cannot be attached twice (409).
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { title: Service procedure, fileName: SC-215 procedure.pdf, data: "JVBERi0xLjcK…" }
+ *     responses:
+ *       201: { description: "data.document" }
+ *       400: { description: Wrong file type, too large or unreadable }
+ *       409: { description: The file is already attached }
+ * /campaigns/{id}/documents/{documentId}/file:
+ *   get:
+ *     tags: [Campaigns]
+ *     summary: Download or view a campaign manual (campaign:read or campaign:manual:read)
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: query, name: disposition, schema: { type: string, enum: [inline, attachment], default: attachment } }
+ *     responses:
+ *       200: { description: The file, with its stored content type }
+ * /campaigns/{id}/documents/{documentId}:
+ *   delete:
+ *     tags: [Campaigns]
+ *     summary: Remove a campaign manual (campaign:update)
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: documentId, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: Removed }
+ * /campaigns/{id}/vehicles/download:
+ *   get:
+ *     tags: [Campaigns]
+ *     summary: Download every affected VIN as CSV (campaign:read or campaign:manual:read)
+ *     description: |
+ *       UTF-8 CSV with a byte order mark: VIN, make, model, year, registration, branch, status,
+ *       completed on and job card. Customer name and phone are added only for roles with
+ *       campaign:vehicle:update, and only for their own branch when branch-scoped.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: CSV file, content: { text/csv: {} } }
+ */
+router.get("/:id/documents", canView, validateRequest(campaignIdSchema), controller.listDocuments);
+router.post("/:id/documents", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(uploadCampaignDocumentSchema), controller.uploadDocument);
+router.get("/:id/documents/:documentId/file", canView, validateRequest(campaignDocumentFileSchema), controller.downloadDocument);
+router.delete("/:id/documents/:documentId", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(campaignDocumentParamsSchema), controller.deleteDocument);
+router.get("/:id/vehicles/download", canView, validateRequest(campaignIdSchema), controller.downloadAffectedVins);
 router.put("/:id", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(updateCampaignSchema), controller.update);
 router.post("/:id/activate", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(campaignIdSchema), controller.activate);
 router.post("/:id/close", requirePermission(P.CAMPAIGN_UPDATE), validateRequest(campaignIdSchema), controller.close);

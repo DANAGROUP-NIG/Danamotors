@@ -58,7 +58,7 @@ export function CoverageBanner({ check, variant = "jobcard" }: { check: Warranty
 
 const CAMPAIGN_BANNER: Record<OpenCampaign["type"], { tone: BannerTone; label: string; icon: ReactNode; hint: string }> = {
   RECALL: { tone: "red", label: "Open recall", icon: <CircleAlert />, hint: "include this work in the job." },
-  FREE_FIX: { tone: "blue", label: "Free fix", icon: <Info />, hint: "no charge to customer." },
+  FREE_FIX: { tone: "blue", label: "Field fix", icon: <Info />, hint: "no charge to customer." },
   SERVICE_CAMPAIGN: { tone: "blue", label: "Service campaign", icon: <Info />, hint: "offer this service to the customer." },
   FPC: { tone: "amber", label: "FPC bulletin", icon: <CircleAlert />, hint: "check the vehicle under this bulletin and record on the job card whether it was done." },
 };

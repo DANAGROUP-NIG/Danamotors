@@ -16,6 +16,7 @@ import {
   openCaseSchema,
   searchPartsSchema,
   transitionCaseSchema,
+  recordReimbursementSchema,
   updateCaseLineSchema,
   updateCaseSchema,
   updateCodeSchema,
@@ -376,9 +377,13 @@ router.patch("/cases/:id", requirePermission(P.WARRANTY_UPDATE), validateRequest
  *     description: |
  *       Validated server-side with a row lock, so concurrent updates cannot double-apply (409 on conflict).
  *       - `SUBMIT` needs at least one line, a causal part, a defect code on every part line and a complaint.
- *       - `PARTIALLY_APPROVE` takes `lineApprovals` (percent per line); at least one below 100%.
- *       - `REJECT` needs `rejectReasonId`. `RETURN` needs `remarks`. `SETTLE` needs `settlementRef`.
- *       - `CLOSE` on an unsubmitted case withdraws it and needs `remarks`.
+ *       - `PARTIALLY_APPROVE` takes `lineApprovals`: per line, the `approvedAmount` shown on the Kia portal
+ *         (kept exactly, percent derived) or an `approvalPercent`. At least one line must be below its claimed amount.
+ *       - `REJECT` needs `rejectReasonId`. `RETURN` needs `remarks`.
+ *       - `SETTLE` records the agreed `settledAmount` (defaults to the approved amount). The reimbursement can be
+ *         pending: send `reimbursementReceived: true` with `settlementRef` only when the credit note or payment is in hand.
+ *       - `CLOSE` is allowed from `SETTLED` whether or not the reimbursement has been received.
+ *         On an unsubmitted case it withdraws the case and needs `remarks`.
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     requestBody:
@@ -386,7 +391,9 @@ router.patch("/cases/:id", requirePermission(P.WARRANTY_UPDATE), validateRequest
  *         application/json:
  *           examples:
  *             partial:
- *               value: { action: PARTIALLY_APPROVE, decisionAt: "2026-10-09", remarks: "Catalytic sensor approved at 60% — pre-existing wear.", lineApprovals: [{ lineId: "…", approvalPercent: 60 }] }
+ *               value: { action: PARTIALLY_APPROVE, decisionAt: "2026-10-09", remarks: "Catalytic sensor approved below claim, pre-existing wear.", lineApprovals: [{ lineId: "…", approvedAmount: 69480 }] }
+ *             settlePending:
+ *               value: { action: SETTLE, settledAmount: 186800, settledAt: "2026-10-20", reimbursementReceived: false }
  *             reject:
  *               value: { action: REJECT, rejectReasonId: "…", remarks: "Outside warranty period" }
  *             submit:
@@ -397,6 +404,28 @@ router.patch("/cases/:id", requirePermission(P.WARRANTY_UPDATE), validateRequest
  *       409: { description: The case was changed by someone else }
  */
 router.patch("/cases/:id/status", requirePermission(P.WARRANTY_CLAIM), validateRequest(transitionCaseSchema), controller.transition);
+
+/**
+ * @openapi
+ * /warranty/cases/{id}/reimbursement:
+ *   post:
+ *     tags: [Warranty]
+ *     summary: Record the manufacturer's reimbursement for a settled or closed case (warranty:claim)
+ *     description: |
+ *       For cases settled with the reimbursement pending. Needs the credit note or payment reference and the
+ *       amount received. The case status does not change; a history entry is added. Recorded once.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { settlementRef: CN-2026-0091, reimbursedAmount: 186800, reimbursedAt: "2026-11-02" }
+ *     responses:
+ *       200: { description: Updated case }
+ *       400: { description: Case not settled, already reimbursed, or a field is missing }
+ *       409: { description: The case was changed by someone else }
+ */
+router.post("/cases/:id/reimbursement", requirePermission(P.WARRANTY_CLAIM), validateRequest(recordReimbursementSchema), controller.recordReimbursement);
 
 /**
  * @openapi

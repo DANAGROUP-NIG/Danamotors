@@ -3,6 +3,9 @@ import {
   assertScopedResource,
   ownBranchScope,
 } from "../../middleware/authorize";
+import { PERMISSIONS, ROLES } from "../../shared/constants/roles";
+import { contentDisposition } from "./campaign-download.logic";
+import { CampaignDownloadService } from "./campaign-download.service";
 import { CampaignService } from "./campaign.service";
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
@@ -22,8 +25,12 @@ const ok = (res: Response, data: unknown, message?: string, statusCode = 200) =>
     .status(statusCode)
     .json({ status: "success", statusCode, ...(message && { message }), data });
 
+const hasPermission = (req: Request, permission: string) =>
+  req.user?.role === ROLES.SUPER_ADMIN || req.user?.permissions.includes(permission) === true;
+
 export class CampaignController {
   private service = new CampaignService();
+  private downloads = new CampaignDownloadService();
 
   summary = handle(async (req, res) =>
     ok(res, await this.service.summary(ownBranchScope(req.user))),
@@ -203,4 +210,51 @@ export class CampaignController {
       201,
     );
   });
+
+  // ── Manuals, affected VIN download, open-campaign alert ───────────────────
+
+  listDocuments = handle(async (req, res) =>
+    ok(res, { documents: await this.downloads.listDocuments(req.params.id) }),
+  );
+
+  downloadDocument = handle(async (req, res) => {
+    const doc = await this.downloads.getDocumentFile(req.params.id, req.params.documentId);
+    res.setHeader("Content-Type", doc.contentType);
+    res.setHeader("Content-Length", String(doc.sizeBytes));
+    res.setHeader("Content-Disposition", contentDisposition(doc.fileName, req.query.disposition === "inline"));
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.end(Buffer.from(doc.data));
+  });
+
+  uploadDocument = handle(async (req, res) =>
+    ok(
+      res,
+      { document: await this.downloads.uploadDocument(req.params.id, req.body, req.user!.userId) },
+      "Campaign manual uploaded",
+      201,
+    ),
+  );
+
+  deleteDocument = handle(async (req, res) => {
+    await this.downloads.deleteDocument(req.params.id, req.params.documentId);
+    ok(res, null, "Campaign manual removed");
+  });
+
+  /** Every affected VIN as CSV. Customer contacts are added for outreach roles only, within their branch. */
+  downloadAffectedVins = handle(async (req, res) => {
+    const file = await this.downloads.affectedVinsCsv(req.params.id, {
+      includeContacts: hasPermission(req, PERMISSIONS.CAMPAIGN_VEHICLE_UPDATE),
+      contactBranchId: ownBranchScope(req.user),
+    });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", contentDisposition(file.fileName, false));
+    res.setHeader("X-Total-Count", String(file.count));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(file.csv);
+  });
+
+  openForVehicle = handle(async (req, res) =>
+    ok(res, await this.downloads.openForVehicle(req.query as { vehicleId?: string; vin?: string })),
+  );
 }

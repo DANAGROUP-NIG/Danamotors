@@ -25,7 +25,8 @@ function buildCsvContent(rows: ExportableItem[], columns?: { key: string; label:
   return lines.join("\n");
 }
 
-function downloadFile(blob: Blob, filename: string) {
+/** Saves a blob (a server file or a generated export) under the given name. */
+export function downloadFile(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -41,7 +42,8 @@ export function downloadCsv(
   rows: ExportableItem[],
   columns?: { key: string; label: string }[],
 ) {
-  const content = buildCsvContent(rows, columns);
+  // The byte order mark makes Excel read the file as UTF-8, so the naira sign and accents survive.
+  const content = "﻿" + buildCsvContent(rows, columns);
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   downloadFile(blob, `${filename}.csv`);
   toast.success(`Downloaded ${filename}.csv`);

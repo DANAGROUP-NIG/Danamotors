@@ -71,7 +71,7 @@ Warranty cases live under **Warranty** in the sidebar (`/warranty`); the role is
 ```
 OPEN → IN_REVIEW → SUBMITTED → APPROVED | PARTIALLY_APPROVED | REJECTED | RETURNED
 RETURNED → IN_REVIEW          (manufacturer asked for corrections)
-APPROVED | PARTIALLY_APPROVED → SETTLED → CLOSED
+APPROVED | PARTIALLY_APPROVED → SETTLED → CLOSED   (reimbursement may still be pending)
 REJECTED → CLOSED
 OPEN | IN_REVIEW | RETURNED → CLOSED   (withdrawn; reason required)
 ```
@@ -79,8 +79,16 @@ OPEN | IN_REVIEW | RETURNED → CLOSED   (withdrawn; reason required)
 **Guards** (`planTransition`):
 
 - **Submit** needs at least one line, exactly one **causal** part, a defect code on every part line, and a complaint.
-- **Partial approval** needs an approval % per line, with at least one line below 100%.
-- **Reject** needs a reason code. **Return** needs remarks. **Settle** needs a settlement reference.
+- **Partial approval** takes, per line, the **approved amount exactly as shown on the Kia portal** (or an approval %).
+  The amount is stored as entered and the % is derived for display. At least one line must be below its claimed
+  amount, something must be approved, and no line may exceed its claimed amount
+  (`TODO(confirm)`: whether Kia ever approves more than claimed).
+- **Reject** needs a reason code. **Return** needs remarks.
+- **Settle** records the amount agreed with Kia (defaults to the approved total). The **reimbursement** (credit note
+  or payment) is tracked separately as `PENDING` or `RECEIVED`. A case can be settled and **closed while the
+  reimbursement is pending**; **Record reimbursement** (`POST /warranty/cases/:id/reimbursement`) adds the reference,
+  amount and date later, on a settled or closed case, once. The status does not change; a history entry is added.
+  The case list has a Reimbursement filter and an "Awaiting reimbursement" KPI.
 
 **Recording.** Every transition takes a row lock and a conditional update, so two officers cannot double-apply it (the
 second gets `409`). It is recorded in `WarrantyCaseStatusHistory` with the user, time and remarks. The job card's
@@ -95,6 +103,11 @@ adviser and the branch workshop manager are notified.
 Each line has defect and position codes, batch no., quantity or hours, rate, approval %, and claimed and approved
 amounts (computed on the server). Only `SparePart.warrantyApplicable` parts can be claimed, and the default rate is
 `warrantyRate`. **Import job card lines** copies the job card's `WARRANTY` lines onto the claim.
+
+**Issued parts vs approved claim.** The case page lists every warranty part issued from our store on the job card (net
+of returns, at the job card rate) beside the claimed amount and the amount Kia approved, with the variance per part
+and in total. Results: Recovered, Shortfall, Awaiting decision, Not on claim (issued but not claimed) and Not issued on
+job card (claimed but not linked to an issue). Logic: `reconcileIssuedParts` in `warranty.logic.ts`.
 
 Lookups (complaint, defect, position and reject reason) are maintained under **Warranty → Settings**. They are seeded
 from the legacy `warrcomp`, `warrdef`, `warrpos` and `warrrej` tables.
@@ -135,7 +148,8 @@ card's **Who pays** card shows totals by payer; the bill adds the service charge
 
 **Campaigns** in the sidebar (`/campaigns`).
 
-- **Types:** `RECALL`, `FREE_FIX`, `SERVICE_CAMPAIGN` and `FPC` (manufacturer field product check bulletin, #98).
+- **Types:** `RECALL`, `FREE_FIX` (shown to users as **Field fix**), `SERVICE_CAMPAIGN` and `FPC` (manufacturer
+  field product check bulletin, #98). The stored enum value keeps its original name so no data changes.
   `FPC` behaves like `RECALL`; see [FPC bulletins](#fpc-bulletins).
 - **Status:** `DRAFT → ACTIVE → CLOSED`. Activation needs at least one vehicle or VIN range, and notifies service
   advisers and reception managers at the branches with affected vehicles. Activation also adds vehicles registered
@@ -163,6 +177,14 @@ card's **Who pays** card shows totals by payer; the bill adds the service charge
 - **Progress** is shown overall and by branch; the branch is the vehicle owner's branch.
 - **Contacts:** phone, SMS, WhatsApp, e-mail, visit and letter. Outcome `SENT` (a letter or call list went out) counts
   as called but does not change the status, because the customer was not reached.
+- **Manuals:** the warranty team imports campaign manuals (PDF, PNG or JPEG, checked by content, up to 10 MB and 20
+  per campaign) on the campaign page. They are stored in `CampaignDocument` and every role can download them.
+- **Affected VIN download:** **Download affected VINs** on the campaign page gives every role a UTF-8 CSV of all
+  affected VINs with model, registration, branch and status. Customer name and phone are added only for roles with
+  `campaign:vehicle:update`, and only for their own branch when branch-scoped.
+- **Affected-VIN pop-up:** picking a vehicle on the job card form, or opening a vehicle, pops up its open campaigns
+  (type, what to do, manuals to download). It uses `GET /campaigns/open-for-vehicle`, so it shows for every role,
+  including those without `warranty:read`.
 
 ### FPC bulletins
 
@@ -202,14 +224,16 @@ table, screen or API. **FPC bulletins** in the sidebar opens `/campaigns?type=FP
 | `warranty:update` | Edit cases and lines, set the warranty model or sale date on the warranty screen, charge goodwill | WarrantyOfficer, Admin |
 | `warranty:claim` | Open cases and move them through the workflow | WarrantyOfficer, Admin |
 | `warranty:settings` | Model policies, claim codes, extended warranty or goodwill overrides | WarrantyOfficer, Admin |
-| `campaign:read` | See campaigns | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager, Receptionist, ReceptionManager |
+| `campaign:read` | See campaigns and the affected vehicles with customer details | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager, Receptionist, ReceptionManager |
+| `campaign:manual:read` | See campaigns, download manuals and the affected VIN list, see the affected-VIN pop-up | Every role (`EVERY_ROLE_PERMISSIONS`) |
 | `campaign:create` / `campaign:update` | Create, edit, activate or close campaigns; add vehicles | WarrantyOfficer, Admin |
 | `campaign:vehicle:update` | Outreach: contacts, scheduling, status; "record as called" in the FPC vehicles report | WarrantyOfficer, Admin, Receptionist, ReceptionManager |
 | `jobcard:update` | Record whether a linked campaign's work was done on the job card | ServiceAdviser, WorkshopManager, Admin, … |
 | `jobcard:line:update` | Change who pays for a line | WarrantyOfficer, Admin, ServiceAdviser, WorkshopManager |
 
-SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migration
-`20260930090100_warranty_permissions` (existing databases).
+SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migrations
+`20260930090100_warranty_permissions` and `20261126130000_campaign_manual_read_permission` (existing databases; the
+latter grants `campaign:manual:read` to every role row, custom roles included).
 
 ## Migrations and seeds
 
@@ -223,6 +247,8 @@ SuperAdmin has everything. Grants are in `ROLE_PERMISSIONS` (seed) and in migrat
   portal shows the calculated coverage in their place. Drop them in a follow-up migration once no deployed build reads them.
 - `20261102100000_fpc_bulletins` adds the `FPC` type, the bulletin fields, `CampaignVinRange`, the attended columns on
   `JobCardCampaign`, `LETTER` / `SENT`, `ReportSetting` and the FPC report permissions. Additive and idempotent.
+- `20261126120000_warranty_reimbursement_campaign_documents` adds the reimbursement columns on `WarrantyCase` (cases
+  already settled with a reference are marked `RECEIVED`) and the `CampaignDocument` table. Additive and idempotent.
 - `npm run prisma:seed:demo` includes an FPC bulletin with vehicles in every FPC list (see `doc/fpc-testing-guide.md`).
 - `npm run prisma:seed:warranty` seeds Kia model policies, sample claim codes, a demo Kia Sportage under warranty, and
   a draft recall `RC-2026-014` that includes it. Activate it to see the banners.

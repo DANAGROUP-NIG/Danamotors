@@ -3,6 +3,7 @@ import type {
   CaseLinePayload,
   CaseListParams,
   CodeType,
+  ReimbursementPayload,
   TransitionPayload,
   UpdateVehicleWarrantyPayload,
   VehicleModel,
@@ -88,6 +89,10 @@ export async function updateWarrantyCaseRequest(
 
 export async function transitionWarrantyCaseRequest(id: string, body: TransitionPayload) {
   return (await apiPatch<{ case: WarrantyCase }>(`/warranty/cases/${id}/status`, body)).case;
+}
+
+export async function recordReimbursementRequest(id: string, body: ReimbursementPayload) {
+  return (await apiPost<{ case: WarrantyCase }>(`/warranty/cases/${id}/reimbursement`, body)).case;
 }
 
 export async function addCaseLineRequest(id: string, body: CaseLinePayload) {

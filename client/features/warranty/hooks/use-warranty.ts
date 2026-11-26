@@ -14,6 +14,7 @@ import {
   getWarrantySummaryRequest,
   importCaseLinesRequest,
   openWarrantyCaseRequest,
+  recordReimbursementRequest,
   searchWarrantyPartsRequest,
   transitionWarrantyCaseRequest,
   updateCaseLineRequest,
@@ -28,6 +29,7 @@ import type {
   CaseLinePayload,
   CaseListParams,
   CodeType,
+  ReimbursementPayload,
   TransitionPayload,
   UpdateVehicleWarrantyPayload,
   VehicleModelPayload,
@@ -117,6 +119,13 @@ export const useTransitionWarrantyCase = (id: string) =>
     (body: TransitionPayload) => transitionWarrantyCaseRequest(id, body),
     (c) => `Case is now ${CASE_STATUS_LABELS[c.status].toLowerCase()}`,
     "Could not update the case",
+  );
+
+export const useRecordReimbursement = (id: string) =>
+  useCaseMutation(
+    (body: ReimbursementPayload) => recordReimbursementRequest(id, body),
+    (c) => `Reimbursement recorded for case ${c.caseNumber}`,
+    "Could not record the reimbursement",
   );
 
 export const useAddCaseLine = (id: string) =>

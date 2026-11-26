@@ -50,6 +50,8 @@ app.use("/api/stock-takes", express.json({ limit: "10mb" }));
 app.use("/api/handheld", express.json({ limit: "2mb" }));
 // Mobis price list batches (2,000 rows each).
 app.use("/api/inventory/part-catalogue/import", express.json({ limit: "2mb" }));
+// Campaign manuals are sent as base64 JSON (10 MB file, about 13.4 MB encoded).
+app.use("/api/campaigns/:id/documents", express.json({ limit: "15mb" }));
 // Mobis price bulletins (a few thousand part numbers and list prices).
 app.use("/api/finance/mobis-pricing", express.json({ limit: "5mb" }));
 app.use(express.json());

@@ -19,7 +19,7 @@ import { CAMPAIGN_STATUS_LABELS } from "./campaigns-page";
 
 const TYPES: { value: CampaignType; title: string; text: string; icon: ReactNode }[] = [
   { value: "RECALL", title: "Recall", text: "Known defect — vehicles must be called back", icon: <Siren /> },
-  { value: "FREE_FIX", title: "Free fix", text: "Repair at no cost to the customer", icon: <Wrench /> },
+  { value: "FREE_FIX", title: "Field fix", text: "Repair at no cost to the customer", icon: <Wrench /> },
   { value: "SERVICE_CAMPAIGN", title: "Service campaign", text: "Free or discounted services", icon: <CalendarCheck /> },
   { value: "FPC", title: "FPC bulletin", text: "Manufacturer field product check on a VIN range", icon: <ClipboardCheck /> },
 ];

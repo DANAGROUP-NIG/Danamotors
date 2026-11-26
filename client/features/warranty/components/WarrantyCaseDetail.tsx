@@ -8,6 +8,7 @@ import {
   Clock,
   Download,
   FileCheck2,
+  HandCoins,
   Link2,
   MoreHorizontal,
   Pencil,
@@ -33,6 +34,9 @@ import {
   CASE_STATUS_TONES,
   COVERAGE_LABELS,
   COVERAGE_TONES,
+  NOT_AVAILABLE,
+  REIMBURSEMENT_LABELS,
+  REIMBURSEMENT_TONES,
   fmtDate,
   fmtDateTime,
   fmtKm,
@@ -40,8 +44,9 @@ import {
   personName,
 } from "../lib/warranty-format";
 import type { CaseLine, WarrantyCase } from "../types/warranty.types";
-import { CaseActionDialog, EditClaimDetailsDialog, type SimpleAction } from "./CaseDialogs";
+import { CaseActionDialog, EditClaimDetailsDialog, RecordReimbursementDialog, type SimpleAction } from "./CaseDialogs";
 import { CaseLineDialog } from "./CaseLineDialog";
+import { IssuedPartsCard } from "./IssuedPartsCard";
 import { RecordDecisionDialog } from "./RecordDecisionDialog";
 import { DetailField, PageState, Pill, SectionCard, Stepper, tdCls, thCls } from "./ui";
 
@@ -74,10 +79,10 @@ function LinesTable({
             {isPart && <th className={thCls}>Position</th>}
             {isPart && <th className={thCls}>Batch</th>}
             <th className={`${thCls} text-right`}>{isPart ? "Qty" : "Hours"}</th>
-            <th className={`${thCls} text-right`}>Rate (₦)</th>
+            <th className={`${thCls} text-right`}>Rate</th>
             <th className={`${thCls} text-right`}>Approval %</th>
-            <th className={`${thCls} text-right`}>Claimed (₦)</th>
-            <th className={`${thCls} text-right`}>Approved (₦)</th>
+            <th className={`${thCls} text-right`}>Claimed</th>
+            <th className={`${thCls} text-right`}>Approved</th>
             <th className={thCls} />
           </tr>
         </thead>
@@ -85,21 +90,21 @@ function LinesTable({
           {lines.map((l, i) => (
             <tr key={l.id} className={cn(l.approvedAmount != null && l.approvalPercent < 100 && "bg-amber-50/60")}>
               <td className={tdCls}>{i + 1}</td>
-              <td className={`${tdCls} font-mono text-xs`}>{(isPart ? l.partNumber : l.operationCode) ?? "—"}</td>
+              <td className={`${tdCls} font-mono text-xs`}>{(isPart ? l.partNumber : l.operationCode) ?? NOT_AVAILABLE}</td>
               <td className={tdCls}>
                 {l.description}
                 {isPart && l.sparePart && !l.sparePart.warrantyApplicable && (
                   <span className="block text-xs text-red-600">No longer warranty-applicable</span>
                 )}
               </td>
-              <td className={tdCls}>{l.defectCode ? `${l.defectCode.code} · ${l.defectCode.description}` : <span className="text-slate-300">—</span>}</td>
-              {isPart && <td className={tdCls}>{l.positionCode ? `${l.positionCode.code} · ${l.positionCode.description}` : <span className="text-slate-300">—</span>}</td>}
-              {isPart && <td className={tdCls}>{l.batchNo ?? "—"}</td>}
-              <td className={`${tdCls} text-right`}>{isPart ? l.quantity : l.quantity.toFixed(1)}</td>
-              <td className={`${tdCls} text-right`}>{fmtNaira(l.rate)}</td>
-              <td className={`${tdCls} text-right`}>{l.approvalPercent}%</td>
-              <td className={`${tdCls} text-right`}>{fmtNaira(l.claimedAmount)}</td>
-              <td className={`${tdCls} text-right font-medium`}>{l.approvedAmount == null ? "—" : fmtNaira(l.approvedAmount)}</td>
+              <td className={tdCls}>{l.defectCode ? `${l.defectCode.code} · ${l.defectCode.description}` : <span className="text-slate-500">{NOT_AVAILABLE}</span>}</td>
+              {isPart && <td className={tdCls}>{l.positionCode ? `${l.positionCode.code} · ${l.positionCode.description}` : <span className="text-slate-500">{NOT_AVAILABLE}</span>}</td>}
+              {isPart && <td className={tdCls}>{l.batchNo ?? <span className="text-slate-500">{NOT_AVAILABLE}</span>}</td>}
+              <td className={`${tdCls} text-right tabular-nums`}>{isPart ? l.quantity : l.quantity.toFixed(1)}</td>
+              <td className={`${tdCls} text-right tabular-nums`}>{fmtNaira(l.rate)}</td>
+              <td className={`${tdCls} text-right tabular-nums`}>{l.approvedAmount == null ? <span className="text-slate-500">{NOT_AVAILABLE}</span> : `${l.approvalPercent}%`}</td>
+              <td className={`${tdCls} text-right tabular-nums`}>{fmtNaira(l.claimedAmount)}</td>
+              <td className={`${tdCls} text-right tabular-nums font-medium`}>{fmtNaira(l.approvedAmount)}</td>
               <td className={`${tdCls} text-right`}>
                 {editable && (
                   <ActionMenu
@@ -127,7 +132,7 @@ function LinesTable({
   );
 }
 
-/** Screen 06 — the claim workbench for one warranty case. */
+/** Screen 06: the claim workbench for one warranty case. */
 export function WarrantyCaseDetail({ id }: { id: string }) {
   const { data: c, isLoading, isError } = useWarrantyCase(id);
   const { hasPermission, isSuperAdmin } = useAuth();
@@ -141,6 +146,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
   const [action, setAction] = useState<SimpleAction | null>(null);
   const [deciding, setDeciding] = useState<"APPROVE" | "PARTIALLY_APPROVE" | "REJECT" | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
+  const [reimbursing, setReimbursing] = useState(false);
 
   if (isLoading) return <PageState loading />;
   if (isError || !c) {
@@ -217,6 +223,11 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
               Record settlement
             </Button>
           )}
+          {canClaim && c.canRecordReimbursement && (
+            <Button size="sm" variant={c.status === "CLOSED" ? "default" : "outline"} className="gap-1.5" onClick={() => setReimbursing(true)}>
+              <HandCoins className="size-4" /> Record reimbursement
+            </Button>
+          )}
         </div>
       </div>
 
@@ -227,10 +238,11 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{c.caseNumber}</h1>
             <Pill status={CASE_STATUS_LABELS[c.status]} tone={CASE_STATUS_TONES[c.status]} />
+            {c.reimbursementStatus && <Pill status={REIMBURSEMENT_LABELS[c.reimbursementStatus]} tone={REIMBURSEMENT_TONES[c.reimbursementStatus]} />}
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {c.openedAutomatically ? "Opened automatically from " : "Opened from "}
-            {c.jobCard?.jobNumber ?? "—"} · {c.branch.name}
+            {c.jobCard?.jobNumber ?? "no job card"} · {c.branch.name}
             {c.assignedOfficer && ` · Officer: ${personName(c.assignedOfficer)}`}
           </p>
 
@@ -243,7 +255,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
               label="Kia claim no."
               value={
                 <span className="inline-flex items-center gap-2 font-mono">
-                  {c.manufacturerClaimNo ?? "—"}
+                  {c.manufacturerClaimNo ?? NOT_AVAILABLE}
                   {canUpdate && c.status !== "CLOSED" && (
                     <button type="button" aria-label="Edit claim details" onClick={() => setEditingDetails(true)} className="text-slate-400 hover:text-slate-700 print:hidden">
                       <Pencil className="size-3.5" />
@@ -261,7 +273,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
                     {c.jobCard.jobNumber}
                   </Link>
                 ) : (
-                  "—"
+                  NOT_AVAILABLE
                 )
               }
             />
@@ -277,7 +289,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
                     Add complaint code
                   </button>
                 ) : (
-                  "—"
+                  NOT_AVAILABLE
                 )
               }
             />
@@ -363,6 +375,8 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
           />
         </SectionCard>
 
+        <IssuedPartsCard reconciliation={c.issuedParts} hasJobCard={Boolean(c.jobCard)} />
+
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <SectionCard
             icon={<Wrench />}
@@ -389,15 +403,39 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
                 <dt className="text-slate-500">Approved total</dt>
                 <dd className="font-semibold">{fmtNaira(c.approvedAmount)}</dd>
               </div>
-              {c.settledAmount != null && (
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Issued parts</dt>
+                <dd className="font-semibold tabular-nums">{fmtNaira(c.issuedParts.totals.issuedAmount)}</dd>
+              </div>
+              {c.settledAt && (
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Settled</dt>
-                  <dd className="font-semibold">{fmtNaira(c.settledAmount)}</dd>
+                  <dd className="font-semibold tabular-nums">{fmtNaira(c.settledAmount)}</dd>
                 </div>
               )}
-              <div className="flex justify-between">
-                <dt className="text-slate-500">Settlement ref.</dt>
-                <dd>{c.settlementRef ?? "—"}</dd>
+              {c.reimbursementStatus && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Reimbursement</dt>
+                  <dd>
+                    <Pill status={c.reimbursementStatus === "RECEIVED" ? "Received" : "Pending"} tone={REIMBURSEMENT_TONES[c.reimbursementStatus]} />
+                  </dd>
+                </div>
+              )}
+              {c.reimbursementStatus === "RECEIVED" && (
+                <>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Amount received</dt>
+                    <dd className="font-semibold tabular-nums">{fmtNaira(c.reimbursedAmount)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Received on</dt>
+                    <dd>{fmtDate(c.reimbursedAt)}</dd>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Credit note or payment ref.</dt>
+                <dd className="text-right">{c.settlementRef ?? <span className="text-slate-500">{NOT_AVAILABLE}</span>}</dd>
               </div>
             </dl>
           </div>
@@ -425,6 +463,7 @@ export function WarrantyCaseDetail({ id }: { id: string }) {
       {action && <CaseActionDialog warrantyCase={c} action={action} onClose={() => setAction(null)} />}
       {deciding && <RecordDecisionDialog warrantyCase={c} initial={deciding} onClose={() => setDeciding(null)} />}
       {editingDetails && <EditClaimDetailsDialog warrantyCase={c} onClose={() => setEditingDetails(false)} />}
+      {reimbursing && <RecordReimbursementDialog warrantyCase={c} onClose={() => setReimbursing(false)} />}
     </div>
   );
 }

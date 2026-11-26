@@ -23,7 +23,7 @@ const VISIT_SHOWS = ["VISITED_NOT_ATTENDED", "ATTENDED", "ATTENDED_NOT_CALLED"];
 const CAMPAIGN_TYPE_CHOICES = [
   { value: "FPC", label: "FPC bulletins" },
   { value: "RECALL", label: "Recalls" },
-  { value: "FREE_FIX", label: "Free fixes" },
+  { value: "FREE_FIX", label: "Field fixes" },
   { value: "SERVICE_CAMPAIGN", label: "Service campaigns" },
   { value: "ALL", label: "All campaign types" },
 ];

@@ -66,6 +66,8 @@ export const CAMPAIGN_PERMISSIONS = {
   CREATE: "campaign:create",
   UPDATE: "campaign:update",
   VEHICLE_UPDATE: "campaign:vehicle:update",
+  /** Every role: view campaigns, open manuals, download the affected VIN list. */
+  MANUAL_READ: "campaign:manual:read",
 } as const;
 
 export const BRANCH_ALL = "branch:all";

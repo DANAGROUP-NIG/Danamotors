@@ -14,6 +14,7 @@ import {
   Download,
   FileText,
   Hourglass,
+  Loader2,
   Phone,
   Printer,
   ShieldCheck,
@@ -31,8 +32,17 @@ import { useDataTableSelection } from "@/hooks/use-data-table-selection";
 import { downloadCsv } from "@/lib/table-actions";
 import { cn } from "@/lib/utils";
 import { FilterPills, PageState, Pill } from "@/features/warranty/components/ui";
-import { CAMPAIGN_TYPE_LABELS, CAMPAIGN_TYPE_TONES, CAMPAIGN_VEHICLE_LABELS, CAMPAIGN_VEHICLE_TONES, daysAgo, fmtDate } from "@/features/warranty/lib/warranty-format";
-import { useBulkUpdateCampaignVehicles, useCampaign, useCampaignStatus, useCampaignVehicles } from "../hooks/use-campaigns";
+import {
+  CAMPAIGN_TYPE_LABELS,
+  CAMPAIGN_TYPE_TONES,
+  CAMPAIGN_VEHICLE_LABELS,
+  CAMPAIGN_VEHICLE_TONES,
+  NOT_AVAILABLE,
+  daysAgo,
+  fmtDate,
+} from "@/features/warranty/lib/warranty-format";
+import { useBulkUpdateCampaignVehicles, useCampaign, useCampaignStatus, useCampaignVehicles, useDownloadAffectedVins } from "../hooks/use-campaigns";
+import { CampaignDocumentsCard } from "./CampaignDocumentsCard";
 import type { CampaignVehicleRow, CampaignVehicleStatus, Progress } from "../types/campaign.types";
 import { AddVehiclesDialog } from "./AddVehiclesDialog";
 import { VinRangesCard } from "./VinRangesCard";
@@ -88,7 +98,7 @@ function BigProgress({ p }: { p: Progress }) {
   );
 }
 
-/** Screen 10 — campaign progress and the affected-vehicle outreach list. */
+/** Screen 10: campaign progress, manuals and the affected-vehicle outreach list. */
 export function CampaignDetail({ id }: { id: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -98,6 +108,9 @@ export function CampaignDetail({ id }: { id: string }) {
   const can = (p: string) => isSuperAdmin || hasPermission(p);
   const canUpdate = can(CAMPAIGN_PERMISSIONS.UPDATE);
   const canOutreach = can(CAMPAIGN_PERMISSIONS.VEHICLE_UPDATE);
+  // Roles with only campaign:manual:read see manuals and the VIN download, not customer details.
+  const canSeeVehicles = can(CAMPAIGN_PERMISSIONS.READ);
+  const downloadVins = useDownloadAffectedVins();
   const statusMutation = useCampaignStatus(id);
   const bulk = useBulkUpdateCampaignVehicles(id);
 
@@ -126,13 +139,17 @@ export function CampaignDetail({ id }: { id: string }) {
     router.replace(pathname);
   }, [rangesRequested, campaign, router, pathname]);
 
-  const vehicles = useCampaignVehicles(id, {
-    status: status || undefined,
-    branchId: branchId || undefined,
-    search: committed || undefined,
-    page,
-    limit: PAGE_SIZE,
-  });
+  const vehicles = useCampaignVehicles(
+    id,
+    {
+      status: status || undefined,
+      branchId: branchId || undefined,
+      search: committed || undefined,
+      page,
+      limit: PAGE_SIZE,
+    },
+    canSeeVehicles,
+  );
   const items = useMemo(() => vehicles.data?.items ?? [], [vehicles.data]);
   const selection = useDataTableSelection<CampaignVehicleRow>({ data: items, rowKey: (v) => v.id });
 
@@ -157,7 +174,7 @@ export function CampaignDetail({ id }: { id: string }) {
 
   const columns: Column<CampaignVehicleRow>[] = [
     { header: "VIN", render: (v) => <span className={cn("font-mono text-xs", v.vehicle ? "text-blue-700" : "text-slate-500")}>{v.vehicle ? <Link href={`/vehicles/${v.vehicle.id}`} className="hover:underline">{v.vin}</Link> : v.vin}</span> },
-    { header: "Model", render: (v) => v.vehicle?.model ?? "—" },
+    { header: "Model", render: (v) => v.vehicle?.model ?? NOT_AVAILABLE },
     {
       header: "Customer",
       render: (v) =>
@@ -172,7 +189,7 @@ export function CampaignDetail({ id }: { id: string }) {
           <span className="italic text-slate-400">Not in system</span>
         ),
     },
-    { header: "Branch", render: (v) => v.vehicle?.customer.branch.name ?? "—" },
+    { header: "Branch", render: (v) => v.vehicle?.customer.branch.name ?? NOT_AVAILABLE },
     {
       header: "Last contact",
       render: (v) =>
@@ -184,7 +201,7 @@ export function CampaignDetail({ id }: { id: string }) {
             <p className="text-slate-400">{fmtDate(v.lastContactAt)}</p>
           </div>
         ) : (
-          "—"
+          NOT_AVAILABLE
         ),
     },
     { header: "Attempts", className: "text-center", headerClassName: "text-center", render: (v) => v.contactAttempts },
@@ -197,7 +214,7 @@ export function CampaignDetail({ id }: { id: string }) {
             {v.completedJobCard.jobNumber}
           </Link>
         ) : (
-          "—"
+          NOT_AVAILABLE
         ),
     },
     {
@@ -297,7 +314,7 @@ export function CampaignDetail({ id }: { id: string }) {
           )}
           <span className="inline-flex items-center gap-2">
             <CalendarDays className="size-4" /> {isFpc ? "Effective " : ""}
-            {fmtDate(campaign.startDate)} – {campaign.endDate ? fmtDate(campaign.endDate) : "open"}
+            {fmtDate(campaign.startDate)} to {campaign.endDate ? fmtDate(campaign.endDate) : "no end date"}
           </span>
           <span className="inline-flex flex-wrap items-center gap-2">
             <Car className="size-4" />
@@ -306,7 +323,7 @@ export function CampaignDetail({ id }: { id: string }) {
               : campaign.models.map((m) => (
                   <span key={m.vehicleModelId} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-0.5">
                     {m.vehicleModel.name}
-                    {(m.yearFrom || m.yearTo) && ` (${m.yearFrom ?? "…"}–${m.yearTo ?? "…"})`}
+                    {(m.yearFrom || m.yearTo) && ` (${m.yearFrom ?? "any year"} to ${m.yearTo ?? "any year"})`}
                   </span>
                 ))}
           </span>
@@ -333,6 +350,8 @@ export function CampaignDetail({ id }: { id: string }) {
           )}
         </p>
       </div>
+
+      <CampaignDocumentsCard campaign={campaign} canEdit={canUpdate} />
 
       <div id="vin-ranges" className="scroll-mt-6">
         {(isFpc || hasRanges || canUpdate) && <VinRangesCard campaign={campaign} canEdit={canUpdate} />}
@@ -405,10 +424,40 @@ export function CampaignDetail({ id }: { id: string }) {
       </section>
 
       {/* ── Affected vehicles ── */}
+      {!canSeeVehicles ? (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-5">
+          <div>
+            <h2 className="font-semibold text-slate-800">Affected vehicles</h2>
+            <p className="text-sm text-slate-500">
+              {p.affected.toLocaleString("en-NG")} VINs on the affected list. Customer details are handled by the CCU and warranty teams.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={downloadVins.isPending || p.affected === 0}
+            onClick={() => downloadVins.mutate({ id: campaign.id, code: campaign.code })}
+          >
+            {downloadVins.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
+            {downloadVins.isPending ? "Downloading" : "Download affected VINs"}
+          </Button>
+        </section>
+      ) : (
       <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-slate-800">Affected vehicles</h2>
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-10 gap-1.5"
+              disabled={downloadVins.isPending || p.affected === 0}
+              onClick={() => downloadVins.mutate({ id: campaign.id, code: campaign.code })}
+            >
+              {downloadVins.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
+              {downloadVins.isPending ? "Downloading" : "Download affected VINs"}
+            </Button>
             {branchRows.length > 0 && (
               <select className={cn(inputCls, "w-44")} value={branchId} onChange={(e) => { setBranchId(e.target.value); setPage(1); }}>
                 <option value="">All branches</option>
@@ -507,6 +556,7 @@ export function CampaignDetail({ id }: { id: string }) {
           />
         </DataTable>
       </section>
+      )}
 
       {adding && <AddVehiclesDialog campaign={campaign} onClose={() => setAdding(false)} />}
       {outreach && <OutreachDialog campaignId={id} vehicleId={outreach.vehicleId} initialSection={outreach.section} onClose={() => setOutreach(null)} />}

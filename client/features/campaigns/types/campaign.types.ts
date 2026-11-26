@@ -1,4 +1,4 @@
-import type { CampaignType, CampaignVehicleStatus, Person } from "@/features/warranty/types/warranty.types";
+import type { CampaignType, CampaignVehicleStatus, OpenCampaign, Person } from "@/features/warranty/types/warranty.types";
 
 export type { CampaignType, CampaignVehicleStatus };
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "CLOSED";
@@ -61,7 +61,26 @@ export type Campaign = {
   byBranch?: (Progress & { branchId: string | null; branchName: string })[];
   unmatchedVins?: number;
   createdBy?: Person | null;
+  documents?: CampaignDocument[];
 };
+
+/** A campaign manual or bulletin (PDF or image). */
+export type CampaignDocument = {
+  id: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+  uploadedBy: Person | null;
+};
+
+export type OpenCampaignWithManuals = OpenCampaign & {
+  documents: Pick<CampaignDocument, "id" | "title" | "fileName" | "contentType" | "sizeBytes">[];
+};
+
+/** Open campaigns for one vehicle, for the affected-VIN pop-up. */
+export type OpenCampaignAlert = { vin: string; campaigns: OpenCampaignWithManuals[] };
 
 export type CampaignList = { items: Campaign[]; total: number; page: number; limit: number };
 export type CampaignSummary = Progress & { activeCampaigns: number };

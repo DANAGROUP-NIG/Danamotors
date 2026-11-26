@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
+import { CampaignAlertModal, useCampaignAlert } from "@/features/campaigns/components/CampaignAlertDialog";
 import { useUpdateAppointment } from "@/features/appointments/hooks/use-update-appointment";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -18,8 +19,10 @@ import type { WarrantyCheck } from "../types/warranty.types";
 import { WarrantyCheckPanel, ackRequiredCheck } from "./WarrantyCheckPanel";
 
 /**
- * Screen 03 — check a vehicle in: record the odometer, show warranty status and open
- * campaigns, and require the customer to be informed before confirming.
+ * Screen 03: check a vehicle in. Record the odometer, show warranty status and open
+ * campaigns, and require the customer to be informed before confirming. A vehicle on a
+ * campaign's affected list first gets the campaign pop-up; the check-in form opens after it
+ * (shown one after the other, never stacked, so Escape cannot close both).
  */
 export function CheckInDialog({ appointment, onClose }: { appointment: Appointment; onClose: () => void }) {
   const { user, isSuperAdmin, hasPermission } = useAuth();
@@ -28,6 +31,8 @@ export function CheckInDialog({ appointment, onClose }: { appointment: Appointme
   const [mileage, setMileage] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [serverCheck, setServerCheck] = useState<WarrantyCheck | null>(null);
+  // Every role sees the pop-up, including those without warranty:read.
+  const campaignAlert = useCampaignAlert(appointment.vehicleId);
 
   const parsed = /^\d+$/.test(mileage.replace(/,/g, "")) ? Number(mileage.replace(/,/g, "")) : undefined;
   const debounced = useDebouncedValue(parsed, 450);
@@ -69,6 +74,20 @@ export function CheckInDialog({ appointment, onClose }: { appointment: Appointme
     );
   }
 
+  if (campaignAlert.open) {
+    return (
+      <CampaignAlertModal
+        vin={campaignAlert.vin}
+        campaigns={campaignAlert.campaigns}
+        context="checkin"
+        onContinue={campaignAlert.dismiss}
+        continueLabel="Continue to check-in"
+        onCancel={onClose}
+        cancelLabel="Cancel check-in"
+      />
+    );
+  }
+
   return (
     <ModalFame isOpen onClose={onClose} title="Check in vehicle">
       <div className="grid gap-5">
@@ -103,7 +122,7 @@ export function CheckInDialog({ appointment, onClose }: { appointment: Appointme
           />
           <span className={cn("text-xs", tooLow ? "text-red-600" : "text-slate-500")}>
             {lastRecorded != null ? `Last recorded ${fmtKm(lastRecorded)}` : "No previous reading recorded"}
-            {tooLow && " — the new reading cannot be lower. Use the job card if the odometer was replaced."}
+            {tooLow && ". The new reading cannot be lower. Use the job card if the odometer was replaced."}
           </span>
         </Field>
 

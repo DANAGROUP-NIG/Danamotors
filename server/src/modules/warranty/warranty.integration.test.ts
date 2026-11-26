@@ -324,12 +324,20 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
     expect(approved).toMatchObject({ status: "APPROVED", approvedAmount: 71_000, manufacturerClaimNo: "KNG-WC-558213" });
     await expect(cases.addLine(caseId, { kind: "LABOUR", description: "x", quantity: 1, rate: 1 })).rejects.toThrow(/cannot be changed/);
 
-    await expect(cases.transition(caseId, "SETTLE", {}, officer.id)).rejects.toThrow(/settlement reference/);
-    await cases.transition(caseId, "SETTLE", { settlementRef: "CN-2026-0091" }, officer.id);
+    // Settled with the reimbursement still pending, then closed before it arrives.
+    const pending = await cases.transition(caseId, "SETTLE", {}, officer.id);
+    expect(pending).toMatchObject({ status: "SETTLED", settledAmount: 71_000, reimbursementStatus: "PENDING", settlementRef: null });
     const settled = await cases.transition(caseId, "CLOSE", {}, officer.id);
     expect(settled.status).toBe("CLOSED");
+    expect(settled.canRecordReimbursement).toBe(true);
     expect(settled.statusHistory.map((h) => h.toStatus)).toEqual(["CLOSED", "SETTLED", "APPROVED", "SUBMITTED", "IN_REVIEW", "OPEN"]);
     expect(settled.statusHistory.every((h) => h.actorId === officer.id || h.toStatus === "OPEN")).toBe(true);
+
+    await expect(cases.recordReimbursement(caseId, { reimbursedAmount: 71_000 }, officer.id)).rejects.toThrow(/credit note or payment reference/);
+    const reimbursed = await cases.recordReimbursement(caseId, { settlementRef: "CN-2026-0091", reimbursedAmount: 71_000 }, officer.id);
+    expect(reimbursed).toMatchObject({ status: "CLOSED", reimbursementStatus: "RECEIVED", settlementRef: "CN-2026-0091", reimbursedAmount: 71_000 });
+    expect(reimbursed.canRecordReimbursement).toBe(false);
+    await expect(cases.recordReimbursement(caseId, { settlementRef: "CN-2", reimbursedAmount: 1 }, officer.id)).rejects.toThrow(/already recorded/);
 
     const statusNotes = await prisma.notification.findMany({ where: { userId: adviser.id, type: "WARRANTY_CASE_STATUS" } });
     expect(statusNotes.length).toBeGreaterThanOrEqual(5);

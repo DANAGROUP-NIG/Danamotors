@@ -190,6 +190,8 @@ function deriveAction(method: string, originalUrl: string): string {
  * replaced by `[REDACTED]`.  Returns `undefined` when the body is
  * empty or not an object.
  */
+const MAX_AUDIT_VALUE_LENGTH = 10_000;
+
 function sanitizeDetails(body: any): string | undefined {
   if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
     return undefined;
@@ -204,6 +206,12 @@ function sanitizeDetails(body: any): string | undefined {
   for (const field of SENSITIVE_FIELDS) {
     if (field in sanitized) {
       sanitized[field] = '[REDACTED]';
+    }
+  }
+  // Uploaded files (base64) and other very long values are not copied into the audit log.
+  for (const [field, value] of Object.entries(sanitized)) {
+    if (typeof value === 'string' && value.length > MAX_AUDIT_VALUE_LENGTH) {
+      sanitized[field] = `[Omitted: ${value.length} characters]`;
     }
   }
 

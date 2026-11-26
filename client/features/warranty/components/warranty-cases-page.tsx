@@ -24,10 +24,11 @@ import {
   CASE_STATUS_TONES,
   daysAgo,
   fmtDate,
+  NOT_AVAILABLE,
   fmtNaira,
   fmtNairaShort,
 } from "../lib/warranty-format";
-import type { CaseListParams, CaseStatus, WarrantyCaseListItem } from "../types/warranty.types";
+import type { CaseListParams, CaseStatus, ReimbursementStatus, WarrantyCaseListItem } from "../types/warranty.types";
 import { OpenCaseDialog } from "./OpenCaseDialog";
 import { FilterPills, KpiCard, Pill } from "./ui";
 
@@ -80,6 +81,7 @@ export function WarrantyCasesPage() {
   const [basedOn, setBasedOn] = useState<"CASE_DATE" | "BILL_DATE">("CASE_DATE");
   const [claimNo, setClaimNo] = useState<"" | "GENERATED" | "NOT_GENERATED">("");
   const [billing, setBilling] = useState<"" | "BILLED" | "UNBILLED">("");
+  const [reimbursement, setReimbursement] = useState<"" | ReimbursementStatus>("");
   const [branchId, setBranchId] = useState("");
   const [search, setSearch] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
@@ -93,6 +95,7 @@ export function WarrantyCasesPage() {
     basedOn: from || to ? basedOn : undefined,
     claimNo: claimNo || undefined,
     billing: billing || undefined,
+    reimbursement: reimbursement || undefined,
     branchId: branchId || undefined,
     search: committedSearch || undefined,
     page,
@@ -131,23 +134,23 @@ export function WarrantyCasesPage() {
             {c.jobCard.jobNumber}
           </Link>
         ) : (
-          "—"
+          NOT_AVAILABLE
         ),
     },
-    { header: "Customer", render: (c) => (c.customer ? `${c.customer.firstName} ${c.customer.lastName}` : "—") },
+    { header: "Customer", render: (c) => (c.customer ? `${c.customer.firstName} ${c.customer.lastName}` : NOT_AVAILABLE) },
     {
       header: "Vehicle",
       render: (c) => (
         <div>
-          <p className="text-slate-800">{[c.vehicle.model, c.vehicle.trim].filter(Boolean).join(" ") || "—"}</p>
+          <p className="text-slate-800">{[c.vehicle.model, c.vehicle.trim].filter(Boolean).join(" ") || NOT_AVAILABLE}</p>
           <p className="font-mono text-xs text-slate-400">{c.vehicle.vin}</p>
         </div>
       ),
     },
-    { header: "Mileage", className: "text-right", headerClassName: "text-right", render: (c) => c.mileage?.toLocaleString("en-NG") ?? "—" },
-    { header: "Kia claim no.", render: (c) => <span className="font-mono text-xs">{c.manufacturerClaimNo ?? "—"}</span> },
+    { header: "Mileage", className: "text-right", headerClassName: "text-right", render: (c) => c.mileage?.toLocaleString("en-NG") ?? NOT_AVAILABLE },
+    { header: "Kia claim no.", render: (c) => <span className="font-mono text-xs">{c.manufacturerClaimNo ?? NOT_AVAILABLE}</span> },
     { header: "Claimed (₦)", className: "text-right", headerClassName: "text-right", render: (c) => fmtNaira(c.claimedAmount) },
-    { header: "Approved (₦)", className: "text-right", headerClassName: "text-right", render: (c) => (c.approvedAmount == null ? "—" : fmtNaira(c.approvedAmount)) },
+    { header: "Approved (₦)", className: "text-right", headerClassName: "text-right", render: (c) => fmtNaira(c.approvedAmount) },
     {
       header: "Status",
       render: (c) => (
@@ -225,17 +228,23 @@ export function WarrantyCasesPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard label="Open" value={s?.open ?? "—"} />
-        <KpiCard label="In review" value={s?.inReview ?? "—"} />
-        <KpiCard label="Submitted to Kia" value={s?.submitted ?? "—"} sub={s ? `${fmtNairaShort(s.submittedClaimedAmount)} claimed` : undefined} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <KpiCard label="Open" value={s?.open ?? NOT_AVAILABLE} />
+        <KpiCard label="In review" value={s?.inReview ?? NOT_AVAILABLE} />
+        <KpiCard label="Submitted to Kia" value={s?.submitted ?? NOT_AVAILABLE} sub={s ? `${fmtNairaShort(s.submittedClaimedAmount)} claimed` : undefined} />
         <KpiCard
           label="Approved (30 days)"
           dot="emerald"
-          value={s?.approvedLast30Days ?? "—"}
+          value={s?.approvedLast30Days ?? NOT_AVAILABLE}
           sub={s ? `${fmtNairaShort(s.approvedLast30DaysAmount)} approved` : undefined}
         />
-        <KpiCard label="Rejected / Returned" dot="red" value={s?.rejectedOrReturned ?? "—"} />
+        <KpiCard label="Rejected / Returned" dot="red" value={s?.rejectedOrReturned ?? NOT_AVAILABLE} />
+        <KpiCard
+          label="Awaiting reimbursement"
+          dot="amber"
+          value={s?.awaitingReimbursement ?? NOT_AVAILABLE}
+          sub={s ? `${fmtNairaShort(s.awaitingReimbursementAmount)} settled, not yet paid` : undefined}
+        />
       </div>
 
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -276,6 +285,14 @@ export function WarrantyCasesPage() {
               <option value="">All</option>
               <option value="BILLED">Billed</option>
               <option value="UNBILLED">Unbilled</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            Reimbursement:
+            <select className={selectCls} value={reimbursement} onChange={(e) => reset(setReimbursement)(e.target.value as typeof reimbursement)}>
+              <option value="">All</option>
+              <option value="PENDING">Pending</option>
+              <option value="RECEIVED">Received</option>
             </select>
           </label>
           {showBranchFilter && (
@@ -323,7 +340,7 @@ export function WarrantyCasesPage() {
           isFetching={isFetching}
           rowKey={(c) => c.id}
           emptyMessage={
-            status || committedSearch || from || to || claimNo || billing
+            status || committedSearch || from || to || claimNo || billing || reimbursement
               ? "No cases match these filters."
               : "No warranty cases yet. Cases open automatically when a job card is created for a vehicle under warranty."
           }
