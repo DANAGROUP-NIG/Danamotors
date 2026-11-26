@@ -48,7 +48,7 @@ Only `server/src/modules/service/job-stage.writer.ts` writes the stage columns. 
 | `GET /service/job-cards/:id/workspace` | `jobcard:read`, job branch | Step, owner and since when, current sub-step, the actions this user can take (each enabled or with plain-English reasons), up to 3 alerts, one line per finished step, read-only flag, cancellation details |
 | `POST /service/job-cards/:id/stage` | `jobcard:update`, job branch | `{ action, note?, requestId }`. Runs one action under the job lock |
 
-Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs Details, Walk-around and Customer consent complete, see "Check-in (phase 2)"), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (diagnosis onward, workshop roles; needs an assigned technician), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
+Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs Details, Walk-around and Customer consent complete, see "Check-in (phase 2)"), `SEND_TO_ENGINEER` (technician or supervisor; a finding for every request, see "Diagnosis (phase 3)"), `RETURN_TO_TECHNICIAN` (service engineer; note required), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (the service engineer confirms the diagnosis; offered by routing, after the findings are sent), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
 
 Actions that change the status run through `JobCardWorkflowService.updateInTx`, so the estimate approval and advance gates, QC checks, billing readiness, status history and status notifications all still apply. A blocked move returns 409 `STAGE_ACTION_BLOCKED` with `details.reasons`; the wrong role or another technician gets 403 `STAGE_ACTION_FORBIDDEN`; a missing job 404; invalid input 400 naming the field. Repeating a request ID returns the current workspace without acting again; reusing it for another action returns 409 `STAGE_REQUEST_REUSED`. PDI jobs keep their own screens and refuse stage actions.
 
@@ -76,7 +76,7 @@ Moves that change the status are announced by the existing status notification r
 |---|---|
 | Check-in | Replaced in phase 2: Details, Walk-around and Customer consent (see "Check-in (phase 2)") |
 | Estimate | Customer consent (only when missing or out of date), estimate, advance |
-| Diagnosis | Technician assignment, findings and work done, then opening approval, estimate, advance |
+| Diagnosis | Replaced in phase 3: allocation, technician findings and engineer review (see "Diagnosis (phase 3)") |
 | Warranty | Warranty at creation, who pays for each line |
 | Repair | Request part, Service transactions, issued parts and collection, recorded labour, technician |
 | Quality check | Record QC pass or failure, inspections, findings |
@@ -132,6 +132,50 @@ The walk-around saves itself about a second after each change and shows "Saved 1
 Every write takes the job row lock first, like the workflow. A check-in write on a job past check-in returns 409 `CHECK_IN_LOCKED`; the wrong role 403 `CHECK_IN_LOCKED`.
 
 **Data.** Migration `20261126054810_jobcard_check_in` adds `JobCheckIn` (one per job), `JobDamageMark` (x and y `Decimal(5,2)` with 0 to 100 checks), `JobPhoto` and the enums `FuelLevel`, `DamageType` and `JobPhotoCategory`; adds `JobOpeningSignature.signerPhone`; moves any free text in `JobCard.checklist` to `JobCheckIn.checklistNote` and drops `JobCard.checklist`. The internal picking list reads the checklist note instead. Customer requests are now created with ascending ids, so they keep the order they were entered in. The job card response includes the check-in record (without photos) and the damage marks, for the finished step summary and later phases.
+
+### Diagnosis (phase 3)
+
+After check-in the job is at **Diagnosis**. It has three parts, each owned by one person. The workspace sub-step is `ASSIGN_TECHNICIAN`, `FINDINGS` or `ENGINEER_REVIEW`, and only that part's owner works it; everyone else sees it read-only with the waiting banner.
+
+| Part | Owner | What they do | Hands over with |
+|---|---|---|---|
+| Allocation | Workshop supervisor (WorkshopManager, `TODO(confirm)`; also General workshop manager, service manager, admins) | Choose an active technician of the job's branch (with their team tag, jobs in hand and Available or Busy), a bay (each marked free or "occupied by job N") and an optional note | **Assign and send to (name)** |
+| Findings | The assigned technician (the supervisor may record them for a technician without a device) | One card per customer request: "What did you find?" (typed, or spoken where the browser has speech input), up to 6 photos, work needed (the vehicle model's labour operations; all operations when the model has none), parts needed with quantities, and **Possible warranty**. Plus findings the customer did not mention. No prices. Saves itself about a second after each change | **Send to service engineer** |
+| Engineer review | Service engineer (Engineer role, or an admin, `TODO(confirm)` whether a workshop manager may stand in) | Findings table grouped by request, an edit button per finding, and the routing card | **Confirm and send to warranty officer** or **Confirm and send to service advisor**, or **Return to technician** with a note |
+
+**Rules.**
+- Allocation needs a bay. The supervisor can change the technician or bay until the findings are sent (409 `ALLOCATION_LOCKED` afterwards); anyone else gets 403. The job's team follows the technician's employee team, so the reports that group by team keep working. A repeated request ID assigns once.
+- "Jobs in hand" counts the technician's jobs at Diagnosis, Warranty, Estimate, Repair or Quality check, from the same single grouped query that gives the open and closed totals. 3 or more is **Busy** (`TODO(confirm)`). There is no leave data, so On leave is not shown, and skills are a later addition (the team is shown instead).
+- A bay is occupied when another job of the branch at those steps has it.
+- **Send to service engineer** needs a written finding for every customer request, and words on (or removal of) every finding the customer did not mention. The disabled button names what is missing, for example "Write what you found for every customer request (1 of 2 still empty)."
+- While the engineer reviews, the job is held by the Engineer role (header "With: Service engineer") and the technician cannot change the findings (409 `DIAGNOSIS_LOCKED`).
+- **Return to technician** needs a note ("Write a note for the technician saying what to check again."). The technician gets an in-app notice "Job returned to you ... Note: ..." and an amber banner "Returned by (name), (date)." with the note until they send the findings again.
+- **Routing** is the pure function `diagnosisRoute` (`server/src/modules/service/job-diagnosis.logic.ts`): Warranty when coverage was active at opening, an open campaign is linked, a warranty case exists, or any finding is flagged Possible warranty; otherwise Estimate. On Estimate the warranty step is recorded as skipped with the reason "Not under warranty" (the stage event's note) and the stepper and summary say "Warranty skipped. Not under warranty."
+- Confirming records who confirmed and the route, writes `JOB_DIAGNOSIS_CONFIRMED`, and sets the job's engineer to the confirming Engineer (MIS reports read it).
+- The job's status stays OPEN through diagnosis, as before; the existing technician transition table is unchanged.
+
+**Autosave.** Each finding saves itself with its own version. The client chooses the finding's id, so a retried save never creates a second one. A failed save keeps everything on screen with "Not saved" and **Retry**; a save made against an older version shows "This finding was changed on another screen" with **Load the latest**. Pending changes are sent with a keep-alive request when the page is left. Before **Send to service engineer**, every finding on screen is saved first.
+
+**Data.** Migration `20261126125423_jobcard_diagnosis`:
+- adds `JobDiagnosis` (one per job: allocation note and who and when, submitted, returned with note, confirmed, route), `JobFinding` (job, request or none, cause and defect, possible warranty, version, author) and `JobFindingItem` (kind `LABOUR`, `PART` or `OIL`, the labour item or spare part, its description, `quantity Decimal(12,2)` above 0, order). Parts count as `OIL` when their tax category is oil (`categoryOf`), decided by the server;
+- adds `JobPhoto.findingId` and the `FINDING` photo category (bytes in the database, as at check-in);
+- moves each job's free-text `JobCard.observations` into a finding the customer did not mention, authored by the job's technician, engineer, advisor or creator, and drops the column; moves any `JobCard.assignedTo` text into the internal remarks ("Assigned to (old record): ...") and drops the column;
+- grants `jobcard:update` to the Engineer role (also in `ROLE_PERMISSIONS`), because the engineer acts through `POST /stage`.
+
+The old **Findings** box (free text) is gone. The quality check step shows a **Work done** box (work done, engineer and service charge). The repeat-job review shows the previous job's findings. The finished Diagnosis summary lists the technician, bay, findings, possible warranty count and who confirmed.
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/:id/diagnosis` | `jobcard:read`, job branch | Sub-step, technician, bay, allocation note, advisor instructions, requests, findings (items without prices, photo ids), return note, submitted, confirmed, routing facts and route, gate reasons, branch engineers, `editable`, `canAllocate` |
+| `GET /service/job-cards/:id/diagnosis/bays` | same | Active bays, free or occupied |
+| `GET /service/job-cards/:id/diagnosis/labour-options?q=` | same | Up to 20 labour operations of the vehicle model (or all), no prices |
+| `GET /service/job-cards/:id/diagnosis/part-options?q=` | same | Up to 20 active parts with PART or OIL, no prices or stock |
+| `PUT /service/job-cards/:id/diagnosis/findings/:findingId` | `jobcard:update`, owner of the current part | Save one finding (`expectedVersion` 0 creates it). 409 `FINDING_VERSION` on an older version. Audited `JOB_FINDING_SAVED` |
+| `DELETE /service/job-cards/:id/diagnosis/findings/:findingId` | same | Remove a finding the customer did not mention (409 `FINDING_REQUIRED` for a request's own). Audited |
+| `POST`, `DELETE /service/job-cards/:id/diagnosis/findings/:findingId/photos[/:photoId]` | same | Finding photos, at most 6, idempotent by request ID. Audited without the image |
+| `POST /workshop/assign/:id` | `assignment:create` | Now also takes `bayId` (required at Diagnosis), `note` and `requestId` |
+
+Stage actions added: `SEND_TO_ENGINEER` (technician or supervisor; the findings gate) and `RETURN_TO_TECHNICIAN` (engineer; note required). `SEND_TO_WARRANTY` and `SEND_TO_ADVISOR` are now the engineer's confirmation, offered only after the findings are sent.
 
 ### Vehicles with multiple job cards (issue 142)
 

@@ -195,6 +195,13 @@ export type JobCard = {
   } | null;
   /** x and y arrive as decimal strings (percentages of the diagram). */
   damageMarks?: { id: string; type: DamageType; x: number | string; y: number | string }[];
+  /** Diagnosis (phase 3): the technician's findings and the service engineer's confirmation. */
+  findings?: { id: string; complaintId: string | null; causeAndDefect: string; possibleWarranty: boolean }[];
+  diagnosis?: {
+    confirmedAt: string | null;
+    route: "WARRANTY" | "ESTIMATE" | null;
+    confirmedBy: { firstName: string; lastName: string } | null;
+  } | null;
   serviceAdvisor?: { firstName: string; lastName: string } | null;
   deliveryAdvisor?: { firstName: string; lastName: string } | null;
   estimatedParts?: number | null;
@@ -223,7 +230,6 @@ export type JobCard = {
   team?: { description: string } | null;
   serviceAdvisorId?: string | null;
   creditApprovedById?: string | null;
-  observations?: string | null;
   workDone?: string | null;
   previousJob?: {
     id: string;
@@ -268,7 +274,6 @@ export type JobCard = {
   appointmentId?: string;
   customerId: string;
   vehicleId: string;
-  assignedTo?: string;
   createdBy?: { id: string; firstName: string; lastName: string } | null;
   technician?: { id: string; firstName: string; lastName: string } | null;
   qualityInspector?: { id: string; firstName: string; lastName: string } | null;

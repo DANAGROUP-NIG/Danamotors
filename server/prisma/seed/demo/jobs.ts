@@ -12,6 +12,7 @@ import { WarrantyCaseService } from "../../../src/modules/warranty/warrantyCase.
 import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.coverage";
 import { estimateContentHash } from "../../../src/modules/service/estimate-signature";
 import { JobStageService } from "../../../src/modules/service/job-stage.service";
+import { JobDiagnosisService } from "../../../src/modules/service/job-diagnosis.service";
 import { requestJobcardParts } from "../../../src/modules/service/jobcard-parts-request.service";
 import { ROLES } from "../../../src/shared/constants/roles";
 import type { StageAction } from "../../../src/modules/service/job-stage.logic";
@@ -22,6 +23,8 @@ import { Parties } from "./parties";
 import {
   ClaimFixture,
   DEMO_TAG,
+  DiagnosisFixture,
+  FindingFixture,
   EstimateFixture,
   JobFixture,
   LABOUR,
@@ -46,6 +49,7 @@ const services = {
   receipts: new ReceiptService(),
   warranty: new WarrantyCaseService(),
   stages: new JobStageService(),
+  diagnosis: new JobDiagnosisService(),
 };
 
 const RANK: Record<string, number> = { OPEN: 0, IN_PROGRESS: 1, QC: 2, READY: 3, BILLED: 4, DELIVERED: 5 };
@@ -94,7 +98,7 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
   for (const [index, estimate] of fx.estimates.entries()) await ensureEstimate(ref, job.id, job.customerId!, job.serviceTypeId!, index, estimate, staff.advisor.id);
 
   const target = RANK[TARGET_STATUS[fx.target]];
-  await walkToEstimate(ctx, fx, id, target);
+  await walkToEstimate(ctx, ref, fx, id, target);
   job = await loadJob(id);
   if (canonicalJobStatus(job.status) === "OPEN" && target >= RANK.IN_PROGRESS) {
     await recordAdvance(ctx, fx, id);
@@ -299,23 +303,23 @@ const PRE_REPAIR: JobStage[] = ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE"]
  * Hands the job on through check-in, diagnosis and the warranty check (when the vehicle needs it)
  * to the estimate, or to the step the fixture stops at.
  */
-async function walkToEstimate(ctx: DemoContext, fx: JobFixture, id: string, target: number) {
+async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, id: string, target: number) {
   const staff = ctx.staff[fx.branch];
   const goal: JobStage = target >= RANK.IN_PROGRESS || fx.stop === "CANCELLED" ? "ESTIMATE" : ((fx.stop as JobStage | undefined) ?? "CHECK_IN");
   for (;;) {
     const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } });
-    if (job.stage === goal || job.stage === "ESTIMATE" || !PRE_REPAIR.includes(job.stage)) break;
+    if (job.stage === goal || job.stage === "ESTIMATE" || !PRE_REPAIR.includes(job.stage)) {
+      // A job that stops at diagnosis with a plan gets its findings, and is sent or returned as the fixture says.
+      if (job.stage === "DIAGNOSIS" && fx.diagnosis) await diagnose(ctx, ref, fx, id, fx.diagnosis);
+      break;
+    }
     if (job.stage === "CHECK_IN") {
       // Details, walk-around and the customer's signature, as the advisor records them on screen.
       await completeCheckIn(fx, id, staff.advisor.id, "signed");
       await stageAction(fx, id, "SEND_TO_SUPERVISOR", staff.advisor.id);
     } else if (job.stage === "DIAGNOSIS") {
-      // The warranty check comes next only for a vehicle in warranty or with an open campaign.
-      const technician = await prisma.user.findUniqueOrThrow({ where: { id: staff.technician.id }, select: { id: true, role: { select: { name: true } } } });
-      const workspace = await services.stages.workspace(id, { id: technician.id, role: technician.role.name });
-      const handoff = workspace.actions.find((view) => view.kind === "primary" && view.enabled)?.action;
-      if (!handoff) throw new Error(`${fx.id}: diagnosis cannot be handed on (${workspace.actions.flatMap((view) => view.reasons).join(" ")})`);
-      await stageAction(fx, id, handoff, staff.technician.id);
+      // Supervisor assigns, technician records findings, service engineer confirms (phase 3).
+      await diagnose(ctx, ref, fx, id, null);
     } else {
       await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, "No warranty items on this visit");
     }
@@ -326,6 +330,74 @@ async function walkToEstimate(ctx: DemoContext, fx: JobFixture, id: string, targ
   if (fx.stop === "CANCELLED" && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "ESTIMATE")
     await stageAction(fx, id, "CANCEL", staff.advisor.id, "Customer took the vehicle elsewhere");
 }
+
+const actorOf = async (userId: string) => {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, role: { select: { name: true } } } });
+  return { id: user.id, role: user.role.name };
+};
+
+/**
+ * Diagnosis through the app's services, as staff would do it on screen. Without a plan the job goes
+ * all the way: assigned, a finding per request, sent to the engineer and confirmed (routing decides
+ * warranty or estimate). With a plan it stops where the fixture says. Safe to run again.
+ */
+async function diagnose(ctx: DemoContext, ref: Reference, fx: JobFixture, id: string, plan: DiagnosisFixture | null) {
+  const staff = ctx.staff[fx.branch];
+  let job = await prisma.jobCard.findUniqueOrThrow({
+    where: { id },
+    select: { technicianId: true, diagnosis: { select: { submittedAt: true, returnedAt: true } }, complaints: { select: { id: true, description: true }, orderBy: { id: "asc" } } },
+  });
+  if (!job.technicianId) {
+    const supervisor = await actorOf(staff.supervisor.id);
+    await services.workshop.assignTechnician(id, staff.technician.id, undefined, supervisor.id, {
+      bayId: ref.bays[STAGE_INDEX(fx.id) % ref.bays.length],
+      note: "Customer is waiting; please start with the first request.",
+      requestId: demoUuid(`assign:${fx.id}`),
+      actorRole: supervisor.role,
+    });
+  }
+  const technician = await actorOf(staff.technician.id);
+  const findings: FindingFixture[] = plan?.findings ?? job.complaints.map((_complaint, index) => ({ request: index, text: "", labour: ["service"] }));
+  if (!job.diagnosis?.submittedAt && !job.diagnosis?.returnedAt) {
+    for (const [index, finding] of findings.entries()) {
+      const findingId = demoUuid(`finding:${fx.id}:${index}`);
+      if (await prisma.jobFinding.findUnique({ where: { id: findingId }, select: { id: true } })) continue;
+      const complaint = finding.request === null ? null : job.complaints[finding.request];
+      await services.diagnosis.saveFinding(
+        id,
+        findingId,
+        {
+          complaintId: complaint?.id ?? null,
+          causeAndDefect: finding.text || `Checked and confirmed: ${complaint?.description ?? "general inspection"}.`,
+          possibleWarranty: !!finding.possibleWarranty,
+          items: [
+            ...(finding.labour ?? []).map((key) => ({ kind: "LABOUR" as const, referenceId: ref.labour[key], quantity: 1 })),
+            ...(finding.parts ?? []).map(([key, quantity]) => ({ kind: "PART" as const, referenceId: ref.parts[key], quantity })),
+          ],
+          expectedVersion: 0,
+        },
+        technician,
+      );
+    }
+  }
+  if (plan?.stop === "findings") return;
+  job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { technicianId: true, diagnosis: { select: { submittedAt: true, returnedAt: true } }, complaints: { select: { id: true, description: true }, orderBy: { id: "asc" } } } });
+  if (job.diagnosis?.returnedAt) return; // Already returned on an earlier run.
+  if (!job.diagnosis?.submittedAt) await stageAction(fx, id, "SEND_TO_ENGINEER", staff.technician.id);
+  if (plan?.stop === "review") return;
+  if (plan?.stop === "returned") {
+    await stageAction(fx, id, "RETURN_TO_TECHNICIAN", staff.engineer.id, plan.returnNote ?? "Please check again.");
+    return;
+  }
+  const engineer = await actorOf(staff.engineer.id);
+  const workspace = await services.stages.workspace(id, engineer);
+  const confirm = workspace.actions.find((view) => view.kind === "primary" && view.enabled)?.action;
+  if (!confirm) throw new Error(`${fx.id}: diagnosis cannot be confirmed (${workspace.actions.flatMap((view) => view.reasons).join(" ")})`);
+  await stageAction(fx, id, confirm, staff.engineer.id);
+}
+
+/** A stable small number per fixture, so seeded jobs spread over the bays. */
+const STAGE_INDEX = (key: string) => [...key].reduce((sum, char) => sum + char.charCodeAt(0), 0);
 
 /** A token deposit: any positive advance meets the existing rule, and the bills keep a balance to pay or put on credit. */
 const DEMO_ADVANCE = 10_000;

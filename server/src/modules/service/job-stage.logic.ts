@@ -1,6 +1,7 @@
 import type { JobStage } from "@prisma/client";
 import { allGateReasons, checkInStep, type CheckInGates } from "./job-check-in.logic";
 import { ROLES } from "../../shared/constants/roles";
+import { DIAGNOSIS_ENGINEERS, WARRANTY_SKIPPED_REASON } from "./job-diagnosis.logic";
 
 /**
  * The staged job card: one job, one step, one owner.
@@ -185,6 +186,8 @@ export interface OwnerFacts {
   technicianId: string | null;
   qualityInspectorId: string | null;
   deliveryAdvisorId: string | null;
+  /** Diagnosis: the technician has sent the findings to the service engineer. */
+  diagnosisSubmitted?: boolean;
 }
 
 export interface StageOwner {
@@ -207,6 +210,8 @@ export function stageOwnerFor(stage: JobStage, job: OwnerFacts): StageOwner {
     case "ESTIMATE":
       return advisor;
     case "DIAGNOSIS":
+      // Once the findings are sent, the service engineer holds the job until they confirm or return it.
+      return job.diagnosisSubmitted ? { ownerId: null, ownerRole: ROLES.ENGINEER } : workshop;
     case "REPAIR":
       return workshop;
     case "WARRANTY":
@@ -267,8 +272,12 @@ export interface StageFacts {
   checkInGates: CheckInGates | null;
   approvalProblem: string | null;
   depositProblem: string | null;
-  /** In warranty, an open campaign, or a warranty case. Later phases add items flagged "possible warranty". */
+  /** In warranty, an open campaign, a warranty case, or a finding flagged "possible warranty" (diagnosisRoute). */
   warrantyRelevant: boolean;
+  /** Diagnosis: the findings have been sent to the service engineer. */
+  diagnosisSubmitted: boolean;
+  /** Diagnosis: what stops the findings going to the engineer (findingProblems). Empty elsewhere. */
+  findingProblems: string[];
   billed: boolean;
   creditApproved: boolean;
   unansweredCampaigns: number;
@@ -281,8 +290,10 @@ export interface StageActor {
 
 export const STAGE_ACTIONS = [
   "SEND_TO_SUPERVISOR",
+  "SEND_TO_ENGINEER",
   "SEND_TO_WARRANTY",
   "SEND_TO_ADVISOR",
+  "RETURN_TO_TECHNICIAN",
   "WARRANTY_TO_ADVISOR",
   "RELEASE_TO_REPAIR",
   "PAUSE_FOR_PARTS",
@@ -316,6 +327,10 @@ interface ActionRule {
 
 const TECHNICIAN_GATE = (facts: StageFacts) =>
   facts.technicianId ? [] : ["Assign a technician to this job first."];
+const SUBMITTED_GATE = (facts: StageFacts) =>
+  facts.diagnosisSubmitted ? [] : ["The technician has not sent the findings to the service engineer yet."];
+/** The technician sends the findings; the supervisor can do it for a technician without a device. */
+const FINDINGS_SENDERS = [ROLES.TECHNICIAN, ...SUPERVISORS];
 const problems = (...values: (string | null)[]) => values.filter((value): value is string => !!value);
 
 export const ACTION_RULES: Record<StageAction, ActionRule> = {
@@ -327,21 +342,39 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     // Details valid, walk-around saved and consent signed, each reason naming the step that fixes it.
     gates: (facts) => (facts.checkInGates ? allGateReasons(facts.checkInGates) : []),
   },
+  SEND_TO_ENGINEER: {
+    from: ["DIAGNOSIS"],
+    to: "SAME",
+    roles: FINDINGS_SENDERS,
+    kind: "handoff",
+    when: (facts) => !!facts.technicianId && !facts.diagnosisSubmitted,
+    gates: (facts) => facts.findingProblems,
+  },
+  // The engineer confirms the diagnosis; routing (diagnosisRoute) decides which of these two is offered.
   SEND_TO_WARRANTY: {
     from: ["DIAGNOSIS"],
     to: "WARRANTY",
-    roles: WORKSHOP,
+    roles: DIAGNOSIS_ENGINEERS,
     kind: "handoff",
-    when: (facts) => facts.warrantyRelevant,
-    gates: TECHNICIAN_GATE,
+    when: (facts) => facts.warrantyRelevant && facts.diagnosisSubmitted,
+    gates: (facts) => [...TECHNICIAN_GATE(facts), ...SUBMITTED_GATE(facts)],
   },
   SEND_TO_ADVISOR: {
     from: ["DIAGNOSIS"],
     to: "ESTIMATE",
-    roles: WORKSHOP,
+    roles: DIAGNOSIS_ENGINEERS,
     kind: "handoff",
-    when: (facts) => !facts.warrantyRelevant,
-    gates: TECHNICIAN_GATE,
+    when: (facts) => !facts.warrantyRelevant && facts.diagnosisSubmitted,
+    gates: (facts) => [...TECHNICIAN_GATE(facts), ...SUBMITTED_GATE(facts)],
+  },
+  RETURN_TO_TECHNICIAN: {
+    from: ["DIAGNOSIS"],
+    to: "SAME",
+    roles: DIAGNOSIS_ENGINEERS,
+    kind: "secondary",
+    requiresNote: true,
+    when: (facts) => facts.diagnosisSubmitted,
+    gates: () => [],
   },
   WARRANTY_TO_ADVISOR: {
     from: ["WARRANTY"],
@@ -535,6 +568,7 @@ export type SubStep =
   | "SEND_TO_WORKSHOP"
   | "ASSIGN_TECHNICIAN"
   | "FINDINGS"
+  | "ENGINEER_REVIEW"
   | "WARRANTY_REVIEW"
   | "ESTIMATE_APPROVAL"
   | "ADVANCE_PAYMENT"
@@ -556,7 +590,8 @@ export function currentSubStep(facts: StageFacts): SubStep | null {
     case "CHECK_IN":
       return facts.checkInGates ? checkInStep(facts.checkInGates) : "DETAILS";
     case "DIAGNOSIS":
-      return facts.technicianId ? "FINDINGS" : "ASSIGN_TECHNICIAN";
+      if (!facts.technicianId) return "ASSIGN_TECHNICIAN";
+      return facts.diagnosisSubmitted ? "ENGINEER_REVIEW" : "FINDINGS";
     case "WARRANTY":
       return "WARRANTY_REVIEW";
     case "ESTIMATE":
@@ -616,6 +651,7 @@ export interface StageEventFact {
   toStage: JobStage;
   actorName: string | null;
   createdAt: Date;
+  note?: string | null;
 }
 
 export interface StageSummary {
@@ -624,6 +660,8 @@ export interface StageSummary {
   /** Null for jobs created before the staged job card: shown as "Not provided". */
   by: string | null;
   at: Date | null;
+  /** Why a step was skipped, for example "Not under warranty". */
+  reason: string | null;
 }
 
 /** The step a cancelled job was at when it was cancelled, from its event log. */
@@ -641,11 +679,12 @@ export function stageSummaries(stage: JobStage, events: StageEventFact[]): Stage
         ? STAGE_ORDER.indexOf((stageBeforeCancel(events) ?? "CHECK_IN") as (typeof STAGE_ORDER)[number])
         : STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
   const warrantyVisited = events.some((event) => event.toStage === "WARRANTY");
-  const warrantySkipped = !warrantyVisited && events.some((event) => event.fromStage === "DIAGNOSIS" && event.toStage === "ESTIMATE");
+  const skip = warrantyVisited ? undefined : [...events].reverse().find((event) => event.fromStage === "DIAGNOSIS" && event.toStage === "ESTIMATE");
   return STAGE_ORDER.slice(0, Math.max(reached, 0)).map((step) => {
-    if (step === "WARRANTY" && warrantySkipped) return { stage: step, state: "SKIPPED", by: null, at: null };
+    if (step === "WARRANTY" && skip)
+      return { stage: step, state: "SKIPPED", by: skip.actorName, at: skip.createdAt, reason: skip.note?.trim() || WARRANTY_SKIPPED_REASON };
     const left = [...events].reverse().find((event) => event.fromStage === step && event.toStage !== step);
-    return { stage: step, state: "COMPLETED", by: left?.actorName ?? null, at: left?.createdAt ?? null };
+    return { stage: step, state: "COMPLETED", by: left?.actorName ?? null, at: left?.createdAt ?? null, reason: null };
   });
 }
 

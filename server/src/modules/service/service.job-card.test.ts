@@ -544,7 +544,7 @@ describe("JobCard workflow", () => {
       new ServiceService().updateJobCard(
         id,
         {
-          observations: "changed",
+          workDone: "changed",
         },
         id,
       ),
@@ -598,7 +598,7 @@ describe("JobCard workflow", () => {
 
   it("treats a legacy billed status as locked even without billedAt", async () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ status: "Billed", billedAt: null, invoices: [] });
-    await expect(new ServiceService().updateJobCard(id, { observations: "changed" }, id)).rejects.toThrow("Billed");
+    await expect(new ServiceService().updateJobCard(id, { workDone: "changed" }, id)).rejects.toThrow("Billed");
     expect(prisma.jobCard.update).not.toHaveBeenCalled();
   });
 

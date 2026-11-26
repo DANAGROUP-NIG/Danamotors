@@ -14,8 +14,10 @@ export type JobStage =
 
 export type StageAction =
   | "SEND_TO_SUPERVISOR"
+  | "SEND_TO_ENGINEER"
   | "SEND_TO_WARRANTY"
   | "SEND_TO_ADVISOR"
+  | "RETURN_TO_TECHNICIAN"
   | "WARRANTY_TO_ADVISOR"
   | "RELEASE_TO_REPAIR"
   | "PAUSE_FOR_PARTS"
@@ -34,6 +36,7 @@ export type SubStep =
   | "SEND_TO_WORKSHOP"
   | "ASSIGN_TECHNICIAN"
   | "FINDINGS"
+  | "ENGINEER_REVIEW"
   | "WARRANTY_REVIEW"
   | "ESTIMATE_APPROVAL"
   | "ADVANCE_PAYMENT"
@@ -67,6 +70,8 @@ export interface StageSummary {
   state: "COMPLETED" | "SKIPPED";
   by: string | null;
   at: string | null;
+  /** Why a step was skipped, for example "Not under warranty". */
+  reason: string | null;
 }
 
 export interface JobWorkspace {

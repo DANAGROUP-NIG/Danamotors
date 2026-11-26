@@ -751,7 +751,6 @@ serviceTransactionPaths["/service/job-cards/{id}"] = {
               serviceCharge: amount,
               deliveryAdvisorId: uuid(),
               description: text(5000),
-              observations: text(10000),
               lateReasonIds: {
                 type: "array",
                 maxItems: 6,

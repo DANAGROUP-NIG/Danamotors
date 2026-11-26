@@ -169,7 +169,7 @@ export type DetailsInput = z.infer<typeof detailsBody>;
 export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 export const PHOTO_MAX_DIMENSION = 4096;
 /** A base64 data URL for the largest allowed photo, plus its header. */
-const PHOTO_DATA_URL_LIMIT = Math.ceil((PHOTO_MAX_BYTES * 4) / 3) + 64;
+export const PHOTO_DATA_URL_LIMIT = Math.ceil((PHOTO_MAX_BYTES * 4) / 3) + 64;
 
 export const photoBody = z
   .object({

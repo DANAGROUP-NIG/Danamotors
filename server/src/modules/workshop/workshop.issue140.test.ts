@@ -200,12 +200,15 @@ it("aggregates open and closed counts in one group query", async () => {
     .mockResolvedValue([{ id: "tech" }] as never);
   (prisma.user.count as jest.Mock).mockResolvedValue(1);
   (prisma.jobCard.groupBy as jest.Mock).mockResolvedValue([
-    { technicianId: "tech", status: "IN_PROGRESS", _count: { _all: 2 } },
-    { technicianId: "tech", status: "DELIVERED", _count: { _all: 3 } },
+    { technicianId: "tech", status: "IN_PROGRESS", stage: "REPAIR", _count: { _all: 2 } },
+    { technicianId: "tech", status: "OPEN", stage: "DIAGNOSIS", _count: { _all: 1 } },
+    { technicianId: "tech", status: "DELIVERED", stage: "CLOSED", _count: { _all: 3 } },
   ]);
   const result = await new WorkshopService().listTechnicians();
-  expect(result.technicians[0]).toMatchObject({ openJobs: 2, closedJobs: 3 });
+  // Diagnosis allocation load: jobs in the workshop now, from the same single grouped query.
+  expect(result.technicians[0]).toMatchObject({ openJobs: 3, closedJobs: 3, jobsInHand: 3, availability: "BUSY" });
   expect(prisma.jobCard.groupBy).toHaveBeenCalledTimes(1);
+  expect(prisma.jobCard.groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ["technicianId", "status", "stage"] }));
   list.mockRestore();
 });
 
@@ -262,6 +265,7 @@ it("assigns a branch technician and audits old and new assignments in the transa
         jobCardId: "job",
         previousTechnicianId: "old",
         technicianId: "tech",
+        requestId: null,
       }),
     },
   });

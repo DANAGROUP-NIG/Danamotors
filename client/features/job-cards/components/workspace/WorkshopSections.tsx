@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -16,12 +17,12 @@ import type { JobCard } from "../../types/job-card.types";
 import {
   creditApprovalSchema,
   deliverySchema,
-  findingsSchema,
   qcNotesSchema,
+  workDoneSchema,
   type CreditApprovalValues,
   type DeliveryValues,
-  type FindingsValues,
   type QcNotesValues,
+  type WorkDoneValues,
 } from "../../schemas/workshop-actions.schema";
 import { WORKSPACE_COPY } from "../repair-workspace-copy";
 import { WorkshopPicker } from "../WorkshopPicker";
@@ -39,7 +40,7 @@ function ErrorText({ error, fallback }: { error: unknown; fallback: string }) {
   );
 }
 
-/** Diagnosis and repair: who works on the job. The supervisor assigns; everyone else sees the name. */
+/** Repair: who works on the job. The supervisor can reassign; everyone else sees the name. Diagnosis has its own allocation. */
 export function AssignTechnicianSection({ job }: { job: JobCard }) {
   const { hasPermission } = useAuth();
   const { assign } = useWorkshopActions(job.id, job.jobNumber);
@@ -57,7 +58,8 @@ export function AssignTechnicianSection({ job }: { job: JobCard }) {
           className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
           onSubmit={(event) => {
             event.preventDefault();
-            if (technicianId && !assign.isPending) assign.mutate(technicianId);
+            if (technicianId && !assign.isPending)
+              assign.mutate({ technicianId }, { onSuccess: () => toast.success(`Technician assigned to job ${job.jobNumber}`) });
           }}
         >
           <WorkshopPicker
@@ -79,45 +81,38 @@ export function AssignTechnicianSection({ job }: { job: JobCard }) {
   );
 }
 
-/** Findings, work done, engineer and service charge, saved without moving the job. */
-export function FindingsSection({ job }: { job: JobCard }) {
+/** Work done, engineer and service charge, saved without moving the job. Findings are recorded in Diagnosis. */
+export function WorkDoneSection({ job }: { job: JobCard }) {
   const { hasPermission } = useAuth();
-  const { saveFindings } = useWorkshopActions(job.id, job.jobNumber);
+  const { saveWorkDone } = useWorkshopActions(job.id, job.jobNumber);
   const canEdit = hasPermission("jobcard:update") && !hasJobBill(job);
-  const form = useForm<FindingsValues>({
-    resolver: zodResolver(findingsSchema),
+  const form = useForm<WorkDoneValues>({
+    resolver: zodResolver(workDoneSchema),
     defaultValues: {
       serviceCharge: String(job.serviceCharge ?? 0),
       engineerId: job.engineerId ?? "",
-      observations: job.observations ?? "",
       workDone: job.workDone ?? "",
     },
   });
   if (!canEdit)
     return (
-      <StageCard title="Findings and work done">
-        <DetailList
-          rows={[
-            { label: "Findings", value: job.observations?.trim() || NOT_PROVIDED },
-            { label: "Work done and recommendations", value: job.workDone?.trim() || NOT_PROVIDED },
-          ]}
-        />
+      <StageCard title="Work done">
+        <DetailList rows={[{ label: "Work done and recommendations", value: job.workDone?.trim() || NOT_PROVIDED }]} />
       </StageCard>
     );
   const { errors } = form.formState;
   const submit = form.handleSubmit((values) => {
-    if (saveFindings.isPending) return;
-    saveFindings.mutate({
+    if (saveWorkDone.isPending) return;
+    saveWorkDone.mutate({
       ...(Number(values.serviceCharge) !== (job.serviceCharge ?? 0) ? { serviceCharge: Number(values.serviceCharge) } : {}),
       ...(values.engineerId !== (job.engineerId ?? "") ? { engineerId: values.engineerId || null } : {}),
-      observations: values.observations,
       workDone: values.workDone,
     });
   });
   return (
-    <StageCard title="Findings and work done" description="Saving keeps the job on this step.">
+    <StageCard title="Work done" description="Saving keeps the job on this step.">
       <form className="grid gap-4" onSubmit={submit} noValidate>
-        <fieldset disabled={saveFindings.isPending} className="grid gap-4 sm:grid-cols-2">
+        <fieldset disabled={saveWorkDone.isPending} className="grid gap-4 sm:grid-cols-2">
           <Field label="Service charge (NGN)" required error={errors.serviceCharge?.message}>
             <input className={inputCls} inputMode="decimal" {...form.register("serviceCharge")} />
             <span className="text-xs text-muted-foreground">Saved as a separate bill line. Enter 0 for no service charge.</span>
@@ -129,18 +124,15 @@ export function FindingsSection({ job }: { job: JobCard }) {
             value={form.watch("engineerId")}
             onChange={(value) => form.setValue("engineerId", value, { shouldDirty: true })}
           />
-          <Field label="Findings" error={errors.observations?.message}>
-            <textarea className={`${inputCls} h-28 py-2`} maxLength={10000} {...form.register("observations")} />
-          </Field>
           <Field label="Work done and recommendations" error={errors.workDone?.message}>
             <textarea className={`${inputCls} h-28 py-2`} maxLength={10000} {...form.register("workDone")} />
           </Field>
         </fieldset>
-        <ErrorText error={saveFindings.error} fallback="Could not save the findings. Your text is kept; try again." />
+        <ErrorText error={saveWorkDone.error} fallback="Could not save the work done. Your text is kept; try again." />
         <div>
-          <Button type="submit" variant="outline" disabled={saveFindings.isPending}>
-            {saveFindings.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
-            {saveFindings.isPending ? "Saving findings" : "Save findings"}
+          <Button type="submit" variant="outline" disabled={saveWorkDone.isPending}>
+            {saveWorkDone.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
+            {saveWorkDone.isPending ? "Saving work done" : "Save work done"}
           </Button>
         </div>
       </form>

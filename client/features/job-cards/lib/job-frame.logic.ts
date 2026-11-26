@@ -126,12 +126,20 @@ export function stageDetails(stage: JobStep, job: JobCard): DetailRow[] {
           value: job.openingSignatureCurrent ? "Signed by the customer" : job.openingSignatureRequired ? "Not signed" : NOT_PROVIDED,
         },
       ];
-    case "DIAGNOSIS":
+    case "DIAGNOSIS": {
+      const findings = (job.findings ?? []).filter((finding) => finding.causeAndDefect.trim());
+      const flagged = findings.filter((finding) => finding.possibleWarranty).length;
       return [
         { label: "Technician", value: person(job.technician) },
         { label: "Bay", value: text(job.bay?.description) },
-        { label: "Findings", value: text(job.observations) },
+        { label: "Findings", value: findings.length ? findings.map((finding) => finding.causeAndDefect.trim()).join(" ") : NOT_PROVIDED },
+        { label: "Possible warranty", value: findings.length ? (flagged ? `${flagged} ${flagged === 1 ? "finding" : "findings"}` : "None") : NOT_PROVIDED },
+        {
+          label: "Confirmed by",
+          value: job.diagnosis?.confirmedAt ? `${person(job.diagnosis.confirmedBy)}, ${formatDateTime(job.diagnosis.confirmedAt)}` : NOT_PROVIDED,
+        },
       ];
+    }
     case "WARRANTY":
       return [
         {
@@ -262,6 +270,7 @@ export function activityLine(entry: StageActivity): string {
   if (entry.action === "CANCEL" || entry.toStage === "CANCELLED") return "Job cancelled";
   if (!entry.fromStage) return entry.action === "OPENED" ? "Job opened at Check-in" : `Job placed at ${to}`;
   if (entry.fromStage === entry.toStage) {
+    if (entry.action === "ASSIGNED") return `Technician and bay assigned (${to})`;
     const label = entry.action && entry.action in ACTION_LABELS ? ACTION_LABELS[entry.action as keyof typeof ACTION_LABELS] : null;
     return label ? `${label} (${to})` : `Step owner changed (${to})`;
   }

@@ -19,6 +19,7 @@ import { JobCardPartsSection } from "../JobCardPartsSection";
 import { WarrantySnapshotCard } from "../JobCardWarrantyCards";
 import { CheckInStep, type StageBarProps } from "../check-in/CheckInStep";
 import { ConsentCatchUp } from "../check-in/ConsentCatchUp";
+import { DiagnosisStep } from "../diagnosis/DiagnosisStep";
 import { WORKSPACE_COPY } from "../repair-workspace-copy";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
@@ -26,8 +27,8 @@ import {
   AssignTechnicianSection,
   CreditApprovalSection,
   DeliverySection,
-  FindingsSection,
   QualityCheckSection,
+  WorkDoneSection,
 } from "./WorkshopSections";
 
 const ACTIVE_INVOICE = (status: string) => !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
@@ -45,7 +46,7 @@ export function StageContent({
 }: {
   job: JobCard;
   workspace: JobWorkspace;
-  /** Check-in shows the action bar itself, with its own step buttons. */
+  /** Check-in and Diagnosis show the action bar themselves, with their own buttons. */
   bar: StageBarProps;
   onPrintGatePass: () => void;
   onOpenTab: (tab: JobFileTab) => void;
@@ -57,14 +58,8 @@ export function StageContent({
       // TODO(phase 5): replaced by the estimate, item approval, advance and release screens.
       return <OpeningEstimateAdvance job={job} workspace={workspace} />;
     case "DIAGNOSIS":
-      // TODO(phase 3): replaced by allocation, technician findings and engineer review.
-      return (
-        <>
-          <AssignTechnicianSection job={job} />
-          <FindingsSection job={job} />
-          <OpeningEstimateAdvance job={job} workspace={workspace} />
-        </>
-      );
+      // PDI jobs keep their own screens; everything else uses the staged diagnosis.
+      return workspace.jobType === "PDI" ? null : <DiagnosisStep job={job} bar={bar} />;
     case "WARRANTY":
       // TODO(phase 4): replaced by the warranty decision screen and the service history rule.
       return <WarrantyReview job={job} />;
@@ -84,7 +79,7 @@ export function StageContent({
       return (
         <>
           <QualityCheckSection job={job} />
-          <FindingsSection job={job} />
+          <WorkDoneSection job={job} />
         </>
       );
     case "BILLING":

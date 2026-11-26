@@ -32,6 +32,8 @@ export interface BranchStaff {
   billing: Staff;
   /** Workshop supervisor (WorkshopManager) at the branch, else the admin. Passes QC to the advisor. */
   supervisor: Staff;
+  /** Service engineer (Engineer) at the branch, else the admin. Confirms or returns the diagnosis. */
+  engineer: Staff;
 }
 
 export interface DemoContext {
@@ -44,6 +46,8 @@ export interface DemoContext {
 
 export interface Reference {
   bayId: string;
+  /** Bays A1 to A4 (the first active bay, then A2 to A4), so the diagnosis allocation shows free and occupied bays. */
+  bays: string[];
   teamId: string;
   serviceTypes: Record<ServiceTypeCode, string>;
   workshopModels: Record<WorkshopModelKey, { modelId: string; variantId: string; colourId: string }>;
@@ -97,7 +101,9 @@ export async function loadContext(branchNames: Record<BranchKey, string>): Promi
     const billing = (await findStaff([ROLES.BILLING_OFFICER], id)) ?? advisor;
     // TODO(confirm): the workshop supervisor is the WorkshopManager role (doc/plans/jobcard-revamp-implementation.md).
     const supervisor = (await findStaff([ROLES.WORKSHOP_MANAGER], id)) ?? admin;
-    staff[key] = { advisor, technician, store, billing, supervisor };
+    // TODO(confirm): the service engineer is the Engineer role; an admin stands in where a branch has none.
+    const engineer = (await findStaff([ROLES.ENGINEER], id)) ?? admin;
+    staff[key] = { advisor, technician, store, billing, supervisor, engineer };
   }
   if (missing.length) {
     throw new Error(`The demo seed acts as existing staff and never creates users. Missing active users: ${missing.join("; ")}.`);
@@ -142,6 +148,8 @@ export async function ensureReference(ctx: DemoContext): Promise<Reference> {
   }
   const bay = await activeMaster("BAY", { code: "A1", description: "Bay A1", category: "A" });
   const team = await activeMaster("TEAM", { code: "A", description: "Workshop team A" });
+  const bays = [bay.id];
+  for (const code of ["A2", "A3", "A4"]) bays.push((await master("BAY", code, `Bay ${code}`, { category: "A" })).id);
   const serviceTypes = {} as Reference["serviceTypes"];
   for (const code of ["RG", "RR"] as const) {
     const row = await prisma.workshopMaster.findFirst({ where: { kind: "SERVICE_TYPE", code, active: true } });
@@ -193,7 +201,7 @@ export async function ensureReference(ctx: DemoContext): Promise<Reference> {
     }
   }
 
-  return { bayId: bay.id, teamId: team.id, serviceTypes, workshopModels, warrantyModels, parts, labour, codes };
+  return { bayId: bay.id, bays, teamId: team.id, serviceTypes, workshopModels, warrantyModels, parts, labour, codes };
 }
 
 /** The seed's own ledger: one audit row per finished scenario, so a finished scenario is never re-run over testers' changes. */

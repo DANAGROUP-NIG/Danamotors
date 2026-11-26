@@ -95,6 +95,8 @@ export class WorkshopRepository {
         branchId: true,
         branch: { select: { id: true, name: true } },
         createdAt: true,
+        // The workshop team (legacy empgroup) shown as a tag on the diagnosis allocation list.
+        employee: { select: { team: { select: { description: true } } } },
         _count: {
           select: {
             technicianAssignments: {

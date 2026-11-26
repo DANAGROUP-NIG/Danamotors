@@ -2,17 +2,16 @@ import { z } from "zod";
 
 const MONEY = /^\d{1,13}(\.\d{1,2})?$/;
 
-/** Findings, work done and charges the workshop saves while the job is open. */
-export const findingsSchema = z.object({
+/** Work done, engineer and service charge the workshop saves while the job is open. Findings are recorded in Diagnosis. */
+export const workDoneSchema = z.object({
   serviceCharge: z
     .string()
     .trim()
     .regex(MONEY, "Enter the service charge in naira, 0 or more, with up to two decimal places."),
   engineerId: z.string(),
-  observations: z.string().max(10000, "Keep the findings to 10,000 characters or fewer."),
   workDone: z.string().max(10000, "Keep the work done to 10,000 characters or fewer."),
 });
-export type FindingsValues = z.infer<typeof findingsSchema>;
+export type WorkDoneValues = z.infer<typeof workDoneSchema>;
 
 /** Handing the vehicle over. A late delivery needs at least one reason, up to six. */
 export function deliverySchema(late: boolean) {

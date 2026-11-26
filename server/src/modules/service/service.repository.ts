@@ -402,6 +402,18 @@ export class ServiceRepository {
           },
         },
         damageMarks: { select: { id: true, type: true, x: true, y: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        // Diagnosis summary for the finished step (phase 3): findings text and flags, and the engineer's confirmation.
+        findings: {
+          select: { id: true, complaintId: true, causeAndDefect: true, possibleWarranty: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+        diagnosis: {
+          select: {
+            confirmedAt: true,
+            route: true,
+            confirmedBy: { select: { firstName: true, lastName: true } },
+          },
+        },
         statusHistory: {
           include: {
             actor: { select: { id: true, firstName: true, lastName: true } },

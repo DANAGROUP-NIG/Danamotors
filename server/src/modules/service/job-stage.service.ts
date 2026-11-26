@@ -13,6 +13,8 @@ import { assertSignedJobOpening } from "./job-opening-signature.service";
 import { assertApprovedOperation } from "./estimate-approval";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
 import { loadCheckInGates } from "./job-check-in.service";
+import { canWorkDiagnosis, diagnosisRoute, diagnosisSubStep } from "./job-diagnosis.logic";
+import { applyDiagnosisAction, diagnosisEventNote, loadDiagnosisFacts } from "./job-diagnosis.service";
 import { moveStage } from "./job-stage.writer";
 import {
   ACTION_RULES,
@@ -53,6 +55,7 @@ const workspaceJob = {
   stageOwner: { select: { id: true, firstName: true, lastName: true } },
   warrantyCase: { select: { id: true } },
   campaigns: { select: { attended: true } },
+  diagnosis: { select: { submittedAt: true, returnedAt: true } },
   invoices: { select: { status: true } },
   consolidatedInvoices: { select: { status: true } },
   _count: { select: { complaints: true } },
@@ -80,6 +83,7 @@ const GATED_STAGES = new Set(["ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING"])
 async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: Date = new Date()): Promise<StageFacts> {
   const gated = GATED_STAGES.has(job.stage);
   const checkInGates = job.stage === "CHECK_IN" ? await loadCheckInGates(tx, job.id, now) : null;
+  const diagnosis = job.stage === "DIAGNOSIS" ? await loadDiagnosisFacts(tx, job.id) : null;
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
@@ -98,7 +102,14 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
     approvalProblem,
     depositProblem,
     warrantyRelevant:
-      job.warrantyStatusAtCreation === WarrantyCoverageStatus.ACTIVE || !!job.warrantyCase || job.campaigns.length > 0,
+      diagnosisRoute({
+        coverageActive: job.warrantyStatusAtCreation === WarrantyCoverageStatus.ACTIVE,
+        openCampaigns: job.campaigns.length,
+        warrantyCase: !!job.warrantyCase,
+        flaggedFindings: diagnosis?.flaggedFindings ?? 0,
+      }) === "WARRANTY",
+    diagnosisSubmitted: diagnosis?.submitted ?? false,
+    findingProblems: diagnosis?.findingProblems ?? [],
     billed:
       !!job.billedAt ||
       normaliseJobStatus(job.status) === "BILLED" ||
@@ -112,6 +123,17 @@ export interface StageActionInput {
   action: StageAction;
   note?: string;
   requestId: string;
+}
+
+const NOTE_REQUIRED: Partial<Record<StageAction, string>> = {
+  CANCEL: "Give the reason for cancelling the job.",
+  RETURN_TO_TECHNICIAN: "Write a note for the technician saying what to check again.",
+};
+
+/** Inside Diagnosis, only the person on the current part (supervisor, technician, engineer) works it. */
+function canWorkCurrentPart(job: Pick<WorkspaceJob, "stage" | "technicianId" | "diagnosis">, actor: StageActor) {
+  if (job.stage !== "DIAGNOSIS") return true;
+  return canWorkDiagnosis(diagnosisSubStep(job.technicianId, job.diagnosis), actor, job.technicianId);
 }
 
 export class JobStageService {
@@ -159,7 +181,7 @@ export class JobStageService {
             ? { id: job.stageOwner?.id ?? null, name: fullName(job.stageOwner), role: job.stageOwnerRole }
             : null,
           enteredAt: job.stageEnteredAt,
-          readOnly: pdi || !canUpdate || !canWorkStage(job.stage, actor, job.technicianId),
+          readOnly: pdi || !canUpdate || !canWorkStage(job.stage, actor, job.technicianId) || !canWorkCurrentPart(job, actor),
           actions,
           alerts: stageAlerts({ ...facts, promisedAt: job.promisedAt }, now),
           summaries: stageSummaries(job.stage, eventFacts),
@@ -193,7 +215,7 @@ export class JobStageService {
     const rule = ACTION_RULES[input.action];
     const note = input.note?.trim() || undefined;
     if (rule.requiresNote && !note)
-      throw new BadRequestError("Give the reason for cancelling the job.").withCode("FIELD_VALIDATION", { field: "note" });
+      throw new BadRequestError(NOTE_REQUIRED[input.action] ?? "Write a note before you continue.").withCode("FIELD_VALIDATION", { field: "note" });
 
     await prisma.$transaction(
       async (tx) => {
@@ -225,8 +247,10 @@ export class JobStageService {
           });
         }
 
-        const ctx = { action: input.action, requestId: input.requestId, note };
+        const ctx = { action: input.action, requestId: input.requestId, note: diagnosisEventNote(input.action, note) };
         if (!check.toStatus) {
+          // Diagnosis records who sent, returned or confirmed before the owner moves.
+          await applyDiagnosisAction(tx, id, input.action, actor, note);
           await moveStage(tx, id, check.to, actor.id, ctx);
           // Check-in is finished: record who completed it and when.
           if (input.action === "SEND_TO_SUPERVISOR")

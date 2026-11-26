@@ -66,13 +66,14 @@ export class WorkshopController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { technicianId, qualityInspectorId } = req.body;
+      const { technicianId, qualityInspectorId, bayId, note, requestId } = req.body;
       await assertJobAccess(req);
       const result = await this.workshopService.assignTechnician(
         id,
         technicianId,
         qualityInspectorId,
         req.user?.userId,
+        { bayId, note, requestId, actorRole: req.user?.role },
       );
       res.status(200).json({
         status: "success",

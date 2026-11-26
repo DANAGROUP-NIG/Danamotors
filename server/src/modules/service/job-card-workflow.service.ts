@@ -741,7 +741,6 @@ export class JobCardWorkflowService {
           billed &&
           (data.status !== "DELIVERED" ||
             data.description !== undefined ||
-            data.observations !== undefined ||
             data.workDone !== undefined ||
             data.serviceCharge !== undefined ||
             data.engineerId !== undefined)
@@ -760,7 +759,6 @@ export class JobCardWorkflowService {
 
         const update: Prisma.JobCardUncheckedUpdateInput = {
           description: data.description,
-          observations: data.observations,
           workDone: data.workDone,
           serviceCharge: data.serviceCharge,
           engineerId: data.engineerId,

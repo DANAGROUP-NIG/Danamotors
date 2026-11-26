@@ -11,9 +11,13 @@ export interface WorkshopNotificationPayload {
   dedupeKey: string; jobCardId: string; jobNumber: string; customer?: string; registration: string; branchId: string;
   /** The job card step, for stage handoffs. */
   step?: string;
+  /** Why the job was sent back, for a handoff that returns it (for example by the service engineer). */
+  returnNote?: string;
 }
 export function workshopNotification(event: WorkshopEvent, payload: WorkshopNotificationPayload) {
   const context = [payload.jobNumber, payload.customer, payload.registration].filter(Boolean).join(', ');
   const step = payload.step ? `. Step: ${payload.step}` : '';
-  return { type: event, title: WORKSHOP_EVENTS[event], message: `${WORKSHOP_EVENTS[event]}: ${context}${step}`, link: `/job-cards/${payload.jobCardId}`, branchId: payload.branchId, dedupeKey: `${event}:${payload.dedupeKey}` };
+  const title = payload.returnNote ? 'Job returned to you' : WORKSHOP_EVENTS[event];
+  const note = payload.returnNote ? `. Note: ${payload.returnNote}` : '';
+  return { type: event, title, message: `${title}: ${context}${step}${note}`, link: `/job-cards/${payload.jobCardId}`, branchId: payload.branchId, dedupeKey: `${event}:${payload.dedupeKey}` };
 }

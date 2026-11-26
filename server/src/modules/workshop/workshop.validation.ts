@@ -1,3 +1,4 @@
+import { allocationBody } from "../service/job-diagnosis.logic";
 import { z } from "zod";
 import { jobCardStatus } from "../service/service.validation";
 
@@ -15,13 +16,7 @@ export const assignTechnicianSchema = z.object({
   params: z.object({
     id: z.string().uuid("Invalid job card ID"),
   }),
-  body: z.object({
-    technicianId: z.string().uuid("Invalid technician ID"),
-    qualityInspectorId: z
-      .string()
-      .uuid("Invalid quality inspector ID")
-      .optional(),
-  }),
+  body: allocationBody,
 });
 
 export const updateJobProgressSchema = z.object({

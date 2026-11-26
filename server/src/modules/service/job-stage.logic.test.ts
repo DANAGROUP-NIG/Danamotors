@@ -35,6 +35,8 @@ const facts = (overrides: Partial<StageFacts> = {}): StageFacts => ({
   approvalProblem: null,
   depositProblem: null,
   warrantyRelevant: false,
+  diagnosisSubmitted: false,
+  findingProblems: [],
   billed: false,
   creditApproved: false,
   unansweredCampaigns: 0,
@@ -47,6 +49,7 @@ const otherTechnician = { id: "tech-2", role: ROLES.TECHNICIAN };
 const warrantyOfficer = { id: "wo-1", role: ROLES.WARRANTY_OFFICER };
 const billing = { id: "bo-1", role: ROLES.BILLING_OFFICER };
 const ccu = { id: "ccu-1", role: ROLES.CCU_OFFICER };
+const engineer = { id: "eng-1", role: ROLES.ENGINEER };
 
 describe("status spellings and the stage mapping", () => {
   it.each([
@@ -219,25 +222,56 @@ describe("allowed and blocked moves", () => {
     expect(checkStageAction("SEND_TO_SUPERVISOR", facts(), warrantyOfficer)).toMatchObject({ ok: false, kind: "forbidden" });
   });
 
-  it("diagnosis: warranty route when relevant, straight to the advisor otherwise", () => {
-    const relevant = facts({ stage: "DIAGNOSIS", warrantyRelevant: true });
-    expect(names(availableActions(relevant, supervisor))).toEqual(["SEND_TO_WARRANTY", "CANCEL"]);
-    expect(checkStageAction("SEND_TO_ADVISOR", relevant, supervisor)).toMatchObject({ ok: false, kind: "unavailable" });
-    const plain = facts({ stage: "DIAGNOSIS" });
-    expect(names(availableActions(plain, technician))).toEqual(["SEND_TO_ADVISOR"]);
-    expect(checkStageAction("SEND_TO_ADVISOR", plain, technician)).toEqual({ ok: true, to: "ESTIMATE", toStatus: undefined });
+  it("diagnosis: the technician sends the findings to the engineer once every request has one", () => {
+    const recording = facts({ stage: "DIAGNOSIS", findingProblems: ["Write what you found for the customer request."] });
+    expect(availableActions(recording, technician)).toEqual([
+      { action: "SEND_TO_ENGINEER", kind: "primary", enabled: false, reasons: ["Write what you found for the customer request."], requiresNote: false },
+    ]);
+    expect(checkStageAction("SEND_TO_ENGINEER", facts({ stage: "DIAGNOSIS" }), technician)).toEqual({ ok: true, to: "DIAGNOSIS", toStatus: undefined });
+    // The supervisor can send them for a technician without a device; the engineer cannot.
+    expect(names(availableActions(facts({ stage: "DIAGNOSIS" }), supervisor))).toEqual(["SEND_TO_ENGINEER", "CANCEL"]);
+    expect(availableActions(facts({ stage: "DIAGNOSIS" }), engineer)).toEqual([]);
+    expect(checkStageAction("SEND_TO_WARRANTY", facts({ stage: "DIAGNOSIS", warrantyRelevant: true }), engineer)).toMatchObject({
+      ok: false,
+      kind: "unavailable",
+    });
+  });
+
+  it("diagnosis: the engineer confirms to warranty when relevant, else to the advisor, or returns with a note", () => {
+    const relevant = facts({ stage: "DIAGNOSIS", warrantyRelevant: true, diagnosisSubmitted: true });
+    expect(availableActions(relevant, engineer).map((view) => [view.action, view.kind, view.requiresNote])).toEqual([
+      ["SEND_TO_WARRANTY", "primary", false],
+      ["RETURN_TO_TECHNICIAN", "secondary", true],
+    ]);
+    expect(checkStageAction("SEND_TO_ADVISOR", relevant, engineer)).toMatchObject({ ok: false, kind: "unavailable" });
+    const plain = facts({ stage: "DIAGNOSIS", diagnosisSubmitted: true });
+    expect(names(availableActions(plain, engineer))).toEqual(["SEND_TO_ADVISOR", "RETURN_TO_TECHNICIAN"]);
+    expect(checkStageAction("SEND_TO_ADVISOR", plain, engineer)).toEqual({ ok: true, to: "ESTIMATE", toStatus: undefined });
+    expect(checkStageAction("RETURN_TO_TECHNICIAN", plain, engineer)).toEqual({ ok: true, to: "DIAGNOSIS", toStatus: undefined });
+    // Once sent, the technician has nothing to press and the supervisor cannot confirm.
+    expect(availableActions(plain, technician)).toEqual([]);
+    expect(checkStageAction("SEND_TO_ADVISOR", plain, supervisor)).toMatchObject({ ok: false, kind: "forbidden" });
   });
 
   it("diagnosis needs an assigned technician, and only that technician can act", () => {
     const unassigned = facts({ stage: "DIAGNOSIS", technicianId: null });
-    expect(checkStageAction("SEND_TO_ADVISOR", unassigned, supervisor)).toEqual({
+    expect(availableActions(unassigned, supervisor).map((view) => view.action)).toEqual(["CANCEL"]);
+    expect(checkStageAction("SEND_TO_ADVISOR", facts({ stage: "DIAGNOSIS", technicianId: null, diagnosisSubmitted: true }), engineer)).toEqual({
       ok: false, kind: "blocked", reasons: ["Assign a technician to this job first."],
     });
-    expect(checkStageAction("SEND_TO_ADVISOR", facts({ stage: "DIAGNOSIS" }), otherTechnician)).toEqual({
+    expect(checkStageAction("SEND_TO_ENGINEER", facts({ stage: "DIAGNOSIS" }), otherTechnician)).toEqual({
       ok: false, kind: "forbidden", reasons: ["Only the technician assigned to this job can do this."],
     });
     expect(canWorkStage("DIAGNOSIS", otherTechnician, TECH)).toBe(false);
     expect(canWorkStage("DIAGNOSIS", technician, TECH)).toBe(true);
+  });
+
+  it("diagnosis: the engineer holds the job while the findings are with them", () => {
+    const job = { status: "OPEN", serviceAdvisorId: "advisor-1", technicianId: TECH, qualityInspectorId: null, deliveryAdvisorId: null };
+    expect(stageOwnerFor("DIAGNOSIS", job)).toEqual({ ownerId: TECH, ownerRole: ROLES.TECHNICIAN });
+    expect(stageOwnerFor("DIAGNOSIS", { ...job, diagnosisSubmitted: true })).toEqual({ ownerId: null, ownerRole: ROLES.ENGINEER });
+    expect(currentSubStep(facts({ stage: "DIAGNOSIS" }))).toBe("FINDINGS");
+    expect(currentSubStep(facts({ stage: "DIAGNOSIS", diagnosisSubmitted: true }))).toBe("ENGINEER_REVIEW");
   });
 
   it("warranty: only the warranty officer hands back to the advisor", () => {
@@ -360,13 +394,16 @@ describe("sub-step, alerts and summaries", () => {
     const events = [
       { fromStage: null, toStage: "CHECK_IN" as const, actorName: "Chidi Eze", createdAt: at(8) },
       { fromStage: "CHECK_IN" as const, toStage: "DIAGNOSIS" as const, actorName: "Chidi Eze", createdAt: at(9) },
-      { fromStage: "DIAGNOSIS" as const, toStage: "ESTIMATE" as const, actorName: "Musa Abdullahi", createdAt: at(10) },
+      { fromStage: "DIAGNOSIS" as const, toStage: "ESTIMATE" as const, actorName: "Kelechi Nwosu", createdAt: at(10), note: "Not under warranty" },
     ];
     expect(stageSummaries("ESTIMATE", events)).toEqual([
-      { stage: "CHECK_IN", state: "COMPLETED", by: "Chidi Eze", at: at(9) },
-      { stage: "DIAGNOSIS", state: "COMPLETED", by: "Musa Abdullahi", at: at(10) },
-      { stage: "WARRANTY", state: "SKIPPED", by: null, at: null },
+      { stage: "CHECK_IN", state: "COMPLETED", by: "Chidi Eze", at: at(9), reason: null },
+      { stage: "DIAGNOSIS", state: "COMPLETED", by: "Kelechi Nwosu", at: at(10), reason: null },
+      { stage: "WARRANTY", state: "SKIPPED", by: "Kelechi Nwosu", at: at(10), reason: "Not under warranty" },
     ]);
+    // A skip recorded before phase 3 has no note: the reason is still given.
+    const legacy = events.map((event, index) => (index === 2 ? { ...event, note: null } : event));
+    expect(stageSummaries("ESTIMATE", legacy)[2].reason).toBe("Not under warranty");
     expect(stageSummaries("REPAIR", []).map((row) => [row.stage, row.by])).toEqual([
       ["CHECK_IN", null], ["DIAGNOSIS", null], ["WARRANTY", null], ["ESTIMATE", null],
     ]);

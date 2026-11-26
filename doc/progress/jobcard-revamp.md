@@ -132,3 +132,34 @@ Defects the browser tests found and fixed:
 - Checklist chips broke words in the middle at tablet width; the damage card's keyboard button overflowed.
 - Shared fixes: menu items now have `role="menuitem"`; pagination read "Showing 1–10"; the sidebar and dashboard showed raw role codes, an emoji and a middle dot; the warranty panel used a middle dot and a non-standard date.
 - The booking consent window needs a scroll to the end of the terms; guide step A4 now says so.
+
+## Phase 3: Diagnosis (26 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: `JobDiagnosis`, `JobFinding`, `JobFindingItem` (Decimal quantity), finding photos on `JobPhoto`; `observations` and `assignedTo` moved and dropped in a separate migration; Engineer gets `jobcard:update`.
+2. Server: pure rules in `job-diagnosis.logic.ts` (routing, findings gate, who works each part, load and bays, schemas); `job-diagnosis.service.ts` and routes; stage actions `SEND_TO_ENGINEER` and `RETURN_TO_TECHNICIAN`; confirm actions routed and engineer-only; owner moves to Engineer once findings are sent; allocation through the existing assignment endpoint with bay, note and request ID.
+3. Client: `lib/diagnosis.logic.ts`, `hooks/use-job-diagnosis.ts` (per-finding autosave), `components/diagnosis/` (AllocationStep, FindingsStep, FindingEditor, ItemPicker, DiagnosisParts, DiagnosisStep); Diagnosis owns its action bar.
+4. Demo seed: real diagnosis for jobs passing through, JC-S13 to JC-S15, bays A2 to A4, brake and AC labour and parts.
+5. Tests: logic, routes, integration, Playwright phase 3.
+
+### Status
+
+- [x] Migrations `20261126125423_jobcard_diagnosis` (additive) and `20261126125424_jobcard_drop_observations` (copies observations into findings, assignment text into remarks, drops both columns; safe to re-run). Both checked on local copies with planted text, in both orders.
+- [x] Server, client, demo seed, docs (`doc/job-cards.md` "Diagnosis (phase 3)", `doc/demo-data.md`), manual test guide `doc/testing/jobcard-revamp/phase-3-manual-test.md`.
+- [x] Server database: only the additive migration applied (owner's decision, 26 Nov 2026), because other branches deployed there today still read `JobCard.observations`. **Pending:** apply `20261126125424_jobcard_drop_observations` there once those branches stop reading `observations` and `assignedTo` (`npx prisma migrate deploy` from server/).
+- [x] Demo seed run on the server: JC-S13 2026000046 (LSR-524ST), JC-S14 2026000047 (LSR-525ST), JC-S15 2026000048 (LSR-526ST). It then stopped at the PDI demo as in phase 2 (no active Engineer at Main Branch). The server has no Engineer accounts at all, so the engineer review is done as Admin there until one is created.
+
+### Tests (26 Nov 2026)
+
+- Server typecheck clean. Touched modules (service, workshop, notification, repeat-job, roles, middleware) on a local test database: 871 passed, 40 failed, 8 skipped (919). All 40 failures are in 5 old integration suites with the known causes (vehicles without a model in booking and labour-slip fixtures, a spare-part source rule, a vendor message, the Jest dynamic-import limit). New: diagnosis logic (27), routes (3), integration (3: assign, findings, return, findings, confirm, routing both ways, permissions), updated stage logic and integration.
+- Client: 127 of 128 passed (`issue117-components` fails on a missing `BillHeads` module, as before phase 0). New `test/diagnosis.test.mjs` (8). Typecheck clean, lint 0 errors, production build passes.
+- Browser (Playwright): phase 3 suite 15 of 15 (allocation with keyboard, findings on a phone with photo, work and part pickers, reload, read-only for another technician and the advisor, server refusal for another technician, engineer return with note and notification, confirm to warranty, confirm to advisor with the skipped warranty step, offline save and retry, 1024, 768 and 390 px). Full suite: 38 passed, 1 failed on a cold-compile timeout in phase 2 (D), 6 not run after it; phase 2 alone then passed 19 of 19.
+
+### Found and fixed in passing
+
+- The browser overflow check only measured the page, but the app scrolls inside its content area; it now checks the content area too, which caught two phone overflows (a long button label and the bar inside a grid).
+- Sign-in in the browser test setup could click before the form was ready on a cold dev server; it now retries.
+- Repeat review page: ellipsis, middle dots and "—" fallbacks replaced.

@@ -8,7 +8,7 @@ import { STAGE_LABELS } from '../service/job-stage.logic';
 export const DURABLE_WORKSHOP_EVENTS = ['PART_REQUESTED', 'PARTS_ISSUED', 'PARTS_UNAVAILABLE', 'PART_RECEIVED', 'STAGE_HANDOFF'] as const;
 
 /** The stage snapshot a STAGE_HANDOFF event carries, so delivery can tell when it is out of date. */
-const stageHandoff = z.object({ stage: z.nativeEnum(JobStage), stageOwnerId: z.string().nullable(), stageOwnerRole: z.string() });
+const stageHandoff = z.object({ stage: z.nativeEnum(JobStage), stageOwnerId: z.string().nullable(), stageOwnerRole: z.string(), returnNote: z.string().optional() });
 
 /** The new owner of the job: the named person, or everyone with the owner role in the branch. */
 export function stageHandoffRecipients(branchId: string, handoff: { stageOwnerId: string | null; stageOwnerRole: string }) {
@@ -72,7 +72,7 @@ export async function deliverWorkshopNotification(tx: Prisma.TransactionClient, 
   if (!users.length && !isReceipt && !handoff) throw new Error('No active parts notification recipient');
   const recipients = users.filter(user => isReceipt || user.id !== row.actorId);
   const notification = workshopNotification(event, { dedupeKey: `${card.id}:${occurrence}`, jobCardId: card.id, jobNumber: live.jobNumber, branchId: live.branchId,
-    customer: isReceipt ? undefined : live.customer ? `${live.customer.firstName} ${live.customer.lastName}` : 'Customer not recorded', registration: live.vehicle?.registrationNumber ?? 'Registration not recorded', step: handoff ? STAGE_LABELS[handoff.stage] : undefined });
+    customer: isReceipt ? undefined : live.customer ? `${live.customer.firstName} ${live.customer.lastName}` : 'Customer not recorded', registration: live.vehicle?.registrationNumber ?? 'Registration not recorded', step: handoff ? STAGE_LABELS[handoff.stage] : undefined, returnNote: handoff?.returnNote });
   if (recipients.length) await tx.notification.createMany({ data: recipients.map(user => ({ ...notification, userId: user.id })), skipDuplicates: true });
   await tx.jobcardNotificationAudit.createMany({ data: recipients.length
     ? recipients.map(user => ({ jobCardId: card.id, eventId: row.id, eventType: event, recipientId: `user:${user.id}`, channel: 'in-app', status: 'DELIVERED', createdAt: now }))

@@ -9,7 +9,8 @@ import { reconcileStage, stageAllowsStatus, stageOwnerFor, type StageAction, typ
  */
 
 export interface StageContext {
-  action?: StageAction | "OPENED";
+  /** OPENED when the job is created; ASSIGNED when the supervisor assigns the technician and bay. */
+  action?: StageAction | "OPENED" | "ASSIGNED";
   requestId?: string;
   note?: string | null;
 }
@@ -32,6 +33,7 @@ const stageJob = {
   customerId: true,
   promisedAt: true,
   creditApprovedById: true,
+  diagnosis: { select: { submittedAt: true } },
 } satisfies Prisma.JobCardSelect;
 
 export type StageJob = Prisma.JobCardGetPayload<{ select: typeof stageJob }>;
@@ -43,6 +45,9 @@ export interface StageWrite {
   stageEnteredAt: Date;
   eventId: string;
 }
+
+/** The owner facts of a locked job, including whether its findings are with the service engineer. */
+const ownerOf = (stage: JobStage, job: StageJob) => stageOwnerFor(stage, { ...job, diagnosisSubmitted: !!job.diagnosis?.submittedAt });
 
 async function lockStageJob(tx: Prisma.TransactionClient, jobCardId: string) {
   // Same row lock the job-card workflow takes; re-locking inside one transaction is a no-op.
@@ -116,6 +121,8 @@ async function writeStage(
       stage: toStage,
       stageOwnerId: owner.ownerId,
       stageOwnerRole: owner.ownerRole,
+      // A job sent back (for example by the service engineer) tells the person why.
+      ...(ctx?.action === "RETURN_TO_TECHNICIAN" && ctx.note?.trim() ? { returnNote: ctx.note.trim() } : {}),
     });
   return { ...updated, eventId: event.id };
 }
@@ -133,7 +140,7 @@ export async function syncStage(
 ): Promise<StageWrite | null> {
   const job = await lockStageJob(tx, jobCardId);
   const toStage = reconcileStage(job.stage, job.status, job.qcStatus, !!job.creditApprovedById);
-  return writeStage(tx, job, toStage, stageOwnerFor(toStage, job), actorId, ctx, false);
+  return writeStage(tx, job, toStage, ownerOf(toStage, job), actorId, ctx, false);
 }
 
 /** A stage-only move (no status change), made by a stage action after its gates passed. */
@@ -145,7 +152,7 @@ export async function moveStage(
   ctx: StageContext,
 ): Promise<StageWrite | null> {
   const job = await lockStageJob(tx, jobCardId);
-  return writeStage(tx, job, toStage, stageOwnerFor(toStage, job), actorId, ctx, true);
+  return writeStage(tx, job, toStage, ownerOf(toStage, job), actorId, ctx, true);
 }
 
 /**

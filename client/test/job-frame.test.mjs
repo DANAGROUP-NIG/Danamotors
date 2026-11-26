@@ -213,7 +213,8 @@ test("activity, toasts, vehicle, customer and bill wording never show codes", ()
   assert.equal(frame.activityOwner({ ...entry, ownerName: null, ownerRole: null }), null);
   assert.equal(frame.activityLine({ ...entry, fromStage: null, toStage: "CHECK_IN", action: "OPENED" }), "Job opened at Check-in");
   assert.equal(frame.activityLine({ ...entry, fromStage: "REPAIR", toStage: "REPAIR", action: "PAUSE_FOR_PARTS" }), "Pause for parts (Repair)");
-  assert.equal(frame.activityLine({ ...entry, fromStage: "REPAIR", toStage: "REPAIR", action: "ASSIGNED" }), "Step owner changed (Repair)");
+  assert.equal(frame.activityLine({ ...entry, fromStage: "REPAIR", toStage: "REPAIR", action: null }), "Step owner changed (Repair)");
+  assert.equal(frame.activityLine({ ...entry, fromStage: "DIAGNOSIS", toStage: "DIAGNOSIS", action: "ASSIGNED" }), "Technician and bay assigned (Diagnosis)");
   assert.equal(frame.activityLine({ ...entry, toStage: "CANCELLED", action: "CANCEL" }), "Job cancelled");
 
   const ws = { jobNumber: "2026000127", stage: "DIAGNOSIS", owner: { id: "u", name: "Tunde Bakare", role: "WorkshopManager" } };
@@ -247,8 +248,8 @@ test("forms name the field and the fix", () => {
   assert.equal(cancel.safeParse({ reason: "x".repeat(2001) }).error.issues[0].message, "Keep the reason to 2,000 characters or fewer.");
   assert.equal(cancel.parse({ reason: "  Customer took the vehicle elsewhere " }).reason, "Customer took the vehicle elsewhere");
 
-  const findings = workshopSchemas.findingsSchema;
-  const base = { serviceCharge: "2100", engineerId: "", observations: "", workDone: "" };
+  const findings = workshopSchemas.workDoneSchema;
+  const base = { serviceCharge: "2100", engineerId: "", workDone: "" };
   assert.equal(findings.safeParse(base).success, true);
   assert.equal(findings.safeParse({ ...base, serviceCharge: "2100.50" }).success, true);
   for (const bad of ["", "-1", "12.345", "abc"])

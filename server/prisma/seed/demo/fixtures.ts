@@ -142,6 +142,10 @@ export const VEHICLES = {
   stgConsent: { vin: "KNAPX81DMS7000511", registrationNumber: "KJA-521ST", customer: "adeyemi", model: "SPORTAGE", saleDaysAgo: 400 },
   stgSigned: { vin: "KNAPM81DMK7000512", registrationNumber: "LSR-522ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
   stgBooking: { vin: "KNAPX81DMS7000513", registrationNumber: "KJA-523ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 500 },
+  // Diagnosis (phase 3): out of warranty, so only a "possible warranty" flag sends a job to the warranty officer.
+  stgReview: { vin: "KNAPM81DMK7000514", registrationNumber: "LSR-524ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  stgReturned: { vin: "KNAPM81DMK7000515", registrationNumber: "LSR-525ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  stgPlain: { vin: "KNAPM81DMK7000516", registrationNumber: "LSR-526ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -178,6 +182,17 @@ export const PARTS = {
     unitPrice: 21_000, retailRate: 27_500, warrantyApplicable: false,
     stock: { main: { quantity: 6, minimum: 10, rack: "LUB-02" }, second: { quantity: 9, minimum: 6, rack: "LUB-02" } },
   },
+  // Diagnosis findings (phase 3) list these as parts needed; no job issues them yet.
+  brakePads: {
+    partNumber: "58101-DM100", name: "Front brake pads set", category: "Brakes", partFlag: "O", partType: "S", uom: "SET",
+    unitPrice: 36_000, retailRate: 45_000, warrantyApplicable: true, warrantyRate: 40_000,
+    stock: { main: { quantity: 12, minimum: 4, rack: "BRK-01" }, second: { quantity: 6, minimum: 2, rack: "BRK-01" } },
+  },
+  acRefrigerant: {
+    partNumber: "LOC-R134A-500G", name: "AC refrigerant R134a, 500 g", category: "Air conditioning", partFlag: "L", partType: "S", uom: "CAN",
+    unitPrice: 7_500, retailRate: 9_000, warrantyApplicable: false,
+    stock: { main: { quantity: 20, minimum: 6, rack: "AC-02" }, second: { quantity: 10, minimum: 4, rack: "AC-02" } },
+  },
   // Genuine; the seeded jobs use the last two at the main branch (zero stock there),
   // so only the second branch has it (other-branch-only stock).
   ignitionCoil: {
@@ -196,6 +211,9 @@ export const LABOUR = {
   // The labour catalogue has no free-text lines, so free-text work is quoted on this general
   // operation and described in a complaint (free-text) line of the estimate.
   general: { code: "DM-GEN-LAB", description: "General labour (see estimate notes)", vehicleSystem: "General", group: "General", defaultHours: 1, rate: 10_000 },
+  brakePads: { code: "DM-BRK-PAD", description: "Replace front brake pads", vehicleSystem: "Brakes", group: "Repair", defaultHours: 1, rate: 15_000 },
+  acCheck: { code: "DM-AC-CHK", description: "AC system check and refrigerant recharge", vehicleSystem: "Air conditioning", group: "Repair", defaultHours: 1, rate: 18_000 },
+  steering: { code: "DM-WHL-BAL", description: "Wheel balancing and alignment", vehicleSystem: "Steering", group: "Repair", defaultHours: 1, rate: 12_000 },
 } as const;
 
 export type LabourKey = keyof typeof LABOUR;
@@ -249,6 +267,25 @@ import type { CheckInLevel } from "./check-in";
 
 export type StageStop = "DIAGNOSIS" | "WARRANTY" | "ESTIMATE" | "CANCELLED" | "WAITING_PARTS" | "QUALITY_CHECK" | "QC_PASSED";
 
+/** One finding: for the customer request at `request` (0-based), or one the customer did not mention (null). */
+export interface FindingFixture {
+  request: number | null;
+  text: string;
+  possibleWarranty?: boolean;
+  labour?: LabourKey[];
+  parts?: [PartKey, number][];
+}
+
+/**
+ * Diagnosis for a job that stops at it (phase 3): how far it gets and what the technician found.
+ * findings: recorded, not sent; review: sent to the service engineer; returned: sent back with a note.
+ */
+export interface DiagnosisFixture {
+  stop: "findings" | "review" | "returned";
+  findings: FindingFixture[];
+  returnNote?: string;
+}
+
 export interface JobFixture {
   id: string;
   vehicle: VehicleKey;
@@ -276,6 +313,8 @@ export interface JobFixture {
   stop?: StageStop;
   /** For a job that stays at check-in: how far check-in has got (default: just opened). */
   checkIn?: CheckInLevel;
+  /** For a job that stops at diagnosis with a technician: findings and how far they got. */
+  diagnosis?: DiagnosisFixture;
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -568,7 +607,7 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis"> & {
     stop?: StageStop;
     estimate?: "none" | "pending" | "approved";
   },
@@ -588,6 +627,7 @@ const stageJob = (
   target: fields.target,
   stop: fields.stop,
   checkIn: fields.checkIn,
+  diagnosis: fields.diagnosis,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
@@ -649,6 +689,41 @@ export const STAGE_JOBS: JobFixture[] = [
     description: "Periodic service. Wipers smear the windscreen.",
     complaints: ["Periodic service (30,000 km)", "Wipers smear the windscreen"],
     mileage: 29_800, withTechnician: false, target: "OPEN", estimate: "none", checkIn: "walkAround", priorMileage: 24_600,
+  }),
+  // Diagnosis (phase 3): with the service engineer, one finding flagged possible warranty (routes to warranty).
+  stageJob("JC-S13", "stgReview", {
+    description: "Noise from the front left wheel when braking, and the AC is not cooling well.",
+    complaints: ["Noise from front left wheel when braking", "AC not cooling well"],
+    mileage: 93_400, withTechnician: true, target: "OPEN", stop: "DIAGNOSIS", estimate: "none",
+    diagnosis: {
+      stop: "review",
+      findings: [
+        { request: 0, text: "Front pads worn to 2 mm, disc surface fine.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 1, text: "Compressor clutch not engaging. No refrigerant leak seen.", possibleWarranty: true, labour: ["acCheck"], parts: [["acRefrigerant", 1]] },
+        { request: null, text: "Rear wiper blade torn.", labour: [], parts: [] },
+      ],
+    },
+  }),
+  // Returned by the service engineer with a note; the technician sees it in a banner.
+  stageJob("JC-S14", "stgReturned", {
+    description: "Steering pulls to the left on the expressway.",
+    complaints: ["Steering pulls to the left"],
+    mileage: 88_900, withTechnician: true, target: "OPEN", stop: "DIAGNOSIS", estimate: "none",
+    diagnosis: {
+      stop: "returned",
+      findings: [{ request: 0, text: "Front tyres worn unevenly.", labour: ["steering"], parts: [] }],
+      returnNote: "Check the wheel alignment readings and the front suspension bushes before we quote.",
+    },
+  }),
+  // With the service engineer, nothing warranty related: confirming sends it straight to the advisor.
+  stageJob("JC-S15", "stgPlain", {
+    description: "Periodic service (100,000 km).",
+    complaints: ["Periodic service (100,000 km)"],
+    mileage: 99_800, withTechnician: true, target: "OPEN", stop: "DIAGNOSIS", estimate: "none",
+    diagnosis: {
+      stop: "review",
+      findings: [{ request: 0, text: "Due for the 100,000 km service. No other faults found.", labour: ["service"], parts: [["engineOil", 1]] }],
+    },
   }),
   stageJob("JC-S12", "stgSigned", {
     description: "Clicking noise when turning the steering fully.",

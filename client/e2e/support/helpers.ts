@@ -56,9 +56,13 @@ export async function expectCleanText(page: Page, where: string, scope?: Locator
   expect(problems, `${where} shows forbidden text`).toEqual([]);
 }
 
-/** No sideways scrolling at the current width. */
+/** No sideways scrolling at the current width: neither the page nor the content area the app scrolls in. */
 export async function expectNoHorizontalOverflow(page: Page, where: string) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const overflow = await page.evaluate(() => {
+    const page = document.documentElement.scrollWidth - window.innerWidth;
+    const main = document.querySelector("main");
+    return Math.max(page, main ? main.scrollWidth - main.clientWidth : 0);
+  });
   expect(overflow, `${where} scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1);
 }
 

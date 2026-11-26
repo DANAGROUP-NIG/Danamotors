@@ -2,6 +2,7 @@ import { recordJobDeposit } from "./job-deposit.service";
 import { listMultiJobVehicles, multiJobBranch, multiJobVehiclesQuery } from "./multi-job-vehicles";
 import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
 import { jobCheckInRoutes, jobPhotoRoutes } from "./job-check-in.routes";
+import { jobDiagnosisRoutes } from "./job-diagnosis.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -56,6 +57,7 @@ router.use(authMiddleware);
 router.use("/job-cards/:id/opening-consent", jobOpeningSignatureRoutes);
 router.use("/job-cards/:id/check-in", jobCheckInRoutes);
 router.use("/job-cards/:id/photos", jobPhotoRoutes);
+router.use("/job-cards/:id/diagnosis", jobDiagnosisRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),
@@ -640,7 +642,6 @@ router.delete(
  *             type: object
  *             properties:
  *               status: { type: string, enum: [OPEN, IN_PROGRESS, QC, READY, BILLED, DELIVERED, CANCELLED] }
- *               observations: { type: string }
  *               workDone: { type: string }
  *               remarks: { type: string, description: Required when cancelling }
  *               deliveryAdvisorId: { type: string, format: uuid }
@@ -978,8 +979,8 @@ router.get(
  *             additionalProperties: false
  *             required: [action, requestId]
  *             properties:
- *               action: { type: string, enum: [SEND_TO_SUPERVISOR, SEND_TO_WARRANTY, SEND_TO_ADVISOR, WARRANTY_TO_ADVISOR, RELEASE_TO_REPAIR, PAUSE_FOR_PARTS, RESUME_REPAIR, SEND_TO_QC, RETURN_TO_REPAIR, QC_PASSED_TO_ADVISOR, MARK_READY, SEND_TO_DELIVERY, CANCEL] }
- *               note: { type: string, maxLength: 2000, description: Required for CANCEL }
+ *               action: { type: string, enum: [SEND_TO_SUPERVISOR, SEND_TO_ENGINEER, SEND_TO_WARRANTY, SEND_TO_ADVISOR, RETURN_TO_TECHNICIAN, WARRANTY_TO_ADVISOR, RELEASE_TO_REPAIR, PAUSE_FOR_PARTS, RESUME_REPAIR, SEND_TO_QC, RETURN_TO_REPAIR, QC_PASSED_TO_ADVISOR, MARK_READY, SEND_TO_DELIVERY, CANCEL] }
+ *               note: { type: string, maxLength: 2000, description: Required for CANCEL and RETURN_TO_TECHNICIAN }
  *               requestId: { type: string, format: uuid }
  *           example: { action: SEND_TO_SUPERVISOR, requestId: '11111111-1111-4111-8111-111111111111' }
  *     responses:

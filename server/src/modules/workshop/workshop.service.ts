@@ -15,6 +15,8 @@ import prisma from "../../prisma/client";
 import { jobUpdateBody } from "../service/service.validation";
 import { canonicalJobStatus } from "../service/job-card-workflow.service";
 import { syncStage } from "../service/job-stage.writer";
+import { DIAGNOSIS_SUPERVISORS, IN_WORKSHOP_STAGES, availability, canAllocate, diagnosisSubStep } from "../service/job-diagnosis.logic";
+import { ConflictError } from "../../shared/errors/appError";
 import { ServiceService } from "../service/service.service";
 
 export class WorkshopService {
@@ -76,21 +78,25 @@ export class WorkshopService {
     branchId?: string,
   ) {
     if (!technicians.length) return [];
+    // One grouped query for the page: open and closed totals, and the jobs in the workshop now.
     const counts = await prisma.jobCard.groupBy({
-      by: ["technicianId", "status"],
+      by: ["technicianId", "status", "stage"],
       where: {
         branchId,
         technicianId: { in: technicians.map((technician) => technician.id) },
       },
       _count: { _all: true },
     });
-    const totals = new Map<string, { openJobs: number; closedJobs: number }>();
+    const totals = new Map<string, { openJobs: number; closedJobs: number; jobsInHand: number }>();
+    const inWorkshop = new Set<string>(IN_WORKSHOP_STAGES);
     for (const row of counts) {
       if (!row.technicianId) continue;
       const total = totals.get(row.technicianId) ?? {
         openJobs: 0,
         closedJobs: 0,
+        jobsInHand: 0,
       };
+      if (inWorkshop.has(row.stage)) total.jobsInHand += row._count._all;
       const closed = ["BILLED", "DELIVERED", "CANCELLED"].includes(
         canonicalJobStatus(row.status),
       );
@@ -99,10 +105,8 @@ export class WorkshopService {
       totals.set(row.technicianId, total);
     }
     return technicians.map((technician) => {
-      return {
-        ...technician,
-        ...(totals.get(technician.id) ?? { openJobs: 0, closedJobs: 0 }),
-      };
+      const total = totals.get(technician.id) ?? { openJobs: 0, closedJobs: 0, jobsInHand: 0 };
+      return { ...technician, ...total, availability: availability(total.jobsInHand) };
     });
   }
 
@@ -192,11 +196,17 @@ export class WorkshopService {
     });
   }
 
+  /**
+   * Assigns the technician (and inspector). At Diagnosis this is the supervisor's allocation: it
+   * also needs a bay, keeps the note to the technician and takes a request ID so a double click
+   * assigns once. The job's team follows the technician's employee team, for the reports.
+   */
   async assignTechnician(
     id: string,
     technicianId: string,
     qualityInspectorId?: string,
     actorId?: string,
+    allocation: { bayId?: string; note?: string; requestId?: string; actorRole?: string } = {},
   ) {
     const jobCard = await this.workshopRepository.findJobCardById(id);
     if (!jobCard) {
@@ -213,7 +223,7 @@ export class WorkshopService {
       throw new BadRequestError("This job card is no longer open");
     const technician = await prisma.user.findUnique({
       where: { id: technicianId },
-      include: { role: true },
+      include: { role: true, employee: { select: { teamId: true } } },
     });
     if (
       !technician ||
@@ -240,12 +250,44 @@ export class WorkshopService {
         );
     }
 
+    if (allocation.bayId) {
+      const bay = await prisma.workshopMaster.findFirst({
+        where: { id: allocation.bayId, kind: "BAY", active: true },
+        select: { id: true },
+      });
+      if (!bay)
+        throw new BadRequestError("Choose an active bay").withCode("FIELD_VALIDATION", { field: "bayId" });
+    }
+
     const updatedJobCard = await prisma.$transaction(async (tx) => {
       await setNotificationActor(tx, actorId);
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
       );
-      const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
+      // A repeated request ID (double click, retry after a dropped connection) assigns once.
+      if (allocation.requestId) {
+        const replay = await tx.jobStageEvent.findUnique({
+          where: { jobCardId_requestId: { jobCardId: id, requestId: allocation.requestId } },
+          select: { id: true },
+        });
+        if (replay) return { job: await tx.jobCard.findUniqueOrThrow({ where: { id } }), replayed: true };
+      }
+      const current = await tx.jobCard.findUniqueOrThrow({
+        where: { id },
+        include: { diagnosis: { select: { submittedAt: true, returnedAt: true } } },
+      });
+      const atDiagnosis = current.stage === "DIAGNOSIS";
+      if (atDiagnosis) {
+        const subStep = diagnosisSubStep(current.technicianId, current.diagnosis);
+        const actor = { id: actorId ?? "", role: allocation.actorRole ?? "" };
+        if (!canAllocate(subStep, actor))
+          throw (DIAGNOSIS_SUPERVISORS.includes(actor.role)
+            ? new ConflictError("The service engineer is reviewing the findings. The technician can be changed after the engineer returns the job.")
+            : new ForbiddenError("Only the workshop supervisor can assign the technician and bay.")
+          ).withCode("ALLOCATION_LOCKED");
+        if (!allocation.bayId && !current.bayId)
+          throw new BadRequestError("Choose a bay").withCode("FIELD_VALIDATION", { field: "bayId" });
+      }
       if (
         current.billedAt ||
         ["READY", "BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -253,12 +295,21 @@ export class WorkshopService {
         )
       )
         throw new BadRequestError("This job card is no longer open");
+      const teamId = technician.employee?.teamId ?? current.teamId;
       const updated = await tx.jobCard.update({
         where: { id },
-        data: { technicianId, qualityInspectorId },
+        data: { technicianId, qualityInspectorId, teamId, ...(allocation.bayId ? { bayId: allocation.bayId } : {}) },
       });
+      if (atDiagnosis) {
+        const note = allocation.note?.trim() || null;
+        await tx.jobDiagnosis.upsert({
+          where: { jobCardId: id },
+          create: { jobCardId: id, allocationNote: note, allocatedById: actorId ?? null, allocatedAt: new Date() },
+          update: { allocationNote: note, allocatedById: actorId ?? null, allocatedAt: new Date() },
+        });
+      }
       // The technician now holds diagnosis or repair, and the inspector holds the quality check.
-      await syncStage(tx, id, actorId ?? null);
+      await syncStage(tx, id, actorId ?? null, allocation.requestId ? { action: "ASSIGNED", requestId: allocation.requestId, note: allocation.note } : undefined);
       if (actorId)
         await tx.auditLog.create({
           data: {
@@ -266,18 +317,23 @@ export class WorkshopService {
             action: "TECHNICIAN_ASSIGNED",
             details: JSON.stringify({
               jobCardId: id,
+              branchId: current.branchId,
               previousTechnicianId: current.technicianId,
               technicianId,
               qualityInspectorId,
+              previousBayId: current.bayId,
+              bayId: updated.bayId,
+              teamId,
+              requestId: allocation.requestId ?? null,
             }),
           },
         });
-      return updated;
+      return { job: updated, replayed: false };
     });
 
-    await notifyWorkshopEvent("TECHNICIAN_ASSIGNED", id, technicianId);
+    if (!updatedJobCard.replayed) await notifyWorkshopEvent("TECHNICIAN_ASSIGNED", id, technicianId);
 
-    return updatedJobCard;
+    return updatedJobCard.job;
   }
 
   async updateProgress(

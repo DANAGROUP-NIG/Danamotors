@@ -35,6 +35,8 @@ export interface StageBarProps {
   pending: StageAction | null;
   onAction: (action: StageAction) => void;
   onDangerAction: (action: StageAction) => void;
+  /** An action that needs a note (Return to technician). onDone runs after it succeeds, to close the dialog. */
+  onNoteAction: (action: StageAction, note: string, onDone: () => void) => void;
 }
 
 /** Check-in: Details, Walk-around and Customer consent, then the handoff to the workshop supervisor. */

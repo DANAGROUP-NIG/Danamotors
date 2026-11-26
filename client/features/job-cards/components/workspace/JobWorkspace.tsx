@@ -74,7 +74,7 @@ function JobFrame({ job }: { job: JobCard }) {
   if (!workspace) return null;
 
   const pending = stageAction.isPending ? (stageAction.variables?.action ?? null) : null;
-  const run = (action: StageAction, note?: string) => {
+  const run = (action: StageAction, note?: string, onDone?: () => void) => {
     if (stageAction.isPending) return;
     setCancelError(null);
     stageAction.mutate(
@@ -83,6 +83,7 @@ function JobFrame({ job }: { job: JobCard }) {
         onSuccess: (next) => {
           toast.success(actionToast(action, next));
           if (action === "CANCEL") setCancelling(false);
+          onDone?.();
         },
         onError: (error) => {
           const message = apiErrorMessage(error, "Could not update the job. Reload the page and try again.");
@@ -100,6 +101,7 @@ function JobFrame({ job }: { job: JobCard }) {
     danger,
     pending,
     onAction: (action: StageAction) => run(action),
+    onNoteAction: (action: StageAction, note: string, onDone: () => void) => run(action, note, onDone),
     onDangerAction: (action: StageAction) => {
       if (action === "CANCEL") {
         setCancelError(null);
@@ -107,8 +109,9 @@ function JobFrame({ job }: { job: JobCard }) {
       }
     },
   };
-  // Check-in shows the bar itself, with its Details, Walk-around and Customer consent buttons.
-  const ownBar = workspace.stage === "CHECK_IN" && workspace.jobType !== "PDI";
+  // Check-in and Diagnosis show the bar themselves: check-in with its part buttons, diagnosis with the
+  // allocation's "Assign and send to" button and the engineer's note dialog.
+  const ownBar = ["CHECK_IN", "DIAGNOSIS"].includes(workspace.stage) && workspace.jobType !== "PDI";
   const steps = stepperView(workspace);
   const cancelled = workspace.stage === "CANCELLED";
   const waiting = waitingMessage(workspace);

@@ -145,7 +145,7 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 
 Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
 
-**Staged job card: one job at every step (JC-S01 to JC-S12)**
+**Staged job card: one job at every step (JC-S01 to JC-S15)**
 
 Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all at the main branch, each on its own vehicle. Periodic service labour only, no parts.
 
@@ -153,7 +153,7 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 |---|---|---|---|
 | JC-S01 | KJA-482TX (Sportage, in warranty) | Check-in, Walk-around | Just opened: three customer requests, nothing on the walk-around yet. Last recorded reading 43,100 km |
 | JC-S02 | LSR-512ST | Diagnosis | No technician yet (team only): waiting for the workshop supervisor to assign one |
-| JC-S03 | LSR-513ST | Diagnosis | Technician assigned, recording findings |
+| JC-S03 | LSR-513ST | Diagnosis, Findings | Technician assigned, nothing recorded yet |
 | JC-S04 | KJA-514ST (Sportage, in warranty) | Warranty | Waiting for the warranty officer |
 | JC-S05 | LSR-515ST | Estimate | Estimate waiting for the customer's approval |
 | JC-S06 | LSR-516ST | Repair | Paused for parts |
@@ -163,6 +163,11 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S10 | LSR-520ST | Cancelled | Cancelled at the estimate: "Customer took the vehicle elsewhere" |
 | JC-S11 | KJA-521ST (Sportage, in warranty) | Check-in, Customer consent | Details and walk-around done, waiting for Tobi Adeyemi to sign. Last recorded 24,600 km |
 | JC-S12 | LSR-522ST | Check-in, ready to send | Signed by the owner, Lakeside Courier Services Ltd; ready to send to the workshop supervisor |
+| JC-S13 | LSR-524ST (Sorento, out of warranty) | Diagnosis, Engineer review | Findings sent to the service engineer: front pads worn (brake pads work and part), AC compressor clutch flagged **Possible warranty** (so it routes to the warranty officer), and a torn rear wiper blade the customer did not mention |
+| JC-S14 | LSR-525ST (Sorento) | Diagnosis, Findings | Returned by the service engineer: "Check the wheel alignment readings and the front suspension bushes before we quote." |
+| JC-S15 | LSR-526ST (Sorento, out of warranty) | Diagnosis, Engineer review | 100,000 km service findings, nothing warranty related: confirming sends it to the service advisor and skips the warranty step |
+
+Jobs past diagnosis (JC-S04 onward and the scenario jobs) are diagnosed through the services: the workshop supervisor assigns the technician and a bay (bays A1 to A4 are added when missing), the technician records a finding per request with the periodic service labour, and the service engineer confirms. The service engineer is an active Engineer at the branch, or the admin where the branch has none (`TODO(confirm)`); the seed never creates users.
 
 A booking for **KJA-523ST** (Sportage, Adaeze Okafor, last recorded 16,050 km, two requests) is left open at the main branch so testers can open a job card from it.
 

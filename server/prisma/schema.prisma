@@ -299,6 +299,11 @@ model User {
   stageOwnedJobs              JobCard[]       @relation("JobStageOwner")
   jobStageEventsActed         JobStageEvent[] @relation("JobStageEventActor")
   jobStageEventsOwned         JobStageEvent[] @relation("JobStageEventOwner")
+  diagnosesAllocated          JobDiagnosis[]  @relation("DiagnosisAllocatedBy")
+  diagnosesSubmitted          JobDiagnosis[]  @relation("DiagnosisSubmittedBy")
+  diagnosesReturned           JobDiagnosis[]  @relation("DiagnosisReturnedBy")
+  diagnosesConfirmed          JobDiagnosis[]  @relation("DiagnosisConfirmedBy")
+  jobFindingsCreated          JobFinding[]    @relation("JobFindingCreatedBy")
   qualityInspectorAssignments JobCard[]       @relation("QualityInspectorAssignments")
 
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
@@ -714,6 +719,9 @@ model JobCard {
   checkIn                  JobCheckIn?
   damageMarks              JobDamageMark[]
   photos                   JobPhoto[]
+  /// Diagnosis: allocation note, technician findings and the service engineer's review (job card revamp phase 3).
+  diagnosis                JobDiagnosis?
+  findings                 JobFinding[]
   advanceReceipts          Receipt[]             @relation("JobAdvances")
   consolidatedInvoices     Invoice[]             @relation("WarrantyJobBills")
   depositReceiptId         String?               @unique
@@ -758,7 +766,6 @@ model JobCard {
   inHouse            Boolean                @default(true)
   remarks            String?
   customerRemarks    String?
-  observations       String?
   workDone           String?
   isRepeat           Boolean                @default(false)
   previousJobId      String?
@@ -806,8 +813,7 @@ model JobCard {
   serviceCharge   Float?
   estimatedCost   Float?
 
-  assignedTo String?
-  progress   Int?    @default(0)
+  progress Int? @default(0)
 
   qcStatus String? @default("Pending")
   qcNotes  String?
@@ -2428,6 +2434,7 @@ model JobComplaint {
   spare           Float           @default(0)
   oil             Float           @default(0)
   labour          Float           @default(0)
+  findings        JobFinding[]
 
   @@index([jobCardId])
 }
@@ -2464,6 +2471,7 @@ enum DamageType {
 enum JobPhotoCategory {
   CHECK_IN
   DAMAGE
+  FINDING
 }
 
 /// The service advisor's check-in record, one per job. Written only while the job is at check-in.
@@ -2526,9 +2534,13 @@ model JobPhoto {
   createdById String
   createdAt   DateTime         @default(now())
   damageMark  JobDamageMark?
+  /// For FINDING photos: the technician's finding the photo belongs to.
+  findingId   String?
+  finding     JobFinding?      @relation(fields: [findingId], references: [id], onDelete: Cascade)
 
   @@unique([jobCardId, requestId])
   @@index([jobCardId, category])
+  @@index([findingId])
 }
 
 model JobStageEvent {
@@ -5267,4 +5279,80 @@ model PsfCallLine {
 
   @@index([callId])
   @@index([jobCardLabourId])
+}
+
+enum DiagnosisRoute {
+  WARRANTY
+  ESTIMATE
+}
+
+enum JobFindingItemKind {
+  LABOUR
+  PART
+  OIL
+}
+
+/// Diagnosis for a job (job card revamp phase 3), one per job: the supervisor's note to the
+/// technician, when the technician sent the findings, the engineer's return or confirmation and
+/// where the job was routed. Written only while the job is at Diagnosis.
+model JobDiagnosis {
+  jobCardId      String          @id
+  jobCard        JobCard         @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  allocationNote String?
+  allocatedById  String?
+  allocatedBy    User?           @relation("DiagnosisAllocatedBy", fields: [allocatedById], references: [id], onDelete: SetNull)
+  allocatedAt    DateTime?
+  /// Set when the technician sends the findings to the service engineer; cleared when returned.
+  submittedAt    DateTime?
+  submittedById  String?
+  submittedBy    User?           @relation("DiagnosisSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  returnedAt     DateTime?
+  returnedById   String?
+  returnedBy     User?           @relation("DiagnosisReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+  returnedNote   String?
+  confirmedAt    DateTime?
+  confirmedById  String?
+  confirmedBy    User?           @relation("DiagnosisConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  route          DiagnosisRoute?
+  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime        @default(now())
+}
+
+/// What the technician found (the paper card's "cause and nature of defect"). One per customer
+/// request, plus findings the customer did not mention (complaintId null).
+model JobFinding {
+  id               String           @id @default(uuid())
+  jobCardId        String
+  jobCard          JobCard          @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  complaintId      String?
+  complaint        JobComplaint?    @relation(fields: [complaintId], references: [id], onDelete: SetNull)
+  causeAndDefect   String           @default("")
+  possibleWarranty Boolean          @default(false)
+  /// Optimistic version for the autosave.
+  version          Int              @default(1)
+  createdById      String
+  createdBy        User             @relation("JobFindingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  items            JobFindingItem[]
+  photos           JobPhoto[]
+
+  @@unique([jobCardId, complaintId])
+  @@index([jobCardId, createdAt])
+}
+
+/// Work or a part the technician says is needed. No prices: the estimate prices them later.
+model JobFindingItem {
+  id          String             @id @default(uuid())
+  findingId   String
+  finding     JobFinding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  kind        JobFindingItemKind
+  /// LabourItem id for LABOUR, SparePart id for PART and OIL.
+  referenceId String
+  description String
+  quantity    Decimal            @db.Decimal(12, 2)
+  sortOrder   Int
+
+  @@index([findingId, sortOrder])
 }

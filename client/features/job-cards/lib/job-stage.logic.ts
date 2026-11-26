@@ -99,7 +99,7 @@ export function stepStates(workspace: Pick<JobWorkspace, "stage" | "summaries">)
 /** One line per finished step, for example "Check-in completed by Chidi Eze, 25 Nov 2026, 09:40." */
 export function summaryLine(summary: StageSummary): string {
   const label = STAGE_LABELS[summary.stage];
-  if (summary.state === "SKIPPED") return `${label} skipped.`;
+  if (summary.state === "SKIPPED") return summary.reason ? `${label} skipped. ${summary.reason}.` : `${label} skipped.`;
   if (!summary.by) return `${label} completed. ${NOT_PROVIDED}.`;
   return `${label} completed by ${summary.by}, ${formatDateTime(summary.at)}.`;
 }
@@ -107,8 +107,11 @@ export function summaryLine(summary: StageSummary): string {
 /** Button wording for each action. */
 export const ACTION_LABELS: Record<StageAction, string> = {
   SEND_TO_SUPERVISOR: "Send to workshop supervisor",
-  SEND_TO_WARRANTY: "Send to warranty officer",
-  SEND_TO_ADVISOR: "Send to service advisor",
+  SEND_TO_ENGINEER: "Send to service engineer",
+  // Diagnosis: the service engineer confirms; routing decides which of these two is offered.
+  SEND_TO_WARRANTY: "Confirm and send to warranty officer",
+  SEND_TO_ADVISOR: "Confirm and send to service advisor",
+  RETURN_TO_TECHNICIAN: "Return to technician",
   WARRANTY_TO_ADVISOR: "Send to service advisor",
   RELEASE_TO_REPAIR: "Release to technician",
   PAUSE_FOR_PARTS: "Pause for parts",
@@ -159,6 +162,7 @@ export const SUB_STEP_LABELS: Record<SubStep, string> = {
   SEND_TO_WORKSHOP: "Ready to send to the workshop",
   ASSIGN_TECHNICIAN: "Waiting for a technician to be assigned",
   FINDINGS: "Technician is inspecting the vehicle",
+  ENGINEER_REVIEW: "Service engineer is reviewing the findings",
   WARRANTY_REVIEW: "Warranty officer is checking cover",
   ESTIMATE_APPROVAL: "Waiting for the customer to approve the estimate",
   ADVANCE_PAYMENT: "Waiting for the advance payment",

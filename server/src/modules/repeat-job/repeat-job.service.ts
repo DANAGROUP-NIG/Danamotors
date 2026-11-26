@@ -43,7 +43,7 @@ const comparedJobSelect = {
   status: true,
   description: true,
   workDone: true,
-  observations: true,
+  findings: { select: { causeAndDefect: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   billedAt: true,
   branch: { select: { id: true, name: true } },
   serviceType: { select: { code: true, description: true } },
@@ -76,7 +76,8 @@ function jobView(job: ComparedJob) {
     description: job.description,
     customerRequests: job.complaints.map((row) => ({ id: row.id, code: row.defectCode, description: row.description })),
     workDone: job.workDone,
-    observations: job.observations,
+    // The technician's findings (cause and nature of defect), replacing the old free-text observations.
+    findings: job.findings.map((finding) => finding.causeAndDefect.trim()).filter(Boolean),
     labour: job.labourLines.map((line) => ({ id: line.id, code: line.labourItem.code, description: line.description || line.labourItem.description })),
     billedAt: job.billedAt,
   };

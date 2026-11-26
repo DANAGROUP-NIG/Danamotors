@@ -15,7 +15,7 @@ export function RepeatReviewPage({ id }: { id: string }) {
   const detail = useRepeatJob(id);
   const reasons = useRepeatReasons();
 
-  if (detail.isLoading || reasons.isLoading) return <PageState loading message="Loading repeat job…" />;
+  if (detail.isLoading || reasons.isLoading) return <PageState loading message="Loading repeat job" />;
   if (detail.isError || !detail.data)
     return (
       <div className="px-4 py-6 lg:px-6">
@@ -101,13 +101,13 @@ function ReviewScreen({ detail, reasons }: { detail: RepeatDetail; reasons: Repe
             <SourceTag source={detail.source} />
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {detail.job.registration ?? "No registration"} · {[detail.job.model, detail.job.variant].filter(Boolean).join(" · ") || "Model not set"}
-            {detail.job.vin && <span className="ml-1 font-mono text-xs">· {detail.job.vin}</span>}
+            {detail.job.registration ?? "No registration"}, {[detail.job.model, detail.job.variant].filter(Boolean).join(", ") || "Model not set"}
+            {detail.job.vin && <span className="ml-1 font-mono text-xs">VIN {detail.job.vin}</span>}
           </p>
         </div>
         <div className="text-right text-sm text-slate-500">
           <p>Flagged {formatDateTime(detail.flaggedAt)} ({REPEAT_SOURCE[detail.source].toLowerCase()})</p>
-          {detail.reviewedAt && <p>Reviewed by {detail.reviewedBy?.name ?? "—"} · {formatDateTime(detail.reviewedAt)}</p>}
+          {detail.reviewedAt && <p>Reviewed by {detail.reviewedBy?.name ?? "Not provided"}, {formatDateTime(detail.reviewedAt)}</p>}
         </div>
       </header>
 
@@ -123,7 +123,7 @@ function ReviewScreen({ detail, reasons }: { detail: RepeatDetail; reasons: Repe
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Counts against</p>
           <p className="mt-1 text-base font-semibold text-slate-900">{detail.previousJob.engineer ?? "No engineer"}</p>
-          <p className="text-sm text-slate-500">Service advisor: {detail.previousJob.serviceAdvisor ?? "—"}</p>
+          <p className="text-sm text-slate-500">Service advisor: {detail.previousJob.serviceAdvisor ?? "Not provided"}</p>
           <p className="mt-1 text-xs text-slate-400">Branch window when flagged: {windowText(detail.window)}</p>
         </div>
       </div>
@@ -140,7 +140,7 @@ function ReviewScreen({ detail, reasons }: { detail: RepeatDetail; reasons: Repe
         action={
           editable ? (
             <span className="hidden items-center gap-1 text-xs text-slate-400 md:inline-flex">
-              <Keyboard className="size-3.5" aria-hidden="true" /> Type a code (0–9) to toggle it
+              <Keyboard className="size-3.5" aria-hidden="true" /> Type a code (0 to 9) to toggle it
             </span>
           ) : undefined
         }
@@ -157,9 +157,9 @@ function ReviewScreen({ detail, reasons }: { detail: RepeatDetail; reasons: Repe
 
         {!editable ? (
           <div className="space-y-4">
-            <AlertBanner tone="gray" icon={<Lock />} title={detail.status === "PENDING_REVIEW" ? "You can view this repeat job but not review it" : "Reviewed — only the reviewer or an Admin can change it"} />
+            <AlertBanner tone="gray" icon={<Lock />} title={detail.status === "PENDING_REVIEW" ? "You can view this repeat job but not review it" : "Reviewed. Only the reviewer or an Admin can change it"} />
             <DetailField label="Reasons" value={<ReasonChips reasons={detail.reasons} />} />
-            <DetailField label="Remarks" value={detail.remarks ? <span className="whitespace-pre-wrap">{detail.remarks}</span> : "—"} />
+            <DetailField label="Remarks" value={detail.remarks ? <span className="whitespace-pre-wrap">{detail.remarks}</span> : "Not provided"} />
           </div>
         ) : (
           <div className="space-y-5">
@@ -293,9 +293,15 @@ function JobColumn({ title, tone, job, technicians }: { title: string; tone: "pr
             </ul>
           )}
         </Block>
-        {job.observations && (
-          <Block title="Observations">
-            <p className="whitespace-pre-wrap text-sm text-slate-700">{job.observations}</p>
+        {job.findings.length > 0 && (
+          <Block title="Findings">
+            <ul className="space-y-1">
+              {job.findings.map((finding, index) => (
+                <li key={index} className="whitespace-pre-wrap text-sm text-slate-700">
+                  {finding}
+                </li>
+              ))}
+            </ul>
           </Block>
         )}
       </div>

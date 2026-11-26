@@ -18,10 +18,13 @@ for (const role of Object.keys(ACCOUNTS) as Role[]) {
     await page.goto("/login");
     // The dev server compiles on first visit; wait until React has taken over the form.
     await page.waitForLoadState("networkidle");
-    await page.getByLabel("Email").fill(ACCOUNTS[role]);
-    await page.getByLabel("Password", { exact: true }).fill(passwordFor(ACCOUNTS[role]));
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 });
+    // On a cold dev server the first click can land before React hydrates the form; try again until it signs in.
+    await expect(async () => {
+      await page.getByLabel("Email").fill(ACCOUNTS[role]);
+      await page.getByLabel("Password", { exact: true }).fill(passwordFor(ACCOUNTS[role]));
+      await page.getByRole("button", { name: "Sign in" }).click();
+      await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+    }).toPass({ timeout: 90_000 });
     await page.context().storageState({ path: authFile(role) });
   });
 }

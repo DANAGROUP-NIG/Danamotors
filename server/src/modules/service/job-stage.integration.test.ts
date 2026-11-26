@@ -29,7 +29,8 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
   let serviceTypeId: string;
   const run = `${Date.now()}`;
   let sequence = 0;
-  const users: Record<'advisor' | 'supervisor' | 'technician' | 'otherTechnician' | 'warranty' | 'billing' | 'admin', { id: string; role: string }> = {} as never;
+  const users: Record<'advisor' | 'supervisor' | 'technician' | 'otherTechnician' | 'engineer' | 'warranty' | 'billing' | 'admin', { id: string; role: string }> = {} as never;
+  let bayId: string;
 
   beforeAll(async () => {
     if (!database || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(database).hostname)) throw new Error('Stage tests require a disposable localhost database');
@@ -51,6 +52,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await person('supervisor', 'WorkshopManager', 'Supervisor');
     await person('technician', 'Technician', 'Technician');
     await person('otherTechnician', 'Technician', 'Other');
+    await person('engineer', 'Engineer', 'Engineer');
     await person('warranty', 'WarrantyOfficer', 'Warranty');
     await person('billing', 'BillingOfficer', 'Billing');
     await person('admin', 'Admin', 'Admin');
@@ -61,7 +63,16 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     labourItemId = (await db.labourItem.create({ data: { code: `STG-L-${run}`, description: 'Brake pad replacement', defaultHours: 1, rate: 15000 } })).id;
     await db.labourRate.create({ data: { labourItemId, modelId: model.id, pricing: 'FIXED', hours: 1, rate: 15000 } });
     serviceTypeId = (await db.workshopMaster.create({ data: { kind: 'SERVICE_TYPE', code: `STG-S-${run}`, description: 'Periodic service' } })).id;
+    bayId = (await db.workshopMaster.create({ data: { kind: 'BAY', code: `STG-B-${run}`, description: 'Bay A2' } })).id;
   });
+
+  /** Diagnosis (phase 3): the technician writes a finding for every request and sends them to the engineer. */
+  async function sendFindings(id: string) {
+    const complaints = await db.jobComplaint.findMany({ where: { jobCardId: id }, select: { id: true } });
+    for (const complaint of complaints)
+      await db.jobFinding.create({ data: { jobCardId: id, complaintId: complaint.id, causeAndDefect: 'Front pads worn to 2 mm', createdById: users.technician.id } });
+    await act(id, 'SEND_TO_ENGINEER', 'technician');
+  }
 
   /** A finished walk-around: fuel recorded and all 25 items checked (job card revamp phase 2). */
   const fullCheckIn = () => ({
@@ -108,10 +119,12 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await act(card.id, 'SEND_TO_SUPERVISOR', 'advisor');
     expect(await expectAt(card.id, 'DIAGNOSIS', 'OPEN')).toMatchObject({ stageOwnerId: null, stageOwnerRole: 'WorkshopManager' });
 
-    await workshop.assignTechnician(card.id, users.technician.id, undefined, users.supervisor.id);
+    await workshop.assignTechnician(card.id, users.technician.id, undefined, users.supervisor.id, { bayId, actorRole: users.supervisor.role });
     expect(await expectAt(card.id, 'DIAGNOSIS', 'OPEN')).toMatchObject({ stageOwnerId: users.technician.id, stageOwnerRole: 'Technician' });
 
-    await act(card.id, 'SEND_TO_ADVISOR', 'technician');
+    await sendFindings(card.id);
+    expect(await expectAt(card.id, 'DIAGNOSIS', 'OPEN')).toMatchObject({ stageOwnerId: null, stageOwnerRole: 'Engineer' });
+    await act(card.id, 'SEND_TO_ADVISOR', 'engineer');
     expect(await expectAt(card.id, 'ESTIMATE', 'OPEN')).toMatchObject({ stageOwnerId: users.advisor.id });
 
     await act(card.id, 'RELEASE_TO_REPAIR', 'advisor');
@@ -150,7 +163,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
 
     const events = await db.jobStageEvent.findMany({ where: { jobCardId: card.id }, orderBy: { createdAt: 'asc' } });
     expect(events.map(e => e.toStage)).toEqual([
-      'DIAGNOSIS', 'DIAGNOSIS', 'ESTIMATE', 'REPAIR', 'REPAIR', 'REPAIR', 'QUALITY_CHECK', 'BILLING', 'BILLING', 'DELIVERY', 'CLOSED',
+      'DIAGNOSIS', 'DIAGNOSIS', 'DIAGNOSIS', 'ESTIMATE', 'REPAIR', 'REPAIR', 'REPAIR', 'QUALITY_CHECK', 'BILLING', 'BILLING', 'DELIVERY', 'CLOSED',
     ]);
     const audits = await db.auditLog.count({ where: { action: 'JOB_STAGE_CHANGED', details: { contains: card.id } } });
     expect(audits).toBe(events.length);
@@ -180,12 +193,13 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
 
   it('routes a warranty vehicle through the warranty officer and tells them through the outbox', async () => {
     const card = await job('DIAGNOSIS', 'OPEN', { warrantyStatusAtCreation: 'ACTIVE' });
-    const view = await stages.workspace(card.id, users.technician);
-    expect(view.actions.map(a => a.action)).toEqual(['SEND_TO_WARRANTY']);
+    await sendFindings(card.id);
+    const view = await stages.workspace(card.id, users.engineer);
+    expect(view.actions.map(a => a.action)).toEqual(['SEND_TO_WARRANTY', 'RETURN_TO_TECHNICIAN']);
     expect(view.warrantyJob).toBe(true);
-    await expect(act(card.id, 'SEND_TO_ADVISOR', 'technician')).rejects.toMatchObject({ statusCode: 409, code: 'STAGE_ACTION_BLOCKED' });
+    await expect(act(card.id, 'SEND_TO_ADVISOR', 'engineer')).rejects.toMatchObject({ statusCode: 409, code: 'STAGE_ACTION_BLOCKED' });
 
-    await act(card.id, 'SEND_TO_WARRANTY', 'technician');
+    await act(card.id, 'SEND_TO_WARRANTY', 'engineer');
     expect(await expectAt(card.id, 'WARRANTY', 'OPEN')).toMatchObject({ stageOwnerId: null, stageOwnerRole: 'WarrantyOfficer' });
     const notice = await db.notification.findFirst({ where: { userId: users.warranty.id, type: 'STAGE_HANDOFF', link: `/job-cards/${card.id}` } });
     expect(notice).toMatchObject({ title: 'Job sent to you' });

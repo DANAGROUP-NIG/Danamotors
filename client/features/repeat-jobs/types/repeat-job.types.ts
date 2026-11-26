@@ -60,7 +60,8 @@ export interface ComparedJob {
   description: string;
   customerRequests: { id: string; code: string | null; description: string }[];
   workDone: string | null;
-  observations: string | null;
+  /** The technician's findings (cause and nature of defect). */
+  findings: string[];
   labour: { id: string; code: string | null; description: string }[];
   billedAt: string | null;
 }

@@ -227,7 +227,6 @@ export const jobUpdateBody = z
   .object({
     serviceCharge: z.number().finite().min(0).max(1e12).multipleOf(0.01).optional(),
     description: z.string().trim().min(1).max(5000).optional(),
-    observations: z.string().trim().max(10000).optional(),
     workDone: z.string().trim().max(10000).optional(),
     status: z
       .enum(["IN_PROGRESS", "WAITING_PARTS", "QC", "READY", "DELIVERED", "CANCELLED"])
