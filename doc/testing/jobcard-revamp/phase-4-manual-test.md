@@ -170,6 +170,7 @@ Pass if: the screen says exactly what is missing and how to fix it, and warranty
    Expected: **Goodwill** stays selected, and under it in red "Not saved." with the reason and a **Retry** link. A red message also appears at the top right.
 3. Set the network back to **No throttling** (or turn Wi-Fi on) and click **Retry**.
    Expected: the red text goes. Reload the page: **Goodwill** is still selected.
+
 Pass if: nothing chosen is lost while offline, and the problem says what to do.
 
 ## H. Phone, tablet and keyboard
