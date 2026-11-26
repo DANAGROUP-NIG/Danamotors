@@ -1142,6 +1142,8 @@ const existingRolePermissions = {
     PERMISSIONS.CUSTOMER_READ,
     PERMISSIONS.VEHICLE_READ,
     PERMISSIONS.JOBCARD_READ,
+    // Returns the job to the advisor from the warranty check (stage action, job card revamp phase 4).
+    PERMISSIONS.JOBCARD_UPDATE,
     PERMISSIONS.JOBCARD_LINE_UPDATE,
     PERMISSIONS.SPAREPART_READ,
     PERMISSIONS.LABOUR_ITEM_READ,

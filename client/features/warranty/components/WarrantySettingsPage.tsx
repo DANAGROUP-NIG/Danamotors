@@ -9,12 +9,14 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { cn } from "@/lib/utils";
 import { useSaveVehicleModel, useSaveWarrantyCode, useVehicleModels, useWarrantyCodes } from "../hooks/use-warranty";
 import type { CodeType, VehicleModel, WarrantyCode } from "../types/warranty.types";
+import { ServiceRuleSettingsPanel } from "./ServiceRuleSettings";
 import { Pill, tdCls, thCls } from "./ui";
 
-type Tab = "models" | CodeType;
+type Tab = "models" | "service-rule" | CodeType;
 
 const TABS: { value: Tab; label: string }[] = [
   { value: "models", label: "Model policies" },
+  { value: "service-rule", label: "Service history rule" },
   { value: "complaint", label: "Complaint codes" },
   { value: "defect", label: "Defect codes" },
   { value: "position", label: "Position codes" },
@@ -24,10 +26,10 @@ const TABS: { value: Tab; label: string }[] = [
 function yearsLabel(days: number | null) {
   if (!days) return "No date limit";
   const years = days / 365;
-  return `${Number.isInteger(Math.round(years * 10) / 10) ? Math.round(years) : years.toFixed(1)} years · ${days.toLocaleString("en-NG")} days`;
+  return `${Number.isInteger(Math.round(years * 10) / 10) ? Math.round(years) : years.toFixed(1)} years, ${days.toLocaleString("en-NG")} days`;
 }
 
-/** Screen 13 — model warranty policies and manufacturer claim codes. */
+/** Screen 13: model warranty policies, the service history rule and manufacturer claim codes. */
 export function WarrantySettingsPage() {
   const [tab, setTab] = useState<Tab>("models");
   const [editing, setEditing] = useState<VehicleModel | "new" | null>(null);
@@ -40,7 +42,7 @@ export function WarrantySettingsPage() {
         </Link>
         <PageHeader
           title="Warranty Settings"
-          description="Model warranty policies and manufacturer claim codes."
+          description="Model warranty policies, the service history rule and manufacturer claim codes."
           actions={
             tab === "models" && (
               <Button size="sm" className="gap-1.5" onClick={() => setEditing("new")}>
@@ -65,7 +67,7 @@ export function WarrantySettingsPage() {
             </button>
           ))}
         </div>
-        {tab === "models" ? <ModelsTable onEdit={setEditing} /> : <CodesTable type={tab} />}
+        {tab === "models" ? <ModelsTable onEdit={setEditing} /> : tab === "service-rule" ? <ServiceRuleSettingsPanel /> : <CodesTable type={tab} />}
       </div>
       {editing && <ModelDrawer model={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
     </div>
@@ -141,6 +143,10 @@ function ModelDrawer({ model, onClose }: { model: VehicleModel | null; onClose: 
   const [km, setKm] = useState(model?.warrantyKm != null ? String(model.warrantyKm) : "100000");
   const [covered, setCovered] = useState(model?.warrantyCovered ?? true);
   const [active, setActive] = useState(model?.isActive ?? true);
+  // The model's own service history rule; empty uses the warranty settings value.
+  const [rule, setRule] = useState<Record<RuleKey, string>>(() =>
+    Object.fromEntries(RULE_FIELDS.map((field) => [field.key, model?.[field.key] != null ? String(model[field.key]) : ""])) as Record<RuleKey, string>,
+  );
   const d = days ? Number(days) : null;
   const valid = code.trim() && name.trim() && (d === null || d > 0) && (!km || Number(km) > 0);
 
@@ -155,6 +161,7 @@ function ModelDrawer({ model, onClose }: { model: VehicleModel | null; onClose: 
           warrantyDays: d,
           warrantyKm: km ? Number(km) : null,
           warrantyCovered: covered,
+          ...Object.fromEntries(RULE_FIELDS.map((field) => [field.key, rule[field.key] ? Number(rule[field.key]) : null])),
           ...(model && { isActive: active }),
         },
       },
@@ -207,6 +214,28 @@ function ModelDrawer({ model, onClose }: { model: VehicleModel | null; onClose: 
           </div>
         </Field>
         <Toggle checked={covered} onChange={setCovered} label="Covered by manufacturer warranty" hint="When turned off, vehicles of this model are not eligible for warranty claims." />
+        <fieldset className="grid gap-3 rounded-lg border border-border p-3">
+          <legend className="px-1 text-sm font-semibold">Service history rule for this model</legend>
+          <p className="text-xs text-muted-foreground">Leave a box empty to use the value in the Service history rule tab.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {RULE_FIELDS.map((field) => (
+              <Field key={field.key} label={field.label}>
+                {field.key === "servicesPerYear" ? (
+                  <select className={inputCls} value={rule[field.key]} onChange={(e) => setRule({ ...rule, [field.key]: e.target.value })}>
+                    <option value="">Use the setting</option>
+                    {["1", "2", "3", "4", "6", "12"].map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className={inputCls} inputMode="numeric" value={rule[field.key]} onChange={(e) => setRule({ ...rule, [field.key]: e.target.value.replace(/\D/g, "") })} />
+                )}
+              </Field>
+            ))}
+          </div>
+        </fieldset>
         {model && <Toggle checked={active} onChange={setActive} label="Active" hint="Inactive models cannot be linked to new vehicles." />}
       </div>
       <div className="flex justify-between gap-2 border-t border-slate-100 p-5">
@@ -214,12 +243,21 @@ function ModelDrawer({ model, onClose }: { model: VehicleModel | null; onClose: 
           Cancel
         </Button>
         <Button onClick={submit} disabled={!valid || save.isPending}>
-          {save.isPending ? "Saving…" : "Save"}
+          {save.isPending ? "Saving" : "Save"}
         </Button>
       </div>
     </aside>
   );
 }
+
+type RuleKey = "serviceIntervalMonths" | "serviceIntervalKm" | "servicesPerYear" | "serviceGraceDays" | "serviceGraceKm";
+const RULE_FIELDS: { key: RuleKey; label: string }[] = [
+  { key: "serviceIntervalMonths", label: "Service every (months)" },
+  { key: "serviceIntervalKm", label: "Or every (km)" },
+  { key: "servicesPerYear", label: "Services per year" },
+  { key: "serviceGraceDays", label: "Grace (days)" },
+  { key: "serviceGraceKm", label: "Grace (km)" },
+];
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
   return (

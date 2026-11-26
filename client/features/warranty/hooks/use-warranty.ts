@@ -18,6 +18,8 @@ import {
   transitionWarrantyCaseRequest,
   updateCaseLineRequest,
   updateVehicleModelRequest,
+  getServiceRuleRequest,
+  updateServiceRuleRequest,
   updateVehicleWarrantyRequest,
   updateWarrantyCaseRequest,
   updateWarrantyCodeRequest,
@@ -160,6 +162,23 @@ export function useSaveVehicleModel() {
       toast.success(vars.id ? "Model policy updated" : "Model added");
     },
     onError: (error) => toast.error(apiErrorMessage(error, "Could not save the model")),
+  });
+}
+
+/** The service history rule in warranty settings. */
+export function useServiceRule() {
+  return useQuery({ queryKey: warrantyKeys.serviceRule(), queryFn: getServiceRuleRequest });
+}
+
+export function useSaveServiceRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    networkMode: "always",
+    mutationFn: updateServiceRuleRequest,
+    onSuccess: (rule) => {
+      qc.setQueryData(warrantyKeys.serviceRule(), rule);
+      toast.success("Service history rule saved");
+    },
   });
 }
 

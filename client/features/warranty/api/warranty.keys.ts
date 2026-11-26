@@ -3,6 +3,7 @@ export const warrantyKeys = {
   vehicle: (vehicleId: string, mileage?: number) => [...warrantyKeys.all, "vehicle", vehicleId, mileage ?? null] as const,
   vehicles: () => [...warrantyKeys.all, "vehicle"] as const,
   models: (params?: Record<string, unknown>) => [...warrantyKeys.all, "models", params ?? {}] as const,
+  serviceRule: () => [...warrantyKeys.all, "service-rule"] as const,
   codes: (includeInactive = false) => [...warrantyKeys.all, "codes", includeInactive] as const,
   parts: (search: string, applicableOnly: boolean) => [...warrantyKeys.all, "parts", search, applicableOnly] as const,
   summary: () => [...warrantyKeys.all, "summary"] as const,

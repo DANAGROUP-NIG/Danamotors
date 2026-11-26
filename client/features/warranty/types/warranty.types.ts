@@ -76,6 +76,15 @@ export type VehicleModel = {
   warrantyCovered: boolean;
   isActive: boolean;
   vehiclesLinked?: number;
+} & ModelServiceRule;
+
+/** The model's own service history rule; null uses the warranty settings value. */
+export type ModelServiceRule = {
+  serviceIntervalMonths?: number | null;
+  serviceIntervalKm?: number | null;
+  servicesPerYear?: number | null;
+  serviceGraceKm?: number | null;
+  serviceGraceDays?: number | null;
 };
 
 export type VehicleModelPayload = {
@@ -86,6 +95,16 @@ export type VehicleModelPayload = {
   warrantyKm?: number | null;
   warrantyCovered?: boolean;
   isActive?: boolean;
+} & ModelServiceRule;
+
+/** Warranty settings: the service history rule (job card revamp phase 4). */
+export type ServiceRuleSettings = {
+  serviceIntervalMonths: number;
+  serviceIntervalKm: number;
+  servicesPerYear: number;
+  serviceGraceKm: number;
+  serviceGraceDays: number;
+  updatedAt?: string;
 };
 
 export type UpdateVehicleWarrantyPayload = {

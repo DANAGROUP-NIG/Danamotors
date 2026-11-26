@@ -67,7 +67,7 @@ const SETTINGS_CARDS = [
   },
   {
     title: "Warranty",
-    description: "Model warranty policies and manufacturer claim codes.",
+    description: "Model warranty policies, the service history rule and manufacturer claim codes.",
     href: "/warranty/settings",
   },
   {

@@ -7,6 +7,7 @@ import type {
   UpdateVehicleWarrantyPayload,
   VehicleModel,
   VehicleModelPayload,
+  ServiceRuleSettings,
   WarrantyCase,
   WarrantyCaseList,
   WarrantyCheck,
@@ -46,6 +47,14 @@ export async function createVehicleModelRequest(body: VehicleModelPayload) {
 
 export async function updateVehicleModelRequest(id: string, body: Partial<VehicleModelPayload>) {
   return (await apiPut<{ model: VehicleModel }>(`/vehicle-models/${id}`, body)).model;
+}
+
+export async function getServiceRuleRequest() {
+  return apiGet<ServiceRuleSettings>("/warranty/service-rule");
+}
+
+export async function updateServiceRuleRequest(body: Omit<ServiceRuleSettings, "updatedAt">) {
+  return apiPut<ServiceRuleSettings>("/warranty/service-rule", body);
 }
 
 // ── Codes & parts ────────────────────────────────────────────────────────────

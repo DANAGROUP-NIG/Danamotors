@@ -9,6 +9,7 @@ export const ACCOUNTS = {
   technician: "tech1@kiamotors.com",
   otherTechnician: "tech2@kiamotors.com",
   engineer: "engineer1@kiamotors.com",
+  warranty: "warranty@kiamotors.com",
   abujaAdmin: "admin.abuja@kiamotors.com",
 } as const;
 export type Role = keyof typeof ACCOUNTS;

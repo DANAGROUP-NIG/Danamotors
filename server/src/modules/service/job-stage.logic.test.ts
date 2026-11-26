@@ -37,6 +37,7 @@ const facts = (overrides: Partial<StageFacts> = {}): StageFacts => ({
   warrantyRelevant: false,
   diagnosisSubmitted: false,
   findingProblems: [],
+  warrantyProblems: [],
   billed: false,
   creditApproved: false,
   unansweredCampaigns: 0,
@@ -279,6 +280,15 @@ describe("allowed and blocked moves", () => {
     expect(checkStageAction("WARRANTY_TO_ADVISOR", warranty, warrantyOfficer)).toEqual({ ok: true, to: "ESTIMATE", toStatus: undefined });
     expect(checkStageAction("WARRANTY_TO_ADVISOR", warranty, advisor)).toMatchObject({ ok: false, kind: "forbidden" });
     expect(canWorkStage("WARRANTY", advisor, TECH)).toBe(false);
+  });
+
+  it("warranty: the handoff waits for every decision and, when needed, the reason", () => {
+    const blocked = facts({ stage: "WARRANTY", warrantyRelevant: true, warrantyProblems: ["Choose who pays for every item (2 of 5 not decided yet)."] });
+    expect(checkStageAction("WARRANTY_TO_ADVISOR", blocked, warrantyOfficer)).toEqual({
+      ok: false,
+      kind: "blocked",
+      reasons: ["Choose who pays for every item (2 of 5 not decided yet)."],
+    });
   });
 
   it("estimate: release to repair runs every existing gate", () => {

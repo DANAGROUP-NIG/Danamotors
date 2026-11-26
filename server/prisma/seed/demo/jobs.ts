@@ -13,6 +13,7 @@ import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.cov
 import { estimateContentHash } from "../../../src/modules/service/estimate-signature";
 import { JobStageService } from "../../../src/modules/service/job-stage.service";
 import { JobDiagnosisService } from "../../../src/modules/service/job-diagnosis.service";
+import { decideCustomerPay } from "./warranty-check";
 import { requestJobcardParts } from "../../../src/modules/service/jobcard-parts-request.service";
 import { ROLES } from "../../../src/shared/constants/roles";
 import type { StageAction } from "../../../src/modules/service/job-stage.logic";
@@ -310,7 +311,7 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
     const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } });
     if (job.stage === goal || job.stage === "ESTIMATE" || !PRE_REPAIR.includes(job.stage)) {
       // A job that stops at diagnosis with a plan gets its findings, and is sent or returned as the fixture says.
-      if (job.stage === "DIAGNOSIS" && fx.diagnosis) await diagnose(ctx, ref, fx, id, fx.diagnosis);
+      if (job.stage === "DIAGNOSIS" && fx.diagnosis && fx.diagnosis.stop !== "confirmed") await diagnose(ctx, ref, fx, id, fx.diagnosis);
       break;
     }
     if (job.stage === "CHECK_IN") {
@@ -319,8 +320,10 @@ async function walkToEstimate(ctx: DemoContext, ref: Reference, fx: JobFixture, 
       await stageAction(fx, id, "SEND_TO_SUPERVISOR", staff.advisor.id);
     } else if (job.stage === "DIAGNOSIS") {
       // Supervisor assigns, technician records findings, service engineer confirms (phase 3).
-      await diagnose(ctx, ref, fx, id, null);
+      await diagnose(ctx, ref, fx, id, fx.diagnosis?.stop === "confirmed" ? fx.diagnosis : null);
     } else {
+      // The warranty officer decides who pays for every item first (phase 4).
+      await decideCustomerPay(ctx, id);
       await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, "No warranty items on this visit");
     }
   }

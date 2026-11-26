@@ -7,6 +7,7 @@
  *   TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/danamotors_test npx jest warranty.integration
  */
 import type { PrismaClient } from "@prisma/client";
+import { estimateContentHash } from "../service/estimate-signature";
 import type { ServiceService as ServiceServiceType } from "../service/service.service";
 import type { WarrantyCaseService as CaseServiceType } from "./warrantyCase.service";
 import type { CampaignService as CampaignServiceType } from "../campaign/campaign.service";
@@ -60,7 +61,14 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
       },
     });
 
-  const jobCard = (vehicleId: string, extra: Record<string, unknown> = {}) =>
+  // These jobs test warranty and campaign charging, not check-in, so they skip the signed opening
+  // consent gate (as job-stage.integration does) by marking the signature not required.
+  const jobCard = async (vehicleId: string, extra: Record<string, unknown> = {}) => {
+    const card = await openJobCard(vehicleId, extra);
+    await prisma.jobCard.update({ where: { id: card.id }, data: { openingSignatureRequired: false } });
+    return card;
+  };
+  const openJobCard = (vehicleId: string, extra: Record<string, unknown> = {}) =>
     service.createJobCard({
       vehicleId,
       customerId: customer.id,
@@ -84,7 +92,14 @@ describeDb("Warranty, charge types and campaigns (database)", () => {
       description: "Approved scope",
       lines: [{ type: "SERVICE", referenceId: serviceType.id, quantity: 1 }, ...scope],
     });
-    await service.addApproval(estimate.id, { customerId: customer.id, approved: true });
+    // Approvals name the version and content hash the customer saw (versioned estimates, issue #117).
+    const signed = await prisma.estimate.findUniqueOrThrow({ where: { id: estimate.id }, include: { lines: true } });
+    await service.addApproval(
+      estimate.id,
+      { customerId: customer.id, approved: true, expectedVersion: signed.version, expectedHash: estimateContentHash(signed), overrideReason: "Paper approval on file" },
+      adviser.id,
+      { deviceOrIp: "test", allowOverride: true },
+    );
   };
 
   /** OPEN → IN_PROGRESS → QC (passed) → READY. */

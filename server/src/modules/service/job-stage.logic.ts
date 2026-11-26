@@ -278,6 +278,8 @@ export interface StageFacts {
   diagnosisSubmitted: boolean;
   /** Diagnosis: what stops the findings going to the engineer (findingProblems). Empty elsewhere. */
   findingProblems: string[];
+  /** Warranty check: what stops the officer returning the job (decisionProblems). Empty elsewhere. */
+  warrantyProblems: string[];
   billed: boolean;
   creditApproved: boolean;
   unansweredCampaigns: number;
@@ -381,7 +383,8 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     to: "ESTIMATE",
     roles: WARRANTY_ROLES,
     kind: "handoff",
-    gates: () => [],
+    // Who pays is decided for every item, and the reason is written when the history is irregular.
+    gates: (facts) => facts.warrantyProblems,
   },
   RELEASE_TO_REPAIR: {
     from: ["ESTIMATE"],

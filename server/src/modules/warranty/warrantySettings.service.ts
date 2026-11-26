@@ -5,6 +5,15 @@ import { checkVehicleWarranty } from "./warranty.coverage";
 
 export type CodeType = "complaint" | "defect" | "position" | "reject";
 
+/** Per-model service history rule; null uses the warranty settings value. */
+export interface ModelServiceRule {
+  serviceIntervalMonths?: number | null;
+  serviceIntervalKm?: number | null;
+  servicesPerYear?: number | null;
+  serviceGraceKm?: number | null;
+  serviceGraceDays?: number | null;
+}
+
 export interface CodeInput {
   code: string;
   description: string;
@@ -38,7 +47,7 @@ export class WarrantySettingsService {
     warrantyDays?: number | null;
     warrantyKm?: number | null;
     warrantyCovered?: boolean;
-  }) {
+  } & ModelServiceRule) {
     try {
       return await prisma.vehicleModel.create({
         data: { ...data, code: data.code.trim().toUpperCase(), make: data.make?.trim() || "Kia", name: data.name.trim() },
@@ -59,7 +68,7 @@ export class WarrantySettingsService {
       warrantyKm?: number | null;
       warrantyCovered?: boolean;
       isActive?: boolean;
-    },
+    } & ModelServiceRule,
   ) {
     const existing = await prisma.vehicleModel.findUnique({ where: { id } });
     if (!existing) throw new NotFoundError("Vehicle model not found");

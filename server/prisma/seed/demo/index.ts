@@ -38,6 +38,7 @@ import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS, STAGE_JOBS } from "./fixtures";
 import { seedStageBooking } from "./check-in";
+import { prepareWarrantyDemo } from "./warranty-check";
 
 const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
@@ -153,6 +154,9 @@ async function main() {
 
   // FPC bulletin (#98): VIN range, letter and call, and job cards for every FPC list.
   await seedFpc(ctx, ref, parties, done);
+
+  // Warranty check (phase 4): service histories and the recall for the warranty step's vehicles.
+  await prepareWarrantyDemo(ctx, ref, parties);
 
   // Staged job card (job card revamp): one job at every step.
   for (const job of STAGE_JOBS) {

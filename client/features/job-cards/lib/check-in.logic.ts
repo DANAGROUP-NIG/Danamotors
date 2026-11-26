@@ -6,6 +6,7 @@ import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { formatDate, formatKm, NOT_PROVIDED } from "@/lib/format";
 import type {
   CheckInGates,
+  CheckInServiceHistory,
   CheckInPhotoSlot,
   CheckInStepKey,
   Checklist,
@@ -16,6 +17,7 @@ import type {
   FuelLevel,
   JobCheckIn,
 } from "../types/job-check-in.types";
+import { serviceHistoryAlert } from "./warranty-check.logic";
 
 export const CHECK_IN_STEPS: { key: CheckInStepKey; label: string; gate: keyof CheckInGates }[] = [
   { key: "DETAILS", label: "Details", gate: "details" },
@@ -360,7 +362,8 @@ export type DetailsAlert = { id: string; tone: "info" | "warning"; message: stri
 
 /**
  * Up to three notes for the advisor at check-in: repeat visit (from the repeat check at opening),
- * warranty cover when the job opened, and open campaigns. Phase 4 adds the service history rule.
+ * warranty cover when the job opened (with the service history verdict when services were missed),
+ * and open campaigns.
  */
 export function detailsAlerts(
   job: {
@@ -370,6 +373,7 @@ export function detailsAlerts(
     campaigns?: { campaignCode?: string; campaignTitle?: string }[];
   },
   lastVisit: { openedAt: string; service: string | null } | null,
+  serviceHistory: CheckInServiceHistory | null = null,
 ): DetailsAlert[] {
   const alerts: DetailsAlert[] = [];
   if (job.isRepeat)
@@ -391,7 +395,8 @@ export function detailsAlerts(
     alerts.push({
       id: "warranty",
       tone: "warning",
-      message: "This vehicle is under warranty. Warranty items will need the warranty officer's review.",
+      message:
+        serviceHistoryAlert(serviceHistory, true) ?? "This vehicle is under warranty. Warranty items will need the warranty officer's review.",
       link: { label: "View warranty", tab: "warranty" },
     });
   const campaigns = (job.campaigns ?? []).map((campaign) => campaign.campaignCode ?? campaign.campaignTitle).filter((value): value is string => !!value);

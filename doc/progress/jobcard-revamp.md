@@ -163,3 +163,35 @@ Built on Jayking (no phase branch, at the owner's request).
 - The browser overflow check only measured the page, but the app scrolls inside its content area; it now checks the content area too, which caught two phone overflows (a long button label and the bar inside a grid).
 - Sign-in in the browser test setup could click before the form was ready on a cold dev server; it now retries.
 - Repeat review page: ellipsis, middle dots and "—" fallbacks replaced.
+
+## Phase 4: Warranty check (26 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: who pays on `JobFindingItem`, the decision reason on the job, `WarrantySettings` (the service rule) with per-model overrides, `WorkshopMaster.isPeriodicMaintenance`, `ExternalServiceRecord` (soft delete), `SERVICE_BOOK` photos; WarrantyOfficer gets `jobcard:update`.
+2. Server: pure `service-history.logic.ts` (gaps, year by quarter grid, verdict, sentence) and `job-warranty.logic.ts` (gates; decisions checked with `assertChargeChange`); `job-warranty.service.ts` and routes; `WARRANTY_TO_ADVISOR` gated and opening the warranty case through `WarrantyCaseService.openForJobCard`; `/warranty/service-rule`.
+3. Client: `lib/warranty-check.logic.ts`, `hooks/use-job-warranty.ts`, `components/warranty/` (Coverage, Service history, outside record dialogs, Campaigns, Items to decide), read-only and skipped views, check-in alert, settings.
+4. Demo seed: JC-S16 to JC-S18 with service histories; jobs passing the warranty check decide customer pay.
+5. Tests: rule logic (most), gates, routes, integration to the warranty case, client logic, Playwright phase 4.
+
+### Status
+
+- [x] Migration `20261126184824_jobcard_warranty_check` (additive, with the periodic maintenance backfill, the settings row and the permission). Generated against a local database; the generated file also carried old schema drift (SparePart columns, constraint renames), which was removed by hand.
+- [x] Server, client, demo seed, docs (`doc/job-cards.md` "Warranty check (phase 4)", `doc/demo-data.md`), manual test guide `doc/testing/jobcard-revamp/phase-4-manual-test.md`.
+- [x] Server database: only this migration applied (from a copy of the migrations folder without `20261126125424_jobcard_drop_observations`, which stays held back). None of its objects existed there; the foreign migrations deployed by other teams today do not touch them. Demo seed run: JC-S16 2026000049 (KJA-527ST), JC-S17 2026000050 (KJA-528ST), JC-S18 2026000051 (KJA-529ST). It then stopped at the PDI demo as before (no Engineer at Main Branch).
+
+### Tests (26 Nov 2026)
+
+- Server typecheck clean (and the seed folder). New: service history logic 33, warranty decision logic 15, routes 5, integration 3 (evidence, gates through the stage service, outside record with replay and soft delete, handoff opening the warranty case, existing case kept, missing sale date), stage logic +1.
+- Touched modules (service, warranty, workshop, job-card-line, campaign, shared) on a local test database: 930 passed, 44 failed, 974 total. All 44 are in 7 old integration suites with known fixture causes: vehicles without a model (booking, labour slip), the advance gate (warranty: 2 tests, also failing on the base commit; its approval and signature fixtures were brought up to date, the advance receipt was not, after 3 attempts), a registration number rule (FPC), the Jest dynamic-import limit and two old rule mismatches (service document, part source, workshop).
+- Client: 135 of 136 (`issue117-components`, missing `BillHeads`, as before). New `test/warranty-check.test.mjs` (8). Typecheck clean, lint 0 errors (74 old warnings), production build passes.
+- Browser (Playwright): phase 4 suite 11 of 11 (screen and evidence, outside record with errors and removal, decisions with the reason gate and handoff, advisor read-only and technician refused, campaign decision, missing sale date, offline Not saved and Retry, keyboard arrows, skipped step read-only, check-in alert, 1024, 768 and 390 px). Phases 3 and 4 together 18 of 18; phase 2 alone 20 of 20; full suite 50 passed with phase 2 (D) failing on the known cold-compile 404 of the signed copy page in long runs.
+
+### Found and fixed in passing
+
+- The job card list search never filtered: the search box asked to search before the typed text reached state. Fixed in `JobCardsTable`.
+- Booking requests came back in random order (same creation time, random ids); they now get ascending ids like job card requests.
+- Stepper captions overlapped their neighbours instead of truncating.
+- A "—" fallback in Workshop masters; middle dot and ellipsis on the warranty settings page.

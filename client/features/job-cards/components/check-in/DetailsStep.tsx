@@ -65,7 +65,7 @@ export function DetailsStep({
     for (const problem of serverErrors) setError(problem.field, { type: "server", message: problem.message }, { shouldFocus: true });
   }, [serverErrors, setError]);
 
-  const alerts = detailsAlerts(job, lastVisit);
+  const alerts = detailsAlerts(job, lastVisit, checkIn.serviceHistory);
   const reading = previousReadingText(checkIn.previousReading);
   const billTo = job.customer as PickerRecord | undefined;
   const owner = checkIn.vehicleOwner;

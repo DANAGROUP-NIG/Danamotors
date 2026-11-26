@@ -25,6 +25,8 @@ const dateTime = new Intl.DateTimeFormat("en-GB", {
   timeZone: LAGOS,
 });
 
+const monthYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: LAGOS });
+
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
 type MoneyValue = number | string | null | undefined;
@@ -57,6 +59,12 @@ export function formatDate(value: DateValue): string {
 export function formatDateTime(value: DateValue): string {
   const parsed = toDate(value);
   return parsed ? dateTime.format(parsed) : NOT_PROVIDED;
+}
+
+/** Mar 2023, in Lagos time. */
+export function formatMonthYear(value: DateValue): string {
+  const parsed = toDate(value);
+  return parsed ? monthYear.format(parsed) : NOT_PROVIDED;
 }
 
 const whole = new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 });

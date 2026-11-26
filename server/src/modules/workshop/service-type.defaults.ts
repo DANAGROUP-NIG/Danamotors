@@ -35,6 +35,15 @@ export function defaultServiceCategory(code: string, freeService = false, preDel
   return freeService ? 'FREE' : 'OTHER';
 }
 
+// Periodic maintenance for the warranty service history rule (job card revamp phase 4): free and
+// paid periodic services count; inspections (DI), service campaigns (SC) and pre-delivery work do
+// not. Migration 20261126184824_jobcard_warranty_check backfills existing service types the same way.
+// TODO(confirm) the list with the warranty lead.
+export function defaultPeriodicMaintenance(code: string, category: string | null, preDelivery = false): boolean {
+  const upper = code.trim().toUpperCase();
+  return !preDelivery && ['FREE', 'PAID'].includes((category ?? '').toUpperCase()) && !['DI', 'SC'].includes(upper);
+}
+
 // Free service due limits from the legacy service detail master: 1F within 30 days / 1,000 km and
 // 2F within 90 days / 5,000 km of the sale date. 3F has no limit.
 export function freeServiceDueLimits(code: string): { daysLimit: number; mileageLimit: number } | null {

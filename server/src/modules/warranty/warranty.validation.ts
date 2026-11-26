@@ -57,6 +57,16 @@ const modelFields = {
   warrantyDays: z.number().int().positive("Warranty days must be greater than zero").max(36_500).nullable().optional(),
   warrantyKm: z.number().int().positive("Warranty km must be greater than zero").max(MAX_MILEAGE).nullable().optional(),
   warrantyCovered: z.boolean().optional(),
+  // Service history rule for this model; null uses the warranty settings value.
+  serviceIntervalMonths: z.number().int("Enter whole months").min(1, "Enter at least 1 month").max(24, "Enter 24 months or fewer").nullable().optional(),
+  serviceIntervalKm: z.number().int("Enter whole km").min(500, "Enter at least 500 km").max(100_000, "Enter 100,000 km or fewer").nullable().optional(),
+  servicesPerYear: z
+    .number()
+    .refine((value) => [1, 2, 3, 4, 6, 12].includes(value), "Choose 1, 2, 3, 4, 6 or 12 services per year")
+    .nullable()
+    .optional(),
+  serviceGraceKm: z.number().int("Enter whole km").min(0, "Enter 0 or more grace km").max(10_000, "Enter 10,000 grace km or fewer").nullable().optional(),
+  serviceGraceDays: z.number().int("Enter whole days").min(0, "Enter 0 or more grace days").max(90, "Enter 90 grace days or fewer").nullable().optional(),
 };
 
 export const listModelsSchema = z.object({
@@ -74,6 +84,11 @@ export const updateModelSchema = z.object({
     warrantyDays: modelFields.warrantyDays,
     warrantyKm: modelFields.warrantyKm,
     warrantyCovered: modelFields.warrantyCovered,
+    serviceIntervalMonths: modelFields.serviceIntervalMonths,
+    serviceIntervalKm: modelFields.serviceIntervalKm,
+    servicesPerYear: modelFields.servicesPerYear,
+    serviceGraceKm: modelFields.serviceGraceKm,
+    serviceGraceDays: modelFields.serviceGraceDays,
     isActive: z.boolean().optional(),
   }),
 });

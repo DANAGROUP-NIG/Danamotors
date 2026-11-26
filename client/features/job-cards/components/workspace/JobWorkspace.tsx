@@ -31,6 +31,7 @@ import { JobStepper } from "./JobStepper";
 import { StageActionBar } from "./StageActionBar";
 import { StageContent } from "./StageContent";
 import { StageSummaryList } from "./StageSummaryList";
+import { WarrantyEvidence } from "../warranty/WarrantyStep";
 import { WaitingBanner } from "./WaitingBanner";
 
 /** The staged job card: one job, one step, one owner. */
@@ -111,7 +112,7 @@ function JobFrame({ job }: { job: JobCard }) {
   };
   // Check-in and Diagnosis show the bar themselves: check-in with its part buttons, diagnosis with the
   // allocation's "Assign and send to" button and the engineer's note dialog.
-  const ownBar = ["CHECK_IN", "DIAGNOSIS"].includes(workspace.stage) && workspace.jobType !== "PDI";
+  const ownBar = ["CHECK_IN", "DIAGNOSIS", "WARRANTY"].includes(workspace.stage) && workspace.jobType !== "PDI";
   const steps = stepperView(workspace);
   const cancelled = workspace.stage === "CANCELLED";
   const waiting = waitingMessage(workspace);
@@ -164,6 +165,7 @@ function JobFrame({ job }: { job: JobCard }) {
           items={summaryItems(workspace, job)}
           openStage={openStage}
           onToggle={(stage) => setOpenStage((current) => (current === stage ? null : stage))}
+          extra={(stage) => (stage === "WARRANTY" && workspace.jobType !== "PDI" ? <WarrantyEvidence jobCardId={job.id} /> : null)}
         />
         {!cancelled && (
           <section aria-labelledby="current-step-title" className="space-y-4">

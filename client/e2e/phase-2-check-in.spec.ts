@@ -125,7 +125,8 @@ test("B: Details shows the notes, names each mistake beside its field, and saves
   await page.goto(`/job-cards/${await jobIdByPlate(request, "KJA-482TX")}`);
   await tab(page, "Details").click();
   await expect(page.getByText(/^Not a repeat visit\./)).toBeVisible();
-  await expect(page.getByText("This vehicle is under warranty. Warranty items will need the warranty officer's review.")).toBeVisible();
+  // Phase 4: the vehicle has had no periodic service since its sale, so the alert gives the verdict.
+  await expect(page.getByText("Service history has 3 missed services in warranty year 1. Warranty items will need the warranty officer's review.")).toBeVisible();
   await expect(page.getByText("Last recorded 43,100 km")).toBeVisible();
   await expect(page.getByText("₦")).toHaveCount(0);
   const mileage = page.getByLabel("Mileage");

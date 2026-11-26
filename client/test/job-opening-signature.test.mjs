@@ -69,7 +69,9 @@ const signature = {
   signatureImage: "data:image/png;base64,SYNTHETIC",
 };
 const format = load("lib/format.ts");
-const checkInLogic = load("features/job-cards/lib/check-in.logic.ts", { "@/lib/format": format });
+// check-in.logic words the check-in warranty alert with the warranty check's logic (phase 4).
+const warrantyLogic = load("features/job-cards/lib/warranty-check.logic.ts", { "@/lib/format": format });
+const checkInLogic = load("features/job-cards/lib/check-in.logic.ts", { "@/lib/format": format, "./warranty-check.logic": warrantyLogic });
 const documentComponent = load(
   "features/job-cards/components/JobOpeningDocument.tsx",
   { "@/lib/format": format, "../lib/check-in.logic": checkInLogic },

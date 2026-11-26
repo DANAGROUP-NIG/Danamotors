@@ -15,6 +15,7 @@ import { JobCardWorkflowService } from "./job-card-workflow.service";
 import { loadCheckInGates } from "./job-check-in.service";
 import { canWorkDiagnosis, diagnosisRoute, diagnosisSubStep } from "./job-diagnosis.logic";
 import { applyDiagnosisAction, diagnosisEventNote, loadDiagnosisFacts } from "./job-diagnosis.service";
+import { applyWarrantyHandoff, loadWarrantyFacts } from "./job-warranty.service";
 import { moveStage } from "./job-stage.writer";
 import {
   ACTION_RULES,
@@ -84,6 +85,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   const gated = GATED_STAGES.has(job.stage);
   const checkInGates = job.stage === "CHECK_IN" ? await loadCheckInGates(tx, job.id, now) : null;
   const diagnosis = job.stage === "DIAGNOSIS" ? await loadDiagnosisFacts(tx, job.id) : null;
+  const warrantyProblems = job.stage === "WARRANTY" && job.jobType !== JobCardType.PDI ? await loadWarrantyFacts(tx, job.id) : [];
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
@@ -110,6 +112,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
       }) === "WARRANTY",
     diagnosisSubmitted: diagnosis?.submitted ?? false,
     findingProblems: diagnosis?.findingProblems ?? [],
+    warrantyProblems,
     billed:
       !!job.billedAt ||
       normaliseJobStatus(job.status) === "BILLED" ||
@@ -251,6 +254,12 @@ export class JobStageService {
         if (!check.toStatus) {
           // Diagnosis records who sent, returned or confirmed before the owner moves.
           await applyDiagnosisAction(tx, id, input.action, actor, note);
+          // The warranty check opens the warranty case for warranty items and records the decision.
+          if (input.action === "WARRANTY_TO_ADVISOR") {
+            const decided = await applyWarrantyHandoff(tx, id, actor);
+            await moveStage(tx, id, check.to, actor.id, { ...ctx, note: note ? `${decided} ${note}` : decided });
+            return;
+          }
           await moveStage(tx, id, check.to, actor.id, ctx);
           // Check-in is finished: record who completed it and when.
           if (input.action === "SEND_TO_SUPERVISOR")

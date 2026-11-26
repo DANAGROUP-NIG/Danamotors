@@ -79,7 +79,8 @@ function StepBody({ step, cancelled, onOpenSummary }: { step: StepView; cancelle
     </span>
   );
   const text = (
-    <span className="min-w-0">
+    // max-w-full keeps a long caption inside its column (truncated, with the full text as its tooltip).
+    <span className="min-w-0 max-w-full">
       <span
         className={cn(
           "block text-sm",

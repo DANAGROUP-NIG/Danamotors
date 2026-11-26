@@ -48,7 +48,7 @@ Only `server/src/modules/service/job-stage.writer.ts` writes the stage columns. 
 | `GET /service/job-cards/:id/workspace` | `jobcard:read`, job branch | Step, owner and since when, current sub-step, the actions this user can take (each enabled or with plain-English reasons), up to 3 alerts, one line per finished step, read-only flag, cancellation details |
 | `POST /service/job-cards/:id/stage` | `jobcard:update`, job branch | `{ action, note?, requestId }`. Runs one action under the job lock |
 
-Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs Details, Walk-around and Customer consent complete, see "Check-in (phase 2)"), `SEND_TO_ENGINEER` (technician or supervisor; a finding for every request, see "Diagnosis (phase 3)"), `RETURN_TO_TECHNICIAN` (service engineer; note required), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (the service engineer confirms the diagnosis; offered by routing, after the findings are sent), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
+Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs Details, Walk-around and Customer consent complete, see "Check-in (phase 2)"), `SEND_TO_ENGINEER` (technician or supervisor; a finding for every request, see "Diagnosis (phase 3)"), `RETURN_TO_TECHNICIAN` (service engineer; note required), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (the service engineer confirms the diagnosis; offered by routing, after the findings are sent), `WARRANTY_TO_ADVISOR` (warranty officer; every item decided and, when the service history is irregular, a reason, see "Warranty check (phase 4)"), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
 
 Actions that change the status run through `JobCardWorkflowService.updateInTx`, so the estimate approval and advance gates, QC checks, billing readiness, status history and status notifications all still apply. A blocked move returns 409 `STAGE_ACTION_BLOCKED` with `details.reasons`; the wrong role or another technician gets 403 `STAGE_ACTION_FORBIDDEN`; a missing job 404; invalid input 400 naming the field. Repeating a request ID returns the current workspace without acting again; reusing it for another action returns 409 `STAGE_REQUEST_REUSED`. PDI jobs keep their own screens and refuse stage actions.
 
@@ -77,7 +77,7 @@ Moves that change the status are announced by the existing status notification r
 | Check-in | Replaced in phase 2: Details, Walk-around and Customer consent (see "Check-in (phase 2)") |
 | Estimate | Customer consent (only when missing or out of date), estimate, advance |
 | Diagnosis | Replaced in phase 3: allocation, technician findings and engineer review (see "Diagnosis (phase 3)") |
-| Warranty | Warranty at creation, who pays for each line |
+| Warranty | Replaced in phase 4: coverage, service history, campaigns and who pays (see "Warranty check (phase 4)") |
 | Repair | Request part, Service transactions, issued parts and collection, recorded labour, technician |
 | Quality check | Record QC pass or failure, inspections, findings |
 | Billing | Bill (create job bill, bills table), delivery on credit |
@@ -176,6 +176,57 @@ The old **Findings** box (free text) is gone. The quality check step shows a **W
 | `POST /workshop/assign/:id` | `assignment:create` | Now also takes `bayId` (required at Diagnosis), `note` and `requestId` |
 
 Stage actions added: `SEND_TO_ENGINEER` (technician or supervisor; the findings gate) and `RETURN_TO_TECHNICIAN` (engineer; note required). `SEND_TO_WARRANTY` and `SEND_TO_ADVISOR` are now the engineer's confirmation, offered only after the findings are sent.
+
+### Warranty check (phase 4)
+
+After the service engineer confirms the diagnosis, a job routed to warranty (see "Diagnosis (phase 3)") is at **Warranty check**, held by the warranty officer role. The screen puts the evidence and the decisions together:
+
+- **Coverage**: Active, Expired, Expired by km, Not covered or Cannot confirm, the sale and expiry dates, and two bars, "Time used: 1 year 7 months of 5 years" and "Distance: 27,300 of 100,000 km". Coverage is worked out as of the day the job opened, with the job's mileage (`coverageFor`, the existing check).
+- **Service history**: the service history rule (below) as a grid, one row per warranty year ("Year 2 (current)", "Apr 2026 to Apr 2027"), each year split into quarters. Every block shows a status in words as well as colour (On time, Missed, Upcoming, No service due), the service date and "4,500 km since last service" (or ", at Kia Ikeja" for an outside record). A missed block says "5 months 2 weeks and 4,500 km since the last service". The card's badge reads "Regular", "1 missed service" or "Cannot check", with one sentence such as "Service history has 1 missed service in warranty year 2." When the rule cannot be checked, the card says what is missing and how to fix it ("No sale date is recorded for this vehicle. Add the sale date on the vehicle's warranty details (Warranty, Vehicle warranty).").
+- **Outside service records**: **Add outside service record** opens a dialog for a service done at another authorised Kia dealer: service date (not in the future, not before the sale), km reading, dealer, note and a required photo of the stamped service book page. The record belongs to the vehicle and counts in the rule at once. Only the person who added it or an admin can remove it, with a reason; removal is a soft delete and stays on file.
+- **Campaigns and recalls**: the campaigns linked to the job when it opened, or "No open campaigns for this vehicle."
+- **Items to decide**: every item the technician listed (work, parts and oil, with the technician's note and the request it answers), each with a segmented control: **Warranty**, **Goodwill**, **Campaign**, **Customer pay**. Each choice saves at once; a failed save keeps the choice on screen marked "Not saved" with **Retry**. A choice that cannot apply is disabled with its reason as the tooltip and spoken label ("This part cannot be claimed under warranty.", "Not in warranty when the job opened. Open a warranty case from the Warranty menu first, or choose goodwill.", "No campaign is linked to this job."). With more than one linked campaign, Campaign asks which one pays.
+- **Reason**: shown when the service history is irregular. It is required when any item is Warranty or Goodwill, and saves itself about a second after typing stops.
+
+The bottom bar's **Return to service advisor** is disabled until every item has a payer ("Choose who pays for every item (2 of 7 not decided yet).") and, when needed, the reason is written ("Write a reason, because the service history is not regular and items are set to warranty or goodwill."). Once enabled it shows "Chidi Eze will prepare the estimate." Returning runs `WARRANTY_TO_ADVISOR` through the stage service (job lock, gates, stage event, `STAGE_HANDOFF` notice to the advisor). For warranty items it opens the job's warranty case through `WarrantyCaseService.openForJobCard` (one case per job; an existing case, for example the one opened automatically for a covered vehicle, is kept). The stage event note records the decision, for example "2 items warranty, 5 items customer pay. Warranty case WTY2026000031.", and the audit log gets `JOB_WARRANTY_DECIDED`. After that the decisions are locked (409 `WARRANTY_LOCKED`).
+
+**Who can do what.** Deciding needs a warranty role (WarrantyOfficer or an admin), `jobcard:update` and `warranty:update`, with the job at the warranty check. Goodwill uses the job card line rule (`warranty:update`), and every decision is checked with `assertChargeChange`, so a decision is never one the estimate could not charge. Outside records need `warranty:update`. Seeing the evidence needs `warranty:read`: the service advisor and workshop managers see the step read-only; a technician sees "Only warranty staff can see the warranty evidence. ..." and the API returns 403. The WarrantyOfficer role now has `jobcard:update` (migration and `ROLE_PERMISSIONS`), because the handoff is a stage action.
+
+**Finished or skipped.** The finished Warranty line ("Warranty completed by Folake Adebayo, ...") opens the same screen read-only. A skipped warranty step ("Warranty skipped. Not under warranty.") also opens it, from the summary line and from the stepper, so the officer can still read the evidence.
+
+**Check-in alert.** For a vehicle under warranty, the Details alert now gives the verdict when services were missed: "Service history has 3 missed services in warranty year 1. Warranty items will need the warranty officer's review." With a regular history it keeps "This vehicle is under warranty. ...". The check-in response carries `serviceHistory` (verdict and sentence).
+
+#### The service history rule
+
+Pure function `evaluateServiceHistory` in `server/src/modules/warranty/service-history.logic.ts` (Reading A, confirmed with the warranty lead):
+
+- Warranty years run from the sale date (Lagos calendar days). Each year is split into `servicesPerYear` periods (4 gives quarters).
+- Every gap is checked: sale to first service (a new car is at 0 km), between services, and last service to the day the current job opened (with its mileage). A gap is missed when it passes `intervalMonths` calendar months plus `graceDays`, or `intervalKm` plus `graceKm`. Exactly 3 months, or exactly 5,000 km, is on time. A service due on the day of the current visit is not missed, because this visit can be that service.
+- A long gap counts one missed service for each due date it passes (9 months without a service is 3 missed services). `TODO(confirm)` with the warranty lead. A gap over the km limit only is one missed service, placed where the next service found it. Each missed service is shown in the period it belonged to: the day before it fell due.
+- Services counted: this vehicle's delivered jobs (closed, or with a delivery date) at any branch, not PDI, whose service type is marked **Periodic maintenance**, dated by the day the job opened with its mileage; plus outside service records not removed. The current job is not counted. A reading lower than the one before (odometer replaced) skips the km check for that gap; a service without a reading is checked by time only.
+- Verdict: `REGULAR`, `IRREGULAR` (count, years and where), or `INSUFFICIENT_DATA` (no sale date, a sale date after the visit, or no reading on this visit). The grid is still shown when only the reading is missing.
+
+**Settings.** **Warranty > Settings > Service history rule**: service every 3 months, or every 5,000 km, 4 services per year, grace 0 days and 0 km (`WarrantySettings`, one row; grace `TODO(confirm)`). Changing it needs `warranty:settings` and is audited (`WARRANTY_SERVICE_RULE_UPDATED`, before and after). A model policy (**Model policies > Edit**) can override each value under "Service history rule for this model"; an empty box uses the setting. **Settings > Workshop masters > Service types** has a **Periodic maintenance (counts in the warranty service history)** tick. The migration ticks free services and paid periodic services (MIS category FREE or PAID), except DI (inspection), SC (service campaign) and pre-delivery types (`defaultPeriodicMaintenance`, `TODO(confirm)`).
+
+**Data.** Migration `20261126184824_jobcard_warranty_check`, additive:
+- enum `FindingPayer` (WARRANTY, GOODWILL, CAMPAIGN, CUSTOMER); `JobFindingItem.payer`, `decidedById`, `decidedAt`, `campaignId` (CAMPAIGN becomes a FREE line charged to that campaign when the estimate is built, phase 5);
+- `JobCard.warrantyDecisionReason`;
+- `JobPhotoCategory.SERVICE_BOOK` (stamp photos are stored like other job photos, on the job they were added from);
+- `WorkshopMaster.isPeriodicMaintenance` with the backfill above;
+- `VehicleModel.serviceIntervalMonths`, `serviceIntervalKm`, `servicesPerYear`, `serviceGraceKm`, `serviceGraceDays` (null uses the setting);
+- `WarrantySettings` (one row, inserted with the defaults);
+- `ExternalServiceRecord` (vehicle, job it was added from, service date, mileage of 0 or more, dealer, note, photo, added by, request ID, removed at, by and reason);
+- `jobcard:update` for WarrantyOfficer.
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/:id/warranty` | `jobcard:read`, `warranty:read`, job branch | Coverage, service history (grid, missed services, verdict, sentence, how to fix missing data), outside records, linked campaigns, items with payers, reason, whether it is needed, handoff problems, decision summary, warranty case, `editable`, `canAddRecords` |
+| `PUT /service/job-cards/:id/warranty` | plus `jobcard:update`, `warranty:update`, warranty role, job at the warranty check | `{ items: [{ itemId, payer, campaignId? }], reason? }`. A refused decision is 400 naming `items.N.payer` and the item. Audited `JOB_WARRANTY_DECISIONS_SAVED` |
+| `POST /service/job-cards/:id/warranty/outside-services` | `warranty:update` | `{ requestId, serviceDate, mileage, dealerName, note?, image }`; a repeated request ID stores once. Audited `EXTERNAL_SERVICE_RECORD_ADDED` (photo hash, never the image) |
+| `DELETE /service/job-cards/:id/warranty/outside-services/:recordId` | `warranty:update`, the creator or an admin | `{ reason }`. Soft delete. Audited `EXTERNAL_SERVICE_RECORD_REMOVED` |
+| `GET`, `PUT /warranty/service-rule` | `warranty:read`, `warranty:settings` | The rule settings |
+
+Every write takes the job row lock first. The old Warranty step content (warranty at creation and the job card lines card) is gone from the step; both stay in the Job file's Warranty and campaigns tab.
 
 ### Vehicles with multiple job cards (issue 142)
 

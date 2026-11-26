@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Loader2, Package, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 import { ServiceTransactions } from "@/features/service-transactions/components/ServiceTransactions";
 import { formatDateTime } from "@/lib/format";
 import { useRequestJobCardParts } from "../../hooks/use-request-job-card-parts";
@@ -14,12 +13,11 @@ import type { JobFileTab } from "../../lib/job-frame.logic";
 import { JobAdvanceSection } from "../JobAdvanceSection";
 import { JobCardEstimateSection } from "../JobCardEstimateSection";
 import { JobCardLabourSection } from "../JobCardLabourSection";
-import { JobCardLinesCard } from "../JobCardLinesCard";
 import { JobCardPartsSection } from "../JobCardPartsSection";
-import { WarrantySnapshotCard } from "../JobCardWarrantyCards";
 import { CheckInStep, type StageBarProps } from "../check-in/CheckInStep";
 import { ConsentCatchUp } from "../check-in/ConsentCatchUp";
 import { DiagnosisStep } from "../diagnosis/DiagnosisStep";
+import { WarrantyStep } from "../warranty/WarrantyStep";
 import { WORKSPACE_COPY } from "../repair-workspace-copy";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
@@ -46,7 +44,7 @@ export function StageContent({
 }: {
   job: JobCard;
   workspace: JobWorkspace;
-  /** Check-in and Diagnosis show the action bar themselves, with their own buttons. */
+  /** Check-in, Diagnosis and Warranty show the action bar themselves, with their own buttons. */
   bar: StageBarProps;
   onPrintGatePass: () => void;
   onOpenTab: (tab: JobFileTab) => void;
@@ -61,8 +59,8 @@ export function StageContent({
       // PDI jobs keep their own screens; everything else uses the staged diagnosis.
       return workspace.jobType === "PDI" ? null : <DiagnosisStep job={job} bar={bar} />;
     case "WARRANTY":
-      // TODO(phase 4): replaced by the warranty decision screen and the service history rule.
-      return <WarrantyReview job={job} />;
+      // PDI jobs keep their own screens; everything else uses the staged warranty check.
+      return workspace.jobType === "PDI" ? null : <WarrantyStep job={job} bar={bar} />;
     case "REPAIR":
       // TODO(phase 6): replaced by the technician repair view, parts collection and supplementary estimate.
       return (
@@ -120,23 +118,6 @@ function OpeningEstimateAdvance({ job, workspace }: { job: JobCard; workspace: J
         </StageCard>
       )}
       {(job.advanceSummary || job.advanceReceipts) && <JobAdvanceSection jobCard={job} open={!closed} />}
-    </>
-  );
-}
-
-function WarrantyReview({ job }: { job: JobCard }) {
-  const { hasPermission, isSuperAdmin } = useAuth();
-  const canSeeWarranty = isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
-  return (
-    <>
-      {canSeeWarranty ? (
-        <WarrantySnapshotCard jobCard={job} />
-      ) : (
-        <StageCard title="Warranty check">
-          <p className="text-sm text-muted-foreground">The warranty officer is checking the vehicle&apos;s cover. Details are shown to staff with warranty access.</p>
-        </StageCard>
-      )}
-      <JobCardLinesCard jobCardId={job.id} />
     </>
   );
 }

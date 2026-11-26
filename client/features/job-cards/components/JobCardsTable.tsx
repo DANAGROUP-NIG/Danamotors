@@ -157,8 +157,15 @@ export function JobCardsTable() {
     setPage(1);
   }
 
+  // The search box reports each change and then asks to search straight away, before the new text
+  // reaches state; committing the typed value here keeps the list in step with the box.
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setCommittedSearch(value);
+    setPage(1);
+  }
+
   function handleCommitSearch() {
-    setCommittedSearch(search);
     setPage(1);
   }
 
@@ -345,7 +352,7 @@ export function JobCardsTable() {
         <div className="flex flex-col gap-4">
           <DataTableSearchHeader
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onCommitSearch={handleCommitSearch}
             onClearSearch={handleClearSearch}
             placeholder="Search by job #, customer, vehicle..."

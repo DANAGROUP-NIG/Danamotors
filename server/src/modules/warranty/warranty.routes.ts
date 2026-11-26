@@ -1,9 +1,12 @@
 import { Router } from "express";
+import { z } from "zod";
 import { authMiddleware } from "../../middleware/authMiddleware";
 import { requirePermission } from "../../middleware/authorize";
 import { validateRequest } from "../../middleware/requestValidator";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { WarrantyController } from "./warranty.controller";
+import { getServiceRuleSettings, updateServiceRuleSettings } from "../service/job-warranty.service";
+import { serviceRuleBody } from "../service/job-warranty.logic";
 import {
   addCaseLineSchema,
   caseIdSchema,
@@ -256,6 +259,37 @@ router.use(authMiddleware);
  *     responses:
  *       200: { description: Updated }
  */
+/**
+ * @openapi
+ * /api/warranty/service-rule:
+ *   get:
+ *     tags: [Warranty]
+ *     summary: The service history rule (warranty settings)
+ *     description: 'Requires warranty:read. Service at least every serviceIntervalMonths or serviceIntervalKm, whichever comes first, in every warranty year; servicesPerYear periods on the grid; grace km and days. A vehicle model can override each value.'
+ *     responses:
+ *       200: { description: The rule }
+ *   put:
+ *     tags: [Warranty]
+ *     summary: Change the service history rule
+ *     description: 'Requires warranty:settings. Audited as WARRANTY_SERVICE_RULE_UPDATED with the values before and after.'
+ *     responses:
+ *       200: { description: The rule after saving }
+ *       400: { description: Invalid fields }
+ */
+router.get("/service-rule", requirePermission(P.WARRANTY_READ), async (_req, res, next) => {
+  try {
+    res.json({ status: "success", statusCode: 200, data: await getServiceRuleSettings() });
+  } catch (error) {
+    next(error);
+  }
+});
+router.put("/service-rule", requirePermission(P.WARRANTY_SETTINGS), validateRequest(z.object({ body: serviceRuleBody })), async (req, res, next) => {
+  try {
+    res.json({ status: "success", statusCode: 200, message: "Service history rule saved", data: await updateServiceRuleSettings(req.body, req.user!.userId) });
+  } catch (error) {
+    next(error);
+  }
+});
 router.get("/codes", requirePermission(P.WARRANTY_READ), validateRequest(listCodesSchema), controller.listCodes);
 router.post("/codes/:type", requirePermission(P.WARRANTY_SETTINGS), validateRequest(createCodeSchema), controller.createCode);
 router.put("/codes/:type/:id", requirePermission(P.WARRANTY_SETTINGS), validateRequest(updateCodeSchema), controller.updateCode);

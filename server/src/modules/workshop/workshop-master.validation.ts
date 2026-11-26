@@ -15,6 +15,8 @@ export const masterBody = z.object({
   freeService: z.boolean().optional(),
   displayOrder: z.number().int().min(0).max(100000).nullable().optional(),
   preDelivery: z.boolean().optional(),
+  // SERVICE_TYPE only: counted by the warranty service history rule.
+  isPeriodicMaintenance: z.boolean().optional(),
   parentId: z.string().uuid().nullable().optional(),
   fuel: z.string().trim().max(50).nullable().optional(),
   gearbox: z.string().trim().max(50).nullable().optional(),

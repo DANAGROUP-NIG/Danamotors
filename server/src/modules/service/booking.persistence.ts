@@ -8,7 +8,7 @@ import {
   NotFoundError,
 } from "../../shared/errors/appError";
 import { bookingRequestBody } from "./service.validation";
-import { resolveJobComplaints } from "./job-card-complaints";
+import { resolveJobComplaints, withOrderedIds } from "./job-card-complaints";
 import { bookingView } from "./booking.logic";
 
 export type BookingFields = {
@@ -78,7 +78,10 @@ export async function bookingRelations(
           .min(1, "Add a customer request")
           .parse(data.requests),
   );
-  return rows.map((row) => ({
+  // Requests are listed by creation time then id, and are written together: ascending ids keep
+  // the order they were entered in (as for job card requests).
+  return withOrderedIds(rows).map((row) => ({
+    id: row.id,
     complaintCodeId: row.complaintCodeId,
     defectCode: row.defectCode,
     description: row.description,

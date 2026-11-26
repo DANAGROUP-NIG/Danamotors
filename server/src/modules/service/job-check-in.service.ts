@@ -22,6 +22,7 @@ import {
 } from "./job-check-in.logic";
 import { openingConsentState } from "./job-opening-signature.service";
 import { canWorkStage, STAGE_LABELS, type StageActor } from "./job-stage.logic";
+import { serviceHistoryNote } from "./job-warranty.service";
 
 type Tx = Prisma.TransactionClient;
 type Database = Tx | typeof prisma;
@@ -136,6 +137,8 @@ export class JobCheckInService {
         ? prisma.user.findUnique({ where: { id: job.checkIn.completedById }, select: { firstName: true, lastName: true } })
         : null,
     ]);
+    // The service history verdict for the Details alert (warranty service rule, phase 4).
+    const serviceHistory = await serviceHistoryNote(prisma, job);
     const previous = previousMileageOf(job);
     const problem = options.canUpdate ? editProblem(job, actor) : { status: 403 as const, message: "You can view check-in but not change it." };
     const owner = job.vehicle?.customer;
@@ -153,6 +156,7 @@ export class JobCheckInService {
         previous == null
           ? null
           : { km: previous, at: previousVisit && previousVisit.mileage === previous ? previousVisit.createdAt : null },
+      serviceHistory,
       vehicleOwner: owner
         ? { id: owner.id, name: owner.companyName || [owner.firstName, owner.lastName].filter(Boolean).join(" ") }
         : null,

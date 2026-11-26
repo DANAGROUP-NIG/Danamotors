@@ -295,16 +295,19 @@ model User {
   jobStatusChanges    JobCardStatusHistory[]
   createdJobCards     JobCard[]              @relation("CreatedJobCards")
 
-  technicianAssignments       JobCard[]       @relation("TechnicianAssignments")
-  stageOwnedJobs              JobCard[]       @relation("JobStageOwner")
-  jobStageEventsActed         JobStageEvent[] @relation("JobStageEventActor")
-  jobStageEventsOwned         JobStageEvent[] @relation("JobStageEventOwner")
-  diagnosesAllocated          JobDiagnosis[]  @relation("DiagnosisAllocatedBy")
-  diagnosesSubmitted          JobDiagnosis[]  @relation("DiagnosisSubmittedBy")
-  diagnosesReturned           JobDiagnosis[]  @relation("DiagnosisReturnedBy")
-  diagnosesConfirmed          JobDiagnosis[]  @relation("DiagnosisConfirmedBy")
-  jobFindingsCreated          JobFinding[]    @relation("JobFindingCreatedBy")
-  qualityInspectorAssignments JobCard[]       @relation("QualityInspectorAssignments")
+  technicianAssignments       JobCard[]               @relation("TechnicianAssignments")
+  stageOwnedJobs              JobCard[]               @relation("JobStageOwner")
+  jobStageEventsActed         JobStageEvent[]         @relation("JobStageEventActor")
+  jobStageEventsOwned         JobStageEvent[]         @relation("JobStageEventOwner")
+  diagnosesAllocated          JobDiagnosis[]          @relation("DiagnosisAllocatedBy")
+  diagnosesSubmitted          JobDiagnosis[]          @relation("DiagnosisSubmittedBy")
+  diagnosesReturned           JobDiagnosis[]          @relation("DiagnosisReturnedBy")
+  diagnosesConfirmed          JobDiagnosis[]          @relation("DiagnosisConfirmedBy")
+  jobFindingsCreated          JobFinding[]            @relation("JobFindingCreatedBy")
+  findingItemsDecided         JobFindingItem[]        @relation("FindingItemDecidedBy")
+  externalServicesAdded       ExternalServiceRecord[] @relation("ExternalServiceAddedBy")
+  externalServicesRemoved     ExternalServiceRecord[] @relation("ExternalServiceRemovedBy")
+  qualityInspectorAssignments JobCard[]               @relation("QualityInspectorAssignments")
 
   purchaseRequests PurchaseRequest[] @relation("UserPurchaseRequests")
 
@@ -707,12 +710,12 @@ model ServiceAppointment {
 model JobCard {
   csiSurvey                CsiSurvey?
   /// SERVICE (default) or PDI. PDI jobs have their own number series and stay out of service history.
-  jobType                  JobCardType           @default(SERVICE)
+  jobType                  JobCardType             @default(SERVICE)
   /// PDI only: the temporary registration (default: last 6 of the VIN). Never the vehicle's real plate.
   pdiRegistration          String?
   /// First print of the job card; edit-after-print rules (PDI settings) apply from then.
   printedAt                DateTime?
-  openingSignatureRequired Boolean               @default(true)
+  openingSignatureRequired Boolean                 @default(true)
   openingSignatures        JobOpeningSignature[]
   openingConsent           Json?
   /// Check-in record (fuel, checklist, belongings, instructions), damage marks and photos (job card revamp phase 2).
@@ -722,17 +725,22 @@ model JobCard {
   /// Diagnosis: allocation note, technician findings and the service engineer's review (job card revamp phase 3).
   diagnosis                JobDiagnosis?
   findings                 JobFinding[]
-  advanceReceipts          Receipt[]             @relation("JobAdvances")
-  consolidatedInvoices     Invoice[]             @relation("WarrantyJobBills")
-  depositReceiptId         String?               @unique
-  depositReceipt           Receipt?              @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
-  followUpAppointments     ServiceAppointment[]  @relation("BookingFollowUp")
+  /// Warranty check (job card revamp phase 4): why warranty or goodwill was approved although the
+  /// service history is irregular. Required in that case before the job returns to the advisor.
+  warrantyDecisionReason   String?
+  /// Outside service records added while this job was at the warranty check.
+  externalServiceRecords   ExternalServiceRecord[]
+  advanceReceipts          Receipt[]               @relation("JobAdvances")
+  consolidatedInvoices     Invoice[]               @relation("WarrantyJobBills")
+  depositReceiptId         String?                 @unique
+  depositReceipt           Receipt?                @relation("JobDeposit", fields: [depositReceiptId], references: [id], onDelete: Restrict)
+  followUpAppointments     ServiceAppointment[]    @relation("BookingFollowUp")
   requisitions             PartRequisition[]
   returnSlips              PartReturnSlip[]
   labourSlips              LabourSlip[]
   engineerId               String?
-  engineer                 User?                 @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
-  id                       String                @id @default(uuid())
+  engineer                 User?                   @relation("JobEngineer", fields: [engineerId], references: [id], onDelete: Restrict)
+  id                       String                  @id @default(uuid())
 
   appointmentId String?
   appointment   ServiceAppointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
@@ -1082,14 +1090,16 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  images           VehicleImage[]
-  ownerships       VehicleOwnership[]
-  appointments     ServiceAppointment[]
-  jobCards         JobCard[]
-  warrantyCases    WarrantyCase[]
-  campaignVehicles CampaignVehicle[]
-  cscCases         CscCase[]
-  psfFollowUps     PsfFollowUp[]
+  images                 VehicleImage[]
+  ownerships             VehicleOwnership[]
+  appointments           ServiceAppointment[]
+  jobCards               JobCard[]
+  warrantyCases          WarrantyCase[]
+  campaignVehicles       CampaignVehicle[]
+  cscCases               CscCase[]
+  psfFollowUps           PsfFollowUp[]
+  /// Services done at another authorised dealer, added by the warranty officer (phase 4).
+  externalServiceRecords ExternalServiceRecord[]
 
   @@index([customerId])
   @@index([modelId])
@@ -2339,6 +2349,8 @@ model WorkshopMaster {
   category                 String?
   chargedTo                String                    @default("CUSTOMER")
   freeService              Boolean                   @default(false)
+  /// SERVICE_TYPE only: a periodic maintenance service, counted by the warranty service history rule.
+  isPeriodicMaintenance    Boolean                   @default(false)
   displayOrder             Int?
   preDelivery              Boolean                   @default(false)
   parentId                 String?
@@ -2472,6 +2484,8 @@ enum JobPhotoCategory {
   CHECK_IN
   DAMAGE
   FINDING
+  /// A stamped service book page for an outside service record (warranty check).
+  SERVICE_BOOK
 }
 
 /// The service advisor's check-in record, one per job. Written only while the job is at check-in.
@@ -2518,25 +2532,26 @@ model JobDamageMark {
 
 /// A photo stored in the database. Bytes are served only by the photo endpoint, never in job responses.
 model JobPhoto {
-  id          String           @id @default(uuid())
-  jobCardId   String
-  jobCard     JobCard          @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
-  category    JobPhotoCategory
+  id                    String                 @id @default(uuid())
+  jobCardId             String
+  jobCard               JobCard                @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  category              JobPhotoCategory
   /// For check-in photos: FRONT, REAR, LEFT, RIGHT or ODOMETER. Null for other categories.
-  slot        String?
-  contentType String
-  byteSize    Int
-  width       Int
-  height      Int
-  sha256      String           @db.Char(64)
-  data        Bytes
-  requestId   String
-  createdById String
-  createdAt   DateTime         @default(now())
-  damageMark  JobDamageMark?
+  slot                  String?
+  contentType           String
+  byteSize              Int
+  width                 Int
+  height                Int
+  sha256                String                 @db.Char(64)
+  data                  Bytes
+  requestId             String
+  createdById           String
+  createdAt             DateTime               @default(now())
+  damageMark            JobDamageMark?
+  externalServiceRecord ExternalServiceRecord?
   /// For FINDING photos: the technician's finding the photo belongs to.
-  findingId   String?
-  finding     JobFinding?      @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId             String?
+  finding               JobFinding?            @relation(fields: [findingId], references: [id], onDelete: Cascade)
 
   @@unique([jobCardId, requestId])
   @@index([jobCardId, category])
@@ -3452,6 +3467,13 @@ model VehicleModel {
   warrantyCovered Boolean @default(true)
   isActive        Boolean @default(true)
 
+  // Service history rule for this model (phase 4). Null uses the warranty settings value.
+  serviceIntervalMonths Int?
+  serviceIntervalKm     Int?
+  servicesPerYear       Int?
+  serviceGraceKm        Int?
+  serviceGraceDays      Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3733,6 +3755,7 @@ model Campaign {
   vinRanges    CampaignVinRange[]
   jobCards     JobCardCampaign[]
   jobCardLines JobCardLine[]
+  findingItems JobFindingItem[]
 
   @@index([status, type])
 }
@@ -5353,6 +5376,63 @@ model JobFindingItem {
   description String
   quantity    Decimal            @db.Decimal(12, 2)
   sortOrder   Int
+  /// Who pays, decided by the warranty officer at the warranty check. Null until decided.
+  payer       FindingPayer?
+  decidedById String?
+  decidedBy   User?              @relation("FindingItemDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt   DateTime?
+  /// CAMPAIGN only: the linked campaign that pays.
+  campaignId  String?
+  campaign    Campaign?          @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([findingId, sortOrder])
+}
+
+/// Who pays for a diagnosed item. CAMPAIGN becomes a FREE line charged to the job's linked campaign.
+enum FindingPayer {
+  WARRANTY
+  GOODWILL
+  CAMPAIGN
+  CUSTOMER
+}
+
+/// The service history rule (Reading A, maintenance compliance): a service at least every
+/// intervalMonths or intervalKm, whichever comes first, in every warranty year. One row, id "default".
+/// A vehicle model can override each value (VehicleModel.service*).
+model WarrantySettings {
+  id                    String   @id @default("default")
+  serviceIntervalMonths Int      @default(3)
+  serviceIntervalKm     Int      @default(5000)
+  servicesPerYear       Int      @default(4)
+  serviceGraceKm        Int      @default(0)
+  serviceGraceDays      Int      @default(0)
+  updatedById           String?
+  updatedAt             DateTime @updatedAt
+}
+
+/// A service done at another authorised dealer, from the stamped service book. Counted by the
+/// service history rule. Removed only by its creator or an admin, with a reason (soft delete).
+model ExternalServiceRecord {
+  id            String    @id @default(uuid())
+  vehicleId     String
+  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  /// The job at the warranty check when the record was added; its photo belongs to that job.
+  jobCardId     String?
+  jobCard       JobCard?  @relation(fields: [jobCardId], references: [id], onDelete: SetNull)
+  serviceDate   DateTime  @db.Date
+  mileage       Int
+  dealerName    String
+  note          String?
+  photoId       String?   @unique
+  photo         JobPhoto? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  addedById     String
+  addedBy       User      @relation("ExternalServiceAddedBy", fields: [addedById], references: [id], onDelete: Restrict)
+  requestId     String    @unique
+  createdAt     DateTime  @default(now())
+  removedAt     DateTime?
+  removedById   String?
+  removedBy     User?     @relation("ExternalServiceRemovedBy", fields: [removedById], references: [id], onDelete: SetNull)
+  removedReason String?
+
+  @@index([vehicleId, serviceDate])
 }

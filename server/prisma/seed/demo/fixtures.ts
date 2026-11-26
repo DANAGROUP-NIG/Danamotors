@@ -146,6 +146,11 @@ export const VEHICLES = {
   stgReview: { vin: "KNAPM81DMK7000514", registrationNumber: "LSR-524ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
   stgReturned: { vin: "KNAPM81DMK7000515", registrationNumber: "LSR-525ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
   stgPlain: { vin: "KNAPM81DMK7000516", registrationNumber: "LSR-526ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
+  // Warranty check (phase 4): service histories in warranty-check.ts. One missed service; regular and in the
+  // open recall; no sale date recorded (cleared before its job opens).
+  stgWtyIrregular: { vin: "KNAPX81DMS7000517", registrationNumber: "KJA-527ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 600 },
+  stgWtyRegular: { vin: "KNAPX81DMS7000518", registrationNumber: "KJA-528ST", customer: "lakeside", model: "SPORTAGE", saleDaysAgo: 250 },
+  stgWtyNoSale: { vin: "KNAPX81DMS7000519", registrationNumber: "KJA-529ST", customer: "adeyemi", model: "SPORTAGE", saleDaysAgo: 300 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -187,6 +192,12 @@ export const PARTS = {
     partNumber: "58101-DM100", name: "Front brake pads set", category: "Brakes", partFlag: "O", partType: "S", uom: "SET",
     unitPrice: 36_000, retailRate: 45_000, warrantyApplicable: true, warrantyRate: 40_000,
     stock: { main: { quantity: 12, minimum: 4, rack: "BRK-01" }, second: { quantity: 6, minimum: 2, rack: "BRK-01" } },
+  },
+  // Warranty check (phase 4): a claimable part for the AC finding.
+  acCompressor: {
+    partNumber: "97701-DM300", name: "AC compressor", category: "Air conditioning", partFlag: "O", partType: "S", uom: "PCS",
+    unitPrice: 380_000, retailRate: 480_000, warrantyApplicable: true, warrantyRate: 420_000,
+    stock: { main: { quantity: 3, minimum: 1, rack: "AC-01" }, second: { quantity: 1, minimum: 1, rack: "AC-01" } },
   },
   acRefrigerant: {
     partNumber: "LOC-R134A-500G", name: "AC refrigerant R134a, 500 g", category: "Air conditioning", partFlag: "L", partType: "S", uom: "CAN",
@@ -278,10 +289,12 @@ export interface FindingFixture {
 
 /**
  * Diagnosis for a job that stops at it (phase 3): how far it gets and what the technician found.
- * findings: recorded, not sent; review: sent to the service engineer; returned: sent back with a note.
+ * findings: recorded, not sent; review: sent to the service engineer; returned: sent back with a note;
+ * confirmed: confirmed by the engineer.
  */
 export interface DiagnosisFixture {
-  stop: "findings" | "review" | "returned";
+  /** confirmed: the engineer confirms these findings and routing moves the job on (to the warranty check). */
+  stop: "findings" | "review" | "returned" | "confirmed";
   findings: FindingFixture[];
   returnNote?: string;
 }
@@ -723,6 +736,43 @@ export const STAGE_JOBS: JobFixture[] = [
     diagnosis: {
       stop: "review",
       findings: [{ request: 0, text: "Due for the 100,000 km service. No other faults found.", labour: ["service"], parts: [["engineOil", 1]] }],
+    },
+  }),
+  // Warranty check (phase 4), with the warranty officer. One missed service in year 2; AC items to claim.
+  stageJob("JC-S16", "stgWtyIrregular", {
+    description: "AC not cooling well, brakes noisy, and the 25,000 km service.",
+    complaints: ["AC not cooling well", "Noise from front left wheel when braking", "Periodic service (25,000 km)"],
+    mileage: 27_300, withTechnician: true, target: "OPEN", stop: "WARRANTY", estimate: "none",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Compressor clutch not engaging. No refrigerant leak seen.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1], ["acRefrigerant", 1]] },
+        { request: 1, text: "Front pads worn to 2 mm, disc surface fine.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+        { request: 2, text: "Due for the 25,000 km service.", labour: ["service"], parts: [["engineOil", 1]] },
+      ],
+    },
+  }),
+  // Regular history and the open recall: the recall work can be charged to the campaign.
+  stageJob("JC-S17", "stgWtyRegular", {
+    description: "Periodic service and the engine wiring harness recall.",
+    complaints: ["Periodic service (15,000 km)", "Engine wiring harness recall"],
+    mileage: 12_400, withTechnician: true, target: "OPEN", stop: "WARRANTY", estimate: "none",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Due for the 15,000 km service.", labour: ["service"], parts: [["engineOil", 1]] },
+        { request: 1, text: "Harness rubbing on the intake bracket. Reroute as per the recall.", labour: ["general"] },
+      ],
+    },
+  }),
+  // No sale date: the service history cannot be checked; the AC finding is flagged possible warranty.
+  stageJob("JC-S18", "stgWtyNoSale", {
+    description: "AC not cooling well.",
+    complaints: ["AC not cooling well"],
+    mileage: 18_600, withTechnician: true, target: "OPEN", stop: "WARRANTY", estimate: "none",
+    diagnosis: {
+      stop: "confirmed",
+      findings: [{ request: 0, text: "Compressor clutch not engaging.", possibleWarranty: true, labour: ["acCheck"], parts: [["acCompressor", 1]] }],
     },
   }),
   stageJob("JC-S12", "stgSigned", {

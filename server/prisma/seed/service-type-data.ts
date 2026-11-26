@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { defaultServiceCategory, freeServiceDueLimits, LEGACY_SERVICE_TYPES, rioServiceTypeCharge } from '../../src/modules/workshop/service-type.defaults';
+import { defaultPeriodicMaintenance, defaultServiceCategory, freeServiceDueLimits, LEGACY_SERVICE_TYPES, rioServiceTypeCharge } from '../../src/modules/workshop/service-type.defaults';
 
 export async function seedServiceTypes(db: Prisma.TransactionClient, modelId: string) {
   await db.workshopMaster.updateMany({
@@ -11,6 +11,7 @@ export async function seedServiceTypes(db: Prisma.TransactionClient, modelId: st
     data: LEGACY_SERVICE_TYPES.map(([code, description, chargedTo, freeService]) => ({
       id: randomUUID(), kind: 'SERVICE_TYPE', code, description, chargedTo, freeService,
       preDelivery: code === 'PD' || code === 'BD', category: defaultServiceCategory(code, freeService),
+      isPeriodicMaintenance: defaultPeriodicMaintenance(code, defaultServiceCategory(code, freeService), code === 'PD' || code === 'BD'),
     })), skipDuplicates: true,
   });
   // Service types seeded before #97 have no MIS category.

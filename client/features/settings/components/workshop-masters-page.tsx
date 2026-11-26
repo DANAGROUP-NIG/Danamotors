@@ -14,6 +14,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ServiceTypeModelSettings } from "./service-type-model-settings";
 import { DefectModelEstimates } from "./defect-model-estimates";
 import { MASTER_KIND_GROUPS, MASTER_KINDS, SERVICE_CATEGORY_LABELS, type AttributeField } from "./master-kinds";
+import { NOT_PROVIDED } from "@/lib/format";
 
 type Master = {
   id: string;
@@ -29,6 +30,8 @@ type Master = {
   freeService?: boolean;
   displayOrder?: number | null;
   preDelivery?: boolean;
+  /** SERVICE_TYPE: counted by the warranty service history rule. */
+  isPeriodicMaintenance?: boolean;
   fuel?: string | null;
   gearbox?: string | null;
   acFitted?: boolean;
@@ -117,6 +120,7 @@ export function WorkshopMastersPage() {
         freeService: record.freeService,
         displayOrder: kind === "SERVICE_TYPE" ? record.displayOrder : undefined,
         preDelivery: kind === "SERVICE_TYPE" ? record.preDelivery : undefined,
+        isPeriodicMaintenance: kind === "SERVICE_TYPE" ? record.isPeriodicMaintenance : undefined,
         fuel: record.fuel,
         gearbox: record.gearbox,
         acFitted: record.acFitted,
@@ -193,7 +197,7 @@ export function WorkshopMastersPage() {
           render: row => row.description,
         }, ...(kind === "SERVICE_TYPE" ? [{
           header: "MIS category",
-          render: (row: Master) => SERVICE_CATEGORY_LABELS[row.category ?? ""] ?? "—",
+          render: (row: Master) => SERVICE_CATEGORY_LABELS[row.category ?? ""] ?? NOT_PROVIDED,
         }] : []), ...(config.parent ? [{
           header: config.parent.label,
           render: (row: Master) => row.parent ? `${row.parent.code} | ${row.parent.description}` : "",
@@ -281,6 +285,8 @@ export function WorkshopMastersPage() {
               value={form.displayOrder ?? ""} onChange={event => setForm({ ...form, displayOrder: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
             <label className="flex gap-2"><input type="checkbox" checked={form.preDelivery ?? false}
               onChange={event => setForm({ ...form, preDelivery: event.target.checked })} />Pre-delivery service (unsold vehicles only)</label>
+            <label className="flex gap-2"><input type="checkbox" checked={form.isPeriodicMaintenance ?? false}
+              onChange={event => setForm({ ...form, isPeriodicMaintenance: event.target.checked })} />Periodic maintenance (counts in the warranty service history)</label>
           </>}
           {kind === "BAY" && <Field label="Bay group"><input
               className={inputCls}

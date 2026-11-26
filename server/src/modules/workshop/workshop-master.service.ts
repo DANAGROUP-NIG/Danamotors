@@ -103,8 +103,8 @@ export class WorkshopMasterService {
   }
 
   async create(data: MasterInput) {
-    if (data.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
-      throw new BadRequestError('Display order and pre-delivery apply only to service types');
+    if (data.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined || data.isPeriodicMaintenance !== undefined))
+      throw new BadRequestError('Display order, pre-delivery and periodic maintenance apply only to service types');
     assertServiceCategory(data.kind, data.category);
     await this.validateParent(data.kind, data.parentId);
     const { attributes, ...rest } = data;
@@ -131,8 +131,8 @@ export class WorkshopMasterService {
 
     if (!existing)
       throw new NotFoundError('Master not found');
-    if (existing.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined))
-      throw new BadRequestError('Display order and pre-delivery apply only to service types');
+    if (existing.kind !== 'SERVICE_TYPE' && (data.displayOrder !== undefined || data.preDelivery !== undefined || data.isPeriodicMaintenance !== undefined))
+      throw new BadRequestError('Display order, pre-delivery and periodic maintenance apply only to service types');
 
     const kind = existing.kind as MasterKind;
     assertServiceCategory(kind, data.category);

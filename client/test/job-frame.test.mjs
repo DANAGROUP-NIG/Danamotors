@@ -73,7 +73,8 @@ test("stepper shows each step's state, who finished it and when, and skipped ste
     [
       [1, "Check-in", "completed", "Chidi Eze, 25 Nov 2026, 09:40", true],
       [2, "Diagnosis", "completed", "Not provided", true],
-      [3, "Warranty", "skipped", "Skipped", false],
+      // A skipped warranty check still opens its read-only view (phase 4).
+      [3, "Warranty", "skipped", "Skipped", true],
       [4, "Estimate", "completed", "Chidi Eze, 25 Nov 2026, 12:05", true],
       [5, "Repair", "current", null, false],
       [6, "Quality check", "upcoming", null, false],
@@ -300,12 +301,12 @@ test("an enabled handoff has no reason, and the bar is absent when there is noth
   assert.ok(bar({ onSaveDraft() {} }).includes("Save draft"));
 });
 
-test("the stepper is an ordered list with the current step marked and finished steps as buttons", () => {
+test("the stepper is an ordered list with the current step marked and finished steps (and the skipped warranty check) as buttons", () => {
   const steps = frame.stepperView({ stage: "REPAIR", summaries });
   const html = renderToStaticMarkup(React.createElement(JobStepper, { steps, phoneLabel: "Step 5 of 8: Repair", progress: 50, cancelled: false, onOpenSummary() {} }));
   assert.ok(html.includes("<ol"));
   assert.equal((html.match(/aria-current="step"/g) || []).length, 1);
-  assert.equal((html.match(/<button/g) || []).length, 4);
+  assert.equal((html.match(/<button/g) || []).length, 5);
   assert.ok(html.includes("Step 5 of 8: Repair"));
   assert.ok(html.includes('aria-valuenow="50"'));
 });

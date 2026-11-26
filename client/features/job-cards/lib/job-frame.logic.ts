@@ -62,7 +62,7 @@ export interface StepView {
   state: StepState;
   /** Who finished the step and when, "Skipped", or nothing for current and upcoming steps. */
   caption: string | null;
-  /** A finished step that opens its read-only summary. */
+  /** A finished step (or the skipped warranty check) that opens its read-only summary. */
   opensSummary: boolean;
 }
 
@@ -79,7 +79,9 @@ export function stepperView(workspace: Pick<JobWorkspace, "stage" | "summaries">
             ? `${summary.by}, ${formatDateTime(summary.at)}`
             : NOT_PROVIDED
           : null;
-    return { stage, number: index + 1, label: STAGE_LABELS[stage], state, caption, opensSummary: state === "completed" };
+    // A skipped warranty check still opens: the warranty officer can read the evidence.
+    const opensSummary = state === "completed" || (state === "skipped" && stage === "WARRANTY");
+    return { stage, number: index + 1, label: STAGE_LABELS[stage], state, caption, opensSummary };
   });
 }
 

@@ -57,6 +57,8 @@ export interface JobCheckIn {
   photoSlots: CheckInPhotoSlot[];
   previousReading: { km: number; at: string | null } | null;
   vehicleOwner: { id: string; name: string } | null;
+  /** The warranty service history verdict for this visit (phase 4). Null without a vehicle. */
+  serviceHistory: CheckInServiceHistory | null;
   record: WalkAroundDraft & {
     instructionsToTechnician: string | null;
     version: number;
@@ -110,4 +112,10 @@ export interface SignedCheckIn {
   belongingsNote: string | null;
   damageMarks: { id: string; type: DamageType; x: number; y: number; note: string | null; photoId: string | null }[];
   photos: { id: string; category: string; slot: string | null; sha256: string }[];
+}
+
+/** The service history verdict at check-in: REGULAR, IRREGULAR or INSUFFICIENT_DATA, and its sentence. */
+export interface CheckInServiceHistory {
+  verdict: "REGULAR" | "IRREGULAR" | "INSUFFICIENT_DATA";
+  sentence: string;
 }

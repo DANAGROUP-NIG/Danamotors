@@ -27,9 +27,13 @@ test.describe("phase 0: job card list", () => {
     await expect(page.getByRole("columnheader", { name: "Step" })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "Status" })).toBeVisible();
     const search = page.getByPlaceholder("Search by job #, customer, vehicle...");
-    await search.fill("KJA-482TX");
-    await search.press("Enter");
-    const row = page.getByRole("row").filter({ hasText: "KJA" }).first();
+    const row = page.getByRole("row").filter({ hasText: "KJA-482TX" }).first();
+    // On a cold dev server the first Enter can land before React hydrates the box; search again until it filters.
+    await expect(async () => {
+      await search.fill("KJA-482TX");
+      await search.press("Enter");
+      await expect(page.getByRole("row").filter({ hasText: "KJA-528ST" })).toHaveCount(0, { timeout: 5_000 });
+    }).toPass({ timeout: 45_000 });
     await expect(row).toContainText("Check-in");
     await expect(row).toContainText("Open");
     await expect(row).not.toContainText("OPEN");

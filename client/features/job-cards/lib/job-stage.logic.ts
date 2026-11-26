@@ -112,7 +112,7 @@ export const ACTION_LABELS: Record<StageAction, string> = {
   SEND_TO_WARRANTY: "Confirm and send to warranty officer",
   SEND_TO_ADVISOR: "Confirm and send to service advisor",
   RETURN_TO_TECHNICIAN: "Return to technician",
-  WARRANTY_TO_ADVISOR: "Send to service advisor",
+  WARRANTY_TO_ADVISOR: "Return to service advisor",
   RELEASE_TO_REPAIR: "Release to technician",
   PAUSE_FOR_PARTS: "Pause for parts",
   RESUME_REPAIR: "Resume repair",

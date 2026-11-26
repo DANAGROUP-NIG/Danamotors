@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import { api } from "./axios";
 
 export type ApiSuccessResponse<T> = {
@@ -33,7 +34,8 @@ export async function apiPut<T, B = unknown>(url: string, body?: B): Promise<T> 
   return data.data;
 }
 
-export async function apiDelete<T>(url: string): Promise<T> {
-  const { data } = await api.delete<ApiSuccessResponse<T>>(url);
+/** `config.data` sends a body, for deletes that need a reason. */
+export async function apiDelete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  const { data } = await api.delete<ApiSuccessResponse<T>>(url, config);
   return data.data;
 }
