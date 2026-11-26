@@ -14,6 +14,7 @@ const protectedPrefixes = [
   "/job-cards",
   "/technicians",
   "/inventory",
+  "/part-master",
   "/suppliers",
   "/quotations",
   "/invoices",

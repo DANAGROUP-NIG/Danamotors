@@ -119,7 +119,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
       {isSourceRecord && main ? (
         <p className="text-sm text-slate-600">
           This is the {partSourceLabel(part.partFlag).toLowerCase()} record of{" "}
-          <Link href={`/inventory/${main.id}`} className="font-mono font-medium text-primary hover:underline">
+          <Link href={`/part-master/${main.id}`} className="font-mono font-medium text-primary hover:underline">
             {main.partNumber}
           </Link>
           . It has its own stock and price; estimates and issues choose it explicitly.
@@ -153,7 +153,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
                   {record.id === part.id ? (
                     <span className="font-mono font-medium text-slate-800">{record.partNumber} (this part)</span>
                   ) : (
-                    <Link href={`/inventory/${record.id}`} className="font-mono font-medium text-primary hover:underline">
+                    <Link href={`/part-master/${record.id}`} className="font-mono font-medium text-primary hover:underline">
                       {record.partNumber}
                     </Link>
                   )}

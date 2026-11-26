@@ -283,7 +283,7 @@ export function MitDetail({ id }: { id: string }) {
               {newParts.map((l, i) => (
                 <span key={l.id}>
                   {i > 0 && ", "}
-                  <Link href={`/inventory/${l.partId}`} className="font-mono font-medium hover:underline">
+                  <Link href={`/part-master/${l.partId}`} className="font-mono font-medium hover:underline">
                     {l.part.partNumber}
                   </Link>
                 </span>
@@ -353,7 +353,7 @@ export function MitDetail({ id }: { id: string }) {
                     <td className={cn(tdCls, "font-mono text-sm")}>{l.orderNumber ?? ""}</td>
                     <td className={cn(tdCls, "font-mono text-sm")}>{l.lineNumber != null ? String(l.lineNumber).padStart(4, "0") : ""}</td>
                     <td className={tdCls}>
-                      <Link href={`/inventory/${l.partId}`} className="font-mono text-sm font-medium hover:underline">
+                      <Link href={`/part-master/${l.partId}`} className="font-mono text-sm font-medium hover:underline">
                         {l.part.partNumber}
                       </Link>
                       {l.newPart && <span className="ml-1.5 rounded bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">NEW</span>}

@@ -44,7 +44,7 @@ export function InventoryAlertBanner({ alertsCount = 7 }: InventoryAlertBannerPr
         )}
       </div>
       <a
-        href="/inventory"
+        href="/part-master"
         className={cn(
           "shrink-0 text-sm font-bold hover:underline",
           hasAlerts ? "text-amber-700" : "text-emerald-700"

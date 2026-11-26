@@ -66,7 +66,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/inventory/mrn": [INVENTORY_PERMISSIONS.STOCK_READ],
   "/inventory/stock-taking": [STOCK_TAKE_PERMISSIONS.READ],
   "/inventory/stock-audit": [STOCK_AUDIT_PERMISSIONS.READ],
-  "/inventory": [
+  "/part-master": [
     INVENTORY_PERMISSIONS.SPAREPART_READ,
     INVENTORY_PERMISSIONS.STOCK_READ,
   ],

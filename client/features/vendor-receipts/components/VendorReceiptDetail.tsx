@@ -159,7 +159,7 @@ export function VendorReceiptDetail({ id }: { id: string }) {
                 {receipt.lines.map((line) => (
                   <tr key={line.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">
-                      <Link href={`/inventory/${line.part.id}`} className="font-mono font-medium text-primary hover:underline print:text-inherit">
+                      <Link href={`/part-master/${line.part.id}`} className="font-mono font-medium text-primary hover:underline print:text-inherit">
                         {line.part.partNumber}
                       </Link>
                       <span className="block text-xs text-muted-foreground">

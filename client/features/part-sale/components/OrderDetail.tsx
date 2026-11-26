@@ -223,7 +223,7 @@ export function OrderDetail({ id }: { id: string }) {
                   return (
                     <tr key={l.id} className="border-t border-slate-100">
                       <td className={cn(tdCls, "font-mono font-medium")}>
-                        <Link href={`/inventory/${l.partId}`} className="hover:underline">
+                        <Link href={`/part-master/${l.partId}`} className="hover:underline">
                           {l.part.partNumber}
                         </Link>
                       </td>

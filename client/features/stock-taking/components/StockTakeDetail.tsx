@@ -121,7 +121,7 @@ export function StockTakeDetail({ id, kind = "COUNT" }: { id: string; kind?: Kin
       render: (l) => (
         <span>
           {l.partId ? (
-            <Link href={`/inventory/${l.partId}`} className="font-mono font-medium hover:underline">
+            <Link href={`/part-master/${l.partId}`} className="font-mono font-medium hover:underline">
               {l.partNumber}
             </Link>
           ) : (
