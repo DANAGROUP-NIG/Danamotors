@@ -70,13 +70,13 @@ export function ServiceTypePicker({ vehicleId, date, value, serviceCharge, onCha
       </span>}
     />
     {!vehicleId && <p className="text-sm text-muted-foreground">Select a vehicle to see available service types.</p>}
-    {vehicleId && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading service types...</p>}
+    {vehicleId && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading service types</p>}
     {vehicleId && query.isError && <p role="alert" className="text-sm text-destructive">Could not load service types. <button type="button" className="underline" onClick={() => query.refetch()}>Retry</button></p>}
     {query.data?.message && <p role="status" className="text-sm text-muted-foreground">{query.data.message}</p>}
     {query.data?.message && <div className="flex flex-wrap items-center gap-3 text-sm">
       {canConfigure && <Link href="/settings/workshop-masters" target="_blank" rel="noopener noreferrer" className="underline">Configure model services</Link>}
       <button type="button" disabled={query.isFetching} className="underline" onClick={() => query.refetch()}>Refresh services</button>
     </div>}
-    <p className="text-sm">Charged to: <span className="font-medium">{selected ? selected.chargedTo === "COMPANY" ? "Company" : "Customer" : "—"}</span></p>
+    <p className="text-sm">Charged to: <span className="font-medium">{selected ? selected.chargedTo === "COMPANY" ? "Company" : "Customer" : "Choose a service type"}</span></p>
   </div>;
 }

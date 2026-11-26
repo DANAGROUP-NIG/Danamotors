@@ -138,6 +138,10 @@ export const VEHICLES = {
   stgBilling: { vin: "KNAPM81DMK7000508", registrationNumber: "LSR-518ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
   stgDelivery: { vin: "KNAPM81DMK7000509", registrationNumber: "LSR-519ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
   stgCancelled: { vin: "KNAPM81DMK7000510", registrationNumber: "LSR-520ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  // Check-in (phase 2): walk-around done and waiting for the customer to sign; signed and ready to hand on; a booking to open.
+  stgConsent: { vin: "KNAPX81DMS7000511", registrationNumber: "KJA-521ST", customer: "adeyemi", model: "SPORTAGE", saleDaysAgo: 400 },
+  stgSigned: { vin: "KNAPM81DMK7000512", registrationNumber: "LSR-522ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  stgBooking: { vin: "KNAPX81DMS7000513", registrationNumber: "KJA-523ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 500 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -241,6 +245,8 @@ export interface ClaimFixture {
   remarks?: string;
 }
 
+import type { CheckInLevel } from "./check-in";
+
 export type StageStop = "DIAGNOSIS" | "WARRANTY" | "ESTIMATE" | "CANCELLED" | "WAITING_PARTS" | "QUALITY_CHECK" | "QC_PASSED";
 
 export interface JobFixture {
@@ -268,6 +274,10 @@ export interface JobFixture {
    * IN_PROGRESS jobs stop in repair unless told to pause for parts or go on to quality check.
    */
   stop?: StageStop;
+  /** For a job that stays at check-in: how far check-in has got (default: just opened). */
+  checkIn?: CheckInLevel;
+  /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
+  priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
   campaignWork?: { attended: true } | { attended: false; reason: NotAttendedReason; note?: string };
   claim?: ClaimFixture;
@@ -558,7 +568,7 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage"> & {
     stop?: StageStop;
     estimate?: "none" | "pending" | "approved";
   },
@@ -577,6 +587,8 @@ const stageJob = (
   workDone: "Periodic service done. Brakes and air conditioning checked.",
   target: fields.target,
   stop: fields.stop,
+  checkIn: fields.checkIn,
+  priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
 });
@@ -586,7 +598,7 @@ export const STAGE_JOBS: JobFixture[] = [
   stageJob("JC-S01", "stgCheckIn", {
     description: "50,000 km periodic service. Noise from the front left wheel when braking.",
     complaints: ["Noise from front left wheel when braking", "AC not cooling well", "Periodic service (50,000 km)"],
-    mileage: 48_250, withTechnician: false, target: "OPEN", estimate: "none",
+    mileage: 48_250, withTechnician: false, target: "OPEN", estimate: "none", priorMileage: 43_100,
   }),
   stageJob("JC-S02", "stgAssign", {
     description: "Engine warning light came on yesterday.",
@@ -632,5 +644,15 @@ export const STAGE_JOBS: JobFixture[] = [
     description: "Periodic service. Customer took the vehicle elsewhere.",
     complaints: ["Periodic service"],
     mileage: 94_700, withTechnician: true, target: "OPEN", stop: "CANCELLED", estimate: "pending",
+  }),
+  stageJob("JC-S11", "stgConsent", {
+    description: "Periodic service. Wipers smear the windscreen.",
+    complaints: ["Periodic service (30,000 km)", "Wipers smear the windscreen"],
+    mileage: 29_800, withTechnician: false, target: "OPEN", estimate: "none", checkIn: "walkAround", priorMileage: 24_600,
+  }),
+  stageJob("JC-S12", "stgSigned", {
+    description: "Clicking noise when turning the steering fully.",
+    complaints: ["Clicking noise when turning the steering fully"],
+    mileage: 96_900, withTechnician: false, target: "OPEN", estimate: "none", checkIn: "signed", priorMileage: 91_300,
   }),
 ];

@@ -1,4 +1,5 @@
 import type { JobStage } from "@prisma/client";
+import { allGateReasons, checkInStep, type CheckInGates } from "./job-check-in.logic";
 import { ROLES } from "../../shared/constants/roles";
 
 /**
@@ -262,6 +263,8 @@ export interface StageFacts {
   complaintCount: number;
   /** Problem text from the existing gate checks, or null when the gate is met. */
   openingSignatureProblem: string | null;
+  /** Check-in only: what is still missing on Details, Walk-around and Customer consent. Null at other steps. */
+  checkInGates: CheckInGates | null;
   approvalProblem: string | null;
   depositProblem: string | null;
   /** In warranty, an open campaign, or a warranty case. Later phases add items flagged "possible warranty". */
@@ -310,9 +313,6 @@ interface ActionRule {
   gates: (facts: StageFacts) => string[];
 }
 
-/** At check-in the existing consent check reads as a next step, not a work-start rule. */
-export const CHECK_IN_SIGNATURE =
-  "Get the customer's signature on the job-opening approval before sending the job to the workshop.";
 
 const TECHNICIAN_GATE = (facts: StageFacts) =>
   facts.technicianId ? [] : ["Assign a technician to this job first."];
@@ -324,10 +324,8 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     to: "DIAGNOSIS",
     roles: ADVISORS,
     kind: "handoff",
-    gates: (facts) => [
-      ...(facts.complaintCount > 0 ? [] : ["Add at least one customer request."]),
-      ...(facts.openingSignatureProblem ? [CHECK_IN_SIGNATURE] : []),
-    ],
+    // Details valid, walk-around saved and consent signed, each reason naming the step that fixes it.
+    gates: (facts) => (facts.checkInGates ? allGateReasons(facts.checkInGates) : []),
   },
   SEND_TO_WARRANTY: {
     from: ["DIAGNOSIS"],
@@ -531,6 +529,8 @@ export function checkStageAction(action: StageAction, facts: StageFacts, actor: 
 }
 
 export type SubStep =
+  | "DETAILS"
+  | "WALK_AROUND"
   | "CUSTOMER_CONSENT"
   | "SEND_TO_WORKSHOP"
   | "ASSIGN_TECHNICIAN"
@@ -554,7 +554,7 @@ export function currentSubStep(facts: StageFacts): SubStep | null {
   const qc = facts.qcStatus?.toUpperCase();
   switch (facts.stage) {
     case "CHECK_IN":
-      return facts.openingSignatureProblem ? "CUSTOMER_CONSENT" : "SEND_TO_WORKSHOP";
+      return facts.checkInGates ? checkInStep(facts.checkInGates) : "DETAILS";
     case "DIAGNOSIS":
       return facts.technicianId ? "FINDINGS" : "ASSIGN_TECHNICIAN";
     case "WARRANTY":

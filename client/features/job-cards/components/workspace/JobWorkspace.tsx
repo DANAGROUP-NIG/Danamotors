@@ -94,6 +94,21 @@ function JobFrame({ job }: { job: JobCard }) {
   };
 
   const { primary, secondary, danger } = splitActions(workspace);
+  const bar = {
+    primary,
+    secondary,
+    danger,
+    pending,
+    onAction: (action: StageAction) => run(action),
+    onDangerAction: (action: StageAction) => {
+      if (action === "CANCEL") {
+        setCancelError(null);
+        setCancelling(true);
+      }
+    },
+  };
+  // Check-in shows the bar itself, with its Details, Walk-around and Customer consent buttons.
+  const ownBar = workspace.stage === "CHECK_IN" && workspace.jobType !== "PDI";
   const steps = stepperView(workspace);
   const cancelled = workspace.stage === "CANCELLED";
   const waiting = waitingMessage(workspace);
@@ -155,23 +170,11 @@ function JobFrame({ job }: { job: JobCard }) {
               </h2>
               {subStep && <p className="text-sm text-muted-foreground">{subStep}</p>}
             </div>
-            <StageContent job={job} workspace={workspace} onPrintGatePass={printGatePass} />
+            <StageContent job={job} workspace={workspace} bar={bar} onPrintGatePass={printGatePass} onOpenTab={openTab} />
           </section>
         )}
       </div>
-      <StageActionBar
-        primary={primary}
-        secondary={secondary}
-        danger={danger}
-        pending={pending}
-        onAction={(action) => run(action)}
-        onDangerAction={(action) => {
-          if (action === "CANCEL") {
-            setCancelError(null);
-            setCancelling(true);
-          }
-        }}
-      />
+      {!ownBar && <StageActionBar {...bar} />}
       <div className="pb-4 print:hidden" />
       <JobFileDrawer
         open={drawer.open}

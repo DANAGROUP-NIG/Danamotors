@@ -31,13 +31,21 @@ export function requestTotals(rows: CreateJobCardFormValues["complaints"]) {
   };
 }
 
+/** The fields the request editor reads from its form: the requests and the vehicle for defect codes. */
+type RequestsForm = Pick<CreateJobCardFormValues, "complaints" | "vehicleId">;
+
 export function CustomerRequestsTab(
   {
     lastJobId,
     showLastVisit = true,
+    showAmounts = true,
+    description,
   }: {
     lastJobId?: string;
     showLastVisit?: boolean;
+    /** Check-in shows no prices; the amounts already on each request are kept as they are. */
+    showAmounts?: boolean;
+    description?: string;
   },
 ) {
   const {
@@ -49,7 +57,7 @@ export function CustomerRequestsTab(
     formState: {
       errors,
     },
-  } = useFormContext<CreateJobCardFormValues>();
+  } = useFormContext<RequestsForm>();
 
   const {
     fields,
@@ -77,7 +85,7 @@ export function CustomerRequestsTab(
   return (
     <div className="space-y-5"><OpeningCard
         title="Customer requests"
-        description="Type the customer's request. Optionally pick a workshop defect code: it fills the description and its estimate for this model. Amounts update the opening estimate automatically."
+        description={description ?? "Type the customer's request. Optionally pick a workshop defect code: it fills the description and its estimate for this model. Amounts update the opening estimate automatically."}
         action={<Button
           type="button"
           variant="outline"
@@ -146,7 +154,7 @@ export function CustomerRequestsTab(
 
                       // Fill the defect's estimate for this model unless amounts were already entered.
                       const estimate = (record as DefectOption).estimate;
-                      if (estimate && !row.spare && !row.oil && !row.labour)
+                      if (showAmounts && estimate && !row.spare && !row.oil && !row.labour)
                         for (const [key, amount] of [["spare", estimate.partAmount], ["oil", estimate.oilAmount], ["labour", estimate.labourAmount]] as const)
                           setValue(`complaints.${index}.${key}`, amount, {
                             shouldDirty: true,
@@ -156,7 +164,7 @@ export function CustomerRequestsTab(
                     aria-label={`Request ${index + 1} description`}
                     className={openingInput}
                     {...register(`complaints.${index}.description`)} />{errors.complaints?.[index]?.description && <span role="alert" className="text-sm text-destructive">{errors.complaints[index]?.description?.message}</span>}</label></div>
-              <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">{(["spare", "oil", "labour"] as const).map(
+              {showAmounts && <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">{(["spare", "oil", "labour"] as const).map(
                   key => <div key={key} className="space-y-1.5"><span className="text-sm font-medium capitalize">{key}</span><Controller
                       name={`complaints.${index}.${key}`}
                       control={control}
@@ -173,11 +181,11 @@ export function CustomerRequestsTab(
                 )}<div className="space-y-1.5"><p className="text-sm font-medium">Total</p><p
                     className="flex h-10 items-center justify-end rounded-lg bg-muted/50 px-3 text-sm font-semibold tabular-nums">{money(
                       (Math.round((rows[index]?.spare || 0) * 100) + Math.round((rows[index]?.oil || 0) * 100) + Math.round((rows[index]?.labour || 0) * 100)) / 100,
-                    )}</p></div></div>
+                    )}</p></div></div>}
             </div>,
           )}
         </div>
-        <div
+        {showAmounts && <div
           className="sticky bottom-0 mt-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted p-4 text-right sm:grid-cols-4">{[
             ["Total spare", totals.spare],
             ["Total oil", totals.oil],
@@ -185,7 +193,7 @@ export function CustomerRequestsTab(
             ["Grand total", totals.spare + totals.oil + totals.labour],
           ].map(
             ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
-          )}</div>
+          )}</div>}
         {errors.complaints?.message && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints.message}</p>}
       </OpeningCard>{showLastVisit && <LastVisitCard id={lastJobId} />}</div>
   );
@@ -207,7 +215,7 @@ function LastVisitCard(
   const job = query.data;
 
   return (
-    <details className="rounded-xl border border-border bg-background p-4 shadow-sm md:p-6" open><summary className="cursor-pointer text-sm font-semibold">Last visit</summary><div className="mt-4">{!id && <p className="text-sm text-muted-foreground">No previous visits found.</p>}{id && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading previous visit...</p>}{query.isError && <p role="alert" className="text-sm text-destructive">Could not load previous visit. <button type="button" className="underline" onClick={() => query.refetch()}>Retry</button></p>}{job && <div className="grid gap-6 md:grid-cols-2"><div className="space-y-4"><div><h4 className="mb-2 text-sm font-medium">Customer requests</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.complaints?.map(row => row.description).join("\n") || job.description}</p></div><div><h4 className="mb-2 text-sm font-medium">Labour details</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.labourLines?.map(row => row.labourItem.description).join("\n") || "No labour details recorded"}</p></div></div><dl className="grid grid-cols-2 content-start gap-4 text-sm"><div><dt className="text-sm text-muted-foreground">Job no.</dt><dd><Link
+    <details className="rounded-xl border border-border bg-background p-4 shadow-sm md:p-6" open><summary className="cursor-pointer text-sm font-semibold">Last visit</summary><div className="mt-4">{!id && <p className="text-sm text-muted-foreground">No previous visits found.</p>}{id && query.isPending && <p role="status" className="text-sm text-muted-foreground">Loading previous visit</p>}{query.isError && <p role="alert" className="text-sm text-destructive">Could not load previous visit. <button type="button" className="underline" onClick={() => query.refetch()}>Retry</button></p>}{job && <div className="grid gap-6 md:grid-cols-2"><div className="space-y-4"><div><h4 className="mb-2 text-sm font-medium">Customer requests</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.complaints?.map(row => row.description).join("\n") || job.description}</p></div><div><h4 className="mb-2 text-sm font-medium">Labour details</h4><p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{job.labourLines?.map(row => row.labourItem.description).join("\n") || "No labour details recorded"}</p></div></div><dl className="grid grid-cols-2 content-start gap-4 text-sm"><div><dt className="text-sm text-muted-foreground">Job no.</dt><dd><Link
                   target="_blank"
                   rel="noopener noreferrer"
                   href={`/job-cards/${job.id}`}

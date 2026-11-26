@@ -153,6 +153,8 @@ export function handoffToast(workspace: Pick<JobWorkspace, "jobNumber" | "owner"
 
 /** What is happening inside the current step. */
 export const SUB_STEP_LABELS: Record<SubStep, string> = {
+  DETAILS: "Confirming the visit details",
+  WALK_AROUND: "Walking round the vehicle",
   CUSTOMER_CONSENT: "Waiting for the customer's check-in signature",
   SEND_TO_WORKSHOP: "Ready to send to the workshop",
   ASSIGN_TECHNICIAN: "Waiting for a technician to be assigned",

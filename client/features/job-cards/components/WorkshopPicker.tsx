@@ -80,7 +80,7 @@ export function recordLabel(row: PickerRecord) {
 
 /** Customer pickers lead with the customer code, then the name; search still matches names. */
 export function customerLabel(row: PickerRecord) {
-  return [row.code, row.companyName || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.name].filter(Boolean).join(" · ") || row.id;
+  return [row.code, row.companyName || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.name].filter(Boolean).join(", ") || row.id;
 }
 
 export function customerOption(row: PickerRecord) {
@@ -265,7 +265,7 @@ export function WorkshopPicker({
                 ? formatLabel(selected)
                 : selectedId
                   ? query.isFetching
-                    ? "Loading selection..."
+                    ? "Loading selection"
                     : "Selected record - search to change"
                   : ""
           }

@@ -1,6 +1,6 @@
 "use client";
-import { useId } from "react";
-import { ArrowRight, Ban, Loader2, MoreHorizontal, Save } from "lucide-react";
+import { useId, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, Ban, Loader2, MoreHorizontal, Save } from "lucide-react";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import { ActionMenuItem } from "@/components/ui/ActionMenuItem";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,10 @@ export function StageActionBar({
   onDangerAction,
   onSaveDraft,
   savingDraft = false,
+  back,
+  next,
+  note,
+  status,
 }: {
   primary: StageActionView | null;
   secondary: StageActionView[];
@@ -31,12 +35,24 @@ export function StageActionBar({
   onDangerAction: (action: StageAction) => void;
   onSaveDraft?: () => void;
   savingDraft?: boolean;
+  /** Moves back a part of the step, for example from Walk-around to Details. */
+  back?: { label: string; onClick: () => void };
+  /**
+   * Moves on inside the step (saving first) instead of the handoff, for example "Continue to
+   * walk-around". `form` submits that form.
+   */
+  next?: { label: string; onClick?: () => void; form?: string; pending?: boolean; pendingLabel?: string };
+  /** A short line under the handoff, such as who takes the job next. */
+  note?: string;
+  /** Extra status on the left, such as "Saved 10:42". */
+  status?: ReactNode;
 }) {
   const reasonId = useId();
-  const busy = pending !== null || savingDraft;
-  const shownSecondary = secondary.filter((view) => view.enabled);
-  if (!primary && !shownSecondary.length && !danger.length && !onSaveDraft) return null;
-  const blocked = primary && !primary.enabled ? primary.reasons.join(" ") : null;
+  const noteId = useId();
+  const busy = pending !== null || savingDraft || !!next?.pending;
+  const shownSecondary = next ? [] : secondary.filter((view) => view.enabled);
+  if (!primary && !shownSecondary.length && !danger.length && !onSaveDraft && !back && !next && !status) return null;
+  const blocked = !next && primary && !primary.enabled ? primary.reasons.join(" ") : null;
   return (
     <div
       role="region"
@@ -45,6 +61,12 @@ export function StageActionBar({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
+          {back && (
+            <Button type="button" variant="outline" onClick={back.onClick} disabled={busy}>
+              <ArrowLeft aria-hidden="true" />
+              {back.label}
+            </Button>
+          )}
           {onSaveDraft && (
             <Button type="button" variant="outline" onClick={onSaveDraft} disabled={busy}>
               {savingDraft ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
@@ -71,6 +93,7 @@ export function StageActionBar({
               ))}
             </ActionMenu>
           )}
+          {status}
         </div>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-2">
           {blocked && (
@@ -84,16 +107,30 @@ export function StageActionBar({
               {ACTION_LABELS[view.action]}
             </Button>
           ))}
-          {primary && (
-            <Button
-              type="button"
-              disabled={!primary.enabled || busy}
-              aria-describedby={blocked ? reasonId : undefined}
-              onClick={() => onAction(primary.action)}
-            >
-              {pending === primary.action ? <Loader2 className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
-              {pending === primary.action ? "Sending" : ACTION_LABELS[primary.action]}
+          {next ? (
+            <Button type={next.form ? "submit" : "button"} form={next.form} disabled={busy} onClick={next.onClick}>
+              {next.pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+              {next.pending ? (next.pendingLabel ?? "Saving") : next.label}
             </Button>
+          ) : (
+            primary && (
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  type="button"
+                  disabled={!primary.enabled || busy}
+                  aria-describedby={[blocked ? reasonId : null, note && primary.enabled ? noteId : null].filter(Boolean).join(" ") || undefined}
+                  onClick={() => onAction(primary.action)}
+                >
+                  {pending === primary.action ? <Loader2 className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+                  {pending === primary.action ? "Sending" : ACTION_LABELS[primary.action]}
+                </Button>
+                {note && primary.enabled && (
+                  <p id={noteId} className="text-xs text-muted-foreground">
+                    {note}
+                  </p>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>

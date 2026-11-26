@@ -68,16 +68,11 @@ const signature = {
   signedAt: "2026-11-17T23:30:00Z",
   signatureImage: "data:image/png;base64,SYNTHETIC",
 };
-const consent = {
-  document,
-  expectedHash: "hash",
-  state: "required",
-  signature: null,
-};
-const logic = load("features/service-transactions/transaction.logic.ts");
+const format = load("lib/format.ts");
+const checkInLogic = load("features/job-cards/lib/check-in.logic.ts", { "@/lib/format": format });
 const documentComponent = load(
   "features/job-cards/components/JobOpeningDocument.tsx",
-  { "@/features/service-transactions/transaction.logic": logic },
+  { "@/lib/format": format, "../lib/check-in.logic": checkInLogic },
 );
 const button = {
   Button: ({ children, asChild, ...props }) =>
@@ -106,7 +101,7 @@ function print({
       "@/features/job-cards/hooks/use-job-opening-consent": {
         useJobOpeningPrint: () => ({ data, isError, isLoading, refetch() {} }),
       },
-      "@/features/service-transactions/transaction.logic": logic,
+      "@/lib/format": format,
       "@/features/job-cards/components/JobOpeningDocument": documentComponent,
       "@/components/ui/button": button,
       "@/components/ui/loading-skeleton": loading,
@@ -161,145 +156,31 @@ test("signed print covers permission denial, loading and reloadable errors witho
   assert.ok(print({ isError: true }).includes("Reload signed consent"));
 });
 
-function card({
-  value = consent,
-  allowed = true,
-  isLoading = false,
-  isError = false,
-  modalStates,
-  pending = false,
-  closed = false,
-} = {}) {
-  const state = [...(modalStates ?? [])];
-  const react = modalStates
-    ? {
-        ...React,
-        useState: (initial) => [
-          state.length
-            ? state.shift()
-            : typeof initial === "function"
-              ? initial()
-              : initial,
-          () => {},
+test("a version 2 signed copy shows the walk-around the customer confirmed and the representative's phone", () => {
+  const v2 = {
+    ...document,
+    version: 2,
+    scope: {
+      ...document.scope,
+      checkIn: {
+        fuelLevel: "HALF",
+        checklist: [
+          { code: "HUB_CAPS", label: "Hub caps", state: "MISSING" },
+          { code: "AC_WORKING", label: "AC working", state: "NOT_WORKING" },
+          { code: "CLOCK", label: "Clock", state: "PRESENT" },
         ],
-      }
-    : React;
-  const Card = load("features/job-cards/components/JobOpeningConsentCard.tsx", {
-    react,
-    "@/features/auth/hooks/use-auth": {
-      useAuth: () => ({ hasPermission: () => allowed }),
+        checklistNote: null,
+        serviceBookSeen: true,
+        serviceBookStamps: 3,
+        noValuables: true,
+        belongingsNote: "Umbrella in boot",
+        damageMarks: [{ id: "m", type: "DENT", x: 80, y: 42, note: null, photoId: null }],
+        photos: [{ id: "p", category: "CHECK_IN", slot: "FRONT", sha256: "a".repeat(64) }],
+      },
     },
-    "../hooks/use-job-opening-consent": {
-      useJobOpeningConsent: () => ({
-        data: value,
-        isLoading,
-        isError,
-        refetch() {},
-      }),
-      useSignJobOpening: () => ({
-        isPending: pending,
-        error: null,
-        mutate() {},
-      }),
-    },
-    "@/features/service-transactions/transaction.logic": logic,
-    "./JobOpeningDocument": documentComponent,
-    "./SignaturePad": {
-      SignaturePad: ({ label }) =>
-        React.createElement("canvas", { "aria-label": label }),
-    },
-    "@/components/modals/ModalFame": {
-      default: ({ children, title }) =>
-        React.createElement(
-          "section",
-          { role: "dialog", "aria-label": title },
-          children,
-        ),
-    },
-    "@/components/forms/FormField": load("components/forms/FormField.tsx"),
-    "@/components/ui/button": button,
-    "@/components/ui/loading-skeleton": loading,
-    "next/link": {
-      default: ({ children, ...props }) =>
-        React.createElement("a", props, children),
-    },
-  }).JobOpeningConsentCard;
-  return renderToStaticMarkup(
-    React.createElement(Card, { jobCardId: "job", closed }),
-  );
-}
-
-test("opening card covers required, signed, stale, legacy, closed, loading and error states", () => {
-  assert.ok(card().includes("Customer signature required before work starts"));
-  assert.ok(
-    card({ value: { ...consent, state: "signed", signature } }).includes(
-      "Print signed job opening",
-    ),
-  );
-  assert.ok(
-    card({ value: { ...consent, state: "stale", signature } }).includes(
-      "obtain a new signature",
-    ),
-  );
-  assert.ok(
-    card({ value: { ...consent, state: "legacy" } }).includes("Historical job"),
-  );
-  assert.equal(
-    card({ closed: true }).includes("Get job-opening signature"),
-    false,
-  );
-  assert.equal(card({ allowed: false }), "");
-  assert.ok(card({ isLoading: true }).includes("Loading job-opening consent"));
-  assert.ok(card({ isError: true }).includes("Reload consent"));
-});
-
-test("signature form disables submission without acceptance, drawing or representative authority", () => {
-  const states = [true, "Test Customer", "", false, null, "retry-key"];
-  const incomplete = card({ modalStates: states });
-  assert.match(
-    incomplete,
-    /<button[^>]*disabled=""[^>]*>Save signed job-opening approval/,
-  );
-  const complete = card({
-    modalStates: [
-      true,
-      "Test Customer",
-      "",
-      true,
-      signature.signatureImage,
-      "retry-key",
-    ],
-  });
-  assert.match(
-    complete,
-    /<button type="button">Save signed job-opening approval/,
-  );
-  const representative = card({
-    modalStates: [
-      true,
-      "Fleet representative",
-      "",
-      true,
-      signature.signatureImage,
-      "retry-key",
-    ],
-  });
-  assert.ok(representative.includes("Explain who is signing for the customer"));
-  assert.match(
-    representative,
-    /<button[^>]*disabled=""[^>]*>Save signed job-opening approval/,
-  );
-  assert.ok(
-    card({
-      pending: true,
-      modalStates: [
-        true,
-        "Test Customer",
-        "",
-        true,
-        signature.signatureImage,
-        "retry-key",
-      ],
-    }).includes("Saving signature"),
-  );
+  };
+  const html = print({ data: { document: v2, signature: { ...signature, relationship: "Driver", signerPhone: "0803 555 0199" }, current: true } });
+  for (const text of ["Vehicle condition at check-in", "Half (1/2)", "Dent on front right door", "Hub caps", "Missing", "Not working", "Umbrella in boot", "Seen, 3 stamps", "0803 555 0199"])
+    assert.ok(html.includes(text), text);
+  assert.equal(/undefined|null|NaN|NOT_WORKING|DENT</.test(html), false);
 });

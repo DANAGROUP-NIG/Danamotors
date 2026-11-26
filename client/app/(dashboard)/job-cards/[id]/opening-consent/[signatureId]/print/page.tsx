@@ -1,10 +1,11 @@
 "use client";
 import Image from "next/image";
+import { useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { lagosDate } from "@/features/service-transactions/transaction.logic";
+import { formatDateTime } from "@/lib/format";
 import { useJobOpeningPrint } from "@/features/job-cards/hooks/use-job-opening-consent";
 import { JobOpeningDocument } from "@/features/job-cards/components/JobOpeningDocument";
 
@@ -14,6 +15,13 @@ export default function SignedOpeningPrint() {
   const allowed =
     hasPermission("jobcard:read") && hasPermission("estimate:print");
   const query = useJobOpeningPrint(id, signatureId, allowed);
+  const printed = useRef(false);
+  // "Print" on the job card opens this page with ?print=1: print once the signed copy has loaded.
+  useEffect(() => {
+    if (!query.data || printed.current || new URLSearchParams(window.location.search).get("print") !== "1") return;
+    printed.current = true;
+    window.print();
+  }, [query.data]);
   if (!allowed)
     return (
       <p>You do not have permission to print signed job-opening consent.</p>
@@ -63,9 +71,12 @@ export default function SignedOpeningPrint() {
         />
         <p>Signed by {signature.signerName}</p>
         {signature.relationship && (
-          <p>Relationship or authority: {signature.relationship}</p>
+          <p>
+            Representative: {signature.relationship}
+            {signature.signerPhone ? `, phone ${signature.signerPhone}` : ""}
+          </p>
         )}
-        <p>Signed on {lagosDate(signature.signedAt)}, Africa/Lagos</p>
+        <p>Signed on {formatDateTime(signature.signedAt)}, Lagos time</p>
       </section>
     </article>
   );

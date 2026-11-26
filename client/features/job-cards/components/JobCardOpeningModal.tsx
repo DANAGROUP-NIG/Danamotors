@@ -54,7 +54,7 @@ function OpeningSession({
       isOpen
       onClose={requestClose}
       title="Open job card"
-      description="Capture the vehicle, customer requests, workshop assignment, and promised delivery."
+      description="Vehicle, customer, requests and promised delivery. Check-in follows on the job card."
       size="wide"
       flush
     >

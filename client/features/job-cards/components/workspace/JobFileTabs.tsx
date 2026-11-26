@@ -95,7 +95,8 @@ export function CustomerVehicleTab({ job }: { job: JobCard }) {
             ...tyres.map((tyre, index) => ({ label: `Tyre ${index + 1}`, value: `${text(tyre.make)}, ${text(tyre.number)}` })),
             ...(job.batteryMake || job.batteryNumber ? [{ label: "Battery", value: `${text(job.batteryMake)}, ${text(job.batteryNumber)}` }] : []),
             ...(job.customField1 ? [{ label: "Custom field", value: job.customField1 }] : []),
-            { label: "Checklist to follow", value: text(job.checklist) },
+            { label: "Instructions to technician", value: text(job.checkIn?.instructionsToTechnician) },
+            { label: "Checklist notes", value: text(job.checkIn?.checklistNote) },
             { label: "Internal remarks", value: text(job.remarks) },
           ]}
         />

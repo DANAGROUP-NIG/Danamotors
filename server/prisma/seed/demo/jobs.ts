@@ -33,6 +33,7 @@ import {
   jobKey,
 } from "./fixtures";
 import { needsRetime, retimeJob } from "./retime";
+import { completeCheckIn } from "./check-in";
 
 const services = {
   service: new ServiceService(),
@@ -147,6 +148,16 @@ async function openJob(ctx: DemoContext, ref: Reference, parties: Parties, fx: J
   const staff = ctx.staff[fx.branch];
   const previous = fx.repeatOf ? done.get(fx.repeatOf) : undefined;
   if (fx.repeatOf && !previous) throw new Error(`${fx.id} is a repeat of ${fx.repeatOf}, which has not been seeded.`);
+  // A reading from an earlier visit elsewhere, about 3.5 months ago, so check-in can show "Last recorded".
+  if (fx.priorMileage)
+    await prisma.vehicle.updateMany({
+      where: { id: vehicle.id, lastRecordedMileage: null },
+      data: { lastRecordedMileage: fx.priorMileage, lastMileageAt: new Date(Date.now() - 106 * 86_400_000) },
+    });
+  // Testers may have recorded a higher reading on a demo vehicle since the last run. The scenario's own
+  // reading is then entered through the audited odometer replacement, as staff would.
+  const recorded = (await prisma.vehicle.findUniqueOrThrow({ where: { id: vehicle.id }, select: { lastRecordedMileage: true } })).lastRecordedMileage;
+  const replaced = recorded != null && recorded > fx.mileage;
   // The adviser sees the warranty check first and acknowledges coverage and open campaigns.
   const check = await checkVehicleWarranty(vehicle.id, fx.mileage);
   const card = await services.service.createJobCard({
@@ -156,6 +167,7 @@ async function openJob(ctx: DemoContext, ref: Reference, parties: Parties, fx: J
     branchName: ctx.branches[fx.branch].name,
     description: fx.description,
     mileage: fx.mileage,
+    ...(replaced && { odometerReplaced: true, odometerReplacedReason: "Demo data: reading reset for the demo scenario" }),
     bayId: ref.bayId,
     serviceAdvisorId: staff.advisor.id,
     ...(fx.withTechnician ? { technicianId: staff.technician.id } : { teamId: ref.teamId }),
@@ -291,12 +303,11 @@ async function walkToEstimate(ctx: DemoContext, fx: JobFixture, id: string, targ
   const staff = ctx.staff[fx.branch];
   const goal: JobStage = target >= RANK.IN_PROGRESS || fx.stop === "CANCELLED" ? "ESTIMATE" : ((fx.stop as JobStage | undefined) ?? "CHECK_IN");
   for (;;) {
-    const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, openingSignatureRequired: true } });
+    const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } });
     if (job.stage === goal || job.stage === "ESTIMATE" || !PRE_REPAIR.includes(job.stage)) break;
     if (job.stage === "CHECK_IN") {
-      // TODO(confirm): the check-in consent is captured on screen from phase 2. Until then, demo jobs past
-      // check-in are recorded without it, like jobs opened before signed consent existed.
-      if (job.openingSignatureRequired) await prisma.jobCard.update({ where: { id }, data: { openingSignatureRequired: false } });
+      // Details, walk-around and the customer's signature, as the advisor records them on screen.
+      await completeCheckIn(fx, id, staff.advisor.id, "signed");
       await stageAction(fx, id, "SEND_TO_SUPERVISOR", staff.advisor.id);
     } else if (job.stage === "DIAGNOSIS") {
       // The warranty check comes next only for a vehicle in warranty or with an open campaign.
@@ -309,6 +320,9 @@ async function walkToEstimate(ctx: DemoContext, fx: JobFixture, id: string, targ
       await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, "No warranty items on this visit");
     }
   }
+  // A job that stays at check-in shows the step the fixture names.
+  if (goal === "CHECK_IN" && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "CHECK_IN")
+    await completeCheckIn(fx, id, staff.advisor.id, fx.checkIn ?? "opened");
   if (fx.stop === "CANCELLED" && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "ESTIMATE")
     await stageAction(fx, id, "CANCEL", staff.advisor.id, "Customer took the vehicle elsewhere");
 }

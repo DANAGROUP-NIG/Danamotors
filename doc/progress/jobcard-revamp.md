@@ -79,3 +79,42 @@ Branch `feature/jobcard-revamp-p1-shell`, from the phase 0 branch.
 - The full frame and all five Job file tabs were rendered with that live data for 11 demo jobs and 3 roles (33 renders) and scanned: no "undefined", "null", "NaN", raw codes, dashes, middle dots, ellipses or replacement characters.
 - The dev server compiles and serves the page.
 - Not verified on screen: layout at 1440, 1024, 768 and 390 px, the sticky header and bar while scrolling, focus rings, the drawer animation and focus trap in a real browser, and printing the gate pass.
+
+## Phase 2: Check-in
+
+Branch `feature/jobcard-revamp-p2-checkin`, from the phase 1 branch.
+
+### Plan
+
+1. Data: migration `20261126054810_jobcard_check_in` adds `JobCheckIn`, `JobDamageMark`, `JobPhoto` (bytes in the database) and `JobOpeningSignature.signerPhone`; moves the free-text `JobCard.checklist` into `JobCheckIn.checklistNote` and drops the column. Bay is optional at opening.
+2. Server: pure rules in `job-check-in.logic.ts` (25 items, schemas, gates, photo checks, signed snapshot); `job-check-in.service.ts` and routes under `/service/job-cards/:id/check-in` and `/photos`, branch-scoped, check-in role and stage checked, audited, idempotent by request ID.
+3. Signature: version 2 signed document with the walk-around in its scope; version 1 signatures are compared with version 1 scope, so they stay verifiable and current.
+4. Client: `lib/check-in.logic.ts`, hooks, `components/check-in/` (Details, Walk-around, Customer consent), its own action bar; opening form slimmed; `JobOpeningConsentCard` deleted.
+5. Demo seed: real walk-around and signature for jobs past check-in; JC-S11 (walk-around done, unsigned), JC-S12 (signed), and a booking to open.
+
+### Status
+
+- [x] Migration `20261126054810_jobcard_check_in`: applied to local databases and, on 26 Nov 2026, to the server database together with the phase 0 migration. The server had no old checklist text to move; the move was checked on a local copy with planted rows.
+- [x] Server: `job-check-in.logic.ts`, `job-check-in.service.ts`, `job-check-in.routes.ts`; signature version 2 with `signerPhone`; the check-in gates drive `SEND_TO_SUPERVISOR` and the sub-step; bay optional at opening; picking list reads the checklist note; request rows keep their entry order.
+- [x] Client: `components/check-in/` (CheckInStep, DetailsStep, WalkAroundStep, CarDiagram, PhotoSlots, ConsentStep, ConsentCatchUp), `lib/check-in.logic.ts`, `hooks/use-job-check-in.ts`, `schemas/check-in.schema.ts`; the action bar takes Back, Next and a status; the signed copy shows the walk-around; the opening form is one slim page.
+- [x] Deleted: `JobOpeningConsentCard`, `OtherDetailsTab`, the opening form's tabs, Find, Load estimate, bay, engineer, opening estimate, service charge, A/C type, in-house, remarks, tyres, battery, custom field and the placeholder delivery card; `openingLabels`; `JobCard.checklist`; the unused `CHECK_IN_SIGNATURE` reason.
+- [x] Demo seed: walk-around and signature for jobs past check-in, JC-S11, JC-S12, a booking for KJA-523ST, earlier readings for the check-in vehicles, and the audited odometer reset when testers raised a demo vehicle's reading. Run twice from scratch on local databases.
+- [x] Docs: `doc/job-cards.md` ("Check-in (phase 2)"), `doc/workshop.md`, `doc/demo-data.md`, `doc/testing/jobcard-revamp/phase-2-manual-test.md`.
+- [x] Server database: demo seed run on 26 Nov 2026 with `--second-branch="Abuja Branch"` (Dana Motors Demo has no advisor or technician there). All phase 2 data is in: JC-S01 2026000033 (KJA-482TX) to JC-S12 2026000044, and the KJA-523ST booking. The run then stopped at the PDI demo: no active Engineer at Main Branch on the server (not a phase 2 problem).
+- [ ] Browser screenshots: not taken. See "Verification".
+
+### Tests (26 Nov 2026)
+
+- Server typecheck clean. Touched modules (service, pdi, requisition, workshop, document-terms): 603 passed, 49 failed, 652 total. All 49 failures are in 7 old integration suites, from fixtures that miss the vehicle model, have negative line amounts, a spare part without a source, or no check-in signature, plus one Jest dynamic-import limit. New: check-in logic, routes and integration, signature version 1 and 2 compatibility, updated stage and opening tests.
+- Client: 119 of 120 passed (`issue117-components` fails on the base commit too). Typecheck clean, lint clean on touched files, production build passes.
+
+### Verification
+
+- Live API on a fresh local demo database: the full check-in flow through every endpoint, including each validation message, the technician refused (403), the stale-save conflict, photo type refusal, a representative without a phone refused, an idempotent signature retry, the handoff to Diagnosis, the workshop manager's notice, and check-in locked afterwards.
+- The real check-in components rendered with that live data for 4 jobs and 2 roles (28 renders) and scanned: no "undefined", "null", "NaN", raw codes, dashes, middle dots, ellipses or replacement characters.
+- Not verified on screen: layout at 1440, 1024, 768 and 390 px, the drawing and markers under a real finger or mouse, the signature pad, photo capture on a tablet, the autosave timing, printing, and focus rings.
+
+### Found and fixed in passing
+
+- `booking.integration.test.ts` created its Prisma client from `server/.env` before reading `TEST_DATABASE_URL`, so its fixtures went to the shared database. Fixed. Today's two runs left 4 empty fixture branches ("Booking fixture/other 1795677540341" and "1795677633174") and 2 `@example.test` users there; not deleted, waiting for the owner's go-ahead. Several other integration suites set the database after their imports; they did not write to the server in this session but should be checked.
+- Middle dots in the warranty job notification, an em dash in the service type picker, and "..." in loading texts of the reused opening components.

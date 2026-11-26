@@ -214,25 +214,27 @@ export class ServiceDocumentService {
         const job = estimate.jobCardId
           ? await tx.jobCard.findUnique({
               where: { id: estimate.jobCardId },
-              select: { ...jobSelect, checklist: true },
+              select: { ...jobSelect, checkIn: { select: { checklistNote: true } } },
             })
           : null;
         // TODO(confirm): no job/checklist relation exists. Resolve only an explicit
         // saved code; mileage-based selection must not add unapproved live parts.
-        const checklistMaster = job?.checklist?.trim()
+        // The saved checklist text now lives on the check-in record (phase 2 moved it there).
+        const checklistText = job?.checkIn?.checklistNote ?? null;
+        const checklistMaster = checklistText?.trim()
           ? await tx.workshopMaster.findFirst({
               where: {
                 kind: "CHECKLIST",
-                code: { equals: job.checklist.trim(), mode: "insensitive" },
+                code: { equals: checklistText.trim(), mode: "insensitive" },
               },
               select: { code: true, description: true },
             })
           : null;
-        const checklist = job?.checklist
+        const checklist = checklistText
           ? {
               code: checklistMaster?.code ?? null,
               description: checklistMaster?.description ?? null,
-              text: job.checklist,
+              text: checklistText,
             }
           : null;
         const vehicle =

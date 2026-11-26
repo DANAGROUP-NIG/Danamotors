@@ -55,6 +55,8 @@ integration("Signed job openings in disposable localhost PostgreSQL", () => {
               jobNumber: `J-${suffix}`,
               description: "Original opening request",
               status: "OPEN",
+              // Past check-in: this test is about the signature evidence, not the check-in gates.
+              stage: "ESTIMATE",
               complaints: { create: { description: "Brake noise" } },
             },
           });

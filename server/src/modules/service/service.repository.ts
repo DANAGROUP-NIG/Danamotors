@@ -386,7 +386,22 @@ export class ServiceRepository {
         serviceType: true,
         bay: true,
         team: true,
-        complaints: { include: { complaintCode: true } },
+        complaints: { include: { complaintCode: true }, orderBy: { id: "asc" } },
+        // Check-in summary for the finished step and later steps. Photos and their bytes stay out.
+        checkIn: {
+          select: {
+            fuelLevel: true,
+            checklist: true,
+            checklistNote: true,
+            serviceBookSeen: true,
+            serviceBookStamps: true,
+            noValuables: true,
+            belongingsNote: true,
+            instructionsToTechnician: true,
+            completedAt: true,
+          },
+        },
+        damageMarks: { select: { id: true, type: true, x: true, y: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         statusHistory: {
           include: {
             actor: { select: { id: true, firstName: true, lastName: true } },

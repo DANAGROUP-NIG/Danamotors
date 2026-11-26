@@ -28,6 +28,8 @@ export type StageAction =
   | "CANCEL";
 
 export type SubStep =
+  | "DETAILS"
+  | "WALK_AROUND"
   | "CUSTOMER_CONSENT"
   | "SEND_TO_WORKSHOP"
   | "ASSIGN_TECHNICIAN"

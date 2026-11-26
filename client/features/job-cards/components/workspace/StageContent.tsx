@@ -10,13 +10,15 @@ import { useRequestJobCardParts } from "../../hooks/use-request-job-card-parts";
 import { canonicalJobStatus, hasJobBill } from "../../types/job-card-status";
 import type { JobCard } from "../../types/job-card.types";
 import type { JobWorkspace } from "../../types/job-workspace.types";
+import type { JobFileTab } from "../../lib/job-frame.logic";
 import { JobAdvanceSection } from "../JobAdvanceSection";
 import { JobCardEstimateSection } from "../JobCardEstimateSection";
 import { JobCardLabourSection } from "../JobCardLabourSection";
 import { JobCardLinesCard } from "../JobCardLinesCard";
 import { JobCardPartsSection } from "../JobCardPartsSection";
 import { WarrantySnapshotCard } from "../JobCardWarrantyCards";
-import { JobOpeningConsentCard } from "../JobOpeningConsentCard";
+import { CheckInStep, type StageBarProps } from "../check-in/CheckInStep";
+import { ConsentCatchUp } from "../check-in/ConsentCatchUp";
 import { WORKSPACE_COPY } from "../repair-workspace-copy";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
@@ -34,20 +36,33 @@ const ACTIVE_INVOICE = (status: string) => !["CANCELLED", "CANCELED", "VOID"].in
  * What the current step shows. Steps not rebuilt yet show the existing sections that serve them,
  * so the app stays usable; each later phase replaces its step here.
  */
-export function StageContent({ job, workspace, onPrintGatePass }: { job: JobCard; workspace: JobWorkspace; onPrintGatePass: () => void }) {
+export function StageContent({
+  job,
+  workspace,
+  bar,
+  onPrintGatePass,
+  onOpenTab,
+}: {
+  job: JobCard;
+  workspace: JobWorkspace;
+  /** Check-in shows the action bar itself, with its own step buttons. */
+  bar: StageBarProps;
+  onPrintGatePass: () => void;
+  onOpenTab: (tab: JobFileTab) => void;
+}) {
   switch (workspace.stage) {
     case "CHECK_IN":
-    // TODO(phase 2): replaced by the Details, Walk-around and Customer consent steps.
+      return <CheckInStep job={job} workspace={workspace} bar={bar} onOpenTab={onOpenTab} />;
     case "ESTIMATE":
       // TODO(phase 5): replaced by the estimate, item approval, advance and release screens.
-      return <OpeningEstimateAdvance job={job} />;
+      return <OpeningEstimateAdvance job={job} workspace={workspace} />;
     case "DIAGNOSIS":
       // TODO(phase 3): replaced by allocation, technician findings and engineer review.
       return (
         <>
           <AssignTechnicianSection job={job} />
           <FindingsSection job={job} />
-          <OpeningEstimateAdvance job={job} />
+          <OpeningEstimateAdvance job={job} workspace={workspace} />
         </>
       );
     case "WARRANTY":
@@ -96,12 +111,12 @@ export function StageContent({ job, workspace, onPrintGatePass }: { job: JobCard
   }
 }
 
-function OpeningEstimateAdvance({ job }: { job: JobCard }) {
+function OpeningEstimateAdvance({ job, workspace }: { job: JobCard; workspace: JobWorkspace }) {
   const status = canonicalJobStatus(job.status);
   const closed = hasJobBill(job) || ["BILLED", "DELIVERED", "CANCELLED"].includes(status);
   return (
     <>
-      <JobOpeningConsentCard jobCardId={job.id} closed={closed} />
+      {!closed && <ConsentCatchUp jobCardId={job.id} editable={!workspace.readOnly} />}
       {job.estimates ? (
         <JobCardEstimateSection jobCard={job} />
       ) : (

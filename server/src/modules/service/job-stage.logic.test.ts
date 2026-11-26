@@ -3,7 +3,6 @@ import { JOB_TRANSITION_ROLES } from "./job-transitions";
 import {
   isWarrantyJob,
   ACTION_RULES,
-  CHECK_IN_SIGNATURE,
   ALL_STAGES,
   CANONICAL_STATUSES,
   STAGE_ACTIONS,
@@ -32,6 +31,7 @@ const facts = (overrides: Partial<StageFacts> = {}): StageFacts => ({
   technicianId: TECH,
   complaintCount: 2,
   openingSignatureProblem: null,
+  checkInGates: { details: [], walkAround: [], consent: [] },
   approvalProblem: null,
   depositProblem: null,
   warrantyRelevant: false,
@@ -197,13 +197,19 @@ describe("action rules stay within the existing workflow", () => {
 describe("allowed and blocked moves", () => {
   const names = (list: { action: StageAction }[]) => list.map((view) => view.action);
 
-  it("check-in: the advisor sends to the supervisor once requests and consent are in place", () => {
+  it("check-in: the advisor sends to the supervisor once details, walk-around and consent are in place", () => {
     expect(availableActions(facts(), advisor)).toEqual([
       { action: "SEND_TO_SUPERVISOR", kind: "primary", enabled: true, reasons: [], requiresNote: false },
       { action: "CANCEL", kind: "danger", enabled: true, reasons: [], requiresNote: true },
     ]);
-    const blocked = checkStageAction("SEND_TO_SUPERVISOR", facts({ complaintCount: 0, openingSignatureProblem: "Get the signature" }), advisor);
-    expect(blocked).toEqual({ ok: false, kind: "blocked", reasons: ["Add at least one customer request.", CHECK_IN_SIGNATURE] });
+    const gates = {
+      details: ["Add at least one customer request on Details."],
+      walkAround: ["Record the fuel level on Walk-around."],
+      consent: ["Get the customer's signature on Customer consent."],
+    };
+    const blocked = checkStageAction("SEND_TO_SUPERVISOR", facts({ checkInGates: gates }), advisor);
+    // Every missing gate is a reason, in step order.
+    expect(blocked).toEqual({ ok: false, kind: "blocked", reasons: [...gates.details, ...gates.walkAround, ...gates.consent] });
     expect(checkStageAction("SEND_TO_SUPERVISOR", facts(), advisor)).toEqual({ ok: true, to: "DIAGNOSIS", toStatus: undefined });
   });
 
@@ -325,7 +331,9 @@ describe("allowed and blocked moves", () => {
 
 describe("sub-step, alerts and summaries", () => {
   it("names the current sub-step", () => {
-    expect(currentSubStep(facts({ openingSignatureProblem: "x" }))).toBe("CUSTOMER_CONSENT");
+    expect(currentSubStep(facts({ checkInGates: { details: ["x"], walkAround: ["y"], consent: ["z"] } }))).toBe("DETAILS");
+    expect(currentSubStep(facts({ checkInGates: { details: [], walkAround: ["y"], consent: ["z"] } }))).toBe("WALK_AROUND");
+    expect(currentSubStep(facts({ checkInGates: { details: [], walkAround: [], consent: ["z"] } }))).toBe("CUSTOMER_CONSENT");
     expect(currentSubStep(facts())).toBe("SEND_TO_WORKSHOP");
     expect(currentSubStep(facts({ stage: "DIAGNOSIS", technicianId: null }))).toBe("ASSIGN_TECHNICIAN");
     expect(currentSubStep(facts({ stage: "ESTIMATE", approvalProblem: "x" }))).toBe("ESTIMATE_APPROVAL");

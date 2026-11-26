@@ -8,6 +8,7 @@ import type { JobCardLineService } from '../job-card-line/jobCardLine.service';
 import type { JobBillingService } from '../finance/job-billing.service';
 import type { StageAction } from './job-stage.logic';
 import { stageAllowsStatus } from './job-stage.logic';
+import { CHECKLIST_ITEMS } from './job-check-in.logic';
 
 const database = process.env.TEST_DATABASE_URL;
 const describeDb = database ? describe : describe.skip;
@@ -25,6 +26,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
   let customerId: string;
   let vehicleId: string;
   let labourItemId: string;
+  let serviceTypeId: string;
   const run = `${Date.now()}`;
   let sequence = 0;
   const users: Record<'advisor' | 'supervisor' | 'technician' | 'otherTechnician' | 'warranty' | 'billing' | 'admin', { id: string; role: string }> = {} as never;
@@ -58,6 +60,12 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     vehicleId = (await db.vehicle.create({ data: { vin: `STAGE${run}`, catalogueId: variant.id, customModel: 'Synthetic Sportage', customerId } })).id;
     labourItemId = (await db.labourItem.create({ data: { code: `STG-L-${run}`, description: 'Brake pad replacement', defaultHours: 1, rate: 15000 } })).id;
     await db.labourRate.create({ data: { labourItemId, modelId: model.id, pricing: 'FIXED', hours: 1, rate: 15000 } });
+    serviceTypeId = (await db.workshopMaster.create({ data: { kind: 'SERVICE_TYPE', code: `STG-S-${run}`, description: 'Periodic service' } })).id;
+  });
+
+  /** A finished walk-around: fuel recorded and all 25 items checked (job card revamp phase 2). */
+  const fullCheckIn = () => ({
+    create: { fuelLevel: 'HALF' as const, checklist: Object.fromEntries(CHECKLIST_ITEMS.map((item) => [item.code, 'PRESENT'])) },
   });
 
   afterAll(async () => { await db?.$disconnect(); });
@@ -68,12 +76,13 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
       branchId, customerId, vehicleId, jobNumber: `STG-${run}-${++sequence}`, description: 'Stage test job', status, stage,
       serviceAdvisorId: users.advisor.id, technicianId: users.technician.id, openingSignatureRequired: false,
       promisedAt: new Date(Date.now() + 2 * 86_400_000), complaints: { create: { description: 'Noise from front left wheel when braking' } },
+      mileage: 48_250, serviceTypeId, checkIn: fullCheckIn(),
       ...extra,
     } });
     await db.receipt.create({ data: { receiptNumber: `STG-ADV-${run}-${sequence}`, branchId, customerId, advanceJobCardId: card.id, amount: 9000, advanceAmount: 9000 } });
     await db.estimate.create({ data: {
       branchId, jobCardId: card.id, customerId, description: 'Approved scope', amount: 15000, status: 'Approved',
-      lines: { create: [{ type: 'LABOUR', referenceId: labourItemId, description: 'Brake pad replacement', quantity: 1, rate: 15000, amount: 15000 }] },
+      lines: { create: [{ type: 'LABOUR', referenceId: labourItemId, description: 'Brake pad replacement', quantity: 1, rate: 15000, amount: 15000 }, { type: 'SERVICE', referenceId: serviceTypeId, description: 'Periodic service', quantity: 1, rate: 0, amount: 0 }] },
       approvals: { create: { customerId, approved: true, status: 'Approved', signatureRequired: false, overrideReason: 'Synthetic test approval' } },
     } });
     return card;
@@ -204,7 +213,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     const unsigned = await job('CHECK_IN', 'OPEN', { openingSignatureRequired: true });
     const blocked = act(unsigned.id, 'SEND_TO_SUPERVISOR', 'advisor');
     await expect(blocked).rejects.toMatchObject({ statusCode: 409, code: 'STAGE_ACTION_BLOCKED' });
-    await expect(blocked).rejects.toHaveProperty('details.reasons', ["Get the customer's signature on the job-opening approval before sending the job to the workshop."]);
+    await expect(blocked).rejects.toHaveProperty('details.reasons', ["Get the customer's signature on Customer consent."]);
     expect((await stages.workspace(unsigned.id, users.advisor)).subStep).toBe('CUSTOMER_CONSENT');
 
     const noAdvance = await job('ESTIMATE', 'OPEN');

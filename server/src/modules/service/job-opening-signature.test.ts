@@ -19,6 +19,7 @@ import { DocumentTermsService } from "../document-terms/document-terms.service";
 import {
   assertSignedJobOpening,
   getSignedOpeningConsent,
+  openingCheckInScope,
   openingJobScope,
   printSignedJobOpening,
   signJobOpening,
@@ -28,6 +29,7 @@ import {
   openingEvidenceHash,
   validOpeningEvidence,
   signedOpeningDocumentSchema,
+  signedOpeningDocumentV2,
   SIGNED_OPENING_STATEMENT,
   openingSignatureBody,
 } from "./job-opening-signature.logic";
@@ -59,8 +61,13 @@ const job = {
     },
   ],
   status: "OPEN",
+  stage: "ESTIMATE",
+  serviceTypeId: "service-type",
   billedAt: null,
   openingSignatureRequired: true,
+  checkIn: null,
+  damageMarks: [],
+  photos: [],
 };
 const terms = {
   terms: ["Job opening only, repair approval is separate."],
@@ -71,31 +78,39 @@ const document = signedOpeningDocumentSchema.parse({
   termsVersion: openingHash({ statement: SIGNED_OPENING_STATEMENT, ...terms }),
   statement: SIGNED_OPENING_STATEMENT,
   ...terms,
-  scope: openingJobScope(job as Parameters<typeof openingJobScope>[0]),
+  scope: openingJobScope(job as unknown as Parameters<typeof openingJobScope>[0]),
+});
+/** What new signatures sign from phase 2: the job details plus the walk-around. */
+const documentV2 = signedOpeningDocumentSchema.parse({
+  ...document,
+  version: 2,
+  scope: openingCheckInScope(job as unknown as Parameters<typeof openingCheckInScope>[0]),
 });
 const body = {
   accepted: true,
-  expectedHash: openingHash(document),
+  expectedHash: openingHash(documentV2),
   idempotencyKey: id,
   signerName: "Test Customer",
   signatureImage: image,
 };
-function signature() {
+/** A stored signature. The default is an old version 1 signature, taken before check-in existed. */
+function signature(doc: typeof document = document, signerPhone: string | null = null) {
   const evidence = {
-    documentHash: body.expectedHash,
+    documentHash: openingHash(doc),
     signerName: body.signerName,
     relationship: null,
     capturedById: "actor",
     signedAt: new Date("2026-11-17T09:30:00Z"),
     signatureImage: image,
+    signerPhone,
   };
   return {
     id: "signature",
     jobCardId: id,
     revision: 1,
     idempotencyKey: id,
-    scopeHash: openingHash(document.scope),
-    snapshot: document,
+    scopeHash: openingHash(doc.scope),
+    snapshot: doc,
     ...evidence,
     evidenceHash: openingEvidenceHash(evidence),
   };
@@ -120,7 +135,7 @@ afterEach(() => jest.restoreAllMocks());
 it("hashes JSONB objects consistently and detects changes to scope, terms, image and signer evidence", () => {
   expect(
     openingHash(Object.fromEntries(Object.entries(document).reverse())),
-  ).toBe(body.expectedHash);
+  ).toBe(openingHash(document));
   expect(validOpeningEvidence(signature())).toBe(true);
   for (const change of [
     { snapshot: { ...document, terms: ["Changed terms"] } },
@@ -160,7 +175,7 @@ it("stores an independent immutable opening approval and image-free audit withou
   });
   expect(prisma.jobOpeningSignature.create).toHaveBeenCalledWith({
     data: expect.objectContaining({
-      snapshot: document,
+      snapshot: documentV2,
       signatureImage: image,
       capturedById: "actor",
       signedAt: expect.any(Date),
@@ -182,7 +197,7 @@ it("stores an independent immutable opening approval and image-free audit withou
 
 it("returns original metadata on an identical retry and rejects reuse with changed details", async () => {
   (prisma.jobOpeningSignature.findUnique as jest.Mock).mockResolvedValue(
-    signature(),
+    signature(documentV2),
   );
   await expect(signJobOpening(id, body, "actor")).resolves.toMatchObject({
     id: "signature",
@@ -203,10 +218,10 @@ it("refuses stale scope or terms and requires representative authority", async (
   await expect(
     signJobOpening(
       id,
-      { ...body, signerName: "Representative", relationship: "Fleet manager" },
+      { ...body, signerName: "Representative", relationship: "Fleet manager", signerPhone: "0803 555 0199" },
       "actor",
     ),
-  ).resolves.toMatchObject({ signerName: "Representative" });
+  ).resolves.toMatchObject({ signerName: "Representative", signerPhone: "0803 555 0199" });
 });
 
 it("creates a new signed revision after material changes without overwriting earlier evidence", async () => {
@@ -216,8 +231,8 @@ it("creates a new signed revision after material changes without overwriting ear
   const updated = { ...job, description: "Inspect brakes and steering" };
   (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(updated);
   const nextDocument = {
-    ...document,
-    scope: openingJobScope(updated as Parameters<typeof openingJobScope>[0]),
+    ...documentV2,
+    scope: openingCheckInScope(updated as unknown as Parameters<typeof openingCheckInScope>[0]),
   };
   await expect(
     signJobOpening(
@@ -304,4 +319,76 @@ it("rejects signing after billing and propagates audit failure from the transact
   await expect(signJobOpening(id, body, "actor")).rejects.toThrow(
     "audit unavailable",
   );
+});
+
+describe("version 2 documents with the check-in snapshot (phase 2)", () => {
+  const walkedJob = {
+    ...job,
+    stage: "CHECK_IN",
+    checkIn: {
+      fuelLevel: "HALF",
+      checklist: { HUB_CAPS: "MISSING" },
+      checklistNote: null,
+      serviceBookSeen: true,
+      serviceBookStamps: 3,
+      noValuables: true,
+      belongingsNote: "Umbrella in boot",
+    },
+    damageMarks: [{ id: "mark", type: "SCRATCH", x: 50, y: 96, note: null, photoId: null, createdAt: new Date("2026-11-17T09:10:00Z") }],
+    photos: [{ id: "photo", category: "CHECK_IN", slot: "FRONT", sha256: "a".repeat(64) }],
+  };
+  const v2 = signedOpeningDocumentV2.parse({
+    ...document,
+    version: 2,
+    scope: openingCheckInScope(walkedJob as unknown as Parameters<typeof openingCheckInScope>[0]),
+  });
+
+  it("verifies old version 1 signatures and new version 2 signatures", () => {
+    expect(validOpeningEvidence(signature())).toBe(true);
+    expect(validOpeningEvidence(signature(v2))).toBe(true);
+    expect(validOpeningEvidence(signature(v2, "0803 555 0199"))).toBe(true);
+  });
+
+  it("keeps the evidence hash of signatures taken before the phone was recorded", () => {
+    const old = signature();
+    const { signerPhone: _phone, ...withoutPhone } = old;
+    expect(openingEvidenceHash(withoutPhone)).toBe(old.evidenceHash);
+    expect(validOpeningEvidence({ ...signature(v2, "0803 555 0199"), signerPhone: "0803 555 0100" })).toBe(false);
+  });
+
+  it("covers the walk-around: changing fuel, checklist, marks or photos breaks the hash", () => {
+    const scope = v2.scope;
+    for (const checkIn of [
+      { ...scope.checkIn, fuelLevel: "FULL" as const },
+      { ...scope.checkIn, belongingsNote: "Laptop in boot" },
+      { ...scope.checkIn, damageMarks: [] },
+      { ...scope.checkIn, photos: [{ ...scope.checkIn.photos[0], sha256: "b".repeat(64) }] },
+    ])
+      expect(validOpeningEvidence({ ...signature(v2), snapshot: { ...v2, scope: { ...scope, checkIn } } })).toBe(false);
+  });
+
+  it("keeps a version 1 signature current on an unchanged job, and a version 2 signature goes stale when the walk-around changes", async () => {
+    (prisma.jobOpeningSignature.findFirst as jest.Mock).mockResolvedValue(signature());
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(walkedJob);
+    await expect(assertSignedJobOpening(prisma, id)).resolves.toBeUndefined();
+
+    (prisma.jobOpeningSignature.findFirst as jest.Mock).mockResolvedValue(signature(v2));
+    await expect(assertSignedJobOpening(prisma, id)).resolves.toBeUndefined();
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...walkedJob, checkIn: { ...walkedJob.checkIn, fuelLevel: "FULL" } });
+    expect((await getSignedOpeningConsent(id)).state).toBe("stale");
+  });
+
+  it("refuses a signature at check-in until Details and Walk-around are complete", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ ...walkedJob, checkIn: null });
+    await expect(signJobOpening(id, body, "actor")).rejects.toMatchObject({
+      code: "CHECK_IN_INCOMPLETE",
+      message: "Finish Details and Walk-around before the customer signs.",
+    });
+    expect(prisma.jobOpeningSignature.create).not.toHaveBeenCalled();
+  });
+
+  it("needs a phone number from a representative", () => {
+    const result = openingSignatureBody.safeParse({ ...body, signerName: "Rep", relationship: "Driver" });
+    expect(result.error?.issues[0]).toMatchObject({ path: ["signerPhone"], message: "Enter the phone number of the person signing for the customer" });
+  });
 });
