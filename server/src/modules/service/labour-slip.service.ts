@@ -344,7 +344,11 @@ export class LabourSlipService {
             },
           }))
         )
-          throw new BadRequestError("Engineer must be active in this branch");
+          throw new BadRequestError(
+            job.jobType === JobCardType.PDI
+              ? "Engineer must be active in this branch"
+              : "Technician must be active in this branch",
+          );
         const now = new Date();
         const pdi = job.jobType === JobCardType.PDI;
         if (pdi)

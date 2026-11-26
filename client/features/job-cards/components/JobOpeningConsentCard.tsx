@@ -28,9 +28,11 @@ const stateLabels = {
 export function JobOpeningConsentCard({
   jobCardId,
   closed,
+  embedded = false,
 }: {
   jobCardId: string;
   closed: boolean;
+  embedded?: boolean;
 }) {
   const { hasPermission } = useAuth();
   const allowed = hasPermission("jobcard:read");
@@ -51,9 +53,14 @@ export function JobOpeningConsentCard({
       </section>
     );
   const consent = query.data;
+  const surface = embedded
+    ? consent.state === "signed"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : "border-border bg-card"
+    : "border-border";
   return (
     <section
-      className="space-y-3 rounded-xl border border-border p-4 print:hidden"
+      className={`space-y-3 rounded-xl border p-4 print:hidden ${surface}`}
       aria-label="Job-opening approval"
     >
       <h2 className="font-semibold">Job-opening approval</h2>

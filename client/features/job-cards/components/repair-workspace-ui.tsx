@@ -80,11 +80,11 @@ export function WorkspaceHeader({ status }: { status: JobCardStatus }) {
     </>
   );
 }
-export function JobProgressStepper({ status }: { status: JobCardStatus }) {
+export function JobProgressStepper({ status, embedded = false }: { status: JobCardStatus; embedded?: boolean }) {
   return (
-    <div className={cn(workspaceCardClass, "print:hidden")}>
+    <div className={cn(!embedded && workspaceCardClass, "print:hidden")}>
       <div
-        className="overflow-x-auto p-4 sm:p-5"
+        className={cn("overflow-x-auto", embedded ? "py-1" : "p-4 sm:p-5")}
         tabIndex={0}
         role="region"
         aria-label={COPY.title}
@@ -94,7 +94,7 @@ export function JobProgressStepper({ status }: { status: JobCardStatus }) {
             <li
               key={step.status}
               aria-current={step.state === "current" ? "step" : undefined}
-              className="flex items-center gap-2.5 text-xs"
+              className={cn("flex items-center gap-2.5 text-xs", embedded && "flex-1 after:h-0.5 after:flex-1 after:bg-border last:flex-none last:after:hidden")}
             >
               <span
                 className={cn(

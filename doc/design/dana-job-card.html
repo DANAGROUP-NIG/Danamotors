@@ -1,0 +1,1998 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dana Motors · Job 2026000026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --surface: #fff;
+        --ink: #05141f;
+        --muted: #596879;
+        --line: #e2e7ed;
+        --accent: #165cdb;
+        --tint: #edf4ff;
+        --green: #08734c;
+        --green-bg: #eaf8f1;
+        --amber: #925400;
+        --amber-bg: #fff6e4;
+        --red: #bb2636;
+        --soft: #f8fafc;
+        --radius: 14px;
+        --sidebar: 208px;
+      }
+      html[data-theme="dark"] {
+        --bg: #0b131b;
+        --surface: #111e29;
+        --ink: #eff5fc;
+        --muted: #a7b7c8;
+        --line: #2a3948;
+        --accent: #78a8ff;
+        --tint: #1b3457;
+        --green: #70dba8;
+        --green-bg: #163328;
+        --amber: #ffd080;
+        --amber-bg: #3b2d17;
+        --red: #ff8b96;
+        --soft: #16232f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 Inter,
+          Geist,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button,
+      select,
+      summary {
+        cursor: pointer;
+      }
+      button {
+        color: inherit;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      summary:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #70a7ff;
+        outline-offset: 2px;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 30px;
+        letter-spacing: -1.1px;
+        line-height: 1.2;
+        font-weight: 730;
+      }
+      h2 {
+        font-size: 17px;
+        font-weight: 680;
+        letter-spacing: -0.3px;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .micro {
+        font-size: 11px;
+        letter-spacing: 0.065em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 650;
+      }
+      .shell {
+        margin-left: var(--sidebar);
+      }
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: var(--sidebar);
+        background: #05141f;
+        color: #afc0ce;
+        display: flex;
+        flex-direction: column;
+        z-index: 40;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 16px;
+        color: white;
+        border-bottom: 1px solid #253541;
+      }
+      .mark {
+        display: inline-grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: #fff;
+        color: #05141f;
+        font-size: 20px;
+        font-weight: 850;
+        flex: none;
+      }
+      .brand strong {
+        font-size: 14px;
+        line-height: 1.1;
+        display: block;
+      }
+      .brand small {
+        font-size: 10px;
+        color: #9cb0c0;
+      }
+      .navscroll {
+        overflow: auto;
+        padding: 12px 10px;
+        scrollbar-width: thin;
+        flex: 1;
+      }
+      .navheading {
+        font-size: 10px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        margin: 17px 10px 5px;
+        color: #8198a9;
+        font-weight: 700;
+      }
+      .navitem {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #b5c5d1;
+        width: 100%;
+        padding: 7px 10px;
+        border: 0;
+        background: none;
+        text-align: left;
+        border-radius: 7px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .navitem:hover {
+        background: #1b2e3b;
+      }
+      .navitem.active {
+        background: #1d4168;
+        color: #fff;
+        font-weight: 650;
+      }
+      .ico {
+        width: 18px;
+        height: 18px;
+        flex: none;
+        display: inline-grid;
+        place-items: center;
+        font-size: 16px;
+      }
+      .navfooter {
+        padding: 12px;
+        border-top: 1px solid #253541;
+      }
+      .topbar {
+        height: 62px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        position: sticky;
+        top: 0;
+        z-index: 30;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .between {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .topsearch {
+        width: 240px;
+        display: flex;
+        justify-content: space-between;
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 12px;
+        color: var(--muted);
+      }
+      .kbd {
+        font-size: 11px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 9px 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        min-height: 36px;
+      }
+      .btn:hover {
+        background: var(--soft);
+      }
+      .primary {
+        background: #165cdb;
+        color: white;
+        border-color: #165cdb;
+      }
+      .primary:hover {
+        background: #104dbd;
+      }
+      .primary:disabled {
+        background: #dce5f2;
+        color: #445a75;
+        border-color: transparent;
+        opacity: 1;
+      }
+      .ghost {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+      }
+      .link {
+        border: 0;
+        background: transparent;
+        color: var(--accent);
+        font-weight: 650;
+        padding: 4px 0;
+      }
+      .danger {
+        color: var(--red);
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        font-weight: 700;
+        background: var(--tint);
+        color: var(--accent);
+        flex: none;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 20px;
+        padding: 4px 9px;
+        white-space: nowrap;
+        background: var(--tint);
+        color: var(--accent);
+      }
+      .badge.amber {
+        background: var(--amber-bg);
+        color: var(--amber);
+      }
+      .badge.green {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 100%;
+        background: currentColor;
+      }
+      .jobhead {
+        position: sticky;
+        top: 62px;
+        z-index: 20;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        padding: 18px 28px 16px;
+      }
+      .crumb {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .headinfo {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .headactions {
+        text-align: right;
+      }
+      .hint {
+        font-size: 11px;
+        color: var(--amber);
+        margin-top: 6px;
+      }
+      .stepper {
+        display: flex;
+        align-items: center;
+        margin-top: 22px;
+        gap: 0;
+      }
+      .step {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 550;
+        flex: 1;
+        white-space: nowrap;
+      }
+      .step:not(:last-child):after {
+        content: "";
+        height: 2px;
+        background: var(--line);
+        flex: 1;
+        margin: 0 10px;
+      }
+      .step:last-child {
+        flex: 0;
+      }
+      .stepnum {
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--soft);
+        font-size: 11px;
+      }
+      .step.current {
+        color: var(--accent);
+        font-weight: 750;
+      }
+      .step.current .stepnum {
+        background: #165cdb;
+        color: white;
+        border-color: #165cdb;
+        box-shadow: 0 0 0 4px var(--tint);
+      }
+      .step.done .stepnum {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .content {
+        max-width: 1560px;
+        margin: auto;
+        padding: 20px 28px 48px;
+      }
+      .banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: var(--green-bg);
+        color: var(--green);
+        margin-bottom: 10px;
+      }
+      .banner strong {
+        font-size: 13px;
+      }
+      .banner small {
+        display: block;
+        color: var(--green);
+        margin-top: 2px;
+      }
+      .banner button {
+        color: var(--green);
+        font-size: 12px;
+      }
+      .warning {
+        background: var(--amber-bg);
+        color: var(--amber);
+        font-size: 13px;
+        margin-bottom: 20px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .card,
+      .kpi {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+      .kpi {
+        padding: 17px 18px;
+      }
+      .kpi strong {
+        display: block;
+        font-size: 23px;
+        letter-spacing: -0.65px;
+        margin-top: 5px;
+        font-weight: 700;
+      }
+      .gridmain {
+        display: grid;
+        grid-template-columns: minmax(0, 1.85fr) minmax(290px, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+      .workspace {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+      }
+      .card {
+        padding: 22px;
+        min-width: 0;
+      }
+      .cardtitle {
+        margin-bottom: 17px;
+      }
+      .tabs {
+        display: flex;
+        overflow: auto;
+        gap: 17px;
+        border-bottom: 1px solid var(--line);
+        margin: 0 -22px 20px;
+        padding: 0 22px;
+        scrollbar-width: none;
+      }
+      .tab {
+        white-space: nowrap;
+        padding: 10px 0;
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+        border-bottom: 2px solid transparent;
+      }
+      .tab.active {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .formgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        min-width: 0;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        height: 39px;
+        background: var(--surface);
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px 11px;
+        min-width: 0;
+      }
+      .field textarea {
+        height: 76px;
+        resize: vertical;
+      }
+      .segment {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        padding: 4px;
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        margin: 6px 0 16px;
+      }
+      .segment button {
+        flex: 1;
+        background: none;
+        border: 0;
+        border-radius: 6px;
+        padding: 7px;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .segment button.active {
+        background: var(--surface);
+        color: var(--accent);
+        box-shadow: 0 1px 3px #0001;
+        font-weight: 700;
+      }
+      .partrow {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 30px;
+        gap: 10px;
+        align-items: end;
+        margin: 16px 0;
+      }
+      .hr {
+        height: 1px;
+        background: var(--line);
+        margin: 20px 0;
+      }
+      .empty {
+        padding: 24px 12px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .emptyicon {
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        background: var(--tint);
+        color: var(--accent);
+        border-radius: 13px;
+        margin: 0 auto 10px;
+        font-size: 24px;
+      }
+      .empty strong {
+        display: block;
+        color: var(--ink);
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      .empty .btn {
+        margin-top: 14px;
+      }
+      .context {
+        position: sticky;
+        top: 245px;
+        max-height: calc(100vh - 260px);
+        overflow: auto;
+        scrollbar-width: thin;
+        display: grid;
+        gap: 12px;
+        padding-bottom: 3px;
+      }
+      .context .card {
+        padding: 0;
+      }
+      .context summary {
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
+        font-weight: 680;
+      }
+      .context summary::-webkit-details-marker {
+        display: none;
+      }
+      .context summary:after {
+        content: "⌄";
+        color: var(--muted);
+        font-size: 17px;
+      }
+      .context details[open] summary:after {
+        transform: rotate(180deg);
+      }
+      .detailsbody {
+        padding: 0 18px 18px;
+      }
+      .kv {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 5px 0;
+        font-size: 13px;
+      }
+      .kv span:first-child {
+        color: var(--muted);
+      }
+      .kv span:last-child {
+        text-align: right;
+        font-weight: 550;
+      }
+      .plate {
+        display: inline-block;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 4px 9px;
+        letter-spacing: 0.08em;
+        font-weight: 800;
+        color: var(--ink);
+        background: var(--soft);
+      }
+      .contact {
+        font-size: 13px;
+        margin: 8px 0;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .mini {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .amounts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 14px 0;
+      }
+      .amounts strong {
+        display: block;
+        font-size: 19px;
+      }
+      .advancehint {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        background: var(--soft);
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .timeline {
+        border-left: 2px solid var(--line);
+        margin: 10px 0 0 10px;
+        padding-left: 18px;
+      }
+      .event {
+        position: relative;
+        margin: 12px 0;
+      }
+      .event:before {
+        content: "";
+        position: absolute;
+        left: -25px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        background: var(--accent);
+        border: 3px solid var(--surface);
+        border-radius: 50%;
+      }
+      .mobilebar,
+      .mobileprogress,
+      .mobilecta {
+        display: none;
+      }
+      .menuwrap {
+        position: relative;
+      }
+      .menu {
+        position: absolute;
+        right: 0;
+        top: 45px;
+        width: 230px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 6px;
+        box-shadow: 0 10px 30px #0002;
+        z-index: 50;
+      }
+      .menu button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: none;
+        padding: 10px;
+        border-radius: 6px;
+      }
+      .menu button:hover {
+        background: var(--soft);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 14px 20px;
+        border-radius: 10px;
+        box-shadow: 0 8px 30px #0002;
+        z-index: 100;
+      }
+      .dialog {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--surface);
+        color: var(--ink);
+        padding: 24px;
+        width: min(460px, 92vw);
+      }
+      .dialog::backdrop {
+        background: #05141f88;
+      }
+      .collapsed {
+        --sidebar: 66px;
+      }
+      .collapsed .navheading,
+      .collapsed .navitem span:not(.ico),
+      .collapsed .brand div,
+      .collapsed .navfooter span {
+        display: none;
+      }
+      .collapsed .navitem {
+        justify-content: center;
+      }
+      .collapsed .brand {
+        padding: 16px;
+      }
+      .collapsed .navheading {
+        margin: 3px;
+      }
+      .collapsed .brand .mark {
+        display: grid;
+      }
+      .navitem svg {
+        width: 18px;
+        height: 18px;
+      }
+      .statepanel {
+        animation: appear 0.18s ease;
+      }
+      @keyframes appear {
+        from {
+          opacity: 0.5;
+          transform: translateY(3px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (max-width: 1100px) {
+        :root {
+          --sidebar: 66px;
+        }
+        .sidebar .navheading,
+        .sidebar .navitem span:not(.ico),
+        .sidebar .brand div,
+        .sidebar .navfooter span {
+          display: none;
+        }
+        .sidebar .navitem {
+          justify-content: center;
+        }
+        .gridmain {
+          grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+        }
+        .content,
+        .jobhead,
+        .topbar {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+        .kpi strong {
+          font-size: 20px;
+        }
+      }
+      @media (max-width: 820px) {
+        .gridmain {
+          grid-template-columns: 1fr;
+        }
+        .context {
+          position: static;
+          max-height: none;
+          grid-row: 1;
+        }
+        .context details:not([open]) {
+          display: block;
+        }
+        .headactions .hint {
+          display: none;
+        }
+        .context {
+          grid-template-columns: 1fr 1fr;
+        }
+        .kpis {
+          grid-template-columns: 1fr 1fr;
+        }
+        .topsearch {
+          width: 150px;
+        }
+      }
+      @media (max-width: 600px) {
+        :root {
+          --sidebar: 0px;
+        }
+        .sidebar {
+          display: none;
+        }
+        .topbar {
+          height: 56px;
+          padding: 0 16px;
+        }
+        .topsearch,
+        .desktoponly,
+        .stepper,
+        .headactions {
+          display: none;
+        }
+        .jobhead {
+          top: 56px;
+          padding: 14px 16px;
+        }
+        h1 {
+          font-size: 27px;
+        }
+        .crumb {
+          margin-bottom: 9px;
+        }
+        .mobileprogress {
+          display: block;
+          margin-top: 12px;
+        }
+        .progress {
+          height: 5px;
+          background: var(--line);
+          border-radius: 10px;
+          overflow: hidden;
+          margin-top: 6px;
+        }
+        .progress span {
+          display: block;
+          height: 100%;
+          width: 16.67%;
+          background: #165cdb;
+        }
+        .content {
+          padding: 14px 14px 140px;
+        }
+        .banner,
+        .warning {
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .banner .row {
+          flex-wrap: wrap;
+        }
+        .kpi {
+          padding: 12px;
+        }
+        .kpi strong {
+          font-size: 19px;
+        }
+        .kpis {
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .gridmain {
+          gap: 14px;
+        }
+        .context {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+        .context details {
+          border-radius: 10px;
+        }
+        .context summary {
+          min-height: 48px;
+        }
+        .workspace {
+          gap: 14px;
+        }
+        .card {
+          padding: 16px;
+        }
+        .tabs {
+          margin: 0 -16px 14px;
+          padding: 0 16px;
+        }
+        .formgrid {
+          grid-template-columns: 1fr;
+        }
+        .partrow {
+          grid-template-columns: 1fr 1fr 32px;
+        }
+        .partrow .field:first-child {
+          grid-column: 1/-1;
+        }
+        .amounts {
+          gap: 8px;
+        }
+        .amounts strong {
+          font-size: 16px;
+        }
+        .mobilebar {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          display: flex;
+          justify-content: space-around;
+          background: var(--surface);
+          border-top: 1px solid var(--line);
+          z-index: 60;
+          padding: 7px 4px max(7px, env(safe-area-inset-bottom));
+        }
+        .mobilebar button {
+          border: 0;
+          background: none;
+          display: grid;
+          justify-items: center;
+          gap: 2px;
+          color: var(--muted);
+          font-size: 10px;
+          width: 20%;
+          min-height: 44px;
+        }
+        .mobilebar button.active {
+          color: var(--accent);
+          font-weight: 700;
+        }
+        .mobilebar .ico {
+          font-size: 20px;
+        }
+        .mobilecta {
+          position: fixed;
+          bottom: 59px;
+          left: 0;
+          right: 0;
+          padding: 9px 14px;
+          background: var(--surface);
+          border-top: 1px solid var(--line);
+          display: block;
+          z-index: 59;
+        }
+        .mobilecta button {
+          width: 100%;
+        }
+        .mobilecta .hint {
+          text-align: center;
+          margin-top: 3px;
+        }
+        .btn,
+        .field input,
+        .field select {
+          min-height: 44px;
+        }
+        .toast {
+          bottom: 145px;
+          right: 14px;
+          left: 14px;
+        }
+        .advancehint {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+      @media print {
+        .sidebar,
+        .topbar,
+        .headactions,
+        .mobilebar,
+        .mobilecta,
+        .btn,
+        .link {
+          display: none !important;
+        }
+        .shell {
+          margin: 0;
+        }
+        .jobhead,
+        .context {
+          position: static;
+          max-height: none;
+          overflow: visible;
+        }
+        .content {
+          padding: 0;
+        }
+        .gridmain {
+          display: block;
+        }
+        .context {
+          margin-top: 16px;
+        }
+        .card {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="mark">D</span>
+        <div><strong>DANA MOTORS</strong><small>Service platform</small></div>
+      </div>
+      <nav class="navscroll" id="nav" aria-label="Main navigation"></nav>
+      <div class="navfooter">
+        <button
+          class="navitem"
+          onclick="document.documentElement.classList.toggle('collapsed')"
+          aria-label="Collapse sidebar"
+        >
+          <span class="ico">◀</span><span>Collapse sidebar</span>
+        </button>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="topbar">
+        <div class="row">
+          <span class="ico">▦</span
+          ><select aria-label="Branch" class="btn" style="border: 0">
+            <option>Main Branch</option>
+          </select>
+        </div>
+        <div class="row">
+          <button
+            class="topsearch"
+            onclick="
+              showDialog(
+                'Global search',
+                'Search the workshop',
+                'Search job cards, vehicles or customers',
+                'Search',
+              )
+            "
+          >
+            <span>⌕ &nbsp; Search anything</span
+            ><span class="kbd">⌘ K</span></button
+          ><button
+            class="btn ghost"
+            aria-label="Toggle dark theme"
+            onclick="toggleTheme()"
+          >
+            ◐</button
+          ><button
+            class="btn ghost"
+            aria-label="6 notifications"
+            onclick="toast('You have 6 notifications')"
+          >
+            ♧ <span class="badge">6</span></button
+          ><button
+            class="btn ghost"
+            onclick="toast('Signed in as Super Admin')"
+          >
+            <span class="avatar">SA</span
+            ><span class="desktoponly">Super Admin ▾</span>
+          </button>
+        </div>
+      </header>
+      <main>
+        <section class="jobhead">
+          <div class="between crumb">
+            <span>Workshop &nbsp; / &nbsp; <strong>Job card</strong></span>
+            <div class="row">
+              <button
+                class="link"
+                onclick="toast('Job cards list · Prototype')"
+              >
+                ← Back to Job Cards</button
+              ><button class="link desktoponly" onclick="print()">
+                ⎙ Print
+              </button>
+            </div>
+          </div>
+          <div class="headinfo">
+            <div>
+              <div class="row">
+                <h1>2026000026</h1>
+                <span class="badge" id="status"
+                  ><span class="dot"></span> OPEN</span
+                >
+              </div>
+              <p class="subtitle">
+                <strong style="color: var(--ink)">Check the AC</strong>
+                &nbsp;·&nbsp; Created 25 Nov 2026, 10:22
+              </p>
+            </div>
+            <div class="headactions">
+              <div class="row">
+                <button
+                  class="btn primary start"
+                  disabled
+                  title="Advance required before work can start"
+                >
+                  🔒 Start work
+                </button>
+                <div class="menuwrap">
+                  <button
+                    class="btn"
+                    onclick="
+                      document.getElementById('more').toggleAttribute('hidden')
+                    "
+                    aria-label="More actions"
+                  >
+                    More ···
+                  </button>
+                  <div class="menu" id="more" hidden>
+                    <button onclick="print()">Print picking list</button
+                    ><button onclick="print()">Print signed job opening</button
+                    ><button
+                      class="danger"
+                      onclick="
+                        showDialog(
+                          'Cancel job card?',
+                          'Cancellation reason',
+                          'Enter a reason',
+                          'Cancel job card',
+                          'cancel',
+                        )
+                      "
+                    >
+                      Cancel job card
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p class="hint startHint">
+                Advance required before work can start
+              </p>
+            </div>
+          </div>
+          <div class="stepper" id="steps"></div>
+          <div class="mobileprogress">
+            <div class="between">
+              <span class="micro" id="mobileStage">Stage 1 of 6 · Open</span
+              ><button
+                class="link"
+                onclick="
+                  document
+                    .getElementById('moreMobile')
+                    .toggleAttribute('hidden')
+                "
+              >
+                More ···
+              </button>
+            </div>
+            <div class="menu" id="moreMobile" hidden>
+              <button onclick="print()">Print</button
+              ><button onclick="print()">Print picking list</button
+              ><button onclick="print()">Print signed job opening</button
+              ><button
+                class="danger"
+                onclick="
+                  showDialog(
+                    'Cancel job card?',
+                    'Cancellation reason',
+                    'Enter a reason',
+                    'Cancel job card',
+                    'cancel',
+                  )
+                "
+              >
+                Cancel job card
+              </button>
+            </div>
+            <div class="progress"><span id="progress"></span></div>
+          </div>
+        </section>
+        <div class="content">
+          <div class="banner">
+            <div class="row">
+              <span style="font-size: 23px">✓</span>
+              <div>
+                <strong id="consent"
+                  >Job opening signed by Cosmas Ogbobe on 25 Nov 2026, 10:37,
+                  revision 1</strong
+                ><small
+                  >This signature is separate from estimate approval.</small
+                >
+              </div>
+            </div>
+            <div class="row">
+              <button class="link" onclick="toast('Consent refreshed')">
+                Reload consent</button
+              ><button
+                class="link"
+                onclick="
+                  showDialog(
+                    'Review and sign a new revision',
+                    'Customer signature',
+                    'Type customer name',
+                    'Sign revision',
+                    'sign',
+                  )
+                "
+              >
+                Review & sign ↗
+              </button>
+            </div>
+          </div>
+          <div class="warning" id="approvalWarning">
+            <span
+              >⚠ &nbsp; <strong>Estimate approval required.</strong> Approve the
+              latest estimate before starting or completing work.</span
+            ><button class="link" onclick="tab('Estimate & approval')">
+              Review estimate →
+            </button>
+          </div>
+          <section class="kpis" aria-label="Job summary">
+            <div class="kpi">
+              <span class="micro">Estimated cost</span
+              ><strong>₦15,000.00</strong>
+            </div>
+            <div class="kpi">
+              <span class="micro">Advances received</span
+              ><strong class="advanceValue">₦0.00</strong>
+            </div>
+            <div class="kpi">
+              <span class="micro">Estimated balance</span
+              ><strong class="balanceValue">₦0.00</strong>
+            </div>
+            <div class="kpi">
+              <span class="micro">QC status</span>
+              <div style="margin-top: 11px">
+                <span class="badge amber"
+                  ><span class="dot"></span> Pending</span
+                >
+              </div>
+            </div>
+          </section>
+          <div class="gridmain">
+            <div class="workspace">
+              <section class="card" id="transactions">
+                <div class="between cardtitle">
+                  <div>
+                    <h2>Service transactions</h2>
+                    <p class="muted" style="font-size: 12px; margin-top: 3px">
+                      Manage parts, labour and approvals for this job.
+                    </p>
+                  </div>
+                  <button
+                    class="btn ghost"
+                    onclick="print()"
+                    title="Print picking list"
+                  >
+                    ⎙ <span class="desktoponly">Picking list</span>
+                  </button>
+                </div>
+                <div class="tabs" role="tablist" id="tabs"></div>
+                <div class="statepanel" id="tabContent"></div>
+              </section>
+              <section class="card" id="advance">
+                <div class="between">
+                  <h2>Advance payments</h2>
+                  <span class="badge amber" id="advanceBadge">Required</span>
+                </div>
+                <div class="amounts">
+                  <div>
+                    <span class="mini">Estimate total</span
+                    ><strong class="estimateValue">₦0.00</strong>
+                  </div>
+                  <div>
+                    <span class="mini">Received</span
+                    ><strong class="advanceValue">₦0.00</strong>
+                  </div>
+                  <div>
+                    <span class="mini">Balance</span
+                    ><strong class="balanceValue">₦0.00</strong>
+                  </div>
+                </div>
+                <div class="advancehint">
+                  <div>
+                    <strong>Suggested advance · 60%</strong>
+                    <p class="mini">
+                      Any positive amount is accepted. Final balance depends on
+                      the invoice.
+                    </p>
+                  </div>
+                  <button class="btn" onclick="recordAdvance()">
+                    + Record advance
+                  </button>
+                </div>
+              </section>
+              <section class="card">
+                <div class="cardtitle">
+                  <h2>Diagnosis & findings</h2>
+                  <p class="mini">Capture the inspection and work performed.</p>
+                </div>
+                <form
+                  onsubmit="
+                    event.preventDefault();
+                    addEvent('Diagnosis & findings saved');
+                    toast('Diagnosis saved');
+                  "
+                >
+                  <div class="formgrid">
+                    <label class="field"
+                      >Observations<textarea
+                        placeholder="Describe observations"
+                      ></textarea></label
+                    ><label class="field"
+                      >Work done and recommendations<textarea
+                        placeholder="Record work and recommendations"
+                      ></textarea></label
+                    ><label class="field"
+                      >Next action<textarea
+                        placeholder="What happens next?"
+                      ></textarea>
+                    </label>
+                    <div>
+                      <label class="field"
+                        >Service charge (NGN)<input
+                          type="number"
+                          value="15000"
+                          min="0" /></label
+                      ><label class="field" style="margin-top: 8px"
+                        >Engineer<select>
+                          <option>Choose engineer</option>
+                          <option>Chidi Eze</option>
+                        </select></label
+                      >
+                    </div>
+                  </div>
+                  <p class="mini" style="margin: 12px 0">
+                    Service charge is a separate bill line. Confirm before
+                    billing.
+                  </p>
+                  <button class="btn primary">Save diagnosis & findings</button>
+                </form>
+              </section>
+              <section class="card">
+                <h2>Activity</h2>
+                <p class="mini">Inspections, estimates, parts and invoices</p>
+                <div id="activity" class="empty">
+                  <div class="emptyicon">◷</div>
+                  <strong>No activity yet</strong>Updates will appear here as
+                  work progresses.
+                </div>
+              </section>
+            </div>
+            <aside class="context" aria-label="Job context">
+              <details class="card" open>
+                <summary>Customer</summary>
+                <div class="detailsbody">
+                  <div class="row">
+                    <span class="avatar" style="width: 42px; height: 42px"
+                      >CO</span
+                    >
+                    <div>
+                      <strong>Cosmas Ogbobe</strong>
+                      <p class="mini">Individual</p>
+                    </div>
+                  </div>
+                  <p class="contact">
+                    ☎ &nbsp;009000900<br />✉ &nbsp;cogbobe@danagroup.com
+                  </p>
+                  <button
+                    class="link"
+                    onclick="
+                      showDialog(
+                        'Customer profile',
+                        'Cosmas Ogbobe',
+                        'Individual · 009000900 · cogbobe@danagroup.com',
+                        'Close',
+                        'close',
+                      )
+                    "
+                  >
+                    View full profile ↗
+                  </button>
+                </div>
+              </details>
+              <details class="card" open>
+                <summary>Vehicle</summary>
+                <div class="detailsbody">
+                  <div class="between">
+                    <strong>1999 Kia Rio</strong
+                    ><span class="plate">MUS 108 DA</span>
+                  </div>
+                  <p class="mini" style="margin: 8px 0 12px">
+                    Rio / 1.4L 16V 5MT FWD (97 HP)
+                  </p>
+                  <div class="kv"><span>VIN</span><span>15HHH8HHY</span></div>
+                  <div class="kv">
+                    <span>Year / Color</span><span>1999 / —</span>
+                  </div>
+                  <div class="kv">
+                    <span>Mileage</span><span>8,879 km</span>
+                  </div>
+                </div>
+              </details>
+              <details class="card" open>
+                <summary>People & assignment</summary>
+                <div class="detailsbody">
+                  <div class="kv"><span>Created by</span><span>Mark</span></div>
+                  <div class="kv">
+                    <span>Received by</span><span>Chidi Eze</span>
+                  </div>
+                  <div class="kv">
+                    <span>Delivered by</span><span>Awaiting delivery</span>
+                  </div>
+                  <div class="kv">
+                    <span>Technician</span
+                    ><span id="technician">Not assigned</span>
+                  </div>
+                  <div class="kv">
+                    <span>Quality inspector</span><span>Not assigned</span>
+                  </div>
+                  <button
+                    class="btn"
+                    style="margin-top: 10px; width: 100%"
+                    onclick="
+                      showDialog(
+                        'Assign technician',
+                        'Technician name',
+                        'Enter technician name',
+                        'Assign',
+                        'assign',
+                      )
+                    "
+                  >
+                    + Assign technician
+                  </button>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Job specifications</summary>
+                <div class="detailsbody">
+                  <div class="kv">
+                    <span>Service</span><span>Air Conditioning Service</span>
+                  </div>
+                  <div class="kv"><span>Bay</span><span>A2</span></div>
+                  <div class="kv">
+                    <span>Appointment</span><span>27 Nov 2026, 10:10</span>
+                  </div>
+                  <div class="kv">
+                    <span>Promised</span><span>28 Nov 2026, 12:01</span>
+                  </div>
+                  <div class="kv">
+                    <span>Estimated hours</span><span>N/A</span>
+                  </div>
+                  <div class="kv"><span>A/C fitted</span><span>No</span></div>
+                  <div class="kv"><span>In-house</span><span>No</span></div>
+                  <div class="kv">
+                    <span>Ready</span><span>Awaiting QC</span>
+                  </div>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Cost breakdown</summary>
+                <div class="detailsbody">
+                  <div class="kv">
+                    <span>Estimated parts</span><span>₦0.00</span>
+                  </div>
+                  <div class="kv">
+                    <span>Estimated oil</span><span>₦0.00</span>
+                  </div>
+                  <div class="kv">
+                    <span>Estimated labour</span><span>₦0.00</span>
+                  </div>
+                  <div class="hr" style="margin: 8px 0"></div>
+                  <div class="kv">
+                    <span>Service charge</span><span>₦15,000.00</span>
+                  </div>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Warranty & campaigns</summary>
+                <div class="detailsbody">
+                  <div class="between">
+                    <span>Warranty at creation</span
+                    ><span class="badge amber">Unknown</span>
+                  </div>
+                  <p class="mini" style="margin: 8px 0">
+                    No linked model warranty policy. Snapshot taken at job
+                    creation; later changes do not alter it.
+                  </p>
+                  <button
+                    class="link"
+                    onclick="
+                      showDialog(
+                        'Open warranty case',
+                        'Case details',
+                        'Describe the warranty concern',
+                        'Open case',
+                        'generic',
+                      )
+                    "
+                  >
+                    Open warranty case ↗
+                  </button>
+                  <div class="hr"></div>
+                  <h3>Linked campaigns</h3>
+                  <p class="mini">No recall, FPC or campaign work linked.</p>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Issued parts & collection</summary>
+                <div class="detailsbody">
+                  <p class="mini" id="issuedSummary">
+                    No parts issued. Request and issue parts through
+                    Requisition; return through Returns.
+                  </p>
+                  <button class="link" onclick="tab('Requisition')">
+                    Open requisition →
+                  </button>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Recorded labour</summary>
+                <div class="detailsbody">
+                  <p class="mini" id="labourSummary">
+                    No labour recorded. Historical entries will appear here.
+                  </p>
+                  <button class="link" onclick="tab('Labour')">
+                    Record labour →
+                  </button>
+                </div>
+              </details>
+              <details class="card">
+                <summary>Who pays</summary>
+                <div class="detailsbody">
+                  <p class="mini">
+                    No parts or labour yet. Issued parts and recorded labour
+                    appear here.
+                  </p>
+                </div>
+              </details>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
+    <div class="mobilecta">
+      <button class="btn primary start" disabled>🔒 Start work</button>
+      <p class="hint startHint">Advance required before work can start</p>
+    </div>
+    <nav class="mobilebar" aria-label="Mobile navigation">
+      <button onclick="toast('Home · Prototype')">
+        <span class="ico">⌂</span>Home</button
+      ><button onclick="toast('Vehicles · Prototype')">
+        <span class="ico">▱</span>Vehicles</button
+      ><button onclick="toast('Booking · Prototype')">
+        <span class="ico">▦</span>Book</button
+      ><button class="active"><span class="ico">▤</span>Jobs</button
+      ><button onclick="toggleTheme()">
+        <span class="ico">⚙</span>Settings
+      </button>
+    </nav>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <dialog class="dialog" id="dialog">
+      <form id="dialogForm">
+        <div class="between">
+          <h2 id="dialogTitle"></h2>
+          <button
+            type="button"
+            class="btn ghost"
+            onclick="dialog.close()"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <label class="field" style="margin: 18px 0" id="dialogField"
+          ><span id="dialogLabel"></span><input id="dialogInput" required
+        /></label>
+        <div class="row" style="justify-content: flex-end">
+          <button type="button" class="btn" onclick="dialog.close()">
+            Dismiss</button
+          ><button class="btn primary" id="dialogSubmit">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+    <script>
+      const $ = (id) => document.getElementById(id),
+        groups = {
+          Main: ["Dashboard", "Customers", "Vehicles", "Appointments"],
+          Workshop: [
+            "Job Cards",
+            "PDI",
+            "Repeat Jobs",
+            "Late Deliveries",
+            "CSC Follow-up",
+            "Post-service Follow-up",
+          ],
+          Services: ["Warranty", "Campaigns", "FPC bulletins", "Reports"],
+          Operations: [
+            "Inventory",
+            "Part Query",
+            "Barcode Labels",
+            "MIT",
+            "Vendor Receipts",
+            "Shortage Approvals",
+            "Stock Taking",
+            "Stock Audit",
+            "Part Sale",
+            "Data Management",
+            "Transfers",
+            "Parts Reports",
+          ],
+          Account: ["Finance", "Tally", "Credit Applications"],
+          Admin: [
+            "Branches",
+            "Employees",
+            "Users",
+            "Technicians",
+            "Labour Catalogue",
+            "Settings",
+          ],
+        },
+        icons = [
+          "▦",
+          "♙",
+          "▱",
+          "▣",
+          "▤",
+          "✓",
+          "↻",
+          "◷",
+          "☏",
+          "↗",
+          "◇",
+          "◎",
+          "▧",
+          "▥",
+        ];
+      let n = 0;
+      Object.entries(groups).forEach(([name, items]) => {
+        $("nav").insertAdjacentHTML(
+          "beforeend",
+          `<div class="navheading">${name}</div>${items.map((x) => `<button class="navitem ${x === "Job Cards" ? "active" : ""}" title="${x}" ${x === "Job Cards" ? 'aria-current="page"' : ""} onclick="toast('${x} · Prototype')"><span class="ico">${icons[n++ % icons.length]}</span><span>${x}</span></button>`).join("")}`,
+        );
+      });
+      let stage = 0,
+        estimate = 0,
+        paid = 0,
+        approved = false,
+        revision = 1,
+        parts = [],
+        labour = [],
+        reqType = "Non warranty",
+        active = "Requisition",
+        events = [],
+        remark = "";
+      const stages = [
+          "Open",
+          "In progress",
+          "QC",
+          "Ready",
+          "Billed",
+          "Delivered",
+        ],
+        tabs = [
+          "Requisition",
+          "Returns",
+          "Labour",
+          "Remarks",
+          "Estimate & approval",
+        ];
+      const money = (x) =>
+        "₦" +
+        Number(x).toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      function renderSteps() {
+        $("steps").innerHTML = stages
+          .map(
+            (s, i) =>
+              `<div class="step ${i === stage ? "current" : i < stage ? "done" : ""}" ${i === stage ? 'aria-current="step"' : ""}><span class="stepnum">${i < stage ? "✓" : i + 1}</span>${s}</div>`,
+          )
+          .join("");
+        $("status").innerHTML =
+          `<span class="dot"></span> ${stages[stage].toUpperCase()}`;
+        $("mobileStage").textContent =
+          `Stage ${stage + 1} of 6 · ${stages[stage]}`;
+        $("progress").style.width = ((stage + 1) / 6) * 100 + "%";
+      }
+      renderSteps();
+      function toggleTheme() {
+        let dark = document.documentElement.dataset.theme === "dark";
+        document.documentElement.dataset.theme = dark ? "light" : "dark";
+        localStorage.setItem("dana-theme", dark ? "light" : "dark");
+      }
+      document.documentElement.dataset.theme =
+        localStorage.getItem("dana-theme") || "light";
+      function toast(s) {
+        $("toast").textContent = "✓  " + s;
+        $("toast").hidden = false;
+        clearTimeout(window.toastTimer);
+        window.toastTimer = setTimeout(() => ($("toast").hidden = true), 2800);
+      }
+      function addEvent(s) {
+        events.unshift(s);
+        $("activity").className = "timeline";
+        $("activity").innerHTML = events
+          .map(
+            (e) =>
+              `<div class="event"><strong>${esc(e)}</strong><p class="mini">Just now · Super Admin</p></div>`,
+          )
+          .join("");
+      }
+      function esc(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+      function empty(icon, title, desc, action = "") {
+        return `<div class="empty"><div class="emptyicon">${icon}</div><strong>${title}</strong>${desc}${action}</div>`;
+      }
+      function tab(t, scroll = true) {
+        active = t;
+        $("tabs").innerHTML = tabs
+          .map(
+            (x) =>
+              `<button role="tab" aria-selected="${x === t}" class="tab ${x === t ? "active" : ""}" onclick="tab('${x}',false)">${x}</button>`,
+          )
+          .join("");
+        let c = $("tabContent");
+        if (t === "Requisition") {
+          c.innerHTML = `<h3>Parts requisition</h3><p class="mini" style="margin:4px 0 12px">Choose a requested part, then save and issue stock.</p><label class="field">Requisition type</label><div class="segment">${["Non warranty", "Warranty", "Free of cost", "Goodwill"].map((x) => `<button class="${x === reqType ? "active" : ""}" onclick="reqType='${x}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===this))">${x}</button>`).join("")}</div><div class="formgrid"><label class="field">Group (optional)<select><option>Select group</option><option>Air conditioning</option><option>General repair</option></select></label><label class="field">Engineer (optional)<select><option>Select engineer</option><option>Chidi Eze</option></select></label></div><form id="requisitionForm"><div id="partRows"></div><button type="button" class="link" onclick="addPart()">+ Add part</button><div class="between" style="margin-top:18px"><span class="mini">Stock checked at issue</span><button class="btn primary">Save and issue parts</button></div></form><div class="hr"></div><div class="between"><h3>Saved documents</h3><span class="mini">${parts.length} records</span></div>${parts.length ? parts.map((p) => `<div class="kv"><span>${esc(p.name)}</span><span>${p.qty} issued · ${esc(p.type)}</span></div>`).join("") : empty("▤", "No saved documents", "Issued requisitions will appear here.")}<div class="between"><button class="btn" disabled>Previous</button><span class="mini">Page 1</span><button class="btn" disabled>Next</button></div>`;
+          addPart();
+          $("requisitionForm").onsubmit = (e) => {
+            e.preventDefault();
+            document.querySelectorAll(".partrow").forEach((r) => {
+              let inputs = r.querySelectorAll("input");
+              parts.push({
+                name: inputs[0].value,
+                qty: inputs[2].value,
+                type: reqType,
+              });
+            });
+            $("issuedSummary").textContent =
+              parts.length + " part lines issued.";
+            addEvent("Parts requisition saved");
+            toast("Parts issued");
+            tab(t, false);
+          };
+        } else if (t === "Estimate & approval") {
+          c.innerHTML = estimate
+            ? `<div class="between"><h3>Estimate · Revision 1</h3><span class="badge ${approved ? "green" : "amber"}">${approved ? "Approved" : "Awaiting approval"}</span></div><p style="font-size:26px;font-weight:700;margin:20px 0">${money(estimate)}</p><button class="btn primary" onclick="showDialog('Estimate approval','Customer signature','Type customer name','Approve estimate','approve')">${approved ? "Approve new revision" : "Approve estimate"}</button> <button class="btn" onclick="createEstimate()">Revise estimate</button>`
+            : empty(
+                "▧",
+                "No estimate yet",
+                "Create the first estimate to request customer approval and take an advance.",
+                '<button class="btn primary" onclick="createEstimate()">+ Create estimate</button>',
+              );
+        } else if (t === "Returns") {
+          c.innerHTML = parts.length
+            ? `<h3>Return issued parts</h3>${parts.map((p, i) => `<div class="between" style="margin:12px 0"><span>${esc(p.name)} · ${p.qty} issued</span><button class="btn" onclick="returnPart(${i})">Return</button></div>`).join("")}`
+            : empty(
+                "↩",
+                "No parts to return",
+                "Issue parts before creating a return.",
+                '<button class="btn" onclick="tab(\'Requisition\')">Go to requisition</button>',
+              );
+        } else if (t === "Labour") {
+          c.innerHTML = `<h3>Record labour</h3><form onsubmit="event.preventDefault();labour.push(document.getElementById('labourName').value);document.getElementById('labourSummary').textContent=labour.length+' labour entries recorded.';addEvent('Labour recorded');toast('Labour saved');tab('Labour',false)"><div class="formgrid" style="margin:14px 0"><label class="field">Labour description<input id="labourName" required placeholder="Service task"></label><label class="field">Hours<input type="number" required min="0.1" step="0.1" placeholder="0.0"></label><label class="field">Engineer<select><option>Choose engineer</option><option>Chidi Eze</option></select></label><label class="field">Rate (NGN)<input type="number" min="0" value="0"></label></div><button class="btn primary">Save labour</button></form><div class="hr"></div>${labour.length ? labour.map((l) => `<div class="kv">${esc(l)}</div>`).join("") : empty("◷", "No labour recorded", "Saved work appears here.")}`;
+        } else {
+          c.innerHTML = `<label class="field">Remarks / cancellation reason<textarea id="remarks" placeholder="Add a workshop remark">${esc(remark)}</textarea></label><button class="btn primary" style="margin-top:14px" onclick="remark=$('remarks').value;addEvent('Remark saved');toast('Remark saved')">Save remarks</button>`;
+        }
+        if (scroll)
+          $("transactions").scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+      }
+      function addPart() {
+        let row = document.createElement("div");
+        row.className = "partrow";
+        row.innerHTML =
+          '<label class="field">Requested part<input required placeholder="Search or request part"></label><label class="field">Required<input required type="number" min="1" value="1"></label><label class="field">Issued<input required type="number" min="0" value="0"></label><button type="button" class="btn ghost danger" aria-label="Remove part" onclick="this.closest(\'.partrow\').remove()">×</button>';
+        $("partRows").append(row);
+      }
+      function returnPart(i) {
+        let p = parts.splice(i, 1)[0];
+        addEvent("Returned " + p.name);
+        $("issuedSummary").textContent = parts.length
+          ? parts.length + " part lines issued."
+          : "No parts issued.";
+        tab("Returns", false);
+        toast("Return saved");
+      }
+      tab("Requisition", false);
+      function refresh() {
+        document
+          .querySelectorAll(".estimateValue")
+          .forEach((e) => (e.textContent = money(estimate)));
+        document
+          .querySelectorAll(".advanceValue")
+          .forEach((e) => (e.textContent = money(paid)));
+        document
+          .querySelectorAll(".balanceValue")
+          .forEach(
+            (e) => (e.textContent = money(Math.max(estimate - paid, 0))),
+          );
+        $("approvalWarning").hidden = approved;
+        $("advanceBadge").textContent = paid > 0 ? "Received" : "Required";
+        document.querySelectorAll(".start").forEach((b) => {
+          b.disabled = !(approved && paid > 0) || stage === 5;
+          b.textContent =
+            stage === 5
+              ? "Delivered"
+              : stage === 0
+                ? b.disabled
+                  ? "🔒 Start work"
+                  : "Start work"
+                : "Move to " + stages[stage + 1];
+          b.onclick = () => {
+            stage++;
+            renderSteps();
+            addEvent("Job moved to " + stages[stage]);
+            refresh();
+            toast("Status updated");
+          };
+        });
+        document
+          .querySelectorAll(".startHint")
+          .forEach(
+            (e) =>
+              (e.textContent =
+                paid === 0
+                  ? "Advance required before work can start"
+                  : !approved
+                    ? "Estimate approval required"
+                    : "Ready to proceed"),
+          );
+      }
+      let action = "";
+      function showDialog(title, label, placeholder, submit, kind = "generic") {
+        action = kind;
+        $("dialogTitle").textContent = title;
+        $("dialogLabel").textContent = label;
+        $("dialogInput").placeholder = placeholder;
+        $("dialogInput").value = "";
+        $("dialogInput").type = ["estimate", "advance"].includes(kind)
+          ? "number"
+          : "text";
+        $("dialogInput").min = "1";
+        $("dialogInput").required = kind !== "close";
+        $("dialogSubmit").textContent = submit;
+        $("dialog").showModal();
+        $("more").hidden = true;
+        $("moreMobile").hidden = true;
+      }
+      function createEstimate() {
+        showDialog(
+          "Create estimate",
+          "Estimate total (NGN)",
+          "15000",
+          "Save estimate",
+          "estimate",
+        );
+        $("dialogInput").value = estimate || 15000;
+      }
+      function recordAdvance() {
+        if (!estimate) {
+          tab("Estimate & approval");
+          toast("Create an estimate before recording an advance");
+          return;
+        }
+        showDialog(
+          "Record advance",
+          "Amount (NGN)",
+          "9000",
+          "Record payment",
+          "advance",
+        );
+        $("dialogInput").value = Math.round(estimate * 0.6);
+      }
+      $("dialogForm").onsubmit = (e) => {
+        e.preventDefault();
+        let v = $("dialogInput").value;
+        if (action === "estimate") {
+          estimate = Number(v);
+          approved = false;
+          addEvent("Estimate prepared");
+          tab("Estimate & approval", false);
+        } else if (action === "approve") {
+          approved = true;
+          addEvent("Estimate approved by " + v);
+          tab("Estimate & approval", false);
+        } else if (action === "advance") {
+          paid += Number(v);
+          addEvent("Advance payment recorded");
+        } else if (action === "assign") {
+          $("technician").textContent = v;
+          addEvent("Technician assigned: " + v);
+        } else if (action === "sign") {
+          revision++;
+          $("consent").textContent =
+            `Job opening signed by ${v}, revision ${revision}`;
+          addEvent("Job opening signed");
+        } else if (action === "cancel") {
+          $("status").textContent = "CANCELLED";
+          addEvent("Job cancelled: " + v);
+          document.querySelectorAll(".start").forEach((b) => {
+            b.disabled = true;
+            b.textContent = "Cancelled";
+          });
+          $("dialog").close();
+          toast("Job card cancelled");
+          return;
+        } else if (action === "generic") {
+          addEvent($("dialogTitle").textContent);
+        }
+        $("dialog").close();
+        refresh();
+        toast("Saved successfully");
+      };
+      document.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+          e.preventDefault();
+          showDialog(
+            "Global search",
+            "Search workshop",
+            "Search job cards, vehicles or customers",
+            "Search",
+          );
+        }
+      });
+      if (innerWidth < 821)
+        document
+          .querySelectorAll(".context details")
+          .forEach((d) => (d.open = false));
+    </script>
+  </body>
+</html>

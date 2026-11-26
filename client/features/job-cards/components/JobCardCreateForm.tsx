@@ -122,12 +122,14 @@ export function JobCardCreateForm({
   onDirtyChange,
   onPendingChange,
   defaultValues,
+  bookingInHeader = false,
 }: {
   onSuccess?: (id: string) => void;
   onClose?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
   defaultValues?: Partial<CreateJobCardFormValues>;
+  bookingInHeader?: boolean;
 }) {
   const create = useCreateJobCard();
 
@@ -351,7 +353,6 @@ export function JobCardCreateForm({
       });
 
       setValue("serviceAdvisorId", "");
-      setValue("engineerId", "");
     }
 
     if (record.serviceId) {
@@ -385,7 +386,7 @@ export function JobCardCreateForm({
       });
 
     setValue("serviceAdvisorId", "");
-    setValue("engineerId", "");
+    setValue("technicianId", undefined);
 
     setValue(
       "complaints",
@@ -516,7 +517,6 @@ export function JobCardCreateForm({
           promisedAt: new Date(
             `${promisedDate}T${promisedTime}:00+01:00`,
           ).toISOString(),
-          engineerId: values.engineerId || undefined,
           previousJobId: values.isRepeat ? values.previousJobId : undefined,
           repeatReason: values.isRepeat
             ? values.repeatReason?.trim() || undefined
@@ -651,6 +651,34 @@ export function JobCardCreateForm({
     (!!customerId && customerQuery.isPending) ||
     (!!vehicleId && vehicleQuery.isPending);
 
+  const jobNumberNotice = (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md border bg-muted/50 font-medium ${bookingInHeader ? "max-w-32 px-2 py-1 text-xs sm:max-w-none" : "px-2.5 py-1 text-sm"}`}
+    >
+      <LockKeyhole className="size-3 shrink-0" aria-hidden="true" />
+      Job no. assigned on save
+    </span>
+  );
+  const bookingPicker = (
+    <Controller
+      name="appointmentId"
+      control={control}
+      render={({ field }) => (
+        <WorkshopPicker
+          label="Booking"
+          endpoint={`/service/appointments?branchId=${branchId ?? ""}&status=BOOKED`}
+          collection="appointments"
+          value={field.value ?? ""}
+          selectedRecord={bookingQuery.data?.appointment}
+          disabled={!branchId || !hasPermission("appointment:update")}
+          onChange={field.onChange}
+          onBlur={field.onBlur}
+          onSelect={applyBooking}
+        />
+      )}
+    />
+  );
+
   return (
     <FormProvider {...form}>
       <form
@@ -671,14 +699,21 @@ export function JobCardCreateForm({
           className="contents"
           inert={!!(confirmation || find) || create.isPending}
         >
-          <header className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <header
+            className={`shrink-0 border-b border-border bg-background px-4 md:px-6 ${bookingInHeader ? "pb-2" : "py-3"}`}
+          >
+            {bookingInHeader && (
+              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                {bookingPicker}
+                {jobNumberNotice}
+              </div>
+            )}
+            <div
+              className={`flex flex-wrap items-center justify-between ${bookingInHeader ? "gap-x-3 gap-y-1 text-xs" : "mb-3 gap-2 text-sm"}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted/50 px-2.5 py-1 text-sm font-medium">
-                  <LockKeyhole className="h-3 w-3" />
-                  Job no. assigned on save
-                </span>
-                <span className="text-sm text-muted-foreground">
+                {!bookingInHeader && jobNumberNotice}
+                <span className="text-muted-foreground">
                   {formatDate(openedAt.toISOString())}{" "}
                   <span className="px-1">/</span>{" "}
                   {openedAt.toLocaleTimeString("en-GB", {
@@ -708,59 +743,45 @@ export function JobCardCreateForm({
                     VIP
                   </span>
                 )}
-                <span className="text-sm text-muted-foreground">
+                <span className="text-muted-foreground">
                   {branchName || "Select a branch from the app header"}
                 </span>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {/* <div className="flex items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <WorkshopPicker
-                    label="Estimate"
-                    endpoint={`/service/estimates?branchId=${branchId ?? ""}`}
-                    collection="estimates"
-                    value={estimate?.id ?? ""}
-                    selectedRecord={estimate}
-                    disabled={!branchId || !hasPermission("estimate:read")}
-                    onChange={(id) => {
-                      if (!id) setEstimate(undefined);
+            {!bookingInHeader && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {/* <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <WorkshopPicker
+                      label="Estimate"
+                      endpoint={`/service/estimates?branchId=${branchId ?? ""}`}
+                      collection="estimates"
+                      value={estimate?.id ?? ""}
+                      selectedRecord={estimate}
+                      disabled={!branchId || !hasPermission("estimate:read")}
+                      onChange={(id) => {
+                        if (!id) setEstimate(undefined);
+                      }}
+                      onSelect={setEstimate}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!estimate || create.isPending}
+                    aria-label="Load selected estimate"
+                    title="Load selected estimate"
+                    onClick={() => {
+                      if (isDirty) setConfirmation("estimate");
+                      else applyEstimate();
                     }}
-                    onSelect={setEstimate}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!estimate || create.isPending}
-                  aria-label="Load selected estimate"
-                  title="Load selected estimate"
-                  onClick={() => {
-                    if (isDirty) setConfirmation("estimate");
-                    else applyEstimate();
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </div> */}
-              <Controller
-                name="appointmentId"
-                control={control}
-                render={({ field }) => (
-                  <WorkshopPicker
-                    label="Booking"
-                    endpoint={`/service/appointments?branchId=${branchId ?? ""}&status=BOOKED`}
-                    collection="appointments"
-                    value={field.value ?? ""}
-                    selectedRecord={bookingQuery.data?.appointment}
-                    disabled={!branchId || !hasPermission("appointment:update")}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    onSelect={applyBooking}
-                  />
-                )}
-              />
-            </div>
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div> */}
+                {bookingPicker}
+              </div>
+            )}
           </header>
           <div
             role="tablist"
@@ -1214,18 +1235,18 @@ export function JobCardCreateForm({
                     )}
                   />
                   <Controller
-                    name="engineerId"
+                    name="technicianId"
                     control={control}
                     render={({ field }) => (
                       <WorkshopPicker
-                        label="Engineer (optional)"
-                        endpoint={`/service/staff?role=Engineer&branchId=${branchId ?? ""}`}
+                        label="Technician (optional)"
+                        endpoint={`/service/staff?role=Technician&branchId=${branchId ?? ""}`}
                         collection="users"
                         disabled={!branchId}
                         value={field.value ?? ""}
-                        onChange={field.onChange}
+                        onChange={(id) => field.onChange(id || undefined)}
                         onBlur={field.onBlur}
-                        error={errors.engineerId?.message}
+                        error={errors.technicianId?.message}
                       />
                     )}
                   />
@@ -1297,8 +1318,7 @@ export function JobCardCreateForm({
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Assign an engineer or group. Parts, oil and labour totals come
-                  from Customer Requests.
+                  Parts, oil and labour totals come from Customer Requests.
                 </p>
                 <label className="mt-3 flex items-center gap-2 text-sm">
                   <input type="checkbox" {...register("inHouse")} /> In-house

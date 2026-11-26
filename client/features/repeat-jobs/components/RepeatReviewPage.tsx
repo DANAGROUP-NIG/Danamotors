@@ -122,7 +122,7 @@ function ReviewScreen({ detail, reasons }: { detail: RepeatDetail; reasons: Repe
         />
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Counts against</p>
-          <p className="mt-1 text-base font-semibold text-slate-900">{detail.previousJob.engineer ?? "No engineer"}</p>
+          <p className="mt-1 text-base font-semibold text-slate-900">{detail.previousJob.technicians.filter(Boolean).join(", ") || detail.previousJob.technician || detail.previousJob.engineer || "Not assigned"}</p>
           <p className="text-sm text-slate-500">Service advisor: {detail.previousJob.serviceAdvisor ?? "—"}</p>
           <p className="mt-1 text-xs text-slate-400">Branch window when flagged: {windowText(detail.window)}</p>
         </div>
@@ -259,8 +259,7 @@ function JobColumn({ title, tone, job, technicians }: { title: string; tone: "pr
         <DetailField label="Mileage" value={<span className="inline-flex items-center gap-1 tabular-nums"><Gauge className="size-3.5 text-slate-400" />{formatKm(job.mileage)}</span>} />
         <DetailField label="Service type" value={job.serviceType} />
         <DetailField label="Service advisor" value={job.serviceAdvisor} />
-        <DetailField label="Engineer" value={job.engineer} />
-        <DetailField label={technicians ? "Technicians" : "Mechanic"} value={technicians?.filter(Boolean).join(", ") || job.technician} />
+        <DetailField label="Technician" value={technicians?.filter(Boolean).join(", ") || job.technician || job.engineer} />
       </div>
       <div className="mt-5 space-y-4">
         <Block title="Customer requests">

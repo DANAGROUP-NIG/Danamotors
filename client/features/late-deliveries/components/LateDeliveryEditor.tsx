@@ -9,6 +9,7 @@ import { useSaveLateReasons } from "../hooks/use-late-deliveries";
 import { formatDate, formatDateTime, formatTime, isDirty, LATE_KIND, lateByText, MAX_LATE_REASONS, MAX_LATE_REMARKS, saveProblem, toggleReason } from "../lib/late-delivery.logic";
 import type { LateDetail, LateHistoryEntry, LateKind, LateReasonOption } from "../types/late-delivery.types";
 import { LateKindBadge } from "./late-ui";
+import { formatJobCardLateReason } from "../late-reason-label";
 
 interface EditorProps {
   kind: LateKind;
@@ -136,7 +137,7 @@ export function LateDeliveryEditor({ kind, detail, reasons, onDirtyChange, onPre
                     {on ? <Check className="size-4" /> : reason.code.length <= 2 ? reason.code : "•"}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{reason.description}</span>
+                    <span className="block truncate font-medium">{formatJobCardLateReason(reason.description)}</span>
                     {!reason.active && <span className="text-xs text-amber-700">No longer in use</span>}
                   </span>
                   {on && <span className="rounded bg-primary/10 px-1.5 text-xs font-medium text-primary" title="Order entered">#{position + 1}</span>}

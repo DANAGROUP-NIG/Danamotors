@@ -54,12 +54,13 @@ function OpeningSession({
       isOpen
       onClose={requestClose}
       title="Open job card"
-      description="Capture the vehicle, customer requests, workshop assignment, and promised delivery."
+      compactHeader
       size="wide"
       flush
     >
       <div hidden={discard}>
         <JobCardCreateForm
+          bookingInHeader
           defaultValues={defaultValues}
           onSuccess={(id) => { onClose(); router.push(`/job-cards/${id}`); }}
           onClose={requestClose}

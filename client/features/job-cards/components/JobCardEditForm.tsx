@@ -1,4 +1,5 @@
 "use client";
+import { formatJobCardLateReason } from "@/features/late-deliveries/late-reason-label";
 import { WORKSPACE_COPY } from "./repair-workspace-copy";
 import { useState } from "react";
 import { isAxiosError } from "axios";
@@ -54,7 +55,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const [observations, setObservations] = useState(jobCard.observations ?? "");
   const [workDone, setWorkDone] = useState(jobCard.workDone ?? "");
   const [advisor, setAdvisor] = useState(jobCard.serviceAdvisorId ?? "");
-  const [engineer, setEngineer] = useState(jobCard.engineerId ?? "");
   const [reasons, setReasons] = useState<string[]>([]);
   const [lateRemarks, setLateRemarks] = useState("");
 
@@ -102,9 +102,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
           : {
               ...(Number(serviceCharge) !== (jobCard.serviceCharge ?? 0)
                 ? { serviceCharge: Number(serviceCharge) }
-                : {}),
-              ...(engineer !== (jobCard.engineerId ?? "")
-                ? { engineerId: engineer || null }
                 : {}),
               observations,
               workDone,
@@ -260,13 +257,6 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
               0 means no service charge.
             </p>
           </Field>
-          <WorkshopPicker
-            label="Engineer (optional)"
-            endpoint={`/service/staff?role=Engineer&branchId=${jobCard.branchId}`}
-            collection="users"
-            value={engineer}
-            onChange={setEngineer}
-          />
           <Field label="Observations">
             <textarea
               className={inputCls}
@@ -400,7 +390,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
                     }
                   />
                   {reason.code.length <= 2 && <span className="font-mono text-xs text-slate-500">{reason.code}</span>}
-                  {reason.description}
+                  {formatJobCardLateReason(reason.description)}
                 </label>
               ))}
               {lateReasons.data?.items.length === 0 && (

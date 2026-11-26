@@ -85,7 +85,7 @@ export function OpeningRepeatCheck({ vehicleId, branchId, mileage }: { vehicleId
             <Item label="Service type">{candidate.previousJob.serviceType ?? "—"}</Item>
             <Item label="Days since" highlight={candidate.byDays}>{formatDays(candidate.daysDifference)}</Item>
             <Item label="Km since" highlight={candidate.byKm}>{formatKm(candidate.kmDifference)}</Item>
-            <Item label="Engineer">{candidate.previousJob.engineer ?? "—"}</Item>
+            <Item label="Technician">{candidate.previousJob.technician ?? candidate.previousJob.engineer ?? "Not assigned"}</Item>
             <Item label="Service advisor">{candidate.previousJob.serviceAdvisor ?? "—"}</Item>
             <Item label="Complaint" wide>{candidate.previousJob.description}</Item>
             <Item label="Work done" wide>{candidate.previousJob.workDone ?? <span className="text-slate-400">Not recorded</span>}</Item>

@@ -265,7 +265,7 @@ date-time (`promisedAt`) and one delivery date-time (`deliveredAt`); days are La
 
 Delivery after the promise still requires one to six distinct `LATE_REASON` ids, and now also takes an optional
 delay remark (`lateRemarks`, internal, not the customer-facing `remarks`). The six legacy reasons are seeded as
-codes 1–6: Engineer absent, Spare unavailable, On diagnosis, Customer's decision awaited, Wrong estimation, Open
+codes 1–6: Technician absent, Spare unavailable, On diagnosis, Customer's decision awaited, Wrong estimation, Open
 time. The older "Awaiting parts" / "Awaiting customer approval" are made inactive (TODO(confirm)); jobs that used
 them keep them. Masters are never deleted, only made inactive.
 
@@ -365,7 +365,7 @@ the required stock fields once for all lines and reuse those snapshots.
 | `GET /inventory/return-slips/:id` or `/:id/print` | `requisition:read`   | Internal return detail/print projection            |
 | `POST /inventory/return-slips/:id/cancel`         | `requisition:cancel` | Cancelled return after reversing the return effect |
 
-Lists accept branchId/jobCardId, page (1), limit (25, maximum 100) and chargeType; returns additionally accept requisitionId. Requisition input contains branchId, jobCardId, chargeType, optional group/engineer/campaign/goodwillReason and 1-100 distinct part lines (sparePartId, quantityRequired, quantityIssued). Quantities are whole numbers; issued cannot exceed branch available stock after reservations. Scope must remain within the approved estimate. The part number is read from the linked part master; descriptions, source flag, UOM, bin/location, rates and financial shares use their saved document data where present. Decimal rate/amount snapshots serialize as strings; footer totals are numbers.
+Lists accept branchId/jobCardId, page (1), limit (25, maximum 100) and chargeType; returns additionally accept requisitionId. Requisition input contains branchId, jobCardId, chargeType, optional group, technician (sent in the existing `engineerId` field), campaign and goodwill reason and 1-100 distinct part lines (sparePartId, quantityRequired, quantityIssued). Quantities are whole numbers; issued cannot exceed branch available stock after reservations. Scope must remain within the approved estimate. The part number is read from the linked part master; descriptions, source flag, UOM, bin/location, rates and financial shares use their saved document data where present. Decimal rate/amount snapshots serialize as strings; footer totals are numbers.
 
 Payer rules: CUSTOMER is non-warranty; WARRANTY is 100/0 and needs eligible coverage/case and a warranty-applicable part; FREE needs a linked campaign; GOODWILL additionally requires `requisition:goodwill`, a reason and approval/customer percentages totaling 100. A partial approval creates separate approved and customer JobCardLines whose amounts reconcile to the document amount. Rates are resolved and snapshotted server-side, never typed into these requests. Catalogue changes do not reprice saved documents. Source flags are internal and excluded from customer estimate/billing print projections.
 
@@ -385,21 +385,21 @@ No create, return or cancellation is allowed on billed/delivered/cancelled jobs 
 ### Labour slips and vehicle ready
 
 Editing a saved labour line retains its campaign, goodwill reason, assignment and
-group. For an employee who also has a login, the edit submits only `mechanicId`;
+group. For an existing employee-backed assignment, the edit submits only `mechanicId`;
 the server resolves the associated login rather than accepting two assignees.
 Hours-only edits keep saved standard hours, rate and TIME/FIXED pricing. The staff
-grid and internal print show the line's group alongside its mechanic/technician.
+grid and internal print show the line's group alongside its technician.
 
 | Method and path                                 | Permission              | Behavior                                                                       |
 | ----------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
 | `GET /service/labour-slips`                     | `jobcard:read`          | Paginated branch/job list, same page/limit defaults as parts documents.        |
-| `POST /service/labour-slips`                    | `jobcard:labour:update` | Create a slip with branch/job, optional header group/engineer and 1-100 lines. |
-| `GET /service/labour-slips/:id` or `/:id/print` | `jobcard:read`          | Internal saved hours, rates, mechanic, payer and totals.                       |
+| `POST /service/labour-slips`                    | `jobcard:labour:update` | Create a slip with branch/job, optional header group and 1-100 lines. |
+| `GET /service/labour-slips/:id` or `/:id/print` | `jobcard:read`          | Internal saved hours, rates, technician, payer and totals.                       |
 | `POST /service/labour-slips/:id/lines`          | `jobcard:labour:update` | Add one line; returns 200 with `data.labourSlip`.                              |
 | `PUT /service/labour-slips/:id/lines/:lineId`   | `jobcard:labour:update` | Replace one saved line while preserving applicable snapshots.                  |
 | `PUT /service/job-cards/:id`                    | `jobcard:update`        | Existing workDone and lifecycle endpoint; READY still requires passed QC.      |
 
-Each line selects exactly one technicianId login **or** mechanicId employee (including employees without logins), an operation, chargeType, optional chargedHours/group/campaign/reason. Standard hours, rate and pricing mode come from the vehicle model schedule. chargedHours defaults to standardHours; TIME uses charged hours times saved rate, while FIXED keeps the saved model amount. Existing `JobCardLabour.hours` remains the charged-hours column and the API also exposes chargedHours. Editing the same operation preserves rate/standard-hour/pricing snapshots; another operation resolves its model schedule.
+New lines select one technician login (`technicianId`), an operation, a charge type and optional charged hours, group, campaign and reason. Existing employee-backed lines retain the `mechanicId` compatibility key. Standard hours, rate and pricing mode come from the vehicle model schedule. chargedHours defaults to standardHours; TIME uses charged hours times saved rate, while FIXED keeps the saved model amount. Existing `JobCardLabour.hours` remains the charged-hours column and the API also exposes chargedHours. Editing the same operation preserves rate/standard-hour/pricing snapshots; another operation resolves its model schedule.
 
 Labour GOODWILL requires `warranty:update` and a reason (distinct from parts goodwill permission); WARRANTY/FREE retain eligibility/linkage rules. Footer warrantyAmount, nonWarrantyAmount, freeAmount and separate goodwillAmount reconcile to totalAmount. Closed jobs/active bills and protected claim/bill references reject edits. Changes reopen ready work for QC. **Work done** persists only in workDone. **Vehicle ready** uses the existing QC -> passed inspection -> READY transition; it does not bypass approval, recorded-scope or QC gates.
 
@@ -456,4 +456,4 @@ Use Service transactions, Requisition as the job-card entry point for requested 
 
 Issued parts and collection now shows all issue history, including closed jobs and cancelled requisitions. Only the assigned technician with jobprogress:update can open the existing signature capture on an eligible open job. Signatures are rendered on demand, one at a time; images are not fetched in job detail. Cancelled requisition issues cannot be collected. Requisition-linked returns use the Returns tab. Older direct issues retain their return action; the return controller derives the actor from the session and the branch from the issuance, and returnedById is optional for backwards-compatible requests.
 
-Recorded labour is a read-only operational summary of both historical and slip-managed entries. It uses the existing authorized job-detail response, including mechanic/technician names; rate and amount visibility still requires estimate:read or invoice:read and existing server-side monetary redaction. Work done, QC, readiness and billing behavior are unchanged. The summaries add no HTTP reads, catalogue lookups or staff lookup calls. Mutations refresh the shared job detail; collection only marks job lists stale rather than refetching every list. No response-time benchmark or live database EXPLAIN was performed.
+Recorded labour is a read-only operational summary of both historical and slip-managed entries. It uses the existing authorized job-detail response, including technician names and historical employee assignments; rate and amount visibility still requires estimate:read or invoice:read and existing server-side monetary redaction. Work done, QC, readiness and billing behavior are unchanged. The summaries add no HTTP reads, catalogue lookups or staff lookup calls. Mutations refresh the shared job detail; collection only marks job lists stale rather than refetching every list. No response-time benchmark or live database EXPLAIN was performed.

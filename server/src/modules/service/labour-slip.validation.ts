@@ -11,7 +11,7 @@ export const labourSlipLineBody = z.object({
   groupId: id.optional(),
   campaignId: id.optional(),
   reason: z.string().trim().min(1).max(2000).optional(),
-}).strict().refine(line => !!line.technicianId !== !!line.mechanicId, 'Choose exactly one technician or mechanic');
+}).strict().refine(line => !!line.technicianId !== !!line.mechanicId, 'Choose exactly one technician');
 export type LabourSlipLineInput = z.infer<typeof labourSlipLineBody>;
 export const labourSlipBody = z.object({ branchId: id, jobCardId: id, groupId: id.optional(), engineerId: id.optional(), mileage: z.number().int().min(0).max(9_999_999).optional(), lines: z.array(labourSlipLineBody).min(1).max(100) }).strict();
 export type LabourSlipInput = z.infer<typeof labourSlipBody>;

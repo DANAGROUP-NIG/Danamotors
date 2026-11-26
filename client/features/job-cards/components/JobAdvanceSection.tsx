@@ -10,14 +10,14 @@ import { WorkshopPicker } from './WorkshopPicker';
 import { useLinkJobAdvance } from '../hooks/use-job-advances';
 import type { JobCard } from '../types/job-card.types';
 
-export function JobAdvanceSection({ jobCard, open }: { jobCard: JobCard; open: boolean }) {
+export function JobAdvanceSection({ jobCard, open, embedded = false }: { jobCard: JobCard; open: boolean; embedded?: boolean }) {
   const { hasPermission } = useAuth();
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptId, setReceiptId] = useState('');
   const link = useLinkJobAdvance(jobCard.id);
   const summary = jobCard.advanceSummary;
   const canReceive = open && summary?.hasEstimate && !!jobCard.customerId && hasPermission('receipt:create');
-  return <section className="space-y-3 rounded-xl border border-border p-4" aria-label="Job advance payments">
+  return <section className={`space-y-3 rounded-xl border border-border p-4 ${embedded ? "bg-card" : ""}`} aria-label="Job advance payments">
     <h3 className="font-semibold">Advance payments</h3>
     {summary && <dl className="grid gap-3 text-sm sm:grid-cols-2">
       <div><dt>{summary.basis === 'INVOICE' ? 'Final invoice total' : 'Current estimate total'}</dt><dd>{moneyText(summary.total)}</dd></div>

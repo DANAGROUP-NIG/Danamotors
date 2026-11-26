@@ -12,12 +12,21 @@ import { ReasonChips, RepeatStatusBadge, SourceTag } from "./repeat-ui";
  * The repeat block on the job card: previous job, days and km since, reasons once reviewed. It prints
  * with the job card when the branch's "print repeat block" setting is on.
  */
-export function JobCardRepeatPanel({ jobCardId, enabled = true }: { jobCardId: string; enabled?: boolean }) {
+export function JobCardRepeatPanel({
+  jobCardId,
+  enabled = true,
+  previousJob,
+}: {
+  jobCardId: string;
+  enabled?: boolean;
+  previousJob?: { id: string; technician?: { firstName: string; lastName: string } | null } | null;
+}) {
   const { hasPermission } = useAuth();
   const { data } = useJobRepeat(jobCardId, enabled);
   const repeat = data?.repeat;
   if (!repeat) return null;
 
+  const technician = previousJob?.id === repeat.previousJob.id ? previousJob.technician : null;
   const inside = withinWindow(repeat.window, repeat.daysDifference, repeat.kmDifference);
   const canOpen = hasPermission(REPEAT_PERMISSIONS.READ);
   const canReview = hasPermission(REPEAT_PERMISSIONS.REVIEW);
@@ -68,8 +77,10 @@ export function JobCardRepeatPanel({ jobCardId, enabled = true }: { jobCardId: s
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">Previous engineer</dt>
-          <dd className="mt-0.5 text-slate-700">{repeat.previousEngineer ?? "—"}</dd>
+          <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">Previous technician</dt>
+          <dd className="mt-0.5 text-slate-700">
+            {technician ? `${technician.firstName} ${technician.lastName}` : repeat.previousEngineer ?? "Not assigned"}
+          </dd>
         </div>
       </dl>
 

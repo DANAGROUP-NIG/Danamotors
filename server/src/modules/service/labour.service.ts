@@ -102,7 +102,7 @@ export class LabourService {
       if (!input.keepMechanic) {
         const mechanic = await transaction.employee.findFirst({ where: { id: input.mechanicId, ...currentEmployeeWhere() } });
         if (!mechanic) throw new NotFoundError('Current employee not found');
-        if (mechanic.branchId !== input.branchId) throw new BadRequestError('The mechanic must belong to the job card branch');
+        if (mechanic.branchId !== input.branchId) throw new BadRequestError('The technician must belong to the job card branch');
         technicianId = mechanic.userId;
       }
     } else if (input.technicianId) {

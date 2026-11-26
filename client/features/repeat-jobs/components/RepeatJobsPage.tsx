@@ -87,7 +87,7 @@ export function RepeatJobsPage() {
         header: "Responsible (previous job)",
         render: (row) => (
           <div className="text-sm">
-            <p className="text-slate-800">{row.previousEngineer ?? "No engineer"}</p>
+            <p className="text-slate-800">{row.previousEngineer ?? "Not assigned"}</p>
             <p className="text-xs text-muted-foreground">SA: {row.previousServiceAdvisor ?? "—"}</p>
           </div>
         ),

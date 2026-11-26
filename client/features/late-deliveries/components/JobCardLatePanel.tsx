@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLateReasons } from "../hooks/use-late-deliveries";
 import { formatDateTime, LATE_KIND, LATE_PERMISSIONS, lateByText, lateKindOf } from "../lib/late-delivery.logic";
+import { formatJobCardLateReason } from "../late-reason-label";
 import { LateKindBadge, LateReasonChips } from "./late-ui";
 
 interface Props {
@@ -38,7 +39,7 @@ export function JobCardLatePanel({ jobCard }: Props) {
         )}
       </div>
       <div className="mt-3 pl-8">
-        <LateReasonChips reasons={chips} empty={<span className="text-sm font-medium text-amber-800">No reason recorded</span>} />
+        <LateReasonChips reasons={chips.map((reason) => ({ ...reason, description: formatJobCardLateReason(reason.description) }))} empty={<span className="text-sm font-medium text-amber-800">No reason recorded</span>} />
         {jobCard.lateRemarks && <p className="mt-2 text-sm text-slate-700">{jobCard.lateRemarks}</p>}
       </div>
     </section>

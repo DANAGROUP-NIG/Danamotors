@@ -175,7 +175,11 @@ export class RequisitionService {
             },
           }))
         )
-          throw new BadRequestError("Engineer must be active in this branch");
+          throw new BadRequestError(
+            job.jobType === JobCardType.PDI
+              ? "Engineer must be active in this branch"
+              : "Technician must be active in this branch",
+          );
         const ids = [
           ...new Set(
             input.lines.flatMap((line) => [

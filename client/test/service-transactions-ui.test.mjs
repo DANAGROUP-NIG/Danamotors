@@ -272,18 +272,18 @@ test("return screen does not permit an empty return and displays load failures",
     }).html.includes("Could not load documents"),
   );
 });
-test("labour screen keeps a single technician or employee assignment and separates work done", () => {
+test("labour screen keeps a single technician assignment and separates work done", () => {
   const { html } = render("LabourPanel", {
     permissions: ["jobcard:labour:update", "jobcard:update", "employee:read"],
   });
   for (const text of [
     "Charged hours",
-    "Technician login",
-    "Employee mechanic",
+    "Technician",
     "Work done",
     "Mark vehicle ready",
   ])
     assert.ok(html.includes(text));
+  assert.doesNotMatch(html, /engineer|mechanic/i);
   assert.match(html, /<button[^>]*disabled=""[^>]*>Mark vehicle ready/);
   const ready = render("LabourPanel", {
     permissions: ["jobcard:update"],

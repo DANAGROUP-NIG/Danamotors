@@ -244,7 +244,6 @@ export type JobCard = {
   qcStatus: string;
   qcNotes?: string;
   branchId: string;
-  engineerId?: string;
   technicianId?: string;
   qualityInspectorId?: string;
   appointmentId?: string;

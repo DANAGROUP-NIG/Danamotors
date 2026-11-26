@@ -14,6 +14,7 @@ interface ModalProps {
   disableBackdropClose?: boolean;
   fitViewport?: boolean;
   nested?: boolean;
+  compactHeader?: boolean;
 }
 
 export default function ModalFame({
@@ -28,6 +29,7 @@ export default function ModalFame({
   disableBackdropClose = false,
   fitViewport = false,
   nested = false,
+  compactHeader = false,
 }: ModalProps) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -135,7 +137,9 @@ export default function ModalFame({
       >
         {}
         {title && (
-          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
+          <div
+            className={`flex shrink-0 items-center justify-between gap-4 ${compactHeader ? "px-4 pt-2 md:px-6" : "border-b border-border px-5 py-4 sm:px-6 sm:py-5"}`}
+          >
             <div className="min-w-0">
               <h2 id={titleId} className="text-lg font-semibold sm:text-xl">
                 {title}

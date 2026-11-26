@@ -12,6 +12,6 @@ export function PayerFields({ value, onChange, label = 'Requisition type', goodw
     {value.chargeType === 'GOODWILL' && <Field label="Goodwill reason"><input className={inputCls} required maxLength={2000} value={value.reason ?? ''} onChange={event => onChange({ ...value, reason: event.target.value })} /></Field>}
   </div>;
 }
-export function AssignmentFields({ branchId, groupId, engineerId, onGroup, onEngineer }: { branchId: string; groupId: string; engineerId: string; onGroup: (id: string) => void; onEngineer: (id: string) => void }) {
-  return <div className="grid gap-3 sm:grid-cols-2"><WorkshopPicker label="Group (optional)" endpoint="/workshop-masters?kind=TEAM" collection="items" value={groupId} onChange={onGroup} /><WorkshopPicker label="Engineer (optional)" endpoint={`/service/staff?role=Engineer&branchId=${branchId}`} collection="users" value={engineerId} onChange={onEngineer} /></div>;
+export function AssignmentFields({ branchId, groupId, technicianId, onGroup, onTechnician }: { branchId: string; groupId: string; technicianId: string; onGroup: (id: string) => void; onTechnician: (id: string) => void }) {
+  return <div className="grid gap-3 sm:grid-cols-2"><WorkshopPicker label="Group (optional)" endpoint="/workshop-masters?kind=TEAM" collection="items" value={groupId} onChange={onGroup} /><WorkshopPicker label="Technician (optional)" endpoint={`/service/staff?role=Technician&branchId=${branchId}`} collection="users" value={technicianId} onChange={onTechnician} /></div>;
 }

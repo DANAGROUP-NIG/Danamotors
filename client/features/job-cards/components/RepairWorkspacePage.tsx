@@ -14,7 +14,7 @@ import {
 import { WORKSPACE_COPY as COPY } from "./repair-workspace-copy";
 import { cn } from "@/lib/utils";
 
-export function RepairWorkspacePage({ id }: { id: string }) {
+export function RepairWorkspacePage({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const { data: jobCard, isLoading, error, refetch } = useJobCard(id);
   if (isLoading)
     return <LoadingSkeleton variant="workspace" label={COPY.loading} />;
@@ -28,11 +28,11 @@ export function RepairWorkspacePage({ id }: { id: string }) {
       </div>
     );
   return (
-    <section className="min-w-0 space-y-7 rounded-2xl border border-border bg-muted/40 p-4 text-foreground sm:p-6 print:hidden">
-      <WorkspaceHeader status={jobCard.status} />
-      <JobProgressStepper status={jobCard.status} />
-      <ServiceTransactions job={jobCard} />
-      {(jobCard.advanceSummary || jobCard.advanceReceipts) && <JobAdvanceSection jobCard={jobCard} open={!hasJobBill(jobCard) && !['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))} />}
+    <section className={cn("min-w-0 text-foreground print:hidden", embedded ? "space-y-4" : "space-y-7 rounded-2xl border border-border bg-muted/40 p-4 sm:p-6")}>
+      {!embedded && <WorkspaceHeader status={jobCard.status} />}
+      {!embedded && <JobProgressStepper status={jobCard.status} />}
+      <ServiceTransactions job={jobCard} embedded={embedded} />
+      {(jobCard.advanceSummary || jobCard.advanceReceipts) && <JobAdvanceSection jobCard={jobCard} embedded={embedded} open={!hasJobBill(jobCard) && !['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))} />}
       {jobCard.estimates ? (
         <JobCardEstimateSection jobCard={jobCard} />
       ) : (
