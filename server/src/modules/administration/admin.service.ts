@@ -633,7 +633,7 @@ export class AdminService {
       audit: 'Audit Management',
       books: 'Books Closed (Year End)',
       warranty: 'Warranty',
-      campaign: 'Campaigns (Recall / Free Fix)',
+      campaign: 'Campaigns (Recall / Field Fix)',
     };
 
     const groupsMap = new Map<string, typeof permissions>();

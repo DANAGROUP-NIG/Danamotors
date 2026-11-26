@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
+import { api } from "@/lib/api/axios";
 import { qs } from "@/features/warranty/api/warranty.api";
 import type {
   AddVehiclesPayload,
@@ -12,9 +13,11 @@ import type {
   CampaignType,
   CampaignVehicleDetail,
   CampaignVehicleList,
+  CampaignDocument,
   CampaignVehicleStatus,
   ContactChannel,
   ContactOutcome,
+  OpenCampaignAlert,
 } from "../types/campaign.types";
 
 export const campaignKeys = {
@@ -24,6 +27,7 @@ export const campaignKeys = {
   detail: (id: string) => [...campaignKeys.all, "detail", id] as const,
   vehicles: (id: string, params?: Record<string, unknown>) => [...campaignKeys.all, "vehicles", id, params ?? {}] as const,
   vehicle: (id: string, vehicleId: string) => [...campaignKeys.all, "vehicle", id, vehicleId] as const,
+  openForVehicle: (vehicleId: string) => [...campaignKeys.all, "open-for-vehicle", vehicleId] as const,
 };
 
 export type CampaignListParams = { type?: CampaignType; status?: CampaignStatus; search?: string; page?: number; limit?: number };
@@ -57,6 +61,35 @@ export const addVinRangesRequest = (id: string, body: { ranges: { vinFrom: strin
   apiPost<AddVinRangesResult>(`/campaigns/${id}/vin-ranges`, body);
 export const removeVinRangeRequest = async (id: string, rangeId: string) =>
   (await apiDelete<{ campaign: Campaign }>(`/campaigns/${id}/vin-ranges/${rangeId}`)).campaign;
+// ── Manuals, affected VIN download, open-campaign alert ─────────────────────
+
+export const uploadCampaignDocumentRequest = async (id: string, body: { title: string; fileName: string; data: string }) =>
+  (await apiPost<{ document: CampaignDocument }>(`/campaigns/${id}/documents`, body)).document;
+export const deleteCampaignDocumentRequest = (id: string, documentId: string) => apiDelete<null>(`/campaigns/${id}/documents/${documentId}`);
+
+/** Fetches a file. Error bodies arrive as blobs, so they are parsed back into JSON for the usual error messages. */
+async function getFile(url: string): Promise<Blob> {
+  try {
+    return (await api.get<Blob>(url, { responseType: "blob" })).data;
+  } catch (error) {
+    const response = (error as { response?: { data?: unknown } }).response;
+    if (response?.data instanceof Blob) {
+      try {
+        response.data = JSON.parse(await response.data.text());
+      } catch {
+        response.data = undefined;
+      }
+    }
+    throw error;
+  }
+}
+
+export const getCampaignDocumentFileRequest = (id: string, documentId: string) => getFile(`/campaigns/${id}/documents/${documentId}/file`);
+/** Every affected VIN as CSV; customer contacts are included only for outreach roles. */
+export const getAffectedVinsFileRequest = (id: string) => getFile(`/campaigns/${id}/vehicles/download`);
+export const getOpenCampaignsForVehicleRequest = (vehicleId: string) =>
+  apiGet<OpenCampaignAlert>(`/campaigns/open-for-vehicle${qs({ vehicleId })}`);
+
 /** "Record as called": one SENT contact per printed vehicle. */
 export const recordPrintedContactsRequest = (body: { campaignVehicleIds: string[]; channel: "LETTER" | "PHONE" }) =>
   apiPost<{ recorded: number; skipped: number }>("/campaigns/contacts/printed", body);

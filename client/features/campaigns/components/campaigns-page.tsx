@@ -32,7 +32,7 @@ function period(c: Pick<Campaign, "startDate" | "endDate">) {
   return `${fmtDate(c.startDate)} – ${c.endDate ? fmtDate(c.endDate) : "open"}`;
 }
 
-/** Screen 08 — recalls, free fixes and service campaigns with progress. */
+/** Screen 08: recalls, field fixes and service campaigns with progress. */
 export function CampaignsPage() {
   const router = useRouter();
   const { hasPermission, isSuperAdmin } = useAuth();
@@ -139,7 +139,7 @@ export function CampaignsPage() {
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
         title={isFpc ? "FPC bulletins" : "Campaigns"}
-        description={isFpc ? "Manufacturer field product check bulletins and the VIN ranges they cover." : "Recalls, free fixes, service campaigns and FPC bulletins targeted by VIN."}
+        description={isFpc ? "Manufacturer field product check bulletins and the VIN ranges they cover." : "Recalls, field fixes, service campaigns and FPC bulletins targeted by VIN."}
         actions={
           <div className="flex gap-2">
             <ActionMenu
@@ -192,7 +192,7 @@ export function CampaignsPage() {
           options={[
             { label: "All", value: "" },
             { label: "Recall", value: "RECALL" },
-            { label: "Free fix", value: "FREE_FIX" },
+            { label: "Field fix", value: "FREE_FIX" },
             { label: "Service campaign", value: "SERVICE_CAMPAIGN" },
             { label: "FPC bulletin", value: "FPC" },
           ]}
@@ -241,7 +241,7 @@ export function CampaignsPage() {
           isLoading={isLoading}
           isFetching={isFetching}
           rowKey={(c) => c.id}
-          emptyMessage={type || status || committed ? "No campaigns match these filters." : "No campaigns yet. Create one to target recalls or free fixes by VIN."}
+          emptyMessage={type || status || committed ? "No campaigns match these filters." : "No campaigns yet. Create one to target recalls or field fixes by VIN."}
           page={page}
           pageSize={PAGE_SIZE}
           total={total}

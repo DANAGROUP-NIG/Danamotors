@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { JobCardLineKind, WarrantyCaseStatus, WarrantyLineRole, WarrantyOverrideType } from "@prisma/client";
+import {
+  JobCardLineKind,
+  WarrantyCaseStatus,
+  WarrantyLineRole,
+  WarrantyOverrideType,
+  WarrantyReimbursementStatus,
+} from "@prisma/client";
 import { MAX_MILEAGE } from "./warranty.logic";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
@@ -122,6 +128,7 @@ export const listCasesSchema = z.object({
     basedOn: z.enum(["CASE_DATE", "BILL_DATE"]).optional(),
     claimNo: z.enum(["GENERATED", "NOT_GENERATED"]).optional(),
     billing: z.enum(["BILLED", "UNBILLED"]).optional(),
+    reimbursement: z.nativeEnum(WarrantyReimbursementStatus).optional(),
     search: optionalText(80),
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -192,12 +199,38 @@ export const transitionCaseSchema = z.object({
     settlementRef: nullableText(60),
     settledAmount: money.nullable().optional(),
     settledAt: z.coerce.date().nullable().optional(),
+    // Settlement only: true when the credit note or payment is already in hand.
+    reimbursementReceived: z.boolean().nullable().optional(),
+    reimbursedAmount: money.nullable().optional(),
+    reimbursedAt: z.coerce.date().nullable().optional(),
     decisionAt: z.coerce.date().nullable().optional(),
     manufacturerClaimNo: nullableText(40),
     manufacturerClaimDate: z.coerce.date().nullable().optional(),
     lineApprovals: z
-      .array(z.object({ lineId: uuid("line ID"), approvalPercent: z.number().min(0).max(100) }))
+      .array(
+        z
+          .object({
+            lineId: uuid("line ID"),
+            approvalPercent: z.number().min(0, "Approval % cannot be negative").max(100, "Approval % cannot exceed 100").nullable().optional(),
+            // The approved amount for the line as shown on the Kia portal.
+            approvedAmount: money.nullable().optional(),
+          })
+          .refine((l) => l.approvalPercent != null || l.approvedAmount != null, {
+            message: "Enter the approved amount or approval % for each line",
+            path: ["approvedAmount"],
+          }),
+      )
       .max(500)
       .optional(),
+  }),
+});
+
+export const recordReimbursementSchema = z.object({
+  params: z.object({ id: uuid("case ID") }),
+  body: z.object({
+    settlementRef: text(60).min(1, "Enter the credit note or payment reference"),
+    reimbursedAmount: money,
+    reimbursedAt: z.coerce.date().nullable().optional(),
+    remarks: nullableText(1000),
   }),
 });

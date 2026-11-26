@@ -5,21 +5,32 @@ import {
   WarrantyCaseStatus,
   WarrantyCoverageStatus,
   WarrantyLineRole,
+  WarrantyReimbursementStatus,
 } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { nextSequenceNumber } from "../../shared/db/documentSequence";
 import { NOTIFICATION_TYPES, NotificationPayload, NotificationService } from "../notification/notification.service";
+import { sumMoney } from "../finance/money";
+import { actualLineAmount, netIssued } from "../reports/report.logic";
 import {
   CaseState,
   EDITABLE_CASE_STATUSES,
+  LineApprovalInput,
+  REIMBURSABLE_CASE_STATUSES,
+  ReimbursementInput,
+  SettlementInput,
   WarrantyCaseAction,
   actionPast,
   allowedActions,
+  assertCanRecordReimbursement,
   label,
   lineAmounts,
+  planReimbursement,
+  planSettlement,
   planTransition,
+  reconcileIssuedParts,
   round2,
 } from "./warranty.logic";
 
@@ -122,14 +133,70 @@ function buildProgress(detail: WarrantyCaseDetail) {
   });
 }
 
-function presentCase(detail: WarrantyCaseDetail) {
+const DECIDED_STATUSES: WarrantyCaseStatus[] = ["APPROVED", "PARTIALLY_APPROVED", "REJECTED", "SETTLED"];
+
+/** Statuses in which the manufacturer has decided the claim (approved amounts are final). */
+function isDecided(detail: Pick<WarrantyCaseDetail, "status" | "approvedAmount">) {
+  return DECIDED_STATUSES.includes(detail.status) || (detail.status === "CLOSED" && detail.approvedAmount != null);
+}
+
+/**
+ * Parts issued from our store against the case's job card: warranty-charged part lines and
+ * any part line already on the claim, net of returns, at the job card rate.
+ */
+async function loadIssuedParts(detail: WarrantyCaseDetail) {
+  if (!detail.jobCardId) return [];
+  const claimed = detail.lines.map((l) => l.jobCardLineId).filter((id): id is string => Boolean(id));
+  const lines = await prisma.jobCardLine.findMany({
+    where: {
+      jobCardId: detail.jobCardId,
+      kind: JobCardLineKind.PART,
+      OR: [{ chargeType: ChargeType.WARRANTY }, ...(claimed.length ? [{ id: { in: claimed } }] : [])],
+    },
+    select: {
+      id: true,
+      kind: true,
+      description: true,
+      quantity: true,
+      amount: true,
+      sparePart: { select: { partNumber: true } },
+      partIssuance: { select: { quantity: true, returns: { select: { quantity: true, status: true } } } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return lines.map((l) => ({
+    jobCardLineId: l.id,
+    partNumber: l.sparePart?.partNumber ?? null,
+    description: l.description,
+    quantity: l.partIssuance ? netIssued(l.partIssuance.quantity, l.partIssuance.returns) : l.quantity,
+    amount: actualLineAmount(l),
+  }));
+}
+
+async function presentCase(detail: WarrantyCaseDetail) {
   const billDate = detail.jobCard?.invoices.find((i) => !/cancel|void/i.test(i.status))?.issuedDate ?? null;
+  const issuedParts = reconcileIssuedParts(
+    await loadIssuedParts(detail),
+    detail.lines
+      .filter((l) => l.kind === "PART")
+      .map((l) => ({
+        id: l.id,
+        jobCardLineId: l.jobCardLineId,
+        partNumber: l.partNumber,
+        description: l.description,
+        claimedAmount: l.claimedAmount,
+        approvedAmount: l.approvedAmount,
+      })),
+    isDecided(detail),
+  );
   return {
     ...detail,
     billDate,
     allowedActions: allowedActions(detail.status),
     editable: EDITABLE_CASE_STATUSES.includes(detail.status),
+    canRecordReimbursement: REIMBURSABLE_CASE_STATUSES.includes(detail.status) && detail.reimbursementStatus !== "RECEIVED",
     progress: buildProgress(detail),
+    issuedParts,
   };
 }
 
@@ -153,6 +220,7 @@ export interface CaseListFilters {
   basedOn?: "CASE_DATE" | "BILL_DATE";
   claimNo?: "GENERATED" | "NOT_GENERATED";
   billing?: "BILLED" | "UNBILLED";
+  reimbursement?: WarrantyReimbursementStatus;
   search?: string;
   page?: number;
   limit?: number;
@@ -243,7 +311,7 @@ export class WarrantyCaseService {
   async get(id: string) {
     const detail = await prisma.warrantyCase.findUnique({ where: { id }, include: caseDetailInclude });
     if (!detail) throw new NotFoundError("Warranty case not found");
-    return presentCase(detail);
+    return await presentCase(detail);
   }
 
   private buildWhere(f: CaseListFilters): Prisma.WarrantyCaseWhereInput {
@@ -251,6 +319,7 @@ export class WarrantyCaseService {
     if (f.scopeBranchId) and.push({ branchId: f.scopeBranchId });
     if (f.branchId) and.push({ branchId: f.branchId });
     if (f.status) and.push({ status: f.status });
+    if (f.reimbursement) and.push({ reimbursementStatus: f.reimbursement });
     if (f.claimNo === "GENERATED") and.push({ manufacturerClaimNo: { not: null } });
     if (f.claimNo === "NOT_GENERATED") and.push({ manufacturerClaimNo: null });
     if (f.billing === "BILLED") and.push({ jobCard: { invoices: { some: {} } } });
@@ -303,13 +372,18 @@ export class WarrantyCaseService {
   async summary(scopeBranchId?: string) {
     const scope: Prisma.WarrantyCaseWhereInput = scopeBranchId ? { branchId: scopeBranchId } : {};
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [byStatus, submitted, approved30] = await Promise.all([
+    const [byStatus, submitted, approved30, awaiting] = await Promise.all([
       prisma.warrantyCase.groupBy({ by: ["status"], where: scope, _count: { _all: true } }),
       prisma.warrantyCase.aggregate({ where: { ...scope, status: "SUBMITTED" }, _sum: { claimedAmount: true } }),
       prisma.warrantyCase.aggregate({
         where: { ...scope, status: { in: ["APPROVED", "PARTIALLY_APPROVED", "SETTLED"] }, decisionAt: { gte: since } },
         _count: { _all: true },
         _sum: { approvedAmount: true },
+      }),
+      prisma.warrantyCase.aggregate({
+        where: { ...scope, reimbursementStatus: "PENDING" },
+        _count: { _all: true },
+        _sum: { settledAmount: true },
       }),
     ]);
     const count = (s: WarrantyCaseStatus) => byStatus.find((r) => r.status === s)?._count._all ?? 0;
@@ -321,6 +395,8 @@ export class WarrantyCaseService {
       approvedLast30Days: approved30._count._all,
       approvedLast30DaysAmount: round2(approved30._sum.approvedAmount ?? 0),
       rejectedOrReturned: count("REJECTED") + count("RETURNED"),
+      awaitingReimbursement: awaiting._count._all,
+      awaitingReimbursementAmount: round2(awaiting._sum.settledAmount ?? 0),
     };
   }
 
@@ -485,16 +561,13 @@ export class WarrantyCaseService {
   async transition(
     caseId: string,
     action: WarrantyCaseAction,
-    input: {
+    input: SettlementInput & {
       remarks?: string | null;
       rejectReasonId?: string | null;
-      settlementRef?: string | null;
-      settledAmount?: number | null;
-      settledAt?: Date | null;
       decisionAt?: Date | null;
       manufacturerClaimNo?: string | null;
       manufacturerClaimDate?: Date | null;
-      lineApprovals?: { lineId: string; approvalPercent: number }[];
+      lineApprovals?: LineApprovalInput[];
     },
     actorId: string,
   ) {
@@ -530,14 +603,11 @@ export class WarrantyCaseService {
         else if (input.manufacturerClaimNo && !current.manufacturerClaimDate) data.manufacturerClaimDate = now;
       }
       if (plan.approvals) {
-        let approvedTotal = 0;
-        for (const line of lines) {
-          const percent = plan.approvals.get(line.id)!;
-          const { approvedAmount } = lineAmounts(line.quantity, line.rate, percent);
-          approvedTotal += approvedAmount!;
-          await tx.warrantyCaseLine.update({ where: { id: line.id }, data: { approvalPercent: percent, approvedAmount } });
+        const decisions = lines.map((line) => ({ id: line.id, ...plan.approvals!.get(line.id)! }));
+        for (const d of decisions) {
+          await tx.warrantyCaseLine.update({ where: { id: d.id }, data: { approvalPercent: d.approvalPercent, approvedAmount: d.approvedAmount } });
         }
-        data.approvedAmount = round2(approvedTotal);
+        data.approvedAmount = sumMoney(decisions.map((d) => d.approvedAmount));
         data.decisionAt = input.decisionAt ?? now;
       }
       if (action === "REJECT") data.rejectReasonId = input.rejectReasonId!;
@@ -548,11 +618,7 @@ export class WarrantyCaseService {
         data.approvedAmount = null;
         data.rejectReasonId = null;
       }
-      if (action === "SETTLE") {
-        data.settledAt = input.settledAt ?? now;
-        data.settlementRef = input.settlementRef!.trim();
-        data.settledAmount = input.settledAmount ?? current.approvedAmount;
-      }
+      if (action === "SETTLE") Object.assign(data, planSettlement(input, current.approvedAmount, now));
       if (action === "CLOSE") data.closedAt = now;
 
       const claimed = await tx.warrantyCase.updateMany({ where: { id: caseId, status: current.status }, data });
@@ -566,6 +632,34 @@ export class WarrantyCaseService {
     });
 
     await this.notifyStatusChange(detail.id, from, to, action);
+    return this.get(caseId);
+  }
+
+  /**
+   * Records the manufacturer's credit note or payment for a case settled with the
+   * reimbursement pending. Allowed after the case is closed; the status does not change.
+   */
+  async recordReimbursement(caseId: string, input: ReimbursementInput & { remarks?: string | null }, actorId: string) {
+    await prisma.$transaction(async (tx) => {
+      const current = await this.lock(tx, caseId);
+      assertCanRecordReimbursement(current.status, current.reimbursementStatus);
+      const plan = planReimbursement(input, new Date());
+      const claimed = await tx.warrantyCase.updateMany({
+        where: { id: caseId, status: current.status, reimbursementStatus: current.reimbursementStatus },
+        data: plan,
+      });
+      if (claimed.count !== 1) throw new ConflictError("This case was changed by someone else. Refresh and try again.");
+      const note = `Reimbursement received: ${plan.settlementRef}`;
+      await tx.warrantyCaseStatusHistory.create({
+        data: {
+          caseId,
+          fromStatus: current.status,
+          toStatus: current.status,
+          actorId,
+          remarks: input.remarks?.trim() ? `${note}. ${input.remarks.trim()}` : note,
+        },
+      });
+    });
     return this.get(caseId);
   }
 

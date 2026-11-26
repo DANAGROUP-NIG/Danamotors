@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiErrorMessage } from "@/features/warranty/lib/warranty-format";
+import { apiErrorMessage, todayInLagos } from "@/features/warranty/lib/warranty-format";
+import { downloadFile } from "@/lib/table-actions";
 import { warrantyKeys } from "@/features/warranty/api/warranty.keys";
 import {
   activateCampaignRequest,
@@ -11,14 +12,19 @@ import {
   campaignKeys,
   closeCampaignRequest,
   createCampaignRequest,
+  deleteCampaignDocumentRequest,
+  getAffectedVinsFileRequest,
+  getCampaignDocumentFileRequest,
   getCampaignRequest,
   getCampaignSummaryRequest,
   getCampaignVehicleRequest,
   getCampaignVehiclesRequest,
   getCampaignsRequest,
+  getOpenCampaignsForVehicleRequest,
   removeVinRangeRequest,
   scheduleCampaignVehicleRequest,
   updateCampaignRequest,
+  uploadCampaignDocumentRequest,
   type CampaignListParams,
   type CampaignVehicleParams,
 } from "../api/campaign.api";
@@ -31,11 +37,12 @@ export const useCampaigns = (params: CampaignListParams) =>
 
 export const useCampaign = (id: string) => useQuery({ queryKey: campaignKeys.detail(id), queryFn: () => getCampaignRequest(id), enabled: Boolean(id) });
 
-export const useCampaignVehicles = (id: string, params: CampaignVehicleParams) =>
+/** Needs campaign:read (customer details); pass enabled=false for manual-only roles. */
+export const useCampaignVehicles = (id: string, params: CampaignVehicleParams, enabled = true) =>
   useQuery({
     queryKey: campaignKeys.vehicles(id, params),
     queryFn: () => getCampaignVehiclesRequest(id, params),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && enabled,
     placeholderData: keepPreviousData,
   });
 
@@ -72,7 +79,7 @@ export function useCampaignStatus(id: string) {
     mutationFn: (action: "activate" | "close") => (action === "activate" ? activateCampaignRequest(id) : closeCampaignRequest(id)),
     onSuccess: (c) => {
       invalidate();
-      toast.success(c.status === "ACTIVE" ? "Campaign activated — advisers and reception have been notified" : "Campaign closed");
+      toast.success(c.status === "ACTIVE" ? "Campaign activated. Advisers and reception have been notified." : "Campaign closed");
     },
     onError: (e) => toast.error(apiErrorMessage(e, "Could not update the campaign")),
   });
@@ -162,3 +169,68 @@ export function useRemoveVinRange(id: string) {
     onError: (e) => toast.error(apiErrorMessage(e, "Could not remove the VIN range")),
   });
 }
+
+// ── Manuals, affected VIN download, open-campaign alert ─────────────────────
+
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+    reader.onerror = () => reject(new Error("The file could not be read. Choose it again."));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function useUploadCampaignDocument(id: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ title, file }: { title: string; file: File }) =>
+      uploadCampaignDocumentRequest(id, { title, fileName: file.name, data: await readAsBase64(file) }),
+    onSuccess: (doc) => {
+      invalidate();
+      toast.success(`Manual "${doc.title}" added to the campaign`);
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not upload the manual")),
+  });
+}
+
+export function useDeleteCampaignDocument(id: string) {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (doc: { id: string; title: string }) => deleteCampaignDocumentRequest(id, doc.id),
+    onSuccess: (_r, doc) => {
+      invalidate();
+      toast.success(`Manual "${doc.title}" removed`);
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not remove the manual")),
+  });
+}
+
+export function useDownloadCampaignDocument() {
+  return useMutation({
+    mutationFn: async (doc: { campaignId: string; id: string; fileName: string }) => {
+      downloadFile(await getCampaignDocumentFileRequest(doc.campaignId, doc.id), doc.fileName);
+    },
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not download the manual")),
+  });
+}
+
+export function useDownloadAffectedVins() {
+  return useMutation({
+    mutationFn: async (campaign: { id: string; code: string }) => {
+      const code = campaign.code.replace(/[^A-Za-z0-9_-]/g, "") || "campaign";
+      downloadFile(await getAffectedVinsFileRequest(campaign.id), `${code}-affected-vins-${todayInLagos()}.csv`);
+    },
+    onSuccess: () => toast.success("Affected VIN list downloaded"),
+    onError: (e) => toast.error(apiErrorMessage(e, "Could not download the affected VIN list")),
+  });
+}
+
+/** Open campaigns for a vehicle, for the affected-VIN pop-up. Available to every role. */
+export const useOpenCampaignsForVehicle = (vehicleId: string | null | undefined, enabled = true) =>
+  useQuery({
+    queryKey: campaignKeys.openForVehicle(vehicleId ?? ""),
+    queryFn: () => getOpenCampaignsForVehicleRequest(vehicleId!),
+    enabled: Boolean(vehicleId) && enabled,
+    staleTime: 60_000,
+  });

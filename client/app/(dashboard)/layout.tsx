@@ -139,7 +139,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   "/warranty/settings": [WARRANTY_PERMISSIONS.SETTINGS],
   "/warranty": [WARRANTY_PERMISSIONS.READ],
   "/campaigns/new": [CAMPAIGN_PERMISSIONS.CREATE],
-  "/campaigns": [CAMPAIGN_PERMISSIONS.READ],
+  "/campaigns": [CAMPAIGN_PERMISSIONS.READ, CAMPAIGN_PERMISSIONS.MANUAL_READ],
   "/settings/party-reports": ["role:read", "report:party-outstanding-age"],
   "/settings": ["role:read"],
 };

@@ -19,6 +19,7 @@ import {
   NotificationService,
 } from "../notification/notification.service";
 import { ServiceService } from "../service/service.service";
+import { campaignDocumentSelect } from "./campaign-download.service";
 import {
   CAMPAIGN_TRANSITIONS,
   assertVehicleTransition,
@@ -37,7 +38,7 @@ export const MAX_VEHICLES_PER_REQUEST = 20_000;
 
 const TYPE_LABEL: Record<CampaignType, string> = {
   RECALL: "Recall",
-  FREE_FIX: "Free fix",
+  FREE_FIX: "Field fix",
   SERVICE_CAMPAIGN: "Service campaign",
   FPC: "FPC bulletin",
 };
@@ -199,6 +200,7 @@ export class CampaignService {
           select: { id: true, vinFrom: true, vinTo: true, createdAt: true },
         },
         createdBy: { select: { id: true, firstName: true, lastName: true } },
+        documents: { select: campaignDocumentSelect, orderBy: { createdAt: "desc" } },
       },
     });
     if (!campaign) throw new NotFoundError("Campaign not found");

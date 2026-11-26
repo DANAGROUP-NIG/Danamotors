@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { seedDepartmentRoles } from "../../prisma/seed-department-roles";
-import { NEW_DEPARTMENT_ROLE_BASES, PERMISSIONS, ROLE_PERMISSIONS, ROLES } from "./roles";
+import { EVERY_ROLE_PERMISSIONS, NEW_DEPARTMENT_ROLE_BASES, PERMISSIONS, ROLE_PERMISSIONS, ROLES } from "./roles";
 
 it("deploys the same department permissions as the seed", () => {
   const sql = readFileSync(resolve(__dirname, "../../../prisma/migrations/20261125120000_department_roles/migration.sql"), "utf8");
@@ -15,6 +15,9 @@ it("deploys the same department permissions as the seed", () => {
     .map((migration) => readFileSync(resolve(__dirname, `../../../prisma/migrations/${migration}/migration.sql`), "utf8"))
     .join("\n");
   const psfGrants = [...grantSql.matchAll(/\('([A-Za-z]+)', '([^']+)'\)/g)];
+  // Granted to every role row, whatever its name.
+  const everyRoleSql = readFileSync(resolve(__dirname, "../../../prisma/migrations/20261126130000_campaign_manual_read_permission/migration.sql"), "utf8");
+  expect(EVERY_ROLE_PERMISSIONS.every((permission) => everyRoleSql.includes(`'${permission}'`))).toBe(true);
   expect(roles.map(([, role]) => role).sort()).toEqual(Object.keys(NEW_DEPARTMENT_ROLE_BASES).sort());
   expect([...new Set(psfGrants.map(([, role]) => role))].every(
     role => Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role),
@@ -26,6 +29,7 @@ it("deploys the same department permissions as the seed", () => {
       ...templates.get(template)!,
       ...(allBranches === "true" ? [PERMISSIONS.BRANCH_ALL] : []),
       ...psfGrants.filter(([, target]) => target === role).map(([, , permission]) => permission),
+      ...EVERY_ROLE_PERMISSIONS,
     ];
     expect(grants.sort()).toEqual([...new Set(ROLE_PERMISSIONS[roleName])].sort());
   }

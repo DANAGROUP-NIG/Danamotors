@@ -43,7 +43,9 @@ export function DetailField({ label, value, mono, className }: { label: string; 
   return (
     <div className={cn("min-w-0", className)}>
       <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{label}</p>
-      <div className={cn("mt-0.5 break-words text-sm text-slate-700", mono && "font-mono")}>{value ?? "—"}</div>
+      <div className={cn("mt-0.5 break-words text-sm text-slate-700", mono && "font-mono")}>
+        {value == null || value === "" ? <span className="text-slate-500">N/A</span> : value}
+      </div>
     </div>
   );
 }

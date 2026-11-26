@@ -309,8 +309,11 @@ export const PERMISSIONS = {
   // Model warranty policies, claim codes, extended warranty and goodwill overrides.
   WARRANTY_SETTINGS: "warranty:settings",
 
-  // ── Campaigns (recall / free fix / service campaign) ──────────────────────
+  // ── Campaigns (recall / field fix / service campaign) ─────────────────────
   CAMPAIGN_READ: "campaign:read",
+  // View campaigns, download their manuals and the affected VIN list (no customer contacts).
+  // Granted to every role.
+  CAMPAIGN_MANUAL_READ: "campaign:manual:read",
   CAMPAIGN_CREATE: "campaign:create",
   CAMPAIGN_UPDATE: "campaign:update",
   CAMPAIGN_VEHICLE_UPDATE: "campaign:vehicle:update",
@@ -1141,7 +1144,7 @@ const existingRolePermissions = {
     PERMISSIONS.FPC_VEHICLES_READ,
   ],
 
-  // Handles warranty claims with the manufacturer and runs recall / free-fix campaigns
+  // Handles warranty claims with the manufacturer and runs recall / field fix campaigns
   [ROLES.WARRANTY_OFFICER]: [
     PERMISSIONS.REQUISITION_READ,
     PERMISSIONS.REQUISITION_GOODWILL,
@@ -1198,7 +1201,17 @@ const newRolePermissions = Object.fromEntries(
   ]),
 ) as Record<keyof typeof NEW_DEPARTMENT_ROLE_BASES, PermissionType[]>;
 
-export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
-  ...existingRolePermissions,
-  ...newRolePermissions,
-};
+/**
+ * Permissions every role holds, whatever its department. Deployed to every existing role by
+ * migration 20261126130000_campaign_manual_read_permission.
+ */
+export const EVERY_ROLE_PERMISSIONS: PermissionType[] = [PERMISSIONS.CAMPAIGN_MANUAL_READ];
+
+export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = Object.fromEntries(
+  Object.entries<PermissionType[]>({ ...existingRolePermissions, ...newRolePermissions }).map(([role, permissions]) => [
+    role,
+    EVERY_ROLE_PERMISSIONS.every((p) => permissions.includes(p))
+      ? permissions
+      : [...permissions, ...EVERY_ROLE_PERMISSIONS.filter((p) => !permissions.includes(p))],
+  ]),
+) as Record<RoleType, PermissionType[]>;

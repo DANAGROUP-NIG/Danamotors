@@ -7,8 +7,13 @@ import {
   assertMileage,
   computeCoverage,
   lagosDayNumber,
+  assertCanRecordReimbursement,
   lineAmounts,
+  planReimbursement,
+  planSettlement,
   planTransition,
+  reconcileIssuedParts,
+  resolveLineDecision,
 } from "./warranty.logic";
 
 const policy = { warrantyDays: 1825, warrantyKm: 100_000, warrantyCovered: true };
@@ -168,7 +173,7 @@ describe("warranty case transitions", () => {
     "%s from %s is allowed only when listed",
     (action, status) => {
       const allowed = CASE_TRANSITIONS[action].from.includes(status);
-      const input = { remarks: "because", rejectReasonId: "r1", settlementRef: "CN-1", lineApprovals: [{ lineId: "l2", approvalPercent: 60 }] };
+      const input = { remarks: "because", rejectReasonId: "r1", lineApprovals: [{ lineId: "l2", approvalPercent: 60 }] };
       if (allowed) expect(planTransition(state(status), action, input).to).toBe(CASE_TRANSITIONS[action].to);
       else expect(() => planTransition(state(status), action, input)).toThrow(/cannot be/);
     },
@@ -193,16 +198,23 @@ describe("warranty case transitions", () => {
     expect(() => planTransition({ ...state("IN_REVIEW"), complaintCodeId: null }, "SUBMIT", {})).toThrow(/complaint/);
   });
 
-  it("approve sets every line to 100%", () => {
+  it("approve sets every line to 100% of its claimed amount", () => {
     const r = planTransition(state("SUBMITTED"), "APPROVE", {});
-    expect([...r.approvals!.values()]).toEqual([100, 100, 100]);
+    expect([...r.approvals!.values()]).toEqual([
+      { approvalPercent: 100, approvedAmount: 48_500 },
+      { approvalPercent: 100, approvedAmount: 115_800 },
+      { approvalPercent: 100, approvedAmount: 22_500 },
+    ]);
   });
 
-  it("partial approval needs a line below 100% and something approved", () => {
+  it("partial approval needs a line below its claimed amount and something approved", () => {
     const r = planTransition(state("SUBMITTED"), "PARTIALLY_APPROVE", { lineApprovals: [{ lineId: "l2", approvalPercent: 60 }] });
-    expect(r.approvals!.get("l2")).toBe(60);
-    expect(r.approvals!.get("l1")).toBe(100);
-    expect(() => planTransition(state("SUBMITTED"), "PARTIALLY_APPROVE", { lineApprovals: [] })).toThrow(/below 100%/);
+    expect(r.approvals!.get("l2")).toEqual({ approvalPercent: 60, approvedAmount: 69_480 });
+    expect(r.approvals!.get("l1")).toEqual({ approvalPercent: 100, approvedAmount: 48_500 });
+    expect(() => planTransition(state("SUBMITTED"), "PARTIALLY_APPROVE", { lineApprovals: [] })).toThrow(/below the claimed amount/);
+    expect(() =>
+      planTransition(state("SUBMITTED"), "PARTIALLY_APPROVE", { lineApprovals: [{ lineId: "l1", approvedAmount: 48_500 }] }),
+    ).toThrow(/below the claimed amount/);
     expect(() =>
       planTransition(state("SUBMITTED"), "PARTIALLY_APPROVE", {
         lineApprovals: readyLines.map((l) => ({ lineId: l.id, approvalPercent: 0 })),
@@ -219,14 +231,101 @@ describe("warranty case transitions", () => {
   it("reject needs a reason code and zeroes approvals", () => {
     expect(() => planTransition(state("SUBMITTED"), "REJECT", {})).toThrow(/reject reason/);
     const r = planTransition(state("SUBMITTED"), "REJECT", { rejectReasonId: "r1" });
-    expect([...r.approvals!.values()]).toEqual([0, 0, 0]);
+    expect([...r.approvals!.values()].map((a) => a.approvedAmount)).toEqual([0, 0, 0]);
   });
 
-  it("return needs remarks; settle needs a reference; withdrawing needs a reason", () => {
+  it("return needs remarks; settle needs no reference; withdrawing needs a reason", () => {
     expect(() => planTransition(state("SUBMITTED"), "RETURN", { remarks: " " })).toThrow(/corrected/);
-    expect(() => planTransition(state("APPROVED"), "SETTLE", {})).toThrow(/settlement reference/);
+    expect(planTransition(state("APPROVED"), "SETTLE", {}).to).toBe("SETTLED");
     expect(() => planTransition(state("OPEN"), "CLOSE", {})).toThrow(/reason/);
     expect(planTransition(state("SETTLED"), "CLOSE", {}).to).toBe("CLOSED");
+  });
+});
+
+describe("approved amounts entered from the Kia portal", () => {
+  it("keeps the amount exactly and derives the percentage", () => {
+    expect(resolveLineDecision(12_345.67, 10_000, 100, 1)).toEqual({ approvalPercent: 81, approvedAmount: 10_000 });
+    expect(resolveLineDecision(115_800, 69_480, 100, 1)).toEqual({ approvalPercent: 60, approvedAmount: 69_480 });
+    expect(resolveLineDecision(0, 0, 100, 1)).toEqual({ approvalPercent: 100, approvedAmount: 0 });
+  });
+
+  it("falls back to the percentage when no amount is entered", () => {
+    expect(resolveLineDecision(0.3, null, 33.33, 1)).toEqual({ approvalPercent: 33.33, approvedAmount: 0.1 });
+  });
+
+  it("names the line when the amount is out of range", () => {
+    expect(() => resolveLineDecision(100, 100.01, 100, 2)).toThrow(/Line 2: the approved amount cannot be more than the claimed amount/);
+    expect(() => resolveLineDecision(100, -1, 100, 3)).toThrow(/Line 3/);
+    expect(() => resolveLineDecision(100, null, 101, 1)).toThrow(/between 0 and 100/);
+  });
+});
+
+describe("settlement and reimbursement", () => {
+  const now = new Date("2026-11-26T11:00:00Z");
+
+  it("settles with the reimbursement pending and no reference", () => {
+    const plan = planSettlement({}, 186_800, now);
+    expect(plan).toMatchObject({ settledAmount: 186_800, settlementRef: null, reimbursementStatus: "PENDING", reimbursedAmount: null, reimbursedAt: null });
+    expect(plan.settledAt).toEqual(now);
+  });
+
+  it("records the reimbursement at settlement when it is already received", () => {
+    const plan = planSettlement({ reimbursementReceived: true, settlementRef: " CN-2026-0091 " }, 186_800, now);
+    expect(plan).toMatchObject({ settlementRef: "CN-2026-0091", reimbursementStatus: "RECEIVED", reimbursedAmount: 186_800 });
+    expect(() => planSettlement({ reimbursementReceived: true }, 186_800, now)).toThrow(/credit note or payment reference/);
+  });
+
+  it("rejects future dates and negative amounts", () => {
+    expect(() => planSettlement({ settledAt: new Date("2026-11-28T09:00:00Z") }, 10, now)).toThrow(/settlement date cannot be in the future/);
+    expect(() => planSettlement({ settledAmount: -5 }, 10, now)).toThrow(/negative/);
+    expect(() => planReimbursement({ settlementRef: "CN-1", reimbursedAmount: null }, now)).toThrow(/amount received/);
+    expect(() => planReimbursement({ settlementRef: "CN-1", reimbursedAmount: 5, reimbursedAt: new Date("2026-12-01") }, now)).toThrow(/future/);
+  });
+
+  it("allows recording a pending reimbursement after the case is closed, once", () => {
+    expect(() => assertCanRecordReimbursement("CLOSED", "PENDING")).not.toThrow();
+    expect(() => assertCanRecordReimbursement("SETTLED", "PENDING")).not.toThrow();
+    expect(() => assertCanRecordReimbursement("APPROVED", null)).toThrow(/Record the settlement first/);
+    expect(() => assertCanRecordReimbursement("CLOSED", "RECEIVED")).toThrow(/already recorded/);
+  });
+});
+
+describe("issued parts against the approved claim", () => {
+  const issued = [
+    { jobCardLineId: "j1", partNumber: "39210-2B000", description: "Oxygen sensor", quantity: 1, amount: 48_500 },
+    { jobCardLineId: "j2", partNumber: "28500-2B100", description: "Catalytic converter", quantity: 1, amount: 120_000 },
+    { jobCardLineId: "j3", partNumber: "21510-23001", description: "Oil sump gasket", quantity: 2, amount: 6_000 },
+  ];
+  const claim = [
+    { id: "c1", jobCardLineId: "j1", partNumber: "39210-2B000", description: "Oxygen sensor", claimedAmount: 48_500, approvedAmount: 48_500 },
+    { id: "c2", jobCardLineId: "j2", partNumber: "28500-2B100", description: "Catalytic converter", claimedAmount: 115_800, approvedAmount: 69_480 },
+    { id: "c3", jobCardLineId: null, partNumber: "11403-1", description: "Bolt", claimedAmount: 500, approvedAmount: 500 },
+  ];
+
+  it("shows recovered, shortfall, not claimed and not issued rows with totals", () => {
+    const r = reconcileIssuedParts(issued, claim, true);
+    expect(r.rows.map((x) => [x.partNumber, x.outcome, x.variance])).toEqual([
+      ["39210-2B000", "RECOVERED", 0],
+      ["28500-2B100", "SHORTFALL", -50_520],
+      ["21510-23001", "NOT_CLAIMED", null],
+      ["11403-1", "NOT_ISSUED", null],
+    ]);
+    expect(r.totals).toEqual({ issuedAmount: 174_500, claimedAmount: 164_800, approvedAmount: 118_480, variance: -56_020 });
+  });
+
+  it("waits for the decision before showing approved amounts or a variance", () => {
+    const r = reconcileIssuedParts(issued, claim, false);
+    expect(r.rows[0]).toMatchObject({ outcome: "AWAITING_DECISION", approvedAmount: null, variance: null });
+    expect(r.totals.approvedAmount).toBeNull();
+    expect(r.totals.variance).toBeNull();
+  });
+
+  it("is empty when nothing was issued or claimed", () => {
+    expect(reconcileIssuedParts([], [], true)).toEqual({
+      decided: true,
+      rows: [],
+      totals: { issuedAmount: 0, claimedAmount: 0, approvedAmount: 0, variance: 0 },
+    });
   });
 });
 

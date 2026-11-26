@@ -19,7 +19,7 @@ export function OpenCampaignsCard({ campaigns, isLoading }: { campaigns?: OpenCa
       {isLoading ? (
         <div className="h-32 animate-pulse rounded-lg bg-slate-100" />
       ) : !campaigns?.length ? (
-        <p className="text-sm text-slate-400">No open recalls or free fixes for this vehicle.</p>
+        <p className="text-sm text-slate-400">No open recalls or field fixes for this vehicle.</p>
       ) : (
         <ul className="space-y-3">
           {campaigns.map((c) => (

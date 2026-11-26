@@ -69,6 +69,7 @@ import {
   money,
 } from "./opening/opening-ui";
 import { NumberInput } from "@/components/forms/NumberInput";
+import { CampaignAlertDialog } from "@/features/campaigns/components/CampaignAlertDialog";
 
 const tabs = ["Vehicle Details", "Customer Requests", "Other Details"] as const;
 type Tab = (typeof tabs)[number];
@@ -653,6 +654,7 @@ export function JobCardCreateForm({
 
   return (
     <FormProvider {...form}>
+      <CampaignAlertDialog vehicleId={vehicleId} context="jobcard" />
       <form
         className="flex h-[calc(100dvh-10rem)] min-h-0 flex-col text-sm"
         onSubmit={submit}

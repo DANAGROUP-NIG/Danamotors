@@ -195,7 +195,7 @@ function CampaignAttendance({ jobCardId, campaign, canEdit }: { jobCardId: strin
 export function LinkedCampaignsCard({ jobCard, canEdit }: { jobCard: JobCard; canEdit: boolean }) {
   const campaigns = jobCard.campaigns ?? [];
   const { hasPermission, isSuperAdmin } = useAuth();
-  const canOpenCampaign = isSuperAdmin || hasPermission(CAMPAIGN_PERMISSIONS.READ);
+  const canOpenCampaign = isSuperAdmin || hasPermission(CAMPAIGN_PERMISSIONS.READ) || hasPermission(CAMPAIGN_PERMISSIONS.MANUAL_READ);
   const open = campaigns.filter((c) => c.attended === null && !c.hasFreeLine).length;
   return (
     <SectionCard

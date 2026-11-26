@@ -201,3 +201,32 @@ export const campaignAttendanceSchema = z.object({
     .refine((b) => b.attended || !!b.reason, { message: "Give the reason the campaign work was not done", path: ["reason"] })
     .refine((b) => b.attended || b.reason !== "OTHER" || !!b.note, { message: "Describe the other reason", path: ["note"] }),
 });
+
+// ── Manuals, affected VIN download, open-campaign alert ─────────────────────
+
+export const campaignDocumentParamsSchema = z.object({
+  params: z.object({ id: uuid("campaign ID"), documentId: uuid("manual ID") }),
+});
+
+export const campaignDocumentFileSchema = campaignDocumentParamsSchema.extend({
+  query: z.object({ disposition: z.enum(["inline", "attachment"]).optional() }),
+});
+
+export const uploadCampaignDocumentSchema = z.object({
+  params: z.object({ id: uuid("campaign ID") }),
+  body: z.object({
+    title: z.string().trim().min(1, "Enter a title for the manual").max(120, "Keep the title under 120 characters"),
+    fileName: z.string().trim().min(1, "Choose a file").max(200),
+    // Base64 file content; the decoded file is checked and capped at 10 MB by the service.
+    data: z.string().min(1, "Choose a file").max(14_500_000, "The manual is larger than 10 MB"),
+  }),
+});
+
+export const openForVehicleSchema = z.object({
+  query: z
+    .object({
+      vehicleId: uuid("vehicle ID").optional(),
+      vin: z.string().trim().min(11, "Enter at least 11 characters of the VIN").max(17, "A VIN has 17 characters").optional(),
+    })
+    .refine((q) => Boolean(q.vehicleId || q.vin), { message: "Choose a vehicle or enter a VIN", path: ["vehicleId"] }),
+});

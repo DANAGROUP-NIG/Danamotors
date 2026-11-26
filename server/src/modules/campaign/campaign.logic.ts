@@ -1,5 +1,5 @@
 /**
- * Pure business rules for recall, free-fix and service campaigns.
+ * Pure business rules for recall, field fix and service campaigns.
  * Database-free so they can be unit tested directly.
  */
 import { CampaignStatus, CampaignVehicleStatus, ContactOutcome } from "@prisma/client";

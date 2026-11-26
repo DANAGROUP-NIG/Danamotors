@@ -366,6 +366,7 @@ model User {
   campaignsCreated             Campaign[]                  @relation("CampaignCreatedBy")
   campaignContactLogs          CampaignContactLog[]        @relation("CampaignContactActor")
   campaignVinRangesCreated     CampaignVinRange[]          @relation("CampaignVinRangeCreatedBy")
+  campaignDocumentsUploaded    CampaignDocument[]          @relation("CampaignDocumentUploadedBy")
   jobCardCampaignsAttended     JobCardCampaign[]           @relation("JobCardCampaignAttendedBy")
 
   customerOrdersCreated       CustomerOrder[]         @relation("CustomerOrderCreatedBy")
@@ -3414,8 +3415,15 @@ enum WarrantyLineRole {
   CONSEQUENTIAL
 }
 
+// Reimbursement from the manufacturer for a settled warranty case.
+enum WarrantyReimbursementStatus {
+  PENDING
+  RECEIVED
+}
+
 enum CampaignType {
   RECALL
+  // Shown to users as "Field fix". The stored value keeps its original name.
   FREE_FIX
   SERVICE_CAMPAIGN
   // Manufacturer field product check bulletin (legacy FPC). Behaves like RECALL.
@@ -3629,9 +3637,15 @@ model WarrantyCase {
   approvedAmount Float?
 
   settledAt     DateTime?
+  // Credit note or payment reference from the manufacturer.
   settlementRef String?
   settledAmount Float?
   closedAt      DateTime?
+
+  // A settled case can be closed while the manufacturer's reimbursement is still pending.
+  reimbursementStatus WarrantyReimbursementStatus?
+  reimbursedAmount    Float?
+  reimbursedAt        DateTime?
 
   assignedOfficerId String?
   assignedOfficer   User?   @relation("WarrantyCaseOfficer", fields: [assignedOfficerId], references: [id], onDelete: SetNull)
@@ -3711,7 +3725,7 @@ model WarrantyCaseStatusHistory {
   @@index([caseId, createdAt])
 }
 
-// Recall, free fix or service campaign targeted by VIN.
+// Recall, field fix or service campaign targeted by VIN.
 model Campaign {
   id     String         @id @default(uuid())
   code   String         @unique
@@ -3747,6 +3761,7 @@ model Campaign {
   coveredItems CampaignCoveredItem[]
   vehicles     CampaignVehicle[]
   vinRanges    CampaignVinRange[]
+  documents    CampaignDocument[]
   jobCards     JobCardCampaign[]
   jobCardLines JobCardLine[]
 
@@ -3771,6 +3786,29 @@ model CampaignVinRange {
 
   @@unique([campaignId, vinFrom, vinTo])
   @@index([vinFrom, vinTo])
+}
+
+/// Campaign manual or bulletin (PDF or image) imported by the warranty team.
+/// Stored in the database so it is backed up with the campaign; files are capped at 10 MB.
+model CampaignDocument {
+  id String @id @default(uuid())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  title       String @db.VarChar(120)
+  fileName    String @db.VarChar(200)
+  contentType String @db.VarChar(100)
+  sizeBytes   Int
+  sha256      String @db.Char(64)
+  data        Bytes
+
+  uploadedById String?
+  uploadedBy   User?    @relation("CampaignDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@unique([campaignId, sha256])
+  @@index([campaignId, createdAt])
 }
 
 model CampaignModel {

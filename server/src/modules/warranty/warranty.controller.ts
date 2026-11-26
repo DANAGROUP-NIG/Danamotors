@@ -139,4 +139,9 @@ export class WarrantyController {
     const { action, ...input } = req.body;
     ok(res, { case: await this.cases.transition(req.params.id, action, input, req.user!.userId) }, "Warranty case updated");
   });
+
+  recordReimbursement = handle(async (req, res) => {
+    assertBranchOwnership(req, await this.cases.branchOf(req.params.id));
+    ok(res, { case: await this.cases.recordReimbursement(req.params.id, req.body, req.user!.userId) }, "Reimbursement recorded");
+  });
 }

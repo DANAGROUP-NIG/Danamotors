@@ -126,6 +126,31 @@ export type CaseAction =
   | "SETTLE"
   | "CLOSE";
 
+export type ReimbursementStatus = "PENDING" | "RECEIVED";
+
+/** How a part issued from our store compares with what the manufacturer approved. */
+export type IssuedPartOutcome = "NOT_CLAIMED" | "NOT_ISSUED" | "AWAITING_DECISION" | "RECOVERED" | "SHORTFALL";
+
+export type IssuedPartRow = {
+  jobCardLineId: string | null;
+  claimLineId: string | null;
+  partNumber: string | null;
+  description: string;
+  issuedQuantity: number;
+  issuedAmount: number;
+  claimedAmount: number | null;
+  approvedAmount: number | null;
+  /** Approved minus issued; null until the manufacturer has decided. */
+  variance: number | null;
+  outcome: IssuedPartOutcome;
+};
+
+export type IssuedPartsReconciliation = {
+  decided: boolean;
+  rows: IssuedPartRow[];
+  totals: { issuedAmount: number; claimedAmount: number; approvedAmount: number | null; variance: number | null };
+};
+
 export type LineKind = "PART" | "LABOUR";
 export type LineRole = "CAUSAL" | "CONSEQUENTIAL";
 
@@ -192,9 +217,14 @@ export type WarrantyCase = {
   settledAt: string | null;
   settlementRef: string | null;
   settledAmount: number | null;
+  reimbursementStatus: ReimbursementStatus | null;
+  reimbursedAmount: number | null;
+  reimbursedAt: string | null;
   closedAt: string | null;
   createdAt: string;
   billDate: string | null;
+  canRecordReimbursement: boolean;
+  issuedParts: IssuedPartsReconciliation;
   jobCard: {
     id: string;
     jobNumber: string;
@@ -251,6 +281,8 @@ export type WarrantySummary = {
   approvedLast30Days: number;
   approvedLast30DaysAmount: number;
   rejectedOrReturned: number;
+  awaitingReimbursement: number;
+  awaitingReimbursementAmount: number;
 };
 
 export type CaseListParams = {
@@ -261,6 +293,7 @@ export type CaseListParams = {
   basedOn?: "CASE_DATE" | "BILL_DATE";
   claimNo?: "GENERATED" | "NOT_GENERATED";
   billing?: "BILLED" | "UNBILLED";
+  reimbursement?: ReimbursementStatus;
   search?: string;
   page?: number;
   limit?: number;
@@ -286,10 +319,22 @@ export type TransitionPayload = {
   settlementRef?: string | null;
   settledAmount?: number | null;
   settledAt?: string | null;
+  /** Settlement only: the credit note or payment is already in hand. */
+  reimbursementReceived?: boolean;
+  reimbursedAmount?: number | null;
+  reimbursedAt?: string | null;
   decisionAt?: string | null;
   manufacturerClaimNo?: string | null;
   manufacturerClaimDate?: string | null;
-  lineApprovals?: { lineId: string; approvalPercent: number }[];
+  /** Per line: the approved amount from the Kia portal, or an approval percentage. */
+  lineApprovals?: { lineId: string; approvedAmount?: number; approvalPercent?: number }[];
+};
+
+export type ReimbursementPayload = {
+  settlementRef: string;
+  reimbursedAmount: number;
+  reimbursedAt?: string | null;
+  remarks?: string | null;
 };
 
 export type WarrantyPart = {

@@ -4,8 +4,9 @@
  * Everything here is deterministic and database-free so it can be unit tested
  * directly. Services load data, call these helpers and persist the results.
  */
-import { WarrantyCaseStatus, WarrantyCoverageStatus } from "@prisma/client";
+import { Prisma, WarrantyCaseStatus, WarrantyCoverageStatus, WarrantyReimbursementStatus } from "@prisma/client";
 import { BadRequestError } from "../../shared/errors/appError";
+import { money, sumMoney } from "../finance/money";
 
 // ── Money ────────────────────────────────────────────────────────────────────
 
@@ -292,18 +293,31 @@ export interface CaseState {
   lines: CaseLineState[];
 }
 
+/**
+ * The manufacturer's decision for one line. The officer enters either the approved
+ * amount shown on the Kia portal or an approval percentage; the amount wins when both are sent.
+ */
+export interface LineApprovalInput {
+  lineId: string;
+  approvalPercent?: number | null;
+  approvedAmount?: number | null;
+}
+
+export interface LineDecision {
+  approvalPercent: number;
+  approvedAmount: number;
+}
+
 export interface TransitionInput {
   remarks?: string | null;
   rejectReasonId?: string | null;
-  settlementRef?: string | null;
-  /** Approval percentages per line id, for decisions. */
-  lineApprovals?: { lineId: string; approvalPercent: number }[];
+  lineApprovals?: LineApprovalInput[];
 }
 
 export interface TransitionResult {
   to: WarrantyCaseStatus;
-  /** New approval percent per line, set by decisions. */
-  approvals?: Map<string, number>;
+  /** Approval percent and approved amount per line id, set by decisions. */
+  approvals?: Map<string, LineDecision>;
 }
 
 /**
@@ -337,29 +351,28 @@ export function planTransition(state: CaseState, action: WarrantyCaseAction, inp
       return { to: rule.to };
     }
     case "APPROVE": {
-      return { to: rule.to, approvals: new Map(state.lines.map((l) => [l.id, 100])) };
+      return {
+        to: rule.to,
+        approvals: new Map(state.lines.map((l) => [l.id, { approvalPercent: 100, approvedAmount: money(l.claimedAmount) }])),
+      };
     }
     case "PARTIALLY_APPROVE": {
       const approvals = decisionApprovals(state, input.lineApprovals ?? []);
-      const values = [...approvals.values()];
-      if (!values.some((v) => v < 100)) {
-        throw new BadRequestError("A partial approval needs at least one line approved below 100%. Use Approved instead.");
+      const below = state.lines.some((l) => approvals.get(l.id)!.approvedAmount < money(l.claimedAmount));
+      if (!below) {
+        throw new BadRequestError("A partial approval needs at least one line approved below the claimed amount. Use Approved instead.");
       }
-      if (!values.some((v) => v > 0)) {
+      if (![...approvals.values()].some((v) => v.approvedAmount > 0)) {
         throw new BadRequestError("Nothing is approved. Use Rejected instead.");
       }
       return { to: rule.to, approvals };
     }
     case "REJECT": {
       if (!input.rejectReasonId) throw new BadRequestError("Rejecting a claim requires a reject reason code");
-      return { to: rule.to, approvals: new Map(state.lines.map((l) => [l.id, 0])) };
+      return { to: rule.to, approvals: new Map(state.lines.map((l) => [l.id, { approvalPercent: 0, approvedAmount: 0 }])) };
     }
     case "RETURN": {
       if (!remarks) throw new BadRequestError("Say what the manufacturer asked to be corrected");
-      return { to: rule.to };
-    }
-    case "SETTLE": {
-      if (!input.settlementRef?.trim()) throw new BadRequestError("Enter the settlement reference (credit note or payment)");
       return { to: rule.to };
     }
     case "CLOSE": {
@@ -372,20 +385,265 @@ export function planTransition(state: CaseState, action: WarrantyCaseAction, inp
   }
 }
 
-function decisionApprovals(state: CaseState, given: { lineId: string; approvalPercent: number }[]): Map<string, number> {
-  const byId = new Map(given.map((g) => [g.lineId, g.approvalPercent]));
+function decisionApprovals(state: CaseState, given: LineApprovalInput[]): Map<string, LineDecision> {
+  const byId = new Map(given.map((g) => [g.lineId, g]));
   for (const id of byId.keys()) {
     if (!state.lines.some((l) => l.id === id)) throw new BadRequestError("A decision line does not belong to this case");
   }
-  const approvals = new Map<string, number>();
-  for (const line of state.lines) {
-    const value = byId.get(line.id) ?? line.approvalPercent;
-    if (!Number.isFinite(value) || value < 0 || value > 100) {
-      throw new BadRequestError("Approval percentages must be between 0 and 100");
-    }
-    approvals.set(line.id, round2(value));
-  }
+  const approvals = new Map<string, LineDecision>();
+  state.lines.forEach((line, index) => {
+    const entry = byId.get(line.id);
+    approvals.set(
+      line.id,
+      resolveLineDecision(line.claimedAmount, entry?.approvedAmount ?? null, entry?.approvalPercent ?? line.approvalPercent, index + 1),
+    );
+  });
   return approvals;
+}
+
+/**
+ * One line's decision from the approved amount (as entered from the Kia portal) or a percentage.
+ * The amount is kept exactly as entered; the percentage is derived from it for display.
+ */
+export function resolveLineDecision(
+  claimedAmount: number,
+  approvedAmount: number | null,
+  approvalPercent: number,
+  lineNumber: number,
+): LineDecision {
+  const claimed = new Prisma.Decimal(money(claimedAmount));
+  if (approvedAmount != null) {
+    if (!Number.isFinite(approvedAmount) || approvedAmount < 0) {
+      throw new BadRequestError(`Line ${lineNumber}: enter an approved amount of zero or more`);
+    }
+    const amount = new Prisma.Decimal(money(approvedAmount));
+    // TODO(confirm): can Kia approve more than the dealer claimed on a line? Blocked until confirmed.
+    if (amount.greaterThan(claimed)) {
+      throw new BadRequestError(`Line ${lineNumber}: the approved amount cannot be more than the claimed amount`);
+    }
+    const percent = claimed.isZero()
+      ? 100
+      : amount.div(claimed).times(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toNumber();
+    return { approvalPercent: percent, approvedAmount: amount.toNumber() };
+  }
+  if (!Number.isFinite(approvalPercent) || approvalPercent < 0 || approvalPercent > 100) {
+    throw new BadRequestError("Approval percentages must be between 0 and 100");
+  }
+  const percent = new Prisma.Decimal(approvalPercent).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  return {
+    approvalPercent: percent.toNumber(),
+    approvedAmount: money(claimed.times(percent).div(100).toNumber()),
+  };
+}
+
+// ── Settlement and reimbursement ─────────────────────────────────────────────
+
+export interface SettlementInput {
+  settledAmount?: number | null;
+  settledAt?: Date | null;
+  /** Credit note or payment reference. Only needed when the reimbursement is already in. */
+  settlementRef?: string | null;
+  reimbursementReceived?: boolean | null;
+  reimbursedAmount?: number | null;
+  reimbursedAt?: Date | null;
+}
+
+export interface ReimbursementPlan {
+  settlementRef: string | null;
+  reimbursementStatus: WarrantyReimbursementStatus;
+  reimbursedAmount: number | null;
+  reimbursedAt: Date | null;
+}
+
+export interface SettlementPlan extends ReimbursementPlan {
+  settledAmount: number | null;
+  settledAt: Date;
+}
+
+/**
+ * Settling records the amount agreed with the manufacturer. The reimbursement (credit note
+ * or payment) may still be pending: the case can then be closed and the reimbursement
+ * recorded later.
+ */
+export function planSettlement(input: SettlementInput, approvedAmount: number | null, now: Date): SettlementPlan {
+  const settledAt = input.settledAt ?? now;
+  assertNotFuture(settledAt, now, "The settlement date");
+  const agreed = input.settledAmount ?? approvedAmount;
+  if (agreed != null && (!Number.isFinite(agreed) || agreed < 0)) throw new BadRequestError("The settled amount cannot be negative");
+  const settledAmount = agreed == null ? null : money(agreed);
+  const ref = input.settlementRef?.trim() || null;
+  if (!input.reimbursementReceived) {
+    return {
+      settledAmount,
+      settledAt,
+      settlementRef: ref,
+      reimbursementStatus: WarrantyReimbursementStatus.PENDING,
+      reimbursedAmount: null,
+      reimbursedAt: null,
+    };
+  }
+  const received = planReimbursement(
+    { settlementRef: ref, reimbursedAmount: input.reimbursedAmount ?? settledAmount, reimbursedAt: input.reimbursedAt ?? settledAt },
+    now,
+  );
+  return { settledAmount, settledAt, ...received };
+}
+
+export interface ReimbursementInput {
+  settlementRef?: string | null;
+  reimbursedAmount?: number | null;
+  reimbursedAt?: Date | null;
+}
+
+/** Statuses in which a pending reimbursement can be recorded as received. */
+export const REIMBURSABLE_CASE_STATUSES: WarrantyCaseStatus[] = [S.SETTLED, S.CLOSED];
+
+/** Validates a received reimbursement (credit note or payment from the manufacturer). */
+export function planReimbursement(input: ReimbursementInput, now: Date): ReimbursementPlan {
+  const settlementRef = input.settlementRef?.trim();
+  if (!settlementRef) throw new BadRequestError("Enter the credit note or payment reference for the reimbursement");
+  if (input.reimbursedAmount == null || !Number.isFinite(input.reimbursedAmount) || input.reimbursedAmount < 0) {
+    throw new BadRequestError("Enter the amount received from the manufacturer");
+  }
+  const reimbursedAt = input.reimbursedAt ?? now;
+  assertNotFuture(reimbursedAt, now, "The date received");
+  return {
+    settlementRef,
+    reimbursementStatus: WarrantyReimbursementStatus.RECEIVED,
+    reimbursedAmount: money(input.reimbursedAmount),
+    reimbursedAt,
+  };
+}
+
+/** A pending reimbursement can be recorded once, on a settled or closed case. */
+export function assertCanRecordReimbursement(status: WarrantyCaseStatus, reimbursement: WarrantyReimbursementStatus | null): void {
+  if (!REIMBURSABLE_CASE_STATUSES.includes(status)) {
+    throw new BadRequestError(`Record the settlement first. A case that is ${label(status)} has no reimbursement to record.`);
+  }
+  if (reimbursement === WarrantyReimbursementStatus.RECEIVED) {
+    throw new BadRequestError("The reimbursement for this case is already recorded as received");
+  }
+}
+
+function assertNotFuture(date: Date, now: Date, what: string) {
+  if (lagosDayNumber(date) > lagosDayNumber(now)) throw new BadRequestError(`${what} cannot be in the future`);
+}
+
+// ── Issued parts against the approved claim ──────────────────────────────────
+
+/** A part issued from our store against the job card (net of returns), at the job card rate. */
+export interface IssuedPartInput {
+  jobCardLineId: string;
+  partNumber: string | null;
+  description: string;
+  quantity: number;
+  amount: number;
+}
+
+export interface ClaimPartInput {
+  id: string;
+  jobCardLineId: string | null;
+  partNumber: string | null;
+  description: string;
+  claimedAmount: number;
+  approvedAmount: number | null;
+}
+
+/**
+ * NOT_CLAIMED: issued but not on the claim. NOT_ISSUED: claimed but not linked to a part
+ * issued on the job card. AWAITING_DECISION: no manufacturer decision yet.
+ * RECOVERED: the approved amount covers the issued amount. SHORTFALL: approved is less than issued.
+ */
+export type IssuedPartOutcome = "NOT_CLAIMED" | "NOT_ISSUED" | "AWAITING_DECISION" | "RECOVERED" | "SHORTFALL";
+
+export interface IssuedPartRow {
+  jobCardLineId: string | null;
+  claimLineId: string | null;
+  partNumber: string | null;
+  description: string;
+  issuedQuantity: number;
+  issuedAmount: number;
+  claimedAmount: number | null;
+  approvedAmount: number | null;
+  /** Approved minus issued; null until the manufacturer has decided. */
+  variance: number | null;
+  outcome: IssuedPartOutcome;
+}
+
+export interface IssuedPartsReconciliation {
+  decided: boolean;
+  rows: IssuedPartRow[];
+  totals: {
+    issuedAmount: number;
+    claimedAmount: number;
+    approvedAmount: number | null;
+    /** Approved minus issued across all rows; null until the manufacturer has decided. */
+    variance: number | null;
+  };
+}
+
+/**
+ * Lines the parts issued from our store up against the amounts claimed and approved on
+ * the Kia portal, so the officer sees what was recovered and any shortfall.
+ */
+export function reconcileIssuedParts(issued: IssuedPartInput[], claimParts: ClaimPartInput[], decided: boolean): IssuedPartsReconciliation {
+  const claimsByJobLine = new Map<string, ClaimPartInput[]>();
+  for (const c of claimParts) {
+    if (c.jobCardLineId) claimsByJobLine.set(c.jobCardLineId, [...(claimsByJobLine.get(c.jobCardLineId) ?? []), c]);
+  }
+  const issuedIds = new Set(issued.map((i) => i.jobCardLineId));
+
+  const rows: IssuedPartRow[] = issued.map((part) => {
+    const claims = claimsByJobLine.get(part.jobCardLineId) ?? [];
+    const issuedAmount = money(part.amount);
+    const identity = { jobCardLineId: part.jobCardLineId, partNumber: part.partNumber, description: part.description, issuedQuantity: part.quantity, issuedAmount };
+    if (claims.length === 0) {
+      return { ...identity, claimLineId: null, claimedAmount: null, approvedAmount: null, variance: null, outcome: "NOT_CLAIMED" };
+    }
+    const approvedAmount = decided ? sumMoney(claims.map((c) => c.approvedAmount ?? 0)) : null;
+    return {
+      ...identity,
+      claimLineId: claims[0].id,
+      claimedAmount: sumMoney(claims.map((c) => c.claimedAmount)),
+      approvedAmount,
+      ...decisionOutcome(issuedAmount, approvedAmount),
+    };
+  });
+
+  for (const c of claimParts) {
+    if (c.jobCardLineId && issuedIds.has(c.jobCardLineId)) continue;
+    rows.push({
+      jobCardLineId: c.jobCardLineId,
+      claimLineId: c.id,
+      partNumber: c.partNumber,
+      description: c.description,
+      issuedQuantity: 0,
+      issuedAmount: 0,
+      claimedAmount: money(c.claimedAmount),
+      approvedAmount: decided ? money(c.approvedAmount ?? 0) : null,
+      variance: null,
+      outcome: "NOT_ISSUED",
+    });
+  }
+
+  const issuedTotal = sumMoney(rows.map((r) => r.issuedAmount));
+  const approvedTotal = decided ? sumMoney(rows.map((r) => r.approvedAmount ?? 0)) : null;
+  return {
+    decided,
+    rows,
+    totals: {
+      issuedAmount: issuedTotal,
+      claimedAmount: sumMoney(rows.map((r) => r.claimedAmount ?? 0)),
+      approvedAmount: approvedTotal,
+      variance: approvedTotal == null ? null : money(new Prisma.Decimal(approvedTotal).minus(issuedTotal).toNumber()),
+    },
+  };
+}
+
+function decisionOutcome(issuedAmount: number, approvedAmount: number | null): { variance: number | null; outcome: IssuedPartOutcome } {
+  if (approvedAmount == null) return { variance: null, outcome: "AWAITING_DECISION" };
+  const variance = money(new Prisma.Decimal(approvedAmount).minus(issuedAmount).toNumber());
+  return { variance, outcome: variance < 0 ? "SHORTFALL" : "RECOVERED" };
 }
 
 export function lineAmounts(quantity: number, rate: number, approvalPercent: number | null) {

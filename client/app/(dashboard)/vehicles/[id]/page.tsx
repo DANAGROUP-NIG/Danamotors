@@ -19,6 +19,7 @@ import { useVehicleWarranty } from "@/features/warranty/hooks/use-warranty";
 import { WarrantyCoverageCard } from "@/features/warranty/components/WarrantyCoverageCard";
 import { OpenCampaignsCard } from "@/features/warranty/components/OpenCampaignsCard";
 import { FilterPills, PageState, Pill, SectionCard, tdCls, thCls } from "@/features/warranty/components/ui";
+import { CampaignAlertDialog } from "@/features/campaigns/components/CampaignAlertDialog";
 import { COVERAGE_LABELS, COVERAGE_TONES, fmtDate, fmtKm, fmtNaira } from "@/features/warranty/lib/warranty-format";
 
 type HistoryFilter = "" | "warranty" | "customer" | "repeat";
@@ -59,6 +60,7 @@ export default function VehicleDetailPage() {
 
   return (
     <div className="space-y-5 px-4 py-6 lg:px-6">
+      <CampaignAlertDialog vehicleId={id} />
       <Link href="/vehicles" className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline">
         <ArrowLeft className="size-4" /> Back to Vehicles
       </Link>

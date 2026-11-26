@@ -286,7 +286,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Campaigns",
         href: "/campaigns",
         icon: Megaphone,
-        permissions: [CAMPAIGN_PERMISSIONS.READ],
+        permissions: [CAMPAIGN_PERMISSIONS.READ, CAMPAIGN_PERMISSIONS.MANUAL_READ],
       },
       {
         label: "Reports",
