@@ -16,10 +16,12 @@ export const mobisKeys = {
   detail: (id: string) => [...mobisKeys.all, "detail", id] as const,
 };
 
-export async function getMobisMitsRequest(params: { status?: MitStatus; search?: string } = {}) {
+/** `branchId` narrows the list for cross-branch users; the server keeps everyone else to their own branch. */
+export async function getMobisMitsRequest(params: { status?: MitStatus; search?: string; branchId?: string } = {}) {
   const q = new URLSearchParams();
   if (params.status) q.set("status", params.status);
   if (params.search) q.set("search", params.search);
+  if (params.branchId) q.set("branchId", params.branchId);
   const qs = q.toString();
   const data = await apiGet<{ mits: MobisMitListItem[] }>(`${BASE}${qs ? `?${qs}` : ""}`);
   return data.mits;

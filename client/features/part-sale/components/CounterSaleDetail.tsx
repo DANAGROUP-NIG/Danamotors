@@ -7,14 +7,17 @@ import { ArrowLeft, Ban, FileText, Printer, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { PART_SALE_PERMISSIONS } from "@/features/auth/roles";
 import { DetailField } from "./OrderDetail";
+import { CounterSalePrint } from "./CounterSalePrint";
 import { useCancelCounterSale, useCounterSale, useCreateReturn } from "../hooks/use-part-sale";
 import {
   BILL_STATUS_TONES,
+  TAX_FORM_LABELS,
   TRANSPORT_MODE_LABELS,
   customerAddress,
   customerName,
@@ -47,7 +50,13 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
   const invalid = values.some((v) => !v.ok);
   const chosen = values.filter((v) => v.ok && v.q > 0);
   const preview = previewSale(
-    chosen.map((v) => ({ quantity: v.q, rate: v.line.rate, vatPercent: v.line.vatPercent ?? 0 })),
+    chosen.map((v) => ({
+      quantity: v.q,
+      rate: v.line.rate,
+      vatPercent: v.line.vatPercent ?? 0,
+      tradeDiscountPercent: v.line.tradeDiscountPercent ?? 0,
+      handlingPercent: v.line.handlingPercent ?? 0,
+    })),
     sale.invoice.partsDiscountPercent,
   );
 
@@ -79,14 +88,13 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
                   <td className={cn(tdCls, "text-right")}>{line.quantity}</td>
                   <td className={cn(tdCls, "text-right text-slate-500")}>{line.returnedQuantity}</td>
                   <td className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       max={left}
                       className={cn(inputCls, "ml-auto h-9 w-20 text-right", !ok && "border-red-400")}
-                      value={qty[line.id] ?? ""}
+                      value={qty[line.id] ? Number(qty[line.id]) : null}
                       placeholder="0"
-                      onChange={(e) => setQty((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                      onValueChange={(v) => setQty((prev) => ({ ...prev, [line.id]: v == null ? "" : String(v) }))}
                     />
                   </td>
                   <td className={cn(tdCls, "text-right")}>{fmtCurrency(line.rate)}</td>
@@ -112,7 +120,8 @@ function ReturnDialog({ sale, onClose }: { sale: CounterSale; onClose: () => voi
               Credit {fmtCurrency(preview.total)}
               <span className="text-slate-400">
                 {" "}
-                (gross {fmtCurrency(preview.gross)} − discount {fmtCurrency(preview.discount)} + VAT {fmtCurrency(preview.vat)})
+                (gross {fmtCurrency(preview.gross)} − discount {fmtCurrency(preview.tradeDiscount + preview.discount)}
+                {preview.handling ? ` + handling ${fmtCurrency(preview.handling)}` : ""} + VAT {fmtCurrency(preview.vat)})
               </span>
             </p>
           </div>
@@ -196,6 +205,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
     !cancelled && hasPermission(PART_SALE_PERMISSIONS.RETURN) && invoice.lines.some((l) => l.quantity > l.returnedQuantity);
   const canCancel = !cancelled && hasPermission(PART_SALE_PERMISSIONS.BILL) && sale.returns.length === 0;
   const totalQty = invoice.lines.reduce((s, l) => s + l.quantity, 0);
+  // Legacy trade discount / handling columns, shown only when a line carries them.
+  const hasCharges = invoice.lines.some((l) => l.tradeDiscountPercent || l.handlingPercent);
 
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
@@ -225,7 +236,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="space-y-5">
+      {/* On paper the formal bill (CounterSalePrint) replaces the screen view. */}
+      <div className="space-y-5 print:hidden">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -242,6 +254,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
             <DetailField label="Invoice date" value={fmtDate(invoice.issuedDate)} />
             <DetailField label="Due date" value={fmtDate(invoice.dueDate)} />
             <DetailField label="Gate pass" value={sale.gatePassNumber} />
+            <DetailField label="Tax type" value={TAX_FORM_LABELS[sale.taxForm]} />
             <DetailField wide label="Address" value={customerAddress(invoice.customer) || null} />
             <DetailField
               label="Sales executive"
@@ -278,6 +291,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
                   <th className={cn(thCls, "text-right")}>Qty</th>
                   <th className={cn(thCls, "text-right")}>Returned</th>
                   <th className={cn(thCls, "text-right")}>Rate</th>
+                  {hasCharges && <th className={cn(thCls, "text-right")}>Disc %</th>}
+                  {hasCharges && <th className={cn(thCls, "text-right")}>Hdl %</th>}
                   <th className={cn(thCls, "text-right")}>VAT</th>
                   <th className={cn(thCls, "text-right")}>Amount</th>
                 </tr>
@@ -301,6 +316,8 @@ export function CounterSaleDetail({ id }: { id: string }) {
                       <td className={cn(tdCls, "text-right")}>{l.quantity}</td>
                       <td className={cn(tdCls, "text-right", l.returnedQuantity ? "text-red-600" : "text-slate-300")}>{l.returnedQuantity}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtCurrency(l.rate)}</td>
+                      {hasCharges && <td className={cn(tdCls, "text-right")}>{l.tradeDiscountPercent ? `${l.tradeDiscountPercent}%` : "—"}</td>}
+                      {hasCharges && <td className={cn(tdCls, "text-right")}>{l.handlingPercent ? `${l.handlingPercent}%` : "—"}</td>}
                       <td className={cn(tdCls, "text-right")}>{l.vatPercent ? `${l.vatPercent}%` : "—"}</td>
                       <td className={cn(tdCls, "text-right")}>{fmtCurrency(l.amount)}</td>
                     </tr>
@@ -329,8 +346,20 @@ export function CounterSaleDetail({ id }: { id: string }) {
             </dd>
             <dt className="text-slate-500">Gross</dt>
             <dd className="text-right">{fmtCurrency(invoice.partsTotal)}</dd>
+            {invoice.tradeDiscountAmount > 0 && (
+              <>
+                <dt className="text-slate-500">Trade discount</dt>
+                <dd className="text-right">− {fmtCurrency(invoice.tradeDiscountAmount)}</dd>
+              </>
+            )}
             <dt className="text-slate-500">Cash discount ({Number(invoice.partsDiscountPercent.toFixed(4))}%)</dt>
             <dd className="text-right">− {fmtCurrency(invoice.partsDiscountAmount)}</dd>
+            {invoice.handlingAmount > 0 && (
+              <>
+                <dt className="text-slate-500">Handling</dt>
+                <dd className="text-right">{fmtCurrency(invoice.handlingAmount)}</dd>
+              </>
+            )}
             <dt className="text-slate-500">VAT</dt>
             <dd className="text-right">{fmtCurrency(invoice.vatAmount)}</dd>
             <dt className="text-slate-500">Round off</dt>
@@ -376,6 +405,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
         )}
         <DocumentTermsBlock documentType="COUNTER_SALE" branchId={sale.branchId} />
       </div>
+      <CounterSalePrint sale={sale} />
 
       {dialog === "return" && <ReturnDialog sale={sale} onClose={() => setDialog(null)} />}
       {dialog === "cancel" && <CancelDialog sale={sale} onClose={() => setDialog(null)} />}

@@ -132,7 +132,7 @@ export default function EnquiryPage() {
                 label="Name"
                 value={`${enquiry.firstName} ${enquiry.lastName}`}
               />
-              <DetailField label="Email" value={enquiry.email} />
+              <DetailField label="Email" value={enquiry.email || "—"} />
               <DetailField label="Phone" value={enquiry.phoneNumber ?? null} />
             </div>
           </div>
@@ -152,9 +152,10 @@ export default function EnquiryPage() {
                 value={enquiry.vehicleRegNumber ?? "—"}
               />
               <DetailField
-                label="Year"
+                label="Model Year"
                 value={enquiry.vehicleYear ?? undefined}
               />
+              <DetailField label="VIN" value={enquiry.vin || "—"} />
             </div>
           </div>
 

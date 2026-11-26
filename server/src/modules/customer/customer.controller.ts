@@ -1,9 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import { CustomerService } from './customer.service';
-import { ROLES } from '../../shared/constants/roles';
-import { TallyService } from '../finance/tally.service';
-import { ForbiddenError } from '../../shared/errors/appError';
-import { canAccessAllBranches, directoryBranchFilter } from '../../middleware/authorize';
+import { Request, Response, NextFunction } from "express";
+import { CustomerService } from "./customer.service";
+import { ROLES } from "../../shared/constants/roles";
+import { TallyService } from "../finance/tally.service";
+import { ForbiddenError } from "../../shared/errors/appError";
+import {
+  canAccessAllBranches,
+  directoryBranchFilter,
+  isGeneralDepartmentManager,
+} from "../../middleware/authorize";
 
 export class CustomerController {
   private customerService: CustomerService;
@@ -14,30 +18,58 @@ export class CustomerController {
     this.tallyService = new TallyService();
   }
 
-  updateCustomerTallyLedger = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateCustomerTallyLedger = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
-      if (req.user?.role !== ROLES.SUPER_ADMIN && !req.user?.branchId) {
-        throw new ForbiddenError('Your account must be assigned to a branch');
+      if (
+        req.user?.role !== ROLES.SUPER_ADMIN &&
+        !isGeneralDepartmentManager(req.user) &&
+        !req.user?.branchId
+      ) {
+        throw new ForbiddenError("Your account must be assigned to a branch");
       }
 
-      const updated = await this.tallyService.setCustomerLedger(id, req.body.tallyLedgerCode);
-      res.status(200).json({ status: 'success', statusCode: 200, data: { customer: updated } });
+      const updated = await this.tallyService.setCustomerLedger(
+        id,
+        req.body.tallyLedgerCode,
+      );
+      res.status(200).json({
+        status: "success",
+        statusCode: 200,
+        data: { customer: updated },
+      });
     } catch (error) {
       next(error);
     }
   };
 
-  getCustomers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCustomers = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 10;
       const search = req.query.search as string | undefined;
       const category = req.query.category as string | undefined;
-      const result = await this.customerService.listCustomers({ page, limit, search, category, branchId: req.user?.role === ROLES.ACCOUNTANT ? req.user.branchId ?? undefined : directoryBranchFilter(req) });
+      const result = await this.customerService.listCustomers({
+        page,
+        limit,
+        search,
+        category,
+        branchId:
+          req.user?.role === ROLES.ACCOUNTANT
+            ? (req.user.branchId ?? undefined)
+            : directoryBranchFilter(req),
+      });
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: {
           customers: result.customers,
@@ -49,13 +81,17 @@ export class CustomerController {
     }
   };
 
-  getCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCustomer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const result = await this.customerService.getCustomer(id);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: {
           customer: result,
@@ -66,16 +102,29 @@ export class CustomerController {
     }
   };
 
-  createCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  createCustomer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const createdById = req.user?.userId;
-      if (req.body.code && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may supply customer codes');
-      const result = await this.customerService.createCustomer({ ...req.body, createdById });
+      if (
+        req.body.code &&
+        ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(
+          req.user?.role as typeof ROLES.ADMIN,
+        )
+      )
+        throw new ForbiddenError("Only admins may supply customer codes");
+      const result = await this.customerService.createCustomer({
+        ...req.body,
+        createdById,
+      });
 
       res.status(201).json({
-        status: 'success',
+        status: "success",
         statusCode: 201,
-        message: 'Customer registered successfully',
+        message: "Customer registered successfully",
         data: {
           customer: result,
         },
@@ -85,18 +134,33 @@ export class CustomerController {
     }
   };
 
-  updateCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  updateCustomer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
-      if (req.body.code && ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(req.user?.role as typeof ROLES.ADMIN)) throw new ForbiddenError('Only admins may change customer codes');
-      const branchId = canAccessAllBranches(req.user) ? undefined : req.user?.branchId ?? null;
-      const result = await this.customerService.updateCustomer(id, req.body, { id: req.user!.userId, branchId });
+      if (
+        req.body.code &&
+        ![ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(
+          req.user?.role as typeof ROLES.ADMIN,
+        )
+      )
+        throw new ForbiddenError("Only admins may change customer codes");
+      const branchId = canAccessAllBranches(req.user)
+        ? undefined
+        : (req.user?.branchId ?? null);
+      const result = await this.customerService.updateCustomer(id, req.body, {
+        id: req.user!.userId,
+        branchId,
+      });
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
-        message: 'Customer profile updated successfully',
+        message: "Customer profile updated successfully",
         data: {
           customer: result,
         },
@@ -106,16 +170,23 @@ export class CustomerController {
     }
   };
 
-  addCustomerDocument = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addCustomerDocument = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
-      const result = await this.customerService.addCustomerDocument(id, req.body);
+      const result = await this.customerService.addCustomerDocument(
+        id,
+        req.body,
+      );
 
       res.status(201).json({
-        status: 'success',
+        status: "success",
         statusCode: 201,
-        message: 'Customer document uploaded successfully',
+        message: "Customer document uploaded successfully",
         data: {
           document: result,
         },
@@ -125,14 +196,18 @@ export class CustomerController {
     }
   };
 
-  getCustomerDocuments = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getCustomerDocuments = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
       const result = await this.customerService.getCustomerDocuments(id);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: {
           documents: result,
@@ -143,16 +218,20 @@ export class CustomerController {
     }
   };
 
-  addServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  addServiceHistory = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
       const result = await this.customerService.addServiceHistory(id, req.body);
 
       res.status(201).json({
-        status: 'success',
+        status: "success",
         statusCode: 201,
-        message: 'Service history record created successfully',
+        message: "Service history record created successfully",
         data: {
           serviceHistory: result,
         },
@@ -162,14 +241,18 @@ export class CustomerController {
     }
   };
 
-  getServiceHistory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getServiceHistory = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
       const result = await this.customerService.getServiceHistory(id);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: {
           serviceHistory: result,
@@ -180,18 +263,25 @@ export class CustomerController {
     }
   };
 
-  manageCustomerAccount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  manageCustomerAccount = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
 
-      const result = await this.customerService.upsertCustomerAccount(id, req.body);
+      const result = await this.customerService.upsertCustomerAccount(
+        id,
+        req.body,
+      );
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         message: result.created
-          ? 'Customer portal account created successfully'
-          : 'Customer portal account updated successfully',
+          ? "Customer portal account created successfully"
+          : "Customer portal account updated successfully",
         data: {
           account: result,
         },

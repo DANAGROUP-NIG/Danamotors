@@ -70,6 +70,7 @@ export const MOVEMENT_LABELS: Record<string, string> = {
   ADJUSTMENT: "SAN",
   ISSUED: "Issue",
   TRANSFER_OUT: "STN",
+  VENDOR_RETURN: "MRN return",
 };
 
 export const userName = (u?: { firstName: string; lastName: string } | null) => (u ? `${u.firstName} ${u.lastName}`.trim() : "");

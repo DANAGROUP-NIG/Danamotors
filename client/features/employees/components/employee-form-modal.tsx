@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost, apiPut } from "@/lib/api/apiClient";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { Button } from "@/components/ui/button";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -168,16 +169,15 @@ export function EmployeeFormModal({ employee, onClose }: { employee: Employee | 
           {masterPicker("designationId", "Designation", "DESIGNATION")}
           {masterPicker("departmentId", "Department", "DEPARTMENT")}
           {masterPicker("teamId", "Group", "TEAM")}
-          <Field label="Experience (years)"><input
-              type="number"
+          <Field label="Experience (years)"><NumberInput
               min="0"
               max="80"
               step="0.5"
               className={inputCls}
-              value={form.experienceYears ?? ""}
-              onChange={e => setForm({
+              value={form.experienceYears}
+              onValueChange={v => setForm({
                 ...form,
-                experienceYears: e.target.value === "" ? null : Number(e.target.value),
+                experienceYears: v,
               })} /></Field>
           {dateInput("joinDate", "Join date")}
           {dateInput("leftDate", "Left on")}

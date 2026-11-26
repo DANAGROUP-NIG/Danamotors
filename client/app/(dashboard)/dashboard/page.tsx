@@ -77,8 +77,8 @@ const QUICK_LINKS = [
     permission: "jobcard:read",
   },
   {
-    label: "Inventory",
-    href: "/inventory",
+    label: "Part Master",
+    href: "/part-master",
     icon: Package,
     color: "bg-amber-50",
     iconColor: "text-amber-600",

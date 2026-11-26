@@ -133,7 +133,7 @@ export function PartMasterTable() {
       headerClassName: "whitespace-nowrap",
       className: "whitespace-nowrap",
       render: (p) => (
-        <Link href={`/inventory/${p.id}`} className="font-mono font-medium text-foreground hover:underline">
+        <Link href={`/part-master/${p.id}`} className="font-mono font-medium text-foreground hover:underline">
           {p.partNumber}
         </Link>
       ),
@@ -185,7 +185,7 @@ export function PartMasterTable() {
             },
           ]}
           actions={[
-            { id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/${p.id}`) },
+            { id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/part-master/${p.id}`) },
             canEdit &&
               (p.partStatus === "ACTIVE"
                 ? {
@@ -207,7 +207,7 @@ export function PartMasterTable() {
               id: "copy-link",
               label: "Copy link",
               icon: <Link2 className="size-4" />,
-              onClick: () => copyToClipboard(`${window.location.origin}/inventory/${p.id}`, "Part link copied"),
+              onClick: () => copyToClipboard(`${window.location.origin}/part-master/${p.id}`, "Part link copied"),
             },
             canDelete && {
               id: "delete",

@@ -14,7 +14,7 @@ import { API_ROUTES } from "@/lib/constants/apiRoutes";
 type DocumentType = "JOB_BILL" | "RECEIPT" | "DEBIT_NOTE" | "CREDIT_NOTE";
 // PDI bills export as job bills but post to the PDI_BILL ledgers: the PDI party and the PDI account.
 type MappingType = DocumentType | "PDI_BILL";
-const JOB_BILL_ROLES = ["PARTS_SALES", "LABOUR_SALES", "SERVICE_SALES", "PARTS_DISCOUNT", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"];
+const JOB_BILL_ROLES = ["PARTS_SALES", "LABOUR_SALES", "SERVICE_SALES", "PARTS_DISCOUNT", "PARTS_HANDLING", "LABOUR_DISCOUNT", "VAT", "ROUND_OFF"];
 const mappingRoles = (type: MappingType) =>
   type === "JOB_BILL" ? JOB_BILL_ROLES : type === "PDI_BILL" ? ["PARTY", "SALES", ...JOB_BILL_ROLES] : type === "DEBIT_NOTE" ? ["RECEIPT", "AMOUNT"] : ["BANK", "CASH"];
 type TallyDocument = {

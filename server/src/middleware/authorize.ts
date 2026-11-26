@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ForbiddenError, UnauthorizedError } from "../shared/errors/appError";
-import { PERMISSIONS, ROLES } from "../shared/constants/roles";
+import { GENERAL_DEPARTMENT_ROLES, OWN_BRANCH_DEPARTMENT_ROLES, PERMISSIONS, ROLES } from "../shared/constants/roles";
 
 export const requireRole = (...allowedRoles: string[]) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -60,9 +60,24 @@ export const requireAnyPermission = (...permissions: string[]) => {
   };
 };
 
-/** SuperAdmin retains its bypass; other roles need an explicit permission. */
-export function canAccessAllBranches(user: Request["user"]): boolean {
-  return user?.role === ROLES.SUPER_ADMIN ||
+export function requiresOwnBranch(user: Pick<NonNullable<Request["user"]>, "role"> | undefined): boolean {
+  return user !== undefined && OWN_BRANCH_DEPARTMENT_ROLES.has(user.role);
+}
+
+export function isGeneralDepartmentManager(user: Pick<NonNullable<Request["user"]>, "role"> | undefined): boolean {
+  return user !== undefined && GENERAL_DEPARTMENT_ROLES.has(user.role);
+}
+
+export function ownBranchScope(user: Request["user"]): string | undefined {
+  if (!requiresOwnBranch(user)) return undefined;
+  if (!user?.branchId) throw new ForbiddenError("Your account is not assigned to a branch");
+  return user.branchId;
+}
+
+/** SuperAdmin retains its bypass; other eligible roles need an explicit permission. */
+export function canAccessAllBranches(user: Pick<NonNullable<Request["user"]>, "role" | "permissions"> | undefined): boolean {
+  if (requiresOwnBranch(user)) return false;
+  return isGeneralDepartmentManager(user) || user?.role === ROLES.SUPER_ADMIN ||
     user?.permissions.includes(PERMISSIONS.BRANCH_ALL) === true;
 }
 
@@ -74,8 +89,20 @@ export function canAccessAllBranches(user: Request["user"]): boolean {
  */
 export function directoryBranchFilter(req: Request): string | undefined {
   const requested = req.query.branchId as string | undefined;
+  const branchId = ownBranchScope(req.user);
+  if (branchId) {
+    assertBranchOwnership(req, requested);
+    return branchId;
+  }
   if (!requested || canAccessAllBranches(req.user)) return requested;
   return req.user?.branchId ?? requested;
+}
+
+export function assertScopedResource(req: Request, resourceBranchId?: string | null): void {
+  const branchId = ownBranchScope(req.user);
+  if (branchId && resourceBranchId !== branchId) {
+    throw new ForbiddenError("You can only access resources within your own branch");
+  }
 }
 
 /** Ensures branch-scoped users can only access their own branch's resources. */
@@ -113,8 +140,8 @@ export function assertInventoryBranchAccess(
   }
 
   if (
-    req.user.role === ROLES.SUPER_ADMIN ||
-    req.user.permissions.includes(PERMISSIONS.INVENTORY_CROSS_BRANCH)
+    isGeneralDepartmentManager(req.user) || req.user.role === ROLES.SUPER_ADMIN ||
+    (!requiresOwnBranch(req.user) && req.user.permissions.includes(PERMISSIONS.INVENTORY_CROSS_BRANCH))
   ) {
     return;
   }

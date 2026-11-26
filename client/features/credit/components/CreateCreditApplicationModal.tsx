@@ -11,6 +11,7 @@ import { useBranchStore } from "@/store/branch.store";
 import { useCustomers } from "@/features/customers";
 import { useInvoices } from "@/features/invoices/hooks/use-invoices";
 import { useCreateCreditApplication } from "../hooks/use-credit";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const createApplicationSchema = z.object({
   customerId: z.string().min(1, "Select a customer"),
@@ -102,8 +103,7 @@ export function CreateCreditApplicationModal({
         </Field>
 
         <Field label="Amount (₦)" error={errors.amount?.message}>
-          <input
-            type="number"
+          <NumberInput
             step="0.01"
             className={inputCls}
             placeholder="0.00"

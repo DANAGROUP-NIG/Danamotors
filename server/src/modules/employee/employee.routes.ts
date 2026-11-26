@@ -1,10 +1,20 @@
-import { Router } from 'express';
-import { authMiddleware } from '../../middleware/authMiddleware';
-import { assertBranchOwnership, canAccessAllBranches, requirePermission } from '../../middleware/authorize';
-import { validateRequest } from '../../middleware/requestValidator';
-import { PERMISSIONS } from '../../shared/constants/roles';
-import { EmployeeService } from './employee.service';
-import { createEmployeeSchema, employeeIdSchema, listEmployeeSchema, updateEmployeeSchema } from './employee.validation';
+import { Router } from "express";
+import { authMiddleware } from "../../middleware/authMiddleware";
+import {
+  assertBranchOwnership,
+  canAccessAllBranches,
+  isGeneralDepartmentManager,
+  requirePermission,
+} from "../../middleware/authorize";
+import { validateRequest } from "../../middleware/requestValidator";
+import { PERMISSIONS } from "../../shared/constants/roles";
+import { EmployeeService } from "./employee.service";
+import {
+  createEmployeeSchema,
+  employeeIdSchema,
+  listEmployeeSchema,
+  updateEmployeeSchema,
+} from "./employee.validation";
 
 const router = Router();
 const service = new EmployeeService();
@@ -40,72 +50,94 @@ router.use(authMiddleware);
  *     tags: [Employees]
  *     summary: Update an employee; code and branch are fixed
  */
-router.get('/', requirePermission(PERMISSIONS.EMPLOYEE_READ), validateRequest(listEmployeeSchema), async (req, res, next) => {
-  try {
-    const query = listEmployeeSchema.parse({
-      query: req.query,
-    }).query;
+router.get(
+  "/",
+  requirePermission(PERMISSIONS.EMPLOYEE_READ),
+  validateRequest(listEmployeeSchema),
+  async (req, res, next) => {
+    try {
+      const query = listEmployeeSchema.parse({
+        query: req.query,
+      }).query;
 
-    const branchId = canAccessAllBranches(req.user) ? query.branchId : req.user!.branchId ?? undefined;
-    if (!branchId)
-      assertBranchOwnership(req);
+      const branchId = canAccessAllBranches(req.user)
+        ? query.branchId
+        : (req.user!.branchId ?? undefined);
+      if (!branchId && !isGeneralDepartmentManager(req.user))
+        assertBranchOwnership(req);
 
-    res.json({
-      status: 'success',
-      data: await service.list(query, branchId),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+      res.json({
+        status: "success",
+        data: await service.list(query, branchId),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
-router.get('/:id', requirePermission(PERMISSIONS.EMPLOYEE_READ), validateRequest(employeeIdSchema), async (req, res, next) => {
-  try {
-    const item = await service.get(req.params.id);
-    assertBranchOwnership(req, item.branchId);
+router.get(
+  "/:id",
+  requirePermission(PERMISSIONS.EMPLOYEE_READ),
+  validateRequest(employeeIdSchema),
+  async (req, res, next) => {
+    try {
+      const item = await service.get(req.params.id);
+      assertBranchOwnership(req, item.branchId);
 
-    res.json({
-      status: 'success',
+      res.json({
+        status: "success",
 
-      data: {
-        item,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+        data: {
+          item,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
-router.post('/', requirePermission(PERMISSIONS.EMPLOYEE_MANAGE), validateRequest(createEmployeeSchema), async (req, res, next) => {
-  try {
-    assertBranchOwnership(req, req.body.branchId);
+router.post(
+  "/",
+  requirePermission(PERMISSIONS.EMPLOYEE_MANAGE),
+  validateRequest(createEmployeeSchema),
+  async (req, res, next) => {
+    try {
+      assertBranchOwnership(req, req.body.branchId);
 
-    res.status(201).json({
-      status: 'success',
+      res.status(201).json({
+        status: "success",
 
-      data: {
-        item: await service.create(req.body),
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+        data: {
+          item: await service.create(req.body),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
-router.put('/:id', requirePermission(PERMISSIONS.EMPLOYEE_MANAGE), validateRequest(updateEmployeeSchema), async (req, res, next) => {
-  try {
-    assertBranchOwnership(req, (await service.get(req.params.id)).branchId);
+router.put(
+  "/:id",
+  requirePermission(PERMISSIONS.EMPLOYEE_MANAGE),
+  validateRequest(updateEmployeeSchema),
+  async (req, res, next) => {
+    try {
+      assertBranchOwnership(req, (await service.get(req.params.id)).branchId);
 
-    res.json({
-      status: 'success',
+      res.json({
+        status: "success",
 
-      data: {
-        item: await service.update(req.params.id, req.body),
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+        data: {
+          item: await service.update(req.params.id, req.body),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

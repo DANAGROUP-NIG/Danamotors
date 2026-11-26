@@ -1,3 +1,4 @@
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import { PartyReportService } from './party-report.service';
 import type { Request,Response,NextFunction,RequestHandler } from 'express';
 import { ROLES,PERMISSIONS } from '../../shared/constants/roles';
@@ -6,7 +7,7 @@ import { OutstandingService,escapeLetter } from './outstanding.service';
 import { maintenanceFilters,letterFilters } from './outstanding.validation';
 import { writeReport } from './party-report.controller';
 export function outstandingScope(req:Request,branchId?:string){
- if(req.user?.role===ROLES.ADMIN||req.user?.role===ROLES.SUPER_ADMIN)return branchId;
+ if(isGeneralDepartmentManager(req.user)||req.user?.role===ROLES.ADMIN||req.user?.role===ROLES.SUPER_ADMIN)return branchId;
  if(!req.user?.branchId)throw new ForbiddenError('Your account must be assigned to a branch');
  if(branchId&&branchId!==req.user.branchId)throw new ForbiddenError('You can only access your own branch');
  return req.user.branchId;

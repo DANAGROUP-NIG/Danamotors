@@ -17,6 +17,7 @@ import {
   partSearchSchema,
   pendingOrderLinesSchema,
   pickOrderSchema,
+  salesExecutivesSchema,
 } from "./partSale.validation";
 
 const router = Router();
@@ -174,8 +175,22 @@ const returns = requirePermission(PERMISSIONS.PART_SALE_RETURN);
  *     tags: [Part Sale]
  *     summary: List sale returns
  *     responses: { 200: { description: Returns } }
+ * /part-sale/handling-rates:
+ *   get:
+ *     tags: [Part Sale]
+ *     summary: Handling % by part category at the selling branch (Part Category Master), the default for counter-sale lines
+ *     parameters: [{ in: query, name: branchId, required: true, schema: { type: string, format: uuid } }]
+ *     responses: { 200: { description: "{ rates: { C: 9, O: 0 } }" } }
+ * /part-sale/sales-executives:
+ *   get:
+ *     tags: [Part Sale]
+ *     summary: Active staff of the selling branch, for the counter sale's Sales Executive
+ *     parameters: [{ in: query, name: branchId, required: true, schema: { type: string, format: uuid } }]
+ *     responses: { 200: { description: "{ executives: [{ id, firstName, lastName }] }" } }
  */
 router.get("/customers", read, validateRequest(customerSearchSchema), controller.searchCustomers);
+router.get("/sales-executives", read, validateRequest(salesExecutivesSchema), controller.listSalesExecutives);
+router.get("/handling-rates", read, validateRequest(salesExecutivesSchema), controller.handlingRates);
 router.get("/parts", read, validateRequest(partSearchSchema), controller.searchParts);
 
 router.get("/orders", read, validateRequest(listOrdersSchema), controller.listOrders);

@@ -174,7 +174,7 @@ export class MobisPurchaseService {
         (totals.totalCases ? ` in ${totals.totalCases} case(s)` : "") +
         (ignored.length ? `, ${ignored.length} part(s) not in Part Master left off` : "") +
         ". Check the shipment and generate the MRN.",
-      link: `/inventory/mobis-receipts/${mit.id}`,
+      link: `/inventory/mit/${mit.id}`,
     });
     return this.getMobisMit(mit.id);
   }
@@ -352,7 +352,7 @@ export class MobisPurchaseService {
         (totals.damaged ? `, ${totals.damaged} damaged` : "") +
         (totals.short ? `, ${totals.short} short` : "") +
         ".",
-      link: `/inventory/mobis-receipts/${mit.id}`,
+      link: `/inventory/mit/${mit.id}`,
     });
     if (discrepancyStatusFor(totals)) {
       await notifyDiscrepancyPending({
@@ -361,7 +361,7 @@ export class MobisPurchaseService {
         totalDamaged: totals.damaged,
         totalShort: totals.short,
         document: `Mobis invoice ${mit.invoiceNumber}, MIT ${mit.mitNumber}`,
-        link: `/inventory/mobis-receipts/${mit.id}`,
+        link: `/inventory/mit/${mit.id}`,
       });
     }
     // Mobis stock is what usually fills the branch back orders CPD is holding.

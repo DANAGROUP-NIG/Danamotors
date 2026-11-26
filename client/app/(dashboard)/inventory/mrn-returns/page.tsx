@@ -1,0 +1,5 @@
+import { VendorReturnsPage } from "@/features/vendor-receipts";
+
+export default function Page() {
+  return <VendorReturnsPage />;
+}

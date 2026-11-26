@@ -7,6 +7,7 @@ export type AppRole =
   | "generalstoremanager"
   | "branchstoremanager"
   | "workshopmanager"
+  | "servicemanager"
   | "accountant"
   | "billingofficer"
   | "serviceadviser"
@@ -69,6 +70,23 @@ export const CAMPAIGN_PERMISSIONS = {
 
 export const BRANCH_ALL = "branch:all";
 
+/** Mirrors the CSI permission identifiers used by the backend role seed. */
+export const CSI_PERMISSIONS = {
+  MASTER_READ: "csi:master:read",
+  MASTER_UPDATE: "csi:master:update",
+  CARD_GENERATE: "csi:card:generate",
+  RESPONSE_READ: "csi:response:read",
+  RESPONSE_UPDATE: "csi:response:update",
+  REPORT: "report:csi",
+  ATTRIBUTE_REPORT: "report:csi-attribute",
+  CHECKLIST_REPORT: "report:csi-checklist",
+} as const;
+export const CSI_REPORT_PERMISSIONS = [
+  CSI_PERMISSIONS.REPORT,
+  CSI_PERMISSIONS.ATTRIBUTE_REPORT,
+  CSI_PERMISSIONS.CHECKLIST_REPORT,
+] as const;
+
 /**
  * Admin-level permissions (mirrors isAdminLevelPermission in server/src/shared/effectivePermissions.ts):
  * managing users, roles and rights, the audit log, all-branch access and branch management. Only a super
@@ -84,6 +102,7 @@ export function isAdminLevelPermission(name: string): boolean {
 
 /** Framework reports (#75) and report settings. */
 export const FRAMEWORK_REPORT_PERMISSIONS = [
+  ...CSI_REPORT_PERMISSIONS,
   "report:fpc-vehicles",
   "report:fpc-analysis",
   // Service MIS (#97)
@@ -137,6 +156,13 @@ export const PART_SALE_PERMISSIONS = {
   RETURN: "partsale:return",
 } as const;
 
+// Dispatch challans: unbilled issues of fuel and consumables to internal cost centres.
+export const CHALLAN_PERMISSIONS = {
+  READ: "challan:read",
+  ISSUE: "challan:issue",
+  RETURN: "challan:return",
+} as const;
+
 // Physical stock taking: batches, count sheets, S/E confirmation.
 export const STOCK_TAKE_PERMISSIONS = {
   READ: "stocktake:read",
@@ -180,6 +206,7 @@ export const FINANCE_ROLES: AppRole[] = [
 export const WORKSHOP_ROLES: AppRole[] = [
   "superadmin",
   "admin",
+  "servicemanager",
   "workshopmanager",
   "serviceadviser",
   "technician",

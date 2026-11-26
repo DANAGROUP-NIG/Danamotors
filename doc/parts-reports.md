@@ -48,7 +48,8 @@ title, filters, options and columns are defined once, in
 | Branch Stock Indent Outward Register | `indent-outward-register` | Indents the branch raised on other branches, with the same columns and order filter as the inward register |
 | Branch In Transit Report | `branch-in-transit` | STN lines dispatched to the branch: sent, received, damaged, short and still on the way; **All** or **Pending** |
 | Consumption Report (Consolidated), Consumption Summary (Consolidated) | `consumption` | Legacy layout: part, flag, dealer and retail rate; PDI req, job order issues (qty, amount), FOC, goodwill, PDI warr and warr req (job type and who pays the job card line); counter sale (qty, amount); consumable issue (no job card); samples (flag F parts, at no value); STN; SAN (stock taken out by SAN subtractions; additions are ignored; for reference: not in the total); total issues (qty, amount); closing balance at the *to* date. Returns (optional) come off the issue they undo. Valued at the retail rate on each line; STNs and consumable issues use the part's retail rate. Cancelled bills are left out. Carried forward page by page. **Only summary** totals by part category |
-| Checklist for Issues | `issue-checklist` | Every issue voucher wise, with subtotals per section: **STN** at the STN rate, **Counter sales** at the billed value, **Workshop issues** (to job cards) at the job card rate, and **Other issues** (no job card) at retail rate. Cancelled bills and STNs are left out. Cust code is the receiving store's code on an STN and the customer's code otherwise. The part flag is shown, as legacy printed it before the description. Qty reqd is what was asked for: the indent line on an STN, the CPO line on a bill, and otherwise the issued quantity. The legacy service columns (registration, model, VIN, job, mileage) are dropped. As on legacy, every 30 lines (one A4 landscape page) end with a **Carried forward** line showing the running grand total, on screen, in print and in the Excel file. Dispatch challans, the legacy CHALLAN section, will join when they are built |
+| Checklist for Issues | `issue-checklist` | Every issue voucher wise, with subtotals per section: **STN** at the STN rate, **Counter sales** at the billed value, **Dispatch challans** (legacy CHALLAN section, cust code = the cost centre) at the challan's rate, **Workshop issues** (to job cards) at the job card rate, and **Other issues** (no job card) at retail rate. Cancelled bills and STNs are left out. Cust code is the receiving store's code on an STN and the customer's code otherwise. The part flag is shown, as legacy printed it before the description. Qty reqd is what was asked for: the indent line on an STN, the CPO line on a bill, and otherwise the issued quantity. The legacy service columns (registration, model, VIN, job, mileage) are dropped. As on legacy, every 30 lines (one A4 landscape page) end with a **Carried forward** line showing the running grand total, on screen, in print and in the Excel file. |
+| Dispatch Challan Register | `dispatch-challan-register` | Dispatch challans (unbilled issues of fuel and consumables to cost centres): a heading per challan (challan number, date, cost centre code and name, gate pass), its lines (part number, description, UOM, qty issued, qty returned, rate, amount) at the rate issued, and a subtotal. Filters: cost centre, challan number, part, **part type** (legacy Spare / Oil / Both), flag and category. Covers every store of the branch (legacy printed store A only). Legacy's Pending / All is left out: no challan is ever billed |
 | SAN Register | `stock-adjustments` | Stock adjustments: Addition, Subtraction or All |
 
 ### Stock reports
@@ -82,9 +83,6 @@ The legacy **Stock Reports** menu. Reports marked *as on* take one date; *now* r
   outside the app; the Mobis order number on each MIT line is shown on the Material In Transit Report.
 - **Receipt Summary (Invoice Wise)** is the MRN Register's **Summary (invoice wise)** option, not a
   separate report.
-- The **Dispatch Challan Register**. Dispatch challans (internal fuel and consumable
-issues) are not built yet; see [part-sale.md](./part-sale.md). Its layout and filters are kept there,
-for when challans are built.
 
 Counter-sale reports merged or left out, so that no report repeats another:
 
@@ -101,16 +99,17 @@ Counter-sale reports merged or left out, so that no report repeats another:
 - **Handling** and the trade **Discount** (legacy DISCOUNT, apart from CASH DISCOUNT) are kept on the
   register, the summary and the annexure. CPD charged handling in 2011 and 2013. Lagos charged it every
   year from 2011 to 2025, and ABJ from 2011 to 2016 and in 2021. A trade discount was given at Lagos
-  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. A bill here can carry only a cash
-  discount, so both columns show zero until bills can record them.
+  on and off until 2024, and at ABJ from 2012 to 2015 and from 2023 to 2026. Bills record both per line
+  (see [part-sale.md](./part-sale.md#pricing)), and the reports show the amounts charged. Sales values on
+  the revenue and MIS reports are after both discounts, with handling, before VAT.
 - **Entry tax, LST surcharge and other charges** are left out: they are zero on every counter-sale bill,
   in every year, in all three databases.
-- **Tax form is not covered yet.** Legacy gave each bill a tax form: L (VAT, a local sale), X
-  (TRNSFR WO/V, a transfer without VAT), or P, Y or Z (purchase forms). The datewise register's
-  "Local sales" and "Central sales" blocks split bills by form, and the annexure groups them under the
-  form's name. CPD billed form X up to 2024 (15 non-VAT-form bills since 2010, one of ₦19.3m in 2022),
-  and Lagos billed form X in 2026. Our bills have no tax form, so a bill without VAT cannot be told
-  apart from a bill of VAT-exempt parts.
+- **Tax form.** Legacy gave each bill a tax form: L (VAT, a local sale), X (TRNSFR WO/V, a transfer
+  without VAT), or P, Y or Z (purchase forms). Bills record it as the **Tax type** (Sale (VAT) or
+  Transfer without VAT). The datewise register shows a block per form ("Sales (VAT)", then "Transfers
+  without VAT (TRNSFR WO/V)", the legacy "Central sales" block), each with a subtotal, and the annexure
+  lists bills under a heading per form. CPD billed form X up to 2024 and Lagos up to 2026. The rare
+  purchase forms P, Y and Z (Lagos 2018–2021, all at 0%) count as transfers without VAT.
 
 Stock reports merged or left out, so that no report repeats another:
 
@@ -143,7 +142,7 @@ The legacy **MIS Reports** menu.
 
 | Legacy report | Kind | What it shows |
 |---|---|---|
-| Minimum / Maximum Level Report, Items Falling Below Min. Level, Re-order Calculated vs Entered | `stock-levels` | *As on.* **Minimum / maximum level**: every part with levels, its stock and whether it is below minimum, above maximum or within. **Items falling below minimum level**: the shortfall and the quantity to order up to the maximum, at dealer rate. **Re-order calculated vs entered**: what was consumed over the given days (default 90) against the re-order quantity in Part Master |
+| Minimum / Maximum Level Report, Items Falling Below Min. Level, Re-order Calculated vs Entered | `stock-levels` | *As on.* **Minimum / maximum level**: every part with levels, its stock and whether it is below minimum, above maximum or within. **Items falling below minimum level**: the shortfall and the quantity to order up to the maximum, at dealer rate. **Re-order level (formula / entered re-order qty)**: legacy Reorder Level Report. Consumption over the given days (default 90 = 3 months), the average per month, minimum and re-order level (that average, or Part Master's re-order qty), closing balance, back order on open indents, and the quantity to order (level − closing − back order, rounded up); only parts with something to order are listed. **Include STN** counts STNs as consumption |
 | Maximum Consumed Parts | `max-consumed` | The top N parts (default 10) by quantity consumed: counter sales, workshop jobs and STNs, less returns, at dealer rate, with workshop issues split into five mileage bands. **Consumed by** one kind only, or all |
 | Model Wise Mileage Wise Part Issue | `model-mileage-issue` | Workshop issues less returns, by vehicle model, split into five mileage bands |
 | Profitability Statement, Profitability Statement Revised | `profitability` | Sale value against cost, by kind: counter sales, FOC bills, workshop jobs, PDI jobs, STNs and SANs; cost FIFO or at dealer rate. **Only summary** totals by part category |
@@ -230,8 +229,13 @@ MIS reports merged or left out, so that no report repeats another:
 
 - **Stock levels.** A branch's own minimum and maximum (set on its stock location) are used where set;
   otherwise Part Master's. The re-order quantity is Part Master's. "Below minimum" is stock less than the
-  minimum. The calculated re-order is what the period consumed (issues and STNs less returns; SANs are not
-  consumption); the legacy default was three months, hence 90 days.
+  minimum. The re-order option is legacy's Reorder Level Report, matched line for line on 2026-11-26 against two
+  Kia Plaza printouts (as on 05/06/2026, parts 263202A501–263203N000, without and with Include STN): average =
+  consumption ÷ months (counter sales and workshop issues less returns; STNs only with **Include STN**, off by
+  default; SANs are not consumption); minimum and re-order level = that average, or the entered re-order qty;
+  re-order qty = level − closing balance − back order, rounded up; parts with nothing to order are left out. The
+  period is legacy `control1.reordermonth`: 3 months at Lagos and CPD (90 days), 12 at Abuja (365). Legacy's
+  "Unavail. Qty" column (0 on every line seen) is not shown; what it counts is not known yet.
 - **Mileage** is the job card's odometer reading. Five increasing limits make six bands (default 10,000,
   20,000, 40,000, 60,000 and 100,000 km); jobs with no mileage recorded have their own column. Counter
   sales and STNs have no mileage. The model is the vehicle's catalogue model, else the model typed on it.

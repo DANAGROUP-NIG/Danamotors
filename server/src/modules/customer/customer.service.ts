@@ -1,15 +1,26 @@
 import { withPartyTransaction } from "../finance/party-account.service";
-import { keptFields, mergeSnapshot, type MergeKeep } from './customer-merge-extras';
-import { z } from 'zod';
-import { customerBody, validateCustomerIdentity } from './customer.validation';
-import { Prisma } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import prisma from '../../prisma/client';
-import { CustomerRepository } from './customer.repository';
-import { NotFoundError, ConflictError, BadRequestError, ForbiddenError } from '../../shared/errors/appError';
+import {
+  keptFields,
+  mergeSnapshot,
+  type MergeKeep,
+} from "./customer-merge-extras";
+import { z } from "zod";
+import { customerBody, validateCustomerIdentity } from "./customer.validation";
+import { Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import prisma from "../../prisma/client";
+import { CustomerRepository } from "./customer.repository";
+import {
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+  ForbiddenError,
+} from "../../shared/errors/appError";
 
 /** The anniversary (YYYY-MM-DD text on the API) as a date for the birthday / anniversary report (#97). */
-export function anniversaryOn(text: string | null | undefined): Date | null | undefined {
+export function anniversaryOn(
+  text: string | null | undefined,
+): Date | null | undefined {
   if (text === undefined) return undefined;
   return text ? new Date(`${text}T00:00:00Z`) : null;
 }
@@ -21,22 +32,17 @@ export class CustomerService {
     this.customerRepository = new CustomerRepository();
   }
 
-  async listCustomers(
-    params: {
-      page: number;
-      limit: number;
-      search?: string;
-      category?: string;
-      branchId?: string;
-      createdById?: string;
-    },
-  ) {
+  async listCustomers(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    category?: string;
+    branchId?: string;
+    createdById?: string;
+  }) {
     const skip = (params.page - 1) * params.limit;
 
-    const {
-      customers,
-      total,
-    } = await this.customerRepository.listCustomers({
+    const { customers, total } = await this.customerRepository.listCustomers({
       skip,
       take: params.limit,
       search: params.search,
@@ -46,7 +52,7 @@ export class CustomerService {
     });
 
     return {
-      customers: customers.map(customer => ({
+      customers: customers.map((customer) => ({
         ...customer,
         id: customer.id,
         firstName: customer.firstName,
@@ -80,7 +86,7 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(id);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     return {
@@ -120,11 +126,13 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(customerId);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     if (!customer.email || customer.mergedIntoId)
-      throw new BadRequestError('An active customer with an email is required for portal access');
+      throw new BadRequestError(
+        "An active customer with an email is required for portal access",
+      );
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
@@ -146,9 +154,11 @@ export class CustomerService {
         data: {
           passwordHash,
 
-          ...(data.isActive !== undefined ? {
-            isActive: data.isActive,
-          } : {}),
+          ...(data.isActive !== undefined
+            ? {
+                isActive: data.isActive,
+              }
+            : {}),
         },
       });
     } else {
@@ -159,9 +169,11 @@ export class CustomerService {
           customerId,
           passwordHash,
 
-          ...(data.isActive !== undefined ? {
-            isActive: data.isActive,
-          } : {}),
+          ...(data.isActive !== undefined
+            ? {
+                isActive: data.isActive,
+              }
+            : {}),
         },
       });
     }
@@ -179,24 +191,26 @@ export class CustomerService {
       createdById?: string;
     },
   ) {
-    const {
-      createdById,
-      ...body
-    } = input;
+    const { createdById, ...body } = input;
 
     const data = customerBody.superRefine(validateCustomerIdentity).parse(body);
 
-    if (data.email && (await prisma.customer.findUnique({
-      where: {
-        email: data.email,
-      },
-    })))
-      throw new ConflictError('A customer with this email address already exists');
+    if (
+      data.email &&
+      (await prisma.customer.findUnique({
+        where: {
+          email: data.email,
+        },
+      }))
+    )
+      throw new ConflictError(
+        "A customer with this email address already exists",
+      );
 
     await this.assertOrganization(data.organizationId);
     const duplicates = await this.findDuplicates(data);
 
-    const customer = await prisma.$transaction(async tx => {
+    const customer = await prisma.$transaction(async (tx) => {
       let code = data.code;
 
       if (!code) {
@@ -221,27 +235,31 @@ export class CustomerService {
             },
           });
 
-          code = `${prefix}${String(sequence.value).padStart(6, '0')}`;
-        } while (await tx.customer.findUnique({
-          where: {
-            code,
-          },
+          code = `${prefix}${String(sequence.value).padStart(6, "0")}`;
+        } while (
+          await tx.customer.findUnique({
+            where: {
+              code,
+            },
 
-          select: {
-            id: true,
-          },
-        }));
+            select: {
+              id: true,
+            },
+          })
+        );
       }
 
       return tx.customer.create({
         data: {
           ...data,
-          type: data.partyStatus === 'VENDOR' ? 'OTHERS' : data.type,
+          type: data.partyStatus === "VENDOR" ? "OTHERS" : data.type,
           code,
           createdById,
           email: data.email ?? null,
-          salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
-          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+          salutation: data.type === "CORPORATE" ? "M/S." : data.salutation,
+          dateOfBirth: data.dateOfBirth
+            ? new Date(data.dateOfBirth)
+            : undefined,
           anniversaryOn: anniversaryOn(data.anniversaryDate),
         },
       });
@@ -260,73 +278,101 @@ export class CustomerService {
       lastName?: string;
       companyName?: string | null;
     },
+    branchId?: string,
   ) {
     const OR: Prisma.CustomerWhereInput[] = [];
 
-    if (data.phoneNumber) OR.push({
-      phoneNumber: data.phoneNumber,
-    });
+    if (data.phoneNumber)
+      OR.push({
+        phoneNumber: data.phoneNumber,
+      });
 
-    if (data.companyName) OR.push({
-      companyName: {
-        equals: data.companyName,
-        mode: 'insensitive',
-      },
-    });
+    if (data.companyName)
+      OR.push({
+        companyName: {
+          equals: data.companyName,
+          mode: "insensitive",
+        },
+      });
 
-    if (data.firstName && data.lastName) OR.push({
-      firstName: {
-        equals: data.firstName,
-        mode: 'insensitive',
-      },
+    if (data.firstName && data.lastName)
+      OR.push({
+        firstName: {
+          equals: data.firstName,
+          mode: "insensitive",
+        },
 
-      lastName: {
-        equals: data.lastName,
-        mode: 'insensitive',
-      },
-    });
+        lastName: {
+          equals: data.lastName,
+          mode: "insensitive",
+        },
+      });
 
-    return OR.length ? prisma.customer.findMany({
-      where: {
-        mergedIntoId: null,
-        OR,
-      },
+    return OR.length
+      ? prisma.customer.findMany({
+          where: {
+            mergedIntoId: null,
+            branchId,
+            OR,
+          },
 
-      select: {
-        id: true,
-        code: true,
-        firstName: true,
-        lastName: true,
-        companyName: true,
-        phoneNumber: true,
-      },
+          select: {
+            id: true,
+            code: true,
+            firstName: true,
+            lastName: true,
+            companyName: true,
+            phoneNumber: true,
+          },
 
-      take: 10,
-    }) : [];
+          take: 10,
+        })
+      : [];
   }
 
-  private async assertOrganization(organizationId?: string | null, customerId?: string) {
-    if (!organizationId)
-      return;
+  private async assertOrganization(
+    organizationId?: string | null,
+    customerId?: string,
+  ) {
+    if (!organizationId) return;
     if (organizationId === customerId)
-      throw new BadRequestError('A customer cannot be its own organization');
-    if (!(await prisma.customer.findFirst({ where: { id: organizationId, mergedIntoId: null }, select: { id: true } })))
-      throw new NotFoundError('Organization customer not found');
+      throw new BadRequestError("A customer cannot be its own organization");
+    if (
+      !(await prisma.customer.findFirst({
+        where: { id: organizationId, mergedIntoId: null },
+        select: { id: true },
+      }))
+    )
+      throw new NotFoundError("Organization customer not found");
   }
 
-  async updateCustomer(id: string, input: z.infer<ReturnType<typeof customerBody.partial>>, actor?: { id: string; branchId?: string | null }) {
+  async updateCustomer(
+    id: string,
+    input: z.infer<ReturnType<typeof customerBody.partial>>,
+    actor?: { id: string; branchId?: string | null },
+  ) {
     return withPartyTransaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Customer" WHERE id = ${id} FOR UPDATE`;
       const existing = await tx.customer.findUnique({ where: { id } });
 
       if (!existing || existing.mergedIntoId)
-        throw new NotFoundError('Customer not found');
-      if (actor?.branchId !== undefined && (!actor.branchId || existing.branchId !== actor.branchId || (input.branchId && input.branchId !== actor.branchId)))
-        throw new ForbiddenError('You can only update customers in your own branch');
+        throw new NotFoundError("Customer not found");
+      if (
+        actor?.branchId !== undefined &&
+        (!actor.branchId ||
+          existing.branchId !== actor.branchId ||
+          (input.branchId && input.branchId !== actor.branchId))
+      )
+        throw new ForbiddenError(
+          "You can only update customers in your own branch",
+        );
 
       const data = customerBody.superRefine(validateCustomerIdentity).parse({
         ...Object.fromEntries(
-          Object.keys(customerBody.shape).map(key => [key, existing[key as keyof typeof existing] ?? undefined]),
+          Object.keys(customerBody.shape).map((key) => [
+            key,
+            existing[key as keyof typeof existing] ?? undefined,
+          ]),
         ),
 
         ...input,
@@ -343,21 +389,33 @@ export class CustomerService {
 
         data: {
           ...data,
-          type: data.partyStatus === 'VENDOR' ? 'OTHERS' : data.type,
-          salutation: data.type === 'CORPORATE' ? 'M/S.' : data.salutation,
-          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+          type: data.partyStatus === "VENDOR" ? "OTHERS" : data.type,
+          salutation: data.type === "CORPORATE" ? "M/S." : data.salutation,
+          dateOfBirth: data.dateOfBirth
+            ? new Date(data.dateOfBirth)
+            : undefined,
           anniversaryOn: anniversaryOn(data.anniversaryDate),
         },
       });
-      if (actor && (existing.type !== customer.type || existing.partyStatus !== customer.partyStatus)) {
+      if (
+        actor &&
+        (existing.type !== customer.type ||
+          existing.partyStatus !== customer.partyStatus)
+      ) {
         await tx.auditLog.create({
           data: {
             userId: actor.id,
-            action: 'CUSTOMER_CATEGORY_CHANGED',
+            action: "CUSTOMER_CATEGORY_CHANGED",
             details: JSON.stringify({
               customerId: id,
-              before: { category: existing.type, partyStatus: existing.partyStatus },
-              after: { category: customer.type, partyStatus: customer.partyStatus },
+              before: {
+                category: existing.type,
+                partyStatus: existing.partyStatus,
+              },
+              after: {
+                category: customer.type,
+                partyStatus: customer.partyStatus,
+              },
             }),
           },
         });
@@ -371,12 +429,19 @@ export class CustomerService {
    * phone, email, address), whether the survivor keeps its own details or takes the duplicate's
    * (customer-merge-extras.ts). The audit event records what moved and both records as they were.
    */
-  async merge(sourceId: string, targetId: string, actorId: string, keep: MergeKeep = {}) {
+  async merge(
+    sourceId: string,
+    targetId: string,
+    actorId: string,
+    keep: MergeKeep = {},
+  ) {
     if (sourceId === targetId)
-      throw new ConflictError('Select two different customers');
+      throw new ConflictError("Select two different customers");
 
-    return withPartyTransaction(async tx => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "Customer" WHERE id IN (${sourceId}, ${targetId}) ORDER BY id FOR UPDATE`);
+    return withPartyTransaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Customer" WHERE id IN (${sourceId}, ${targetId}) ORDER BY id FOR UPDATE`,
+      );
 
       const records = await tx.customer.findMany({
         where: {
@@ -389,13 +454,22 @@ export class CustomerService {
       });
 
       if (records.length !== 2)
-        throw new NotFoundError('Active customers not found');
+        throw new NotFoundError("Active customers not found");
 
-      const source = records.find(c => c.id === sourceId)!;
-      const target = records.find(c => c.id === targetId)!;
+      const source = records.find((c) => c.id === sourceId)!;
+      const target = records.find((c) => c.id === targetId)!;
 
-      if ((source.tallyLedgerId && target.tallyLedgerId && source.tallyLedgerId !== target.tallyLedgerId) || (source.tallyPartyCode && target.tallyPartyCode && source.tallyPartyCode !== target.tallyPartyCode))
-        throw new ConflictError('Resolve different Tally accounts before merging');
+      if (
+        (source.tallyLedgerId &&
+          target.tallyLedgerId &&
+          source.tallyLedgerId !== target.tallyLedgerId) ||
+        (source.tallyPartyCode &&
+          target.tallyPartyCode &&
+          source.tallyPartyCode !== target.tallyPartyCode)
+      )
+        throw new ConflictError(
+          "Resolve different Tally accounts before merging",
+        );
 
       // Disable the old portal identity and revoke sessions instead of transferring credentials.
       const account = await tx.customerAccount.findUnique({
@@ -454,35 +528,82 @@ export class CustomerService {
       // The PSF delegate is available when this code is built with the PSF schema.
       const { psfFollowUp } = tx as typeof tx & {
         psfFollowUp?: {
-          updateMany(args: { where: typeof where; data: typeof data }): Promise<{ count: number }>;
+          updateMany(args: {
+            where: typeof where;
+            data: typeof data;
+          }): Promise<{ count: number }>;
         };
       };
 
       const moved = {
         vehicles: (await tx.vehicle.updateMany({ where, data })).count,
-        vehicleOwnerships: (await tx.vehicleOwnership.updateMany({ where, data })).count,
-        appointments: (await tx.serviceAppointment.updateMany({ where, data })).count,
+        vehicleOwnerships: (
+          await tx.vehicleOwnership.updateMany({ where, data })
+        ).count,
+        appointments: (await tx.serviceAppointment.updateMany({ where, data }))
+          .count,
         cscCases: (await tx.cscCase.updateMany({ where, data })).count,
-        psfFollowUps: (await psfFollowUp?.updateMany({ where, data }))?.count ?? 0,
+        psfFollowUps:
+          (await psfFollowUp?.updateMany({ where, data }))?.count ?? 0,
         jobCards: (await tx.jobCard.updateMany({ where, data })).count,
         estimates: (await tx.estimate.updateMany({ where, data })).count,
-        customerApprovals: (await tx.customerApproval.updateMany({ where, data })).count,
-        warrantyCases: (await tx.warrantyCase.updateMany({ where, data })).count,
+        customerApprovals: (
+          await tx.customerApproval.updateMany({ where, data })
+        ).count,
+        warrantyCases: (await tx.warrantyCase.updateMany({ where, data }))
+          .count,
         invoices: (await tx.invoice.updateMany({ where, data })).count,
         receipts: (await tx.receipt.updateMany({ where, data })).count,
-        customerOrders: (await tx.customerOrder.updateMany({ where, data })).count,
-        counterSaleReturns: (await tx.counterSaleReturn.updateMany({ where, data })).count,
-        vendorReceipts: (await tx.materialReceiptNote.updateMany({ where: { vendorId: sourceId }, data: { vendorId: targetId } })).count,
+        customerOrders: (await tx.customerOrder.updateMany({ where, data }))
+          .count,
+        counterSaleReturns: (
+          await tx.counterSaleReturn.updateMany({ where, data })
+        ).count,
+        dispatchChallans: (
+          await tx.dispatchChallan.updateMany({ where, data })
+        ).count,
+        vendorReceipts: (
+          await tx.materialReceiptNote.updateMany({
+            where: { vendorId: sourceId },
+            data: { vendorId: targetId },
+          })
+        ).count,
+        vendorReturns: (
+          await tx.vendorReturn.updateMany({
+            where: { vendorId: sourceId },
+            data: { vendorId: targetId },
+          })
+        ).count,
         partyNotes: (await tx.partyNote.updateMany({ where, data })).count,
-        partyAdjustments: (await tx.partyAdjustmentBatch.updateMany({ where, data })).count,
-        creditTransactions: (await tx.customerCreditTransaction.updateMany({ where, data })).count,
-        creditApplications: (await tx.customerCreditApplication.updateMany({ where, data })).count,
-        outstandingLetters: (await tx.outstandingLetter.updateMany({ where, data })).count,
-        documents: (await tx.customerDocument.updateMany({ where, data })).count,
-        serviceHistory: (await tx.serviceHistory.updateMany({ where, data })).count,
-        pdiSettings: (await tx.pdiSettings.updateMany({ where: { defaultCustomerId: sourceId }, data: { defaultCustomerId: targetId } })).count,
+        partyAdjustments: (
+          await tx.partyAdjustmentBatch.updateMany({ where, data })
+        ).count,
+        creditTransactions: (
+          await tx.customerCreditTransaction.updateMany({ where, data })
+        ).count,
+        creditApplications: (
+          await tx.customerCreditApplication.updateMany({ where, data })
+        ).count,
+        outstandingLetters: (
+          await tx.outstandingLetter.updateMany({ where, data })
+        ).count,
+        documents: (await tx.customerDocument.updateMany({ where, data }))
+          .count,
+        serviceHistory: (await tx.serviceHistory.updateMany({ where, data }))
+          .count,
+        pdiSettings: (
+          await tx.pdiSettings.updateMany({
+            where: { defaultCustomerId: sourceId },
+            data: { defaultCustomerId: targetId },
+          })
+        ).count,
         // Customers merged into the duplicate earlier now point at the survivor, so no chain is left behind.
-        earlierMerges: (await tx.customer.updateMany({ where: { mergedIntoId: sourceId }, data: { mergedIntoId: targetId } })).count,
+        earlierMerges: (
+          await tx.customer.updateMany({
+            where: { mergedIntoId: sourceId },
+            data: { mergedIntoId: targetId },
+          })
+        ).count,
       };
 
       await tx.customer.update({
@@ -497,30 +618,44 @@ export class CustomerService {
 
       // Corporate group: the survivor keeps its own group, or joins the duplicate's when it has none, so the
       // group does not lose a member. A survivor that belonged to the duplicate has just left it (above).
-      const survivorGroup = target.organizationId === sourceId ? null : target.organizationId;
-      const duplicateGroup = source.organizationId === targetId ? null : source.organizationId;
+      const survivorGroup =
+        target.organizationId === sourceId ? null : target.organizationId;
+      const duplicateGroup =
+        source.organizationId === targetId ? null : source.organizationId;
       const organizationId = survivorGroup ?? duplicateGroup;
 
       await tx.auditLog.create({
         data: {
           userId: actorId,
-          action: 'CUSTOMER_MERGE',
+          action: "CUSTOMER_MERGE",
 
           details: JSON.stringify({
             sourceId,
             targetId,
             moved,
             kept: keep,
-            before: { source: mergeSnapshot(source), target: mergeSnapshot(target) },
-            ...(!survivorGroup && duplicateGroup ? { joinedOrganizationId: duplicateGroup } : {}),
-            ...(survivorGroup && duplicateGroup && duplicateGroup !== survivorGroup ? { droppedOrganizationId: duplicateGroup } : {}),
+            before: {
+              source: mergeSnapshot(source),
+              target: mergeSnapshot(target),
+            },
+            ...(!survivorGroup && duplicateGroup
+              ? { joinedOrganizationId: duplicateGroup }
+              : {}),
+            ...(survivorGroup &&
+            duplicateGroup &&
+            duplicateGroup !== survivorGroup
+              ? { droppedOrganizationId: duplicateGroup }
+              : {}),
           }),
         },
       });
 
       // The email is unique: the duplicate gives it up before the survivor takes it.
-      if (keep.email === 'SOURCE' && source.email)
-        await tx.customer.update({ where: { id: sourceId }, data: { email: null } });
+      if (keep.email === "SOURCE" && source.email)
+        await tx.customer.update({
+          where: { id: sourceId },
+          data: { email: null },
+        });
 
       return tx.customer.update({
         where: {
@@ -548,7 +683,7 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(customerId);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     return this.customerRepository.addDocument({
@@ -563,7 +698,7 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(customerId);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     return this.customerRepository.listDocuments(customerId);
@@ -582,7 +717,7 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(customerId);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     return this.customerRepository.addServiceHistory({
@@ -599,7 +734,7 @@ export class CustomerService {
     const customer = await this.customerRepository.findCustomerById(customerId);
 
     if (!customer) {
-      throw new NotFoundError('Customer not found');
+      throw new NotFoundError("Customer not found");
     }
 
     return this.customerRepository.listServiceHistory(customerId);
@@ -607,5 +742,5 @@ export class CustomerService {
 }
 
 export function customerCodePrefix(name: string) {
-  return name.trim().charAt(0).toUpperCase() || 'C';
+  return name.trim().charAt(0).toUpperCase() || "C";
 }

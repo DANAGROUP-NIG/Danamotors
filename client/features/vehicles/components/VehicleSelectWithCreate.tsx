@@ -23,12 +23,13 @@ import {
   type CreateVehicleFormValues,
 } from "@/features/vehicles/schemas/vehicle.schema";
 import type { Vehicle } from "@/features/vehicles/types/vehicle.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface VehicleSelectWithCreateProps {
   value?: string;
   onChange: (vehicleId: string) => void;
   onVehicleSelect?: (vehicle: Vehicle) => void;
-  initialVehicle?: Pick<CreateVehicleFormValues, "registrationNumber" | "make" | "model" | "year">;
+  initialVehicle?: Partial<Pick<CreateVehicleFormValues, "vin" | "registrationNumber" | "make" | "model" | "year">>;
   customerId?: string;
   branchId?: string;
   error?: string;
@@ -158,7 +159,7 @@ export function VehicleSelectWithCreate({
     if (!showInlineCreate) return;
     resetVehicleForm({
       customerId: customerId || "",
-      vin: "",
+      vin: initialVehicle?.vin ?? "",
       registrationNumber: initialVehicle?.registrationNumber ?? searchQuery.trim() ?? "",
       make: initialVehicle?.make ?? searchQuery.split(" ")[0] ?? "",
       model: initialVehicle?.model ?? "",
@@ -170,7 +171,7 @@ export function VehicleSelectWithCreate({
       vehicleModelId: "",
       ownershipStatus: "",
     });
-  }, [customerId, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
+  }, [customerId, initialVehicle?.vin, initialVehicle?.make, initialVehicle?.model, initialVehicle?.registrationNumber, initialVehicle?.year, resetVehicleForm, searchQuery, showInlineCreate]);
 
   function handleCreateInlineVehicle(values: CreateVehicleFormValues) {
     if (!customerId || values.customerId !== customerId) return;
@@ -452,7 +453,7 @@ export function VehicleSelectWithCreate({
                   <input className={inputCls} placeholder="Vehicle identification number" {...registerVehicle("vin")} />
                 </Field>
                 <Field label="Year" error={vehicleErrors.year?.message}>
-                  <input type="number" className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
+                  <NumberInput className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
                 </Field>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-border mt-2">

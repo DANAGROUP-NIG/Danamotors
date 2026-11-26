@@ -4,12 +4,13 @@ export type Enquiry = {
   id:                 string;
   firstName:          string;
   lastName:           string;
-  email:              string;
+  email?:             string | null;
   phoneNumber:        string;
   vehicleMake?:       string | null;
   vehicleModel?:      string | null;
   vehicleYear?:       number | null;
   vehicleRegNumber?:  string | null;
+  vin?:               string | null;
   serviceDescription: string;
   preferredDate?:     string | null;
   status:             EnquiryStatus;
@@ -35,12 +36,13 @@ export type EnquiryListResponse = {
 export type CreateEnquiryPayload = {
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   phoneNumber: string;
   vehicleMake?: string | null;
   vehicleModel?: string | null;
   vehicleYear?: number | null;
   vehicleRegNumber?: string | null;
+  vin?: string | null;
   serviceDescription: string;
   preferredDate?: string | null;
   branchId: string;

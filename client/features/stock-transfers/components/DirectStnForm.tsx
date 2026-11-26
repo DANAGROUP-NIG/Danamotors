@@ -13,10 +13,12 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { isCpd } from "@/features/mobis-receipts/lib/mobis-labels";
 import { PartPicker } from "./PartPicker";
 import { DEFAULT_DESPATCH, StnDespatchFields, despatchPayload } from "./StnDespatchFields";
+import { CaseSplitter, NO_SPLIT, caseSplitPlan } from "./CaseSplitter";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
 import { useDirectStn } from "../hooks/use-stns";
-import { fmtCurrency } from "../lib/indent-status";
+import { STN_VAT_FORMS, fmtCurrency } from "../lib/indent-status";
 import type { PartSearchResult } from "../types/indent.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const toInt = (v: string) => {
   const n = Number(v);
@@ -35,6 +37,7 @@ export function DirectStnForm() {
   const [remarks, setRemarks] = useState("");
   const [lines, setLines] = useState<{ part: PartSearchResult; quantity: string }[]>([]);
   const [despatch, setDespatch] = useState(DEFAULT_DESPATCH);
+  const [split, setSplit] = useState(NO_SPLIT);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -43,6 +46,12 @@ export function DirectStnForm() {
   }, [branches, sourceBranchId, crossBranch, user?.branchId]);
 
   const total = lines.reduce((s, l) => s + toInt(l.quantity) * l.part.unitRate, 0);
+  const caseRows = lines.map((l) => ({ key: l.part.id, label: l.part.partNumber, quantity: toInt(l.quantity) }));
+  const casePlan = caseSplitPlan(split, caseRows);
+  // Forms L and Z carry 7.5% VAT on taxable parts (the server works out the exact amount).
+  const vat = STN_VAT_FORMS.includes(despatch.taxForm)
+    ? lines.reduce((s, l) => s + (l.part.taxable === false ? 0 : toInt(l.quantity) * l.part.unitRate * 0.075), 0)
+    : 0;
 
   function submit() {
     setError("");
@@ -51,6 +60,7 @@ export function DirectStnForm() {
     if (!lines.length) return setError("Add at least one part.");
     const bad = lines.find((l) => !toInt(l.quantity) || toInt(l.quantity) > l.part.sourceAvailable);
     if (bad) return setError(`${bad.part.partNumber}: enter a quantity from 1 to ${bad.part.sourceAvailable} (free stock).`);
+    if (casePlan.error) return setError(casePlan.error);
     send.mutate(
       {
         sourceBranchId,
@@ -58,6 +68,7 @@ export function DirectStnForm() {
         remarks: remarks.trim(),
         ...despatchPayload(despatch),
         lines: lines.map((l) => ({ partId: l.part.id, quantity: toInt(l.quantity) })),
+        cases: casePlan.cases?.map((c) => ({ weight: c.weight, lines: c.lines.map((l) => ({ partId: l.key, quantity: l.quantity })) })),
       },
       { onSuccess: (stn) => router.push(`/transfers/stn/${stn.id}`) },
     );
@@ -116,6 +127,7 @@ export function DirectStnForm() {
           </div>
           <div className="w-full sm:w-96">
             <PartPicker
+              allSources
               sourceBranchId={sourceBranchId || undefined}
               disabled={!sourceBranchId}
               placeholder={sourceBranchId ? "Add a part: search number or name…" : "Choose the sending branch first…"}
@@ -149,13 +161,15 @@ export function DirectStnForm() {
               {lines.map((l) => (
                 <tr key={l.part.id} className="border-t border-slate-100">
                   <td className="px-3 py-2">
-                    <p className="font-mono font-medium">{l.part.partNumber}</p>
+                    <p className="font-mono font-medium">
+                      {l.part.partNumber}
+                      {l.part.partFlag && l.part.partFlag !== "O" && <span className="ml-1.5 text-slate-400">({l.part.partFlag})</span>}
+                    </p>
                     <p className="text-slate-500">{l.part.name}</p>
                   </td>
                   <td className="px-3 py-2 text-right">{l.part.sourceAvailable}</td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       className={cn(inputCls, "ml-auto h-9 w-24 text-right", toInt(l.quantity) > l.part.sourceAvailable && "border-red-400")}
                       value={l.quantity}
@@ -182,13 +196,20 @@ export function DirectStnForm() {
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <StnDespatchFields value={despatch} onChange={setDespatch} />
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-6">
+        <StnDespatchFields value={despatch} onChange={setDespatch} branchId={sourceBranchId || undefined} />
+        {lines.length > 0 && <CaseSplitter rows={caseRows} value={split} onChange={setSplit} />}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">
           {lines.length} part(s) · <span className="font-semibold text-slate-800">{fmtCurrency(total)}</span> at dealer rate
+          {vat > 0 && (
+            <>
+              {" "}
+              + VAT {fmtCurrency(vat)} = <span className="font-semibold text-slate-800">{fmtCurrency(total + vat)}</span>
+            </>
+          )}
         </p>
         <div className="flex flex-col items-end gap-2">
           {error && <p className="text-sm text-red-500">{error}</p>}

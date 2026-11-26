@@ -38,6 +38,7 @@ export type ReportFilterKey =
   | "includeReturns"
   | "includeCancelled"
   | "includeAlternates"
+  | "includeStn"
   | "onlyTransacted"
   | "days"
   | "ageLimits"
@@ -107,6 +108,17 @@ const DEALER_FIRST = [FIFO_FIRST[1], FIFO_FIRST[0]];
 const BASED_ON = { option: "Based on" };
 const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part Number"), text("description", "Description"), text("category", "Category")];
 /** Physical stock taking: the part as counted, valued at dealer rate. */
+/** Legacy Reorder Level Report columns. Averages and levels carry two decimals, as legacy prints them. */
+const REORDER_COLUMNS: ReportColumn[] = [
+  ...PART_COLUMNS,
+  qty("consumed", "Consumption (period)"),
+  money("average", "Average consumption", false),
+  money("minLevel", "Minimum level", false),
+  money("reorderLevel", "Re-order level", false),
+  qty("quantity", "Closing balance", false),
+  qty("backOrder", "Back order qty", false),
+  qty("orderQty", "Re-order qty"),
+];
 const COUNT_PART_COLUMNS: ReportColumn[] = [
   text("partNumber", "Part Number"),
   text("flag", "Flag"),
@@ -447,7 +459,7 @@ export const REPORTS: ReportDefinition[] = [
     title: "Counter Sales Register Summary",
     group: "Part sales",
     description:
-      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day (legacy Tax Register (Datewise)). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
+      "The period's bills in one credit line per branch (legacy Register Summary), grouped by sales executive with subtotals (legacy Sales Executive Wise register), or one line per day in a block per tax form, VAT sales then transfers without VAT (legacy Tax Register (Datewise) and its Central sales block). In the summary, taxable follows the part's tax status; by day, it is the value VAT was charged on.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["option", "customer", "executive"],
     labels: { option: "Group by" },
@@ -498,9 +510,11 @@ export const REPORTS: ReportDefinition[] = [
     kind: "counter-sales-tax-annexure",
     title: "Counter Sales Tax Register (Annexure)",
     group: "Part sales",
-    description: "Bill-wise VAT annexure with customer address. Cancelled bills can be listed but are not totalled.",
+    description:
+      "Bill-wise VAT annexure with customer address, under a heading per tax form (VAT sales, then transfers without VAT, legacy TRNSFR WO/V). Cancelled bills can be listed but are not totalled.",
     permission: PERMISSIONS.PART_SALE_READ,
     filters: ["includeCancelled"],
+    grouped: true,
     columns: [
       text("billNumber", "Bill No"),
       date(),
@@ -913,7 +927,7 @@ export const REPORTS: ReportDefinition[] = [
     kind: "issue-checklist",
     title: "Checklist for Issues",
     group: "Part sales",
-    description: "Every issue in the period, voucher wise: STNs, counter sales, workshop and other issues, with subtotals.",
+    description: "Every issue in the period, voucher wise: STNs, counter sales, dispatch challans, workshop and other issues, with subtotals.",
     permission: PERMISSIONS.STOCK_READ,
     filters: PART_FILTERS,
     grouped: true,
@@ -929,6 +943,26 @@ export const REPORTS: ReportDefinition[] = [
       text("unit", "Unit"),
       qty("required", "Qty reqd", false),
       qty("quantity", "Qty issued"),
+      money("amount", "Amount"),
+    ],
+  },
+  {
+    kind: "dispatch-challan-register",
+    title: "Dispatch Challan Register",
+    group: "Part sales",
+    description:
+      "Dispatch challans (unbilled issues of fuel and consumables to cost centres) with a heading per challan (date, challan, cost centre, gate pass), its lines at the issue rate and a subtotal. Covers every store of the branch.",
+    permission: PERMISSIONS.CHALLAN_READ,
+    filters: ["customer", "search", ...PART_FILTERS],
+    labels: { search: "Challan no. (optional)" },
+    grouped: true,
+    columns: [
+      text("partNumber", "Part Number"),
+      text("description", "Description"),
+      text("unit", "UOM"),
+      qty("quantity", "Qty issued"),
+      qty("returned", "Qty returned"),
+      money("rate", "Rate", false),
       money("amount", "Amount"),
     ],
   },
@@ -1228,15 +1262,16 @@ export const REPORTS: ReportDefinition[] = [
     title: "Minimum / Maximum Level Report",
     group: "MIS",
     description:
-      "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or the re-order quantity worked out from consumption against the one entered.",
+      "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or (legacy Reorder Level Report) what to order: the re-order level (average monthly consumption, or the entered re-order qty) less closing stock and back order.",
     permission: PERMISSIONS.STOCK_READ,
     period: "asOn",
-    filters: [...STOCK_PART_FILTERS, "option", "days"],
-    labels: { option: "Show", days: "Re-order: consumption over (days)" },
+    filters: [...STOCK_PART_FILTERS, "option", "days", "includeStn"],
+    labels: { option: "Show", days: "Re-order: consumption period (days; 90 = 3 months)" },
     options: [
       { value: "MIN_MAX", label: "Minimum / maximum level" },
       { value: "BELOW_MIN", label: "Items falling below minimum level" },
-      { value: "REORDER", label: "Re-order calculated vs entered" },
+      { value: "REORDER", label: "Re-order level: calculated by formula" },
+      { value: "REORDER_ENTERED", label: "Re-order level: entered re-order qty" },
     ],
     grouped: true,
     columns: {
@@ -1260,14 +1295,8 @@ export const REPORTS: ReportDefinition[] = [
         cost("rate", "Dealer rate", false),
         cost("value", "Order value"),
       ],
-      REORDER: [
-        ...PART_COLUMNS,
-        qty("quantity", "Stock"),
-        qty("monthly", "Consumed per month", false),
-        qty("calculated", "Calculated re-order"),
-        qty("entered", "Entered re-order"),
-        qty("difference", "Entered − calculated"),
-      ],
+      REORDER: REORDER_COLUMNS,
+      REORDER_ENTERED: REORDER_COLUMNS,
     },
   },
   {

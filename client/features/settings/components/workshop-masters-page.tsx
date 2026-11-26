@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/table-components/DataTable";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
 import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { Button } from "@/components/ui/button";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -69,12 +70,18 @@ function AttributeInput({ field, value, onChange }: {
         value={typeof value === "string" ? value : ""}
         onChange={e => onChange(e.target.value || null)} /></Field>;
 
+  if (field.type === "number")
+    return <Field label={field.label}><NumberInput
+        className={inputCls}
+        min={1}
+        value={typeof value === "number" ? value : value == null || value === "" ? null : Number(value)}
+        onValueChange={onChange} /></Field>;
+
   return <Field label={field.label}><input
       className={inputCls}
       type={field.type}
-      min={field.type === "number" ? 1 : undefined}
       value={value == null ? "" : String(value)}
-      onChange={e => onChange(e.target.value === "" ? null : field.type === "number" ? Number(e.target.value) : e.target.value)} /></Field>;
+      onChange={e => onChange(e.target.value === "" ? null : e.target.value)} /></Field>;
 }
 
 export function WorkshopMastersPage() {
@@ -277,8 +284,8 @@ export function WorkshopMastersPage() {
                   category: e.target.value || null,
                 })}><option value="">Set from the service flags</option>{Object.entries(SERVICE_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field></>}
           {kind === "SERVICE_TYPE" && <>
-            <Field label="Display order"><input className={inputCls} type="number" min="0" max="100000" step="1"
-              value={form.displayOrder ?? ""} onChange={event => setForm({ ...form, displayOrder: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+            <Field label="Display order"><NumberInput className={inputCls} min="0" max="100000" step="1"
+              value={form.displayOrder} onValueChange={v => setForm({ ...form, displayOrder: v })} /></Field>
             <label className="flex gap-2"><input type="checkbox" checked={form.preDelivery ?? false}
               onChange={event => setForm({ ...form, preDelivery: event.target.checked })} />Pre-delivery service (unsold vehicles only)</label>
           </>}
@@ -302,14 +309,13 @@ export function WorkshopMastersPage() {
                   ...form,
                   acFitted: e.target.checked,
                 })} />AC fitted</label></>}
-          {kind === "MODEL" && <>{(["warrantyDays", "warrantyKm"] as const).map(key => <Field key={key} label={key === "warrantyDays" ? "Warranty days" : "Warranty km"}><input
-                type="number"
+          {kind === "MODEL" && <>{(["warrantyDays", "warrantyKm"] as const).map(key => <Field key={key} label={key === "warrantyDays" ? "Warranty days" : "Warranty km"}><NumberInput
                 min="0"
                 className={inputCls}
-                value={form[key] ?? ""}
-                onChange={e => setForm({
+                value={form[key]}
+                onValueChange={v => setForm({
                   ...form,
-                  [key]: e.target.value ? Number(e.target.value) : null,
+                  [key]: v,
                 })} /></Field>)}</>}
           <label><input
               type="checkbox"

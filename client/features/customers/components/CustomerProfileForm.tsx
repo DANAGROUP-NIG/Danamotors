@@ -14,6 +14,7 @@ import { customerCategories, customerCategoryLabels } from "../lib/customer-cate
 import { MasterOptions } from "@/components/forms/MasterOptions";
 import { useMasterCodes } from "@/hooks/use-master-codes";
 import { WorkshopPicker, customerLabel, customerOption } from "@/features/job-cards/components/WorkshopPicker";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const DEFAULT_SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Chief", "M/S."];
 // Geography inputs suggest names from the ZONE / STATE / CITY masters.
@@ -112,7 +113,7 @@ export function CustomerProfileForm(
   const individual = !isVendor && (!type || type === "INDIVIDUAL");
   const requiredFields: (keyof CreateCustomerFormValues)[] = ["phoneNumber", ...(individual ? ["firstName", "lastName"] as const : isVendor || type !== "OTHERS" ? ["companyName"] as const : [])];
   // New customers always start on the company default credit days; only the edit form changes them.
-  const creditLimitField = <Field label="Credit limit (optional)" error={errors.creditLimit?.message}><input className={inputCls} type="number" min="0" step="0.01" {...register("creditLimit", { setValueAs: value => value === "" || value === null ? null : Number(value) })} /></Field>;
+  const creditLimitField = <Field label="Credit limit (optional)" error={errors.creditLimit?.message}><NumberInput className={inputCls} min="0" step="0.01" {...register("creditLimit", { setValueAs: value => value === "" || value === null ? null : Number(value) })} /></Field>;
 
   return (
     <form
@@ -131,7 +132,7 @@ export function CustomerProfileForm(
       <div className="grid gap-3 sm:grid-cols-2">
         {!isVendor && <Field label="Customer category" required error={errors.type?.message}><select aria-label="Customer category" className={inputCls} {...register("type")}>{customerCategories.map(value => <option key={value} value={value}>{customerCategoryLabels[value]}</option>)}</select></Field>}
         {customer
-          ? <Field label="Credit days (blank uses company default)" error={errors.creditDays?.message}><input className={inputCls} type="number" min="0" max="3650" {...register("creditDays", { setValueAs: value => value === "" ? null : Number(value) })} /></Field>
+          ? <Field label="Credit days (blank uses company default)" error={errors.creditDays?.message}><NumberInput className={inputCls} min="0" max="3650" {...register("creditDays", { setValueAs: value => value === "" ? null : Number(value) })} /></Field>
           : creditLimitField}
         <Field label="Party status" error={errors.partyStatus?.message}><select aria-label="Party status" className={inputCls} {...register("partyStatus")}><option value="CUSTOMER">Customer</option><option value="DEALER">Dealer</option><option value="FA_PARTY">FA party</option><option value="VENDOR">Vendor</option></select></Field>
         <Field label="Salutation">{type === "CORPORATE" ? <input className={inputCls} value="M/S." readOnly /> : <select className={inputCls} {...register("salutation")}><option value="">Select salutation</option>{salutations.map(value => <option key={value}>{value}</option>)}</select>}</Field>

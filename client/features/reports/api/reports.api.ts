@@ -16,15 +16,25 @@ export type LookupSource =
   | "partCategory"
   | "customerCity"
   | "freeService"
-  | "cscReason";
+  | "cscReason"
+  | "csiCard"
+  | "csiAttribute"
+  | "csiResponse";
 
 export function runReportRequest(slug: string, query: Record<string, string>) {
   const search = new URLSearchParams(query).toString();
-  return apiGet<ReportResponse>(`/reports/${encodeURIComponent(slug)}?${search}`);
+  return apiGet<ReportResponse>(
+    `/reports/${encodeURIComponent(slug)}?${search}`,
+  );
 }
 
-export function getReportLookupRequest(source: LookupSource, branchId?: string) {
-  const search = branchId ? `?${new URLSearchParams({ branchId }).toString()}` : "";
+export function getReportLookupRequest(
+  source: LookupSource,
+  branchId?: string,
+) {
+  const search = branchId
+    ? `?${new URLSearchParams({ branchId }).toString()}`
+    : "";
   return apiGet<LookupOption[]>(`/reports/lookups/${source}${search}`);
 }
 
@@ -42,6 +52,9 @@ export function getReportSettingsRequest() {
 }
 
 /** null resets a letter to its default template; a letter left out is not changed. */
-export function saveReportSettingsRequest(body: { fpcLetterTemplate?: string | null; psfLetterTemplate?: string | null }) {
+export function saveReportSettingsRequest(body: {
+  fpcLetterTemplate?: string | null;
+  psfLetterTemplate?: string | null;
+}) {
   return apiPut<ReportSettings>("/reports/settings", body);
 }

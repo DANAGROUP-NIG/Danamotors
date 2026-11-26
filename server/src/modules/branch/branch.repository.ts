@@ -78,6 +78,7 @@ export class BranchRepository {
     email: string;
     code: string | null;
     shortName: string | null;
+    roundMrnTotal: boolean;
     parentBranchId: string | null;
   }>): Promise<Branch> {
     return prisma.branch.update({ where: { id }, data });

@@ -54,7 +54,7 @@ export function MobisReceiptsPage() {
     {
       header: "MIT #",
       render: (m) => (
-        <Link href={`/inventory/mobis-receipts/${m.id}`} className="font-mono text-sm font-medium hover:underline">
+        <Link href={`/inventory/mit/${m.id}`} className="font-mono text-sm font-medium hover:underline">
           {m.mitNumber}
         </Link>
       ),
@@ -96,7 +96,7 @@ export function MobisReceiptsPage() {
         <DataTableRowActions
           item={m}
           actions={[
-            { id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/mobis-receipts/${m.id}`) },
+            { id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/mit/${m.id}`) },
           ]}
         />
       ),
@@ -111,7 +111,7 @@ export function MobisReceiptsPage() {
         actions={
           canUpload && (
             <Button asChild size="sm" className="gap-1.5">
-              <Link href="/inventory/mobis-receipts/new">
+              <Link href="/inventory/mit/new">
                 <Upload className="size-4" />
                 Upload MIT
               </Link>

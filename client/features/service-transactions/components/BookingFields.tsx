@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import type { BookingExtra } from "@/features/appointments/types/appointment.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 export function BookingFields({
   value,
   onChange,
@@ -49,10 +50,9 @@ export function BookingFields({
       </legend>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Booking mileage">
-          <input
+          <NumberInput
             aria-label="Booking mileage"
             className={inputCls}
-            type="number"
             min="0"
             max="2147483647"
             step="1"

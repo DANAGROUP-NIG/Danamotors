@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useLabelPrinters, usePrintLabels } from "../hooks/use-labels";
 import { PrinterLine } from "./label-parts";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 /** "Print label" from a part's page: copies of its label on the branch's label printer. */
 export function PrintLabelDialog({
@@ -31,7 +32,7 @@ export function PrintLabelDialog({
         <p className="text-sm text-slate-600">{part.name}</p>
         <PrinterLine printers={printers.data} loading={printers.isLoading} />
         <Field label="Copies" required error={valid ? undefined : "1 to 100"}>
-          <input type="number" min={1} max={100} className={inputCls} value={copies} onChange={(e) => setCopies(e.target.value)} autoFocus />
+          <NumberInput min={1} max={100} className={inputCls} value={copies} onChange={(e) => setCopies(e.target.value)} autoFocus />
         </Field>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>

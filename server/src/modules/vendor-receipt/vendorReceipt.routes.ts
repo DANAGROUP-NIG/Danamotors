@@ -5,7 +5,11 @@ import { validateRequest } from "../../middleware/requestValidator";
 import { PERMISSIONS } from "../../shared/constants/roles";
 import { VendorReceiptController } from "./vendorReceipt.controller";
 import {
+  branchSettingsSchema,
   createVendorReceiptSchema,
+  createVendorReturnSchema,
+  editVendorReceiptSchema,
+  listVendorReturnsSchema,
   idParamSchema,
   listVendorReceiptsSchema,
   receiptPartSearchSchema,
@@ -16,6 +20,7 @@ const router = Router();
 const controller = new VendorReceiptController();
 
 router.use("/vendor-receipts", authMiddleware);
+router.use("/vendor-returns", authMiddleware);
 
 const read = requirePermission(PERMISSIONS.STOCK_READ);
 const write = requirePermission(PERMISSIONS.STOCK_UPDATE);
@@ -87,6 +92,47 @@ router.get("/vendor-receipts/vendors", read, validateRequest(vendorSearchSchema)
 router.get("/vendor-receipts/parts", read, validateRequest(receiptPartSearchSchema), controller.searchParts);
 router.post("/vendor-receipts", write, validateRequest(createVendorReceiptSchema), controller.createReceipt);
 router.get("/vendor-receipts", read, validateRequest(listVendorReceiptsSchema), controller.listReceipts);
+router.get("/vendor-receipts/settings", read, validateRequest(branchSettingsSchema), controller.branchSettings);
 router.get("/vendor-receipts/:id", read, validateRequest(idParamSchema), controller.getReceipt);
+
+/**
+ * @openapi
+ * /inventory/vendor-receipts/{id}:
+ *   patch:
+ *     tags: [Vendor Receipts]
+ *     summary: Correct a posted vendor MRN
+ *     description: >
+ *       Changes invoice no./date, tax form, conversion rate, remarks or the lines (send the full corrected set).
+ *       Stock moves by the difference; units can only come off while still in stock and not below what was
+ *       returned to the vendor. Branch-bought records (L/U/R) are re-priced. Each change is logged with the reason.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { reason: "Wrong quantity keyed", lines: [{ partId: "uuid", quantity: 2, unitPrice: 8000 }] }
+ *     responses:
+ *       200: { description: The corrected MRN, with its edit log. }
+ *       409: { description: The units to take off have been used, or the books are closed. }
+ */
+router.patch("/vendor-receipts/:id", write, validateRequest(editVendorReceiptSchema), controller.editReceipt);
+
+/**
+ * @openapi
+ * /inventory/vendor-receipts/{id}/returns:
+ *   post:
+ *     tags: [Vendor Receipts]
+ *     summary: Return parts on a vendor MRN to the vendor (MRN return)
+ *     description: >
+ *       Quantities per MRN line, or fullReturn for everything still returnable. Rate, VAT and tax form come from
+ *       the MRN; the vendor defaults to the MRN's. Stock goes out as a VENDOR_RETURN movement.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           example: { lines: [{ mrnLineId: "uuid", quantity: 1 }], remarks: "Wrong part supplied" }
+ *     responses:
+ *       201: { description: The MRN return. }
+ */
+router.post("/vendor-receipts/:id/returns", write, validateRequest(createVendorReturnSchema), controller.createReturn);
+router.get("/vendor-returns", read, validateRequest(listVendorReturnsSchema), controller.listReturns);
+router.get("/vendor-returns/:id", read, validateRequest(idParamSchema), controller.getReturn);
 
 export default router;

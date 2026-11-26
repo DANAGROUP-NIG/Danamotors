@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api/apiClient";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { EstimatePartPicker } from "./EstimatePartPicker";
 import { PartSourceSelect } from "./PartSourceSelect";
@@ -217,9 +218,8 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                     : "Enter a percentage from 0 to 100 (up to two decimal places)"
                 }
               >
-                <input
+                <NumberInput
                   className={inputCls}
-                  type="number"
                   min="0"
                   max="100"
                   step="0.01"
@@ -330,14 +330,13 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                 />
               )}
               <Field label={COPY.editor.quantity}>
-                <input
-                  type="number"
+                <NumberInput
                   min="0.01"
                   max="1000000"
                   step="0.01"
                   className={inputCls}
                   value={quantity}
-                  onChange={(event) => setQuantity(Number(event.target.value))}
+                  onValueChange={(v) => setQuantity(v ?? 0)}
                 />
               </Field>
               <label className="flex items-center gap-2 text-sm">

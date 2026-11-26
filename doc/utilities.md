@@ -49,6 +49,13 @@ Shortages and excesses found in a stock count are now posted as adjustments by t
 Stock Taking ([stock-taking.md](./stock-taking.md)). The adjustments appear in the SAN register and
 the stock ledger.
 
+There is no manual SAN entry screen: the Stock Adjustment Note screen was last used in 2013 in all three
+databases (Lagos 391 SANs ever, Abuja 261, CPD 4), and count differences go through stock taking.
+`POST /api/inventory/stock/adjust` remains for opening stock on a new part (type `STOCKED`) and
+adjustments (type `ADJUSTMENT`). Since 2026-11-25 it locks the stock row and writes the stock and its
+movement in one transaction, accepts only those two types, refuses a quantity of 0, and never takes stock
+below zero or below what is reserved for open picking lists. It checks the user's branch.
+
 ## Part deletion
 
 The screen deleted the parts listed in a file, after the user had backed up the database. Legacy kept a

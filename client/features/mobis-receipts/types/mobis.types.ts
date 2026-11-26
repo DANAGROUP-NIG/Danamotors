@@ -1,6 +1,6 @@
 import type { DiscrepancyFields } from "@/features/stock-discrepancy/types";
 
-export type ReceivedMode = "AIR" | "SEA" | "ROAD";
+export type ReceivedMode = "COURIER" | "AIR" | "SEA" | "ROAD";
 export type MitStatus = "IN_TRANSIT" | "VERIFIED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
 
 type PersonRef = { id: string; firstName: string; lastName: string };
