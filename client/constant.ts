@@ -273,16 +273,24 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [LABEL_PERMISSIONS.PRINT],
       },
       {
-        label: "Stock Taking",
+        label: "Stock Take & Audit",
         href: "/inventory/stock-taking",
         icon: ClipboardCheck,
-        permissions: [STOCK_TAKE_PERMISSIONS.READ],
-      },
-      {
-        label: "Stock Audit",
-        href: "/inventory/stock-audit",
-        icon: FileSearch,
-        permissions: [STOCK_AUDIT_PERMISSIONS.READ],
+        permissions: [STOCK_TAKE_PERMISSIONS.READ, STOCK_AUDIT_PERMISSIONS.READ],
+        children: [
+          {
+            label: "Stock Taking",
+            href: "/inventory/stock-taking",
+            icon: ClipboardCheck,
+            permissions: [STOCK_TAKE_PERMISSIONS.READ],
+          },
+          {
+            label: "Stock Audit",
+            href: "/inventory/stock-audit",
+            icon: FileSearch,
+            permissions: [STOCK_AUDIT_PERMISSIONS.READ],
+          },
+        ],
       },
       {
         // Legacy Part Purchase menu, in its order, with only what is built: Purchase Order Entry is not (no POs
