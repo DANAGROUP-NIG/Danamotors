@@ -35,6 +35,7 @@ export const runReportSchema = z.object({
       includeReturns: flag,
       includeCancelled: flag,
       includeAlternates: flag,
+      includeStn: flag,
       onlyTransacted: flag,
       summary: flag,
       countType: z.enum(["ANNUAL", "PERPETUAL", "INTERNAL", "AUDIT_HEAD", "VISITING_MANAGEMENT"]).optional(),

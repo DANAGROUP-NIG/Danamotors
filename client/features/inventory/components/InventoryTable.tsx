@@ -272,7 +272,7 @@ export function InventoryTable() {
               id: "view",
               label: "View details",
               icon: <Eye className="size-4" />,
-              onClick: () => router.push(`/inventory/${stock.part.id}`),
+              onClick: () => router.push(`/part-master/${stock.part.id}`),
             },
             {
               id: "download",
@@ -313,7 +313,7 @@ export function InventoryTable() {
               shortcut: "⌘C",
               onClick: () =>
                 copyToClipboard(
-                  `${window.location.origin}/inventory/${stock.part.id}`,
+                  `${window.location.origin}/part-master/${stock.part.id}`,
                   "Inventory link copied",
                 ),
             },

@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { jobCardKeys } from "../api/job-card.keys";
 import { WorkshopPicker } from "./WorkshopPicker";
 import type { JobCard } from "../types/job-card.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
   const queryClient = useQueryClient();
@@ -245,8 +246,7 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       {!billed && (
         <>
           <Field label="Service charge (NGN)">
-            <input
-              type="number"
+            <NumberInput
               min="0"
               max="1000000000000"
               step="0.01"

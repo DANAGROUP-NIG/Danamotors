@@ -7,6 +7,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table-components/DataTable";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type Estimate = {
   id: string;
@@ -69,7 +70,7 @@ export function DefectModelEstimates({ defectId }: { defectId: string }) {
       <WorkshopPicker required label="Model" endpoint="/workshop-masters?kind=MODEL" collection="items"
         value={form.modelId} selectedRecord={form.model} disabled={form.editing}
         onChange={modelId => setForm({ ...form, modelId })} />
-      {amounts.map(([key, label]) => <Field key={key} label={label}><input className={inputCls} required type="number" min="0" max="1000000000000" step="0.01"
+      {amounts.map(([key, label]) => <Field key={key} label={label}><NumberInput className={inputCls} required min="0" max="1000000000000" step="0.01"
         value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} /></Field>)}
       {save.isError && <p role="alert" className="text-destructive md:col-span-4">{errorMessage(save.error)}</p>}
       <div className="flex gap-2 md:col-span-4"><Button disabled={save.isPending || !form.modelId}>Save estimate</Button>

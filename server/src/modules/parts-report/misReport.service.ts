@@ -11,8 +11,8 @@ import { CustomerOrderStatus, IndentStatus, PartChangeAction } from "@prisma/cli
 import prisma from "../../prisma/client";
 import { reportEnd } from "../finance/party-report";
 import { money } from "../finance/money";
-import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
-import { bandOf, Basis, ISSUE_MOVEMENTS } from "./stockReport.logic";
+import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, LineCharges, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
+import { bandOf, Basis, ISSUE_MOVEMENTS, reorderPlan } from "./stockReport.logic";
 import { Holding, Movement, partColumns, StockReportService } from "./stockReport.service";
 
 const DAY_MS = 86_400_000;
@@ -80,9 +80,13 @@ export class MisReportService {
     const days = f.days ?? 90;
     const since = new Date(end.getTime() - days * DAY_MS);
     const holdings = await this.stock.holdings(f);
+    const reordering = f.option === "REORDER" || f.option === "REORDER_ENTERED";
+    const backOrders = reordering ? await this.backOrders(f) : new Map<string, number>();
     return holdings.flatMap((h): Row[] => {
       let consumed = 0;
+      // Legacy counts sales and workshop issues less returns; STNs only with "Include STN".
       const { closing } = this.stock.walk(h, "DEALER", new Map(), since, end, (m) => {
+        if (m.type === "TRANSFER_OUT" && !f.includeStn) return;
         if (ISSUE_MOVEMENTS.includes(m.type) || m.type === "RETURNED") consumed -= m.quantity;
       });
       const stock = closing.quantity;
@@ -90,11 +94,15 @@ export class MisReportService {
       const max = h.maximumStock ?? (h.part.maxLevel || null);
       const reorder = h.part.reorderQty || 0;
       const head = { ...(!f.branchId && { group: h.branch }), ...partColumns(h.part) };
-      if (f.option === "REORDER") {
-        // The re-order quantity is what the period consumed (legacy: three months' consumption).
-        const calculated = Math.max(consumed, 0);
-        if (!calculated && !reorder) return [];
-        return [{ ...head, quantity: stock, monthly: money((calculated / days) * 30), calculated, entered: reorder, difference: reorder - calculated }];
+      if (reordering) {
+        // Legacy Reorder Level Report (matched line for line on the Kia Plaza printout, 05/06/2026): the level is
+        // the average monthly consumption, or the entered re-order quantity; what to order is the level less the
+        // closing stock and the back order, rounded up. Only parts with something to order are listed.
+        const used = Math.max(consumed, 0);
+        const backOrder = backOrders.get(`${h.branchId}:${h.part.id}`) ?? 0;
+        const plan = reorderPlan(used, days, f.option === "REORDER_ENTERED" ? reorder : null, stock, backOrder);
+        if (!plan) return [];
+        return [{ ...head, consumed: used, ...plan, quantity: stock, backOrder }];
       }
       if (f.option === "BELOW_MIN") {
         if (!min || stock >= min) return [];
@@ -117,6 +125,26 @@ export class MisReportService {
       const level = stock < min ? "Below minimum" : max != null && stock > max ? "Above maximum" : "Within levels";
       return [{ ...head, bin: h.bin, minLevel: min || null, maxLevel: max, reorderQty: reorder || null, quantity: stock, level }];
     });
+  }
+
+  /** Units each branch is still waiting for on its open indents (legacy back order), by branch and part. */
+  private async backOrders(f: ReportFilters) {
+    const lines = await prisma.branchIndentLine.findMany({
+      where: {
+        backOrderQuantity: { gt: 0 },
+        indent: {
+          status: { notIn: [IndentStatus.DRAFT, IndentStatus.CANCELLED, IndentStatus.REJECTED, IndentStatus.COMPLETED] },
+          ...(f.branchId && { requestingBranchId: f.branchId }),
+        },
+      },
+      select: { partId: true, backOrderQuantity: true, indent: { select: { requestingBranchId: true } } },
+    });
+    const out = new Map<string, number>();
+    for (const l of lines) {
+      const key = `${l.indent.requestingBranchId}:${l.partId}`;
+      out.set(key, (out.get(key) ?? 0) + l.backOrderQuantity);
+    }
+    return out;
   }
 
   // ── Consumption ───────────────────────────────────────────────────────────
@@ -263,11 +291,15 @@ export class MisReportService {
     const [billLines, returnLines, issuances, stnLines] = await Promise.all([
       prisma.invoiceLine.findMany({
         where: { invoiceId: { in: ids("ISSUED", "RETURNED") }, partId: { not: null } },
-        select: { invoiceId: true, partId: true, quantity: true, rate: true, invoice: { select: { partsDiscountPercent: true } } },
+        select: { invoiceId: true, partId: true, quantity: true, rate: true, tradeDiscountPercent: true, handlingPercent: true, invoice: { select: { partsDiscountPercent: true } } },
       }),
       prisma.counterSaleReturnLine.findMany({
         where: { returnId: { in: ids("RETURNED") } },
-        select: { returnId: true, partId: true, quantity: true, rate: true, saleReturn: { select: { counterSale: { select: { invoice: { select: { partsDiscountPercent: true } } } } } } },
+        select: {
+          returnId: true, partId: true, quantity: true, rate: true,
+          invoiceLine: { select: { tradeDiscountPercent: true, handlingPercent: true } },
+          saleReturn: { select: { counterSale: { select: { invoice: { select: { partsDiscountPercent: true } } } } } },
+        },
       }),
       prisma.partIssuance.findMany({
         where: { id: { in: ids("ISSUED", "RETURNED") } },
@@ -277,13 +309,13 @@ export class MisReportService {
     ]);
     // A bill can carry a part on more than one line: its average net rate. FOC bills are 100% discount.
     const bills = new Map<string, { quantity: number; value: number; foc: boolean }>();
-    const take = (doc: string, partId: string, quantity: number, rate: number, discountPercent: number) => {
-      const v = lineValues(quantity, rate, discountPercent, 0);
+    const take = (doc: string, partId: string, quantity: number, rate: number, discountPercent: number, charges: LineCharges) => {
+      const v = lineValues(quantity, rate, discountPercent, 0, charges);
       const bill = bills.get(`${doc}:${partId}`) ?? { quantity: 0, value: 0, foc: discountPercent >= 100 };
-      bills.set(`${doc}:${partId}`, { ...bill, quantity: bill.quantity + quantity, value: bill.value + v.gross - v.discount });
+      bills.set(`${doc}:${partId}`, { ...bill, quantity: bill.quantity + quantity, value: bill.value + v.beforeVat });
     };
-    billLines.forEach((l) => take(l.invoiceId, l.partId!, l.quantity, l.rate, l.invoice.partsDiscountPercent));
-    returnLines.forEach((l) => take(l.returnId, l.partId, l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent));
+    billLines.forEach((l) => take(l.invoiceId, l.partId!, l.quantity, l.rate, l.invoice.partsDiscountPercent, l));
+    returnLines.forEach((l) => take(l.returnId, l.partId, l.quantity, l.rate, l.saleReturn.counterSale.invoice.partsDiscountPercent, l.invoiceLine));
     const jobs = new Map(issuances.map((i) => [i.id, i]));
     const stnRates = new Map(stnLines.map((l) => [`${l.stnId}:${l.partId}`, l.unitRate]));
     return (m, partId) => {

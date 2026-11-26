@@ -30,4 +30,4 @@ export type PendingDiscrepancy = {
 
 /** Where a receipt is shown: its MIT or its STN page. */
 export const receiptLink = (row: Pick<PendingDiscrepancy, "mitId" | "stnId">) =>
-  row.mitId ? `/inventory/mobis-receipts/${row.mitId}` : row.stnId ? `/transfers/stn/${row.stnId}` : "#";
+  row.mitId ? `/inventory/mit/${row.mitId}` : row.stnId ? `/transfers/stn/${row.stnId}` : "#";

@@ -24,6 +24,7 @@ import {
 import { BulkChangeModal } from "./bulk-change-modal";
 import { ApplyToModelsModal } from "./apply-to-models-modal";
 import { CopyModelModal } from "./copy-model-modal";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const PAGE_SIZE = 100;
 export const LABOUR_RATE_UPDATE = "labour-rate:update";
@@ -283,9 +284,8 @@ function NumberCell({ value, onSave, min, label }: { value: number; onSave: (v: 
     if (n !== value) onSave(n);
   };
   return (
-    <input
+    <NumberInput
       aria-label={label}
-      type="number"
       step="0.01"
       min={min}
       className={cn(inputCls, "h-8 w-28 py-0 text-right tabular-nums")}

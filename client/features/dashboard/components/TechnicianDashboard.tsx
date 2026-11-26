@@ -149,7 +149,7 @@ export default function TechnicianDashboard() {
             View Job Cards
           </a>
           <a
-            href="/inventory"
+            href="/part-master"
             className="flex items-center gap-2 rounded-lg border border-[#e8edf3] bg-white px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
           >
             <Clock className="size-4 text-muted-foreground" />

@@ -33,6 +33,8 @@ export const updateBranchSchema = z.object({
     code: z.string().trim().max(10, 'Code must be 10 characters or less').transform((v) => (v ? v.toUpperCase() : null)).nullable().optional(),
     shortName: z.string().trim().max(20, 'Short name must be 20 characters or less').transform((v) => v || null).nullable().optional(),
     parentBranchId: z.string().uuid('Invalid parent branch ID').nullable().optional(),
+    // Legacy control1.roundmrn: round vendor MRN and MRN return totals to the naira.
+    roundMrnTotal: z.boolean().optional(),
   }),
   params: z.object({
     id: z.string().uuid('Invalid branch ID'),

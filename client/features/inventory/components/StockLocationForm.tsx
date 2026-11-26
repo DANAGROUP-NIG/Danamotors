@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useUpdateStockLocation } from "../hooks/use-part-mutations";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface StockLocationFormProps {
   branchId: string;
@@ -65,13 +66,13 @@ export function StockLocationForm({ branchId, branchName, partId, initial, onDon
           />
         </Field>
         <Field label="Minimum stock" error={minInvalid ? "Enter a whole number of 0 or more" : undefined}>
-          <input type="number" min={0} className={inputCls} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
+          <NumberInput min={0} className={inputCls} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
         </Field>
         <Field
           label="Maximum stock (optional)"
           error={maxInvalid ? "Enter a whole number of 0 or more" : rangeInvalid ? "Must be at least the minimum" : undefined}
         >
-          <input type="number" min={0} className={inputCls} value={maxStock} onChange={(e) => setMaxStock(e.target.value)} />
+          <NumberInput min={0} className={inputCls} value={maxStock} onChange={(e) => setMaxStock(e.target.value)} />
         </Field>
       </div>
       <Button type="submit" disabled={update.isPending || minInvalid || maxInvalid || rangeInvalid}>

@@ -48,7 +48,7 @@ export function describeJob(job: JobRef): { label: string; link: string } {
     case HandheldDocumentType.CPO_PICK:
       return { label: `CPO ${job.customerOrder?.cpoNumber ?? job.documentNumber}`, link: `/part-sale/orders/${job.customerOrder?.id}` };
     case HandheldDocumentType.MIT_RECEIVE:
-      return { label: `MIT ${job.mit?.mitNumber ?? job.documentNumber}`, link: `/inventory/mobis-receipts/${job.mit?.id}` };
+      return { label: `MIT ${job.mit?.mitNumber ?? job.documentNumber}`, link: `/inventory/mit/${job.mit?.id}` };
     default: {
       const sheet = job.stockTakeSheet;
       const audit = sheet?.stockTake.type === StockTakeType.AUDIT;

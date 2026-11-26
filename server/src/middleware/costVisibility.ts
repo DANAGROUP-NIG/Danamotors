@@ -7,14 +7,15 @@ import { PERMISSIONS, ROLES } from '../shared/constants/roles';
  *
  * - These keys are a dealer rate or a cost wherever they appear (part master, catalogue, indents, STNs,
  *   MIT/MRN lines, stock-take lines, invoice line cost) and are removed from every response.
- * - On stock documents (indents, STNs, MIT/MRN, vendor receipts, transfers, picking and packing lists),
+ * - On stock documents (indents, STNs, MIT/MRN, vendor receipts and returns, transfers, picking and packing lists),
  *   line and document amounts are valued at those rates, so they are removed too. Elsewhere `amount`
  *   is a selling amount (invoices, CPOs, requisitions) and is left alone.
  * - Parts reports drop their cost columns separately (partsReport.controller.ts).
  */
 const COST_KEYS = new Set(['unitPrice', 'unitRate', 'dealerRate', 'basicRate', 'unitCost', 'oldDealerRate', 'newDealerRate']);
-const VALUE_KEYS = new Set(['amount', 'totalValue', 'totalAmount']);
-const STOCK_DOCUMENT_PATHS = /^\/api\/inventory\/(indents|stn|mobis|mrn|transfer-mrns|transfers|vendor-receipts|packing-lists|picking-lists|cases)(\/|$|\?)/;
+// Vendor MRN and return VAT, round-off and net payable are valued at cost too.
+const VALUE_KEYS = new Set(['amount', 'totalValue', 'totalAmount', 'taxAmount', 'roundOff', 'netAmount']);
+const STOCK_DOCUMENT_PATHS = /^\/api\/inventory\/(indents|stn|mobis|mrn|transfer-mrns|transfers|vendor-receipts|vendor-returns|packing-lists|picking-lists|cases)(\/|$|\?)/;
 /** Writes that may set a part's dealer or base rate. */
 const PART_WRITE_PATHS = /^\/api\/inventory\/(parts|part-catalogue)(\/|$|\?)/;
 

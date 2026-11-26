@@ -12,6 +12,7 @@ import {
   bookPortalAppointmentSchema,
   type BookPortalAppointmentFormValues,
 } from "../schemas/portal.schema";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface BookAppointmentFormProps {
   onSuccess?: () => void;
@@ -110,8 +111,7 @@ export function BookAppointmentForm({ onSuccess }: BookAppointmentFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
-          <input
-            type="number"
+          <NumberInput
             className={inputCls}
             placeholder="60"
             {...register("durationMins")}

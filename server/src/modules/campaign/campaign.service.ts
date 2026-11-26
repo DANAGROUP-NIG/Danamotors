@@ -975,14 +975,17 @@ export class CampaignService {
     });
     if (!branch) throw new NotFoundError("Branch not found");
 
+    const notes =
+      input.notes?.trim() || `${row.campaign.code} — ${row.campaign.title}`;
     const appointment = await new ServiceService().createAppointment({
       customerId: row.vehicle.customerId,
       vehicleId: row.vehicle.id,
       branchName: branch.name,
       scheduledAt: input.scheduledAt.toISOString(),
       serviceId: input.serviceId ?? undefined,
-      notes:
-        input.notes?.trim() || `${row.campaign.code} — ${row.campaign.title}`,
+      notes,
+      // A booking needs at least one customer request; the campaign is it.
+      requests: [{ description: notes }],
       createdById: actorId,
     });
     await prisma.campaignVehicle.update({

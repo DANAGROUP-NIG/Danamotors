@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Printer, Tags } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Printer, Tags, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { fmtDate, fmtNaira } from "@/features/mobis-receipts/lib/mobis-labels";
+import { MRN_TAX_FORM_LABELS } from "../lib/mrn-calc";
 import { useVendorReceipt } from "../hooks/use-vendor-receipts";
 import type { VendorReceipt, VendorReceiptLine } from "../types/vendor-receipt.types";
 
@@ -37,6 +40,8 @@ function ReceiptLabels({ receipt, mode }: { receipt: VendorReceipt; mode: LabelM
 
 export function VendorReceiptDetail({ id }: { id: string }) {
   const { data: receipt, isLoading, isError } = useVendorReceipt(id);
+  const { hasPermission } = useAuth();
+  const canChange = hasPermission(INVENTORY_PERMISSIONS.STOCK_UPDATE);
   const [labels, setLabels] = useState<LabelMode | null>(null);
   const [printing, setPrinting] = useState(false);
 
@@ -58,10 +63,26 @@ export function VendorReceiptDetail({ id }: { id: string }) {
   return (
     <div className="grid gap-5 px-4 py-6 lg:px-6 print:p-0">
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href="/inventory/vendor-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft className="size-4" /> Back to vendor receipts
+        <Link href="/inventory/mrn" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft className="size-4" /> Back to MRNs
         </Link>
         <div className="flex flex-wrap gap-2">
+          {canChange && (
+            <>
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href={`/inventory/mrn/${receipt.id}/edit`}>
+                  <Pencil className="size-4" /> Correct MRN
+                </Link>
+              </Button>
+              {receipt.lines.some((l) => l.receivedQuantity > l.returnedQuantity) && (
+                <Button asChild size="sm" variant="outline" className="gap-1.5">
+                  <Link href={`/inventory/mrn/${receipt.id}/return`}>
+                    <Undo2 className="size-4" /> Return to vendor
+                  </Link>
+                </Button>
+              )}
+            </>
+          )}
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setLabels(null); setPrinting(true); }}>
             <Printer className="size-4" /> Print MRN
           </Button>
@@ -82,7 +103,7 @@ export function VendorReceiptDetail({ id }: { id: string }) {
               <p className="text-sm text-muted-foreground">Vendor receipt · {receipt.receivingBranch.name}</p>
             </div>
             <p className="text-right text-sm">
-              <span className="block font-semibold">{fmtNaira(receipt.totalValue)}</span>
+              <span className="block font-semibold">{fmtNaira(receipt.netAmount)}</span>
               <span className="text-muted-foreground">{receipt.totalReceived} unit(s)</span>
             </p>
           </div>
@@ -104,8 +125,21 @@ export function VendorReceiptDetail({ id }: { id: string }) {
               <span className="block text-xs uppercase text-slate-400">Received by</span>
               {receipt.receivedBy ? `${receipt.receivedBy.firstName} ${receipt.receivedBy.lastName}` : "—"}
             </p>
+            <p>
+              <span className="block text-xs uppercase text-slate-400">Tax form</span>
+              {receipt.taxForm ? MRN_TAX_FORM_LABELS[receipt.taxForm] : "—"}
+            </p>
+            {receipt.conversionRate !== 1 && (
+              <p>
+                <span className="block text-xs uppercase text-slate-400">Conversion rate</span>
+                {receipt.conversionRate}
+              </p>
+            )}
           </div>
           {receipt.remarks && <p className="text-sm text-slate-600">{receipt.remarks}</p>}
+          {receipt.duplicateReason && (
+            <p className="text-sm text-amber-700">Invoice received again: {receipt.duplicateReason}</p>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
@@ -114,15 +148,18 @@ export function VendorReceiptDetail({ id }: { id: string }) {
                   <th className="px-3 py-2">Source</th>
                   <th className="px-3 py-2">Bin</th>
                   <th className="px-3 py-2 text-right">Qty</th>
+                  <th className="px-3 py-2 text-right">Returned</th>
+                  {receipt.conversionRate !== 1 && <th className="px-3 py-2 text-right">Invoice price</th>}
                   <th className="px-3 py-2 text-right">Unit cost</th>
                   <th className="px-3 py-2 text-right">Amount</th>
+                  <th className="px-3 py-2 text-right">VAT</th>
                 </tr>
               </thead>
               <tbody>
                 {receipt.lines.map((line) => (
                   <tr key={line.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">
-                      <Link href={`/inventory/${line.part.id}`} className="font-mono font-medium text-primary hover:underline print:text-inherit">
+                      <Link href={`/part-master/${line.part.id}`} className="font-mono font-medium text-primary hover:underline print:text-inherit">
                         {line.part.partNumber}
                       </Link>
                       <span className="block text-xs text-muted-foreground">
@@ -133,14 +170,70 @@ export function VendorReceiptDetail({ id }: { id: string }) {
                     <td className="px-3 py-2 text-slate-600">{line.sourceLabel}</td>
                     <td className="px-3 py-2 font-mono text-slate-600">{line.bin ?? "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{line.receivedQuantity}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{line.returnedQuantity || "—"}</td>
+                    {receipt.conversionRate !== 1 && <td className="px-3 py-2 text-right tabular-nums">{line.unitPrice.toFixed(2)}</td>}
                     <td className="px-3 py-2 text-right tabular-nums">{fmtNaira(line.unitCost)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{fmtNaira(line.amount)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{line.taxAmount ? fmtNaira(line.taxAmount) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="tabular-nums">
+                {[
+                  ["Goods value", fmtNaira(receipt.totalValue)],
+                  ["VAT", fmtNaira(receipt.taxAmount)],
+                  ...(receipt.roundOff ? [["Round off", receipt.roundOff.toFixed(2)]] : []),
+                  ["Net purchase amount", fmtNaira(receipt.netAmount)],
+                ].map(([label, value], i, rows) => (
+                  <tr key={label} className={i === 0 || i === rows.length - 1 ? "border-t" : undefined}>
+                    <td colSpan={receipt.conversionRate !== 1 ? 7 : 6} className={`px-3 py-1.5 text-right ${i === rows.length - 1 ? "font-semibold" : ""}`}>
+                      {label}
+                    </td>
+                    <td className={`px-3 py-1.5 text-right ${i === rows.length - 1 ? "font-semibold" : ""}`}>{value}</td>
+                  </tr>
+                ))}
+              </tfoot>
             </table>
           </div>
         </div>
+
+        {receipt.returns.length > 0 && (
+          <div className="mt-5 grid gap-2 rounded-xl border bg-white p-5 print:border-0">
+            <h2 className="font-semibold">Returned to vendor</h2>
+            <ul className="text-sm">
+              {receipt.returns.map((r) => (
+                <li key={r.id} className="flex flex-wrap justify-between gap-2 border-t py-1.5 first:border-0">
+                  <Link href={`/inventory/mrn-returns/${r.id}`} className="font-mono text-primary hover:underline print:text-inherit">
+                    {r.returnNumber}
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {fmtDate(r.returnDate)} · {r.totalQuantity} unit(s){r.fullReturn ? " · full return" : ""} · {fmtNaira(r.netAmount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {receipt.edits.length > 0 && (
+          <div className="mt-5 grid gap-2 rounded-xl border bg-white p-5 print:hidden">
+            <h2 className="font-semibold">Corrections</h2>
+            <ul className="text-sm">
+              {receipt.edits.map((e) => (
+                <li key={e.id} className="border-t py-1.5 first:border-0">
+                  <span className="font-medium">
+                    {e.partNumber ? `${e.partNumber} ` : ""}
+                    {e.field}
+                  </span>
+                  : {e.oldValue ?? "—"} → {e.newValue ?? "—"}
+                  <span className="block text-xs text-muted-foreground">
+                    {fmtDate(e.createdAt)} · {e.editedBy ? `${e.editedBy.firstName} ${e.editedBy.lastName}` : "—"} · {e.reason}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className={labels ? "grid gap-2" : "hidden"}>

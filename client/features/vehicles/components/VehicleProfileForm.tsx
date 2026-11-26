@@ -11,6 +11,7 @@ import { createVehicleSchema, vehicleProfileSchema, type CreateVehicleFormValues
 import type { Vehicle } from "../types/vehicle.types";
 import { WorkshopPicker } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 /** Identity fields: changing one needs vehicle:identity:update and a reason (server: vehicle-identity.ts). */
 const IDENTITY_KEYS = ["vin", "registrationNumber", "engineNumber", "year", "saleDate", "vehicleModelId", "catalogueId", "modelId", "generationId", "engineId", "customMake", "customModel"] as const;
@@ -186,8 +187,7 @@ export function VehicleProfileForm(
             keyNumber: "Key number",
             sellingDealer: "Selling dealer",
           }[key]}><input className={inputCls} readOnly={lockIdentity && key === "engineNumber"} {...register(key)} /></Field>)}
-        <Field label="Year"><input
-            type="number"
+        <Field label="Year"><NumberInput
             className={inputCls}
             readOnly={lockIdentity}
             {...register("year", {
@@ -205,7 +205,7 @@ export function VehicleProfileForm(
           <Field label="Vehicle parked at"><select className={inputCls} {...register("parkedAt", { setValueAs: blankToNull })}>
             <option value="">Not set</option><option value="SHOWROOM">Showroom</option><option value="STOCKYARD">Stockyard</option><option value="SOLD">Sold</option>
           </select></Field>
-          {money.map(([key, label]) => <Field key={key} label={label}><input type="number" min="0" step="0.01" className={inputCls}
+          {money.map(([key, label]) => <Field key={key} label={label}><NumberInput min="0" step="0.01" className={inputCls}
             {...register(key, { setValueAs: numberOrUndefined })} /></Field>)}
           {(["saleInvoiceNumber", "wcoNumber", "principalInvoiceNumber"] as const).map(key => <Field key={key}
             label={{ saleInvoiceNumber: "Sale invoice number", wcoNumber: "WCO number", principalInvoiceNumber: "Principal company invoice number" }[key]}>
@@ -213,8 +213,8 @@ export function VehicleProfileForm(
           {(["saleInvoiceDate", "wcoDate", "principalInvoiceDate"] as const).map(key => <Field key={key}
             label={{ saleInvoiceDate: "Sale invoice date", wcoDate: "WCO date", principalInvoiceDate: "Principal company invoice date" }[key]}>
             <input type="date" className={inputCls} {...register(key, { setValueAs: blankToNull })} /></Field>)}
-          <Field label="Manufacture month"><input type="number" min="1" max="12" className={inputCls} {...register("manufactureMonth", { setValueAs: numberOrUndefined })} /></Field>
-          <Field label="Manufacture year"><input type="number" min="1900" max="2200" className={inputCls} {...register("manufactureYear", { setValueAs: numberOrUndefined })} /></Field>
+          <Field label="Manufacture month"><NumberInput min="1" max="12" className={inputCls} {...register("manufactureMonth", { setValueAs: numberOrUndefined })} /></Field>
+          <Field label="Manufacture year"><NumberInput min="1900" max="2200" className={inputCls} {...register("manufactureYear", { setValueAs: numberOrUndefined })} /></Field>
           <label className="flex gap-2"><input type="checkbox" {...register("theft")} />Theft vehicle</label>
         </div>
         <div className="mt-4 grid gap-3">

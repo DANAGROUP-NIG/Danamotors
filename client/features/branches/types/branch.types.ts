@@ -16,6 +16,8 @@ export type Branch = {
   /** Set when this is a sub-location (store, godown) at another branch's premises. */
   parentBranchId?: string | null;
   parentBranch?: { id: string; name: string; code: string | null } | null;
+  /** Vendor MRN and MRN return totals are rounded to the naira (legacy control1.roundmrn). */
+  roundMrnTotal?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,6 +46,7 @@ export type UpdateBranchPayload = Partial<
     /** null clears the short name. */
     shortName: string | null;
     isActive?: boolean;
+    roundMrnTotal?: boolean;
     /** null clears the code. */
     code: string | null;
     /** null makes the branch top-level again. */

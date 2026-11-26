@@ -17,6 +17,7 @@ import { useCreateIndent } from "../hooks/use-indent-mutations";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
 import { MOBIS_ORDER_MODE_LABELS, fmtCurrency } from "../lib/indent-status";
 import type { CreateIndentPayload, PartSearchResult } from "../types/indent.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type DraftLine = {
   key: string;
@@ -289,8 +290,7 @@ export function IndentCreateForm() {
 
                   <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
                     <Field label="Urgent (vehicle)">
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={inputCls}
                         value={l.urgentQuantity}
@@ -298,8 +298,7 @@ export function IndentCreateForm() {
                       />
                     </Field>
                     <Field label="Urgent (stock)">
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={inputCls}
                         value={l.stockQuantity}
@@ -307,8 +306,7 @@ export function IndentCreateForm() {
                       />
                     </Field>
                     <Field label="Stock order (15 days)">
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={inputCls}
                         value={l.stockOrderQuantity}

@@ -20,6 +20,7 @@ import {
   type ReportRow,
 } from "../api/party-report.api";
 import { FinanceReportNav, PARTY_REPORTS } from "./finance-report-nav";
+import { NumberInput } from "@/components/forms/NumberInput";
 export const VENDOR_PARTIES_ENABLED = false;
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -383,11 +384,10 @@ export function PartyReportsPage({ kind }: { kind: ReportKind }) {
             </legend>
             <div className="grid grid-cols-5 gap-2">
               {Array.from({ length: 5 }, (_, i) => (
-                <input
+                <NumberInput
                   key={i}
                   aria-label={"Age limit " + (i + 1)}
                   aria-invalid={!validAges}
-                  type="number"
                   min="1"
                   max="3650"
                   step="1"

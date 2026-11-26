@@ -14,11 +14,19 @@ Part labels printed on a Zebra label printer plugged into a handheld station PC 
 
 ## The label
 
-2" × 2" (406 × 402 dots at 203 dpi), direct thermal, gap media: the stock loaded in the store's ZTC S4M. Layout
-from the Kia factory labels the store supplied: dealer and branch short name, description (2 lines), part number,
-Code 128 barcode of the part number, bin (`InventoryStock.rackLocation` of the printing branch), print date. No
-QTY (user decision). Template: `server/src/modules/labels/labels.zpl.ts`.
+2" × 2" (406 × 402 dots at 203 dpi), direct thermal, gap media: the stock loaded in the store's ZTC S4M. Laid out
+like the Kia Genuine Parts box labels (user photos, 2026-11-23): description (2 lines) top left, the Kia logo and
+"Genuine Parts" top right, the part number large (a plain 10-13 character Kia number split after the fifth
+character, "96610 H9100", as Kia prints it), the Code 128 barcode of the number as stored, then the bin
+(`InventoryStock.rackLocation` of the printing branch) and the print date, and along the bottom a QR code of the
+part number, the black Kia badge, and the dealer and branch short name. Template:
+`server/src/modules/labels/labels.zpl.ts`.
 
+- Left out: QTY (user decision 2026-10-28), and "Made in", the Mobis lot codes (e.g. LC31 / SRL4) and the serial
+  under the QR code, for which we hold no data (user, 2026-11-23).
+- The logo graphics (`labels.logo.ts`, ZPL `^GFA`) are generated from `client/public/logo.webp` by
+  `hhdc/res/make_label_logo.py`; do not edit them by hand.
+- Proofing a layout on a station PC without the web: `HhdcLinkCli printer file LABELS.zpl`.
 - Bars are 2 dots wide up to 13 characters, 1 dot from 14 (quiet zone kept); the legacy labels used 1 dot from 9
   characters and scanned for years. Printed and scanned on the MC3190 on 2026-10-28: 10, 12 and 20 characters
   (spaces, lowercase). The handheld matches scans on letters and digits only, so hyphens and spaces do not matter.

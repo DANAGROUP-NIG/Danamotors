@@ -28,6 +28,7 @@ export class BranchService {
         email: branch.email,
         code: branch.code,
         shortName: branch.shortName,
+        roundMrnTotal: branch.roundMrnTotal,
         parentBranchId: branch.parentBranchId,
         parentBranch: branch.parentBranch,
         isActive: branch.isActive,
@@ -61,6 +62,7 @@ export class BranchService {
       email: branch.email,
       code: branch.code,
       shortName: branch.shortName,
+      roundMrnTotal: branch.roundMrnTotal,
       parentBranchId: branch.parentBranchId,
       parentBranch: branch.parentBranch,
       subLocations: branch.subLocations,
@@ -105,6 +107,7 @@ export class BranchService {
       email: branch.email,
       code: branch.code,
       shortName: branch.shortName,
+      roundMrnTotal: branch.roundMrnTotal,
       parentBranchId: branch.parentBranchId,
       isActive: branch.isActive,
       createdAt: branch.createdAt,
@@ -122,6 +125,7 @@ export class BranchService {
     email?: string;
     code?: string | null;
     shortName?: string | null;
+    roundMrnTotal?: boolean;
     parentBranchId?: string | null;
   }) {
     const branch = await this.branchRepository.findBranchById(id);
@@ -151,6 +155,7 @@ export class BranchService {
       email: updatedBranch.email,
       code: updatedBranch.code,
       shortName: updatedBranch.shortName,
+      roundMrnTotal: updatedBranch.roundMrnTotal,
       parentBranchId: updatedBranch.parentBranchId,
       isActive: updatedBranch.isActive,
       createdAt: updatedBranch.createdAt,

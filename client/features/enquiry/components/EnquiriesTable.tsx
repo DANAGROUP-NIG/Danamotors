@@ -86,7 +86,7 @@ function toExportableRow(e: Enquiry): ExportableEnquiryRow {
   return {
     id: e.id,
     customer: `${e.firstName} ${e.lastName}`.trim(),
-    email: e.email,
+    email: e.email ?? '',
     phone: e.phoneNumber,
     vehicle: vehicleLabel(e),
     preferredDate: formatDate(e.preferredDate),
@@ -102,7 +102,7 @@ function formatEnquiryText(e: Enquiry): string {
   const vehicle = vehicleLabel(e) || 'N/A';
   return [
     `*${name}*`,
-    `Email: ${e.email}`,
+    `Email: ${e.email || 'N/A'}`,
     `Phone: ${e.phoneNumber}`,
     `Vehicle: ${vehicle}`,
     `Preferred date: ${formatDate(e.preferredDate) || 'N/A'}`,
@@ -184,7 +184,7 @@ export function EnquiriesTable() {
           <p className='font-medium text-foreground'>
             {e.firstName} {e.lastName}
           </p>
-          <p className='text-sm text-muted-foreground'>{e.email}</p>
+          {e.email && <p className='text-sm text-muted-foreground'>{e.email}</p>}
         </div>
       ),
     },

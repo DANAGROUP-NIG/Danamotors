@@ -98,7 +98,7 @@ export default function WorkshopManagerDashboard() {
           Job Cards
         </a>
         <a
-          href="/inventory"
+          href="/part-master"
           className="flex items-center gap-2 rounded-lg border border-[#e8edf3] bg-white px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
         >
           <Package className="size-4 text-muted-foreground" />
@@ -149,7 +149,7 @@ export default function WorkshopManagerDashboard() {
           )}
         </div>
         <a
-          href="/inventory"
+          href="/part-master"
           className={cn(
             "shrink-0 text-sm font-bold hover:underline",
             data.inventoryAlerts > 0 ? "text-amber-700" : "text-emerald-700",

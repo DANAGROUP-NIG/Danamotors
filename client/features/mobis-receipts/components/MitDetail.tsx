@@ -23,6 +23,7 @@ import {
 import type { MobisMit } from "../types/mobis.types";
 import { HandheldCard, useHandheldDocuments, type HandheldDocument } from "@/features/handheld";
 import { DiscrepancyPanel } from "@/features/stock-discrepancy/components/DiscrepancyPanel";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -137,8 +138,7 @@ function MrnDialog({ mit, verified, onClose }: { mit: MobisMit; verified?: Handh
                   <td className={cn(tdCls, "text-right")}>{line.quantity}</td>
                   {(["received", "damaged"] as const).map((field) => (
                     <td key={field} className={cn(tdCls, "text-right")}>
-                      <input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={cn(numCls, !ok && "border-red-400")}
                         value={rows[line.id]?.[field] ?? ""}
@@ -216,7 +216,7 @@ export function MitDetail({ id }: { id: string }) {
   if (error || !mit) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href="/inventory/mobis-receipts" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/inventory/mit" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to MIT
         </Link>
         <p className="text-sm text-red-500">MIT not found, or you do not have access to it.</p>
@@ -230,7 +230,7 @@ export function MitDetail({ id }: { id: string }) {
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href="/inventory/mobis-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/inventory/mit" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to MIT
         </Link>
         <div className="flex flex-wrap gap-2">
@@ -283,7 +283,7 @@ export function MitDetail({ id }: { id: string }) {
               {newParts.map((l, i) => (
                 <span key={l.id}>
                   {i > 0 && ", "}
-                  <Link href={`/inventory/${l.partId}`} className="font-mono font-medium hover:underline">
+                  <Link href={`/part-master/${l.partId}`} className="font-mono font-medium hover:underline">
                     {l.part.partNumber}
                   </Link>
                 </span>
@@ -353,7 +353,7 @@ export function MitDetail({ id }: { id: string }) {
                     <td className={cn(tdCls, "font-mono text-sm")}>{l.orderNumber ?? ""}</td>
                     <td className={cn(tdCls, "font-mono text-sm")}>{l.lineNumber != null ? String(l.lineNumber).padStart(4, "0") : ""}</td>
                     <td className={tdCls}>
-                      <Link href={`/inventory/${l.partId}`} className="font-mono text-sm font-medium hover:underline">
+                      <Link href={`/part-master/${l.partId}`} className="font-mono text-sm font-medium hover:underline">
                         {l.part.partNumber}
                       </Link>
                       {l.newPart && <span className="ml-1.5 rounded bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">NEW</span>}

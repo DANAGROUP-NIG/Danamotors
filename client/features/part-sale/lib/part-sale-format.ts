@@ -1,5 +1,5 @@
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
-import type { CustomerOrderStatus, OrderLineCounts, SaleCustomer, TransportMode } from "../types/part-sale.types";
+import type { CustomerOrderStatus, OrderLineCounts, SaleCustomer, SaleTaxForm, TransportMode } from "../types/part-sale.types";
 
 export { fmtCurrency } from "@/features/stock-transfers/lib/indent-status";
 export { fmtDate, isCpd } from "@/features/mobis-receipts/lib/mobis-labels";
@@ -36,6 +36,15 @@ export const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
   DOOR_DELIVERY: "Door delivery",
 };
 
+export const TAX_FORM_LABELS: Record<SaleTaxForm, string> = {
+  VAT_SALE: "Sale (VAT)",
+  TRANSFER_WITHOUT_VAT: "Transfer without VAT (TRNSFR WO/V)",
+};
+
+/** VAT % on a bill line: none on a transfer without VAT (legacy form X), else 7.5% on taxable parts. */
+export const lineVatPercent = (taxForm: SaleTaxForm, taxable: boolean | undefined) =>
+  taxForm === "TRANSFER_WITHOUT_VAT" || !taxable ? 0 : VAT_RATE;
+
 export const customerName = (c: Pick<SaleCustomer, "companyName" | "firstName" | "lastName">) =>
   c.companyName || `${c.firstName} ${c.lastName}`.trim();
 
@@ -52,22 +61,40 @@ export const VAT_RATE = 7.5;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Preview of the server's bill and return pricing (legacy CPD counter sale):
- * gross - cash discount, plus VAT on taxable lines, rounded down to the nearest 10 naira.
+ * Preview of the server's bill and return pricing (legacy counter sale), per line:
+ * gross, less the line trade discount %, less the bill cash discount %, plus the line handling %,
+ * plus VAT on what is left; the bill is rounded down to the nearest 10 naira.
  * The server recomputes everything when the document is saved.
  */
-export function previewSale(lines: { quantity: number; rate: number; vatPercent: number }[], discountPercent: number) {
+export function previewSale(
+  lines: { quantity: number; rate: number; vatPercent: number; tradeDiscountPercent?: number; handlingPercent?: number }[],
+  discountPercent: number,
+) {
   let gross = 0;
+  let tradeDiscount = 0;
   let discount = 0;
+  let handling = 0;
   let vat = 0;
   for (const l of lines) {
     const g = round2(l.quantity * l.rate);
-    const d = round2((g * discountPercent) / 100);
+    const t = round2((g * (l.tradeDiscountPercent ?? 0)) / 100);
+    const d = round2(((g - t) * discountPercent) / 100);
+    const h = round2(((g - t - d) * (l.handlingPercent ?? 0)) / 100);
     gross += g;
+    tradeDiscount += t;
     discount += d;
-    vat += round2(((g - d) * l.vatPercent) / 100);
+    handling += h;
+    vat += round2(((g - t - d + h) * l.vatPercent) / 100);
   }
-  const beforeRoundOff = round2(gross - discount + vat);
+  const beforeRoundOff = round2(gross - tradeDiscount - discount + handling + vat);
   const total = Math.floor(beforeRoundOff / 10) * 10;
-  return { gross: round2(gross), discount: round2(discount), vat: round2(vat), roundOff: round2(total - beforeRoundOff), total };
+  return {
+    gross: round2(gross),
+    tradeDiscount: round2(tradeDiscount),
+    discount: round2(discount),
+    handling: round2(handling),
+    vat: round2(vat),
+    roundOff: round2(total - beforeRoundOff),
+    total,
+  };
 }

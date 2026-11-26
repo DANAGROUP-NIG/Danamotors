@@ -19,7 +19,7 @@ type MergeEntry = {
 const MOVED_LABELS: Record<string, string> = {
   vehicles: "vehicles", vehicleOwnerships: "ownership records", appointments: "appointments", jobCards: "job cards",
   estimates: "estimates", customerApprovals: "approvals", warrantyCases: "warranty cases", invoices: "bills",
-  receipts: "receipts", customerOrders: "customer orders", counterSaleReturns: "sale returns", vendorReceipts: "vendor receipts",
+  receipts: "receipts", customerOrders: "customer orders", counterSaleReturns: "sale returns", vendorReceipts: "vendor receipts", vendorReturns: "MRN returns",
   partyNotes: "debit/credit notes", partyAdjustments: "adjustments", creditTransactions: "credit entries",
   creditApplications: "credit applications", outstandingLetters: "outstanding letters", documents: "documents",
   serviceHistory: "service history entries", earlierMerges: "earlier merged records",

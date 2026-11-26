@@ -24,10 +24,21 @@ interface PartPickerProps {
   searchQuery?: PartSearchQuery;
   /** Right-hand detail for each result; defaults to stock at both branches. */
   renderMeta?: (part: PartSearchResult) => ReactNode;
+  /** Local, used and repaired parts too (direct STN). Indents leave them out. */
+  allSources?: boolean;
 }
 
 /** Search-as-you-type part selector showing stock at both branches. */
-export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, placeholder, disabled, searchQuery, renderMeta }: PartPickerProps) {
+export function PartPicker({
+  requestingBranchId,
+  sourceBranchId,
+  onSelect,
+  placeholder,
+  disabled,
+  searchQuery,
+  renderMeta,
+  allSources,
+}: PartPickerProps) {
   const [text, setText] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -47,8 +58,8 @@ export function PartPicker({ requestingBranchId, sourceBranchId, onSelect, place
   }, []);
 
   const indentQuery = {
-    queryKey: indentKeys.partSearch({ search: debounced, requestingBranchId, sourceBranchId }),
-    queryFn: () => searchIndentPartsRequest({ search: debounced, requestingBranchId, sourceBranchId }),
+    queryKey: indentKeys.partSearch({ search: debounced, requestingBranchId, sourceBranchId, allSources }),
+    queryFn: () => searchIndentPartsRequest({ search: debounced, requestingBranchId, sourceBranchId, allSources }),
   };
   const { data, isFetching } = useQuery({
     ...(searchQuery ? searchQuery(debounced) : indentQuery),

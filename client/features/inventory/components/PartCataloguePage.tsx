@@ -124,7 +124,7 @@ export function PartCataloguePage() {
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
-      <Link href="/inventory" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+      <Link href="/part-master" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft className="size-4" /> Back to Inventory
       </Link>
       <PageHeader

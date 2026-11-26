@@ -8,6 +8,7 @@ import { creditKeys } from "@/features/credit/api/credit.keys";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { cancelReceiptRequest, updateReceiptRequest, type ReceiptRegisterRow } from "../api/invoice.api";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { receipt: ReceiptRegisterRow | null; onClose: () => void; canEdit: boolean; canCancel: boolean }) {
   const queryClient = useQueryClient();
@@ -47,7 +48,7 @@ export function ReceiptManageModal({ receipt, onClose, canEdit, canCancel }: { r
     <ModalFame isOpen={Boolean(receipt)} onClose={() => { if (!update.isPending && !cancel.isPending) onClose(); }} title={`Receipt ${receipt.receiptNumber}`}>
       <form inert={update.isPending || cancel.isPending} className="grid gap-4" onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
         <p className="text-sm text-muted-foreground">Only amount and narration can be edited. The server recalculates bill allocations.</p>
-        <Field label="Amount received (NGN)"><input type="number" min="0.01" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
+        <Field label="Amount received (NGN)"><NumberInput min="0.01" step="0.01" className={inputCls} value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
         <Field label="Narration"><textarea className={inputCls} rows={3} maxLength={1000} value={narration} onChange={(event) => setNarration(event.target.value)} /></Field>
         <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
           {canEdit && <Button type="submit" disabled={update.isPending || Number(amount) <= 0}>{update.isPending ? "Saving..." : "Save changes"}</Button>}

@@ -176,6 +176,8 @@ export class EnquiryService {
       scheduledAt: new Date(data.scheduledAt!),
       durationMins: data.durationMins,
       notes: data.notes ?? enquiry.serviceDescription,
+      // A booking needs at least one customer request; the enquiry's service description is it.
+      requests: [{ description: enquiry.serviceDescription.trim() }],
       status: "Pending",
       source: "OnlineBooking",
     });
@@ -234,12 +236,13 @@ export class EnquiryService {
 
     const prefill: Record<string, unknown> = {
       customerName: `${enquiry.firstName} ${enquiry.lastName}`,
-      email: enquiry.email,
+      email: enquiry.email ?? null,
       phoneNumber: enquiry.phoneNumber,
       vehicleMake: enquiry.vehicleMake ?? null,
       vehicleModel: enquiry.vehicleModel ?? null,
       vehicleYear: enquiry.vehicleYear ?? null,
       vehicleRegNumber: enquiry.vehicleRegNumber ?? null,
+      vin: enquiry.vin ?? null,
       serviceDescription: enquiry.serviceDescription,
       preferredDate: enquiry.preferredDate ?? null,
       branchId: enquiry.branch.id,
