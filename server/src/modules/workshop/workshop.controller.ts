@@ -66,13 +66,14 @@ export class WorkshopController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { technicianId, qualityInspectorId } = req.body;
+      const { technicianId, qualityInspectorId, workflowVersion } = req.body;
       await assertJobAccess(req);
       const result = await this.workshopService.assignTechnician(
         id,
         technicianId,
         qualityInspectorId,
         req.user?.userId,
+        workflowVersion,
       );
       res.status(200).json({
         status: "success",
@@ -118,13 +119,14 @@ export class WorkshopController {
   ): Promise<void> => {
     try {
       const { id } = req.params;
-      const { qcStatus, qcNotes } = req.body;
+      const { qcStatus, qcNotes, workflowVersion } = req.body;
       await assertJobAccess(req);
       const result = await this.workshopService.updateQC(
         id,
         qcStatus,
         qcNotes,
         req.user?.userId,
+        workflowVersion,
       );
       res.status(200).json({
         status: "success",

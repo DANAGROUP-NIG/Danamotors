@@ -23,6 +23,8 @@ import { planEstimateRevision } from "./estimate-revision";
 import { scopeJobCard } from "./job-card-visibility";
 import { nextDocumentNumber } from "../finance/document-number";
 import { latestEstimateQuery } from "./estimate-approval";
+import { requireServiceJobAction } from "./service-job-policy";
+import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { getBranchSettings } from "../company-settings/company-settings.service";
 import {
   serviceChargeDescription,
@@ -48,6 +50,7 @@ import {
   NotFoundError,
   ConflictError,
   BadRequestError,
+  ForbiddenError,
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import { NotificationService } from "../notification/notification.service";
@@ -900,6 +903,7 @@ export class ServiceService {
           include: {
             serviceType: { select: { description: true } },
             vehicle: { include: { catalogue: true } },
+            serviceWorkflow: { include: { parts: true } },
           },
         });
         if (!card) throw new NotFoundError("Job card not found");
@@ -912,6 +916,55 @@ export class ServiceService {
           throw new BadRequestError(
             "Estimates can only be added to unbilled jobs",
           );
+        const workflow = card.serviceWorkflow;
+        const inspectedParts = new Map(
+          workflow?.parts.map((part) => [part.sparePartId, part]),
+        );
+        if (workflow) {
+          const actor = actorId
+            ? await tx.user.findUnique({
+                where: { id: actorId },
+                include: { role: true },
+              })
+            : null;
+          if (!actor?.isActive)
+            throw new ForbiddenError("An active staff account is required");
+          const stage = requireServiceJobAction("prepareEstimate", {
+            stage: workflow.stage,
+            technicianId: card.technicianId,
+            actorId: actor.id,
+            role: actor.role.name,
+            warrantyBypassEnabled: false,
+          });
+          const estimateParts = data.lines.filter(
+            (line) => line.type === "PART",
+          );
+          if (
+            estimateParts.length !== inspectedParts.size ||
+            estimateParts.some(
+              (line) =>
+                inspectedParts.get(line.referenceId ?? "")?.quantity !==
+                line.quantity,
+            )
+          ) {
+            throw new ConflictError(
+              "Use the exact parts and quantities from the submitted inspection",
+            ).withCode("ESTIMATE_INSPECTION_SCOPE_MISMATCH");
+          }
+          await tx.serviceJobWorkflow.update({
+            where: { jobCardId, version: workflow.version },
+            data: { stage, version: { increment: 1 } },
+          });
+          await tx.jobCardStatusHistory.create({
+            data: {
+              jobCardId,
+              fromStatus: workflow.stage,
+              toStatus: stage,
+              actorId: actor.id,
+              remarks: "Estimate prepared",
+            },
+          });
+        }
         const billable = data.lines.filter((line) => line.type !== "COMPLAINT");
         // Each part record once: a used or local version of a part is its own record (source record).
         if (
@@ -954,6 +1007,8 @@ export class ServiceService {
           let rate = 0;
           let quantity = line.quantity;
           let partSource: string | null = null;
+          let isUnderWarranty = false;
+          let catalogueRate: number | null = null;
           if (line.type === "PART") {
             const part = line.referenceId
               ? await tx.sparePart.findUnique({
@@ -961,14 +1016,17 @@ export class ServiceService {
                 })
               : null;
             if (!part) throw new BadRequestError("Select a part");
-            if (part.retailRate == null)
+            isUnderWarranty =
+              inspectedParts.get(part.id)?.isUnderWarranty === true;
+            if (part.retailRate == null && !isUnderWarranty)
               throw new BadRequestError(
                 `Retail rate is not set for ${part.partNumber}`,
               );
             // Snapshot of the chosen record's source (part flag), kept for reporting.
             partSource = part.partFlag;
             description = part.name;
-            rate = part.retailRate;
+            catalogueRate = workflow ? part.retailRate : null;
+            rate = isUnderWarranty ? 0 : (part.retailRate ?? 0);
           } else if (line.type === "LABOUR") {
             const item = line.referenceId
               ? await tx.labourItem.findFirst({
@@ -1015,6 +1073,7 @@ export class ServiceService {
           lines.push({
             ...fields,
             partSource,
+            ...(workflow ? { isUnderWarranty, catalogueRate } : {}),
             type: includedInService ? `INCLUDED_${line.type}` : line.type,
             description,
             rate: includedInService ? 0 : rate,
@@ -1145,7 +1204,13 @@ export class ServiceService {
           );
         const card = await tx.jobCard.findUniqueOrThrow({
           where: { id: approvalJobCardId },
+          include: { serviceWorkflow: true },
         });
+        const workflow = card.serviceWorkflow;
+        if (workflow && workflow.stage !== "ESTIMATE_PREPARED")
+          throw new ConflictError(
+            "Prepare the estimate before recording its decision",
+          ).withCode("WORKFLOW_STAGE_CONFLICT");
         if (
           card.billedAt ||
           ["BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -1201,6 +1266,33 @@ export class ServiceService {
             );
         }
         const status = data.approved ? "Approved" : "Declined";
+        if (workflow && data.approved) {
+          if (!actorId)
+            throw new ForbiddenError(
+              "Staff signature capture is required for this estimate",
+            );
+          const stage = "ESTIMATE_APPROVED";
+          await tx.serviceJobWorkflow.update({
+            where: { jobCardId: card.id, version: workflow.version },
+            data: { stage, version: { increment: 1 } },
+          });
+          await tx.jobCardStatusHistory.create({
+            data: {
+              jobCardId: card.id,
+              fromStatus: workflow.stage,
+              toStatus: stage,
+              actorId,
+              remarks: "Estimate approved",
+            },
+          });
+          await enqueueWorkshopNotification(
+            tx,
+            "ESTIMATE_APPROVED",
+            card,
+            String(workflow.version + 1),
+            actorId,
+          );
+        }
         if (data.approved) {
           const services = estimate.lines.filter(
             (line) => line.type === "SERVICE",

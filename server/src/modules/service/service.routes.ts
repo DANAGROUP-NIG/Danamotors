@@ -1,11 +1,20 @@
 import { recordJobDeposit } from "./job-deposit.service";
-import { listMultiJobVehicles, multiJobBranch, multiJobVehiclesQuery } from "./multi-job-vehicles";
+import {
+  listMultiJobVehicles,
+  multiJobBranch,
+  multiJobVehiclesQuery,
+} from "./multi-job-vehicles";
 import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
-import { ConflictError } from "../../shared/errors/appError";
+import { ConflictError, NotFoundError } from "../../shared/errors/appError";
+import {
+  readServiceJobInspection,
+  serviceJobInspectionAction,
+  updateServiceJobInspection,
+} from "./service-job-inspection";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -115,8 +124,18 @@ router.get(
   async (req, res, next) => {
     try {
       // Repeat check for the opening form: the automatic candidate and the vehicle's earlier jobs.
-      const { params, query } = repeatPreviewSchema.parse({ params: req.params, query: req.query });
-      res.json({ status: "success", data: await new RepeatJobService().preview(params.id, query, repeatActor(req)) });
+      const { params, query } = repeatPreviewSchema.parse({
+        params: req.params,
+        query: req.query,
+      });
+      res.json({
+        status: "success",
+        data: await new RepeatJobService().preview(
+          params.id,
+          query,
+          repeatActor(req),
+        ),
+      });
     } catch (error) {
       next(error);
     }
@@ -899,7 +918,10 @@ router.get(
   async (req, res, next) => {
     try {
       const query = multiJobVehiclesQuery.parse(req.query);
-      const data = await listMultiJobVehicles(query, multiJobBranch(req.user, query.branchId));
+      const data = await listMultiJobVehicles(
+        query,
+        multiJobBranch(req.user, query.branchId),
+      );
       res.json({ status: "success", statusCode: 200, data });
     } catch (error) {
       next(error);
@@ -911,6 +933,55 @@ router.get(
   requirePermission(PERMISSIONS.JOBCARD_READ),
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
+);
+router.post(
+  "/job-cards/:id/workflow/inspection",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  validateRequest(
+    jobCardIdParamSchema.extend({ body: serviceJobInspectionAction }),
+  ),
+  async (req, res, next) => {
+    try {
+      const card = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
+      if (!card) throw new NotFoundError("Job card not found");
+      assertBranchOwnership(req, card.branchId);
+      const workflow = await updateServiceJobInspection(
+        req.params.id,
+        card.branchId,
+        req.user!,
+        req.body,
+      );
+      res.status(200).json({ status: "success", data: { workflow } });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+router.get(
+  "/job-cards/:id/workflow/inspection",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  validateRequest(jobCardIdParamSchema),
+  async (req, res, next) => {
+    try {
+      const card = await prisma.jobCard.findUnique({
+        where: { id: req.params.id },
+        select: { branchId: true },
+      });
+      if (!card) throw new NotFoundError("Job card not found");
+      assertBranchOwnership(req, card.branchId);
+      const workflow = await readServiceJobInspection(
+        req.params.id,
+        card.branchId,
+        req.user!,
+      );
+      res.status(200).json({ status: "success", data: { workflow } });
+    } catch (error) {
+      next(error);
+    }
+  },
 );
 /**
  * @openapi
@@ -942,14 +1013,23 @@ router.get(
  */
 router.post(
   "/job-cards/:id/request-parts",
-  requireAnyPermission(
-    PERMISSIONS.PARTISSUANCE_CREATE,
-    PERMISSIONS.PARTRETURN_CREATE,
-  ),
+  (req, res, next) => {
+    if (req.user?.role === ROLES.WORKSHOP_MANAGER)
+      return requirePermission(PERMISSIONS.ASSIGNMENT_CREATE)(req, res, next);
+    return requireAnyPermission(
+      PERMISSIONS.PARTISSUANCE_CREATE,
+      PERMISSIONS.PARTRETURN_CREATE,
+    )(req, res, next);
+  },
   validateRequest(
     z.object({
       params: z.object({ id: z.string().uuid() }),
-      body: z.object({ requestId: z.string().uuid() }).strict(),
+      body: z
+        .object({
+          requestId: z.string().uuid(),
+          workflowVersion: z.number().int().nonnegative().optional(),
+        })
+        .strict(),
     }),
   ),
   controller.requestParts,

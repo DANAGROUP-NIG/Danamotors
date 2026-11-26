@@ -764,6 +764,7 @@ model JobCard {
   mileage            Int?
   promisedAt         DateTime?
   partsRequestedAt   DateTime?
+  serviceWorkflow    ServiceJobWorkflow?
   acFitted           Boolean                @default(false)
   inHouse            Boolean                @default(true)
   remarks            String?
@@ -1129,6 +1130,7 @@ enum PartRole {
 // ============================================================
 
 model SparePart {
+  serviceWorkflowParts ServiceJobWorkflowPart[]
   requisitionLines      PartRequisitionLine[]
   handheldLines         HandheldDocumentLine[] @relation("HandheldLinePart")
   reportTaxCategoryCode String?
@@ -1842,6 +1844,7 @@ model JobCardLabour {
 }
 
 model InvoiceLine {
+  isUnderWarranty Boolean @default(false)
   jobCardLineId   String?
   jobCardLine     JobCardLine?   @relation(fields: [jobCardLineId], references: [id], onDelete: Restrict)
   id              String         @id @default(uuid())
@@ -2439,6 +2442,38 @@ model JobComplaint {
   @@index([jobCardId])
 }
 
+model ServiceJobWorkflow {
+  jobCardId             String @id
+  jobCard               JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  stage                 String @default("OPENED")
+  version               Int @default(0)
+  faultVerification     String
+  faultVerifiedById     String
+  faultVerifiedAt       DateTime @default(now())
+  inspectionRemarks     String?
+  inspectionSubmittedById String?
+  inspectionSubmittedAt DateTime?
+  noPartsRequired       Boolean @default(false)
+  warrantyResolvedById  String?
+  warrantyResolvedAt    DateTime?
+  warrantySource        String?
+  parts                 ServiceJobWorkflowPart[]
+}
+
+model ServiceJobWorkflowPart {
+  jobCardId       String
+  workflow        ServiceJobWorkflow @relation(fields: [jobCardId], references: [jobCardId], onDelete: Cascade)
+  sparePartId     String
+  sparePart       SparePart @relation(fields: [sparePartId], references: [id], onDelete: Restrict)
+  partNumber      String
+  name            String
+  quantity        Int
+  isUnderWarranty Boolean @default(false)
+
+  @@id([jobCardId, sparePartId])
+  @@index([sparePartId])
+}
+
 model JobCardStatusHistory {
   id         String   @id @default(uuid())
   jobCardId  String
@@ -2468,6 +2503,8 @@ model LabourRate {
 }
 
 model EstimateLine {
+  isUnderWarranty Boolean @default(false)
+  catalogueRate Float?
   id          String   @id @default(uuid())
   estimateId  String
   estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)

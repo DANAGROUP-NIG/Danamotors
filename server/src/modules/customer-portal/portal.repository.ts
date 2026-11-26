@@ -1,11 +1,6 @@
 import { jobScope } from "../reports/report.repository";
-import prisma from '../../prisma/client';
-import {
-  Vehicle,
-  JobCard,
-  ServiceAppointment,
-  Invoice,
-} from '@prisma/client';
+import prisma from "../../prisma/client";
+import { Vehicle, JobCard, ServiceAppointment, Invoice } from "@prisma/client";
 
 export type VehicleWithJobs = Vehicle & {
   images: { id: string; url: string; type: string | null }[];
@@ -13,7 +8,13 @@ export type VehicleWithJobs = Vehicle & {
 };
 
 export type JobCardWithRelations = JobCard & {
-  vehicle: { id: string; make: string | null; model: string | null; year: number | null; registrationNumber: string | null } | null;
+  vehicle: {
+    id: string;
+    make: string | null;
+    model: string | null;
+    year: number | null;
+    registrationNumber: string | null;
+  } | null;
   branch: { id: string; name: string };
   estimates: {
     id: string;
@@ -22,11 +23,34 @@ export type JobCardWithRelations = JobCard & {
     currency: string;
     status: string;
     createdAt: Date;
-    approvals: { id: string; approved: boolean | null; decisionDate: Date | null; comments: string | null; status: string }[];
+    approvals: {
+      id: string;
+      approved: boolean | null;
+      decisionDate: Date | null;
+      comments: string | null;
+      status: string;
+    }[];
   }[];
-  consolidatedInvoices?: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
-  invoices: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
-  inspections: { id: string; findings: string; status: string; passed: boolean | null }[];
+  consolidatedInvoices?: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    total: number;
+    issuedDate: Date;
+  }[];
+  invoices: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    total: number;
+    issuedDate: Date;
+  }[];
+  inspections: {
+    id: string;
+    findings: string;
+    status: string;
+    passed: boolean | null;
+  }[];
 };
 
 export class PortalRepository {
@@ -42,20 +66,23 @@ export class PortalRepository {
   async listVehicles(customerId: string): Promise<VehicleWithJobs[]> {
     return prisma.vehicle.findMany({
       where: { customerId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
+        jobCards: { where: jobScope({}), orderBy: { createdAt: "desc" } },
       },
     }) as Promise<VehicleWithJobs[]>;
   }
 
-  async findVehicle(customerId: string, vehicleId: string): Promise<VehicleWithJobs | null> {
+  async findVehicle(
+    customerId: string,
+    vehicleId: string,
+  ): Promise<VehicleWithJobs | null> {
     return prisma.vehicle.findFirst({
       where: { id: vehicleId, customerId },
       include: {
         images: { select: { id: true, url: true, type: true } },
-        jobCards: { where:jobScope({}), orderBy: { createdAt: 'desc' } },
+        jobCards: { where: jobScope({}), orderBy: { createdAt: "desc" } },
       },
     }) as Promise<VehicleWithJobs | null>;
   }
@@ -66,7 +93,10 @@ export class PortalRepository {
   ): Promise<JobCardWithRelations[]> {
     return prisma.jobCard.findMany({
       where: {
-        AND: [jobScope({}), ...(filters.status ? [{ status: filters.status }] : [])],
+        AND: [
+          jobScope({}),
+          ...(filters.status ? [{ status: filters.status }] : []),
+        ],
         customerId,
         ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
       },
@@ -82,7 +112,7 @@ export class PortalRepository {
         },
         branch: { select: { id: true, name: true } },
         estimates: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             approvals: {
               select: {
@@ -95,7 +125,15 @@ export class PortalRepository {
             },
           },
         },
-        consolidatedInvoices: { select: { id: true, invoiceNumber: true, status: true, total: true, issuedDate: true } },
+        consolidatedInvoices: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            total: true,
+            issuedDate: true,
+          },
+        },
         invoices: {
           select: {
             id: true,
@@ -109,7 +147,7 @@ export class PortalRepository {
           select: { id: true, findings: true, status: true, passed: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     }) as Promise<JobCardWithRelations[]>;
   }
 
@@ -133,7 +171,7 @@ export class PortalRepository {
         },
         branch: { select: { id: true, name: true } },
         estimates: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             approvals: {
               select: {
@@ -146,7 +184,15 @@ export class PortalRepository {
             },
           },
         },
-        consolidatedInvoices: { select: { id: true, invoiceNumber: true, status: true, total: true, issuedDate: true } },
+        consolidatedInvoices: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            total: true,
+            issuedDate: true,
+          },
+        },
         invoices: {
           select: {
             id: true,
@@ -157,7 +203,13 @@ export class PortalRepository {
           },
         },
         inspections: {
-          select: { id: true, findings: true, status: true, passed: true, notes: true },
+          select: {
+            id: true,
+            findings: true,
+            status: true,
+            passed: true,
+            notes: true,
+          },
         },
       },
     }) as Promise<JobCardWithRelations | null>;
@@ -188,14 +240,14 @@ export class PortalRepository {
           },
         },
       },
-      orderBy: { scheduledAt: 'desc' },
+      orderBy: { scheduledAt: "desc" },
     }) as Promise<ServiceAppointment[]>;
   }
 
   async listServices() {
     return prisma.service.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
       select: {
         id: true,
         name: true,
@@ -210,11 +262,16 @@ export class PortalRepository {
 
   async listInvoices(customerId: string): Promise<Invoice[]> {
     return prisma.invoice.findMany({
-      where: { customerId, OR:[{jobCardId:null},{jobCard:{is:jobScope({})}}] },
+      where: {
+        customerId,
+        OR: [{ jobCardId: null }, { jobCard: { is: jobScope({}) } }],
+      },
       include: {
         jobCard: {
           select: {
-            id:true,jobNumber:true,status:true,
+            id: true,
+            jobNumber: true,
+            status: true,
             vehicle: {
               select: {
                 id: true,
@@ -228,9 +285,12 @@ export class PortalRepository {
         },
         payments: true,
         receipts: true,
-        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
+        allocations: {
+          where: { reversedAt: null },
+          include: { receipt: true, creditNote: true },
+        },
         creditApplications: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             amount: true,
@@ -241,17 +301,23 @@ export class PortalRepository {
           },
         },
       },
-      orderBy: { issuedDate: 'desc' },
+      orderBy: { issuedDate: "desc" },
     }) as Promise<Invoice[]>;
   }
 
-  async findInvoice(customerId: string, invoiceId: string): Promise<Invoice | null> {
+  async findInvoice(customerId: string, invoiceId: string) {
     return prisma.invoice.findFirst({
-      where: { id: invoiceId, customerId, OR:[{jobCardId:null},{jobCard:{is:jobScope({})}}] },
+      where: {
+        id: invoiceId,
+        customerId,
+        OR: [{ jobCardId: null }, { jobCard: { is: jobScope({}) } }],
+      },
       include: {
         jobCard: {
           select: {
-            id:true,jobNumber:true,status:true,
+            id: true,
+            jobNumber: true,
+            status: true,
             vehicle: {
               select: {
                 id: true,
@@ -264,10 +330,23 @@ export class PortalRepository {
           },
         },
         payments: true,
+        lines: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            rate: true,
+            amount: true,
+            isUnderWarranty: true,
+          },
+        },
         receipts: true,
-        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
+        allocations: {
+          where: { reversedAt: null },
+          include: { receipt: true, creditNote: true },
+        },
         creditApplications: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             amount: true,
@@ -278,6 +357,6 @@ export class PortalRepository {
           },
         },
       },
-    }) as Promise<Invoice | null>;
+    });
   }
 }

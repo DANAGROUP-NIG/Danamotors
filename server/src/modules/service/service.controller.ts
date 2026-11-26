@@ -455,6 +455,7 @@ export class ServiceController {
         card.branchId,
         req.user!.userId,
         req.body.requestId,
+        req.body.workflowVersion,
       );
       res.status(200).json({
         status: "success",

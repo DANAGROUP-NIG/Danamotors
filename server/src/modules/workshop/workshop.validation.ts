@@ -17,6 +17,7 @@ export const assignTechnicianSchema = z.object({
   }),
   body: z.object({
     technicianId: z.string().uuid("Invalid technician ID"),
+    workflowVersion: z.number().int().nonnegative().optional(),
     qualityInspectorId: z
       .string()
       .uuid("Invalid quality inspector ID")
@@ -40,6 +41,7 @@ export const qcUpdateSchema = z.object({
   }),
   body: z.object({
     qcStatus: z.enum(["PASSED", "FAILED", "PENDING"]),
+    workflowVersion: z.number().int().nonnegative().optional(),
     qcNotes: z.string().optional(),
   }),
 });

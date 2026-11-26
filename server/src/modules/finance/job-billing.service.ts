@@ -26,13 +26,20 @@ import { lineAmount, money, sumMoney } from "./money";
 import { applyJobAdvances } from "./job-advance";
 import { lockParty } from "./party-account.service";
 import { assertJobBillingReady, BILLABLE_STATUSES } from "./job-billing.logic";
+import { requireServiceJobAction } from "../service/service-job-policy";
 
 const JOB_BILL_INCLUDE = {
   estimates: latestEstimateQuery,
   customer: true,
   serviceType: true,
+  serviceWorkflow: true,
   service: { select: { name: true } },
-  appointment: { select: { customerId: true, customer: { select: { governmentVehicle: true } } } },
+  appointment: {
+    select: {
+      customerId: true,
+      customer: { select: { governmentVehicle: true } },
+    },
+  },
   vehicle: true,
   branch: true,
   partIssuances: {
@@ -48,7 +55,10 @@ const JOB_BILL_INCLUDE = {
       quantity: { gt: 0 },
       requisitionLine: { requisition: { status: "ISSUED" } },
     },
-    include: { sparePart: true },
+    include: {
+      sparePart: true,
+      requisitionLine: { select: { requestedSparePartId: true } },
+    },
   },
   labourLines: {
     include: {
@@ -188,6 +198,15 @@ export class JobBillingService {
     // The customer pays a line unless the service type is company-paid or the line's
     // charge type (job card lines: warranty, campaign, goodwill, internal) says otherwise.
     const companyPaid = jobCard.serviceType?.chargedTo === "COMPANY";
+    const warrantyParts = new Set(
+      (jobCard.estimates?.[0]?.lines ?? [])
+        .filter(
+          (line) =>
+            line.isUnderWarranty &&
+            ["PART", "INCLUDED_PART"].includes(line.type),
+        )
+        .map((line) => line.referenceId),
+    );
     const customerPays = (chargeLine: { chargeType: string } | null) =>
       !companyPaid && (chargeLine?.chargeType ?? "CUSTOMER") === "CUSTOMER";
     const partLines = jobCard.partIssuances.flatMap((issuance) => {
@@ -203,13 +222,14 @@ export class JobBillingService {
           0,
         );
       if (quantity <= 0) return [];
-      if (issuance.sparePart.retailRate == null) {
+      const isUnderWarranty = warrantyParts.has(issuance.sparePartId);
+      if (issuance.sparePart.retailRate == null && !isUnderWarranty) {
         throw new BadRequestError(
           `Retail rate is not set for ${issuance.sparePart.partNumber}`,
         );
       }
       // Each source is its own part record, priced by its own retail rate.
-      const rate = issuance.sparePart.retailRate;
+      const rate = isUnderWarranty ? 0 : (issuance.sparePart.retailRate ?? 0);
       return [
         {
           type: "PART" as const,
@@ -224,7 +244,8 @@ export class JobBillingService {
           quantity,
           rate,
           amount: lineAmount(quantity, rate),
-          customerPaid: customerPays(issuance.jobCardLine),
+          customerPaid: isUnderWarranty || customerPays(issuance.jobCardLine),
+          ...(isUnderWarranty ? { isUnderWarranty } : {}),
         },
       ];
     });
@@ -262,6 +283,9 @@ export class JobBillingService {
     const requisitionLines = (jobCard.lines ?? []).map((line) => {
       if (!line.sparePart || !line.sparePartId)
         throw new BadRequestError("Requisition charge is missing its part");
+      const isUnderWarranty = warrantyParts.has(
+        line.requisitionLine?.requestedSparePartId ?? line.sparePartId,
+      );
       return {
         type: "PART" as const,
         jobCardLineId: line.id,
@@ -273,9 +297,10 @@ export class JobBillingService {
         partSource: line.partSource,
         description: line.description,
         quantity: line.quantity,
-        rate: line.rate,
-        amount: money(line.amount),
-        customerPaid: customerPays(line),
+        rate: isUnderWarranty ? 0 : line.rate,
+        amount: isUnderWarranty ? 0 : money(line.amount),
+        customerPaid: isUnderWarranty || customerPays(line),
+        ...(isUnderWarranty ? { isUnderWarranty } : {}),
       };
     });
     const lines = [
@@ -418,7 +443,9 @@ export class JobBillingService {
       ),
       taxSettings.enabled,
       taxSettings.rates,
-      jobCard.customer?.governmentVehicle ?? jobCard.appointment?.customer?.governmentVehicle ?? false,
+      jobCard.customer?.governmentVehicle ??
+        jobCard.appointment?.customer?.governmentVehicle ??
+        false,
     );
   }
 
@@ -491,6 +518,33 @@ export class JobBillingService {
               input,
               transaction,
             );
+            const strictCards = jobCards.filter((card) => card.serviceWorkflow);
+            if (strictCards.length) {
+              const actor = input.actorId
+                ? await transaction.user.findUnique({
+                    where: { id: input.actorId },
+                    include: { role: true },
+                  })
+                : null;
+              if (!actor?.isActive)
+                throw new BadRequestError(
+                  "An active billing account is required",
+                );
+              for (const card of strictCards) {
+                const workflow = card.serviceWorkflow!;
+                const stage = requireServiceJobAction("bill", {
+                  stage: workflow.stage,
+                  technicianId: card.technicianId,
+                  actorId: actor.id,
+                  role: actor.role.name,
+                  warrantyBypassEnabled: false,
+                });
+                await transaction.serviceJobWorkflow.update({
+                  where: { jobCardId: card.id, version: workflow.version },
+                  data: { stage, version: { increment: 1 } },
+                });
+              }
+            }
             const customerId =
               jobCard.customerId ?? jobCard.appointment?.customerId;
             if (!customerId)
@@ -580,7 +634,10 @@ export class JobBillingService {
                 total: totals.total,
                 outstandingAmount: totals.total,
                 partsTotal: totals.partsTotal,
-                ...invoiceSpareHeads(lines.filter((line) => line.type === "PART"), totals),
+                ...invoiceSpareHeads(
+                  lines.filter((line) => line.type === "PART"),
+                  totals,
+                ),
                 labourTotal: totals.labourTotal,
                 serviceTotal: totals.serviceTotal,
                 partsDiscountPercent: input.partsDiscountPercent,
@@ -712,7 +769,12 @@ export class JobBillingService {
   }
 
   // options.pdi: called from the PDI bill service. PDI and service bills are cancelled from their own menus.
-  async cancelJobBill(id: string, cancelledById: string, remark: string, options: { pdi?: boolean } = {}) {
+  async cancelJobBill(
+    id: string,
+    cancelledById: string,
+    remark: string,
+    options: { pdi?: boolean } = {},
+  ) {
     return prisma.$transaction(
       async (transaction) => {
         await transaction.$queryRaw<Array<{ id: string }>>(
@@ -723,15 +785,23 @@ export class JobBillingService {
           include: { jobCards: { select: { id: true } } },
         });
         if (!invoice) throw new NotFoundError("Invoice not found");
-        if (!invoice.jobCardId) throw new BadRequestError("Only job bills can be cancelled through this action");
+        if (!invoice.jobCardId)
+          throw new BadRequestError(
+            "Only job bills can be cancelled through this action",
+          );
         const billedJob = await transaction.jobCard.findUnique({
           where: { id: invoice.jobCardId },
           select: { jobType: true, vehicleId: true },
         });
         const pdiBill = billedJob?.jobType === "PDI";
         if (pdiBill !== Boolean(options.pdi))
-          throw new BadRequestError(pdiBill ? "Cancel PDI bills from the PDI menu" : "This is not a PDI bill");
-        if (!remark.trim()) throw new BadRequestError("A cancellation remark is required");
+          throw new BadRequestError(
+            pdiBill
+              ? "Cancel PDI bills from the PDI menu"
+              : "This is not a PDI bill",
+          );
+        if (!remark.trim())
+          throw new BadRequestError("A cancellation remark is required");
         if (!isActiveBillStatus(invoice.status))
           throw new BadRequestError("This bill is already cancelled");
         if (
@@ -791,6 +861,7 @@ export class JobBillingService {
           );
           const card = await transaction.jobCard.findUnique({
             where: { id: linkedCard.id },
+            include: { serviceWorkflow: true },
           });
           if (
             card?.deliveredAt ||
@@ -810,14 +881,39 @@ export class JobBillingService {
             where: { id: linkedCard.id, billedAt: { not: null } },
             data: { billedAt: null, status: "READY" },
           });
+          if (card?.serviceWorkflow)
+            await transaction.serviceJobWorkflow.updateMany({
+              where: { jobCardId: linkedCard.id, stage: "BILLED" },
+              data: { stage: "READY_FOR_BILLING", version: { increment: 1 } },
+            });
         }
         // A cancelled PDI bill undoes "PDI done" unless another active PDI bill exists for the vehicle.
         if (pdiBill && billedJob?.vehicleId) {
           const otherPdiBill = await transaction.invoice.findFirst({
-            where: { id: { not: id }, jobCard: { vehicleId: billedJob.vehicleId, jobType: "PDI" }, status: { notIn: ["Cancelled", "CANCELLED", "Canceled", "CANCELED", "VOID", "Void"] } },
-            orderBy: { issuedDate: "desc" }, select: { issuedDate: true },
+            where: {
+              id: { not: id },
+              jobCard: { vehicleId: billedJob.vehicleId, jobType: "PDI" },
+              status: {
+                notIn: [
+                  "Cancelled",
+                  "CANCELLED",
+                  "Canceled",
+                  "CANCELED",
+                  "VOID",
+                  "Void",
+                ],
+              },
+            },
+            orderBy: { issuedDate: "desc" },
+            select: { issuedDate: true },
           });
-          await transaction.vehicle.update({ where: { id: billedJob.vehicleId }, data: { pdiDone: !!otherPdiBill, pdiDate: otherPdiBill?.issuedDate ?? null } });
+          await transaction.vehicle.update({
+            where: { id: billedJob.vehicleId },
+            data: {
+              pdiDone: !!otherPdiBill,
+              pdiDate: otherPdiBill?.issuedDate ?? null,
+            },
+          });
         }
         return cancelled;
       },

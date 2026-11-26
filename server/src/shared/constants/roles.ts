@@ -16,6 +16,7 @@ export const ROLES = {
   TECHNICIAN: "Technician",
   ENGINEER: "Engineer",
   WARRANTY_OFFICER: "WarrantyOfficer",
+  QC_OFFICER: "QCOfficer",
   CCU_MANAGER: "CCUManager",
   GENERAL_CCU_MANAGER: "GeneralCCUManager",
   CCU_OFFICER: "CCUOfficer",
@@ -38,6 +39,7 @@ export const GENERAL_DEPARTMENT_ROLES = new Set<string>([
 ]);
 
 export const OWN_BRANCH_DEPARTMENT_ROLES = new Set<string>([
+  ROLES.QC_OFFICER,
   ROLES.WORKSHOP_MANAGER,
   ROLES.ACCOUNT_OFFICER,
   ROLES.ACCOUNT_MANAGER,
@@ -955,6 +957,7 @@ const existingRolePermissions = {
 
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
+    PERMISSIONS.ASSIGNMENT_CREATE,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_READ_PERMISSIONS,
     ...MIS_FRONT_OFFICE_REPORTS,
@@ -1201,4 +1204,10 @@ const newRolePermissions = Object.fromEntries(
 export const ROLE_PERMISSIONS: Record<RoleType, PermissionType[]> = {
   ...existingRolePermissions,
   ...newRolePermissions,
+  [ROLES.QC_OFFICER]: [
+    ...new Set([
+      ...existingRolePermissions[ROLES.SERVICE_ADVISOR],
+      PERMISSIONS.QCSTATUS_UPDATE,
+    ]),
+  ],
 };

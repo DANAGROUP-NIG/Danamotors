@@ -5,7 +5,7 @@ import { BadRequestError } from '../../shared/errors/appError';
 import { lineAmount, money, sumMoney } from '../finance/money';
 
 // Part lines carry a snapshot of the record's source (part flag); each source is its own part record.
-export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number };
+export type ScopeLine = { type: string; referenceId?: string | null; partSource?: string | null; description: string; quantity: number; rate: number; amount: number; isUnderWarranty?: boolean };
 export type ApprovalEstimate = {
   id: string;
   version?: number;
@@ -59,12 +59,13 @@ export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actu
     const planned = expected.get(id);
     const used = grouped.get(id);
     const included = !!planned?.type.startsWith('INCLUDED_');
-    const actualAmount = included ? 0 : money(used?.amount ?? 0);
-    const approvedAmount = included ? 0 : money(planned?.amount ?? 0);
+    const nonPayable = included || planned?.isUnderWarranty === true;
+    const actualAmount = nonPayable ? 0 : money(used?.amount ?? 0);
+    const approvedAmount = nonPayable ? 0 : money(planned?.amount ?? 0);
     let reason: string | null = null;
     if (used && !planned) reason = 'Not in approved scope';
     else if (used && planned && used.quantity > planned.quantity + 0.000001) reason = 'Quantity / hours exceed approval';
-    else if (used && planned && !included && (money(used.rate) > money(planned.rate) || actualAmount > approvedAmount)) reason = 'Charge exceeds approval';
+    else if (used && planned && !nonPayable && (money(used.rate) > money(planned.rate) || actualAmount > approvedAmount)) reason = 'Charge exceeds approval';
     if (reason) issues.push(`${used?.description ?? planned?.description}: ${reason}. Revise the estimate and obtain approval.`);
     return { type: baseType((used ?? planned)!.type), referenceId: (used ?? planned)!.referenceId, partSource: (used ?? planned)!.partSource ?? null, description: (used ?? planned)!.description, approvedQuantity: planned?.quantity ?? 0, actualQuantity: used?.quantity ?? 0, approvedAmount, actualAmount, difference: money(actualAmount - approvedAmount), included, reason };
   });

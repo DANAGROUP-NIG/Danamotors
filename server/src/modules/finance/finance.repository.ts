@@ -1,22 +1,35 @@
-import prisma from '../../prisma/client';
-import { Invoice, Receipt, Prisma } from '@prisma/client';
+import prisma from "../../prisma/client";
+import { Invoice, Receipt, Prisma } from "@prisma/client";
 
 type AllocatedPayment = Prisma.ReceiptAllocationGetPayload<{
   include: {
     invoice: { include: { customer: true; jobCard: true } };
-    receipt: { include: { issuedBy: { select: { id: true; email: true; firstName: true; lastName: true } } } };
+    receipt: {
+      include: {
+        issuedBy: {
+          select: { id: true; email: true; firstName: true; lastName: true };
+        };
+      };
+    };
   };
 }>;
 
 function paymentFromAllocation(allocation: AllocatedPayment) {
   const receipt = allocation.receipt!;
   return {
-    id: 'receipt-allocation:' + allocation.id,
-    invoiceId: allocation.invoiceId!, invoice: allocation.invoice,
-    receiptId: receipt.id, recordedById: receipt.issuedById, recordedBy: receipt.issuedBy,
-    amount: allocation.amount, method: receipt.mode, paymentDate: receipt.issuedAt,
-    reference: receipt.reference, notes: receipt.notes,
-    createdAt: allocation.createdAt, updatedAt: receipt.updatedAt,
+    id: "receipt-allocation:" + allocation.id,
+    invoiceId: allocation.invoiceId!,
+    invoice: allocation.invoice,
+    receiptId: receipt.id,
+    recordedById: receipt.issuedById,
+    recordedBy: receipt.issuedBy,
+    amount: allocation.amount,
+    method: receipt.mode,
+    paymentDate: receipt.issuedAt,
+    reference: receipt.reference,
+    notes: receipt.notes,
+    createdAt: allocation.createdAt,
+    updatedAt: receipt.updatedAt,
   };
 }
 
@@ -33,7 +46,10 @@ export function branchScope(branchId: string) {
 }
 
 export class FinanceRepository {
-  async listInvoices(params?: { branchId?: string; customerId?: string }): Promise<Invoice[]> {
+  async listInvoices(params?: {
+    branchId?: string;
+    customerId?: string;
+  }): Promise<Invoice[]> {
     const where: Record<string, any> = {};
 
     if (params?.customerId) {
@@ -64,18 +80,25 @@ export class FinanceRepository {
         receipts: true,
         lines: true,
         vatBreakdown: true,
-        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
-        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        allocations: {
+          where: { reversedAt: null },
+          include: { receipt: true, creditNote: true },
+        },
+        serviceAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { issuedDate: 'desc' },
+      orderBy: { issuedDate: "desc" },
     });
   }
 
-  async findInvoiceById(id: string): Promise<Invoice | null> {
+  async findInvoiceById(id: string) {
     return prisma.invoice.findUnique({
       where: { id },
       include: {
-        jobCards: { select: { id: true, jobNumber: true, customerRemarks: true } },
+        jobCards: {
+          select: { id: true, jobNumber: true, customerRemarks: true },
+        },
         customer: {
           select: {
             id: true,
@@ -93,8 +116,13 @@ export class FinanceRepository {
         receipts: true,
         lines: true,
         vatBreakdown: true,
-        allocations: { where: { reversedAt: null }, include: { receipt: true, creditNote: true } },
-        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        allocations: {
+          where: { reversedAt: null },
+          include: { receipt: true, creditNote: true },
+        },
+        serviceAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
   }
@@ -104,37 +132,77 @@ export class FinanceRepository {
   }
 
   async listPayments(params?: { branchId?: string }) {
-    const invoiceScope = params?.branchId ? { OR: branchScope(params.branchId) } : {};
+    const invoiceScope = params?.branchId
+      ? { OR: branchScope(params.branchId) }
+      : {};
     const [legacyPayments, allocations] = await Promise.all([
       prisma.payment.findMany({
         // Linked receipts are represented by their current allocations below.
         where: { receiptId: null, invoice: invoiceScope },
-        include: { invoice: { include: { customer: true, jobCard: true } }, recordedBy: { select: { id: true, email: true, firstName: true, lastName: true } } },
+        include: {
+          invoice: { include: { customer: true, jobCard: true } },
+          recordedBy: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+        },
       }),
       prisma.receiptAllocation.findMany({
         where: {
           reversedAt: null,
           invoiceId: { not: null },
           invoice: invoiceScope,
-          receipt: { is: { status: 'ACTIVE', ...(params?.branchId ? { branchId: params.branchId } : {}) } },
+          receipt: {
+            is: {
+              status: "ACTIVE",
+              ...(params?.branchId ? { branchId: params.branchId } : {}),
+            },
+          },
         },
         include: {
           invoice: { include: { customer: true, jobCard: true } },
-          receipt: { include: { issuedBy: { select: { id: true, email: true, firstName: true, lastName: true } } } },
+          receipt: {
+            include: {
+              issuedBy: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
       }),
     ]);
-    return [...legacyPayments, ...allocations.map(paymentFromAllocation)]
-      .sort((a, b) => b.paymentDate.getTime() - a.paymentDate.getTime());
+    return [...legacyPayments, ...allocations.map(paymentFromAllocation)].sort(
+      (a, b) => b.paymentDate.getTime() - a.paymentDate.getTime(),
+    );
   }
 
   async findPaymentById(id: string) {
-    if (id.startsWith('receipt-allocation:')) {
+    if (id.startsWith("receipt-allocation:")) {
       const allocation = await prisma.receiptAllocation.findFirst({
-        where: { id: id.slice('receipt-allocation:'.length), reversedAt: null, invoiceId: { not: null }, receipt: { is: { status: 'ACTIVE' } } },
+        where: {
+          id: id.slice("receipt-allocation:".length),
+          reversedAt: null,
+          invoiceId: { not: null },
+          receipt: { is: { status: "ACTIVE" } },
+        },
         include: {
           invoice: { include: { customer: true, jobCard: true } },
-          receipt: { include: { issuedBy: { select: { id: true, email: true, firstName: true, lastName: true } } } },
+          receipt: {
+            include: {
+              issuedBy: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
       });
       return allocation ? paymentFromAllocation(allocation) : null;
@@ -143,7 +211,9 @@ export class FinanceRepository {
       where: { id, receiptId: null },
       include: {
         invoice: { include: { customer: true, jobCard: true } },
-        recordedBy: { select: { id: true, email: true, firstName: true, lastName: true } },
+        recordedBy: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
       },
     });
   }
@@ -163,7 +233,7 @@ export class FinanceRepository {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
       },
-      orderBy: { issuedAt: 'desc' },
+      orderBy: { issuedAt: "desc" },
     });
   }
 
@@ -178,7 +248,6 @@ export class FinanceRepository {
       },
     });
   }
-
 }
 
 export default FinanceRepository;

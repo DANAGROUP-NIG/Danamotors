@@ -233,11 +233,12 @@ it("keeps permission migration grants equal to ROLE_PERMISSIONS and store grants
   const grants = [...sql.matchAll(/\('([^']+)', '(requisition:[^']+)'\)/g)]
     .map((match) => `${match[1]}:${match[2]}`)
     .sort();
-  // The Auditor role came later: migration 20261105140000_user_permission_overrides grants its reads.
+  // Auditor and QC Officer receive their grants in their later role migrations.
   const expected = Object.entries(ROLE_PERMISSIONS)
     .filter(
       ([role]) =>
         role !== ROLES.AUDITOR &&
+        role !== ROLES.QC_OFFICER &&
         !Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role),
     )
     .flatMap(([role, permissions]) =>
@@ -247,6 +248,7 @@ it("keeps permission migration grants equal to ROLE_PERMISSIONS and store grants
     )
     .sort();
   expect(grants).toEqual(expected);
+  expect(ROLE_PERMISSIONS[ROLES.QC_OFFICER]).toContain(PERMISSIONS.REQUISITION_READ);
   for (const role of [
     ROLES.GENERAL_STORE_MANAGER,
     ROLES.BRANCH_STORE_MANAGER,

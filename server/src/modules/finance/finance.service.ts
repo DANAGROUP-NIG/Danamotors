@@ -1,6 +1,6 @@
-import prisma from '../../prisma/client';
-import { FinanceRepository, branchScope } from './finance.repository';
-import { BadRequestError, NotFoundError } from '../../shared/errors/appError';
+import prisma from "../../prisma/client";
+import { FinanceRepository, branchScope } from "./finance.repository";
+import { BadRequestError, NotFoundError } from "../../shared/errors/appError";
 
 export class FinanceService {
   private financeRepository: FinanceRepository;
@@ -16,21 +16,35 @@ export class FinanceService {
   async getInvoice(id: string) {
     const invoice = await this.financeRepository.findInvoiceById(id);
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError("Invoice not found");
     }
-    return invoice;
+    return {
+      ...invoice,
+      printLines: invoice.lines?.filter((line) => !line.isUnderWarranty) ?? [],
+    };
   }
 
-  async updateInvoice(id: string, data: {
-    dueDate?: string;
-    notes?: string;
-  }) {
+  async updateInvoice(
+    id: string,
+    data: {
+      dueDate?: string;
+      notes?: string;
+    },
+  ) {
     const invoice = await this.financeRepository.findInvoiceById(id);
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError("Invoice not found");
     }
 
-    if (['CANCELLED', 'CANCELED', 'VOID'].includes(invoice.status.toUpperCase()) || invoice.tallyPostedAt) throw new BadRequestError('Cancelled or posted invoices cannot be edited');
+    if (
+      ["CANCELLED", "CANCELED", "VOID"].includes(
+        invoice.status.toUpperCase(),
+      ) ||
+      invoice.tallyPostedAt
+    )
+      throw new BadRequestError(
+        "Cancelled or posted invoices cannot be edited",
+      );
     return this.financeRepository.updateInvoice(id, {
       dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       notes: data.notes,
@@ -44,7 +58,7 @@ export class FinanceService {
   async getPayment(id: string) {
     const payment = await this.financeRepository.findPaymentById(id);
     if (!payment) {
-      throw new NotFoundError('Payment not found');
+      throw new NotFoundError("Payment not found");
     }
     return payment;
   }
@@ -60,7 +74,7 @@ export class FinanceService {
     const hasDateFilter = Object.keys(dateFilter).length > 0;
 
     const invoiceWhere: Record<string, any> = {};
-    const receiptWhere: Record<string, any> = { status: 'ACTIVE' };
+    const receiptWhere: Record<string, any> = { status: "ACTIVE" };
     if (hasDateFilter) invoiceWhere.issuedDate = dateFilter;
     if (hasDateFilter) receiptWhere.issuedAt = dateFilter;
     if (params.branchId) {
@@ -68,23 +82,39 @@ export class FinanceService {
       receiptWhere.branchId = params.branchId;
     }
 
-    const activeInvoiceWhere = { ...invoiceWhere, status: { notIn: ['Cancelled', 'CANCELLED', 'VOID'] } };
-    const [invoiceCount, totalInvoiced, totalOutstanding, receiptCount] = await Promise.all([
-      prisma.invoice.count({ where: invoiceWhere }),
-      prisma.invoice.aggregate({ where: activeInvoiceWhere, _sum: { total: true } }),
-      prisma.invoice.aggregate({ where: activeInvoiceWhere, _sum: { outstandingAmount: true } }),
-      prisma.receipt.count({ where: receiptWhere }),
-    ]);
+    const activeInvoiceWhere = {
+      ...invoiceWhere,
+      status: { notIn: ["Cancelled", "CANCELLED", "VOID"] },
+    };
+    const [invoiceCount, totalInvoiced, totalOutstanding, receiptCount] =
+      await Promise.all([
+        prisma.invoice.count({ where: invoiceWhere }),
+        prisma.invoice.aggregate({
+          where: activeInvoiceWhere,
+          _sum: { total: true },
+        }),
+        prisma.invoice.aggregate({
+          where: activeInvoiceWhere,
+          _sum: { outstandingAmount: true },
+        }),
+        prisma.receipt.count({ where: receiptWhere }),
+      ]);
 
     return {
       totalInvoices: invoiceCount,
       totalInvoiced: totalInvoiced._sum.total ?? 0,
-      totalPaid: (totalInvoiced._sum.total ?? 0) - (totalOutstanding._sum.outstandingAmount ?? 0),
+      totalPaid:
+        (totalInvoiced._sum.total ?? 0) -
+        (totalOutstanding._sum.outstandingAmount ?? 0),
       totalReceipts: receiptCount,
     };
   }
 
-  async getInvoiceReport(params: { startDate?: string; endDate?: string; branchId?: string }) {
+  async getInvoiceReport(params: {
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }) {
     const where: any = {};
     if (params.branchId) where.OR = branchScope(params.branchId);
     if (params.startDate || params.endDate) {
@@ -107,18 +137,25 @@ export class FinanceService {
         payments: true,
         receipts: true,
       },
-      orderBy: { issuedDate: 'desc' },
+      orderBy: { issuedDate: "desc" },
     });
   }
 
   async getDashboardOverview(branchId?: string) {
     const invoiceScope = branchId ? { OR: branchScope(branchId) } : {};
-    const [openInvoices, overdueInvoices, paidInvoices, totalOutstanding] = await Promise.all([
-      prisma.invoice.count({ where: { ...invoiceScope, status: 'Unpaid' } }),
-      prisma.invoice.count({ where: { ...invoiceScope, status: 'Overdue' } }),
-      prisma.invoice.count({ where: { ...invoiceScope, status: 'Paid' } }),
-      prisma.invoice.aggregate({ where: { ...invoiceScope, status: { in: ['Unpaid', 'Partially Paid', 'Overdue'] } }, _sum: { outstandingAmount: true } }),
-    ]);
+    const [openInvoices, overdueInvoices, paidInvoices, totalOutstanding] =
+      await Promise.all([
+        prisma.invoice.count({ where: { ...invoiceScope, status: "Unpaid" } }),
+        prisma.invoice.count({ where: { ...invoiceScope, status: "Overdue" } }),
+        prisma.invoice.count({ where: { ...invoiceScope, status: "Paid" } }),
+        prisma.invoice.aggregate({
+          where: {
+            ...invoiceScope,
+            status: { in: ["Unpaid", "Partially Paid", "Overdue"] },
+          },
+          _sum: { outstandingAmount: true },
+        }),
+      ]);
 
     return {
       openInvoices,

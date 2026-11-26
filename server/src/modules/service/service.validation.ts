@@ -2,10 +2,17 @@ import { z } from "zod";
 import { MAX_MILEAGE } from "../warranty/warranty.logic";
 import { openingConsentProof } from "./job-opening-consent";
 
-const mileageField = z.number().int("Mileage must be a whole number").min(0, "Mileage cannot be negative").max(MAX_MILEAGE);
+const mileageField = z
+  .number()
+  .int("Mileage must be a whole number")
+  .min(0, "Mileage cannot be negative")
+  .max(MAX_MILEAGE);
 const acknowledgementFields = {
   warrantyAcknowledged: z.boolean().optional(),
-  acknowledgedCampaignIds: z.array(z.string().uuid("Invalid campaign ID")).max(50).optional(),
+  acknowledgedCampaignIds: z
+    .array(z.string().uuid("Invalid campaign ID"))
+    .max(50)
+    .optional(),
 };
 
 export const serviceIdParamSchema = z.object({
@@ -31,22 +38,32 @@ export const estimateIdParamSchema = z.object({
   }),
 });
 
-export const bookingRequestBody = z.object({
-  complaintCodeId: z.string().uuid().optional(),
-  defectCode: z.string().trim().max(50).optional(),
-  spare: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-  oil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-  labour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
-  description: z.string().trim().max(2000).optional(),
-}).strict().refine(
-  row => !!row.complaintCodeId || !!row.defectCode || !!row.description,
-  "Enter a complaint code or description",
-);
+export const bookingRequestBody = z
+  .object({
+    complaintCodeId: z.string().uuid().optional(),
+    defectCode: z.string().trim().max(50).optional(),
+    spare: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+    oil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+    labour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
+    description: z.string().trim().max(2000).optional(),
+  })
+  .strict()
+  .refine(
+    (row) => !!row.complaintCodeId || !!row.defectCode || !!row.description,
+    "Enter a complaint code or description",
+  );
 
 // Simple text and the optional detailed grid share the same stored request rows.
-const bookingRequestText = z.string().trim().min(1, "Add a customer request").max(2000)
-  .transform(description => [{ description }]);
-const bookingRequests = z.union([bookingRequestText, z.array(bookingRequestBody).min(1).max(100)]);
+const bookingRequestText = z
+  .string()
+  .trim()
+  .min(1, "Add a customer request")
+  .max(2000)
+  .transform((description) => [{ description }]);
+const bookingRequests = z.union([
+  bookingRequestText,
+  z.array(bookingRequestBody).min(1).max(100),
+]);
 
 const bookingFields = {
   serviceTypeId: z.string().uuid().optional(),
@@ -141,6 +158,7 @@ export const listJobCardsSchema = z.object({
 
 export const jobOpeningBody = z
   .object({
+    faultVerification: z.string().trim().min(1).max(5000).optional(),
     openingConsent: openingConsentProof.optional(),
     appointmentId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
@@ -194,7 +212,13 @@ export const jobOpeningBody = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    if (data.appointmentId && !data.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Accept the job opening terms before converting this appointment' });
+    if (data.appointmentId && !data.openingConsent)
+      ctx.addIssue({
+        code: "custom",
+        path: ["openingConsent"],
+        message:
+          "Accept the job opening terms before converting this appointment",
+      });
     // The reason is recorded at review; at opening the advisor may add a note (repeatReason).
     if (data.isRepeat && !data.previousJobId)
       ctx.addIssue({
@@ -224,12 +248,26 @@ export const createJobCardSchema = z.object({
 
 export const jobUpdateBody = z
   .object({
-    serviceCharge: z.number().finite().min(0).max(1e12).multipleOf(0.01).optional(),
+    workflowVersion: z.number().int().nonnegative().optional(),
+    serviceCharge: z
+      .number()
+      .finite()
+      .min(0)
+      .max(1e12)
+      .multipleOf(0.01)
+      .optional(),
     description: z.string().trim().min(1).max(5000).optional(),
     observations: z.string().trim().max(10000).optional(),
     workDone: z.string().trim().max(10000).optional(),
     status: z
-      .enum(["IN_PROGRESS", "WAITING_PARTS", "QC", "READY", "DELIVERED", "CANCELLED"])
+      .enum([
+        "IN_PROGRESS",
+        "WAITING_PARTS",
+        "QC",
+        "READY",
+        "DELIVERED",
+        "CANCELLED",
+      ])
       .optional(),
     remarks: z.string().trim().max(2000).optional(),
     deliveryAdvisorId: z.string().uuid().optional(),
@@ -273,7 +311,13 @@ export const createInspectionSchema = z.object({
 export const estimateBody = z
   .object({
     description: z.string().trim().min(1).max(2000),
-    upfrontPaymentPercent: z.number().finite().min(0).max(100).multipleOf(0.01).optional(),
+    upfrontPaymentPercent: z
+      .number()
+      .finite()
+      .min(0)
+      .max(100)
+      .multipleOf(0.01)
+      .optional(),
 
     lines: z
       .array(
@@ -407,7 +451,11 @@ export const updateJobCardLabourSchema = z.object({
         .uuid("Invalid technician ID")
         .nullable()
         .optional(),
-      mechanicId: z.string().uuid("Invalid technician ID").nullable().optional(),
+      mechanicId: z
+        .string()
+        .uuid("Invalid technician ID")
+        .nullable()
+        .optional(),
     })
     .strict()
     .refine(

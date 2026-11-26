@@ -10,11 +10,14 @@ import {
   NotFoundError,
   BadRequestError,
   ForbiddenError,
+  ConflictError,
 } from "../../shared/errors/appError";
 import prisma from "../../prisma/client";
 import { jobUpdateBody } from "../service/service.validation";
 import { canonicalJobStatus } from "../service/job-card-workflow.service";
 import { ServiceService } from "../service/service.service";
+import { requireServiceJobAction } from "../service/service-job-policy";
+import { ROLES } from "../../shared/constants/roles";
 
 export class WorkshopService {
   private workshopRepository: WorkshopRepository;
@@ -196,6 +199,7 @@ export class WorkshopService {
     technicianId: string,
     qualityInspectorId?: string,
     actorId?: string,
+    workflowVersion?: number,
   ) {
     const jobCard = await this.workshopRepository.findJobCardById(id);
     if (!jobCard) {
@@ -244,7 +248,10 @@ export class WorkshopService {
       await tx.$queryRaw(
         Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
       );
-      const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
+      const current = await tx.jobCard.findUniqueOrThrow({
+        where: { id },
+        include: { serviceWorkflow: true },
+      });
       if (
         current.billedAt ||
         ["READY", "BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -252,6 +259,70 @@ export class WorkshopService {
         )
       )
         throw new BadRequestError("This job card is no longer open");
+      if (current.serviceWorkflow) {
+        const actor = actorId
+          ? await tx.user.findUnique({
+              where: { id: actorId },
+              include: { role: true },
+            })
+          : null;
+        if (!actor?.isActive)
+          throw new ForbiddenError("An active staff account is required");
+        const stage = requireServiceJobAction(
+          current.technicianId ? "reassignTechnician" : "assignTechnician",
+          {
+            stage: current.serviceWorkflow.stage,
+            technicianId: current.technicianId,
+            actorId: actor.id,
+            role: actor.role.name,
+            warrantyBypassEnabled: false,
+          },
+        );
+        if (
+          current.technicianId === technicianId &&
+          (qualityInspectorId === undefined ||
+            qualityInspectorId === current.qualityInspectorId)
+        )
+          return current;
+        const completedWork = await tx.jobCardStatusHistory.findFirst({
+          where: { jobCardId: id, toStatus: "QC" },
+          select: { id: true },
+        });
+        if (completedWork)
+          throw new ConflictError(
+            "Technician assignment is locked once work is complete",
+          ).withCode("WORKFLOW_STAGE_CONFLICT");
+        if (workflowVersion !== current.serviceWorkflow.version)
+          throw new ConflictError(
+            "Refresh the job card before changing its Technician assignment",
+          ).withCode("WORKFLOW_VERSION_CONFLICT");
+        if (current.technicianId !== technicianId) {
+          await tx.serviceJobWorkflow.update({
+            where: { jobCardId: id, version: current.serviceWorkflow.version },
+            data: { stage, version: { increment: 1 } },
+          });
+          await tx.jobCardStatusHistory.create({
+            data: {
+              jobCardId: id,
+              fromStatus: current.serviceWorkflow.stage,
+              toStatus: stage,
+              actorId: actor.id,
+              remarks: current.technicianId
+                ? "Technician reassigned"
+                : "Technician assigned",
+            },
+          });
+          if (current.technicianId) {
+            await enqueueWorkshopNotification(
+              tx,
+              "TECHNICIAN_UNASSIGNED",
+              current,
+              String(workflowVersion + 1),
+              actor.id,
+            );
+          }
+        }
+      }
       const updated = await tx.jobCard.update({
         where: { id },
         data: { technicianId, qualityInspectorId },
@@ -312,6 +383,7 @@ export class WorkshopService {
     qcStatus: string,
     qcNotes?: string,
     actorId?: string,
+    workflowVersion?: number,
   ) {
     const jobCard = await this.workshopRepository.findJobCardById(id);
     if (!jobCard) {
@@ -332,7 +404,10 @@ export class WorkshopService {
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
         );
-        const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
+        const current = await tx.jobCard.findUniqueOrThrow({
+          where: { id },
+          include: { serviceWorkflow: true },
+        });
         if (
           current.billedAt ||
           ["READY", "BILLED", "DELIVERED", "CANCELLED"].includes(
@@ -340,6 +415,70 @@ export class WorkshopService {
           )
         )
           throw new BadRequestError("This job card is no longer open");
+        const workflow = current.serviceWorkflow;
+        if (workflow) {
+          const actor = actorId
+            ? await tx.user.findUnique({
+                where: { id: actorId },
+                include: { role: true },
+              })
+            : null;
+          if (!actor?.isActive || actor.role.name !== ROLES.QC_OFFICER)
+            throw new ForbiddenError(
+              "Only a QC Officer can record this review",
+            );
+          const notes = qcNotes?.trim();
+          if (!notes || notes.length > 5000)
+            throw new BadRequestError(
+              "Enter QC remarks with up to 5000 characters",
+            ).withCode("FIELD_VALIDATION", { field: "qcNotes" });
+          if (qcStatus !== "PASSED" && qcStatus !== "FAILED")
+            throw new BadRequestError("Select Passed or Failed").withCode(
+              "FIELD_VALIDATION",
+              { field: "qcStatus" },
+            );
+          const duplicate =
+            workflowVersion === workflow.version - 1 &&
+            current.qcStatus === qcStatus &&
+            current.qcNotes === notes;
+          if (duplicate) return current;
+          if (workflowVersion !== workflow.version)
+            throw new ConflictError(
+              "Refresh the job card before recording QC",
+            ).withCode("WORKFLOW_VERSION_CONFLICT");
+          const stage = requireServiceJobAction(
+            qcStatus === "PASSED" ? "passQc" : "failQc",
+            {
+              stage: workflow.stage,
+              technicianId: current.technicianId,
+              actorId: actor.id,
+              role: actor.role.name,
+              warrantyBypassEnabled: false,
+            },
+          );
+          if (qcStatus === "PASSED") await assertRecordedScope(tx, id);
+          await tx.serviceJobWorkflow.update({
+            where: { jobCardId: id, version: workflow.version },
+            data: { stage, version: { increment: 1 } },
+          });
+          await tx.jobCardStatusHistory.create({
+            data: {
+              jobCardId: id,
+              fromStatus: workflow.stage,
+              toStatus: stage,
+              actorId: actor.id,
+              remarks: notes,
+            },
+          });
+          return tx.jobCard.update({
+            where: { id },
+            data: {
+              qcStatus,
+              qcNotes: notes,
+              ...(qcStatus === "FAILED" ? { status: "IN_PROGRESS" } : {}),
+            },
+          });
+        }
         if (canonicalJobStatus(current.status) !== "QC")
           throw new BadRequestError(
             "Send this job for QC before recording a review",

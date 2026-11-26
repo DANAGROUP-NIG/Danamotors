@@ -1,5 +1,7 @@
 import { drainJobcardNotifications } from "../notification/jobcard-notification-router";
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
+import { requireServiceJobAction } from "./service-job-policy";
+import { hasServiceJobIssuedParts } from "./service-job-issuance";
 import { assertDepositPaid } from "./job-deposit.service";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
 import {
@@ -19,9 +21,19 @@ import {
 import { getBranchSettings } from "../company-settings/company-settings.service";
 import { JobCardType, Prisma, WarrantyCoverageStatus } from "@prisma/client";
 import { nextSequenceNumber } from "../../shared/db/documentSequence";
-import { assertNotFrozen, assertServiceTypeForJob, pdiDocumentNumber, pdiRegistrationFromVin, pdiSequenceKey } from "../pdi/pdi.logic";
+import {
+  assertNotFrozen,
+  assertServiceTypeForJob,
+  pdiDocumentNumber,
+  pdiRegistrationFromVin,
+  pdiSequenceKey,
+} from "../pdi/pdi.logic";
 import { getPdiSettings } from "../pdi/pdi.settings.service";
-import { createRepeatRecord, resolveRepeatAtOpening, windowOf } from "../repeat-job/repeat-job.detect";
+import {
+  createRepeatRecord,
+  resolveRepeatAtOpening,
+  windowOf,
+} from "../repeat-job/repeat-job.detect";
 import { matchCasesSafely } from "../csc/csc.match";
 import { z } from "zod";
 import prisma from "../../prisma/client";
@@ -242,17 +254,48 @@ export class JobCardWorkflowService {
     const data = jobOpeningBody.parse(body);
     const jobType = options.jobType ?? JobCardType.SERVICE;
     const pdi = jobType === JobCardType.PDI;
+    const enrollInWorkflow =
+      !pdi && process.env.SERVICE_JOB_WORKFLOW_ENABLED === "true";
+    if (enrollInWorkflow) {
+      if (!data.appointmentId)
+        throw new BadRequestError(
+          "Open the job card from its service appointment",
+        ).withCode("FIELD_VALIDATION", { field: "appointmentId" });
+      if (!data.faultVerification)
+        throw new BadRequestError(
+          "Record the verified faults before opening the job card",
+        ).withCode("FIELD_VALIDATION", { field: "faultVerification" });
+      if (data.technicianId)
+        throw new BadRequestError(
+          "Assign the Technician from the Labour tab after opening the job card",
+        ).withCode("FIELD_VALIDATION", { field: "technicianId" });
+    }
     if (pdi) {
-      if (data.appointmentId) throw new BadRequestError("PDI job cards are not opened from bookings").withCode("FIELD_VALIDATION", { field: "appointmentId" });
-      if (data.isRepeat) throw new BadRequestError("A PDI job card cannot be a repeat job").withCode("FIELD_VALIDATION", { field: "isRepeat" });
-      if (!data.engineerId) throw new BadRequestError("Select the engineer for the PDI").withCode("FIELD_VALIDATION", { field: "engineerId" });
+      if (data.appointmentId)
+        throw new BadRequestError(
+          "PDI job cards are not opened from bookings",
+        ).withCode("FIELD_VALIDATION", { field: "appointmentId" });
+      if (data.isRepeat)
+        throw new BadRequestError(
+          "A PDI job card cannot be a repeat job",
+        ).withCode("FIELD_VALIDATION", { field: "isRepeat" });
+      if (!data.engineerId)
+        throw new BadRequestError("Select the engineer for the PDI").withCode(
+          "FIELD_VALIDATION",
+          { field: "engineerId" },
+        );
     }
     if (!data.appointmentId) assertPromisedDate(data.promisedAt, new Date());
 
     const result = await prisma.$transaction(
       async (tx) => {
-        if (pdi) assertNotFrozen("job", (await getPdiSettings(tx)).jobFreezeDate, new Date());
-      const branch = await tx.branch.findFirst({
+        if (pdi)
+          assertNotFrozen(
+            "job",
+            (await getPdiSettings(tx)).jobFreezeDate,
+            new Date(),
+          );
+        const branch = await tx.branch.findFirst({
           where: {
             name: data.branchName,
             isActive: true,
@@ -305,8 +348,9 @@ export class JobCardWorkflowService {
           (c) => !acknowledged.has(c.campaignId),
         );
         // A PDI is pre-sale work: no warranty acknowledgement or warranty case (open campaigns still apply).
-      const coverageNeedsAck =
-          !pdi && check.coverage.status === WarrantyCoverageStatus.ACTIVE &&
+        const coverageNeedsAck =
+          !pdi &&
+          check.coverage.status === WarrantyCoverageStatus.ACTIVE &&
           !data.warrantyAcknowledged;
         if (coverageNeedsAck || unacknowledgedCampaigns.length > 0)
           throw new ConflictError(
@@ -381,16 +425,27 @@ export class JobCardWorkflowService {
 
         await openingField("bayId", () => requireMaster(tx, data.bayId, "BAY"));
 
-      const serviceType = await openingField("serviceTypeId", async () => {
-        const option = await new ServiceTypeService().requireAvailable(tx, vehicle.id, data.serviceTypeId, new Date(), jobType);
-        assertServiceTypeForJob(jobType, option);
-        return option;
-      });
-      // Appointment services remain a separate catalogue and are never used
-      // to determine the opening dropdown or its model-specific charge.
-      if (data.serviceId && !(await tx.service.findFirst({
-        where: { id: data.serviceId, isActive: true }, select: { id: true },
-      }))) throw new BadRequestError("Select an active appointment service");
+        const serviceType = await openingField("serviceTypeId", async () => {
+          const option = await new ServiceTypeService().requireAvailable(
+            tx,
+            vehicle.id,
+            data.serviceTypeId,
+            new Date(),
+            jobType,
+          );
+          assertServiceTypeForJob(jobType, option);
+          return option;
+        });
+        // Appointment services remain a separate catalogue and are never used
+        // to determine the opening dropdown or its model-specific charge.
+        if (
+          data.serviceId &&
+          !(await tx.service.findFirst({
+            where: { id: data.serviceId, isActive: true },
+            select: { id: true },
+          }))
+        )
+          throw new BadRequestError("Select an active appointment service");
 
         if (data.teamId)
           await openingField("teamId", () =>
@@ -415,7 +470,9 @@ export class JobCardWorkflowService {
             ROLES.TECHNICIAN,
           );
 
-        const repeatWindow = pdi ? null : windowOf(await getBranchSettings(branch.id, tx));
+        const repeatWindow = pdi
+          ? null
+          : windowOf(await getBranchSettings(branch.id, tx));
         const repeat = repeatWindow
           ? await resolveRepeatAtOpening(tx, {
               vehicleId: vehicle.id,
@@ -423,12 +480,18 @@ export class JobCardWorkflowService {
               at: new Date(),
               window: repeatWindow,
               actorId: createdById,
-              manualPreviousJobId: data.isRepeat ? data.previousJobId : undefined,
+              manualPreviousJobId: data.isRepeat
+                ? data.previousJobId
+                : undefined,
             })
           : null;
         const repeatNote = repeat ? data.repeatReason?.trim() || null : null;
 
-        const complaints = await resolveJobComplaints(tx, data.complaints, pdi ? "PDI_DEFECT" : "COMPLAINT");
+        const complaints = await resolveJobComplaints(
+          tx,
+          data.complaints,
+          pdi ? "PDI_DEFECT" : "COMPLAINT",
+        );
 
         const tyres = data.tyres
           ? await Promise.all(
@@ -471,11 +534,12 @@ export class JobCardWorkflowService {
           warrantyAcknowledged: _warrantyAcknowledged,
           acknowledgedCampaignIds: _acknowledgedCampaignIds,
           promisedAt,
+          faultVerification,
           openingConsent: _openingConsentProof,
           isRepeat: _isRepeat,
-        previousJobId: _previousJobId,
-        repeatReason: _repeatReason,
-        ...fields
+          previousJobId: _previousJobId,
+          repeatReason: _repeatReason,
+          ...fields
         } = data;
         const now = new Date();
 
@@ -485,9 +549,9 @@ export class JobCardWorkflowService {
             ...fields,
             openingConsent,
             isRepeat: Boolean(repeat),
-          previousJobId: repeat?.previous.id ?? null,
-          repeatReason: repeatNote,
-          serviceCharge,
+            previousJobId: repeat?.previous.id ?? null,
+            repeatReason: repeatNote,
+            serviceCharge,
             tyres,
             batteryMake,
             acFitted: data.acType ? data.acType !== "NONE" : data.acFitted,
@@ -511,11 +575,28 @@ export class JobCardWorkflowService {
             createdById,
             promisedAt: new Date(promisedAt),
             status: "OPEN",
+            ...(enrollInWorkflow && faultVerification
+              ? {
+                  serviceWorkflow: {
+                    create: {
+                      faultVerification,
+                      faultVerifiedById: createdById,
+                      faultVerifiedAt: now,
+                    },
+                  },
+                }
+              : {}),
             jobType,
-          pdiRegistration: pdi ? (options.pdiRegistration?.trim().toUpperCase() || pdiRegistrationFromVin(vehicle.vin)) : undefined,
-          jobNumber: pdi
-            ? pdiDocumentNumber("JOB_CARD", await nextSequenceNumber(tx, pdiSequenceKey("JOB_CARD")))
-            : await nextDocumentNumber(tx, "JOB_CARD"),
+            pdiRegistration: pdi
+              ? options.pdiRegistration?.trim().toUpperCase() ||
+                pdiRegistrationFromVin(vehicle.vin)
+              : undefined,
+            jobNumber: pdi
+              ? pdiDocumentNumber(
+                  "JOB_CARD",
+                  await nextSequenceNumber(tx, pdiSequenceKey("JOB_CARD")),
+                )
+              : await nextDocumentNumber(tx, "JOB_CARD"),
 
             complaints: {
               create: complaints,
@@ -558,11 +639,23 @@ export class JobCardWorkflowService {
           },
         });
 
-      if (repeat && repeatWindow)
-        await createRepeatRecord(tx, { jobCardId: card.id, branchId: branch.id, repeat, window: repeatWindow, note: repeatNote });
+        if (repeat && repeatWindow)
+          await createRepeatRecord(tx, {
+            jobCardId: card.id,
+            branchId: branch.id,
+            repeat,
+            window: repeatWindow,
+            note: repeatNote,
+          });
 
-      // A service job is the visit for the vehicle's open CSC cases (never blocks the opening).
-      if (!pdi) await matchCasesSafely(tx, { jobCardId: card.id, vehicleId: vehicle.id, at: card.createdAt, actorId: createdById });
+        // A service job is the visit for the vehicle's open CSC cases (never blocks the opening).
+        if (!pdi)
+          await matchCasesSafely(tx, {
+            jobCardId: card.id,
+            vehicleId: vehicle.id,
+            at: card.createdAt,
+            actorId: createdById,
+          });
 
         if (data.appointmentId) {
           await tx.serviceAppointment.update({
@@ -604,9 +697,13 @@ export class JobCardWorkflowService {
               : Math.max(vehicle.lastRecordedMileage ?? 0, data.mileage),
             lastMileageAt: now,
             // PDI tyres (up to five makes and numbers) are saved to the vehicle.
-          ...(pdi && tyres ? { tyres: tyres as unknown as Prisma.InputJsonValue } : {}),
-          ...(pdi && batteryMake !== undefined ? { batteryMake, batteryNumber: data.batteryNumber ?? null } : {}),
-        },
+            ...(pdi && tyres
+              ? { tyres: tyres as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(pdi && batteryMake !== undefined
+              ? { batteryMake, batteryNumber: data.batteryNumber ?? null }
+              : {}),
+          },
         });
 
         if (openCampaigns.length > 0) {
@@ -678,16 +775,81 @@ export class JobCardWorkflowService {
           include: {
             invoices: true,
             consolidatedInvoices: true,
+            serviceWorkflow: { include: { parts: true } },
           },
         });
 
         if (!current) throw new NotFoundError("Job card not found");
         current.invoices.push(...(current.consolidatedInvoices ?? []));
-      // PDI jobs move through the PDI screens (work done, vehicle ready, bill); only delivery is shared.
-      if (current.jobType === JobCardType.PDI && (data.status !== "DELIVERED" || Object.entries(data).some(([key, value]) => value !== undefined && !["status", "deliveryAdvisorId", "lateReasonIds", "lateRemarks", "remarks"].includes(key))))
-        throw new BadRequestError("PDI job cards are updated from the PDI menu");
+        // PDI jobs move through the PDI screens (work done, vehicle ready, bill); only delivery is shared.
+        if (
+          current.jobType === JobCardType.PDI &&
+          (data.status !== "DELIVERED" ||
+            Object.entries(data).some(
+              ([key, value]) =>
+                value !== undefined &&
+                ![
+                  "status",
+                  "deliveryAdvisorId",
+                  "lateReasonIds",
+                  "lateRemarks",
+                  "remarks",
+                ].includes(key),
+            ))
+        )
+          throw new BadRequestError(
+            "PDI job cards are updated from the PDI menu",
+          );
 
         const from = canonicalJobStatus(current.status);
+        const workflow = current.serviceWorkflow;
+        if (
+          workflow &&
+          data.status &&
+          data.status !== from &&
+          !["CANCELLED", "DELIVERED"].includes(data.status)
+        ) {
+          const action =
+            data.status === "IN_PROGRESS"
+              ? "startWork"
+              : data.status === "QC"
+                ? "finishWork"
+                : data.status === "READY"
+                  ? "readyForBilling"
+                  : null;
+          if (!action)
+            throw new ConflictError(
+              "Use the current workflow action to change this job card",
+            ).withCode("WORKFLOW_STAGE_CONFLICT");
+          if (data.workflowVersion !== workflow.version)
+            throw new ConflictError(
+              "Refresh the job card before changing its stage",
+            ).withCode("WORKFLOW_VERSION_CONFLICT");
+          const actor = await tx.user.findUnique({
+            where: { id: actorId },
+            include: { role: true },
+          });
+          if (!actor?.isActive) throw new UnauthorizedError();
+          const stage = requireServiceJobAction(action, {
+            stage: workflow.stage,
+            technicianId: current.technicianId,
+            actorId,
+            role: actor.role.name,
+            warrantyBypassEnabled: false,
+          });
+          if (
+            (action === "startWork" || action === "finishWork") &&
+            !(await hasServiceJobIssuedParts(tx, workflow))
+          ) {
+            throw new ConflictError(
+              "Issue the outstanding approved parts before continuing work",
+            ).withCode("WORKFLOW_PARTS_OUTSTANDING");
+          }
+          await tx.serviceJobWorkflow.update({
+            where: { jobCardId: id, version: workflow.version },
+            data: { stage, version: { increment: 1 } },
+          });
+        }
 
         if (["DELIVERED", "CANCELLED"].includes(from))
           throw new BadRequestError("This job card is closed");
@@ -780,6 +942,19 @@ export class JobCardWorkflowService {
             current.technicianId,
           );
           if (
+            workflow &&
+            (data.status === "CANCELLED" || data.status === "DELIVERED")
+          ) {
+            if (data.workflowVersion !== workflow.version)
+              throw new ConflictError(
+                "Refresh the job card before changing its stage",
+              ).withCode("WORKFLOW_VERSION_CONFLICT");
+            await tx.serviceJobWorkflow.update({
+              where: { jobCardId: id, version: workflow.version },
+              data: { stage: data.status, version: { increment: 1 } },
+            });
+          }
+          if (
             from === "QC" &&
             data.status === "IN_PROGRESS" &&
             current.qcStatus?.toUpperCase() !== "FAILED"
@@ -829,7 +1004,7 @@ export class JobCardWorkflowService {
             update.deliveryAdvisorId = data.deliveryAdvisorId;
             update.lateReasonIds = data.lateReasonIds ?? [];
             update.lateRemarks = data.lateRemarks?.trim() || null;
-          update.gatePassNumber = await nextDocumentNumber(
+            update.gatePassNumber = await nextDocumentNumber(
               tx,
               "GATE_PASS",
               now,
@@ -846,6 +1021,10 @@ export class JobCardWorkflowService {
 
           if (from === "QC" && data.status === "IN_PROGRESS") {
             update.qcStatus = "PENDING";
+          }
+          if (workflow && data.status === "QC") {
+            update.qcStatus = "PENDING";
+            update.qcNotes = null;
           }
           update.status = data.status;
 

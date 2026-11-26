@@ -1,8 +1,13 @@
-import { notifyWorkshopEvent } from '../notification/workshop-notifications';
-import { setNotificationActor } from '../notification/jobcard-notification-router';
-import { assertPartsRequested } from '../service/jobcard-parts-request.logic';
-import { assertApprovedOperation } from '../service/estimate-approval';
-import { defaultSourceCategory, sourceLabel, sourceRecordProblem } from './partSource';
+import { notifyWorkshopEvent } from "../notification/workshop-notifications";
+import { setNotificationActor } from "../notification/jobcard-notification-router";
+import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
+import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
+import { assertApprovedOperation } from "../service/estimate-approval";
+import {
+  defaultSourceCategory,
+  sourceLabel,
+  sourceRecordProblem,
+} from "./partSource";
 import prisma from "../../prisma/client";
 import { InventoryRepository } from "./inventory.repository";
 import {
@@ -11,6 +16,10 @@ import {
   ConflictError,
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
+import {
+  authorizeServiceJobIssuance,
+  completeServiceJobIssuance,
+} from "../service/service-job-issuance";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
@@ -282,7 +291,10 @@ export class InventoryService {
     return this.inventoryRepository.deleteSparePart(id, changedById);
   }
 
-  async createAlternatePart(data: CreateAlternatePartInput, changedById?: string) {
+  async createAlternatePart(
+    data: CreateAlternatePartInput,
+    changedById?: string,
+  ) {
     const mainPart = await prisma.sparePart.findUnique({
       where: { id: data.mainPartId },
     });
@@ -313,12 +325,7 @@ export class InventoryService {
       {} as InheritedDefaults,
     );
 
-    const {
-      mainPartId,
-      partNumber,
-      name,
-      overrides,
-    } = data;
+    const { mainPartId, partNumber, name, overrides } = data;
 
     return prisma.$transaction(async (tx) => {
       const part = await tx.sparePart.create({
@@ -439,26 +446,29 @@ export class InventoryService {
     return { ...rest, unitRate: unitPrice };
   }
 
-  async createPart(data: {
-    partCode?: string;
-    partNumber: string;
-    name: string;
-    uom: string;
-    taxCategory?: string;
-    taxForm?: string;
-    minLevel?: number;
-    maxLevel?: number;
-    reorderQty?: number;
-    unitRate: number;
-    retailRate?: number;
-    taxable?: boolean;
-    partFlag?: string;
-    partType?: string;
-    priceCategoryCode?: string;
-    partStatus?: PartStatus;
-    warrantyApplicable?: boolean;
-    warrantyRate?: number | null;
-  } & LegacyPartFields, changedById?: string) {
+  async createPart(
+    data: {
+      partCode?: string;
+      partNumber: string;
+      name: string;
+      uom: string;
+      taxCategory?: string;
+      taxForm?: string;
+      minLevel?: number;
+      maxLevel?: number;
+      reorderQty?: number;
+      unitRate: number;
+      retailRate?: number;
+      taxable?: boolean;
+      partFlag?: string;
+      partType?: string;
+      priceCategoryCode?: string;
+      partStatus?: PartStatus;
+      warrantyApplicable?: boolean;
+      warrantyRate?: number | null;
+    } & LegacyPartFields,
+    changedById?: string,
+  ) {
     if (data.retailRate === undefined && data.priceCategoryCode) {
       data = {
         ...data,
@@ -481,10 +491,13 @@ export class InventoryService {
     }
 
     const { unitRate, ...rest } = data;
-    const part = await this.inventoryRepository.createPart({
-      ...rest,
-      unitPrice: unitRate,
-    }, changedById);
+    const part = await this.inventoryRepository.createPart(
+      {
+        ...rest,
+        unitPrice: unitRate,
+      },
+      changedById,
+    );
 
     return this.mapToPartMasterDto(part);
   }
@@ -561,7 +574,9 @@ export class InventoryService {
 
     if (data.partFlag && data.partFlag !== part.partFlag) {
       // A part's flag is its source: it is fixed while the part is linked to source records.
-      const linked = part.sourceOfPartId ? 1 : await prisma.sparePart.count({ where: { sourceOfPartId: id } });
+      const linked = part.sourceOfPartId
+        ? 1
+        : await prisma.sparePart.count({ where: { sourceOfPartId: id } });
       if (linked)
         throw new ConflictError(
           part.sourceOfPartId
@@ -570,7 +585,9 @@ export class InventoryService {
         );
     }
     if (part.sourceOfPartId && data.warrantyApplicable)
-      throw new BadRequestError("Source records (local, used or repaired parts) cannot be claimed under warranty");
+      throw new BadRequestError(
+        "Source records (local, used or repaired parts) cannot be claimed under warranty",
+      );
 
     if (data.partCode && data.partCode !== part.partCode) {
       const existing = await this.inventoryRepository.findPartByCode(
@@ -603,7 +620,11 @@ export class InventoryService {
       updateData.retailRate = await this.retailFromCategory(dealer, category);
     }
 
-    const updated = await this.inventoryRepository.updatePart(id, updateData, changedById);
+    const updated = await this.inventoryRepository.updatePart(
+      id,
+      updateData,
+      changedById,
+    );
     return this.mapToPartMasterDto(updated);
   }
 
@@ -616,7 +637,10 @@ export class InventoryService {
    * record's id, it returns that record's main part and siblings.
    */
   async listPartSources(id: string, branchId?: string | null) {
-    const part = await prisma.sparePart.findUnique({ where: { id }, select: { id: true, sourceOfPartId: true } });
+    const part = await prisma.sparePart.findUnique({
+      where: { id },
+      select: { id: true, sourceOfPartId: true },
+    });
     if (!part) throw new NotFoundError("Part not found");
     const mainId = part.sourceOfPartId ?? part.id;
     const records = await prisma.sparePart.findMany({
@@ -638,12 +662,21 @@ export class InventoryService {
         dealerRate: record.unitPrice,
         retailRate: record.retailRate,
         stock: branchId
-          ? { quantity: stock?.quantity ?? 0, available: (stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0), rackLocation: stock?.rackLocation ?? null }
+          ? {
+              quantity: stock?.quantity ?? 0,
+              available:
+                (stock?.quantity ?? 0) - (stock?.reservedQuantity ?? 0),
+              rackLocation: stock?.rackLocation ?? null,
+            }
           : null,
       };
     });
     // Main part first, then its sources in code order (O, A, F, L, U, R).
-    rows.sort((a, b) => Number(b.isMain) - Number(a.isMain) || order.indexOf(a.partFlag) - order.indexOf(b.partFlag));
+    rows.sort(
+      (a, b) =>
+        Number(b.isMain) - Number(a.isMain) ||
+        order.indexOf(a.partFlag) - order.indexOf(b.partFlag),
+    );
     return { mainPartId: mainId, branchId: branchId ?? null, records: rows };
   }
 
@@ -653,7 +686,12 @@ export class InventoryService {
    */
   async createSourceRecord(
     mainPartId: string,
-    data: { source: string; partNumber: string; dealerRate: number; priceCategoryCode?: string | null },
+    data: {
+      source: string;
+      partNumber: string;
+      dealerRate: number;
+      priceCategoryCode?: string | null;
+    },
     changedById?: string,
   ) {
     const main = await prisma.sparePart.findUnique({
@@ -661,19 +699,36 @@ export class InventoryService {
       include: { sourceRecords: { select: { partFlag: true } } },
     });
     if (!main) throw new NotFoundError("Main part not found");
-    const problem = sourceRecordProblem(main, data.source, main.sourceRecords.map((r) => r.partFlag));
+    const problem = sourceRecordProblem(
+      main,
+      data.source,
+      main.sourceRecords.map((r) => r.partFlag),
+    );
     if (problem) throw new BadRequestError(problem);
 
     const partNumber = data.partNumber.trim();
     const taken = await prisma.sparePart.findFirst({
-      where: { OR: [{ partNumber: { equals: partNumber, mode: "insensitive" } }, { partCode: partNumber }] },
+      where: {
+        OR: [
+          { partNumber: { equals: partNumber, mode: "insensitive" } },
+          { partCode: partNumber },
+        ],
+      },
       select: { partNumber: true },
     });
-    if (taken) throw new ConflictError(`Part number ${taken.partNumber} is already in Part Master`);
+    if (taken)
+      throw new ConflictError(
+        `Part number ${taken.partNumber} is already in Part Master`,
+      );
 
     const priceCategoryCode =
-      data.priceCategoryCode !== undefined ? data.priceCategoryCode : defaultSourceCategory(data.source, main.priceCategoryCode);
-    const retailRate = await this.retailFromCategory(data.dealerRate, priceCategoryCode);
+      data.priceCategoryCode !== undefined
+        ? data.priceCategoryCode
+        : defaultSourceCategory(data.source, main.priceCategoryCode);
+    const retailRate = await this.retailFromCategory(
+      data.dealerRate,
+      priceCategoryCode,
+    );
 
     try {
       const part = await this.inventoryRepository.createPart(
@@ -703,8 +758,13 @@ export class InventoryService {
       return this.mapToPartMasterDto(part);
     } catch (error) {
       // Two users adding the same source at once: the unique (sourceOfPartId, partFlag) index decides.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")
-        throw new ConflictError(`${main.partNumber} already has a ${sourceLabel(data.source)} record, or the part number is taken`);
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictError(
+          `${main.partNumber} already has a ${sourceLabel(data.source)} record, or the part number is taken`,
+        );
       throw error;
     }
   }
@@ -723,7 +783,9 @@ export class InventoryService {
         `This part has ${alternates} alternate part(s). Delete or reassign them first, or block the part instead.`,
       );
     }
-    const sourceRecords = await prisma.sparePart.count({ where: { sourceOfPartId: id } });
+    const sourceRecords = await prisma.sparePart.count({
+      where: { sourceOfPartId: id },
+    });
     if (sourceRecords > 0) {
       throw new ConflictError(
         `This part has ${sourceRecords} source record(s) (local, used or repaired). Delete them first, or block the part instead.`,
@@ -805,7 +867,9 @@ export class InventoryService {
     }
 
     const stock = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ id: string; quantity: number; reservedQuantity: number }[]>`
+      const rows = await tx.$queryRaw<
+        { id: string; quantity: number; reservedQuantity: number }[]
+      >`
         SELECT "id", "quantity", "reservedQuantity" FROM "InventoryStock"
         WHERE "branchId" = ${data.branchId} AND "partId" = ${data.partId}
         FOR UPDATE`;
@@ -822,8 +886,17 @@ export class InventoryService {
         );
       }
       const saved = current
-        ? await tx.inventoryStock.update({ where: { id: current.id }, data: { quantity: { increment: data.quantity } } })
-        : await tx.inventoryStock.create({ data: { branchId: data.branchId, partId: data.partId, quantity: data.quantity } });
+        ? await tx.inventoryStock.update({
+            where: { id: current.id },
+            data: { quantity: { increment: data.quantity } },
+          })
+        : await tx.inventoryStock.create({
+            data: {
+              branchId: data.branchId,
+              partId: data.partId,
+              quantity: data.quantity,
+            },
+          });
       await tx.stockTransaction.create({
         data: {
           branchId: data.branchId,
@@ -891,7 +964,14 @@ export class InventoryService {
         include: { branch: true, part: true },
       });
       if (data.rackLocation !== undefined) {
-        await recordBinChange(tx, partId, branchId, current?.rackLocation, saved.rackLocation, changedById);
+        await recordBinChange(
+          tx,
+          partId,
+          branchId,
+          current?.rackLocation,
+          saved.rackLocation,
+          changedById,
+        );
       }
       return saved;
     });
@@ -911,7 +991,9 @@ export class InventoryService {
         where: { partNumber: partNumber.trim().toUpperCase() },
       });
       if (!catalogue)
-        throw new NotFoundError(`Part ${partNumber} not found in Part Master or the Mobis catalogue`);
+        throw new NotFoundError(
+          `Part ${partNumber} not found in Part Master or the Mobis catalogue`,
+        );
       return { source: "CATALOGUE" as const, catalogue };
     }
 
@@ -961,8 +1043,11 @@ export class InventoryService {
     const categories = await prisma.partCategory.findMany();
     const { items, problems } = preparePriceList(rows, categories);
     if (problems.length) {
-      const more = problems.length > 10 ? ` and ${problems.length - 10} more` : "";
-      throw new BadRequestError(`The price list was not saved: ${problems.slice(0, 10).join("; ")}${more}`);
+      const more =
+        problems.length > 10 ? ` and ${problems.length - 10} more` : "";
+      throw new BadRequestError(
+        `The price list was not saved: ${problems.slice(0, 10).join("; ")}${more}`,
+      );
     }
     // xmax = 0 only on a freshly inserted row, which tells added from updated.
     const saved = await prisma.$queryRaw<{ inserted: boolean }[]>`
@@ -993,14 +1078,22 @@ export class InventoryService {
     const item = await prisma.partCatalogueItem.findUnique({
       where: { partNumber: partNumber.trim().toUpperCase() },
     });
-    if (!item) throw new NotFoundError(`Part ${partNumber} is not in the Mobis catalogue`);
+    if (!item)
+      throw new NotFoundError(
+        `Part ${partNumber} is not in the Mobis catalogue`,
+      );
     const existing = await prisma.sparePart.findFirst({
       where: { partNumber: { equals: item.partNumber, mode: "insensitive" } },
       select: { id: true },
     });
-    if (existing) throw new ConflictError(`Part ${item.partNumber} is already in Part Master`);
+    if (existing)
+      throw new ConflictError(
+        `Part ${item.partNumber} is already in Part Master`,
+      );
     const priceCategory = item.priceCategoryCode
-      ? await prisma.partCategory.findUnique({ where: { code: item.priceCategoryCode } })
+      ? await prisma.partCategory.findUnique({
+          where: { code: item.priceCategoryCode },
+        })
       : null;
     return this.createPart(
       {
@@ -1013,7 +1106,9 @@ export class InventoryService {
         partFlag: item.partFlag,
         partType: item.partType,
         // A category deactivated since the upload is left off; the rates are still the list's.
-        priceCategoryCode: priceCategory?.isActive ? priceCategory.code : undefined,
+        priceCategoryCode: priceCategory?.isActive
+          ? priceCategory.code
+          : undefined,
       },
       changedById,
     );
@@ -1150,56 +1245,159 @@ export class InventoryService {
       }
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      await setNotificationActor(tx, data.issuedById);
-      if (data.jobCardId) {
-        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`);
-        const card = await tx.jobCard.findUniqueOrThrow({ where: { id: data.jobCardId } });
-        if (card.branchId !== data.branchId || card.billedAt || ['READY', 'COMPLETED', 'BILLED', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(card.status.toUpperCase())) throw new BadRequestError('Parts can only be issued to an open job in this branch');
-        assertPartsRequested(card);
-        const previous = await tx.partIssuance.findMany({ where: { jobCardId: data.jobCardId, sparePartId: data.sparePartId, OR: [{ requisitionLine: null }, { requisitionLine: { requisition: { status: 'ISSUED' } } }] }, include: { returns: true } });
-        const quantity = data.quantity + previous.reduce((sum, row) => sum + row.quantity - row.returns.filter(r => !['REJECTED', 'CANCELLED'].includes(r.status.toUpperCase())).reduce((n, r) => n + r.quantity, 0), 0);
-        if (sparePart.retailRate == null) throw new BadRequestError('Set the part retail rate before issuing');
-        // Each source is its own part record: the approved estimate must name this exact record.
-        await assertApprovedOperation(tx, card.id, card.customerId, [{ type: 'PART', referenceId: sparePart.id, partSource: sparePart.partFlag, description: `${sparePart.partNumber} (${sparePart.name})`, quantity, rate: sparePart.retailRate, amount: Math.round(quantity * sparePart.retailRate * 100) / 100 }], 'parts issue');
-      }
-      const updated = await tx.inventoryStock.updateMany({
-        where: {
-          branchId: data.branchId,
-          partId: data.sparePartId,
-          quantity: { gte: data.quantity },
-        },
-        data: { quantity: { decrement: data.quantity } },
-      });
-      if (updated.count !== 1) {
-        throw new BadRequestError("Insufficient stock at this branch");
-      }
-
-      if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
-      // partSource is a snapshot of the issued record's source, kept for reporting.
-      const issuance = await tx.partIssuance.create({ data: { ...data, partSource: sparePart.partFlag } });
-      await tx.stockTransaction.create({
-        data: {
-          branchId: data.branchId,
-          partId: data.sparePartId,
-          type: "ISSUED",
-          quantity: -data.quantity,
-          referenceId: issuance.id,
-          notes: data.notes,
-          recordedById: data.issuedById,
-        },
-      });
-      const stock = await tx.inventoryStock.findUniqueOrThrow({
-        where: {
-          branchId_partId: {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        await setNotificationActor(tx, data.issuedById);
+        let advanceWorkflow:
+          | ((issuanceId: string) => Promise<void>)
+          | undefined;
+        if (data.jobCardId) {
+          await tx.$queryRaw(
+            Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${data.jobCardId} FOR UPDATE`,
+          );
+          const card = await tx.jobCard.findUniqueOrThrow({
+            where: { id: data.jobCardId },
+            include: { serviceWorkflow: { include: { parts: true } } },
+          });
+          if (
+            card.branchId !== data.branchId ||
+            card.billedAt ||
+            [
+              "READY",
+              "COMPLETED",
+              "BILLED",
+              "DELIVERED",
+              "CLOSED",
+              "CANCELLED",
+            ].includes(card.status.toUpperCase())
+          )
+            throw new BadRequestError(
+              "Parts can only be issued to an open job in this branch",
+            );
+          assertPartsRequested(card);
+          if (card.serviceWorkflow) {
+            const workflow = card.serviceWorkflow;
+            const stage = await authorizeServiceJobIssuance(
+              tx,
+              workflow,
+              card.technicianId,
+              data.issuedById,
+            );
+            advanceWorkflow = async (issuanceId) => {
+              await completeServiceJobIssuance(
+                tx,
+                card.id,
+                workflow,
+                stage,
+                data.issuedById,
+              );
+              await enqueueWorkshopNotification(
+                tx,
+                "PARTS_ISSUED",
+                card,
+                issuanceId,
+                data.issuedById,
+                false,
+                `${sparePart.partNumber} ${sparePart.name}, quantity ${data.quantity}`,
+              );
+            };
+          }
+          const previous = await tx.partIssuance.findMany({
+            where: {
+              jobCardId: data.jobCardId,
+              sparePartId: data.sparePartId,
+              OR: [
+                { requisitionLine: null },
+                { requisitionLine: { requisition: { status: "ISSUED" } } },
+              ],
+            },
+            include: { returns: true },
+          });
+          const quantity =
+            data.quantity +
+            previous.reduce(
+              (sum, row) =>
+                sum +
+                row.quantity -
+                row.returns
+                  .filter(
+                    (r) =>
+                      !["REJECTED", "CANCELLED"].includes(
+                        r.status.toUpperCase(),
+                      ),
+                  )
+                  .reduce((n, r) => n + r.quantity, 0),
+              0,
+            );
+          if (sparePart.retailRate == null)
+            throw new BadRequestError(
+              "Set the part retail rate before issuing",
+            );
+          // Each source is its own part record: the approved estimate must name this exact record.
+          await assertApprovedOperation(
+            tx,
+            card.id,
+            card.customerId,
+            [
+              {
+                type: "PART",
+                referenceId: sparePart.id,
+                partSource: sparePart.partFlag,
+                description: `${sparePart.partNumber} (${sparePart.name})`,
+                quantity,
+                rate: sparePart.retailRate,
+                amount: Math.round(quantity * sparePart.retailRate * 100) / 100,
+              },
+            ],
+            "parts issue",
+          );
+        }
+        const updated = await tx.inventoryStock.updateMany({
+          where: {
             branchId: data.branchId,
             partId: data.sparePartId,
+            quantity: { gte: data.quantity },
           },
-        },
-        include: { part: { select: { id: true, name: true } } },
-      });
-      return { issuance, stock };
-    }, { maxWait: 5000, timeout: 15000 });
+          data: { quantity: { decrement: data.quantity } },
+        });
+        if (updated.count !== 1) {
+          throw new BadRequestError("Insufficient stock at this branch");
+        }
+
+        if (data.jobCardId)
+          await tx.jobCard.update({
+            where: { id: data.jobCardId },
+            data: { qcStatus: "PENDING" },
+          });
+        // partSource is a snapshot of the issued record's source, kept for reporting.
+        const issuance = await tx.partIssuance.create({
+          data: { ...data, partSource: sparePart.partFlag },
+        });
+        await tx.stockTransaction.create({
+          data: {
+            branchId: data.branchId,
+            partId: data.sparePartId,
+            type: "ISSUED",
+            quantity: -data.quantity,
+            referenceId: issuance.id,
+            notes: data.notes,
+            recordedById: data.issuedById,
+          },
+        });
+        await advanceWorkflow?.(issuance.id);
+        const stock = await tx.inventoryStock.findUniqueOrThrow({
+          where: {
+            branchId_partId: {
+              branchId: data.branchId,
+              partId: data.sparePartId,
+            },
+          },
+          include: { part: { select: { id: true, name: true } } },
+        });
+        return { issuance, stock };
+      },
+      { maxWait: 5000, timeout: 15000 },
+    );
 
     // The stock mutation has committed; notification failure must not invite a duplicate issue.
     await this.notifyLowStock(
@@ -1210,7 +1408,12 @@ export class InventoryService {
     ).catch(() =>
       console.error("Low-stock notification could not be recorded"),
     );
-    if (data.jobCardId) await notifyWorkshopEvent('PARTS_ISSUED', data.jobCardId, result.issuance.id);
+    if (data.jobCardId)
+      await notifyWorkshopEvent(
+        "PARTS_ISSUED",
+        data.jobCardId,
+        result.issuance.id,
+      );
     return result.issuance;
   }
 
@@ -1243,7 +1446,8 @@ export class InventoryService {
         include: { requisitionLine: { select: { id: true } } },
       });
       if (!initial) throw new NotFoundError("Part issuance not found");
-      if (initial.requisitionLine) throw new BadRequestError('Use a return slip for requisition parts');
+      if (initial.requisitionLine)
+        throw new BadRequestError("Use a return slip for requisition parts");
       if (initial.jobCardId) {
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${initial.jobCardId} FOR UPDATE`,

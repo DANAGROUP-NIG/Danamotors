@@ -7,6 +7,7 @@ import {
 import { assertPdiDocumentChange } from "../pdi/pdi.settings.service";
 import { jobWorkUpdate } from "./requisition-work";
 import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
+import { authorizeServiceJobIssuance, completeServiceJobIssuance } from "../service/service-job-issuance";
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { ChargeType, JobCardType, PartStatus, Prisma } from "@prisma/client";
@@ -143,6 +144,7 @@ export class RequisitionService {
             invoices: { select: { status: true } },
             warrantyCase: { select: { id: true } },
             campaigns: { select: { campaignId: true } },
+            serviceWorkflow: { include: { parts: true } },
           },
         });
         if (!job) throw new NotFoundError("Job card not found");
@@ -154,6 +156,10 @@ export class RequisitionService {
         assertRequisitionJob(job);
         assertJobTypeAccess(job, actor);
         const pdi = job.jobType === JobCardType.PDI;
+        const workflow = job.serviceWorkflow;
+        const issuanceStage = workflow
+          ? await authorizeServiceJobIssuance(tx, workflow, job.technicianId, actor.userId)
+          : null;
         const now = new Date();
         if (pdi) await assertPdiDocumentChange(tx, "requisition", now, { create: true });
         if (!pdi && input.lines.some((line) => line.quantityIssued > 0))
@@ -413,7 +419,9 @@ export class RequisitionService {
             }
           }
         }
-        if (issued.length)
+        if (issued.length && workflow && issuanceStage)
+          await completeServiceJobIssuance(tx, job.id, workflow, issuanceStage, actor.userId);
+        if (issued.length && !workflow)
           await tx.jobCard.update({
             where: { id: job.id },
             data: pdi
@@ -445,7 +453,7 @@ export class RequisitionService {
             }),
           },
         });
-        await enqueueWorkshopNotification(
+        if (!workflow) await enqueueWorkshopNotification(
           tx,
           "PART_REQUESTED",
           job,
@@ -459,6 +467,8 @@ export class RequisitionService {
             job,
             document.id,
             actor.userId,
+            false,
+            workflow ? issued.map(item => `${item.part.partNumber} ${item.part.name}, quantity ${item.line.quantityIssued}`).join("; ") : undefined,
           );
         if (
           input.lines.some(
