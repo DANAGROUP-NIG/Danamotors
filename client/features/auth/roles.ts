@@ -15,6 +15,7 @@ export type AppRole =
   | "engineer"
   | "ccuofficer"
   | "ccumanager"
+  | "generalccumanager"
   | "warrantyofficer"
   | "auditor"
   | "customer";
@@ -348,6 +349,8 @@ export const ENQUIRY_REVIEW_ROLES: AppRole[] = [
   "superadmin",
   "admin",
   "ccumanager",
+  "ccuofficer",
+  "generalccumanager"
 ];
 
 // Roles that can create walk-in appointments (service:create)

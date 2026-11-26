@@ -218,7 +218,11 @@ export default function EnquiryPage() {
       <ModalFame
         isOpen={reviewAction !== null}
         onClose={() => setReviewAction(null)}
-        title={reviewAction === "reject-confirm" ? "Reject Enquiry" : "Approve & Schedule"}
+        title={
+          reviewAction === "reject-confirm"
+            ? "Reject Enquiry"
+            : "Approve & Schedule"
+        }
       >
         {enquiry && reviewAction && (
           <EnquiryReviewModal
