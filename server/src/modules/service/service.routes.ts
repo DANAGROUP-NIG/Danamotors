@@ -5,7 +5,7 @@ import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
-import { ConflictError } from "../../shared/errors/appError";
+import { ConflictError, NotFoundError } from "../../shared/errors/appError";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -15,11 +15,12 @@ import {
 } from "../../middleware/authorize";
 import { ROLES } from "../../shared/constants/roles";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
+import { JobStageService } from "./job-stage.service";
 import { RepeatJobService } from "../repeat-job/repeat-job.service";
 import { repeatActor } from "../repeat-job/repeat-job.actor";
 import { repeatPreviewSchema } from "../repeat-job/repeat-job.validation";
 import { requireMaster } from "../workshop/workshop-master.service";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { ServiceController } from "./service.controller";
 import { campaignAttendanceSchema } from "../campaign/campaign.validation";
 import { validateRequest } from "../../middleware/requestValidator";
@@ -44,6 +45,7 @@ import {
   updateLabourItemSchema,
   createJobCardLabourSchema,
   updateJobCardLabourSchema,
+  stageActionSchema,
 } from "./service.validation";
 
 const router = Router();
@@ -911,6 +913,94 @@ router.get(
   requirePermission(PERMISSIONS.JOBCARD_READ),
   validateRequest(jobCardIdParamSchema),
   controller.getJobCard,
+);
+
+const stageService = new JobStageService();
+/** The job must exist and belong to a branch the user can work in. */
+async function assertStageJobAccess(req: Request, id: string) {
+  const card = await prisma.jobCard.findUnique({ where: { id }, select: { branchId: true } });
+  if (!card) throw new NotFoundError("Job card not found");
+  assertBranchOwnership(req, card.branchId);
+}
+const stageActor = (req: Request) => ({ id: req.user!.userId, role: req.user!.role });
+
+/**
+ * @openapi
+ * /api/service/job-cards/{id}/workspace:
+ *   get:
+ *     tags: [Service]
+ *     summary: The staged job card for the signed-in user
+ *     description: Stage, owner and since when, the current sub-step, the actions this user can take (each with an enabled flag and plain-English reasons), up to 3 alerts, summaries of completed steps, a read-only flag, the Warranty or Non-warranty tag (warrantyJob), the step activity log (newest first), the vehicle's last two earlier visits and, for a cancelled job, who cancelled it and why.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: 'status=success, data=workspace' }
+ *       401: { description: Authentication required }
+ *       403: { description: Permission or branch access denied }
+ *       404: { description: Job card not found }
+ */
+router.get(
+  "/job-cards/:id/workspace",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  validateRequest(jobCardIdParamSchema),
+  async (req, res, next) => {
+    try {
+      await assertStageJobAccess(req, req.params.id);
+      const user = req.user!;
+      const data = await stageService.workspace(req.params.id, stageActor(req), {
+        // Matches the POST /stage check, so the screen never offers an action the server refuses.
+        canUpdate: user.role === ROLES.SUPER_ADMIN || user.permissions.includes(PERMISSIONS.JOBCARD_UPDATE),
+      });
+      res.json({ status: "success", statusCode: 200, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * @openapi
+ * /api/service/job-cards/{id}/stage:
+ *   post:
+ *     tags: [Service]
+ *     summary: Pass the job to the next step, or take another step action
+ *     description: Runs one action under the job lock after its permission and gates pass. Actions that change the job status run through the existing workflow. Repeating a requestId returns the current workspace without acting again.
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             required: [action, requestId]
+ *             properties:
+ *               action: { type: string, enum: [SEND_TO_SUPERVISOR, SEND_TO_WARRANTY, SEND_TO_ADVISOR, WARRANTY_TO_ADVISOR, RELEASE_TO_REPAIR, PAUSE_FOR_PARTS, RESUME_REPAIR, SEND_TO_QC, RETURN_TO_REPAIR, QC_PASSED_TO_ADVISOR, MARK_READY, SEND_TO_DELIVERY, CANCEL] }
+ *               note: { type: string, maxLength: 2000, description: Required for CANCEL }
+ *               requestId: { type: string, format: uuid }
+ *           example: { action: SEND_TO_SUPERVISOR, requestId: '11111111-1111-4111-8111-111111111111' }
+ *     responses:
+ *       200: { description: 'status=success, data=workspace after the action' }
+ *       400: { description: Invalid fields. Errors name the field and the fix. }
+ *       401: { description: Authentication required }
+ *       403: { description: 'Permission, role or branch access denied (code STAGE_ACTION_FORBIDDEN for the role rules)' }
+ *       404: { description: Job card not found }
+ *       409: { description: 'Blocked: code STAGE_ACTION_BLOCKED with details.reasons, or STAGE_REQUEST_REUSED' }
+ */
+router.post(
+  "/job-cards/:id/stage",
+  requirePermission(PERMISSIONS.JOBCARD_UPDATE),
+  validateRequest(stageActionSchema),
+  async (req, res, next) => {
+    try {
+      await assertStageJobAccess(req, req.params.id);
+      const data = await stageService.act(req.params.id, req.body, stageActor(req));
+      res.json({ status: "success", statusCode: 200, message: "Job card step updated", data });
+    } catch (error) {
+      next(error);
+    }
+  },
 );
 /**
  * @openapi

@@ -5,7 +5,7 @@ import {
   pdiSequenceKey,
 } from "../pdi/pdi.logic";
 import { assertPdiDocumentChange } from "../pdi/pdi.settings.service";
-import { jobWorkUpdate } from "./requisition-work";
+import { applyJobWorkChange } from "./requisition-work";
 import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
@@ -27,7 +27,6 @@ import {
   RequisitionActor,
   requisitionAmounts,
   requisitionFooter,
-  requisitionWorkUpdate,
 } from "./requisition.logic";
 import {
   RequisitionInput,
@@ -410,12 +409,7 @@ export class RequisitionService {
           }
         }
         if (issued.length)
-          await tx.jobCard.update({
-            where: { id: job.id },
-            data: pdi
-              ? requisitionWorkUpdate(job.status, actor.userId)
-              : await jobWorkUpdate(tx, job, actor.userId),
-          });
+          await applyJobWorkChange(tx, job, actor.userId, { pdi });
         await tx.auditLog.create({
           data: {
             userId: actor.userId,
@@ -578,12 +572,7 @@ export class RequisitionService {
           },
         });
         if (document.lines.some((line) => line.quantityIssued > 0))
-          await tx.jobCard.update({
-            where: { id: job.id },
-            data: pdi
-              ? requisitionWorkUpdate(job.status, actor.userId)
-              : await jobWorkUpdate(tx, job, actor.userId),
-          });
+          await applyJobWorkChange(tx, job, actor.userId, { pdi });
         await tx.auditLog.create({
           data: {
             userId: actor.userId,

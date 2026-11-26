@@ -18,17 +18,17 @@ export function JobCardLatePanel({ jobCard }: Props) {
   const reasons = useLateReasons();
   if (!late?.kind) return null;
   const ids = jobCard.lateReasonIds ?? [];
-  const chips = ids.map((id) => reasons.data?.find((reason) => reason.id === id) ?? { id, code: "?", description: reasons.isLoading ? "Loading…" : "Unknown reason" });
+  const chips = ids.map((id) => reasons.data?.find((reason) => reason.id === id) ?? { id, code: "", description: reasons.isLoading ? "Loading reason" : "Reason no longer listed" });
   return (
     <section aria-label="Late delivery" className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 print:hidden">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <CalendarClock className="mt-0.5 size-5 text-amber-600" aria-hidden />
           <div>
-            <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+            <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
               Delivered {lateByText(late.kind, late.daysLate, late.minutesLate)} late <LateKindBadge kind={late.kind} />
             </p>
-            <p className="text-sm text-slate-600">Promised {formatDateTime(jobCard.promisedAt)} · delivered {formatDateTime(jobCard.deliveredAt)}</p>
+            <p className="text-sm text-muted-foreground">Promised {formatDateTime(jobCard.promisedAt)}, delivered {formatDateTime(jobCard.deliveredAt)}</p>
           </div>
         </div>
         {hasPermission(LATE_PERMISSIONS.UPDATE) && (
@@ -39,7 +39,7 @@ export function JobCardLatePanel({ jobCard }: Props) {
       </div>
       <div className="mt-3 pl-8">
         <LateReasonChips reasons={chips} empty={<span className="text-sm font-medium text-amber-800">No reason recorded</span>} />
-        {jobCard.lateRemarks && <p className="mt-2 text-sm text-slate-700">{jobCard.lateRemarks}</p>}
+        {jobCard.lateRemarks && <p className="mt-2 text-sm text-foreground">{jobCard.lateRemarks}</p>}
       </div>
     </section>
   );

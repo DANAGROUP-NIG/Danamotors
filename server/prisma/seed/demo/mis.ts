@@ -1,4 +1,5 @@
 import { ChargeType, Prisma, RepeatJobSource } from "@prisma/client";
+import { stageColumns } from "./stage";
 import { getBranchSettings } from "../../../src/modules/company-settings/company-settings.service";
 import { createRepeatRecord, requireManualPrevious, windowOf } from "../../../src/modules/repeat-job/repeat-job.detect";
 import { repeatDifference } from "../../../src/modules/repeat-job/repeat-job.logic";
@@ -308,6 +309,7 @@ async function seedMisJob(ctx: DemoContext, ref: Reference, mis: MisReference, p
         jobNumber: `DM-${fx.id}`,
         description: `${DEMO_TAG} MIS demo job ${fx.id}`,
         status: fx.close ? "DELIVERED" : "IN_PROGRESS",
+        ...stageColumns(fx.close ? "DELIVERED" : "IN_PROGRESS"),
         customField1: key,
         branchId,
         customerId: vehicle.customerId,

@@ -1,4 +1,5 @@
 import { notifyWorkshopEvent } from '../notification/workshop-notifications';
+import { resetQualityCheck } from '../service/job-stage.writer';
 import { setNotificationActor } from '../notification/jobcard-notification-router';
 import { assertPartsRequested } from '../service/jobcard-parts-request.logic';
 import { assertApprovedOperation } from '../service/estimate-approval';
@@ -1148,7 +1149,7 @@ export class InventoryService {
         throw new BadRequestError("Insufficient stock at this branch");
       }
 
-      if (data.jobCardId) await tx.jobCard.update({ where: { id: data.jobCardId }, data: { qcStatus: 'PENDING' } });
+      if (data.jobCardId) await resetQualityCheck(tx, data.jobCardId, data.issuedById);
       // partSource is a snapshot of the issued record's source, kept for reporting.
       const issuance = await tx.partIssuance.create({ data: { ...data, partSource: sparePart.partFlag } });
       await tx.stockTransaction.create({

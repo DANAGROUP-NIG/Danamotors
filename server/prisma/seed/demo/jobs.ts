@@ -11,6 +11,12 @@ import { ReceiptService } from "../../../src/modules/finance/receipt.service";
 import { WarrantyCaseService } from "../../../src/modules/warranty/warrantyCase.service";
 import { checkVehicleWarranty } from "../../../src/modules/warranty/warranty.coverage";
 import { estimateContentHash } from "../../../src/modules/service/estimate-signature";
+import { JobStageService } from "../../../src/modules/service/job-stage.service";
+import { requestJobcardParts } from "../../../src/modules/service/jobcard-parts-request.service";
+import { ROLES } from "../../../src/shared/constants/roles";
+import type { StageAction } from "../../../src/modules/service/job-stage.logic";
+import { upfrontAmount } from "../../../src/modules/service/estimate-advance";
+import type { JobStage } from "@prisma/client";
 import { DemoContext, Reference, seedLedger } from "./context";
 import { Parties } from "./parties";
 import {
@@ -38,6 +44,7 @@ const services = {
   billing: new JobBillingService(),
   receipts: new ReceiptService(),
   warranty: new WarrantyCaseService(),
+  stages: new JobStageService(),
 };
 
 const RANK: Record<string, number> = { OPEN: 0, IN_PROGRESS: 1, QC: 2, READY: 3, BILLED: 4, DELIVERED: 5 };
@@ -45,6 +52,7 @@ const TARGET_STATUS: Record<JobFixture["target"], string> = {
   OPEN: "OPEN",
   IN_PROGRESS: "IN_PROGRESS",
   READY: "READY",
+  BILLED: "BILLED",
   BILLED_PAID: "DELIVERED",
   BILLED_CREDIT: "DELIVERED",
 };
@@ -84,10 +92,12 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
 
   for (const [index, estimate] of fx.estimates.entries()) await ensureEstimate(ref, job.id, job.customerId!, job.serviceTypeId!, index, estimate, staff.advisor.id);
 
-  job = await loadJob(id);
   const target = RANK[TARGET_STATUS[fx.target]];
+  await walkToEstimate(ctx, fx, id, target);
+  job = await loadJob(id);
   if (canonicalJobStatus(job.status) === "OPEN" && target >= RANK.IN_PROGRESS) {
-    await services.workflow.update(id, { status: "IN_PROGRESS", remarks: "Work started" }, staff.advisor.id);
+    await recordAdvance(ctx, fx, id);
+    await stageAction(fx, id, "RELEASE_TO_REPAIR", staff.advisor.id, "Work released to the technician");
   }
 
   job = await loadJob(id);
@@ -97,6 +107,16 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
       if (await prisma.jobCardLabour.findFirst({ where: { jobCardId: id, labourItemId }, select: { id: true } })) continue;
       await services.labour.addJobCardLine(id, { labourItemId, hours, technicianId: fx.withTechnician ? staff.technician.id : undefined });
       await services.lines.list(id); // creates the charge line, in order
+    }
+    // The technician asks the store for the parts first (the existing "Request parts" button). The button
+    // only records the request and tells the branch store officer; without one, the request time is recorded.
+    if (fx.issues.length && !(await loadJob(id)).partsRequestedAt) {
+      const storeOfficer = await prisma.user.findFirst({
+        where: { branchId: branch.id, isActive: true, role: { name: ROLES.BRANCH_STORE_MANAGER }, id: { not: staff.technician.id } },
+        select: { id: true },
+      });
+      if (storeOfficer) await requestJobcardParts(id, branch.id, staff.technician.id, demoUuid(`parts:${fx.id}`));
+      else await prisma.jobCard.update({ where: { id }, data: { partsRequestedAt: new Date() } });
     }
     for (const [partKey, quantity] of fx.issues) {
       const sparePartId = ref.parts[partKey];
@@ -112,6 +132,7 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
   if (fx.claim && claimUsesJobLines) await buildClaim(ctx, ref, id, fx.claim, false);
 
   await advance(ctx, fx, id);
+  await stopInWorkshop(ctx, fx, id);
 
   if (fx.claim && claimUsesJobLines) await decideClaim(ctx, ref, id, fx.claim);
 
@@ -216,9 +237,9 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
     if (RANK[status] === undefined || RANK[status] >= target) return;
 
     if (status === "IN_PROGRESS") {
-      await services.workflow.update(id, { status: "QC", remarks: "Work complete, sent for quality check" }, staff.advisor.id);
+      await stageAction(fx, id, "SEND_TO_QC", staff.technician.id, "Work complete, sent for quality check");
     } else if (status === "QC") {
-      if (job.qcStatus?.toUpperCase() !== "PASSED") await services.workshop.updateQC(id, "PASSED", "Road test passed");
+      await passQualityCheck(ctx, fx, id);
       // READY needs a done / not done answer for each linked campaign (FPC bulletins).
       if (fx.campaignWork) {
         const unanswered = await prisma.jobCardCampaign.findMany({ where: { jobCardId: id, attended: null }, select: { campaignId: true } });
@@ -252,6 +273,84 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
       return;
     }
   }
+}
+
+/** Runs one staged job card action as a seeded staff member. The request ID makes re-runs safe. */
+async function stageAction(fx: JobFixture, id: string, action: StageAction, actorId: string, note?: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: actorId }, select: { id: true, role: { select: { name: true } } } });
+  await services.stages.act(id, { action, note, requestId: demoUuid(`stage:${fx.id}:${action}`) }, { id: user.id, role: user.role.name });
+}
+
+const PRE_REPAIR: JobStage[] = ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE"];
+
+/**
+ * Hands the job on through check-in, diagnosis and the warranty check (when the vehicle needs it)
+ * to the estimate, or to the step the fixture stops at.
+ */
+async function walkToEstimate(ctx: DemoContext, fx: JobFixture, id: string, target: number) {
+  const staff = ctx.staff[fx.branch];
+  const goal: JobStage = target >= RANK.IN_PROGRESS || fx.stop === "CANCELLED" ? "ESTIMATE" : ((fx.stop as JobStage | undefined) ?? "CHECK_IN");
+  for (;;) {
+    const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, openingSignatureRequired: true } });
+    if (job.stage === goal || job.stage === "ESTIMATE" || !PRE_REPAIR.includes(job.stage)) break;
+    if (job.stage === "CHECK_IN") {
+      // TODO(confirm): the check-in consent is captured on screen from phase 2. Until then, demo jobs past
+      // check-in are recorded without it, like jobs opened before signed consent existed.
+      if (job.openingSignatureRequired) await prisma.jobCard.update({ where: { id }, data: { openingSignatureRequired: false } });
+      await stageAction(fx, id, "SEND_TO_SUPERVISOR", staff.advisor.id);
+    } else if (job.stage === "DIAGNOSIS") {
+      // The warranty check comes next only for a vehicle in warranty or with an open campaign.
+      const technician = await prisma.user.findUniqueOrThrow({ where: { id: staff.technician.id }, select: { id: true, role: { select: { name: true } } } });
+      const workspace = await services.stages.workspace(id, { id: technician.id, role: technician.role.name });
+      const handoff = workspace.actions.find((view) => view.kind === "primary" && view.enabled)?.action;
+      if (!handoff) throw new Error(`${fx.id}: diagnosis cannot be handed on (${workspace.actions.flatMap((view) => view.reasons).join(" ")})`);
+      await stageAction(fx, id, handoff, staff.technician.id);
+    } else {
+      await stageAction(fx, id, "WARRANTY_TO_ADVISOR", ctx.warrantyOfficer.id, "No warranty items on this visit");
+    }
+  }
+  if (fx.stop === "CANCELLED" && (await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage === "ESTIMATE")
+    await stageAction(fx, id, "CANCEL", staff.advisor.id, "Customer took the vehicle elsewhere");
+}
+
+/** A token deposit: any positive advance meets the existing rule, and the bills keep a balance to pay or put on credit. */
+const DEMO_ADVANCE = 10_000;
+
+/** The cashier records the advance the existing workflow needs before work starts: ₦10,000, or the suggested amount if lower. */
+async function recordAdvance(ctx: DemoContext, fx: JobFixture, id: string) {
+  if (await prisma.receipt.findFirst({ where: { advanceJobCardId: id, status: "ACTIVE" }, select: { id: true } })) return;
+  const job = await loadJob(id);
+  const estimate = await prisma.estimate.findFirst({
+    where: { jobCardId: id },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { amount: true, upfrontPaymentPercent: true },
+  });
+  if (!estimate) throw new Error(`${fx.id} needs an estimate before work starts.`);
+  await services.receipts.createReceipt({
+    customerId: job.customerId!, branchId: job.branchId, idempotencyKey: demoUuid(`advance:${fx.id}`),
+    issuedById: ctx.staff[fx.branch].billing.id, mode: "CASH", category: "SERVICE_PARTS",
+    amount: Math.min(DEMO_ADVANCE, upfrontAmount(estimate.amount, estimate.upfrontPaymentPercent)),
+    narration: `Advance for job card ${job.jobNumber}`, advanceJobCardId: id, allocations: [],
+  });
+}
+
+/** Records a passed QC and the supervisor hands the job to the service advisor. */
+async function passQualityCheck(ctx: DemoContext, fx: JobFixture, id: string) {
+  const supervisor = ctx.staff[fx.branch].supervisor;
+  const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { qcStatus: true, stage: true } });
+  if (job.qcStatus?.toUpperCase() !== "PASSED") await services.workshop.updateQC(id, "PASSED", "Road test passed", supervisor.id);
+  if (job.stage === "QUALITY_CHECK") await stageAction(fx, id, "QC_PASSED_TO_ADVISOR", supervisor.id);
+}
+
+/** Jobs left in the workshop: paused for parts, waiting for QC, or passed QC and waiting for the advisor. */
+async function stopInWorkshop(ctx: DemoContext, fx: JobFixture, id: string) {
+  if (fx.target !== "IN_PROGRESS" || !fx.stop) return;
+  const technician = ctx.staff[fx.branch].technician.id;
+  const status = canonicalJobStatus((await loadJob(id)).status);
+  if (fx.stop === "WAITING_PARTS" && status === "IN_PROGRESS") await stageAction(fx, id, "PAUSE_FOR_PARTS", technician, "Oil filter on order from the main store");
+  if (["QUALITY_CHECK", "QC_PASSED"].includes(fx.stop) && status === "IN_PROGRESS")
+    await stageAction(fx, id, "SEND_TO_QC", technician, "Work complete, sent for quality check");
+  if (fx.stop === "QC_PASSED") await passQualityCheck(ctx, fx, id);
 }
 
 /** Claim lines, complaint code and officer. Only on a case still being drafted that has no lines yet. */

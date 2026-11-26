@@ -1,4 +1,5 @@
 "use client";
+import { NOT_PROVIDED } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { usePart, usePartStock } from "@/features/inventory/hooks/use-parts";
@@ -50,8 +51,8 @@ export function RequisitionStockPreview({
       )}
       {canReadPart && part.data && (
         <p>
-          Flag: {part.data.partFlag} · UOM: {part.data.uom} · Normal rate:{" "}
-          {moneyText(part.data.retailRate ?? part.data.unitRate)} · Warranty
+          Flag: {part.data.partFlag}, UOM: {part.data.uom}, Normal rate:{" "}
+          {moneyText(part.data.retailRate ?? part.data.unitRate)}, Warranty
           rate:{" "}
           {part.data.warrantyRate == null
             ? "Not set"
@@ -60,10 +61,10 @@ export function RequisitionStockPreview({
       )}
       {canReadStock && stock.data && (
         <p>
-          On hand: {branchStock?.quantity ?? 0} · Available:{" "}
-          {branchStock?.availableQuantity ?? 0} · Location:{" "}
-          {branchStock?.rackLocation ?? "—"} · Bin card:{" "}
-          {branchStock?.binCard ?? "—"}
+          On hand: {branchStock?.quantity ?? 0}, Available:{" "}
+          {branchStock?.availableQuantity ?? 0}, Location:{" "}
+          {branchStock?.rackLocation ?? NOT_PROVIDED}, Bin card:{" "}
+          {branchStock?.binCard ?? NOT_PROVIDED}
         </p>
       )}
       <p className="text-xs text-muted-foreground">

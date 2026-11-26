@@ -14,6 +14,7 @@ import {
 import prisma from "../../prisma/client";
 import { jobUpdateBody } from "../service/service.validation";
 import { canonicalJobStatus } from "../service/job-card-workflow.service";
+import { syncStage } from "../service/job-stage.writer";
 import { ServiceService } from "../service/service.service";
 
 export class WorkshopService {
@@ -256,6 +257,8 @@ export class WorkshopService {
         where: { id },
         data: { technicianId, qualityInspectorId },
       });
+      // The technician now holds diagnosis or repair, and the inspector holds the quality check.
+      await syncStage(tx, id, actorId ?? null);
       if (actorId)
         await tx.auditLog.create({
           data: {
@@ -354,6 +357,8 @@ export class WorkshopService {
           where: { id },
           data: { qcStatus, qcNotes },
         });
+        // A changed QC result after the handoff to billing returns the job to the quality check step.
+        await syncStage(tx, id, actorId ?? null);
         if (actorId && current.qcStatus !== qcStatus) {
           await tx.auditLog.create({
             data: {

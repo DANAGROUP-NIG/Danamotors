@@ -1,31 +1,7 @@
-import { canonicalJobStatus } from "../types/job-card-status";
-import type { Estimate, JobCardStatus } from "../types/job-card.types";
+import type { Estimate } from "../types/job-card.types";
 import { moneyText } from "@/features/service-transactions/transaction.logic";
 import { WORKSPACE_COPY as COPY } from "./repair-workspace-copy";
 
-const STEPS = [
-  "OPEN",
-  "IN_PROGRESS",
-  "QC",
-  "READY",
-  "BILLED",
-  "DELIVERED",
-] as const;
-export type StepState = "completed" | "current" | "upcoming";
-export function getStepperState(jobStatus: JobCardStatus) {
-  const current = canonicalJobStatus(jobStatus);
-  const index = STEPS.findIndex((step) => step === current);
-  return STEPS.map((status, position) => ({
-    status,
-    label: COPY.steps[status],
-    number: position + 1,
-    state: (index < 0 || position > index
-      ? "upcoming"
-      : position === index
-        ? "current"
-        : "completed") as StepState,
-  }));
-}
 export type EstimateDisplayStatus = keyof typeof COPY.estimateStates;
 export function toEstimateViewModel(estimate: Estimate) {
   const percent = Number(estimate.upfrontPaymentPercent ?? 60);

@@ -64,6 +64,12 @@ export const CUSTOMERS = {
     phoneNumber: "+2348099900103", email: "fleet@lakeside-courier.demo.danamotors.test",
     address: "22 Placeholder Road, Apapa", city: "Lagos", state: "Lagos", branch: "main", creditDays: 30,
   },
+  // Staged job card demo jobs (job card revamp). Fictional.
+  okafor: {
+    code: "DEMO-C05", type: "INDIVIDUAL", salutation: "Ms.", firstName: "Adaeze", lastName: "Okafor",
+    phoneNumber: "+2348099900105", email: "adaeze.okafor@demo.danamotors.test",
+    address: "3 Sample Avenue, Isolo", city: "Lagos", state: "Lagos", branch: "main",
+  },
   test1: {
     code: "TEST-C01", type: "INDIVIDUAL", firstName: "TEST-Warranty", lastName: "Customer One",
     phoneNumber: "+2348099900191", email: "test.warranty1@demo.danamotors.test",
@@ -121,6 +127,17 @@ export const VEHICLES = {
   fpcDone: { vin: "KNAKU81DMC5000404", registrationNumber: "LSR-404FP", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2300 },
   fpcWalkIn: { vin: "KNAKU81DMC5000405", registrationNumber: "ABJ-405FP", customer: "garba", model: "SORENTO", saleDaysAgo: 2300 },
   fpcAtQc: { vin: "KNAKU81DMC5000406", registrationNumber: "APP-406FP", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2300 },
+  // Staged job card: one vehicle per step. The two Sportages are in warranty; the Sorentos are not.
+  stgCheckIn: { vin: "KNAPX81DMS7000501", registrationNumber: "KJA-482TX", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 300 },
+  stgAssign: { vin: "KNAPM81DMK7000502", registrationNumber: "LSR-512ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
+  stgFindings: { vin: "KNAPM81DMK7000503", registrationNumber: "LSR-513ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  stgWarranty: { vin: "KNAPX81DMS7000504", registrationNumber: "KJA-514ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 600 },
+  stgEstimate: { vin: "KNAPM81DMK7000505", registrationNumber: "LSR-515ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  stgParts: { vin: "KNAPM81DMK7000506", registrationNumber: "LSR-516ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
+  stgQc: { vin: "KNAPM81DMK7000507", registrationNumber: "LSR-517ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
+  stgBilling: { vin: "KNAPM81DMK7000508", registrationNumber: "LSR-518ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  stgDelivery: { vin: "KNAPM81DMK7000509", registrationNumber: "LSR-519ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2200 },
+  stgCancelled: { vin: "KNAPM81DMK7000510", registrationNumber: "LSR-520ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -224,6 +241,8 @@ export interface ClaimFixture {
   remarks?: string;
 }
 
+export type StageStop = "DIAGNOSIS" | "WARRANTY" | "ESTIMATE" | "CANCELLED" | "WAITING_PARTS" | "QUALITY_CHECK" | "QC_PASSED";
+
 export interface JobFixture {
   id: string;
   vehicle: VehicleKey;
@@ -243,7 +262,12 @@ export interface JobFixture {
   /** Job card lines reclassified as warranty (who pays). */
   warrantyLabour?: LabourKey[];
   workDone?: string;
-  target: "OPEN" | "IN_PROGRESS" | "READY" | "BILLED_PAID" | "BILLED_CREDIT";
+  target: "OPEN" | "IN_PROGRESS" | "READY" | "BILLED" | "BILLED_PAID" | "BILLED_CREDIT";
+  /**
+   * Where the job stops on the staged job card. OPEN jobs stop at check-in unless told otherwise;
+   * IN_PROGRESS jobs stop in repair unless told to pause for parts or go on to quality check.
+   */
+  stop?: StageStop;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
   campaignWork?: { attended: true } | { attended: false; reason: NotAttendedReason; note?: string };
   claim?: ClaimFixture;
@@ -522,4 +546,91 @@ export const FPC_JOBS: JobFixture[] = [
   fpcJob("JC-FPC-3", "fpcWalkIn", "second", { attended: true }, "BILLED_PAID", 4),
   // Left at work: QC, then try "Mark vehicle ready" to see the attendance rule.
   fpcJob("JC-FPC-4", "fpcAtQc", "main", undefined, "IN_PROGRESS", 1),
+];
+
+const serviceEstimate = (decided: boolean): EstimateFixture => ({
+  description: "Periodic service",
+  parts: [],
+  labour: [["service", 1.5]],
+  ...(decided ? { decision: { approved: true, comments: "Approved by the customer at the service desk" } } : {}),
+});
+
+const stageJob = (
+  id: string,
+  vehicle: VehicleKey,
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target"> & {
+    stop?: StageStop;
+    estimate?: "none" | "pending" | "approved";
+  },
+): JobFixture => ({
+  id,
+  vehicle,
+  branch: "main",
+  serviceType: "RG",
+  description: fields.description,
+  complaints: fields.complaints,
+  mileage: fields.mileage,
+  withTechnician: fields.withTechnician,
+  estimates: fields.estimate === "none" ? [] : [serviceEstimate(fields.estimate !== "pending")],
+  labour: fields.target === "OPEN" ? [] : [["service", 1.5]],
+  issues: [],
+  workDone: "Periodic service done. Brakes and air conditioning checked.",
+  target: fields.target,
+  stop: fields.stop,
+  startDaysAgo: 0,
+  spanHours: 0,
+});
+
+/** One job at every step of the staged job card (job card revamp, phase 0). Seeded after JOBS. */
+export const STAGE_JOBS: JobFixture[] = [
+  stageJob("JC-S01", "stgCheckIn", {
+    description: "50,000 km periodic service. Noise from the front left wheel when braking.",
+    complaints: ["Noise from front left wheel when braking", "AC not cooling well", "Periodic service (50,000 km)"],
+    mileage: 48_250, withTechnician: false, target: "OPEN", estimate: "none",
+  }),
+  stageJob("JC-S02", "stgAssign", {
+    description: "Engine warning light came on yesterday.",
+    complaints: ["Engine warning light on"],
+    mileage: 88_400, withTechnician: false, target: "OPEN", stop: "DIAGNOSIS", estimate: "none",
+  }),
+  stageJob("JC-S03", "stgFindings", {
+    description: "Vibration through the steering wheel at highway speed.",
+    complaints: ["Steering wheel vibrates above 100 km/h"],
+    mileage: 91_020, withTechnician: true, target: "OPEN", stop: "DIAGNOSIS", estimate: "none",
+  }),
+  stageJob("JC-S04", "stgWarranty", {
+    description: "AC blows warm air after ten minutes of driving.",
+    complaints: ["AC not cooling well"],
+    mileage: 27_300, withTechnician: true, target: "OPEN", stop: "WARRANTY", estimate: "none",
+  }),
+  stageJob("JC-S05", "stgEstimate", {
+    description: "Periodic service and a squeaking door hinge.",
+    complaints: ["Periodic service", "Driver door hinge squeaks"],
+    mileage: 95_600, withTechnician: true, target: "OPEN", stop: "ESTIMATE", estimate: "pending",
+  }),
+  stageJob("JC-S06", "stgParts", {
+    description: "Periodic service. Waiting for an oil filter from the main store.",
+    complaints: ["Periodic service"],
+    mileage: 97_150, withTechnician: true, target: "IN_PROGRESS", stop: "WAITING_PARTS",
+  }),
+  stageJob("JC-S07", "stgQc", {
+    description: "Periodic service, work finished and waiting for the quality check.",
+    complaints: ["Periodic service"],
+    mileage: 99_300, withTechnician: true, target: "IN_PROGRESS", stop: "QUALITY_CHECK",
+  }),
+  stageJob("JC-S08", "stgBilling", {
+    description: "Periodic service, quality check passed, waiting for the advisor to mark it ready.",
+    complaints: ["Periodic service"],
+    mileage: 92_800, withTechnician: true, target: "IN_PROGRESS", stop: "QC_PASSED",
+  }),
+  stageJob("JC-S09", "stgDelivery", {
+    description: "Periodic service, billed and waiting for the customer to collect.",
+    complaints: ["Periodic service"],
+    mileage: 90_450, withTechnician: true, target: "BILLED",
+  }),
+  stageJob("JC-S10", "stgCancelled", {
+    description: "Periodic service. Customer took the vehicle elsewhere.",
+    complaints: ["Periodic service"],
+    mileage: 94_700, withTechnician: true, target: "OPEN", stop: "CANCELLED", estimate: "pending",
+  }),
 ];

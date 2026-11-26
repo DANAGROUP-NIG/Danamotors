@@ -30,7 +30,7 @@ const {LoadingSkeleton,TableSkeleton,SkeletonRows} = load("components/ui/loading
 const {Skeleton} = load("components/ui/skeleton.tsx");
 export function renderLoadingFixture(variant) { return renderToStaticMarkup(React.createElement(LoadingSkeleton,{variant})); }
 test("skeleton variants announce loading once and hide decorative placeholders",()=>{
-  for(const variant of ["detail","list","form","dashboard","workspace"]) {
+  for(const variant of ["detail","list","form","dashboard"]) {
     const html=renderLoadingFixture(variant);
     assert.equal((html.match(/role="status"/g)||[]).length,1);
     assert.ok(html.includes('aria-busy="true"'));assert.ok(html.includes('aria-hidden="true"'));

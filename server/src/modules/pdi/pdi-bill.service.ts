@@ -1,4 +1,5 @@
 import { ChargeType, JobCardType, Prisma } from '@prisma/client';
+import { syncStage } from '../service/job-stage.writer';
 import prisma from '../../prisma/client';
 import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../shared/errors/appError';
 import { ROLES } from '../../shared/constants/roles';
@@ -141,6 +142,7 @@ export class PdiBillService {
               statusHistory: { create: { fromStatus: job.status, toStatus: 'BILLED', actorId: actor.userId, remarks: `PDI bill ${invoiceNumber} (${input.billType})` } },
             },
           });
+          await syncStage(tx, job.id, actor.userId);
           // Billing completes the PDI on the vehicle.
           if (job.vehicleId) await tx.vehicle.update({ where: { id: job.vehicleId }, data: { pdiDone: true, pdiDate: issuedDate } });
           await tx.auditLog.create({ data: { userId: actor.userId, action: 'PDI_BILL_CREATED', details: JSON.stringify({ invoiceId: created.id, invoiceNumber, jobCardId: job.id, billType: input.billType, total: totals.total, chargeable: split.chargeableTotal }) } });

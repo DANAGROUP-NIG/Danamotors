@@ -1,4 +1,5 @@
 import type { JobCardStatus } from "./job-card-status";
+import type { JobStage } from "./job-workspace.types";
 import type {
   CampaignType,
   CampaignVehicleStatus,
@@ -238,6 +239,8 @@ export type JobCard = {
   jobNumber: string;
   description: string;
   status: JobCardStatus;
+  /** Step on the staged job card. */
+  stage?: JobStage;
   estimatedHours: number;
   estimatedCost: number;
   progress: number;

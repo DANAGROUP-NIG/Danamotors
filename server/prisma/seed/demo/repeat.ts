@@ -13,6 +13,7 @@
  *   RPT-7  billed 60 days ago at 10,000 km    → open with 10,300 km (within km) or 12,000 km (no repeat)
  *   RPT-8  last job cancelled 3 days ago      → open a job: no repeat (the older billed job is 90 days back)
  */
+import { stageColumns } from "./stage";
 import { WarrantyCoverageStatus } from "@prisma/client";
 import prisma from "../../../src/prisma/client";
 import { ROLES } from "../../../src/shared/constants/roles";
@@ -148,6 +149,7 @@ async function ensureVisit(ctx: DemoContext, ref: Reference, scenario: Scenario,
       jobNumber: `DM-${scenario.key}-V${index + 1}`,
       description: `${DEMO_TAG} ${visit.complaint}`,
       status: visit.status ?? "DELIVERED",
+      ...stageColumns(visit.status ?? "DELIVERED"),
       customField1: key,
       branchId: ctx.branches.main.id,
       customerId,

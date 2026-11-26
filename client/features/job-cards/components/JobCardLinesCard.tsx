@@ -1,4 +1,5 @@
 "use client";
+import { NOT_PROVIDED, formatMoney } from "@/lib/format";
 
 import { useState } from "react";
 import { Info, Lock, Wrench } from "lucide-react";
@@ -8,7 +9,6 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { JOBCARD_LINE_UPDATE, WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 import { Pill, SectionCard, tdCls, thCls } from "@/features/warranty/components/ui";
-import { fmtNaira } from "@/features/warranty/lib/warranty-format";
 import { cn } from "@/lib/utils";
 import { useJobCardLines, useUpdateJobCardLine } from "../hooks/use-job-card-lines";
 import type { ChargeType, JobCardLine, JobCardLines } from "../types/job-card-line.types";
@@ -17,11 +17,11 @@ const CHARGE_LABELS: Record<ChargeType, string> = {
   CUSTOMER: "Customer",
   WARRANTY: "Warranty",
   GOODWILL: "Goodwill",
-  FREE: "Free – campaign",
+  FREE: "Free, campaign",
 };
 
 const CHARGE_STYLES: Record<ChargeType, string> = {
-  CUSTOMER: "border-slate-200 bg-slate-100 text-slate-700",
+  CUSTOMER: "border-border bg-muted text-foreground",
   WARRANTY: "border-emerald-200 bg-emerald-50 text-emerald-700",
   GOODWILL: "border-purple-200 bg-purple-50 text-purple-700",
   FREE: "border-blue-200 bg-blue-50 text-blue-700",
@@ -55,17 +55,17 @@ function ChargeSelect({
   const options: { value: string; label: string }[] = [{ value: "CUSTOMER", label: CHARGE_LABELS.CUSTOMER }];
   if (warrantyOk || line.chargeType === "WARRANTY") options.push({ value: "WARRANTY", label: CHARGE_LABELS.WARRANTY });
   if (canGoodwill || line.chargeType === "GOODWILL") options.push({ value: "GOODWILL", label: CHARGE_LABELS.GOODWILL });
-  for (const c of data.linkedCampaigns) options.push({ value: `FREE:${c.id}`, label: `Free – ${c.code}` });
+  for (const c of data.linkedCampaigns) options.push({ value: `FREE:${c.id}`, label: `Free, ${c.code}` });
   const value = line.chargeType === "FREE" ? `FREE:${line.campaignId}` : line.chargeType;
   if (line.chargeType === "FREE" && !options.some((o) => o.value === value)) options.push({ value, label: CHARGE_LABELS.FREE });
 
   if (!canEdit || line.locked) {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <Pill status={line.chargeType === "FREE" && line.campaign ? `Free – ${line.campaign.code}` : CHARGE_LABELS[line.chargeType]} tone={line.chargeType === "WARRANTY" ? "emerald" : line.chargeType === "GOODWILL" ? "purple" : line.chargeType === "FREE" ? "blue" : "gray"} />
+        <Pill status={line.chargeType === "FREE" && line.campaign ? `Free, ${line.campaign.code}` : CHARGE_LABELS[line.chargeType]} tone={line.chargeType === "WARRANTY" ? "emerald" : line.chargeType === "GOODWILL" ? "purple" : line.chargeType === "FREE" ? "blue" : "gray"} />
         {line.locked && (
           <span title={line.invoice ? `Billed on ${line.invoice.invoiceNumber}` : `On claim ${line.claim?.caseNumber}`}>
-            <Lock className="size-3.5 text-slate-400" />
+            <Lock className="size-3.5 text-muted-foreground" />
           </span>
         )}
       </span>
@@ -91,7 +91,7 @@ function ChargeSelect({
 }
 
 /**
- * Screen 04 — who pays for each part and labour line. Lines follow the parts issued and the
+ * Screen 04: who pays for each part and labour line. Lines follow the parts issued and the
  * labour recorded on the job card; the job bill charges the customer only for customer lines.
  */
 export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
@@ -114,15 +114,15 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
   return (
     <SectionCard icon={<Wrench />} title="Who pays">
       {isLoading ? (
-        <div className="h-32 animate-pulse rounded-lg bg-slate-100" />
+        <div className="h-32 animate-pulse rounded-lg bg-muted" />
       ) : isError || !data ? (
         <p className="text-sm text-red-500">Could not load the job card lines.</p>
       ) : data.lines.length === 0 ? (
-        <p className="py-6 text-center text-sm text-slate-400">No parts or labour yet. Issued parts and recorded labour appear here.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">No parts or labour yet. Issued parts and recorded labour appear here.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full">
-            <thead className="border-b border-slate-200 bg-slate-50/60">
+            <thead className="border-b border-border bg-muted/60">
               <tr>
                 <th className={thCls}>Type</th>
                 <th className={thCls}>Part no. / Operation</th>
@@ -133,19 +133,19 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
                 <th className={thCls}>Charge to</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {data.lines.map((line) => {
                 const reason = defaultReason(line);
                 return (
-                  <tr key={line.id} className="hover:bg-slate-50">
+                  <tr key={line.id} className="hover:bg-muted">
                     <td className={tdCls}>
                       <Pill status={line.kind === "PART" ? "Part" : "Labour"} tone={line.kind === "PART" ? "blue" : "purple"} />
                     </td>
-                    <td className={`${tdCls} font-mono text-xs`}>{line.sparePart?.partNumber ?? line.operationCode ?? "—"}</td>
+                    <td className={`${tdCls} font-mono text-xs`}>{line.sparePart?.partNumber ?? line.operationCode ?? NOT_PROVIDED}</td>
                     <td className={tdCls}>{line.description}</td>
                     <td className={`${tdCls} text-right`}>{line.kind === "LABOUR" ? line.quantity.toFixed(1) : line.quantity}</td>
-                    <td className={`${tdCls} text-right`}>{fmtNaira(line.rate)}</td>
-                    <td className={`${tdCls} text-right`}>{fmtNaira(line.amount)}</td>
+                    <td className={`${tdCls} text-right`}>{formatMoney(line.rate)}</td>
+                    <td className={`${tdCls} text-right`}>{formatMoney(line.amount)}</td>
                     <td className={tdCls}>
                       <span className="inline-flex items-center gap-1.5">
                         <ChargeSelect
@@ -172,13 +172,13 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
 
       {totals && data && data.lines.length > 0 && (
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <p className="max-w-sm text-sm text-slate-500 print:hidden">
+          <p className="max-w-sm text-sm text-muted-foreground print:hidden">
             {data.bill
               ? `Billed on ${data.bill.invoiceNumber}. Who pays for each line is now fixed.`
               : "The job bill charges the customer only for lines charged to the customer. Warranty lines go on the warranty claim."}
           </p>
-          <div className="w-full max-w-sm rounded-lg border border-slate-200 p-4 text-sm">
-            <dl className="space-y-1 text-slate-600">
+          <div className="w-full max-w-sm rounded-lg border border-border p-4 text-sm">
+            <dl className="space-y-1 text-muted-foreground">
               {(
                 [
                   ["Customer", totals.customer],
@@ -189,18 +189,18 @@ export function JobCardLinesCard({ jobCardId }: { jobCardId: string }) {
               ).map(([label, value]) => (
                 <div key={label} className="flex justify-between">
                   <dt>{label}</dt>
-                  <dd className="tabular-nums">{fmtNaira(value)}</dd>
+                  <dd className="tabular-nums">{formatMoney(value)}</dd>
                 </div>
               ))}
             </dl>
-            <div className="mt-3 flex items-baseline justify-between border-t border-slate-200 pt-3">
-              <span className="font-semibold text-slate-900">Customer parts & labour</span>
+            <div className="mt-3 flex items-baseline justify-between border-t border-border pt-3">
+              <span className="font-semibold text-foreground">Customer parts & labour</span>
               <span className="text-right">
-                <span className="text-base font-bold tabular-nums text-slate-900">{fmtNaira(totals.customerInvoiceTotal)}</span>
-                <span className="block text-xs text-slate-500">incl. {(data.vatRate * 100).toFixed(1)}% VAT</span>
+                <span className="text-base font-bold tabular-nums text-foreground">{formatMoney(totals.customerInvoiceTotal)}</span>
+                <span className="block text-xs text-muted-foreground">incl. {(data.vatRate * 100).toFixed(1)}% VAT</span>
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-400">Before the service charge and bill discounts.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Before the service charge and bill discounts.</p>
           </div>
         </div>
       )}
@@ -224,12 +224,12 @@ function GoodwillDialog({ line, onClose, onConfirm, pending }: { line: JobCardLi
   return (
     <ModalFame isOpen onClose={onClose} title="Charge as goodwill">
       <div className="grid gap-4">
-        <p className="text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{line.description}</span> ({fmtNaira(line.amount)}) will not be billed to the customer and will
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{line.description}</span> ({formatMoney(line.amount)}) will not be billed to the customer and will
           be recorded as goodwill.
         </p>
         <Field label="Reason">
-          <input className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Approved by workshop manager — repeat repair" />
+          <input className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="For example: approved by the workshop manager for a repeat repair" />
         </Field>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>

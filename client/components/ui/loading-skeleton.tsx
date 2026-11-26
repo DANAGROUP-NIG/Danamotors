@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { LoadingRegion, Skeleton } from "./skeleton";
 
-type Variant = "detail" | "list" | "form" | "dashboard" | "workspace";
+type Variant = "detail" | "list" | "form" | "dashboard";
 const card = "min-w-0 rounded-xl border border-border bg-card p-5 shadow-sm";
 function HeaderSkeleton() {
   return (
@@ -110,35 +110,12 @@ export function LoadingSkeleton({
           </div>
         ) : (
           <>
-            {variant === "workspace" && (
-              <div className={cn(card, "flex gap-5 overflow-hidden")}>
-                {Array.from({ length: 6 }, (_, index) => (
-                  <Skeleton
-                    key={index}
-                    className="h-8 min-w-20 flex-1 rounded-full"
-                  />
-                ))}
-              </div>
-            )}
             <div className={card}>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <Skeleton className="h-6 w-44" />
                 <Skeleton className="h-7 w-28 rounded-full" />
               </div>
-              {variant === "workspace" ? (
-                <>
-                  <Skeleton className="mb-4 h-12 w-52" />
-                  <Skeleton className="mb-6 h-4 w-48" />
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                  <ListSkeleton rows={5} />
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <Skeleton className="h-11 w-48" />
-                    <Skeleton className="h-11 w-32" />
-                  </div>
-                </>
-              ) : (
-                <FieldsSkeleton />
-              )}
+              <FieldsSkeleton />
             </div>
             {variant === "detail" && (
               <div className={card}>

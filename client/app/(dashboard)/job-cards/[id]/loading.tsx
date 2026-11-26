@@ -1,5 +1,5 @@
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { JobFrameSkeleton } from "@/features/job-cards/components/workspace/JobPageStates";
 
 export default function Loading() {
-  return <LoadingSkeleton variant="workspace" />;
+  return <JobFrameSkeleton />;
 }

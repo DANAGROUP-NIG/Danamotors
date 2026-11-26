@@ -1,4 +1,5 @@
 import { creditDueDate, defaultCreditDays } from "./credit-terms";
+import { syncStage } from "../service/job-stage.writer";
 import {
   latestEstimateQuery,
   reviewApprovedScope,
@@ -642,6 +643,8 @@ export class JobBillingService {
                   },
                 },
               });
+              // Billed jobs move to the delivery step.
+              await syncStage(transaction, billedCard.id, input.actorId ?? input.serviceAdvisorId);
             }
             const settled = await applyJobAdvances(
               transaction,
@@ -810,6 +813,8 @@ export class JobBillingService {
             where: { id: linkedCard.id, billedAt: { not: null } },
             data: { billedAt: null, status: "READY" },
           });
+          // A cancelled bill returns the job to the billing step.
+          await syncStage(transaction, linkedCard.id, cancelledById);
         }
         // A cancelled PDI bill undoes "PDI done" unless another active PDI bill exists for the vehicle.
         if (pdiBill && billedJob?.vehicleId) {

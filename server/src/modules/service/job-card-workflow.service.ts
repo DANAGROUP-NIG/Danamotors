@@ -2,6 +2,7 @@ import { drainJobcardNotifications } from "../notification/jobcard-notification-
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertDepositPaid } from "./job-deposit.service";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
+import { syncStage, type StageContext } from "./job-stage.writer";
 import {
   loadOpeningConsent,
   recordOpeningConsent,
@@ -511,6 +512,19 @@ export class JobCardWorkflowService {
             createdById,
             promisedAt: new Date(promisedAt),
             status: "OPEN",
+            // Every job starts at check-in with its service advisor.
+            stage: "CHECK_IN",
+            stageOwnerId: data.serviceAdvisorId,
+            stageOwnerRole: ROLES.SERVICE_ADVISOR,
+            stageEvents: {
+              create: {
+                toStage: "CHECK_IN",
+                action: "OPENED",
+                actorId: createdById,
+                ownerId: data.serviceAdvisorId,
+                ownerRole: ROLES.SERVICE_ADVISOR,
+              },
+            },
             jobType,
           pdiRegistration: pdi ? (options.pdiRegistration?.trim().toUpperCase() || pdiRegistrationFromVin(vehicle.vin)) : undefined,
           jobNumber: pdi
@@ -665,7 +679,28 @@ export class JobCardWorkflowService {
     const data = jobUpdateBody.parse(input);
 
     const card = await prisma.$transaction(
-      async (tx) => {
+      (tx) => this.updateInTx(tx, id, data, actorId),
+      { maxWait: 5000, timeout: 15000 },
+    );
+
+    await drainJobcardNotifications(id);
+
+    return card;
+  }
+
+  /**
+   * The job-card lifecycle write, inside the caller's transaction. Every gate, the status
+   * history and the stage sync run here. The stage service calls it for actions that change
+   * the status; `stage` carries that action's request ID and note onto the stage event.
+   */
+  async updateInTx(
+    tx: Prisma.TransactionClient,
+    id: string,
+    input: z.infer<typeof jobUpdateBody>,
+    actorId: string,
+    stage?: StageContext,
+  ) {
+        const data = jobUpdateBody.parse(input);
         await tx.$queryRaw(
           Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
         );
@@ -860,20 +895,20 @@ export class JobCardWorkflowService {
           });
         }
 
-        return tx.jobCard.update({
+        const updated = await tx.jobCard.update({
           where: {
             id,
           },
 
           data: update,
         });
-      },
-      { maxWait: 5000, timeout: 15000 },
-    );
-
-    await drainJobcardNotifications(id);
-
-    return card;
+        if (!update.status) return updated;
+        // The stage follows every status change, in the same transaction.
+        const moved = await syncStage(tx, id, actorId, {
+          ...stage,
+          note: stage?.note ?? data.remarks,
+        });
+        return moved ? { ...updated, ...moved } : updated;
   }
 
   /**

@@ -19,6 +19,7 @@
  *   CSC-13  RG 82 days ago                            → due in 8 days: open a job card in the UI, the case turns visited
  *   CSC-14  last visit 5 years ago                    → left out (not visited for 48 months)
  */
+import { stageColumns } from "./stage";
 import { WarrantyCoverageStatus } from "@prisma/client";
 import prisma from "../../../src/prisma/client";
 import { CustomerService } from "../../../src/modules/customer/customer.service";
@@ -113,7 +114,7 @@ async function ensureVisit(ctx: DemoContext, ref: Reference, services: Record<Se
   const billed = new Date(opened.getTime() + 7 * 3_600_000);
   await prisma.jobCard.create({
     data: {
-      jobNumber: `DM-${scenario.key}-V${index + 1}`, description: `${DEMO_TAG} ${visit.service} service`, status: "DELIVERED", customField1: key,
+      jobNumber: `DM-${scenario.key}-V${index + 1}`, description: `${DEMO_TAG} ${visit.service} service`, status: "DELIVERED", ...stageColumns("DELIVERED"), customField1: key,
       branchId: branch.id, customerId, vehicleId, serviceTypeId: services[visit.service], bayId: ref.bayId, teamId: ref.teamId,
       serviceAdvisorId: staff.advisor.id, deliveryAdvisorId: staff.advisor.id, technicianId: staff.technician.id, mileage: visit.mileage,
       workDone: "Routine service", promisedAt: new Date(opened.getTime() + 8 * 3_600_000), warrantyStatusAtCreation: WarrantyCoverageStatus.NOT_COVERED,

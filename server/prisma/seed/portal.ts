@@ -1,4 +1,5 @@
 import { nextDocumentNumber } from "../../src/modules/finance/document-number";
+import { stageForLegacyStatus } from "../../src/modules/service/job-stage.logic";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "./helpers";
 
@@ -153,7 +154,9 @@ export default async function seedCustomerPortal(
           branchId: branch.id,
           jobNumber,
           description: `${v.year} ${v.make} ${v.model} — routine service and inspection`,
-          status: jobSeq % 2 === 0 ? "In Progress" : "Open",
+          // Canonical lifecycle status, with the stage that status implies (job-stage.logic.ts).
+          status: jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN",
+          stage: stageForLegacyStatus(jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN"),
           progress: jobSeq % 2 === 0 ? 45 : 10,
           estimatedHours: 6,
           estimatedCost: 85000,
