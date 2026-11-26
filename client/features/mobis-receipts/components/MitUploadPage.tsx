@@ -156,13 +156,13 @@ export function MitUploadPage() {
           hsCode: l.hsCode || undefined,
         })),
       },
-      { onSuccess: (mit) => router.push(`/inventory/mobis-receipts/${mit.id}`) },
+      { onSuccess: (mit) => router.push(`/inventory/mit/${mit.id}`) },
     );
   }
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
-      <Link href="/inventory/mobis-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+      <Link href="/inventory/mit" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft className="size-4" /> Back to MIT
       </Link>
       <PageHeader title="Upload MIT" description="Import a Mobis invoice file in MIT format. Nothing is saved until you click Save." />

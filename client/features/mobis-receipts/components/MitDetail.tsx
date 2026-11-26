@@ -216,7 +216,7 @@ export function MitDetail({ id }: { id: string }) {
   if (error || !mit) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href="/inventory/mobis-receipts" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/inventory/mit" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to MIT
         </Link>
         <p className="text-sm text-red-500">MIT not found, or you do not have access to it.</p>
@@ -230,7 +230,7 @@ export function MitDetail({ id }: { id: string }) {
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <Link href="/inventory/mobis-receipts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/inventory/mit" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to MIT
         </Link>
         <div className="flex flex-wrap gap-2">

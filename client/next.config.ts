@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Vendor receipts moved to /inventory/mrn; keep old links and bookmarks working.
+  // Moved pages; keep old links, bookmarks and stored notification links working.
   async redirects() {
     return [
+      { source: "/inventory/mobis-receipts", destination: "/inventory/mit", permanent: true },
+      { source: "/inventory/mobis-receipts/:path*", destination: "/inventory/mit/:path*", permanent: true },
       { source: "/inventory/vendor-receipts", destination: "/inventory/mrn", permanent: true },
       { source: "/inventory/vendor-receipts/:path*", destination: "/inventory/mrn/:path*", permanent: true },
     ];

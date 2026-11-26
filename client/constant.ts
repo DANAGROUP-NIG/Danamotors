@@ -304,7 +304,7 @@ export const NAV_GROUPS: NavGroup[] = [
           },
           {
             label: "Material In Transit (MIT)",
-            href: "/inventory/mobis-receipts",
+            href: "/inventory/mit",
             icon: Ship,
             permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
           },
