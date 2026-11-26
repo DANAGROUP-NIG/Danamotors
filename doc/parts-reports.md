@@ -142,7 +142,7 @@ The legacy **MIS Reports** menu.
 
 | Legacy report | Kind | What it shows |
 |---|---|---|
-| Minimum / Maximum Level Report, Items Falling Below Min. Level, Re-order Calculated vs Entered | `stock-levels` | *As on.* **Minimum / maximum level**: every part with levels, its stock and whether it is below minimum, above maximum or within. **Items falling below minimum level**: the shortfall and the quantity to order up to the maximum, at dealer rate. **Re-order calculated vs entered**: average monthly consumption over the given days (default 90 = 3 months), rounded up, against the re-order quantity in Part Master; **Include STN** counts STNs as consumption |
+| Minimum / Maximum Level Report, Items Falling Below Min. Level, Re-order Calculated vs Entered | `stock-levels` | *As on.* **Minimum / maximum level**: every part with levels, its stock and whether it is below minimum, above maximum or within. **Items falling below minimum level**: the shortfall and the quantity to order up to the maximum, at dealer rate. **Re-order level (formula / entered re-order qty)**: legacy Reorder Level Report. Consumption over the given days (default 90 = 3 months), the average per month, minimum and re-order level (that average, or Part Master's re-order qty), closing balance, back order on open indents, and the quantity to order (level − closing − back order, rounded up); only parts with something to order are listed. **Include STN** counts STNs as consumption |
 | Maximum Consumed Parts | `max-consumed` | The top N parts (default 10) by quantity consumed: counter sales, workshop jobs and STNs, less returns, at dealer rate, with workshop issues split into five mileage bands. **Consumed by** one kind only, or all |
 | Model Wise Mileage Wise Part Issue | `model-mileage-issue` | Workshop issues less returns, by vehicle model, split into five mileage bands |
 | Profitability Statement, Profitability Statement Revised | `profitability` | Sale value against cost, by kind: counter sales, FOC bills, workshop jobs, PDI jobs, STNs and SANs; cost FIFO or at dealer rate. **Only summary** totals by part category |
@@ -229,10 +229,13 @@ MIS reports merged or left out, so that no report repeats another:
 
 - **Stock levels.** A branch's own minimum and maximum (set on its stock location) are used where set;
   otherwise Part Master's. The re-order quantity is Part Master's. "Below minimum" is stock less than the
-  minimum. The calculated re-order is legacy's formula: average monthly consumption over the period (counter
-  sales and workshop issues less returns; STNs only with **Include STN**, off by default as in legacy; SANs are not
-  consumption), rounded up, at least 1. The period is legacy `control1.reordermonth`: 3 months at Lagos and CPD
-  (90 days), 12 at Abuja (365). Checked on 2026-11-25 against Abuja's `reorder` work table: 79 of 83 parts.
+  minimum. The re-order option is legacy's Reorder Level Report, matched line for line on 2026-11-26 against two
+  Kia Plaza printouts (as on 05/06/2026, parts 263202A501–263203N000, without and with Include STN): average =
+  consumption ÷ months (counter sales and workshop issues less returns; STNs only with **Include STN**, off by
+  default; SANs are not consumption); minimum and re-order level = that average, or the entered re-order qty;
+  re-order qty = level − closing balance − back order, rounded up; parts with nothing to order are left out. The
+  period is legacy `control1.reordermonth`: 3 months at Lagos and CPD (90 days), 12 at Abuja (365). Legacy's
+  "Unavail. Qty" column (0 on every line seen) is not shown; what it counts is not known yet.
 - **Mileage** is the job card's odometer reading. Five increasing limits make six bands (default 10,000,
   20,000, 40,000, 60,000 and 100,000 km); jobs with no mileage recorded have their own column. Counter
   sales and STNs have no mileage. The model is the vehicle's catalogue model, else the model typed on it.

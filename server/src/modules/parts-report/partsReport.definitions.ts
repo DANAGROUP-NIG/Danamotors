@@ -108,6 +108,17 @@ const DEALER_FIRST = [FIFO_FIRST[1], FIFO_FIRST[0]];
 const BASED_ON = { option: "Based on" };
 const PART_COLUMNS: ReportColumn[] = [text("partNumber", "Part Number"), text("description", "Description"), text("category", "Category")];
 /** Physical stock taking: the part as counted, valued at dealer rate. */
+/** Legacy Reorder Level Report columns. Averages and levels carry two decimals, as legacy prints them. */
+const REORDER_COLUMNS: ReportColumn[] = [
+  ...PART_COLUMNS,
+  qty("consumed", "Consumption (period)"),
+  money("average", "Average consumption", false),
+  money("minLevel", "Minimum level", false),
+  money("reorderLevel", "Re-order level", false),
+  qty("quantity", "Closing balance", false),
+  qty("backOrder", "Back order qty", false),
+  qty("orderQty", "Re-order qty"),
+];
 const COUNT_PART_COLUMNS: ReportColumn[] = [
   text("partNumber", "Part Number"),
   text("flag", "Flag"),
@@ -1251,7 +1262,7 @@ export const REPORTS: ReportDefinition[] = [
     title: "Minimum / Maximum Level Report",
     group: "MIS",
     description:
-      "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or the re-order quantity worked out from consumption against the one entered.",
+      "Stock on a date against each part's minimum, maximum and re-order levels: every part with levels, the items below their minimum, or (legacy Reorder Level Report) what to order: the re-order level (average monthly consumption, or the entered re-order qty) less closing stock and back order.",
     permission: PERMISSIONS.STOCK_READ,
     period: "asOn",
     filters: [...STOCK_PART_FILTERS, "option", "days", "includeStn"],
@@ -1259,7 +1270,8 @@ export const REPORTS: ReportDefinition[] = [
     options: [
       { value: "MIN_MAX", label: "Minimum / maximum level" },
       { value: "BELOW_MIN", label: "Items falling below minimum level" },
-      { value: "REORDER", label: "Re-order calculated vs entered" },
+      { value: "REORDER", label: "Re-order level: calculated by formula" },
+      { value: "REORDER_ENTERED", label: "Re-order level: entered re-order qty" },
     ],
     grouped: true,
     columns: {
@@ -1283,14 +1295,8 @@ export const REPORTS: ReportDefinition[] = [
         cost("rate", "Dealer rate", false),
         cost("value", "Order value"),
       ],
-      REORDER: [
-        ...PART_COLUMNS,
-        qty("quantity", "Stock"),
-        qty("consumed", "Consumed in period"),
-        qty("calculated", "Calculated re-order (per month)"),
-        qty("entered", "Entered re-order"),
-        qty("difference", "Entered − calculated"),
-      ],
+      REORDER: REORDER_COLUMNS,
+      REORDER_ENTERED: REORDER_COLUMNS,
     },
   },
   {

@@ -129,20 +129,16 @@ describeDb("MIS reports (database)", () => {
     expect(below.totals.value).toBe(329000);
   });
 
-  it("works out the re-order quantity from consumption and compares the one entered", async () => {
-    // Legacy: average monthly consumption over the period (90 days = 3 months), rounded up, at least 1.
-    // Ball joints: counter sale 1 + job 2 − returned 1 = 2 (the STN of 3 counts only with Include STN).
-    // Bolts: one to the PDI job (SANs are not consumption).
-    const r = await report("stock-levels", { option: "REORDER", days: 90 });
-    expect(pick(r.rows, "partNumber", "consumed", "calculated", "entered", "difference")).toEqual([
-      [bolt.partNumber, 1, 1, 0, -1],
-      [joint.partNumber, 2, 1, 2, 1],
+  it("lists what to re-order the legacy way: level less closing stock and back order", async () => {
+    // Over one month: ball joints counter sale 1 + job 2 - returned 1 = 2 (STN of 3 only with Include STN);
+    // bolts 1 (PDI job). Both have 2 in stock, so nothing is to be ordered without the STN.
+    expect((await report("stock-levels", { option: "REORDER", days: 30 })).rows).toEqual([]);
+    const withStn = await report("stock-levels", { option: "REORDER", days: 30, includeStn: true });
+    expect(pick(withStn.rows, "partNumber", "consumed", "average", "reorderLevel", "quantity", "backOrder", "orderQty")).toEqual([
+      [joint.partNumber, 5, 5, 5, 2, 0, 3],
     ]);
-    const withStn = await report("stock-levels", { option: "REORDER", days: 90, includeStn: true });
-    expect(pick(withStn.rows, "partNumber", "consumed", "calculated", "difference")).toEqual([
-      [bolt.partNumber, 1, 1, -1],
-      [joint.partNumber, 5, 2, 0],
-    ]);
+    // Entered re-order qty (ball joints 2) against stock 2: nothing to order.
+    expect((await report("stock-levels", { option: "REORDER_ENTERED", days: 30 })).rows).toEqual([]);
   });
 
   it("ranks the most consumed parts, with workshop issues by mileage", async () => {

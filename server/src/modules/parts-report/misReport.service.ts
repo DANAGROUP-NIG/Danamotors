@@ -12,7 +12,7 @@ import prisma from "../../prisma/client";
 import { reportEnd } from "../finance/party-report";
 import { money } from "../finance/money";
 import { dateRange, DEFAULT_MILEAGE_LIMITS, lineValues, LineCharges, partWhere, ReportFilters, Row, statusLabel, userName } from "./partsReport.common";
-import { bandOf, Basis, ISSUE_MOVEMENTS, reorderFromConsumption } from "./stockReport.logic";
+import { bandOf, Basis, ISSUE_MOVEMENTS, reorderPlan } from "./stockReport.logic";
 import { Holding, Movement, partColumns, StockReportService } from "./stockReport.service";
 
 const DAY_MS = 86_400_000;
@@ -80,6 +80,8 @@ export class MisReportService {
     const days = f.days ?? 90;
     const since = new Date(end.getTime() - days * DAY_MS);
     const holdings = await this.stock.holdings(f);
+    const reordering = f.option === "REORDER" || f.option === "REORDER_ENTERED";
+    const backOrders = reordering ? await this.backOrders(f) : new Map<string, number>();
     return holdings.flatMap((h): Row[] => {
       let consumed = 0;
       // Legacy counts sales and workshop issues less returns; STNs only with "Include STN".
@@ -92,14 +94,15 @@ export class MisReportService {
       const max = h.maximumStock ?? (h.part.maxLevel || null);
       const reorder = h.part.reorderQty || 0;
       const head = { ...(!f.branchId && { group: h.branch }), ...partColumns(h.part) };
-      if (f.option === "REORDER") {
-        // Legacy formula (checked against Abuja's reorder work table, 79 of 83 parts): average monthly
-        // consumption over the period (control1.reordermonth: 3 months at Lagos and CPD, 12 at Abuja),
-        // rounded up, at least 1 for a part on the list.
+      if (reordering) {
+        // Legacy Reorder Level Report (matched line for line on the Kia Plaza printout, 05/06/2026): the level is
+        // the average monthly consumption, or the entered re-order quantity; what to order is the level less the
+        // closing stock and the back order, rounded up. Only parts with something to order are listed.
         const used = Math.max(consumed, 0);
-        if (!used && !reorder) return [];
-        const calculated = reorderFromConsumption(used, days);
-        return [{ ...head, quantity: stock, consumed: used, calculated, entered: reorder, difference: reorder - calculated }];
+        const backOrder = backOrders.get(`${h.branchId}:${h.part.id}`) ?? 0;
+        const plan = reorderPlan(used, days, f.option === "REORDER_ENTERED" ? reorder : null, stock, backOrder);
+        if (!plan) return [];
+        return [{ ...head, consumed: used, ...plan, quantity: stock, backOrder }];
       }
       if (f.option === "BELOW_MIN") {
         if (!min || stock >= min) return [];
@@ -122,6 +125,26 @@ export class MisReportService {
       const level = stock < min ? "Below minimum" : max != null && stock > max ? "Above maximum" : "Within levels";
       return [{ ...head, bin: h.bin, minLevel: min || null, maxLevel: max, reorderQty: reorder || null, quantity: stock, level }];
     });
+  }
+
+  /** Units each branch is still waiting for on its open indents (legacy back order), by branch and part. */
+  private async backOrders(f: ReportFilters) {
+    const lines = await prisma.branchIndentLine.findMany({
+      where: {
+        backOrderQuantity: { gt: 0 },
+        indent: {
+          status: { notIn: [IndentStatus.DRAFT, IndentStatus.CANCELLED, IndentStatus.REJECTED, IndentStatus.COMPLETED] },
+          ...(f.branchId && { requestingBranchId: f.branchId }),
+        },
+      },
+      select: { partId: true, backOrderQuantity: true, indent: { select: { requestingBranchId: true } } },
+    });
+    const out = new Map<string, number>();
+    for (const l of lines) {
+      const key = `${l.indent.requestingBranchId}:${l.partId}`;
+      out.set(key, (out.get(key) ?? 0) + l.backOrderQuantity);
+    }
+    return out;
   }
 
   // ── Consumption ───────────────────────────────────────────────────────────
