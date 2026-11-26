@@ -214,12 +214,6 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [CAMPAIGN_PERMISSIONS.READ],
       },
       {
-        label: "FPC bulletins",
-        href: "/campaigns?type=FPC",
-        icon: ClipboardCheck,
-        permissions: [CAMPAIGN_PERMISSIONS.READ],
-      },
-      {
         label: "Reports",
         href: "/reports",
         icon: FileText,
@@ -279,30 +273,6 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [LABEL_PERMISSIONS.PRINT],
       },
       {
-        label: "MIT",
-        href: "/inventory/mobis-receipts",
-        icon: Ship,
-        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
-      },
-      {
-        label: "MRN",
-        href: "/inventory/mrn",
-        icon: Truck,
-        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
-      },
-      {
-        label: "MRN Returns",
-        href: "/inventory/mrn-returns",
-        icon: Undo2,
-        permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
-      },
-      {
-        label: "Shortage Approvals",
-        href: "/inventory/discrepancies",
-        icon: ShieldAlert,
-        permissions: [INVENTORY_PERMISSIONS.STOCK_DISCREPANCY_APPROVE],
-      },
-      {
         label: "Stock Taking",
         href: "/inventory/stock-taking",
         icon: ClipboardCheck,
@@ -315,10 +285,67 @@ export const NAV_GROUPS: NavGroup[] = [
         permissions: [STOCK_AUDIT_PERMISSIONS.READ],
       },
       {
+        // Legacy Part Purchase menu, in its order, with only what is built: Purchase Order Entry is not (no POs
+        // since 2009-2013); Branch In Transit and Stock Receipt Note are one STN screen (receive = Generate MRN).
+        label: "Part Purchase",
+        href: "/parts-reports/stock-levels",
+        icon: Truck,
+        permissions: [
+          INVENTORY_PERMISSIONS.STOCK_READ,
+          INVENTORY_PERMISSIONS.STOCK_DISCREPANCY_APPROVE,
+          INVENTORY_PERMISSIONS.TRANSFER_READ,
+        ],
+        children: [
+          {
+            label: "Re-order Calculation",
+            href: "/parts-reports/stock-levels",
+            icon: FileBarChart,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+          },
+          {
+            label: "Material In Transit (MIT)",
+            href: "/inventory/mobis-receipts",
+            icon: Ship,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+          },
+          {
+            label: "Material Receipt Note (MRN)",
+            href: "/inventory/mrn",
+            icon: Truck,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+          },
+          {
+            label: "MRN Return",
+            href: "/inventory/mrn-returns",
+            icon: Undo2,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_READ],
+          },
+          {
+            // Upgrade: the legacy S/E Approval button on MIT and Branch In Transit, as one queue.
+            label: "Shortage Approvals",
+            href: "/inventory/discrepancies",
+            icon: ShieldAlert,
+            permissions: [INVENTORY_PERMISSIONS.STOCK_DISCREPANCY_APPROVE],
+          },
+          {
+            label: "Branch Indent To Other Branch",
+            href: "/transfers/new",
+            icon: ArrowLeftRight,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_CREATE],
+          },
+          {
+            label: "Branch In Transit / SRN",
+            href: "/transfers/stn",
+            icon: ClipboardCheck,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_READ],
+          },
+        ],
+      },
+      {
         label: "Part Sale",
         href: "/part-sale/orders",
         icon: ShoppingCart,
-        permissions: [PART_SALE_PERMISSIONS.READ, CHALLAN_PERMISSIONS.READ],
+        permissions: [PART_SALE_PERMISSIONS.READ, CHALLAN_PERMISSIONS.READ, INVENTORY_PERMISSIONS.TRANSFER_READ],
         children: [
           {
             label: "Customer Orders",
@@ -349,6 +376,26 @@ export const NAV_GROUPS: NavGroup[] = [
             href: "/part-sale/challan-returns",
             icon: RotateCcw,
             permissions: [CHALLAN_PERMISSIONS.READ],
+          },
+          // Legacy Part Sale menu, supplier side of transfers. Pick List for STN is merged into indent Approve;
+          // Case Creation and Packing List cum Gate Pass for STN are made by Dispatch.
+          {
+            label: "Branch Indent From Other Branch",
+            href: "/transfers",
+            icon: ClipboardList,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_READ],
+          },
+          {
+            label: "Stock Transfer Note (STN)",
+            href: "/transfers/stn/direct",
+            icon: ArrowLeftRight,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_DISPATCH],
+          },
+          {
+            label: "Dispatch to Branch (cases, packing list)",
+            href: "/transfers/stn/dispatch",
+            icon: Truck,
+            permissions: [INVENTORY_PERMISSIONS.TRANSFER_DISPATCH],
           },
         ],
       },
