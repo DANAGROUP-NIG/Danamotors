@@ -21,6 +21,7 @@ type Props = {
   onChange: (value: ModelSelection) => void;
   selectedName?: string | null;
   error?: string;
+  inlineOptions?: boolean;
 };
 const catalogCache = {
   staleTime: 60_000,
@@ -29,7 +30,7 @@ const catalogCache = {
   refetchOnWindowFocus: false,
 } as const;
 
-export function VehicleModelFields({ value, onChange, selectedName, error }: Props) {
+export function VehicleModelFields({ value, onChange, selectedName, error, inlineOptions = false }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -137,7 +138,7 @@ export function VehicleModelFields({ value, onChange, selectedName, error }: Pro
         </div>
         {open && (
           <ul id={`${id}-options`} role="listbox" aria-label="Vehicle models"
-            className="absolute z-30 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg">
+            className={`${inlineOptions ? "mt-1" : "absolute z-30 max-h-64 overflow-y-auto shadow-lg"} w-full rounded-lg border border-border bg-popover p-1 text-popover-foreground`}>
             {models.isPending && <li role="presentation" className="p-3 text-sm text-muted-foreground">Loading catalogue...</li>}
             {filtered.map((model, index) => (
               <li key={model.id} id={`${id}-${index}`} role="option"

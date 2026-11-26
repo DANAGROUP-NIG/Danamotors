@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -85,10 +85,10 @@ function RejectConfirmDialog({
 
 // ─── Approve confirm step ─────────────────────────────────────────────────────
 function ApproveConfirmDialog({
-  customerName, scheduledAt, onConfirm, onBack, isPending,
+  customerName, scheduledAt, actions,
 }: {
   customerName: string; scheduledAt: string;
-  onConfirm: () => void; onBack: () => void; isPending: boolean;
+  actions?: ReactNode;
 }) {
   return (
     <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
@@ -102,16 +102,7 @@ function ApproveConfirmDialog({
           </p>
         </div>
       </div>
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" size="sm" onClick={onBack} disabled={isPending}>
-          Back to Edit
-        </Button>
-        <Button size="sm" onClick={onConfirm} disabled={isPending}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          {isPending ? 'Approving…' : 'Confirm & Approve'}
-        </Button>
-      </div>
+      {actions}
     </div>
   );
 }
@@ -125,6 +116,8 @@ export function EnquiryReviewModal({
   const [step, setStep] = useState<'details' | 'approve-form' | 'approve-confirm' | 'reject-confirm'>(initialStep);
   const [approveFormValues, setApproveFormValues] = useState<ApproveFormValues | null>(null);
   const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const approvalFormId = useId();
+  const isApproval = initialStep === 'approve-form';
 
   const reviewEnquiry = useReviewEnquiry();
   const { hasPermission, isSuperAdmin } = useAuth();
@@ -179,8 +172,25 @@ export function EnquiryReviewModal({
     );
   }
 
-  return (
-    <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-1">
+  const confirmationActions = (
+    <div className={isApproval ? 'flex flex-wrap justify-end gap-2' : 'flex gap-2 justify-end'}>
+      <Button variant="outline" size="sm" onClick={() => setStep('approve-form')} disabled={reviewEnquiry.isPending}>
+        Back to Edit
+      </Button>
+      <Button size="sm" onClick={confirmApprove} disabled={reviewEnquiry.isPending}
+        className={isApproval ? undefined : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
+      >
+        {reviewEnquiry.isPending ? 'Approving...' : 'Confirm & Approve'}
+      </Button>
+    </div>
+  );
+
+  const body = (
+    <div
+      className={isApproval
+        ? 'min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain wrap-anywhere p-5 sm:p-6'
+        : 'space-y-6 max-h-[80vh] overflow-y-auto pr-1'}
+    >
       {/* ── Enquiry Details Summary ──────────────────────────────────────── */}
       <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3 ">
         <div className="grid grid-cols-2 gap-3 text-sm">
@@ -260,7 +270,7 @@ export function EnquiryReviewModal({
           )}
 
           {step === 'approve-form' && (
-            <form className="space-y-4" onSubmit={handleSubmit(onApproveSubmit)} noValidate>
+            <form id={approvalFormId} className="space-y-4" onSubmit={handleSubmit(onApproveSubmit)} noValidate>
               <p className="text-sm font-semibold text-foreground">
                 Link to an existing customer & vehicle, then set the appointment details:
               </p>
@@ -332,19 +342,16 @@ export function EnquiryReviewModal({
                 />
               </Field>
 
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setStep('details')}
-                >
-                  Back
-                </Button>
-                <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Review & Confirm
-                </Button>
-              </div>
+              {!isApproval && (
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setStep('details')}>
+                    Back
+                  </Button>
+                  <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Review &amp; Confirm
+                  </Button>
+                </div>
+              )}
             </form>
           )}
 
@@ -352,9 +359,7 @@ export function EnquiryReviewModal({
             <ApproveConfirmDialog
               customerName={selectedCustomerName || approveFormValues.customerId}
               scheduledAt={approveFormValues.scheduledAt}
-              onConfirm={confirmApprove}
-              onBack={() => setStep('approve-form')}
-              isPending={reviewEnquiry.isPending}
+              actions={isApproval ? undefined : confirmationActions}
             />
           )}
 
@@ -368,5 +373,26 @@ export function EnquiryReviewModal({
         </>
       )}
     </div>
+  );
+
+  if (!isApproval || !canReview) return body;
+
+  return (
+    <>
+      {body}
+      <div className="shrink-0 border-t border-border px-5 py-4 sm:px-6">
+        {step === 'approve-form' && (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form={approvalFormId} size="sm">
+              Review &amp; Confirm
+            </Button>
+          </div>
+        )}
+        {step === 'approve-confirm' && confirmationActions}
+      </div>
+    </>
   );
 }

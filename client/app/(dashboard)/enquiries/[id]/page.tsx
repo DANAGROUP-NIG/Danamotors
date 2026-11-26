@@ -97,9 +97,9 @@ export default function EnquiryPage() {
                 </Button>
                 <Button
                   size="sm"
-                  variant="default"
+                  variant="destructive"
                   onClick={() => setReviewAction("reject-confirm")}
-                  className="gap-1.5 border-destructive/40 text-secondary hover:bg-destructive/5 cursor-pointer"
+                  className="gap-1.5 border-destructive text-secondary bg-destructive/85 hover:bg-red-600 cursor-pointer"
                 >
                   <XCircle className="size-4" stroke="white" />
                   Reject
@@ -219,6 +219,8 @@ export default function EnquiryPage() {
       <ModalFame
         isOpen={reviewAction !== null}
         onClose={() => setReviewAction(null)}
+        disableBackdropClose={reviewAction === "approve-form"}
+        fitViewport={reviewAction === "approve-form"}
         title={
           reviewAction === "reject-confirm"
             ? "Reject Enquiry"

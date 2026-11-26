@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ModalFame from "@/components/modals/ModalFame";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useAllVehicles } from "@/features/appointments/hooks/use-all-vehicles";
 import { useCreateVehicle } from "@/features/vehicles/hooks/use-create-vehicle";
@@ -402,88 +403,96 @@ export function VehicleSelectWithCreate({
           document.body,
         )}
 
-      {/* Inner Vehicle Modal Portal (z-[99999]) */}
       {showInlineCreate &&
         customerId &&
         mounted &&
         createPortal(
-          <div
-            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in-50"
-            role="dialog"
-            aria-modal="true"
+          <ModalFame
+            isOpen
+            title="Add vehicle"
+            onClose={() => setShowInlineCreate(false)}
+            disableBackdropClose
+            preventAccidentalClose={createVehicleMutation.isPending}
+            fitViewport
+            nested
           >
-            <div
-              className="fixed inset-0"
-              onClick={() => setShowInlineCreate(false)}
-              aria-hidden="true"
-            />
-            <div className="relative z-[100000] my-auto w-full max-w-md rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-border">
-                <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Car className="h-4 w-4 text-primary" />
-                  Add New Vehicle
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setShowInlineCreate(false)}
-                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="grid gap-3.5">
+            <form
+              className="flex min-h-0 flex-1 flex-col"
+              noValidate
+              onSubmit={(event) => {
+                // A portal still bubbles React events to the enclosing approval form.
+                event.stopPropagation();
+                if (createVehicleMutation.isPending) {
+                  event.preventDefault();
+                  return;
+                }
+                void handleSubmitVehicle(handleCreateInlineVehicle)(event);
+              }}
+            >
+              <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain wrap-anywhere p-5 sm:p-6">
                 <VehicleCustomerField value={customerId} readOnly branchId={branchId} />
-                <Field
-                  label="Registration number (Reg No)"
-                  error={vehicleErrors.registrationNumber?.message}
-                >
-                  <input
-                    className={inputCls}
-                    placeholder="e.g. KJA-837-AA"
-                    {...registerVehicle("registrationNumber")}
+                <fieldset disabled={createVehicleMutation.isPending} className="min-w-0">
+                  <legend className="mb-3 text-sm font-semibold">Vehicle details</legend>
+                  <div className="grid items-start gap-4 sm:grid-cols-2">
+                    <Field label="Registration number" error={vehicleErrors.registrationNumber?.message}>
+                      <input className={inputCls} {...registerVehicle("registrationNumber")} />
+                    </Field>
+                    <Field label="VIN" error={vehicleErrors.vin?.message}>
+                      <input className={inputCls} {...registerVehicle("vin")} />
+                    </Field>
+                    <Field label="Year" error={vehicleErrors.year?.message}>
+                      <NumberInput className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
+                    </Field>
+                  </div>
+                </fieldset>
+                <section className="space-y-3" aria-label="Catalogue and specifications">
+                  <h3 className="text-sm font-semibold">Catalogue and specifications</h3>
+                  <VehicleIdentityFields
+                    inlineModelOptions
+                    value={{
+                      catalogueId: watchVehicle("catalogueId"), colourId: watchVehicle("colourId"),
+                      modelId: watchVehicle("modelId"), generationId: watchVehicle("generationId"),
+                      engineId: watchVehicle("engineId"), customModel: watchVehicle("customModel"),
+                      customMake: watchVehicle("customMake"),
+                    }}
+                    disabled={createVehicleMutation.isPending}
+                    modelError={vehicleErrors.modelId?.message || vehicleErrors.customModel?.message}
+                    catalogueError={vehicleErrors.catalogueId?.message}
+                    colourError={vehicleErrors.colourId?.message}
+                    onChange={(next) => {
+                      for (const key of ["catalogueId", "colourId", "modelId", "generationId", "engineId", "customModel", "customMake"] as const) {
+                        setValue(key, next[key], { shouldDirty: true, shouldValidate: true });
+                      }
+                    }}
                   />
-                </Field>
-
-                <VehicleIdentityFields value={{ catalogueId: watchVehicle('catalogueId'), colourId: watchVehicle('colourId'), modelId: watchVehicle('modelId'), generationId: watchVehicle('generationId'), engineId: watchVehicle('engineId'), customModel: watchVehicle('customModel'), customMake: watchVehicle('customMake') }}
-                  disabled={createVehicleMutation.isPending} modelError={vehicleErrors.modelId?.message || vehicleErrors.customModel?.message}
-                  catalogueError={vehicleErrors.catalogueId?.message} colourError={vehicleErrors.colourId?.message}
-                  onChange={next => { for (const key of ['catalogueId', 'colourId', 'modelId', 'generationId', 'engineId', 'customModel', 'customMake'] as const) setValue(key, next[key], { shouldDirty: true, shouldValidate: true }); }} />
-                <Field label="VIN" error={vehicleErrors.vin?.message}>
-                  <input className={inputCls} placeholder="Vehicle identification number" {...registerVehicle("vin")} />
-                </Field>
-                <Field label="Year" error={vehicleErrors.year?.message}>
-                  <NumberInput className={inputCls} {...registerVehicle("year", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
-                </Field>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-border mt-2">
+                </section>
+              </div>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4 sm:px-6">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => setShowInlineCreate(false)}
                   >
                     Cancel
                   </Button>
                   <Button
-                    type="button"
+                    type="submit"
                     size="sm"
                     disabled={createVehicleMutation.isPending}
-                    onClick={handleSubmitVehicle(handleCreateInlineVehicle)}
                   >
                     {createVehicleMutation.isPending ? (
                       <>
                         <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Saving…
+                        Saving...
                       </>
                     ) : (
-                      "Save & Select Vehicle"
+                      "Save and select vehicle"
                     )}
                   </Button>
-                </div>
               </div>
-            </div>
-          </div>,
+            </form>
+          </ModalFame>,
           document.body,
         )}
     </div>
