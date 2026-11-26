@@ -24,7 +24,7 @@ export interface Piece {
 }
 
 /** Movement types that change a branch's stock quantity. RESERVED/UNRESERVED do not. */
-export const STOCK_MOVEMENTS = ["STOCKED", "RECEIVED", "TRANSFER_IN", "RETURNED", "ADJUSTMENT", "ISSUED", "TRANSFER_OUT"];
+export const STOCK_MOVEMENTS = ["STOCKED", "RECEIVED", "TRANSFER_IN", "RETURNED", "ADJUSTMENT", "ISSUED", "TRANSFER_OUT", "VENDOR_RETURN"];
 /** Movement types that consume stock (issues, for slow-moving and consumption). */
 export const ISSUE_MOVEMENTS = ["ISSUED", "TRANSFER_OUT"];
 
@@ -113,4 +113,20 @@ export function bandLabels(limits: number[], unit = "days") {
 export function bandOf(value: number, limits: number[]) {
   const i = limits.findIndex((limit) => value <= limit);
   return i < 0 ? limits.length : i;
+}
+
+/**
+ * Legacy Reorder Level Report. Average monthly consumption over the period (legacy control1.reordermonth: 3 months
+ * at Lagos and CPD, 12 at Abuja; the period is in days, counted in whole months: 90 = 3, 365 = 12). The minimum and
+ * re-order levels are that average ("Calculate based on Formula") or the entered re-order quantity. The quantity to
+ * order is the level less closing stock and back order, rounded up; null when there is nothing to order.
+ * Kia Plaza 05/06/2026, 263202A501: 14 used in 3 months → 4.67, stock 1 → order 4.
+ */
+export function reorderPlan(consumed: number, days: number, entered: number | null, closing: number, backOrder: number) {
+  const months = Math.max(1, Math.round(days / 30));
+  const average = Math.round((consumed / months) * 100) / 100;
+  const level = entered ?? average;
+  const orderQty = Math.ceil(Math.round((level - closing - backOrder) * 100) / 100);
+  if (!(orderQty > 0)) return null;
+  return { average, minLevel: level, reorderLevel: level, orderQty };
 }

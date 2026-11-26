@@ -40,7 +40,7 @@ const enquiryLimiter = rateLimit({
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firstName, lastName, email, phoneNumber, serviceDescription, branchId]
+ *             required: [firstName, lastName, phoneNumber, serviceDescription, preferredDate, branchId]
  *             properties:
  *               firstName:
  *                 type: string
@@ -57,16 +57,23 @@ const enquiryLimiter = rateLimit({
  *                 example: "+2348012345678"
  *               vehicleMake:
  *                 type: string
- *                 example: Honda
+ *                 example: Kia
  *               vehicleModel:
  *                 type: string
- *                 example: Civic
+ *                 example: Rio
  *               vehicleYear:
  *                 type: integer
+ *                 description: Year of manufacture (model year), not the year of sale
  *                 example: 2023
  *               vehicleRegNumber:
  *                 type: string
+ *                 description: Stored in uppercase
  *                 example: ABC-123-DE
+ *               vin:
+ *                 type: string
+ *                 maxLength: 17
+ *                 description: Stored in uppercase
+ *                 example: KNADN512AL6123456
  *               serviceDescription:
  *                 type: string
  *                 minLength: 10

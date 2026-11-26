@@ -559,8 +559,17 @@ export class CustomerService {
         counterSaleReturns: (
           await tx.counterSaleReturn.updateMany({ where, data })
         ).count,
+        dispatchChallans: (
+          await tx.dispatchChallan.updateMany({ where, data })
+        ).count,
         vendorReceipts: (
           await tx.materialReceiptNote.updateMany({
+            where: { vendorId: sourceId },
+            data: { vendorId: targetId },
+          })
+        ).count,
+        vendorReturns: (
+          await tx.vendorReturn.updateMany({
             where: { vendorId: sourceId },
             data: { vendorId: targetId },
           })

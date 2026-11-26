@@ -80,7 +80,7 @@ describeDb("Barcode labels (database)", () => {
     const row = await prisma.labelPrintJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(row.zpl).toContain(`^FD>:${horn.partNumber}^FS`);
     expect(row.zpl).toContain("^FDBIN A-12-03^FS");
-    expect(row.zpl).toContain("^FB378,1,0,R^FH_^FDCPD^FS");
+    expect(row.zpl).toContain("^FB174,1,0,R^FH_^FDCPD^FS");
     expect(row.zpl.match(/\^XA/g)).toHaveLength(2);
     // The other branch's station never sees it.
     expect((await labels.claim(kpPc, READY)).jobs).toHaveLength(0);

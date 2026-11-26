@@ -231,7 +231,7 @@ export class HandheldService {
       lines: m._count.lines,
       quantity: m.totalQuantity,
       cases: m.totalCases,
-      link: `/inventory/mobis-receipts/${m.id}`,
+      link: `/inventory/mit/${m.id}`,
     }));
   }
 

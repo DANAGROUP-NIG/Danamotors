@@ -22,7 +22,20 @@ export default tseslint.config(
       "@next/next/no-html-link-for-pages": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
-      "react-hooks/exhaustive-deps": "warn"
+      "react-hooks/exhaustive-deps": "warn",
+      // A raw number <input> shows "0434" when the user types after a 0, and one bound to a number turns an
+      // emptied field back into 0. Every number field uses NumberInput (components/forms/NumberInput.tsx).
+      "no-restricted-syntax": [
+        "error",
+        ...[
+          "JSXOpeningElement[name.name='input']:has(JSXAttribute[name.name='type'][value.value='number'])",
+          "JSXOpeningElement[name.name='input']:has(JSXAttribute[name.name='type'] JSXExpressionContainer > Literal[value='number'])",
+        ].map((selector) => ({
+          selector,
+          message:
+            "Use NumberInput from @/components/forms/NumberInput for number fields. A raw number input shows '0434' after a 0 and can turn an emptied field into 0.",
+        })),
+      ],
     },
   },
   {

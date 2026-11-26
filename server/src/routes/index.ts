@@ -20,6 +20,7 @@ import stockTransferRoutes from "../modules/stock-transfer/stockTransfer.routes"
 import mobisPurchaseRoutes from "../modules/mobis-purchase/mobisPurchase.routes";
 import vendorReceiptRoutes from "../modules/vendor-receipt/vendorReceipt.routes";
 import partSaleRoutes from "../modules/part-sale/partSale.routes";
+import dispatchChallanRoutes from "../modules/dispatch-challan/dispatchChallan.routes";
 import partsReportRoutes from "../modules/parts-report/partsReport.routes";
 import stockTakeRoutes from "../modules/stock-take/stockTake.routes";
 import handheldRoutes from "../modules/handheld/handheld.routes";
@@ -130,6 +131,7 @@ router.use("/service", serviceDocumentRoutes);
 router.use("/services", servicesRoutes);
 router.use("/workshop", workshopRoutes);
 router.use("/part-sale", partSaleRoutes);
+router.use("/dispatch-challans", dispatchChallanRoutes);
 router.use("/parts-reports", partsReportRoutes);
 router.use("/stock-takes", stockTakeRoutes);
 // Station endpoints use a station key, not a user session; mounted before the user routes.

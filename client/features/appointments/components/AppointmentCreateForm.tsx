@@ -26,6 +26,7 @@ import {
   type CreateAppointmentFormInput,
   type CreateAppointmentFormValues,
 } from "../schemas/appointment.schema";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface AppointmentCreateFormProps {
   onSuccess?: () => void;
@@ -225,8 +226,7 @@ export function AppointmentCreateForm({
           label="Duration (mins, optional)"
           error={errors.durationMins?.message}
         >
-          <input
-            type="number"
+          <NumberInput
             className={inputCls}
             placeholder="e.g. 60"
             {...register("durationMins")}

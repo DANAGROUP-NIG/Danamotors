@@ -16,7 +16,7 @@ import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
 import { buildPartQuery } from "./partQuery";
 import { preparePriceList, type PriceListRow } from "./partCatalogue";
 import { recordBinChange, recordPartChange } from "./partHistory";
-import type { LegacyPartFields } from "./inventory.validation";
+import type { LegacyPartFields, StockAdjustType } from "./inventory.validation";
 
 const INHERITABLE_FIELDS = [
   "uom",
@@ -775,14 +775,23 @@ export class InventoryService {
     return stock.map((item) => this.withAvailableQuantity(item));
   }
 
+  /**
+   * Adds stock to a branch or takes it out: opening stock for a new part (STOCKED) or a stock
+   * adjustment (ADJUSTMENT, shown in the SAN Register). The stock row is locked, and the stock and
+   * its movement are written in one transaction. Stock cannot go below zero, nor below what is
+   * reserved for open picking lists.
+   */
   async adjustStock(data: {
     branchId: string;
     partId: string;
     quantity: number;
-    type: string;
+    type: StockAdjustType;
     notes?: string;
     recordedById?: string;
   }) {
+    if (!Number.isInteger(data.quantity) || data.quantity === 0) {
+      throw new BadRequestError("Quantity must be a whole number other than 0");
+    }
     const part = await this.inventoryRepository.findSparePartById(data.partId);
     if (!part) {
       throw new NotFoundError("Spare part not found");
@@ -795,19 +804,37 @@ export class InventoryService {
       throw new NotFoundError("Branch not found");
     }
 
-    const stock = await this.inventoryRepository.upsertInventoryStock({
-      branchId: data.branchId,
-      partId: data.partId,
-      quantity: data.quantity,
-    });
-
-    await this.inventoryRepository.createStockTransaction({
-      branchId: data.branchId,
-      partId: data.partId,
-      type: data.type,
-      quantity: data.quantity,
-      notes: data.notes,
-      recordedById: data.recordedById,
+    const stock = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<{ id: string; quantity: number; reservedQuantity: number }[]>`
+        SELECT "id", "quantity", "reservedQuantity" FROM "InventoryStock"
+        WHERE "branchId" = ${data.branchId} AND "partId" = ${data.partId}
+        FOR UPDATE`;
+      const current = rows[0];
+      const after = (current?.quantity ?? 0) + data.quantity;
+      if (after < 0) {
+        throw new BadRequestError(
+          `Only ${current?.quantity ?? 0} unit(s) of ${part.partNumber} are in stock; ${-data.quantity} cannot be taken out`,
+        );
+      }
+      if (current && after < current.reservedQuantity) {
+        throw new BadRequestError(
+          `${current.reservedQuantity} unit(s) of ${part.partNumber} are reserved for picking; stock cannot go below that`,
+        );
+      }
+      const saved = current
+        ? await tx.inventoryStock.update({ where: { id: current.id }, data: { quantity: { increment: data.quantity } } })
+        : await tx.inventoryStock.create({ data: { branchId: data.branchId, partId: data.partId, quantity: data.quantity } });
+      await tx.stockTransaction.create({
+        data: {
+          branchId: data.branchId,
+          partId: data.partId,
+          type: data.type,
+          quantity: data.quantity,
+          notes: data.notes,
+          recordedById: data.recordedById,
+        },
+      });
+      return saved;
     });
 
     return this.withAvailableQuantity(stock);

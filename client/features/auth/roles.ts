@@ -156,6 +156,13 @@ export const PART_SALE_PERMISSIONS = {
   RETURN: "partsale:return",
 } as const;
 
+// Dispatch challans: unbilled issues of fuel and consumables to internal cost centres.
+export const CHALLAN_PERMISSIONS = {
+  READ: "challan:read",
+  ISSUE: "challan:issue",
+  RETURN: "challan:return",
+} as const;
+
 // Physical stock taking: batches, count sheets, S/E confirmation.
 export const STOCK_TAKE_PERMISSIONS = {
   READ: "stocktake:read",

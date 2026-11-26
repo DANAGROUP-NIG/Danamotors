@@ -15,6 +15,7 @@ import { labelKeys, searchLabelPartsRequest } from "../api/labels.api";
 import { useCancelLabelJob, useLabelJobs, useLabelPrinters, usePrintLabels, useRetryLabelJob } from "../hooks/use-labels";
 import { JobStatusBadge, LabelPreview, PrinterLine } from "./label-parts";
 import type { LabelPart } from "../types/labels.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -145,8 +146,7 @@ export function BarcodeLabelsPage() {
                       <td className="px-3 py-2">{l.part.name}</td>
                       <td className={tdCls}>{l.part.bin ?? <span className="text-slate-400">—</span>}</td>
                       <td className="px-3 py-1.5">
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           max={MAX_COPIES}
                           aria-label={`Copies of ${l.part.partNumber}`}

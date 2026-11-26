@@ -309,13 +309,20 @@ export const createPartReturnSchema = z.object({
   }),
 });
 
+/** STOCKED = opening stock for a new part; ADJUSTMENT = a stock adjustment (SAN Register). */
+export const STOCK_ADJUST_TYPES = ["STOCKED", "ADJUSTMENT"] as const;
+export type StockAdjustType = (typeof STOCK_ADJUST_TYPES)[number];
+
 export const adjustStockSchema = z.object({
   body: z.object({
     branchId: z.string().uuid("Invalid branch ID"),
     partId: z.string().uuid("Invalid part ID"),
-    quantity: z.number().int("Quantity must be an integer"),
-    type: z.string().min(1, "Transaction type is required"),
-    notes: z.string().optional(),
+    quantity: z
+      .number()
+      .int("Quantity must be an integer")
+      .refine((q) => q !== 0, "Quantity cannot be 0"),
+    type: z.enum(STOCK_ADJUST_TYPES, { message: "Type must be STOCKED (opening stock) or ADJUSTMENT" }),
+    notes: z.string().max(500).optional(),
   }),
 });
 

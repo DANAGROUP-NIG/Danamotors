@@ -116,7 +116,7 @@ function AlternateRows({ rows }: { rows: PartQueryAlternateRow[] }) {
       {rows.map((r) => (
         <tr key={`${r.partId}-${r.branchId}`} className="border-t border-slate-100">
           <td className={tdCls}>
-            <Link href={`/inventory/${r.partId}`} className="font-mono text-sm font-medium text-primary hover:underline">
+            <Link href={`/part-master/${r.partId}`} className="font-mono text-sm font-medium text-primary hover:underline">
               {r.partNumber}
             </Link>
             {r.partStatus === "BLOCKED" && <span className="ml-1.5 text-sm text-red-600">blocked</span>}
@@ -267,7 +267,7 @@ export function PartQueryPage() {
             <Button type="button" variant="outline" className="gap-1.5" onClick={reset}>
               <RotateCcw className="size-4" /> Reset
             </Button>
-            <Button type="button" variant="ghost" className="gap-1.5" onClick={() => router.push("/inventory")}>
+            <Button type="button" variant="ghost" className="gap-1.5" onClick={() => router.push("/part-master")}>
               <LogOut className="size-4" /> Quit
             </Button>
           </div>
@@ -292,7 +292,7 @@ export function PartQueryPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <Link href={`/inventory/${data.part.id}`} className="font-mono text-lg font-semibold text-slate-800 hover:underline">
+                <Link href={`/part-master/${data.part.id}`} className="font-mono text-lg font-semibold text-slate-800 hover:underline">
                   {data.part.partNumber}
                 </Link>
                 <p className="text-sm text-slate-500">{data.part.name}</p>

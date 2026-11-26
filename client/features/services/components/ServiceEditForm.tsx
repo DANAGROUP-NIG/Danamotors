@@ -11,6 +11,7 @@ import {
   type UpdateServiceFormValues,
 } from "../schemas/service-catalog.schema";
 import type { ServiceItem } from "../types/service-catalog.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface ServiceEditFormProps {
   service: ServiceItem;
@@ -78,12 +79,12 @@ export function ServiceEditForm({
           <input className={inputCls} placeholder="e.g. Maintenance" {...register("category")} />
         </Field>
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
-          <input type="number" className={inputCls} {...register("durationMins")} />
+          <NumberInput className={inputCls} {...register("durationMins")} />
         </Field>
       </div>
 
       <Field label="Price" error={errors.price?.message}>
-        <input type="number" step="0.01" className={inputCls} {...register("price")} />
+        <NumberInput step="0.01" className={inputCls} {...register("price")} />
       </Field>
 
       <Field label="Description" error={errors.description?.message}>

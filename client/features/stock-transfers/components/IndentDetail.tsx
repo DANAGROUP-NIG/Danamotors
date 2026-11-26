@@ -31,6 +31,7 @@ import { useIndent } from "../hooks/use-indents";
 import { usePickIndent, useSubmitIndent } from "../hooks/use-indent-mutations";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
 import { IndentProgress } from "./IndentProgress";
+import { PickListPrint, usePrintChoice } from "./TransferPrints";
 import { ApproveIndentDialog, DispatchIndentDialog, ReasonDialog, ReceiveIndentDialog } from "./IndentDialogs";
 import {
   INDENT_STATUS_LABELS,
@@ -101,6 +102,7 @@ export function IndentDetail({ id }: { id: string }) {
   const submit = useSubmitIndent();
   const pick = usePickIndent();
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const printing = usePrintChoice<"pick">();
 
   const can = indent ? abilities(indent) : null;
 
@@ -133,6 +135,8 @@ export function IndentDetail({ id }: { id: string }) {
   const totalAmount = indent.lines.reduce((s, l) => s + l.amount, 0);
   const backOrderLines = indent.lines.filter((l) => l.backOrderQuantity > 0);
   const close = () => setDialog(null);
+  // The pick list to print: the open one, else the latest.
+  const pickToPrint = indent.openPickingList ?? indent.pickingLists[indent.pickingLists.length - 1] ?? null;
 
   return (
     <div className="px-4 py-6 lg:px-6 print:px-0 print:py-0">
@@ -145,6 +149,11 @@ export function IndentDetail({ id }: { id: string }) {
           <Button size="sm" variant="outline" onClick={() => window.print()} className="gap-1.5">
             <Printer className="size-4" /> Print
           </Button>
+          {pickToPrint && (
+            <Button size="sm" variant="outline" onClick={() => printing.print("pick")} className="gap-1.5">
+              <Printer className="size-4" /> Print pick list
+            </Button>
+          )}
           {can.cancel && (
             <Button size="sm" variant="outline" onClick={() => setDialog("cancel")} className="gap-1.5 text-red-600">
               <Ban className="size-4" /> Cancel
@@ -189,7 +198,7 @@ export function IndentDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="space-y-5">
+      <div className={cn("space-y-5", printing.doc && "print:hidden")}>
         {/* ── Header ── */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 print:border print:shadow-none">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -398,6 +407,7 @@ export function IndentDetail({ id }: { id: string }) {
         </SectionCard>
       </div>
 
+      {printing.doc === "pick" && pickToPrint && <PickListPrint indent={indent} pickingList={pickToPrint} />}
       {dialog === "approve" && <ApproveIndentDialog indent={indent} open onClose={close} />}
       {dialog === "dispatch" && <DispatchIndentDialog indent={indent} open onClose={close} />}
       {dialog === "receive" && <ReceiveIndentDialog indent={indent} open onClose={close} />}
@@ -471,8 +481,16 @@ function StnDocuments({ stn, indent }: { stn: Indent["stns"][number]; indent: In
         <DocHeader
           label="STN"
           number={stn.stnNumber}
-          meta={`${fmtDate(stn.documentDate)} · ${personName(stn.dispatchedBy)}`}
+          meta={`${fmtDate(stn.documentDate)} · ${personName(stn.dispatchedBy)}${stn.status === "CANCELLED" ? " · cancelled" : ""}`}
         />
+        {stn.status === "CANCELLED" && (
+          <p className="text-sm text-slate-500">
+            Cancelled: {stn.cancellationReason}. Its units went back on back order.{" "}
+            <Link href={`/transfers/stn/${stn.id}`} className="text-primary hover:underline">
+              View STN
+            </Link>
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4">
           <span>Qty {stn.totalQuantity}</span>
           <span>{fmtCurrency(stn.totalValue)}</span>

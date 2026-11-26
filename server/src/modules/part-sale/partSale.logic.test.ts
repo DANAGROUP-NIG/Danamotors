@@ -22,7 +22,44 @@ describe("priceSale", () => {
   // Legacy CPD counter sale 2026000010: part 97235D4000, 1 x 273,313.81, cash discount 22.5%, VAT 7.5%.
   it("reproduces a legacy CPD bill, rounded down to the nearest 10 naira", () => {
     const { totals } = priceSale([{ quantity: 1, rate: 273313.81, vatPercent: 7.5 }], 22.5);
-    expect(totals).toEqual({ gross: 273313.81, discount: 61495.61, vat: 15886.37, roundOff: -4.57, total: 227700 });
+    expect(totals).toEqual({ gross: 273313.81, tradeDiscount: 0, discount: 61495.61, handling: 0, vat: 15886.37, roundOff: -4.57, total: 227700 });
+  });
+
+  // Legacy Lagos bill 2024000016: 1 x 674,397.51, trade discount 8%, cash discount 22.2%, handling 9%, VAT 7.5%.
+  it("reproduces a legacy Lagos bill with trade discount, cash discount and handling", () => {
+    const { totals } = priceSale([{ quantity: 1, rate: 674397.51, vatPercent: 7.5, tradeDiscountPercent: 8, handlingPercent: 9 }], 22.2);
+    expect(totals).toEqual({
+      gross: 674397.51,
+      tradeDiscount: 53951.8,
+      discount: 137738.95,
+      handling: 43443.61,
+      vat: 39461.28,
+      roundOff: -1.65,
+      total: 565610,
+    });
+  });
+
+  // Legacy Lagos bill 2024000006: two lines, cash discount 20%, handling 9% on each.
+  it("reproduces a legacy Lagos bill with handling on several lines", () => {
+    const { totals } = priceSale(
+      [
+        { quantity: 1, rate: 109286.48, vatPercent: 7.5, handlingPercent: 9 },
+        { quantity: 1, rate: 23566.12, vatPercent: 7.5, handlingPercent: 9 },
+      ],
+      20,
+    );
+    expect(totals).toMatchObject({ gross: 132852.6, discount: 26570.52, handling: 9565.39, vat: 8688.56, total: 124530 });
+  });
+
+  // Legacy ABJ bill 2025000002: 1 x 130,608.61 with a 30% line discount, no cash discount or handling.
+  it("reproduces a legacy ABJ bill with a line trade discount", () => {
+    const { totals } = priceSale([{ quantity: 1, rate: 130608.61, vatPercent: 7.5, tradeDiscountPercent: 30 }], 0);
+    expect(totals).toMatchObject({ tradeDiscount: 39182.58, vat: 6856.95, total: 98280 });
+  });
+
+  it("rejects out-of-range trade discount and handling", () => {
+    expect(() => priceSale([{ quantity: 1, rate: 10, vatPercent: 0, tradeDiscountPercent: 101 }], 0)).toThrow(/Trade discount/);
+    expect(() => priceSale([{ quantity: 1, rate: 10, vatPercent: 0, handlingPercent: -1 }], 0)).toThrow(/Handling/);
   });
 
   // Legacy CPD sale returns 2025000003-5 (bills 2025000010, 2025000015, 2025000028).

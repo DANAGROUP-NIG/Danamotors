@@ -68,6 +68,7 @@ import {
   formatDate,
   money,
 } from "./opening/opening-ui";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const tabs = ["Vehicle Details", "Customer Requests", "Other Details"] as const;
 type Tab = (typeof tabs)[number];
@@ -924,9 +925,8 @@ export function JobCardCreateForm({
                     error={errors.mileage?.message}
                   >
                     <div className="relative">
-                      <input
+                      <NumberInput
                         aria-invalid={!!errors.mileage}
-                        type="number"
                         min={0}
                         step="1"
                         className={`${openingInput} pr-10 tabular-nums`}

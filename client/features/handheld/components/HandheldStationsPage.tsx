@@ -26,7 +26,7 @@ const tdCls = "px-3 py-2 whitespace-nowrap";
 function jobLink(j: HandheldJobRow): { label: string; href: string } {
   if (j.pickingList) return { label: `Indent ${j.pickingList.indent.indentNumber}`, href: `/transfers/indents/${j.pickingList.indent.id}` };
   if (j.customerOrder) return { label: `CPO ${j.customerOrder.cpoNumber}`, href: `/part-sale/orders/${j.customerOrder.id}` };
-  if (j.mit) return { label: `MIT ${j.mit.mitNumber}`, href: `/inventory/mobis-receipts/${j.mit.id}` };
+  if (j.mit) return { label: `MIT ${j.mit.mitNumber}`, href: `/inventory/mit/${j.mit.id}` };
   const s = j.stockTakeSheet!;
   const audit = s.stockTake.type === "AUDIT";
   return { label: `${audit ? "Audit sheet" : "Count sheet"} ${s.sheetNumber}`, href: `/inventory/${audit ? "stock-audit" : "stock-taking"}/${s.stockTake.id}/sheets/${s.id}` };

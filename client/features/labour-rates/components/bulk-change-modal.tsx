@@ -7,6 +7,7 @@ import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { bulkUpdateRates, errorMessage, labourRateKeys, type BulkAction, type BulkResult, type RateScope } from "../api";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type ActionType = BulkAction["type"];
 const ACTIONS: { type: ActionType; label: string }[] = [
@@ -108,7 +109,7 @@ export function BulkChangeModal({
         {type === "CHANGE_PERCENT" && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Percent (−90 to 500)">
-              <input type="number" step="0.01" className={inputCls} value={value} placeholder="e.g. 5 or -10" onChange={(e) => reset(setValue)(e.target.value)} />
+              <NumberInput step="0.01" className={inputCls} value={value} placeholder="e.g. 5 or -10" onChange={(e) => reset(setValue)(e.target.value)} />
             </Field>
             <Field label="Round the result to">
               <select className={inputCls} value={roundTo} onChange={(e) => reset(setRoundTo)(Number(e.target.value))}>
@@ -119,7 +120,7 @@ export function BulkChangeModal({
         )}
         {(type === "SET_RATE" || type === "SET_HOURS") && (
           <Field label={type === "SET_RATE" ? "Rate or fixed amount (₦)" : "Hours"}>
-            <input type="number" step="0.01" min={type === "SET_HOURS" ? 0.01 : 0} className={inputCls} value={value} onChange={(e) => reset(setValue)(e.target.value)} />
+            <NumberInput step="0.01" min={type === "SET_HOURS" ? 0.01 : 0} className={inputCls} value={value} onChange={(e) => reset(setValue)(e.target.value)} />
           </Field>
         )}
         {type === "SET_PRICING" && (

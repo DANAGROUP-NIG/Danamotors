@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Package, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { PageHeader } from "@/components/headers/page-header";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -222,13 +223,14 @@ export function OrderCreateForm() {
                         {l.part.sourceAvailable}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           className={cn(inputCls, "ml-auto h-9 w-24 text-right")}
-                          value={l.quantity}
-                          onChange={(e) =>
-                            setLines((prev) => prev.map((x) => (x.part.id === l.part.id ? { ...x, quantity: e.target.value } : x)))
+                          value={l.quantity ? Number(l.quantity) : null}
+                          onValueChange={(v) =>
+                            setLines((prev) =>
+                              prev.map((x) => (x.part.id === l.part.id ? { ...x, quantity: v == null ? "" : String(v) } : x)),
+                            )
                           }
                         />
                       </td>

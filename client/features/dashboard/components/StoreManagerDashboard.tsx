@@ -64,7 +64,7 @@ export default function StoreManagerDashboard() {
           </p>
         </div>
         <button
-          onClick={() => router.push("/inventory")}
+          onClick={() => router.push("/part-master")}
           className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-primary/30 transition hover:bg-primary/90"
         >
           <Package className="size-4" />
@@ -75,7 +75,7 @@ export default function StoreManagerDashboard() {
       {/* Quick links */}
       <div className="flex flex-wrap gap-2">
         <a
-          href="/inventory"
+          href="/part-master"
           className="flex items-center gap-2 rounded-lg border border-[#e8edf3] bg-white px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
         >
           <Package className="size-4 text-muted-foreground" />
@@ -135,7 +135,7 @@ export default function StoreManagerDashboard() {
           )}
         </div>
         <a
-          href="/inventory"
+          href="/part-master"
           className={cn(
             "shrink-0 text-sm font-bold hover:underline",
             data.inventoryAlerts > 0 ? "text-amber-700" : "text-emerald-700",

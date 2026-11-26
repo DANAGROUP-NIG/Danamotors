@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPut } from "@/lib/api/apiClient";
 import { PageHeader } from "@/components/headers/page-header";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { Button } from "@/components/ui/button";
 type Settings = {
   enabled: boolean;
@@ -63,20 +64,19 @@ export function PartsVatSettings() {
             <div className="grid gap-4 sm:grid-cols-3">
               {(["SPARES", "OIL", "ACCESSORIES"] as const).map((k) => (
                 <Field key={k} label={k + " VAT (%)"}>
-                  <input
-                    type="number"
+                  <NumberInput
                     className={inputCls}
                     min={0}
                     max={100}
                     step="0.01"
                     required
                     value={current.rates[k]}
-                    onChange={(e) =>
+                    onValueChange={(v) =>
                       setDraft({
                         ...current,
                         rates: {
                           ...current.rates,
-                          [k]: Number(e.target.value),
+                          [k]: v ?? 0,
                         },
                       })
                     }

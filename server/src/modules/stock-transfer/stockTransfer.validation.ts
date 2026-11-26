@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IndentStatus, MobisOrderMode, PickingListStatus, StnStatus, TransportMode } from "@prisma/client";
+import { STN_TAX_FORM_CODES } from "./stockTransfer.logic";
 
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const qty = z.number().int("Quantity must be a whole number");
@@ -88,27 +89,33 @@ export const cancelIndentSchema = z.object({
   body: z.object({ reason: optionalText(500) }).default({}),
 });
 
+/** Legacy tax forms: X (transfer without VAT, the default), L, Z, Y, P. */
+const stnTaxForm = z.enum(STN_TAX_FORM_CODES, { message: "Choose a tax form: X, L, Z, Y or P" }).optional();
+
 const dispatchFields = {
-  taxForm: optionalText(2),
+  taxForm: stnTaxForm,
   transportMode: z.nativeEnum(TransportMode).optional(),
   remarks: optionalText(500),
   waybillNumber: optionalText(30),
   courierName: optionalText(60),
   consignmentWeight: z.number().nonnegative().optional(),
   packerName: optionalText(60),
+  /** Legacy Courier Date; defaults to the dispatch date. */
+  courierDate: z.coerce.date().optional(),
 };
 
 export const dispatchIndentSchema = z.object({
   params: z.object({ id: uuid("indent ID") }),
   body: z
     .object({
-      taxForm: optionalText(2),
+      taxForm: stnTaxForm,
       transportMode: z.nativeEnum(TransportMode).optional(),
       remarks: optionalText(500),
       waybillNumber: optionalText(30),
       courierName: optionalText(60),
       consignmentWeight: z.number().nonnegative().optional(),
       packerName: optionalText(60),
+      courierDate: z.coerce.date().optional(),
       lines: z
         .array(z.object({ pickingLineId: uuid("picking line ID"), quantity: qty.nonnegative() }))
         .optional(),
@@ -164,6 +171,19 @@ export const directStnSchema = z.object({
       .array(z.object({ partId: uuid("part ID"), quantity: qty.positive("Quantity must be above zero") }))
       .min(1, "Add at least one part")
       .max(500),
+    /** Several cases; each part's case quantities add up to its line. One case when left out. */
+    cases: z
+      .array(
+        z.object({
+          packerName: optionalText(60),
+          weight: z.number().nonnegative().optional(),
+          lines: z
+            .array(z.object({ partId: uuid("part ID"), quantity: qty.positive() }))
+            .min(1, "A case must contain at least one part"),
+        }),
+      )
+      .max(500)
+      .optional(),
   }),
 });
 
@@ -184,6 +204,27 @@ const receiptBody = z
       .optional(),
   })
   .default({});
+
+/** Legacy STN cancel: only before any MRN. */
+export const cancelStnSchema = z.object({
+  params: z.object({ id: uuid("STN ID") }),
+  body: z.object({ reason: z.string().trim().min(3, "Say why the STN is cancelled").max(500) }),
+});
+
+/** Legacy STN edit (CSSTNEditLog): issued quantities and the tax form, only before any MRN. */
+export const editStnSchema = z.object({
+  params: z.object({ id: uuid("STN ID") }),
+  body: z
+    .object({
+      reason: z.string().trim().min(3, "Say why the STN is changed").max(500),
+      taxForm: stnTaxForm,
+      lines: z
+        .array(z.object({ stnLineId: uuid("STN line ID"), quantity: qty.nonnegative("Quantity cannot be negative") }))
+        .max(500)
+        .optional(),
+    })
+    .refine((b) => b.taxForm || b.lines?.length, { message: "Change a quantity or the tax form", path: ["lines"] }),
+});
 
 export const receiveStnSchema = z.object({ params: z.object({ id: uuid("STN ID") }), body: receiptBody });
 
@@ -262,6 +303,11 @@ export const partSearchSchema = z.object({
     requestingBranchId: uuid("requesting branch ID").optional(),
     sourceBranchId: uuid("supplying branch ID").optional(),
     limit: z.coerce.number().int().min(1).max(50).optional(),
+    /** Every part source (local, used, repaired too), for a direct STN. Indents leave them out. */
+    allSources: z
+      .enum(["true", "false"])
+      .transform((v) => v === "true")
+      .optional(),
   }),
 });
 

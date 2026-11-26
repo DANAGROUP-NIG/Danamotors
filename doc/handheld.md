@@ -2,8 +2,8 @@
 
 The handheld (Motorola MC3190, legacy HHDC) does four jobs: count a stock-taking sheet, pick a branch indent, pick a
 customer purchase order (CPO), and check a Mobis MIT as it is unpacked. Counting rules are in
-[stock-taking.md](./stock-taking.md). The device app (Kia Motors Handheld, KMHH) and the PC program (HHDC Link) are kept outside
-this repository, in `dana_projects/hhdc`.
+[stock-taking.md](./stock-taking.md). The device app (Kia Motors Handheld, KMHH) and the PC program (HHDC Link) are in
+[`hhdc/`](../hhdc/README.md) in this repository.
 
 In the legacy data only CPD uses picking and MIT checking, and still does: about 1,000 indent picks a year, a few dozen
 CPO picks, and every Mobis MIT since 2021 checked line by line on the device before its MRN.

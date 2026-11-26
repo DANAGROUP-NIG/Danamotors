@@ -22,7 +22,15 @@ export type TransportMode = "ROAD" | "AIR" | "SEA" | "COURIER" | "HAND_DELIVERY"
 export type MobisOrderMode = "AIR" | "COURIER";
 
 export type PersonRef = { id: string; firstName: string; lastName: string };
-export type BranchRef = { id: string; name: string };
+export type BranchRef = {
+  id: string;
+  name: string;
+  /** On indent and STN detail, for the printed documents. */
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phoneNumber?: string | null;
+};
 
 export type PartRef = {
   id: string;
@@ -150,6 +158,9 @@ export type StnLine = {
   quantity: number;
   unitRate: number;
   amount: number;
+  /** VAT under a VAT tax form (L, Z) on taxable parts. */
+  vatPercent: number;
+  taxAmount: number;
   // Running totals from the MRNs posted against this line.
   receivedQuantity: number;
   damagedQuantity: number;
@@ -159,7 +170,7 @@ export type StnLine = {
 export type TransferCase = {
   id: string;
   caseNumber: string;
-  status: "PACKED" | "DISPATCHED" | "RECEIVED";
+  status: "PACKED" | "DISPATCHED" | "RECEIVED" | "CANCELLED";
   packerName?: string | null;
   weight?: number | null;
   totalQuantity: number;
@@ -171,11 +182,12 @@ export type PackingList = {
   packingNumber: string;
   /** Legacy "Packing List cum Gate Pass". */
   gatePassNumber?: string | null;
-  status: "PACKED" | "DISPATCHED";
+  status: "PACKED" | "DISPATCHED" | "CANCELLED";
   dispatchMode?: TransportMode | null;
   waybillNumber?: string | null;
   courierName?: string | null;
   consignmentWeight?: number | null;
+  courierDate?: string | null;
   packingDate: string;
   dispatchedAt?: string | null;
   remarks?: string | null;
@@ -220,7 +232,12 @@ export type Stn = {
   remarks?: string | null;
   stockDeducted: boolean;
   totalQuantity: number;
+  /** Goods at the dealer rate, without VAT. */
   totalValue: number;
+  /** VAT on the sender's STN (forms L and Z); the receiving branch books the goods without it. */
+  taxAmount: number;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
   dispatchedAt?: string | null;
   dispatchedBy?: PersonRef | null;
   /** Indents shipped on this STN; empty for a direct STN. */
@@ -251,9 +268,31 @@ export type StnDetail = Omit<Stn, "lines"> & {
   sourceBranch: BranchRef;
   destinationBranch: BranchRef;
   createdBy?: PersonRef | null;
+  cancelledBy?: PersonRef | null;
+  edits: StnEdit[];
   lines: (StnLine & {
     indentLine: { id: string; lineNumber: number; indent: { id: string; indentNumber: string } } | null;
   })[];
+};
+
+/** A change to a dispatched STN before any MRN (legacy CSSTNEditLog). */
+export type StnEdit = {
+  id: string;
+  partId?: string | null;
+  partNumber?: string | null;
+  oldQuantity?: number | null;
+  newQuantity?: number | null;
+  oldTaxForm?: string | null;
+  newTaxForm?: string | null;
+  reason: string;
+  editedBy?: PersonRef | null;
+  createdAt: string;
+};
+
+export type EditStnPayload = {
+  reason: string;
+  taxForm?: string;
+  lines?: { stnLineId: string; quantity: number }[];
 };
 
 export type Indent = {
@@ -368,6 +407,8 @@ export type DispatchIndentPayload = {
   courierName?: string;
   consignmentWeight?: number;
   packerName?: string;
+  /** YYYY-MM-DD; the dispatch date when left out. */
+  courierDate?: string;
   lines?: { pickingLineId: string; quantity: number }[];
   cases?: {
     packerName?: string;
@@ -377,7 +418,7 @@ export type DispatchIndentPayload = {
 };
 
 /** Several picked indents of one branch on one STN. */
-export type DispatchStnPayload = Omit<DispatchIndentPayload, "lines" | "cases"> & { indentIds: string[] };
+export type DispatchStnPayload = Omit<DispatchIndentPayload, "lines"> & { indentIds: string[] };
 
 /** Free stock sent without an indent. */
 export type DirectStnPayload = Omit<DispatchIndentPayload, "lines" | "cases"> & {
@@ -385,6 +426,7 @@ export type DirectStnPayload = Omit<DispatchIndentPayload, "lines" | "cases"> & 
   destinationBranchId: string;
   remarks: string;
   lines: { partId: string; quantity: number }[];
+  cases?: { packerName?: string; weight?: number; lines: { partId: string; quantity: number }[] }[];
 };
 
 export type ReceiveIndentPayload = {

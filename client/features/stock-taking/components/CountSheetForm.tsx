@@ -18,6 +18,7 @@ import { searchStockTakePartsRequest, stockTakeKeys } from "../api/stock-taking.
 import { useCountSheet, useUploadSheet } from "../hooks/use-stock-taking";
 import { KINDS, fmtDateTime, kindOf, sheetIsOpen, sheetStatus, toCount, userName } from "../lib/stock-taking-format";
 import type { CountEntry, Kind } from "../types/stock-taking.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -213,10 +214,10 @@ export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sh
                       {editable ? (
                         <>
                           <td className={cn(tdCls, "text-right")}>
-                            <input type="number" min={0} inputMode="numeric" className={qtyCls} value={e.qty} onChange={(ev) => setEntry(l.id, l.binLocation, { qty: ev.target.value })} />
+                            <NumberInput min={0} inputMode="numeric" className={qtyCls} value={e.qty} onChange={(ev) => setEntry(l.id, l.binLocation, { qty: ev.target.value })} />
                           </td>
                           <td className={cn(tdCls, "text-right")}>
-                            <input type="number" min={0} inputMode="numeric" className={qtyCls} value={e.damaged} onChange={(ev) => setEntry(l.id, l.binLocation, { damaged: ev.target.value })} />
+                            <NumberInput min={0} inputMode="numeric" className={qtyCls} value={e.damaged} onChange={(ev) => setEntry(l.id, l.binLocation, { damaged: ev.target.value })} />
                           </td>
                           <td className={tdCls}>
                             <input className={cn(inputCls, "h-9 w-32 font-mono")} maxLength={40} value={e.bin} onChange={(ev) => setEntry(l.id, l.binLocation, { bin: ev.target.value })} />
@@ -243,10 +244,10 @@ export function CountSheetForm({ id, sheetId, kind = "COUNT" }: { id: string; sh
                     <td className={cn(tdCls, "max-w-56 truncate")}>{x.name || <span className="text-red-600">Not in Part Master</span>}</td>
                     {sheet.showSystemStock && <td />}
                     <td className={cn(tdCls, "text-right")}>
-                      <input type="number" min={0} inputMode="numeric" className={qtyCls} value={x.qty} onChange={(ev) => setExtra(x.key, { qty: ev.target.value })} />
+                      <NumberInput min={0} inputMode="numeric" className={qtyCls} value={x.qty} onChange={(ev) => setExtra(x.key, { qty: ev.target.value })} />
                     </td>
                     <td className={cn(tdCls, "text-right")}>
-                      <input type="number" min={0} inputMode="numeric" className={qtyCls} value={x.damaged} onChange={(ev) => setExtra(x.key, { damaged: ev.target.value })} />
+                      <NumberInput min={0} inputMode="numeric" className={qtyCls} value={x.damaged} onChange={(ev) => setExtra(x.key, { damaged: ev.target.value })} />
                     </td>
                     <td className={tdCls}>
                       <input className={cn(inputCls, "h-9 w-32 font-mono")} maxLength={40} value={x.bin} onChange={(ev) => setExtra(x.key, { bin: ev.target.value })} />

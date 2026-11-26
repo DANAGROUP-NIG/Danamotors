@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Minus, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ModalFame from "@/components/modals/ModalFame";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -15,8 +15,11 @@ import {
   useRejectIndent,
 } from "../hooks/use-indent-mutations";
 import { useReceiveStn } from "../hooks/use-stns";
-import { TRANSPORT_MODE_LABELS } from "../lib/indent-status";
+import { DEFAULT_STN_TAX_FORM, TRANSPORT_MODE_LABELS } from "../lib/indent-status";
+import { TaxFormSelect } from "./StnDespatchFields";
+import { CaseSplitter, NO_SPLIT, StaffNameInput, caseSplitPlan } from "./CaseSplitter";
 import type { DispatchIndentPayload, Indent, IndentLine, Stn, TransportMode } from "../types/indent.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 const textareaCls =
   "min-h-20 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -91,8 +94,7 @@ function ApproveRow({
         {isLoading ? <Loader2 className="ml-auto size-4 animate-spin text-slate-400" /> : available}
       </td>
       <td data-label="Approve" className={cn(tdCls, "text-right")}>
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={line.requestedQuantity}
           className={cn(numCls, "ml-auto", !valid && "border-red-400")}
@@ -183,13 +185,7 @@ export function ApproveIndentDialog({ indent, open, onClose }: DialogProps) {
           </table>
         </div>
         <Field label="Picker (optional)">
-          <input
-            className={inputCls}
-            value={pickerName}
-            maxLength={60}
-            placeholder="Who picks the parts"
-            onChange={(e) => setPickerName(e.target.value)}
-          />
+          <StaffNameInput branchId={indent.sourceBranchId} value={pickerName} onChange={setPickerName} placeholder="Who picks the parts" />
         </Field>
         <Field label="Approval remarks (optional)">
           <textarea className={textareaCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
@@ -220,40 +216,21 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
   const [waybillNumber, setWaybill] = useState("");
   const [courierName, setCourier] = useState("");
   // Legacy STNs between branches use tax form X.
-  const [taxForm, setTaxForm] = useState("X");
+  const [taxForm, setTaxForm] = useState<string>(DEFAULT_STN_TAX_FORM);
   const [packerName, setPacker] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [splitCases, setSplitCases] = useState(false);
-  const [caseCount, setCaseCount] = useState(2);
-  // grid[pickingLineId][caseIndex] = quantity
-  const [grid, setGrid] = useState<Record<string, string[]>>({});
-  const [weights, setWeights] = useState<string[]>([]);
+  const [courierDate, setCourierDate] = useState("");
+  const [weight, setWeight] = useState("");
+  const [split, setSplit] = useState(NO_SPLIT);
 
   const shipQty = (id: string) => toInt(ship[id] ?? "0");
-  const shipping = pickLines.filter((l) => shipQty(l.id) > 0);
   const shipInvalid = pickLines.some((l) => {
     const q = shipQty(l.id);
     return !Number.isFinite(q) || q > l.pickedQuantity;
   });
   const totalShip = pickLines.reduce((s, l) => s + (Number.isFinite(shipQty(l.id)) ? shipQty(l.id) : 0), 0);
-
-  const cell = (lineId: string, c: number) => grid[lineId]?.[c] ?? (c === 0 ? String(shipQty(lineId)) : "");
-  const caseSum = (lineId: string) =>
-    Array.from({ length: caseCount }, (_, c) => toInt(cell(lineId, c) || "0")).reduce((a, b) => a + (b || 0), 0);
-  const casesInvalid = splitCases && shipping.some((l) => caseSum(l.id) !== shipQty(l.id));
-  const emptyCase =
-    splitCases &&
-    Array.from({ length: caseCount }, (_, c) => c).some((c) =>
-      shipping.every((l) => (toInt(cell(l.id, c) || "0") || 0) === 0),
-    );
-
-  function setCell(lineId: string, c: number, v: string) {
-    setGrid((prev) => {
-      const row = Array.from({ length: caseCount }, (_, i) => cell(lineId, i));
-      row[c] = v;
-      return { ...prev, [lineId]: row };
-    });
-  }
+  const caseRows = pickLines.map((l) => ({ key: l.id, label: l.part.partNumber, quantity: Number.isFinite(shipQty(l.id)) ? shipQty(l.id) : 0 }));
+  const casePlan = caseSplitPlan(split, caseRows);
 
   function confirm() {
     const opt = (v: string) => v.trim() || undefined;
@@ -267,16 +244,12 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
       taxForm: opt(taxForm),
       packerName: opt(packerName),
       remarks: opt(remarks),
+      courierDate: opt(courierDate),
+      // Split cases carry their own weights, which add up to the consignment's.
+      consignmentWeight: !split.on && weight.trim() ? Number(weight) : undefined,
       lines: overrides.length ? overrides : undefined,
+      cases: casePlan.cases?.map((c) => ({ weight: c.weight, lines: c.lines.map((l) => ({ pickingLineId: l.key, quantity: l.quantity })) })),
     };
-    if (splitCases) {
-      body.cases = Array.from({ length: caseCount }, (_, c) => ({
-        weight: weights[c] ? Number(weights[c]) : undefined,
-        lines: shipping
-          .map((l) => ({ pickingLineId: l.id, quantity: toInt(cell(l.id, c) || "0") || 0 }))
-          .filter((x) => x.quantity > 0),
-      }));
-    }
     dispatch.mutate({ id: indent.id, body }, { onSuccess: onClose });
   }
 
@@ -312,8 +285,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
                   <td data-label="Bin" className={cn(tdCls, "text-xs text-slate-500")}>{l.binLocation ?? "—"}</td>
                   <td data-label="Picked" className={cn(tdCls, "text-right")}>{l.pickedQuantity}</td>
                   <td data-label="Ship" className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       max={l.pickedQuantity}
                       className={cn(numCls, "ml-auto", (shipQty(l.id) > l.pickedQuantity || !Number.isFinite(shipQty(l.id))) && "border-red-400")}
@@ -349,107 +321,25 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
             <input className={inputCls} value={courierName} maxLength={60} onChange={(e) => setCourier(e.target.value)} />
           </Field>
           <Field label="Packer (optional)">
-            <input className={inputCls} value={packerName} maxLength={60} onChange={(e) => setPacker(e.target.value)} />
+            <StaffNameInput branchId={indent.sourceBranchId} value={packerName} onChange={setPacker} />
           </Field>
-          <Field label="Tax form (optional)">
-            <input
-              className={inputCls}
-              value={taxForm}
-              maxLength={2}
-              placeholder="e.g. X"
-              onChange={(e) => setTaxForm(e.target.value.toUpperCase())}
-            />
+          <Field label="Courier date (blank = today)">
+            <input type="date" className={inputCls} value={courierDate} onChange={(e) => setCourierDate(e.target.value)} />
+          </Field>
+          {!split.on && (
+            <Field label="Consignment weight, kg (optional)">
+              <NumberInput min={0} step="0.1" className={inputCls} value={weight} onChange={(e) => setWeight(e.target.value)} />
+            </Field>
+          )}
+          <Field label="Tax form">
+            <TaxFormSelect value={taxForm} onChange={setTaxForm} />
           </Field>
           <Field label="Remarks (optional)">
             <input className={inputCls} value={remarks} maxLength={500} onChange={(e) => setRemarks(e.target.value)} />
           </Field>
         </div>
 
-        <div className="rounded-lg border border-slate-200 p-4">
-          <label className="flex items-center gap-2 text-sm font-semibold">
-            <input type="checkbox" checked={splitCases} onChange={(e) => setSplitCases(e.target.checked)} />
-            Split into several cases
-          </label>
-          {!splitCases ? (
-            <p className="mt-1 text-sm text-muted-foreground">Everything will be packed into one case.</p>
-          ) : (
-            <div className="mt-3 grid gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span>Cases</span>
-                <Button type="button" size="icon" variant="outline" className="size-8" onClick={() => setCaseCount((c) => Math.max(2, c - 1))}>
-                  <Minus className="size-3.5" />
-                </Button>
-                <span className="w-6 text-center font-medium">{caseCount}</span>
-                <Button type="button" size="icon" variant="outline" className="size-8" onClick={() => setCaseCount((c) => Math.min(20, c + 1))}>
-                  <Plus className="size-3.5" />
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="stack-table w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className={thCls}>Part</th>
-                      {Array.from({ length: caseCount }, (_, c) => (
-                        <th key={c} className={cn(thCls, "text-right")}>
-                          Case {c + 1}
-                        </th>
-                      ))}
-                      <th className={cn(thCls, "text-right")}>Packed / ship</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shipping.map((l) => {
-                      const ok = caseSum(l.id) === shipQty(l.id);
-                      return (
-                        <tr key={l.id} className="border-t border-slate-100">
-                          <td className={cn(tdCls, "font-mono text-sm")}>{l.part.partNumber}</td>
-                          {Array.from({ length: caseCount }, (_, c) => (
-                            <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
-                              <input
-                                type="number"
-                                min={0}
-                                className={cn(numCls, "ml-auto w-16")}
-                                value={cell(l.id, c)}
-                                onChange={(e) => setCell(l.id, c, e.target.value)}
-                              />
-                            </td>
-                          ))}
-                          <td data-label="Packed / ship" className={cn(tdCls, "text-right text-xs font-medium", ok ? "text-emerald-700" : "text-red-600")}>
-                            {caseSum(l.id)} / {shipQty(l.id)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="border-t border-slate-100">
-                      <td className={cn(tdCls, "text-sm text-slate-500")}>Weight (kg)</td>
-                      {Array.from({ length: caseCount }, (_, c) => (
-                        <td key={c} data-label={`Case ${c + 1}`} className={cn(tdCls, "text-right")}>
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.1"
-                            className={cn(numCls, "ml-auto w-16")}
-                            value={weights[c] ?? ""}
-                            onChange={(e) =>
-                              setWeights((prev) => {
-                                const next = [...prev];
-                                next[c] = e.target.value;
-                                return next;
-                              })
-                            }
-                          />
-                        </td>
-                      ))}
-                      <td className="max-sm:hidden" />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {casesInvalid && <p className="text-sm text-red-500">Each part’s cases must add up to the quantity shipped.</p>}
-              {emptyCase && !casesInvalid && <p className="text-sm text-red-500">Every case needs at least one part.</p>}
-            </div>
-          )}
-        </div>
+        <CaseSplitter rows={caseRows} value={split} onChange={setSplit} />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-slate-600">{totalShip} units to ship</p>
@@ -458,7 +348,7 @@ export function DispatchIndentDialog({ indent, open, onClose }: DialogProps) {
               Close
             </Button>
             <Button
-              disabled={dispatch.isPending || shipInvalid || totalShip === 0 || casesInvalid || emptyCase}
+              disabled={dispatch.isPending || shipInvalid || totalShip === 0 || !!casePlan.error}
               onClick={confirm}
             >
               {dispatch.isPending ? "Dispatching…" : "Dispatch"}
@@ -565,8 +455,7 @@ export function ReceiveStnForm({
                 <td data-label="Outstanding" className={cn(tdCls, "text-right")}>{outstanding(line)}</td>
                 {(["received", "damaged"] as const).map((field) => (
                   <td key={field} data-label={field === "received" ? "Received good" : "Damaged"} className={cn(tdCls, "text-right")}>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       className={cn(numCls, "ml-auto", !ok && "border-red-400")}
                       value={rows[line.id]?.[field] ?? ""}

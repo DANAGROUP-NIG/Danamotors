@@ -10,10 +10,11 @@ import { PageHeader } from "@/components/headers/page-header";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { isCpd } from "@/features/mobis-receipts/lib/mobis-labels";
-import { useIndents } from "../hooks/use-indents";
+import { useIndentDetails, useIndents } from "../hooks/use-indents";
 import { useIndentAbilities } from "../hooks/use-indent-abilities";
 import { useDispatchStn } from "../hooks/use-stns";
 import { DEFAULT_DESPATCH, StnDespatchFields, despatchPayload } from "./StnDespatchFields";
+import { CaseSplitter, NO_SPLIT, caseSplitPlan } from "./CaseSplitter";
 import { fmtDate, personName } from "../lib/indent-status";
 
 /**
@@ -31,6 +32,7 @@ export function DispatchToBranchPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [despatch, setDespatch] = useState(DEFAULT_DESPATCH);
   const [remarks, setRemarks] = useState("");
+  const [split, setSplit] = useState(NO_SPLIT);
 
   // Stock usually leaves CPD; default to it, else to the user's own branch.
   useEffect(() => {
@@ -44,9 +46,26 @@ export function DispatchToBranchPage() {
 
   useEffect(() => setSelected(indents.map((i) => i.id)), [data, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Everything picked on the ticked indents ships; split cases need their picking lines.
+  const details = useIndentDetails(split.on ? selected : []);
+  const caseRows = details.flatMap((q) =>
+    (q.data?.openPickingList?.lines ?? []).map((l) => ({
+      key: l.id,
+      label: `${q.data!.indentNumber} · ${l.part.partNumber}`,
+      quantity: l.pickedQuantity,
+    })),
+  );
+  const loadingLines = split.on && details.some((q) => q.isLoading);
+  const casePlan = caseSplitPlan(split, caseRows);
+
   function submit() {
     dispatch.mutate(
-      { indentIds: selected, remarks: remarks.trim() || undefined, ...despatchPayload(despatch) },
+      {
+        indentIds: selected,
+        remarks: remarks.trim() || undefined,
+        ...despatchPayload(despatch),
+        cases: casePlan.cases?.map((c) => ({ weight: c.weight, lines: c.lines.map((l) => ({ pickingLineId: l.key, quantity: l.quantity })) })),
+      },
       { onSuccess: (stn) => router.push(`/transfers/stn/${stn.id}`) },
     );
   }
@@ -132,13 +151,21 @@ export function DispatchToBranchPage() {
           </ul>
         )}
         <p className="mt-3 text-sm text-muted-foreground">
-          Everything picked on the ticked indents ships in one case. To ship less than picked or split cases, dispatch an
-          indent on its own from its page.
+          Everything picked on the ticked indents ships. To ship less than picked, dispatch an indent on its own from its page.
         </p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <StnDespatchFields value={despatch} onChange={setDespatch} />
+        <StnDespatchFields value={despatch} onChange={setDespatch} branchId={sourceBranchId || undefined} />
+        {selected.length > 0 && (
+          <div className="mt-4">
+            {loadingLines ? (
+              <Loader2 className="size-5 animate-spin text-slate-400" />
+            ) : (
+              <CaseSplitter rows={caseRows} value={split} onChange={setSplit} />
+            )}
+          </div>
+        )}
         <div className="mt-4">
           <Field label="Remarks (optional)">
             <input className={inputCls} maxLength={500} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
@@ -147,7 +174,7 @@ export function DispatchToBranchPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button disabled={!selected.length || dispatch.isPending} onClick={submit}>
+        <Button disabled={!selected.length || dispatch.isPending || loadingLines || !!casePlan.error} onClick={submit}>
           {dispatch.isPending ? "Dispatching…" : `Dispatch ${selected.length} indent(s) on one STN`}
         </Button>
       </div>

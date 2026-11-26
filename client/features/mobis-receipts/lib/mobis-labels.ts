@@ -17,8 +17,9 @@ export const MIT_STATUS_TONES: Record<MitStatus, StatusTone> = {
   CANCELLED: "gray",
 };
 
-// Legacy "Received mode": air, ship, road.
+// Legacy MIT "Received mode" codes: 1 sea, 2 air (AWB), 3 courier (DHL, the most used); road kept.
 export const RECEIVED_MODE_LABELS: Record<ReceivedMode, string> = {
+  COURIER: "Courier",
   AIR: "Air",
   SEA: "Ship",
   ROAD: "Road",

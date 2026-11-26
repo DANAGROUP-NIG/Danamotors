@@ -30,6 +30,7 @@ export type ReportFilterKey =
   | "includeReturns"
   | "includeCancelled"
   | "includeAlternates"
+  | "includeStn"
   | "onlyTransacted"
   | "days"
   | "ageLimits"
@@ -106,6 +107,7 @@ export type ReportParams = {
   includeReturns?: boolean;
   includeCancelled?: boolean;
   includeAlternates?: boolean;
+  includeStn?: boolean;
   onlyTransacted?: boolean;
   days?: number;
   /** Five increasing day limits, comma separated. */

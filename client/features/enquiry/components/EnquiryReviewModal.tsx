@@ -28,6 +28,15 @@ const approveSchema = z.object({
 
 type ApproveFormValues = z.infer<typeof approveSchema>;
 
+/** ISO timestamp → the local "YYYY-MM-DDTHH:mm" value DateTimeInput takes; '' when there is none. */
+function toLocalDateTime(iso?: string | null) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 interface EnquiryReviewModalProps {
   enquiry:  Enquiry;
   onClose:  () => void;
@@ -129,7 +138,9 @@ export function EnquiryReviewModal({
   } = useForm<ApproveFormValues>({
     resolver: zodResolver(approveSchema),
     defaultValues: {
-      customerId: '', vehicleId: '', scheduledAt: '', serviceId: '', reviewNotes: '',
+      customerId: '', vehicleId: '', serviceId: '', reviewNotes: '',
+      // Start from the date and time the customer picked on the landing page; staff can change it.
+      scheduledAt: toLocalDateTime(enquiry.preferredDate),
     },
   });
 
@@ -175,10 +186,11 @@ export function EnquiryReviewModal({
         <div className="grid grid-cols-2 gap-3 text-sm">
           {[
             ['Name',   `${enquiry.firstName} ${enquiry.lastName}`],
-            ['Email',  enquiry.email],
+            ['Email',  enquiry.email || '—'],
             ['Phone',  enquiry.phoneNumber],
             ['Branch', enquiry.branch.name],
-            ['Vehicle', [enquiry.vehicleMake, enquiry.vehicleModel, enquiry.vehicleRegNumber].filter(Boolean).join(' · ') || '—'],
+            ['Vehicle', [enquiry.vehicleMake, enquiry.vehicleModel, enquiry.vehicleYear, enquiry.vehicleRegNumber].filter(Boolean).join(' · ') || '—'],
+            ['VIN', enquiry.vin || '—'],
             ['Preferred Date', enquiry.preferredDate
               ? new Date(enquiry.preferredDate).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
               : '—'],
@@ -260,7 +272,7 @@ export function EnquiryReviewModal({
                     initialCustomer={{
                       firstName: enquiry.firstName,
                       lastName: enquiry.lastName,
-                      email: enquiry.email,
+                      email: enquiry.email ?? '',
                       phoneNumber: enquiry.phoneNumber,
                     }}
                     onChange={(id, name) => {
@@ -277,6 +289,7 @@ export function EnquiryReviewModal({
                     customerId={selectedCustomerId}
                     initialVehicle={{
                       registrationNumber: enquiry.vehicleRegNumber ?? undefined,
+                      vin: enquiry.vin ?? undefined,
                       make: enquiry.vehicleMake ?? undefined,
                       model: enquiry.vehicleModel ?? undefined,
                       year: enquiry.vehicleYear ?? undefined,

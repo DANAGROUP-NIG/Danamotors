@@ -5,13 +5,20 @@ export const createEnquirySchema = z.object({
   body: z.object({
     firstName:          z.string().min(1, 'First name is required').max(60),
     lastName:           z.string().min(1, 'Last name is required').max(60),
-    email:              z.string().email('A valid email is required'),
+    // Optional: phone is the contact the customer must give. A blank email is stored as no email.
+    email:              z.preprocess(
+                          value => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+                          z.string().trim().email('Enter a valid email address').optional(),
+                        ),
     phoneNumber:        z.string().min(7, 'Phone number is required').max(20)
                           .regex(/^\+?[0-9\s\-()]+$/, 'Invalid phone number'),
     vehicleMake:        z.string().max(50).optional(),
     vehicleModel:       z.string().max(50).optional(),
+    // Year of manufacture (model year), not the year the vehicle was sold.
     vehicleYear:        z.number().int().min(1900).max(new Date().getFullYear() + 1).optional(),
-    vehicleRegNumber:   z.string().max(20).optional(),
+    vehicleRegNumber:   z.string().trim().max(20).optional().transform(value => value?.toUpperCase()),
+    vin:                z.string().trim().max(17, 'VIN must be 17 characters or less').optional()
+                          .transform(value => value?.toUpperCase()),
     serviceDescription: z.string().min(10, 'Please describe the service needed').max(500),
     // Appointment slot: required and in the future (a few minutes' grace for clock drift).
     preferredDate:      z.string({ required_error: 'Appointment date and time are required' }).datetime({ offset: true })

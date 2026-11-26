@@ -10,6 +10,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { WorkshopPicker, type PickerRecord } from "@/features/job-cards/components/WorkshopPicker";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type MasterRef = { id: string; code: string; description: string };
 type Totals = { part: number; oil: number; labour: number; total: number };
@@ -106,9 +107,9 @@ function ChecklistDefinition({ canManage }: { canManage: boolean }) {
           { header: "Description", render: row => row.sparePart?.name ?? row.labourItem?.description ?? "" },
           { header: "Variant", render: row => row.variant?.description ?? "All variants" },
           { header: "Rate", render: row => row.sparePart ? money(row.sparePart.retailRate ?? row.sparePart.unitPrice) : "" },
-          { header: "Qty", render: row => row.kind === "PART" ? editable(row) ? <input aria-label="Quantity" className={`${inputCls} h-8 w-20`} type="number" min="0.01" step="0.01"
+          { header: "Qty", render: row => row.kind === "PART" ? editable(row) ? <NumberInput aria-label="Quantity" className={`${inputCls} h-8 w-20`} min="0.01" step="0.01"
             defaultValue={row.quantity} onBlur={event => Number(event.target.value) > 0 && Number(event.target.value) !== row.quantity && update.mutate({ line: row, next: Number(event.target.value) })} /> : row.quantity : "" },
-          { header: "Amount", render: row => row.kind === "LABOUR" && editable(row) ? <input aria-label="Labour amount" className={`${inputCls} h-8 w-28`} type="number" min="0" step="0.01"
+          { header: "Amount", render: row => row.kind === "LABOUR" && editable(row) ? <NumberInput aria-label="Labour amount" className={`${inputCls} h-8 w-28`} min="0" step="0.01"
             defaultValue={row.amount} onBlur={event => event.target.value !== "" && Number(event.target.value) !== row.amount && update.mutate({ line: row, next: Number(event.target.value) })} />
             : money(row.kind === "LABOUR" ? row.amount : row.quantity * (row.sparePart?.retailRate ?? row.sparePart?.unitPrice ?? 0)) },
           { header: "Actions", render: row => editable(row) && <Button type="button" variant="outline" size="sm" disabled={remove.isPending} onClick={() => remove.mutate(row.id)}>Remove</Button> },
@@ -122,7 +123,7 @@ function ChecklistDefinition({ canManage }: { canManage: boolean }) {
           ? <WorkshopPicker key="part" required label="Part" endpoint="/inventory/parts" collection="items" value={itemId} formatLabel={partLabel}
             renderOption={row => <span className="font-medium">{partLabel(row)}</span>} onChange={setItemId} />
           : <WorkshopPicker key="labour" required label="Labour" endpoint="/service/labour-items" collection="labourItems" value={itemId} onChange={setItemId} />}
-        <Field label={kind === "PART" ? "Quantity" : "Amount"}><input className={inputCls} required type="number" min={kind === "PART" ? "0.01" : "0"} step="0.01"
+        <Field label={kind === "PART" ? "Quantity" : "Amount"}><NumberInput className={inputCls} required min={kind === "PART" ? "0.01" : "0"} step="0.01"
           value={value} onChange={event => setValue(event.target.value)} /></Field>
         <Button className="self-end" disabled={add.isPending || !itemId}>Add {kind === "PART" ? "part" : "labour"}</Button>
         {add.isError && <p role="alert" className="text-destructive md:col-span-4">{errorMessage(add.error)}</p>}
@@ -171,7 +172,7 @@ function MileageChecklists({ canManage }: { canManage: boolean }) {
         ]} />
       {remove.isError && <p role="alert" className="text-destructive">{errorMessage(remove.error)}</p>}
       {canManage && <form className="grid gap-3 rounded-lg border p-3 md:grid-cols-[10rem_minmax(0,1fr)_auto]" onSubmit={event => { event.preventDefault(); add.mutate(); }}>
-        <Field label="Mileage (km)"><input className={inputCls} required type="number" min="1" step="1" value={mileage} onChange={event => setMileage(event.target.value)} /></Field>
+        <Field label="Mileage (km)"><NumberInput className={inputCls} required min="1" step="1" value={mileage} onChange={event => setMileage(event.target.value)} /></Field>
         <WorkshopPicker required label="Checklist to be followed" endpoint="/workshop-masters?kind=CHECKLIST" collection="items" value={checklistId} onChange={setChecklistId} />
         <Button className="self-end" disabled={add.isPending || !checklistId || !mileage}>Add mileage</Button>
         {add.isError && <p role="alert" className="text-destructive md:col-span-3">{errorMessage(add.error)}</p>}

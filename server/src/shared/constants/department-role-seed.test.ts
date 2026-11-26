@@ -10,8 +10,11 @@ it("deploys the same department permissions as the seed", () => {
     ([, template, permissions]) => [template, [...permissions.matchAll(/'([^']+)'/g)].map(([, permission]) => permission)],
   ));
   const roles = [...sql.matchAll(/\('([A-Za-z]+)', '([A-Za-z]+)', (true|false)\)/g)];
-  const psfSql = readFileSync(resolve(__dirname, "../../../prisma/migrations/20261125130000_department_role_psf_grants/migration.sql"), "utf8");
-  const psfGrants = [...psfSql.matchAll(/\('([A-Za-z]+)', '([^']+)'\)/g)];
+  // Grants added to the department roles after they were created: PSF access, then dispatch challans.
+  const grantSql = ["20261125130000_department_role_psf_grants", "20261126100000_department_role_challan_grants"]
+    .map((migration) => readFileSync(resolve(__dirname, `../../../prisma/migrations/${migration}/migration.sql`), "utf8"))
+    .join("\n");
+  const psfGrants = [...grantSql.matchAll(/\('([A-Za-z]+)', '([^']+)'\)/g)];
   expect(roles.map(([, role]) => role).sort()).toEqual(Object.keys(NEW_DEPARTMENT_ROLE_BASES).sort());
   expect([...new Set(psfGrants.map(([, role]) => role))].every(
     role => Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role),

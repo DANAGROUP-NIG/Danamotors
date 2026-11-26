@@ -24,6 +24,7 @@ export const updateBranchSchema = z.object({
   code: z.string().trim().max(10, "Code must be 10 characters or less").optional(),
   shortName: z.string().trim().max(20, "Short name must be 20 characters or less").optional(),
   parentBranchId: z.string().optional(),
+  roundMrnTotal: z.boolean().optional(),
 });
 
 export type CreateBranchFormValues = z.infer<typeof createBranchSchema>;
