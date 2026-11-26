@@ -1,4 +1,8 @@
-import { FRAMEWORK_REPORT_PERMISSIONS, MONTHLY_REPORT_PERMISSIONS } from "@/features/auth/roles";
+import { CSI_PERMISSIONS } from "@/features/auth/roles";
+import {
+  FRAMEWORK_REPORT_PERMISSIONS,
+  MONTHLY_REPORT_PERMISSIONS,
+} from "@/features/auth/roles";
 import { NavGroup, NavItem } from "./type";
 import {
   CAMPAIGN_PERMISSIONS,
@@ -119,6 +123,9 @@ export const NAV_GROUPS: NavGroup[] = [
       "jobcard:late-reason:update",
       "csc:case:read",
       "csc:master:read",
+      CSI_PERMISSIONS.MASTER_READ,
+      CSI_PERMISSIONS.CARD_GENERATE,
+      CSI_PERMISSIONS.RESPONSE_READ,
       "psf:read",
       "services:read",
       WARRANTY_PERMISSIONS.READ,
@@ -147,12 +154,42 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: ClipboardCheck,
         permissions: ["pdi:read"],
         children: [
-          { label: "PDI Job Cards", href: "/pdi", icon: ClipboardCheck, permissions: ["pdi:read"] },
-          { label: "Open PDI", href: "/pdi/new", icon: ClipboardList, permissions: ["pdi:create"] },
-          { label: "PDI Requisitions", href: "/pdi/requisitions", icon: Package, permissions: ["pdi:read"] },
-          { label: "PDI Returns", href: "/pdi/returns", icon: Package, permissions: ["pdi:read"] },
-          { label: "PDI Labour", href: "/pdi/labour-slips", icon: ListChecks, permissions: ["pdi:read"] },
-          { label: "PDI Bills", href: "/pdi/bills", icon: FileText, permissions: ["pdi:read", "pdi:bill"] },
+          {
+            label: "PDI Job Cards",
+            href: "/pdi",
+            icon: ClipboardCheck,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "Open PDI",
+            href: "/pdi/new",
+            icon: ClipboardList,
+            permissions: ["pdi:create"],
+          },
+          {
+            label: "PDI Requisitions",
+            href: "/pdi/requisitions",
+            icon: Package,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Returns",
+            href: "/pdi/returns",
+            icon: Package,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Labour",
+            href: "/pdi/labour-slips",
+            icon: ListChecks,
+            permissions: ["pdi:read"],
+          },
+          {
+            label: "PDI Bills",
+            href: "/pdi/bills",
+            icon: FileText,
+            permissions: ["pdi:read", "pdi:bill"],
+          },
         ],
       },
       {
@@ -166,8 +203,58 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: CalendarClock,
         permissions: ["jobcard:late-reason:update"],
         children: [
-          { label: "Promise Date Entry", href: "/late-deliveries/date", icon: CalendarClock, permissions: ["jobcard:late-reason:update"] },
-          { label: "Promise Time Entry", href: "/late-deliveries/time", icon: Clock3, permissions: ["jobcard:late-reason:update"] },
+          {
+            label: "Promise Date Entry",
+            href: "/late-deliveries/date",
+            icon: CalendarClock,
+            permissions: ["jobcard:late-reason:update"],
+          },
+          {
+            label: "Promise Time Entry",
+            href: "/late-deliveries/time",
+            icon: Clock3,
+            permissions: ["jobcard:late-reason:update"],
+          },
+        ],
+      },
+      {
+        label: "CSI",
+        icon: ListChecks,
+        permissions: [CSI_PERMISSIONS.MASTER_READ, CSI_PERMISSIONS.CARD_GENERATE, CSI_PERMISSIONS.RESPONSE_READ, CSI_PERMISSIONS.REPORT, CSI_PERMISSIONS.ATTRIBUTE_REPORT, CSI_PERMISSIONS.CHECKLIST_REPORT],
+        children: [
+          { label: "CSI report", href: "/reports/csi", icon: ClipboardList, permissions: [CSI_PERMISSIONS.REPORT] },
+          { label: "Attribute-wise CSI analysis", href: "/reports/csi-attribute", icon: ClipboardList, permissions: [CSI_PERMISSIONS.ATTRIBUTE_REPORT] },
+          { label: "CSI customer checklist", href: "/reports/csi-checklist", icon: ClipboardList, permissions: [CSI_PERMISSIONS.CHECKLIST_REPORT] },
+          {
+            label: "CSI card responses",
+            href: "/csi/response-entry",
+            icon: ClipboardList,
+            permissions: [CSI_PERMISSIONS.RESPONSE_READ],
+          },
+          {
+            label: "CSI card generation",
+            href: "/csi/generate",
+            icon: ClipboardCheck,
+            permissions: [CSI_PERMISSIONS.CARD_GENERATE],
+          },
+          {
+            label: "CSI attribute master",
+            href: "/csi/attributes",
+            icon: ListChecks,
+            permissions: [CSI_PERMISSIONS.MASTER_READ],
+          },
+          {
+            label: "CSI response master",
+            href: "/csi/responses",
+            icon: ClipboardList,
+            permissions: [CSI_PERMISSIONS.MASTER_READ],
+          },
+          {
+            label: "CSI card master",
+            href: "/csi/cards",
+            icon: ClipboardCheck,
+            permissions: [CSI_PERMISSIONS.MASTER_READ],
+          },
         ],
       },
       {
@@ -181,18 +268,6 @@ export const NAV_GROUPS: NavGroup[] = [
           { label: "Generate Cases", href: "/csc/generate", icon: ListChecks, permissions: ["csc:case:generate"] },
           { label: "CSC Master", href: "/csc/schedule", icon: Settings, permissions: ["csc:master:read"] },
           { label: "Closure Reasons", href: "/csc/close-reasons", icon: ClipboardList, permissions: ["csc:master:read"] },
-        ],
-      },
-      {
-        label: "Post-service Follow-up",
-        icon: SmilePlus,
-        permissions: ["psf:read", "psf:letter"],
-        children: [
-          { label: "Follow-up Entry", href: "/psf", icon: PhoneCall, permissions: ["psf:read"] },
-          { label: "Follow-up List", href: "/reports/psf-followup-list", icon: ListChecks, permissions: ["psf:read"] },
-          { label: "Dissatisfied Customers", href: "/reports/psf-dissatisfied", icon: Frown, permissions: ["report:psf-dissatisfied"] },
-          { label: "Follow-up Letters", href: "/reports/psf-letter", icon: Mail, permissions: ["psf:letter"] },
-          { label: "Mailing List", href: "/reports/psf-mailing-list", icon: Tags, permissions: ["psf:letter"] },
         ],
       },
       {

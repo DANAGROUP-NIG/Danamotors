@@ -52,7 +52,7 @@ async function main() {
   const cpd = await prisma.branch.findFirstOrThrow({ where: { name: "CPD" } });
   const kiaPlaza = await prisma.branch.findFirstOrThrow({ where: { name: { startsWith: "KIA PLAZA" } } });
   const actor = await prisma.user.findFirstOrThrow({ where: { email: "superadmin@danamotors.com" } });
-  const customer = await prisma.customer.findFirstOrThrow({ where: { code: { not: null }, NOT: { type: "VENDOR" } }, orderBy: { createdAt: "asc" } });
+  const customer = await prisma.customer.findFirstOrThrow({ where: { code: { not: null }, NOT: [{ type: "VENDOR" }, { partyStatus: "VENDOR" }] }, orderBy: { createdAt: "asc" } });
   const picker =
     (await prisma.employee.findFirst({ where: { code: "00015", leftDate: null } })) ??
     (await prisma.employee.create({ data: { code: "00015", name: "Picker 00015 (test)", branchId: cpd.id } }));

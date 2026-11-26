@@ -301,7 +301,8 @@ export const createPartReturnSchema = z.object({
   body: z.object({
     partIssuanceId: z.string().uuid("Invalid part issuance ID"),
     branchId: z.string().uuid("Invalid branch ID"),
-    returnedById: z.string().uuid("Invalid returner ID"),
+    // The controller always derives the actor from the authenticated session.
+    returnedById: z.string().uuid("Invalid returner ID").optional(),
     quantity: z.number().int().positive("Quantity must be positive"),
     reason: z.string().optional(),
     status: z.string().optional(),

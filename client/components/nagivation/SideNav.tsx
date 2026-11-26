@@ -74,6 +74,7 @@ export default function SideNav({
     isHydrated,
     isSuperAdmin,
     isGeneralStoreManager,
+    isCcuManager,
     hasAccess,
     hasAnyPermission,
   } = useAuth();
@@ -112,7 +113,14 @@ export default function SideNav({
   // For non-SuperAdmin: lock activeBranch to the user's assigned branch
   useEffect(() => {
     if (branchSource !== "store") return;
-    if (isSuperAdmin || isGeneralStoreManager || !branchesFetched || branches.length === 0) return;
+    if (
+      isSuperAdmin ||
+      isGeneralStoreManager ||
+      isCcuManager ||
+      !branchesFetched ||
+      branches.length === 0
+    )
+      return;
 
     const userBranchId = user?.branchId;
     if (!userBranchId) return;
@@ -133,6 +141,7 @@ export default function SideNav({
     setActiveBranch,
     isSuperAdmin,
     isGeneralStoreManager,
+    isCcuManager,
   ]);
 
   // Resolve the branch config passed to the dropdown
@@ -142,21 +151,32 @@ export default function SideNav({
           branches,
           activeBranch,
           isLoading: branchLoading,
-          canSwitch: isSuperAdmin || isGeneralStoreManager,
-          canSeeAll: isSuperAdmin || isGeneralStoreManager,
+          canSwitch: isSuperAdmin || isGeneralStoreManager || isCcuManager,
+          canSeeAll: isSuperAdmin || isGeneralStoreManager || isCcuManager,
           onSelect: (b) => setActiveBranch(b),
           onAllSelect: () => setActiveBranch(null as any),
         }
       : (branch ?? { branches: [], activeBranch: null });
 
   // Every link in the sidebar, so a parent path (/inventory) yields to a closer link (/inventory/part-query).
-  const allHrefs = navGroups.flatMap(group => group.items.flatMap(item => [item.href, ...(item.children ?? []).map(child => child.href)]))
+  const allHrefs = navGroups
+    .flatMap((group) =>
+      group.items.flatMap((item) => [
+        item.href,
+        ...(item.children ?? []).map((child) => child.href),
+      ]),
+    )
     .filter((href): href is string => !!href);
 
   function isItemActive(href: string, pathname: string) {
     if (href === "/logout") return false;
     if (href === exactRoot || href === "/finance") return pathname === href;
-    return isActive(href, pathname) && !allHrefs.some(other => other.length > href.length && isActive(other, pathname));
+    return (
+      isActive(href, pathname) &&
+      !allHrefs.some(
+        (other) => other.length > href.length && isActive(other, pathname),
+      )
+    );
   }
 
   return (

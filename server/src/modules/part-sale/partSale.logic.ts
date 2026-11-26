@@ -16,6 +16,7 @@
 import { CustomerOrderStatus, Prisma } from "@prisma/client";
 import { BadRequestError } from "../../shared/errors/appError";
 import { money, sumMoney } from "../finance/money";
+import { finalizeJobBill } from "../finance/job-bill-calculator";
 
 export interface PriceLineInput {
   quantity: number;
@@ -88,9 +89,12 @@ export function priceSale(lines: PriceLineInput[], cashDiscountPercent: number):
   const discount = sumMoney(priced.map((l) => l.discount));
   const handling = sumMoney(priced.map((l) => l.handling));
   const vat = sumMoney(priced.map((l) => l.vat));
-  const beforeRoundOff = money(gross - tradeDiscount - discount + handling + vat);
-  const total = floorToTen(beforeRoundOff);
-  return { lines: priced, totals: { gross, tradeDiscount, discount, handling, vat, roundOff: money(total - beforeRoundOff), total } };
+  // Shared bill finish (exact decimals, floored to ₦10): trade and cash discounts reduce, handling adds.
+  const { total, roundOff } = finalizeJobBill({
+    partsTotal: gross, partsDiscountAmount: money(tradeDiscount + discount), labourTotal: 0,
+    labourDiscountAmount: 0, serviceTotal: handling, vatRate: 0, vatAmount: vat,
+  }, 10);
+  return { lines: priced, totals: { gross, tradeDiscount, discount, handling, vat, roundOff, total } };
 }
 
 /**

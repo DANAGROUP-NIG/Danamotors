@@ -27,6 +27,7 @@ import {
 } from "../lib/part-sale-format";
 import type { CounterSale } from "../types/part-sale.types";
 import { DocumentTermsBlock } from "@/components/DocumentTermsBlock";
+import { BillHeads } from "@/features/invoices/components/BillHeads";
 
 const thCls = "px-3 py-2 text-left text-sm font-medium uppercase tracking-wider text-slate-400 whitespace-nowrap";
 const tdCls = "px-3 py-2 whitespace-nowrap";
@@ -325,7 +326,20 @@ export function CounterSaleDetail({ id }: { id: string }) {
               </tbody>
             </table>
           </div>
-          <dl className="mt-4 ml-auto grid max-w-sm grid-cols-2 gap-y-1 text-sm">
+          {invoice.kiaSpareTotal != null && invoice.nonKiaSpareTotal != null ? (
+            <div className="mt-4">
+              <p className="mb-2 text-right text-sm tabular-nums">{invoice.lines.length} lines / {totalQty} units</p>
+              <BillHeads
+                {...invoice}
+                kiaSpareTotal={invoice.kiaSpareTotal}
+                nonKiaSpareTotal={invoice.nonKiaSpareTotal}
+                labourTotal={0}
+                serviceTotal={0}
+                discount={invoice.partsDiscountAmount}
+                standardVat
+              />
+            </div>
+          ) : <dl className="mt-4 ml-auto grid max-w-sm grid-cols-2 gap-y-1 text-sm">
             <dt className="text-slate-500">Total items / qty</dt>
             <dd className="text-right">
               {invoice.lines.length} / {totalQty}
@@ -352,7 +366,7 @@ export function CounterSaleDetail({ id }: { id: string }) {
             <dd className="text-right">{fmtCurrency(invoice.roundOff)}</dd>
             <dt className="font-semibold text-slate-800">Net amount</dt>
             <dd className="text-right font-semibold text-slate-800">{fmtCurrency(invoice.total)}</dd>
-          </dl>
+          </dl>}
         </div>
 
         {sale.returns.length > 0 && (

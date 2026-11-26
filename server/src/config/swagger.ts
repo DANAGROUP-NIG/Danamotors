@@ -1,21 +1,30 @@
-import swaggerJsdoc from 'swagger-jsdoc';
-import path from 'path';
-import { serviceTransactionPaths, serviceTransactionSchemas } from '../modules/service/service-transactions.openapi';
-import { monthlyReportPaths, reportManagementPaths } from '../modules/reports/reports.openapi';
-import { pdiPaths } from '../modules/pdi/pdi.openapi';
-import { repeatJobPaths } from '../modules/repeat-job/repeat-job.openapi';
-import { lateDeliveryPaths } from '../modules/late-delivery/late-delivery.openapi';
-import { psfPaths } from '../modules/psf/psf.openapi';
-import { cscPaths } from '../modules/csc/csc.openapi';
-import { buildReportPaths } from '../modules/reports/framework.openapi';
-import { REPORTS } from '../modules/reports/reports.registry';
+import swaggerJsdoc from "swagger-jsdoc";
+import path from "path";
+import {
+  serviceTransactionPaths,
+  serviceTransactionSchemas,
+} from "../modules/service/service-transactions.openapi";
+import {
+  monthlyReportPaths,
+  reportManagementPaths,
+} from "../modules/reports/reports.openapi";
+import { pdiPaths } from "../modules/pdi/pdi.openapi";
+import { repeatJobPaths } from "../modules/repeat-job/repeat-job.openapi";
+import { lateDeliveryPaths } from "../modules/late-delivery/late-delivery.openapi";
+import { psfPaths } from "../modules/psf/psf.openapi";
+import { cscPaths } from "../modules/csc/csc.openapi";
+import { csiPaths } from "../modules/csi/csi.openapi";
+import { csiIssuancePaths } from "../modules/csi/csi-issuance.openapi";
+import { csiResponsePaths } from "../modules/csi/csi-response.openapi";
+import { buildReportPaths } from "../modules/reports/framework.openapi";
+import { REPORTS } from "../modules/reports/reports.registry";
 
 const options: swaggerJsdoc.Options = {
   definition: {
-    openapi: '3.0.0',
+    openapi: "3.0.0",
     info: {
-      title: 'Dana Motors Service Workshop API',
-      version: '1.0.0',
+      title: "Dana Motors Service Workshop API",
+      version: "1.0.0",
       description: `
 ## Dana Motors Service Workshop Platform API
 
@@ -36,467 +45,676 @@ List endpoints support query parameters: \`page\` (default: 1), \`limit\` (defau
 All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field and a descriptive \`message\`.
       `.trim(),
       contact: {
-        name: 'Dana Motors Engineering',
-        email: 'ayeoluwaseyi@gmail.com',
+        name: "Dana Motors Engineering",
+        email: "ayeoluwaseyi@gmail.com",
       },
       license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT',
+        name: "MIT",
+        url: "https://opensource.org/licenses/MIT",
       },
     },
     servers: [
       {
-        url: '/api',
-        description: 'Current Dana Motors API',
+        url: "/api",
+        description: "Current Dana Motors API",
       },
     ],
     tags: [
       {
-        name: 'Health',
-        description: 'API health check endpoint',
+        name: "Health",
+        description: "API health check endpoint",
       },
       {
-        name: 'Repeat Jobs',
-        description: 'Vehicles back soon after a billed job (legacy Service → Repeat Job): automatic flag at opening within the branch window (days or km), review with reason codes, job card summary. Reports: repeat-list, repeat-analysis, repeat-summary under /reports.',
+        name: "Repeat Jobs",
+        description:
+          "Vehicles back soon after a billed job (legacy Service → Repeat Job): automatic flag at opening within the branch window (days or km), review with reason codes, job card summary. Reports: repeat-list, repeat-analysis, repeat-summary under /reports.",
       },
       {
-        name: 'CSC',
-        description: 'Service due reminders (legacy Service → CSC): schedule per model and service, closure reasons, case generation, 1st / 2nd / not-visited follow-ups with booking and closure, automatic visit matching. Reports: csc-call-sheet, csc-followup, csc-not-visited, csc-no-show under /reports.',
+        name: "CSC",
+        description:
+          "Service due reminders (legacy Service → CSC): schedule per model and service, closure reasons, case generation, 1st / 2nd / not-visited follow-ups with booking and closure, automatic visit matching. Reports: csc-call-sheet, csc-followup, csc-not-visited, csc-no-show under /reports.",
       },
       {
-        name: 'Auth',
-        description: 'Authentication — registration, login, token refresh, password reset, and profile management.',
+        name: "Auth",
+        description:
+          "Authentication — registration, login, token refresh, password reset, and profile management.",
       },
       {
-        name: 'Administration',
-        description: 'User management, role definitions, and permission assignments (admin/super-admin only).',
+        name: "Administration",
+        description:
+          "User management, role definitions, and permission assignments (admin/super-admin only).",
       },
       {
-        name: 'Customers',
-        description: 'Customer profile records, documents, and service history.',
+        name: "Customers",
+        description:
+          "Customer profile records, documents, and service history.",
       },
       {
-        name: 'Vehicles',
-        description: 'Vehicle registry — VIN, mileage, specifications, images, and ownership history.',
+        name: "Vehicles",
+        description:
+          "Vehicle registry — VIN, mileage, specifications, images, and ownership history.",
       },
       {
-        name: 'Service & Job Cards',
-        description: 'Service appointments, job cards, and repair workflow management.',
+        name: "Service & Job Cards",
+        description:
+          "Service appointments, job cards, and repair workflow management.",
       },
       {
-        name: 'Inspections & Estimates',
-        description: 'Vehicle inspection sheets, repair estimates, and customer approval workflows.',
+        name: "Inspections & Estimates",
+        description:
+          "Vehicle inspection sheets, repair estimates, and customer approval workflows.",
       },
       {
-        name: 'Services Catalog',
-        description: 'Service catalog management — defining available service types and pricing.',
+        name: "Services Catalog",
+        description:
+          "Service catalog management — defining available service types and pricing.",
       },
       {
-        name: 'Workshop',
-        description: 'Technician management, job assignment, progress tracking, and quality control (QC).',
+        name: "Workshop",
+        description:
+          "Technician management, job assignment, progress tracking, and quality control (QC).",
       },
       {
-        name: 'Inventory & Parts',
-        description: 'Spare parts registry, branch stock levels, purchase requests, issuances, returns, and inter-branch transfers.',
+        name: "Inventory & Parts",
+        description:
+          "Spare parts registry, branch stock levels, purchase requests, issuances, returns, and inter-branch transfers.",
       },
       {
-        name: 'Finance',
-        description: 'Invoices, payments, receipts, and financial reports.',
+        name: "Finance",
+        description: "Invoices, payments, receipts, and financial reports.",
       },
       {
-        name: 'Reports',
-        description: 'Framework reports: one endpoint per report, branch-scoped, aggregated on the server.',
+        name: "Reports",
+        description:
+          "Framework reports: one endpoint per report, branch-scoped, aggregated on the server.",
       },
       {
-        name: 'Branches',
-        description: 'Multi-branch location management and branch settings.',
+        name: "Branches",
+        description: "Multi-branch location management and branch settings.",
       },
       {
-        name: 'Dashboard',
-        description: 'Branch KPIs, stock alerts, revenue summaries, and operational metrics.',
+        name: "Dashboard",
+        description:
+          "Branch KPIs, stock alerts, revenue summaries, and operational metrics.",
       },
       {
-        name: 'Search',
-        description: 'Global search across customers, vehicles, job cards, and parts.',
+        name: "Search",
+        description:
+          "Global search across customers, vehicles, job cards, and parts.",
       },
       {
-        name: 'Notifications',
-        description: 'In-app role-based notification feed with read/unread management.',
+        name: "Notifications",
+        description:
+          "In-app role-based notification feed with read/unread management.",
       },
       {
-        name: 'Customer Portal',
-        description: 'Customer-facing self-service endpoints — profile, vehicles, job cards, appointments, invoices, and credit.',
+        name: "Customer Portal",
+        description:
+          "Customer-facing self-service endpoints — profile, vehicles, job cards, appointments, invoices, and credit.",
       },
       {
-        name: 'Credit',
-        description: 'Customer credit accounts, limits, applications, and aging analysis.',
+        name: "Credit",
+        description:
+          "Customer credit accounts, limits, applications, and aging analysis.",
       },
       {
-        name: 'Enquiries',
-        description: 'Online enquiry submission (public), staff review/approve/reject workflow, and enquiry management.',
+        name: "Enquiries",
+        description:
+          "Online enquiry submission (public), staff review/approve/reject workflow, and enquiry management.",
       },
       {
-        name: 'Audit',
-        description: 'System audit trail — tracks all write operations across the platform with user, action, IP, and timestamp details.',
+        name: "Audit",
+        description:
+          "System audit trail — tracks all write operations across the platform with user, action, IP, and timestamp details.",
       },
     ],
     components: {
       securitySchemes: {
         BearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          description: 'Enter your JWT access token in the format: `Bearer <token>`',
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description:
+            "Enter your JWT access token in the format: `Bearer <token>`",
         },
       },
       schemas: {
         // ── Standard Response Wrapper ─────────────────────────────────
         StandardResponse: {
-          type: 'object',
+          type: "object",
           properties: {
             status: {
-              type: 'string',
-              enum: ['success'],
-              example: 'success',
+              type: "string",
+              enum: ["success"],
+              example: "success",
             },
             message: {
-              type: 'string',
-              example: 'Operation completed successfully',
+              type: "string",
+              example: "Operation completed successfully",
             },
             data: {
-              description: 'Response payload — varies by endpoint',
+              description: "Response payload — varies by endpoint",
             },
           },
-          required: ['status', 'message'],
+          required: ["status", "message"],
         },
         // ── Pagination Meta ──────────────────────────────────────────
         PaginationMeta: {
-          type: 'object',
+          type: "object",
           properties: {
-            total: { type: 'integer', example: 120 },
-            page: { type: 'integer', example: 1 },
-            limit: { type: 'integer', example: 20 },
-            totalPages: { type: 'integer', example: 6 },
+            total: { type: "integer", example: 120 },
+            page: { type: "integer", example: 1 },
+            limit: { type: "integer", example: 20 },
+            totalPages: { type: "integer", example: 6 },
           },
-          required: ['total', 'page', 'limit', 'totalPages'],
+          required: ["total", "page", "limit", "totalPages"],
         },
         // ── Error Response ──────────────────────────────────────────
         ErrorResponse: {
-          type: 'object',
+          type: "object",
           properties: {
             status: {
-              type: 'string',
-              enum: ['error', 'fail'],
-              example: 'error',
+              type: "string",
+              enum: ["error", "fail"],
+              example: "error",
             },
             message: {
-              type: 'string',
-              example: 'An unexpected error occurred',
+              type: "string",
+              example: "An unexpected error occurred",
             },
           },
-          required: ['status', 'message'],
+          required: ["status", "message"],
         },
         // ── Validation Error ────────────────────────────────────────
         ValidationErrorResponse: {
-          type: 'object',
+          type: "object",
           properties: {
-            status: { type: 'string', enum: ['fail'], example: 'fail' },
-            message: { type: 'string', example: 'Validation failed' },
+            status: { type: "string", enum: ["fail"], example: "fail" },
+            message: { type: "string", example: "Validation failed" },
             errors: {
-              type: 'array',
+              type: "array",
               items: {
-                type: 'object',
+                type: "object",
                 properties: {
-                  field: { type: 'string', example: 'email' },
-                  message: { type: 'string', example: 'Invalid email address' },
+                  field: { type: "string", example: "email" },
+                  message: { type: "string", example: "Invalid email address" },
                 },
               },
             },
           },
-          required: ['status', 'message'],
+          required: ["status", "message"],
         },
         // ── Auth Tokens DTO ─────────────────────────────────────────
         AuthTokensDTO: {
-          type: 'object',
+          type: "object",
           properties: {
             accessToken: {
-              type: 'string',
-              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+              type: "string",
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             },
             refreshToken: {
-              type: 'string',
-              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+              type: "string",
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             },
           },
-          required: ['accessToken', 'refreshToken'],
+          required: ["accessToken", "refreshToken"],
         },
         // ── User DTO ────────────────────────────────────────────────
         UserDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid', example: 'cuid2...' },
-            email: { type: 'string', format: 'email', example: 'tech@danamotors.com' },
-            firstName: { type: 'string', example: 'John' },
-            lastName: { type: 'string', example: 'Doe' },
-            phoneNumber: { type: 'string', example: '+2348012345678', nullable: true },
-            role: { type: 'string', example: 'TECHNICIAN' },
-            branchId: { type: 'string', nullable: true, example: 'cuid2...' },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid", example: "cuid2..." },
+            email: {
+              type: "string",
+              format: "email",
+              example: "tech@danamotors.com",
+            },
+            firstName: { type: "string", example: "John" },
+            lastName: { type: "string", example: "Doe" },
+            phoneNumber: {
+              type: "string",
+              example: "+2348012345678",
+              nullable: true,
+            },
+            role: { type: "string", example: "TECHNICIAN" },
+            branchId: { type: "string", nullable: true, example: "cuid2..." },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'email', 'firstName', 'lastName', 'role'],
+          required: ["id", "email", "firstName", "lastName", "role"],
         },
         // ── Customer DTO ────────────────────────────────────────────
         CustomerDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            creditDays: { type: 'integer', nullable: true, minimum: 0, maximum: 3650, description: 'Null uses company default credit days for future job bills' },
-            partyStatus: { type: 'string', enum: ['CUSTOMER','DEALER','FA_PARTY'], default: 'CUSTOMER' },
-            firstName: { type: 'string', example: 'Adaeze' },
-            lastName: { type: 'string', example: 'Okafor' },
-            email: { type: 'string', format: 'email', nullable: true },
-            phoneNumber: { type: 'string', example: '+2348012345678' },
-            address: { type: 'string', nullable: true },
-            branchId: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid" },
+            creditDays: {
+              type: "integer",
+              nullable: true,
+              minimum: 0,
+              maximum: 3650,
+              description:
+                "Null uses company default credit days for future job bills",
+            },
+            partyStatus: {
+              type: "string",
+              enum: ["CUSTOMER", "DEALER", "FA_PARTY", "VENDOR"],
+              default: "CUSTOMER",
+            },
+            type: {
+              type: "string",
+              description:
+                "Customer category for non-vendor parties. Legacy records may have an unmapped category.",
+              example: "IN_HOUSE",
+            },
+            ownCompanyVehicle: {
+              type: "boolean",
+              readOnly: true,
+              description: "Derived from In-House customer category.",
+            },
+            firstName: { type: "string", example: "Adaeze" },
+            lastName: { type: "string", example: "Okafor" },
+            email: { type: "string", format: "email", nullable: true },
+            phoneNumber: { type: "string", example: "+2348012345678" },
+            address: { type: "string", nullable: true },
+            branchId: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'firstName', 'lastName'],
+          required: ["id", "firstName", "lastName"],
         },
         // ── Vehicle DTO ─────────────────────────────────────────────
         VehicleDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            vin: { type: 'string', example: '1HGCM82633A123456' },
-            registrationNumber: { type: 'string', example: 'LSD-123-AB', nullable: true },
-            make: { type: 'string', example: 'Toyota' },
-            model: { type: 'string', example: 'Camry' },
-            year: { type: 'integer', example: 2022 },
-            color: { type: 'string', example: 'Silver', nullable: true },
-            mileage: { type: 'integer', example: 45000, nullable: true },
-            engineNumber: { type: 'string', nullable: true },
-            customerId: { type: 'string', nullable: true },
-            branchId: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid" },
+            vin: { type: "string", example: "1HGCM82633A123456" },
+            registrationNumber: {
+              type: "string",
+              example: "LSD-123-AB",
+              nullable: true,
+            },
+            make: { type: "string", example: "Toyota" },
+            model: { type: "string", example: "Camry" },
+            year: { type: "integer", example: 2022 },
+            color: { type: "string", example: "Silver", nullable: true },
+            mileage: { type: "integer", example: 45000, nullable: true },
+            engineNumber: { type: "string", nullable: true },
+            customerId: { type: "string", nullable: true },
+            branchId: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'vin', 'make', 'model', 'year'],
+          required: ["id", "vin", "make", "model", "year"],
         },
         // ── Job Card DTO ────────────────────────────────────────────
         JobCardDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            jobCardNumber: { type: 'string', example: 'JC-2024-0042' },
-            vehicleId: { type: 'string' },
-            customerId: { type: 'string', nullable: true },
-            branchId: { type: 'string' },
+            id: { type: "string", format: "uuid" },
+            jobCardNumber: { type: "string", example: "JC-2024-0042" },
+            vehicleId: { type: "string" },
+            customerId: { type: "string", nullable: true },
+            branchId: { type: "string" },
             status: {
-              type: 'string',
-              enum: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD'],
-              example: 'IN_PROGRESS',
+              type: "string",
+              enum: [
+                "PENDING",
+                "IN_PROGRESS",
+                "COMPLETED",
+                "CANCELLED",
+                "ON_HOLD",
+              ],
+              example: "IN_PROGRESS",
             },
-            complaint: { type: 'string', example: 'Engine overheating' },
-            diagnosis: { type: 'string', nullable: true },
-            technicianId: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            complaint: { type: "string", example: "Engine overheating" },
+            diagnosis: { type: "string", nullable: true },
+            technicianId: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'jobCardNumber', 'vehicleId', 'status'],
+          required: ["id", "jobCardNumber", "vehicleId", "status"],
         },
         // ── Spare Part DTO ──────────────────────────────────────────
         SparePartDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            partNumber: { type: 'string', example: 'TYT-OIL-5W30' },
-            name: { type: 'string', example: 'Toyota 5W-30 Engine Oil (4L)' },
-            description: { type: 'string', nullable: true },
-            unitPrice: { type: 'number', format: 'float', example: 4500.0 },
-            unit: { type: 'string', example: 'Litre', nullable: true },
-            categoryId: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid" },
+            partNumber: { type: "string", example: "TYT-OIL-5W30" },
+            name: { type: "string", example: "Toyota 5W-30 Engine Oil (4L)" },
+            description: { type: "string", nullable: true },
+            unitPrice: { type: "number", format: "float", example: 4500.0 },
+            unit: { type: "string", example: "Litre", nullable: true },
+            categoryId: { type: "string", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'partNumber', 'name', 'unitPrice'],
+          required: ["id", "partNumber", "name", "unitPrice"],
         },
         // ── Part Master DTO ─────────────────────────────────────────
         PartMasterDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000' },
-            partCode: { type: 'string', readOnly: true, description: 'Generated by the server.', example: '7f3c2a1e-9b4d-4c6e-8a2f-1d5e6b7c8a9f' },
-            partNumber: { type: 'string', example: 'ENG-OIL-5W30' },
-            name: { type: 'string', example: 'Toyota 5W-30 Engine Oil (4L)' },
-            uom: { type: 'string', example: 'Litre' },
-            taxCategory: { type: 'string', nullable: true, example: 'VAT' },
-            taxForm: { type: 'string', nullable: true, example: 'Form C' },
-            minLevel: { type: 'number', format: 'float', nullable: true, example: 10 },
-            maxLevel: { type: 'number', format: 'float', nullable: true, example: 100 },
-            reorderQty: { type: 'number', format: 'float', nullable: true, example: 50 },
-            unitRate: { type: 'number', format: 'float', example: 4500.0 },
-            partStatus: { type: 'string', enum: ['ACTIVE', 'BLOCKED'], example: 'ACTIVE' },
-            role: { type: 'string', enum: ['MAIN', 'ALTERNATE'], example: 'MAIN' },
-            mainPartId: { type: 'string', format: 'uuid', nullable: true, description: 'The parent main part for an alternate part.' },
-            createdAt: { type: 'string', format: 'date-time' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            id: {
+              type: "string",
+              format: "uuid",
+              example: "550e8400-e29b-41d4-a716-446655440000",
+            },
+            partCode: {
+              type: "string",
+              readOnly: true,
+              description: "Generated by the server.",
+              example: "7f3c2a1e-9b4d-4c6e-8a2f-1d5e6b7c8a9f",
+            },
+            partNumber: { type: "string", example: "ENG-OIL-5W30" },
+            name: { type: "string", example: "Toyota 5W-30 Engine Oil (4L)" },
+            uom: { type: "string", example: "Litre" },
+            taxCategory: { type: "string", nullable: true, example: "VAT" },
+            taxForm: { type: "string", nullable: true, example: "Form C" },
+            minLevel: {
+              type: "number",
+              format: "float",
+              nullable: true,
+              example: 10,
+            },
+            maxLevel: {
+              type: "number",
+              format: "float",
+              nullable: true,
+              example: 100,
+            },
+            reorderQty: {
+              type: "number",
+              format: "float",
+              nullable: true,
+              example: 50,
+            },
+            unitRate: { type: "number", format: "float", example: 4500.0 },
+            partStatus: {
+              type: "string",
+              enum: ["ACTIVE", "BLOCKED"],
+              example: "ACTIVE",
+            },
+            role: {
+              type: "string",
+              enum: ["MAIN", "ALTERNATE"],
+              example: "MAIN",
+            },
+            mainPartId: {
+              type: "string",
+              format: "uuid",
+              nullable: true,
+              description: "The parent main part for an alternate part.",
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'partCode', 'partNumber', 'name', 'uom', 'unitRate', 'partStatus', 'role', 'createdAt', 'updatedAt'],
+          required: [
+            "id",
+            "partCode",
+            "partNumber",
+            "name",
+            "uom",
+            "unitRate",
+            "partStatus",
+            "role",
+            "createdAt",
+            "updatedAt",
+          ],
         },
         CreatePartMasterInput: {
-          type: 'object',
-          required: ['partNumber', 'name', 'uom', 'unitRate'],
+          type: "object",
+          required: ["partNumber", "name", "uom", "unitRate"],
           properties: {
-            partNumber: { type: 'string', example: 'ENG-OIL-5W30' },
-            name: { type: 'string', example: 'Toyota 5W-30 Engine Oil (4L)' },
-            uom: { type: 'string', example: 'Litre' },
-            taxCategory: { type: 'string', nullable: true, example: 'VAT' },
-            taxForm: { type: 'string', nullable: true, example: 'Form C' },
-            minLevel: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 10 },
-            maxLevel: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 100 },
-            reorderQty: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 50 },
-            unitRate: { type: 'number', format: 'float', exclusiveMinimum: 0, example: 4500.0 },
-            partStatus: { type: 'string', enum: ['ACTIVE', 'BLOCKED'], example: 'ACTIVE' },
+            partNumber: { type: "string", example: "ENG-OIL-5W30" },
+            name: { type: "string", example: "Toyota 5W-30 Engine Oil (4L)" },
+            uom: { type: "string", example: "Litre" },
+            taxCategory: { type: "string", nullable: true, example: "VAT" },
+            taxForm: { type: "string", nullable: true, example: "Form C" },
+            minLevel: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 10,
+            },
+            maxLevel: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 100,
+            },
+            reorderQty: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 50,
+            },
+            unitRate: {
+              type: "number",
+              format: "float",
+              exclusiveMinimum: 0,
+              example: 4500.0,
+            },
+            partStatus: {
+              type: "string",
+              enum: ["ACTIVE", "BLOCKED"],
+              example: "ACTIVE",
+            },
           },
         },
         UpdatePartMasterInput: {
-          type: 'object',
+          type: "object",
           properties: {
-            partNumber: { type: 'string', example: 'ENG-OIL-5W30' },
-            name: { type: 'string', example: 'Toyota 5W-30 Engine Oil (4L)' },
-            uom: { type: 'string', example: 'Litre' },
-            taxCategory: { type: 'string', nullable: true, example: 'VAT' },
-            taxForm: { type: 'string', nullable: true, example: 'Form C' },
-            minLevel: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 10 },
-            maxLevel: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 100 },
-            reorderQty: { type: 'number', format: 'float', minimum: 0, nullable: true, example: 50 },
-            unitRate: { type: 'number', format: 'float', exclusiveMinimum: 0, example: 4500.0 },
-            partStatus: { type: 'string', enum: ['ACTIVE', 'BLOCKED'], example: 'ACTIVE' },
+            partNumber: { type: "string", example: "ENG-OIL-5W30" },
+            name: { type: "string", example: "Toyota 5W-30 Engine Oil (4L)" },
+            uom: { type: "string", example: "Litre" },
+            taxCategory: { type: "string", nullable: true, example: "VAT" },
+            taxForm: { type: "string", nullable: true, example: "Form C" },
+            minLevel: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 10,
+            },
+            maxLevel: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 100,
+            },
+            reorderQty: {
+              type: "number",
+              format: "float",
+              minimum: 0,
+              nullable: true,
+              example: 50,
+            },
+            unitRate: {
+              type: "number",
+              format: "float",
+              exclusiveMinimum: 0,
+              example: 4500.0,
+            },
+            partStatus: {
+              type: "string",
+              enum: ["ACTIVE", "BLOCKED"],
+              example: "ACTIVE",
+            },
           },
         },
         // ── Invoice DTO ─────────────────────────────────────────────
         InvoiceDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            invoiceNumber: { type: 'string', example: 'INV-2024-0099' },
-            jobCardId: { type: 'string', nullable: true },
-            customerId: { type: 'string', nullable: true },
-            branchId: { type: 'string' },
+            id: { type: "string", format: "uuid" },
+            invoiceNumber: { type: "string", example: "INV-2024-0099" },
+            jobCardId: { type: "string", nullable: true },
+            customerId: { type: "string", nullable: true },
+            branchId: { type: "string" },
             status: {
-              type: 'string',
-              enum: ['DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED'],
-              example: 'ISSUED',
+              type: "string",
+              enum: ["DRAFT", "ISSUED", "PAID", "OVERDUE", "CANCELLED"],
+              example: "ISSUED",
             },
-            totalAmount: { type: 'number', example: 75000.0 },
-            paidAmount: { type: 'number', example: 50000.0 },
-            dueDate: { type: 'string', format: 'date', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
+            totalAmount: { type: "number", example: 75000.0 },
+            kiaSpareTotal: {
+              type: "string",
+              nullable: true,
+              example: "100.01",
+              description:
+                "Stored gross Kia spare amount in NGN. Null when the split is unavailable.",
+            },
+            nonKiaSpareTotal: {
+              type: "string",
+              nullable: true,
+              example: "50.02",
+              description:
+                "Stored gross Non-Kia spare amount in NGN. Null when the split is unavailable.",
+            },
+            paidAmount: { type: "number", example: 50000.0 },
+            dueDate: { type: "string", format: "date", nullable: true },
+            createdAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'invoiceNumber', 'status', 'totalAmount'],
+          required: ["id", "invoiceNumber", "status", "totalAmount"],
         },
         // ── Branch DTO ──────────────────────────────────────────────
         BranchDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string', example: 'Ikeja Branch' },
-            address: { type: 'string', example: '14 Allen Avenue, Ikeja, Lagos' },
-            phone: { type: 'string', nullable: true },
-            email: { type: 'string', format: 'email', nullable: true },
-            isActive: { type: 'boolean', example: true },
-            createdAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Ikeja Branch" },
+            address: {
+              type: "string",
+              example: "14 Allen Avenue, Ikeja, Lagos",
+            },
+            phone: { type: "string", nullable: true },
+            email: { type: "string", format: "email", nullable: true },
+            isActive: { type: "boolean", example: true },
+            createdAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'name', 'address'],
+          required: ["id", "name", "address"],
         },
         // ── Audit Log DTO ─────────────────────────────────────────
         AuditLogDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid', example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' },
-            action: { type: 'string', example: 'USER_CREATE' },
-            details: { type: 'string', nullable: true, example: '{"email":"tech@danamotors.com","firstName":"John","roleName":"Technician"}' },
-            ipAddress: { type: 'string', nullable: true, example: '192.168.1.100' },
-            userAgent: { type: 'string', nullable: true, example: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-            createdAt: { type: 'string', format: 'date-time', example: '2026-08-26T10:30:00.000Z' },
+            id: {
+              type: "string",
+              format: "uuid",
+              example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            },
+            action: { type: "string", example: "USER_CREATE" },
+            details: {
+              type: "string",
+              nullable: true,
+              example:
+                '{"email":"tech@danamotors.com","firstName":"John","roleName":"Technician"}',
+            },
+            ipAddress: {
+              type: "string",
+              nullable: true,
+              example: "192.168.1.100",
+            },
+            userAgent: {
+              type: "string",
+              nullable: true,
+              example:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+              example: "2026-08-26T10:30:00.000Z",
+            },
             user: {
-              type: 'object',
+              type: "object",
               nullable: true,
               properties: {
-                id: { type: 'string', format: 'uuid' },
-                firstName: { type: 'string', example: 'Admin' },
-                lastName: { type: 'string', example: 'User' },
-                email: { type: 'string', format: 'email', example: 'admin@danamotors.com' },
-                branchId: { type: 'string', nullable: true },
+                id: { type: "string", format: "uuid" },
+                firstName: { type: "string", example: "Admin" },
+                lastName: { type: "string", example: "User" },
+                email: {
+                  type: "string",
+                  format: "email",
+                  example: "admin@danamotors.com",
+                },
+                branchId: { type: "string", nullable: true },
               },
             },
           },
-          required: ['id', 'action', 'createdAt'],
+          required: ["id", "action", "createdAt"],
         },
         // ── Audit Log Stats DTO ────────────────────────────────────
         AuditLogStatsDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            totalLogs: { type: 'integer', example: 1500 },
-            todayCount: { type: 'integer', example: 47 },
+            totalLogs: { type: "integer", example: 1500 },
+            todayCount: { type: "integer", example: 47 },
             topActions: {
-              type: 'array',
+              type: "array",
               items: {
-                type: 'object',
+                type: "object",
                 properties: {
-                  action: { type: 'string', example: 'USER_LOGIN' },
-                  count: { type: 'integer', example: 320 },
+                  action: { type: "string", example: "USER_LOGIN" },
+                  count: { type: "integer", example: 320 },
                 },
               },
             },
             topUsers: {
-              type: 'array',
+              type: "array",
               items: {
-                type: 'object',
+                type: "object",
                 properties: {
-                  userId: { type: 'string', format: 'uuid' },
-                  name: { type: 'string', example: 'Admin User' },
-                  count: { type: 'integer', example: 230 },
+                  userId: { type: "string", format: "uuid" },
+                  name: { type: "string", example: "Admin User" },
+                  count: { type: "integer", example: 230 },
                 },
               },
             },
           },
-          required: ['totalLogs', 'todayCount', 'topActions', 'topUsers'],
+          required: ["totalLogs", "todayCount", "topActions", "topUsers"],
         },
         // ── Role DTO ──────────────────────────────────────────────
         RoleDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string', example: 'Receptionist' },
-            description: { type: 'string', example: 'Front-desk staff', nullable: true },
-            permissionsCount: { type: 'integer', example: 8 },
-            usersCount: { type: 'integer', example: 5 },
-            createdAt: { type: 'string', format: 'date-time' },
+            id: { type: "string", format: "uuid" },
+            name: { type: "string", example: "Receptionist" },
+            description: {
+              type: "string",
+              example: "Front-desk staff",
+              nullable: true,
+            },
+            permissionsCount: { type: "integer", example: 8 },
+            usersCount: { type: "integer", example: 5 },
+            createdAt: { type: "string", format: "date-time" },
           },
-          required: ['id', 'name'],
+          required: ["id", "name"],
         },
         // ── Permission DTO ────────────────────────────────────────
         PermissionDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', format: 'uuid' },
-            name: { type: 'string', example: 'user:read' },
-            description: { type: 'string', nullable: true },
+            id: { type: "string", format: "uuid" },
+            name: { type: "string", example: "user:read" },
+            description: { type: "string", nullable: true },
           },
-          required: ['id', 'name'],
+          required: ["id", "name"],
         },
         // ── Permission Group DTO ──────────────────────────────────
         PermissionGroupDTO: {
-          type: 'object',
+          type: "object",
           properties: {
-            module: { type: 'string', example: 'User Management' },
+            module: { type: "string", example: "User Management" },
             permissions: {
-              type: 'array',
-              items: { $ref: '#/components/schemas/PermissionDTO' },
+              type: "array",
+              items: { $ref: "#/components/schemas/PermissionDTO" },
             },
           },
-          required: ['module', 'permissions'],
+          required: ["module", "permissions"],
         },
       },
     },
@@ -506,21 +724,44 @@ All errors follow the \`ErrorResponse\` schema with a \`status: "error"\` field 
   apis: [
     // Scan route files and the central routes index for @openapi JSDoc blocks
     // Normalize paths to use forward slashes so glob matching works on Windows.
-    path.resolve(__dirname, '../routes/index.ts').replace(/\\/g, '/'),
-    path.resolve(__dirname, '../modules/**/*.routes.ts').replace(/\\/g, '/'),
+    path.resolve(__dirname, "../routes/index.ts").replace(/\\/g, "/"),
+    path.resolve(__dirname, "../modules/**/*.routes.ts").replace(/\\/g, "/"),
     // Also scan compiled .js equivalents when running from dist/
-    path.resolve(__dirname, '../routes/index.js').replace(/\\/g, '/'),
-    path.resolve(__dirname, '../modules/**/*.routes.js').replace(/\\/g, '/'),
+    path.resolve(__dirname, "../routes/index.js").replace(/\\/g, "/"),
+    path.resolve(__dirname, "../modules/**/*.routes.js").replace(/\\/g, "/"),
   ],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
-const spec = swaggerSpec as { paths?: Record<string, unknown>; components?: { schemas?: Record<string, unknown> } };
+const spec = swaggerSpec as {
+  paths?: Record<string, unknown>;
+  components?: { schemas?: Record<string, unknown> };
+};
 // Framework report endpoints are generated from the report registry, so their docs come from it too.
-spec.paths = {...spec.paths,...monthlyReportPaths,...reportManagementPaths,...buildReportPaths(REPORTS),...pdiPaths,...repeatJobPaths,...cscPaths,...lateDeliveryPaths,...psfPaths};
+const paths: Record<string, unknown> = {
+  ...spec.paths,
+  ...monthlyReportPaths,
+  ...reportManagementPaths,
+  ...buildReportPaths(REPORTS),
+  ...pdiPaths,
+  ...repeatJobPaths,
+  ...cscPaths,
+  ...csiPaths,
+  ...csiIssuancePaths,
+  ...csiResponsePaths,
+  ...lateDeliveryPaths,
+  ...psfPaths,
+};
 for (const [route, methods] of Object.entries(serviceTransactionPaths)) {
-  spec.paths[route] = { ...(spec.paths[route] as Record<string, unknown> | undefined), ...methods };
+  paths[route] = {
+    ...(paths[route] as Record<string, unknown> | undefined),
+    ...methods,
+  };
 }
-spec.components = { ...spec.components, schemas: { ...spec.components?.schemas, ...serviceTransactionSchemas } };
+spec.paths = paths;
+spec.components = {
+  ...spec.components,
+  schemas: { ...spec.components?.schemas, ...serviceTransactionSchemas },
+};
 
 export default swaggerSpec;

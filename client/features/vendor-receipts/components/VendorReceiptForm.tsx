@@ -39,7 +39,7 @@ export function VendorPicker({ value, onChange }: { value: Vendor | null; onChan
       {query.isError ? (
         <p role="alert" className="text-xs text-destructive">Vendor search failed.</p>
       ) : query.data && query.data.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No vendors found. Add the vendor as a party of type VENDOR first.</p>
+        <p className="text-xs text-muted-foreground">No vendors found. Add a party with Vendor status first.</p>
       ) : (
         <ul className="max-h-40 overflow-y-auto rounded-md border" aria-label="Vendors">
           {query.data?.map((vendor) => (

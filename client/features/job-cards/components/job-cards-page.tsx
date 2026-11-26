@@ -1,6 +1,8 @@
 "use client";
 
 import { Download, FileSpreadsheet } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { ActionMenu } from "@/components/ui/ActionMenu";
@@ -81,6 +83,7 @@ function ExportJobCardsButton({ branchId }: { branchId?: string }) {
 }
 
 export function JobCardsPage() {
+  const { hasPermission } = useAuth();
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { data } = useJobCards({
     page: 1,
@@ -99,6 +102,9 @@ export function JobCardsPage() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {hasPermission("jobcard:multi-vehicle:read") && (
+              <Button asChild variant="outline" size="sm"><Link href="/job-cards/multi-job-vehicles">Vehicles with multiple jobs</Link></Button>
+            )}
             <ExportJobCardsButton branchId={activeBranch?.id} />
             {/* {hasPermission("jobcard:create") && (
               <Button onClick={() => setOpening(true)}>

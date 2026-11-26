@@ -46,8 +46,8 @@ export class VendorReturnService {
 
       const vendorId = input.vendorId ?? mrn.vendorId;
       if (!vendorId) throw new BadRequestError("Choose the vendor the parts go back to");
-      const vendor = await tx.customer.findUnique({ where: { id: vendorId }, select: { ...vendorSelect.select, type: true } });
-      if (!vendor || vendor.type !== "VENDOR") throw new BadRequestError("Choose a vendor (a party of type VENDOR)");
+      const vendor = await tx.customer.findUnique({ where: { id: vendorId }, select: { ...vendorSelect.select, type: true, partyStatus: true, mergedIntoId: true } });
+      if (!vendor || vendor.mergedIntoId || (vendor.partyStatus !== "VENDOR" && vendor.type !== "VENDOR")) throw new BadRequestError("Choose a party with Vendor status");
 
       const lines = planReturn(
         mrn.lines.map((l) => ({ id: l.id, partId: l.partId, partNumber: l.part.partNumber, receivedQuantity: l.receivedQuantity, returnedQuantity: l.returnedQuantity, unitCost: l.unitCost, vatPercent: l.vatPercent })),

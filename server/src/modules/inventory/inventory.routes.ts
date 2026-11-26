@@ -565,6 +565,7 @@ router.use(ignoreCostInput);
  *     tags:
  *       - Inventory & Parts
  *     summary: Issue parts for a job card
+ *     description: Requires partissuance:create and branch access. An estimate approval blocker returns 400 with code PARTS_ISSUE_ESTIMATE_APPROVAL_REQUIRED.
  *     security:
  *       - BearerAuth: []
  *     requestBody:

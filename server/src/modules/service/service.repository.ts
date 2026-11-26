@@ -1,7 +1,7 @@
-import { ConflictError } from '../../shared/errors/appError';
-import { BookingCreate, createBooking } from './booking.persistence';
-import prisma from '../../prisma/client';
-import { jobStatusFilter } from './job-card-workflow.service';
+import { ConflictError } from "../../shared/errors/appError";
+import { BookingCreate, createBooking } from "./booking.persistence";
+import prisma from "../../prisma/client";
+import { jobStatusFilter } from "./job-card-workflow.service";
 import {
   Prisma,
   ServiceAppointment,
@@ -9,7 +9,7 @@ import {
   Inspection,
   Estimate,
   CustomerApproval,
-} from '@prisma/client';
+} from "@prisma/client";
 
 export class ServiceRepository {
   async createAppointment(data: BookingCreate) {
@@ -35,7 +35,10 @@ export class ServiceRepository {
     }
 
     if (params.status) {
-      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      if (
+        ["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].includes(params.status)
+      )
+        where.bookingStatus = params.status;
       else where.status = params.status;
     }
 
@@ -64,14 +67,35 @@ export class ServiceRepository {
 
     if (params.search) {
       where.OR = [
-        { bookingNumber: { contains: params.search, mode: 'insensitive' } },
-        { notes: { contains: params.search, mode: 'insensitive' } },
-        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { email: { contains: params.search, mode: 'insensitive' } } },
+        { bookingNumber: { contains: params.search, mode: "insensitive" } },
+        { notes: { contains: params.search, mode: "insensitive" } },
+        {
+          vehicle: {
+            registrationNumber: {
+              contains: params.search,
+              mode: "insensitive",
+            },
+          },
+        },
+        { vehicle: { vin: { contains: params.search, mode: "insensitive" } } },
+        {
+          customer: {
+            companyName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            firstName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            lastName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: { email: { contains: params.search, mode: "insensitive" } },
+        },
       ];
     }
 
@@ -111,7 +135,7 @@ export class ServiceRepository {
             },
           },
           jobCards: true,
-          requests: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+          requests: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
           serviceType: true,
           followUpJob: { select: { id: true, jobNumber: true } },
           enquiry: {
@@ -124,7 +148,7 @@ export class ServiceRepository {
             },
           },
         },
-        orderBy: { scheduledAt: 'desc' },
+        orderBy: { scheduledAt: "desc" },
       }),
       prisma.serviceAppointment.count({ where }),
     ]);
@@ -166,14 +190,17 @@ export class ServiceRepository {
           },
         },
         jobCards: true,
-        requests: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        requests: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         serviceType: true,
         followUpJob: { select: { id: true, jobNumber: true } },
       },
     });
   }
 
-  async updateAppointment(id: string, data: Partial<ServiceAppointment>): Promise<ServiceAppointment> {
+  async updateAppointment(
+    id: string,
+    data: Partial<ServiceAppointment>,
+  ): Promise<ServiceAppointment> {
     return prisma.serviceAppointment.update({
       where: { id },
       data,
@@ -181,10 +208,20 @@ export class ServiceRepository {
   }
 
   async deleteAppointment(id: string): Promise<void> {
-    await prisma.$transaction(async tx => {
+    await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ServiceAppointment" WHERE id = ${id} FOR UPDATE`;
-      const booking = await tx.serviceAppointment.findUniqueOrThrow({ where: { id }, include: { jobCards: { select: { id: true } } } });
-      if (booking.bookingNumber || booking.jobCards.length || booking.bookingStatus !== 'BOOKED') throw new ConflictError('Cancel this booking with a reason instead of deleting it');
+      const booking = await tx.serviceAppointment.findUniqueOrThrow({
+        where: { id },
+        include: { jobCards: { select: { id: true } } },
+      });
+      if (
+        booking.bookingNumber ||
+        booking.jobCards.length ||
+        booking.bookingStatus !== "BOOKED"
+      )
+        throw new ConflictError(
+          "Cancel this booking with a reason instead of deleting it",
+        );
       await tx.serviceAppointment.delete({ where: { id } });
     });
   }
@@ -212,12 +249,13 @@ export class ServiceRepository {
     customerId?: string;
     search?: string;
     status?: string;
-    jobType?: 'SERVICE' | 'PDI' | 'ALL';
+    unassignedTechnician?: boolean;
+    jobType?: "SERVICE" | "PDI" | "ALL";
     dateFrom?: string;
     dateTo?: string;
   }) {
     const where: Record<string, unknown> = {};
-    if (params?.jobType !== 'ALL') where.jobType = params?.jobType ?? 'SERVICE';
+    if (params?.jobType !== "ALL") where.jobType = params?.jobType ?? "SERVICE";
 
     if (params?.branchId) {
       where.branchId = params.branchId;
@@ -231,25 +269,58 @@ export class ServiceRepository {
       where.status = jobStatusFilter(params.status);
     }
 
+    if (params?.unassignedTechnician) where.technicianId = null;
+
     if (params?.search) {
       where.OR = [
-        { jobNumber: { contains: params.search, mode: 'insensitive' } },
-        { customer: { phoneNumber: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { companyName: { contains: params.search, mode: 'insensitive' } } },
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { customer: { firstName: { contains: params.search, mode: 'insensitive' } } },
-        { customer: { lastName: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { make: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { model: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { vin: { contains: params.search, mode: 'insensitive' } } },
-        { vehicle: { registrationNumber: { contains: params.search, mode: 'insensitive' } } },
+        { jobNumber: { contains: params.search, mode: "insensitive" } },
+        {
+          customer: {
+            phoneNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            companyName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        { description: { contains: params.search, mode: "insensitive" } },
+        {
+          customer: {
+            firstName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          customer: {
+            lastName: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        { vehicle: { make: { contains: params.search, mode: "insensitive" } } },
+        {
+          vehicle: { model: { contains: params.search, mode: "insensitive" } },
+        },
+        { vehicle: { vin: { contains: params.search, mode: "insensitive" } } },
+        {
+          vehicle: {
+            registrationNumber: {
+              contains: params.search,
+              mode: "insensitive",
+            },
+          },
+        },
       ];
     }
 
     const createdAtFilter: Record<string, Date> = {};
     if (params?.dateFrom) createdAtFilter.gte = new Date(params.dateFrom);
-    if (params?.dateTo) createdAtFilter.lte = new Date(params.dateTo.length === 10 ? `${params.dateTo}T23:59:59.999Z` : params.dateTo);
-    if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
+    if (params?.dateTo)
+      createdAtFilter.lte = new Date(
+        params.dateTo.length === 10
+          ? `${params.dateTo}T23:59:59.999Z`
+          : params.dateTo,
+      );
+    if (Object.keys(createdAtFilter).length > 0)
+      where.createdAt = createdAtFilter;
 
     return prisma.jobCard.findMany({
       where,
@@ -257,8 +328,12 @@ export class ServiceRepository {
       take: params?.take ?? 50,
       include: {
         repeatRecord: { select: { id: true, status: true, source: true } },
-        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
-        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        serviceAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        deliveryAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         service: true,
         serviceType: true,
         bay: true,
@@ -283,7 +358,7 @@ export class ServiceRepository {
           select: { id: true, firstName: true, lastName: true },
         },
       },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
   }
 
@@ -291,22 +366,58 @@ export class ServiceRepository {
     return prisma.jobCard.findUnique({
       where: { id },
       include: {
-        labourLines: { include: { labourItem: true } },
-        previousJob: { select: { id: true, jobNumber: true, technician: { select: { firstName: true, lastName: true } } } },
+        advanceReceipts: {
+          orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            receiptNumber: true,
+            amount: true,
+            advanceAmount: true,
+            status: true,
+            mode: true,
+            issuedAt: true,
+          },
+        },
+        labourLines: {
+          include: {
+            labourItem: { select: { id: true, code: true, description: true } },
+            technician: { select: { firstName: true, lastName: true } },
+            mechanic: { select: { name: true } },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+        previousJob: {
+          select: {
+            id: true,
+            jobNumber: true,
+            technician: { select: { firstName: true, lastName: true } },
+          },
+        },
         repeatRecord: { select: { id: true, status: true, source: true } },
-        serviceAdvisor: { select: { id: true, firstName: true, lastName: true } },
-        deliveryAdvisor: { select: { id: true, firstName: true, lastName: true } },
+        serviceAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        deliveryAdvisor: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         service: true,
         serviceType: true,
         bay: true,
         team: true,
         complaints: { include: { complaintCode: true } },
-        statusHistory: { include: { actor: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: 'asc' } },
+        statusHistory: {
+          include: {
+            actor: { select: { id: true, firstName: true, lastName: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
         appointment: true,
         branch: true,
         customer: {
           select: {
             id: true,
+            type: true,
+            partyStatus: true,
             firstName: true,
             lastName: true,
             email: true,
@@ -327,16 +438,31 @@ export class ServiceRepository {
         },
         inspections: true,
         estimates: {
-          orderBy: [{ version: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+          orderBy: [{ version: "desc" }, { createdAt: "desc" }, { id: "desc" }],
           include: {
-            approvals: { orderBy: { createdAt: 'desc' }, include: { signature: true } },
+            approvals: {
+              orderBy: { createdAt: "desc" },
+              include: { signature: true },
+            },
             lines: true,
           },
         },
         partIssuances: {
           include: {
+            requisitionLine: {
+              select: {
+                requisitionId: true,
+                requisition: { select: { status: true } },
+              },
+            },
             sparePart: {
-              select: { id: true, partNumber: true, name: true, unitPrice: true, retailRate: true },
+              select: {
+                id: true,
+                partNumber: true,
+                name: true,
+                unitPrice: true,
+                retailRate: true,
+              },
             },
             issuedBy: {
               select: { id: true, firstName: true, lastName: true },
@@ -366,8 +492,12 @@ export class ServiceRepository {
             attended: true,
             attendedAt: true,
             notAttendedReason: true,
-            attendedBy: { select: { id: true, firstName: true, lastName: true } },
-            campaign: { select: { status: true, jobCardText: true, printOnJobCard: true } },
+            attendedBy: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+            campaign: {
+              select: { status: true, jobCardText: true, printOnJobCard: true },
+            },
           },
           orderBy: { createdAt: "asc" },
         },
@@ -375,7 +505,10 @@ export class ServiceRepository {
     });
   }
 
-  async updateJobCard(id: string, data: Prisma.JobCardUncheckedUpdateInput): Promise<JobCard> {
+  async updateJobCard(
+    id: string,
+    data: Prisma.JobCardUncheckedUpdateInput,
+  ): Promise<JobCard> {
     return prisma.jobCard.update({
       where: { id },
       data,
@@ -434,18 +567,37 @@ export class ServiceRepository {
     }
 
     if (params.status) {
-      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      if (
+        ["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].includes(params.status)
+      )
+        where.bookingStatus = params.status;
       else where.status = params.status;
     }
 
     if (params.search) {
       where.OR = [
-        { findings: { contains: params.search, mode: 'insensitive' } },
-        { bookingNumber: { contains: params.search, mode: 'insensitive' } },
-        { notes: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+        { findings: { contains: params.search, mode: "insensitive" } },
+        { bookingNumber: { contains: params.search, mode: "insensitive" } },
+        { notes: { contains: params.search, mode: "insensitive" } },
+        {
+          jobCard: {
+            jobNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              firstName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              lastName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
       ];
     }
 
@@ -476,7 +628,7 @@ export class ServiceRepository {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -487,23 +639,42 @@ export class ServiceRepository {
     status?: string;
     search?: string;
   }) {
-    const where: Record<string, unknown> = {jobCardId:{not:null}};
+    const where: Record<string, unknown> = { jobCardId: { not: null } };
 
     if (params.branchId) {
       where.jobCard = { branchId: params.branchId };
     }
 
     if (params.status) {
-      if (['BOOKED', 'CONVERTED', 'CANCELLED', 'NO_SHOW'].includes(params.status)) where.bookingStatus = params.status;
+      if (
+        ["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].includes(params.status)
+      )
+        where.bookingStatus = params.status;
       else where.status = params.status;
     }
 
     if (params.search) {
       where.OR = [
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { jobCard: { jobNumber: { contains: params.search, mode: 'insensitive' } } },
-        { jobCard: { customer: { firstName: { contains: params.search, mode: 'insensitive' } } } },
-        { jobCard: { customer: { lastName: { contains: params.search, mode: 'insensitive' } } } },
+        { description: { contains: params.search, mode: "insensitive" } },
+        {
+          jobCard: {
+            jobNumber: { contains: params.search, mode: "insensitive" },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              firstName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          jobCard: {
+            customer: {
+              lastName: { contains: params.search, mode: "insensitive" },
+            },
+          },
+        },
       ];
     }
 
@@ -535,7 +706,7 @@ export class ServiceRepository {
         },
         approvals: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

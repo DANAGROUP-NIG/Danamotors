@@ -78,7 +78,7 @@ async function main() {
   const kiaPlaza = await prisma.branch.findFirstOrThrow({ where: { name: { startsWith: "KIA PLAZA" } } });
   const actor = await prisma.user.findFirstOrThrow({ where: { email: "store.lagos@kiamotors.com" } });
   const executives = await prisma.user.findMany({ where: { email: { in: ["store.lagos@kiamotors.com", "admin.lagos@danamotors.com"] } } });
-  const customers = await prisma.customer.findMany({ where: { code: { not: null }, NOT: { type: "VENDOR" } }, take: 5, orderBy: { createdAt: "asc" } });
+  const customers = await prisma.customer.findMany({ where: { code: { not: null }, NOT: [{ type: "VENDOR" }, { partyStatus: "VENDOR" }] }, take: 5, orderBy: { createdAt: "asc" } });
   if (customers.length < 3) throw new Error("Need at least 3 customers with a code");
 
   // ── Parts, and their stock (see receiveStock) ──
@@ -129,7 +129,7 @@ async function main() {
   // ── Returns: 5 returns, about 10 lines, from bills that were not cancelled ──
   const returned = await prisma.counterSaleReturn.count({ where: { lines: { some: demo } } });
   const returnable = await prisma.counterSale.findMany({
-    where: { returns: { none: {} }, invoice: { cancelledAt: null, customer: { NOT: { type: "VENDOR" } }, lines: { some: demo } } },
+    where: { returns: { none: {} }, invoice: { cancelledAt: null, customer: { NOT: [{ type: "VENDOR" }, { partyStatus: "VENDOR" }] }, lines: { some: demo } } },
     include: { invoice: { include: { lines: true } } },
     take: Math.max(0, 5 - returned),
   });

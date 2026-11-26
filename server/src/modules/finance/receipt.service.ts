@@ -1,4 +1,4 @@
-import { invoiceStatus } from './credit-terms';
+import { invoiceStatus, lagosDay } from './credit-terms';
 import { createHash } from 'crypto';
 import { createReceiptSchema } from './finance.validation';
 import { money, sumMoney } from './money';
@@ -8,6 +8,7 @@ import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../s
 import { nextDocumentNumber } from './document-number';
 import { recalculateReceiptAllocations } from './receipt-allocation';
 import { lockParty, withPartyTransaction } from './party-account.service';
+import { advanceReceiptDateLimit, lockAdvanceJob, prepareJobAdvance } from './job-advance';
 
 type ReceiptAllocationInput = { invoiceId: string; amount: number };
 type ReceiptMode = 'POS' | 'BANK_TRANSFER' | 'CHEQUE' | 'CASH';
@@ -46,6 +47,7 @@ export class ReceiptService {
   }
 
   async createReceipt(input: {
+    advanceJobCardId?: string;
     customerId: string;
     branchId?: string;
     idempotencyKey?: string;
@@ -63,6 +65,7 @@ export class ReceiptService {
   }) {
     const { issuedById, ...body } = input;
     const validated = createReceiptSchema.parse({ body }).body;
+    if (validated.advanceJobCardId && validated.issuedAt && lagosDay(new Date(validated.issuedAt)) > lagosDay(new Date())) throw new BadRequestError('A job advance cannot be dated in the future');
     input = { ...validated, issuedById };
     const requestHash = createHash('sha256').update(JSON.stringify({ ...validated, issuedById, allocations: [...validated.allocations].sort((a, b) => a.invoiceId.localeCompare(b.invoiceId)) })).digest('hex');
 
@@ -86,6 +89,9 @@ export class ReceiptService {
           const bank = await transaction.bank.findFirst({ where: { id: input.bankId, active: true } });
           if (!bank) throw new BadRequestError('Select an active receiving bank');
         }
+        const advanceSnapshot = input.advanceJobCardId
+          ? await prepareJobAdvance(transaction, input.advanceJobCardId, customer.id, branchId, input.amount)
+          : undefined;
         const invoiceIds = input.allocations.map((item) => item.invoiceId);
         const invoices = await lockInvoices(transaction, invoiceIds);
         if (invoices.length !== new Set(invoiceIds).size) throw new NotFoundError('One or more invoices were not found');
@@ -117,6 +123,8 @@ export class ReceiptService {
         const receipt = await transaction.receipt.create({
           data: {
             receiptNumber,
+            advanceJobCardId: input.advanceJobCardId,
+            advanceSnapshot,
             branchId,
             idempotencyKey: input.idempotencyKey,
             requestHash,
@@ -166,6 +174,7 @@ export class ReceiptService {
     const receipt = await prisma.receipt.findUnique({
       where: { id },
       include: {
+        branch: { select: { name: true } },
         customer: true,
         bank: true,
         issuedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -235,6 +244,7 @@ export class ReceiptService {
       });
       if (!receipt) throw new NotFoundError('Receipt not found');
       if (receipt.status !== 'ACTIVE') throw new BadRequestError('Only active receipts can be edited');
+      if (receipt.advanceJobCardId) throw new ConflictError('Job advance receipts cannot be edited; reverse and reissue the receipt to preserve its payment history');
       if (receipt.tallyPostedAt || await transaction.tallyPostingLog.findFirst({ where: { documentType: 'RECEIPT', documentId: id, status: { in: ['EXPORTED', 'POSTED'] } } })) {
         throw new BadRequestError('A receipt exported or posted to Tally cannot be edited');
       }
@@ -291,9 +301,19 @@ export class ReceiptService {
   async cancelReceipt(id: string, remark: string, actorId?: string) {
     if (!remark.trim()) throw new BadRequestError('A cancellation remark is required');
     return withPartyTransaction(async (transaction) => {
-      const owner = await transaction.receipt.findUnique({ where: { id }, select: { customerId: true } });
+      let owner = await transaction.receipt.findUnique({ where: { id }, select: { customerId: true, advanceJobCardId: true } });
       if (!owner) throw new NotFoundError('Receipt not found');
       await lockParty(transaction, owner.customerId);
+      owner = await transaction.receipt.findUnique({ where: { id }, select: { customerId: true, advanceJobCardId: true } });
+      if (!owner) throw new NotFoundError('Receipt not found');
+      if (owner.advanceJobCardId) {
+        await lockAdvanceJob(transaction, owner.advanceJobCardId);
+        const job = await transaction.jobCard.findUniqueOrThrow({ where: { id: owner.advanceJobCardId } });
+        if (['IN_PROGRESS', 'In Progress', 'WAITING_PARTS', 'On Hold', 'QC', 'Quality Check', 'READY', 'Ready'].includes(job.status)) {
+          const replacement = await transaction.receipt.findFirst({ where: { id: { not: id }, advanceJobCardId: job.id, status: 'ACTIVE', mode: { not: 'CHEQUE' }, advanceAmount: { gte: 0.01 }, issuedAt: { lte: advanceReceiptDateLimit() } }, select: { id: true } });
+          if (!replacement) throw new ConflictError('The last advance cannot be cancelled while work is underway; record a replacement payment first');
+        }
+      }
       await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT id FROM "Receipt" WHERE id = ${id} FOR UPDATE`);
       const receipt = await transaction.receipt.findUnique({ where: { id }, include: { allocations: { where: { reversedAt: null } } } });
       if (!receipt) throw new NotFoundError('Receipt not found');
@@ -308,6 +328,9 @@ export class ReceiptService {
         data: { status: 'INVALIDATED' },
       });
       const invoices = await lockInvoices(transaction, receipt.allocations.map((allocation) => allocation.invoiceId!));
+      if (receipt.advanceJobCardId && invoices.length && (invoices.some(invoice => invoice.tallyPostedAt) || await transaction.tallyPostingLog.findFirst({ where: { documentType: 'JOB_BILL', documentId: { in: invoices.map(invoice => invoice.id) }, status: { in: ['EXPORTED', 'POSTED'] } } }))) {
+        throw new ConflictError('An advance applied to an exported or posted bill requires an accounting reversal before cancellation');
+      }
       const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
       for (const allocation of receipt.allocations) {
         const invoice = invoiceById.get(allocation.invoiceId!);

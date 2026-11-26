@@ -25,6 +25,22 @@ export interface JobBillTotals {
   total: number;
 }
 
+export function finalizeJobBill(totals: Omit<JobBillTotals, 'total' | 'roundOff'>, step?: number): JobBillTotals {
+  if (step !== undefined && (!Number.isInteger(step) || step < 1)) {
+    throw new BadRequestError('Round-off value must be a whole number of at least 1');
+  }
+  const beforeRound = new Prisma.Decimal(totals.partsTotal)
+    .minus(totals.partsDiscountAmount)
+    .plus(totals.labourTotal)
+    .minus(totals.labourDiscountAmount)
+    .plus(totals.serviceTotal)
+    .plus(totals.vatAmount);
+  const total = step === undefined
+    ? beforeRound.toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP)
+    : beforeRound.div(step).floor().times(step);
+  return { ...totals, roundOff: total.minus(beforeRound).toNumber(), total: total.toNumber() };
+}
+
 export function calculateJobBillTotals(input: JobBillTotalsInput): JobBillTotals {
   const { partsDiscountPercent, labourDiscountPercent, vatRate } = input;
   const partsTotal = roundMoney(input.partsTotal);
@@ -44,17 +60,10 @@ export function calculateJobBillTotals(input: JobBillTotalsInput): JobBillTotals
   const percentage = (amount: number, percent: number) => roundMoney(new Prisma.Decimal(amount).times(percent).div(100).toNumber());
   const partsDiscountAmount = percentage(partsTotal, partsDiscountPercent);
   const labourDiscountAmount = percentage(labourTotal, labourDiscountPercent);
-  const discountedParts = roundMoney(partsTotal - partsDiscountAmount);
-  const discountedLabour = roundMoney(labourTotal - labourDiscountAmount);
-  const vatAmount = percentage(roundMoney(discountedLabour + serviceTotal), vatRate);
-  const amountBeforeRoundOff = roundMoney(discountedParts + discountedLabour + serviceTotal + vatAmount);
-  const step = input.roundOffValue;
-  if (step !== undefined && (!Number.isInteger(step) || step < 1)) {
-    throw new BadRequestError('Round-off value must be a whole number of at least 1');
-  }
-  const total = step ? Math.floor(roundMoney(amountBeforeRoundOff / step) + 1e-9) * step : Math.round(amountBeforeRoundOff);
+  const labourVatBase = new Prisma.Decimal(labourTotal).minus(labourDiscountAmount).plus(serviceTotal);
+  const vatAmount = percentage(labourVatBase.toNumber(), vatRate);
 
-  return {
+  return finalizeJobBill({
     serviceTotal,
     partsTotal: roundMoney(partsTotal),
     labourTotal: roundMoney(labourTotal),
@@ -62,7 +71,5 @@ export function calculateJobBillTotals(input: JobBillTotalsInput): JobBillTotals
     labourDiscountAmount,
     vatRate,
     vatAmount,
-    roundOff: roundMoney(total - amountBeforeRoundOff),
-    total,
-  };
+  }, input.roundOffValue);
 }

@@ -1,6 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { AuditService } from './audit.service';
-import { ROLES } from '../../shared/constants/roles';
+import { Request, Response, NextFunction } from "express";
+import { AuditService } from "./audit.service";
+import { ROLES } from "../../shared/constants/roles";
+import {
+  assertScopedResource,
+  isGeneralDepartmentManager,
+} from "../../middleware/authorize";
 
 export class AuditController {
   private auditService: AuditService;
@@ -9,12 +13,21 @@ export class AuditController {
     this.auditService = new AuditService();
   }
 
-  listLogs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  listLogs = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-      const { page, limit, userId, action, search, dateFrom, dateTo } = req.query as any;
+      const { page, limit, userId, action, search, dateFrom, dateTo } =
+        req.query as any;
 
       let branchId: string | undefined;
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (
+        req.user &&
+        req.user.role !== ROLES.SUPER_ADMIN &&
+        !isGeneralDepartmentManager(req.user)
+      ) {
         branchId = req.user.branchId ?? undefined;
       }
 
@@ -30,7 +43,7 @@ export class AuditController {
       });
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: result,
       });
@@ -39,13 +52,18 @@ export class AuditController {
     }
   };
 
-  getLog = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getLog = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { id } = req.params;
       const result = await this.auditService.getLog(id);
+      assertScopedResource(req, result.user?.branchId);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: {
           log: result,
@@ -56,17 +74,25 @@ export class AuditController {
     }
   };
 
-  getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getStats = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       let branchId: string | undefined;
-      if (req.user && req.user.role !== ROLES.SUPER_ADMIN) {
+      if (
+        req.user &&
+        req.user.role !== ROLES.SUPER_ADMIN &&
+        !isGeneralDepartmentManager(req.user)
+      ) {
         branchId = req.user.branchId ?? undefined;
       }
 
       const result = await this.auditService.getStats(branchId);
 
       res.status(200).json({
-        status: 'success',
+        status: "success",
         statusCode: 200,
         data: result,
       });

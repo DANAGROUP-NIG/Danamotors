@@ -72,10 +72,18 @@ export function reviewApprovedScope(estimate: ApprovalEstimate | undefined, actu
 }
 
 // Call while holding the JobCard row lock. All estimate decisions and work writes share it.
-export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobCardId: string, customerId: string | null, actual: ScopeLine[]) {
+export async function assertApprovedOperation(tx: Prisma.TransactionClient, jobCardId: string, customerId: string | null, actual: ScopeLine[], operation?: "parts issue") {
   const estimates = await tx.estimate.findMany({ where: { jobCardId }, ...latestEstimateQuery });
   const review = reviewApprovedScope(estimates[0], actual, customerId);
-  if (!review.canBill) throw new BadRequestError(review.issues.join(' '));
+  if (!review.canBill) {
+    const reason = review.issues.join(' ');
+    if (operation === 'parts issue') {
+      throw new BadRequestError(
+        `Cannot issue parts. ${reason} Ask the service advisor to resolve the estimate and record customer approval, then retry the issue.`,
+      ).withCode('PARTS_ISSUE_ESTIMATE_APPROVAL_REQUIRED');
+    }
+    throw new BadRequestError(reason);
+  }
   return review;
 }
 

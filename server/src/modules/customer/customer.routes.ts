@@ -1,16 +1,25 @@
-import { accountantCustomerReadScope } from './customer-read-scope';
-import { duplicateGroups, duplicateGroupsQuery, mergeBatchSchema, mergeHistory, mergeKeepSchema } from './customer-merge-extras';
-import { listCustomerSchema } from './customer.validation';
-import { z } from 'zod';
-import { CustomerService } from './customer.service';
-import { requireRole } from '../../middleware/authorize';
-import { ROLES } from '../../shared/constants/roles';
-import { Router } from 'express';
-import { CustomerController } from './customer.controller';
-import { validateRequest } from '../../middleware/requestValidator';
-import { authMiddleware } from '../../middleware/authMiddleware';
-import { requirePermission } from '../../middleware/authorize';
-import { PERMISSIONS } from '../../shared/constants/roles';
+import {
+  accountantCustomerReadScope,
+  customerBranchScope,
+} from "./customer-read-scope";
+import {
+  duplicateGroups,
+  duplicateGroupsQuery,
+  mergeBatchSchema,
+  mergeHistory,
+  mergeKeepSchema,
+} from "./customer-merge-extras";
+import { listCustomerSchema } from "./customer.validation";
+import { z } from "zod";
+import { CustomerService } from "./customer.service";
+import { ownBranchScope, requireRole } from "../../middleware/authorize";
+import { ROLES } from "../../shared/constants/roles";
+import { Router } from "express";
+import { CustomerController } from "./customer.controller";
+import { validateRequest } from "../../middleware/requestValidator";
+import { authMiddleware } from "../../middleware/authMiddleware";
+import { requirePermission } from "../../middleware/authorize";
+import { PERMISSIONS } from "../../shared/constants/roles";
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -19,43 +28,145 @@ import {
   customerIdParamSchema,
   customerAccountSchema,
   customerTallyLedgerSchema,
-} from './customer.validation';
+} from "./customer.validation";
 
 const router = Router();
 const controller = new CustomerController();
 
 router.use(authMiddleware);
 router.use(accountantCustomerReadScope);
-router.get('/duplicates', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: z.object({ phoneNumber: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), companyName: z.string().optional() }) })), async (req, res, next) => {
-  try { res.json({ status: 'success', data: { customers: await new CustomerService().findDuplicates(req.query) } }); } catch (error) { next(error); }
-});
-router.post('/:id/merge', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }), body: z.object({ targetId: z.string().uuid(), keep: mergeKeepSchema.optional() }).strict() })), async (req, res, next) => {
-  try { res.json({ status: 'success', data: { customer: await new CustomerService().merge(req.params.id, req.body.targetId, req.user!.userId, req.body.keep) } }); } catch (error) { next(error); }
-});
-/** Likely duplicates grouped by phone, name or company (Customers → Duplicates). */
-router.get('/duplicate-groups', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ query: duplicateGroupsQuery })), async (req, res, next) => {
-  try { res.json({ status: 'success', data: await duplicateGroups(duplicateGroupsQuery.parse(req.query)) }); } catch (error) { next(error); }
-});
-/** Many merges in one go; each pair is its own transaction and reports its own result. */
-router.post('/merge-batch', requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN), validateRequest(z.object({ body: mergeBatchSchema })), async (req, res, next) => {
-  try {
-    const service = new CustomerService();
-    const results = [];
-    for (const pair of mergeBatchSchema.parse(req.body).merges) {
-      try {
-        await service.merge(pair.sourceId, pair.targetId, req.user!.userId, pair.keep);
-        results.push({ ...pair, ok: true });
-      } catch (error) {
-        results.push({ ...pair, ok: false, error: (error as Error).message });
-      }
+router.use(customerBranchScope);
+router.get(
+  "/duplicates",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(
+    z.object({
+      query: z.object({
+        phoneNumber: z.string().optional(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        companyName: z.string().optional(),
+      }),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      res.json({
+        status: "success",
+        data: {
+          customers: await new CustomerService().findDuplicates(
+            req.query,
+            ownBranchScope(req.user),
+          ),
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-    res.json({ status: 'success', data: { merged: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, results } });
-  } catch (error) { next(error); }
-});
-router.get('/:id/merge-history', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(z.object({ params: z.object({ id: z.string().uuid() }) })), async (req, res, next) => {
-  try { res.json({ status: 'success', data: { history: await mergeHistory(req.params.id) } }); } catch (error) { next(error); }
-});
-
+  },
+);
+router.post(
+  "/:id/merge",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  validateRequest(
+    z.object({
+      params: z.object({ id: z.string().uuid() }),
+      body: z
+        .object({
+          targetId: z.string().uuid(),
+          keep: mergeKeepSchema.optional(),
+        })
+        .strict(),
+    }),
+  ),
+  async (req, res, next) => {
+    try {
+      res.json({
+        status: "success",
+        data: {
+          customer: await new CustomerService().merge(
+            req.params.id,
+            req.body.targetId,
+            req.user!.userId,
+            req.body.keep,
+          ),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+/** Likely duplicates grouped by phone, name or company (Customers → Duplicates). */
+router.get(
+  "/duplicate-groups",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(z.object({ query: duplicateGroupsQuery })),
+  async (req, res, next) => {
+    try {
+      const query = duplicateGroupsQuery.parse(req.query);
+      res.json({
+        status: "success",
+        data: await duplicateGroups({
+          ...query,
+          branchId: ownBranchScope(req.user) ?? query.branchId,
+        }),
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+/** Many merges in one go; each pair is its own transaction and reports its own result. */
+router.post(
+  "/merge-batch",
+  requireRole(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  validateRequest(z.object({ body: mergeBatchSchema })),
+  async (req, res, next) => {
+    try {
+      const service = new CustomerService();
+      const results = [];
+      for (const pair of mergeBatchSchema.parse(req.body).merges) {
+        try {
+          await service.merge(
+            pair.sourceId,
+            pair.targetId,
+            req.user!.userId,
+            pair.keep,
+          );
+          results.push({ ...pair, ok: true });
+        } catch (error) {
+          results.push({ ...pair, ok: false, error: (error as Error).message });
+        }
+      }
+      res.json({
+        status: "success",
+        data: {
+          merged: results.filter((r) => r.ok).length,
+          failed: results.filter((r) => !r.ok).length,
+          results,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+router.get(
+  "/:id/merge-history",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(z.object({ params: z.object({ id: z.string().uuid() }) })),
+  async (req, res, next) => {
+    try {
+      res.json({
+        status: "success",
+        data: { history: await mergeHistory(req.params.id) },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 /**
  * @openapi
@@ -64,9 +175,13 @@ router.get('/:id/merge-history', requirePermission(PERMISSIONS.CUSTOMER_READ), v
  *     tags:
  *       - Customers
  *     summary: List all customers
+ *     description: Requires customer read permission. A category filter selects customer categories and excludes Vendor parties.
  *     security:
  *       - BearerAuth: []
  *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema: { type: string, enum: [INDIVIDUAL, CORPORATE, GOVERNMENT, IN_HOUSE, OTHERS] }
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
@@ -325,10 +440,30 @@ router.get('/:id/merge-history', requirePermission(PERMISSIONS.CUSTOMER_READ), v
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
  */
-router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(listCustomerSchema), controller.getCustomers);
-router.get('/:id', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomer);
-router.post('/', requirePermission(PERMISSIONS.CUSTOMER_CREATE), validateRequest(createCustomerSchema), controller.createCustomer);
-router.put('/:id', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateRequest(updateCustomerSchema), controller.updateCustomer);
+router.get(
+  "/",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(listCustomerSchema),
+  controller.getCustomers,
+);
+router.get(
+  "/:id",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(customerIdParamSchema),
+  controller.getCustomer,
+);
+router.post(
+  "/",
+  requirePermission(PERMISSIONS.CUSTOMER_CREATE),
+  validateRequest(createCustomerSchema),
+  controller.createCustomer,
+);
+router.put(
+  "/:id",
+  requirePermission(PERMISSIONS.CUSTOMER_UPDATE),
+  validateRequest(updateCustomerSchema),
+  controller.updateCustomer,
+);
 /**
  * @openapi
  * /customers/{id}/tally-ledger:
@@ -343,15 +478,44 @@ router.put('/:id', requirePermission(PERMISSIONS.CUSTOMER_UPDATE), validateReque
  *     responses:
  *       200: { description: Customer ledger mapping saved }
  */
-router.put('/:id/tally-ledger', requirePermission(PERMISSIONS.CUSTOMER_TALLY_MAPPING), validateRequest(customerTallyLedgerSchema), controller.updateCustomerTallyLedger);
+router.put(
+  "/:id/tally-ledger",
+  requirePermission(PERMISSIONS.CUSTOMER_TALLY_MAPPING),
+  validateRequest(customerTallyLedgerSchema),
+  controller.updateCustomerTallyLedger,
+);
 
-router.post('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_DOCUMENT_CREATE), validateRequest(createCustomerDocumentSchema), controller.addCustomerDocument);
-router.get('/:id/documents', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getCustomerDocuments);
+router.post(
+  "/:id/documents",
+  requirePermission(PERMISSIONS.CUSTOMER_DOCUMENT_CREATE),
+  validateRequest(createCustomerDocumentSchema),
+  controller.addCustomerDocument,
+);
+router.get(
+  "/:id/documents",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(customerIdParamSchema),
+  controller.getCustomerDocuments,
+);
 
-router.post('/:id/service-history', requirePermission(PERMISSIONS.CUSTOMER_HISTORY_CREATE), validateRequest(createServiceHistorySchema), controller.addServiceHistory);
-router.get('/:id/service-history', requirePermission(PERMISSIONS.CUSTOMER_READ), validateRequest(customerIdParamSchema), controller.getServiceHistory);
+router.post(
+  "/:id/service-history",
+  requirePermission(PERMISSIONS.CUSTOMER_HISTORY_CREATE),
+  validateRequest(createServiceHistorySchema),
+  controller.addServiceHistory,
+);
+router.get(
+  "/:id/service-history",
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  validateRequest(customerIdParamSchema),
+  controller.getServiceHistory,
+);
 
-router.post('/:id/account', requirePermission(PERMISSIONS.CUSTOMER_ACCOUNT_MANAGE), validateRequest(customerAccountSchema), controller.manageCustomerAccount);
+router.post(
+  "/:id/account",
+  requirePermission(PERMISSIONS.CUSTOMER_ACCOUNT_MANAGE),
+  validateRequest(customerAccountSchema),
+  controller.manageCustomerAccount,
+);
 
 export default router;
-

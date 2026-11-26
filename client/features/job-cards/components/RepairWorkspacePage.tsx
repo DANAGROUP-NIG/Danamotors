@@ -4,6 +4,8 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Button } from "@/components/ui/button";
 import { useJobCard } from "../hooks/use-job-card";
 import { JobCardEstimateSection } from "./JobCardEstimateSection";
+import { JobAdvanceSection } from "./JobAdvanceSection";
+import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import {
   JobProgressStepper,
   WorkspaceHeader,
@@ -30,6 +32,7 @@ export function RepairWorkspacePage({ id }: { id: string }) {
       <WorkspaceHeader status={jobCard.status} />
       <JobProgressStepper status={jobCard.status} />
       <ServiceTransactions job={jobCard} />
+      {(jobCard.advanceSummary || jobCard.advanceReceipts) && <JobAdvanceSection jobCard={jobCard} open={!hasJobBill(jobCard) && !['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))} />}
       {jobCard.estimates ? (
         <JobCardEstimateSection jobCard={jobCard} />
       ) : (

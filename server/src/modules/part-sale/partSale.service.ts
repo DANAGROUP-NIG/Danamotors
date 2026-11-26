@@ -20,6 +20,7 @@ import { nextDocumentNumber as nextFinanceNumber } from "../finance/document-num
 import { creditDueDate, defaultCreditDays } from "../finance/credit-terms";
 import { lockParty, PartyAccountService, withPartyTransaction } from "../finance/party-account.service";
 import { money, sumMoney } from "../finance/money";
+import { invoiceSpareHeads } from "../finance/invoice-bill-heads";
 import { reportEnd, reportStart } from "../finance/party-report";
 import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import {
@@ -671,6 +672,12 @@ export class PartSaleService {
           dueDate: creditDueDate(now, customer.creditDays ?? (await defaultCreditDays(tx))),
           subtotal: totals.gross,
           partsTotal: totals.gross,
+          ...invoiceSpareHeads(
+            entries.map((entry, index) => ({ partSource: entry.part.partFlag, amount: priced.lines[index].gross })),
+            { partsTotal: totals.gross, partsDiscountAmount: money(totals.tradeDiscount + totals.discount), labourTotal: 0,
+              labourDiscountAmount: 0, serviceTotal: totals.handling, vatRate: VAT_RATE,
+              vatAmount: totals.vat, roundOff: totals.roundOff, total: totals.total },
+          ),
           partsDiscountPercent: discountPercent,
           partsDiscountAmount: totals.discount,
           tradeDiscountAmount: totals.tradeDiscount,
@@ -688,6 +695,7 @@ export class PartSaleService {
               data: entries.map((entry, index) => ({
                 type: "PART",
                 partId: entry.partId,
+                partSource: entry.part.partFlag,
                 description: entry.part.name,
                 quantity: entry.quantity,
                 rate: entry.rate,

@@ -1,3 +1,4 @@
+import { isGeneralDepartmentManager } from '../../middleware/authorize';
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../../prisma/client';
 import { ROLES } from '../../shared/constants/roles';
@@ -5,6 +6,7 @@ import { ForbiddenError, NotFoundError } from '../../shared/errors/appError';
 import { PartyAccountService } from './party-account.service';
 
 function scopedBranch(req: Request, selected?: string) {
+  if (isGeneralDepartmentManager(req.user)) return selected;
   if (req.user?.role === ROLES.SUPER_ADMIN || req.user?.role === ROLES.ADMIN) return selected;
   if (!req.user?.branchId) throw new ForbiddenError('Your account must be assigned to a branch');
   if (selected && selected !== req.user.branchId) throw new ForbiddenError('You can only access your own branch');
@@ -12,8 +14,8 @@ function scopedBranch(req: Request, selected?: string) {
 }
 
 async function assertPartyAccess(req: Request, customerId: string) {
-  const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { branchId: true, mergedIntoId: true, type: true } });
-  if (!customer || customer.mergedIntoId || customer.type?.toUpperCase() === 'VENDOR') throw new NotFoundError('Customer not found');
+  const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { branchId: true, mergedIntoId: true, type: true, partyStatus: true } });
+  if (!customer || customer.mergedIntoId || (customer.partyStatus === 'VENDOR' || customer.type?.toUpperCase() === 'VENDOR')) throw new NotFoundError('Customer not found');
   scopedBranch(req,customer.branchId);
 }
 

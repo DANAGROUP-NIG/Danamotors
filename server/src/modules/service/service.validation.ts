@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_MILEAGE } from "../warranty/warranty.logic";
+import { openingConsentProof } from "./job-opening-consent";
 
 const mileageField = z.number().int("Mileage must be a whole number").min(0, "Mileage cannot be negative").max(MAX_MILEAGE);
 const acknowledgementFields = {
@@ -42,25 +43,30 @@ export const bookingRequestBody = z.object({
   "Enter a complaint code or description",
 );
 
+// Simple text and the optional detailed grid share the same stored request rows.
+const bookingRequestText = z.string().trim().min(1, "Add a customer request").max(2000)
+  .transform(description => [{ description }]);
+const bookingRequests = z.union([bookingRequestText, z.array(bookingRequestBody).min(1).max(100)]);
+
 const bookingFields = {
   serviceTypeId: z.string().uuid().optional(),
   mileage: mileageField.optional(),
   acFitted: z.boolean().optional(),
   followUpJobId: z.string().uuid().nullable().optional(),
-  requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100).optional(),
+  requests: bookingRequests.optional(),
 };
 
 export const createAppointmentSchema = z.object({
   body: z.object({
     ...bookingFields,
-    requests: z.array(bookingRequestBody).min(1, "Add a customer request").max(100),
+    requests: bookingRequests,
     customerId: z.string().uuid("Invalid customer ID"),
     vehicleId: z.string().uuid("Invalid vehicle ID"),
     branchName: z.string().min(1, "Branch name is required"),
     serviceTypeId: z.string().uuid("Invalid service type ID").optional(),
     serviceId: z.string().uuid("Invalid service ID").optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date"),
-    durationMins: z.number().int().optional(),
+    durationMins: z.number().int().positive().max(2147483647).optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
     createdById: z.string().uuid("Invalid user ID").optional(),
@@ -74,7 +80,7 @@ export const updateAppointmentSchema = z.object({
     cancelReason: z.string().trim().min(1).max(2000).optional(),
     scheduledAt: z.string().datetime("Invalid scheduled date").optional(),
     serviceId: z.string().uuid("Invalid service ID").optional(),
-    durationMins: z.number().int().optional(),
+    durationMins: z.number().int().positive().max(2147483647).optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
     // Odometer reading taken at check-in (status 'Checked In').
@@ -117,6 +123,7 @@ export const listJobCardsSchema = z.object({
       customerId: z.string().uuid().optional(),
       search: z.string().optional(),
       status: z.string().optional(),
+      unassignedTechnician: z.enum(["true", "false"]).optional(),
       // SERVICE (default) lists service jobs only; PDI jobs have their own menu.
       // HISTORY: a vehicle's history; includes PDI only when the PDI setting says so.
       jobType: z.enum(["SERVICE", "PDI", "ALL", "HISTORY"]).optional(),
@@ -134,6 +141,7 @@ export const listJobCardsSchema = z.object({
 
 export const jobOpeningBody = z
   .object({
+    openingConsent: openingConsentProof.optional(),
     appointmentId: z.string().uuid().optional(),
     serviceId: z.string().uuid().optional(),
     serviceTypeId: z.string().uuid(),
@@ -186,13 +194,7 @@ export const jobOpeningBody = z
   })
   .strict()
   .superRefine((data, ctx) => {
-    if (!data.technicianId && !data.teamId)
-      ctx.addIssue({
-        code: "custom",
-        path: ["technicianId"],
-        message: "Select a main mechanic or team",
-      });
-
+    if (data.appointmentId && !data.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Accept the job opening terms before converting this appointment' });
     // The reason is recorded at review; at opening the advisor may add a note (repeatReason).
     if (data.isRepeat && !data.previousJobId)
       ctx.addIssue({

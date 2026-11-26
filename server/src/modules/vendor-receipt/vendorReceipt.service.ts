@@ -104,12 +104,12 @@ async function repricePart(tx: Tx, partId: string, unitCost: number, actorId: st
 }
 
 export class VendorReceiptService {
-  /** Vendors are Customer rows of type VENDOR; the vendor type gives the default tax form. */
+  /** Vendors are parties with Vendor status; the vendor type (IMP / LOCAL) gives the default tax form. */
   async searchVendors(search?: string) {
     const term = search?.trim();
     const vendors = await prisma.customer.findMany({
       where: {
-        type: "VENDOR",
+        AND: [{ OR: [{ partyStatus: "VENDOR" }, { type: "VENDOR" }] }],
         mergedIntoId: null,
         ...(term && {
           OR: [
@@ -161,8 +161,8 @@ export class VendorReceiptService {
 
   /** Refuses Mobis (it comes through the MIT) and anything that is not a vendor. */
   private async vendorFor(vendorId: string) {
-    const vendor = await prisma.customer.findUnique({ where: { id: vendorId }, select: { ...vendorSelect.select, type: true } });
-    if (!vendor || vendor.type !== "VENDOR") throw new BadRequestError("Choose a vendor (a party of type VENDOR)");
+    const vendor = await prisma.customer.findUnique({ where: { id: vendorId }, select: { ...vendorSelect.select, type: true, partyStatus: true, mergedIntoId: true } });
+    if (!vendor || vendor.mergedIntoId || (vendor.partyStatus !== "VENDOR" && vendor.type !== "VENDOR")) throw new BadRequestError("Choose a party with Vendor status");
     const name = partyName(vendor);
     if (isMobisVendor(name)) throw new BadRequestError("Mobis invoices are received through Mobis receipts (MIT upload), not as a vendor receipt");
     return { ...vendor, name };

@@ -217,7 +217,18 @@ describe("JobCard workflow", () => {
     expect(prisma.jobCard.create).not.toHaveBeenCalled();
   });
 
-  it("rejects raw job numbers, lifecycle overrides, empty complaints and unassigned jobs", () => {
+  it("opens a job without a technician or team", async () => {
+    const body = { ...input, technicianId: undefined, teamId: undefined };
+    expect(createJobCardSchema.safeParse({ body }).success).toBe(true);
+    await new ServiceService().createJobCard({ ...body, createdById: id });
+    expect(prisma.jobCard.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ jobNumber: expect.any(String) }),
+    });
+    expect((prisma.jobCard.create as jest.Mock).mock.calls[0][0].data.technicianId).toBeUndefined();
+    expect((prisma.jobCard.create as jest.Mock).mock.calls[0][0].data.teamId).toBeUndefined();
+  });
+
+  it("rejects raw job numbers, lifecycle overrides, and empty complaints", () => {
     for (const body of [
       {
         ...input,
@@ -239,10 +250,6 @@ describe("JobCard workflow", () => {
             description: " ",
           },
         ],
-      },
-      {
-        ...input,
-        technicianId: undefined,
       },
     ])
       expect(
@@ -460,6 +467,7 @@ describe("JobCard workflow", () => {
       new ServiceService().createJobCard({
         ...input,
         appointmentId: id,
+        openingConsent: { accepted: true, termsHash: 'a'.repeat(64) },
         createdById: id,
       }),
     ).rejects.toThrow("branch");
@@ -549,6 +557,18 @@ describe("JobCard workflow", () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it("applies the branch and unassigned technician filters to rows and totals", async () => {
+    const list = jest.spyOn(ServiceRepository.prototype, "listJobCards").mockResolvedValue([]);
+    (prisma.jobCard.count as jest.Mock).mockResolvedValue(0);
+
+    await new ServiceService().listJobCards({ branchId: id, unassignedTechnician: true });
+
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ branchId: id, unassignedTechnician: true }));
+    expect(prisma.jobCard.count).toHaveBeenCalledWith({
+      where: { branchId: id, jobType: "SERVICE", technicianId: null },
+    });
   });
 
   it("counts records through the end of the selected day", async () => {

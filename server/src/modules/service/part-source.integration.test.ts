@@ -113,7 +113,7 @@ describeDb("Part source records (database)", () => {
     ).rejects.toThrow("already received");
     await expect(
       receipts.createReceipt({ receivingBranchId: branch.id, vendorId: customer.id, invoiceNumber: "X", invoiceDate: new Date(), lines: [{ partId: used.id, quantity: 1, unitPrice: 1 }] }, user.id),
-    ).rejects.toThrow("Choose a vendor");
+    ).rejects.toThrow("Vendor status");
 
     const sources = await inventory.listPartSources(used.id, branch.id);
     expect(sources.mainPartId).toBe(main.id);
