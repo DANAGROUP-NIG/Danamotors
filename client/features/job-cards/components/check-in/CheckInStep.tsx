@@ -189,7 +189,7 @@ function CheckInLoaded({
 
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="Check-in steps" className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-card p-1">
+      <div role="tablist" aria-label="Check-in steps" className="flex gap-1 rounded-xl border border-border bg-card p-1 sm:grid sm:grid-cols-3">
         {views.map((view, index) => (
           <button
             key={view.key}
@@ -204,7 +204,9 @@ function CheckInLoaded({
             onClick={() => void go(view.key)}
             onKeyDown={(event) => onTabKey(event, index)}
             className={cn(
-              "flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              // Phones: the current step gets the room for its name; the others show their tick or number.
+              view.current ? "min-w-0 flex-1" : "flex-none sm:flex-auto",
               view.current ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
@@ -223,7 +225,7 @@ function CheckInLoaded({
             >
               {view.done ? <Check className="size-3.5" /> : index + 1}
             </span>
-            <span className="truncate">{view.label}</span>
+            <span className={cn("truncate", !view.current && "hidden sm:inline")}>{view.label}</span>
           </button>
         ))}
       </div>

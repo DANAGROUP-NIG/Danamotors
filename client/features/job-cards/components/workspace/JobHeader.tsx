@@ -45,7 +45,7 @@ export function JobHeader({
   const plate = job.vehicle?.registrationNumber || job.vehicle?.vin || NOT_PROVIDED;
   const phone = job.customer?.phoneNumber?.trim();
   return (
-    <header className="sticky top-0 z-20 -mx-4 border-b border-border bg-card/95 px-4 pb-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:-mx-5 lg:px-5 print:hidden">
+    <header className="relative z-20 -mx-4 md:sticky md:top-0 border-b border-border bg-card/95 px-4 pb-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/90 lg:-mx-5 lg:px-5 print:hidden">
       <Link
         href="/job-cards"
         className="mb-2 inline-flex items-center gap-1 rounded text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -66,18 +66,18 @@ export function JobHeader({
               {customerName(job.customer)}
               {phone ? `, ${phone}` : ""}
             </span>
-            <StatusBadge status={badge.label} tone={badge.tone} className="text-xs" />
+            <StatusBadge status={badge.label} tone={badge.tone} className="text-xs normal-case" />
             <StatusBadge
               status={workspace.warrantyJob ? "Warranty" : "Non-warranty"}
               tone={workspace.warrantyJob ? "purple" : "gray"}
-              className="hidden text-xs sm:inline-flex"
+              className="hidden text-xs normal-case sm:inline-flex"
             />
             {job.repeatRecord && <RepeatTag status={job.repeatRecord.status} className="hidden text-xs sm:inline-flex" />}
           </div>
           {owner && <p className="truncate text-sm text-muted-foreground">{owner}</p>}
         </div>
         <div className="flex shrink-0 items-start gap-4">
-          <div className="hidden text-right text-sm md:block">
+          <div className="hidden text-right text-sm xl:block">
             <p>
               <span className="text-muted-foreground">Promised delivery: </span>
               <span className="font-medium tabular-nums">{formatDateTime(job.promisedAt)}</span>
@@ -124,8 +124,8 @@ export function JobHeader({
           </div>
         </div>
       </div>
-      {/* Small tablet: the promised time sits under the owner line. Phones show only plate, model, badge and owner. */}
-      <p className="mt-1 hidden text-sm sm:block md:hidden">
+      {/* Below 1280 px the promised time sits under the owner line, so the title keeps its width. Phones show only plate, model, badge and owner. */}
+      <p className="mt-1 hidden text-sm sm:block xl:hidden">
         <span className="text-muted-foreground">Promised: </span>
         <span className="tabular-nums">{formatDateTime(job.promisedAt)}</span>
         {countdown && <span className={cn("ml-2 tabular-nums", COUNTDOWN_TONE[countdown.tone])}>{countdown.text}</span>}

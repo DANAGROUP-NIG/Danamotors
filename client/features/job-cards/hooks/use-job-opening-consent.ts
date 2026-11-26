@@ -20,6 +20,8 @@ export function useJobOpeningConsent(id: string, enabled: boolean) {
 export function useSignJobOpening(id: string) {
   const client = useQueryClient();
   return useMutation({
+    // Offline, fail at once with the signature still on screen rather than wait silently.
+    networkMode: "always",
     mutationFn: (body: OpeningSignatureInput) =>
       apiPost<OpeningSignature>(
         `/service/job-cards/${id}/opening-consent`,

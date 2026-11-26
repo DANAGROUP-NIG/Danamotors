@@ -1,0 +1,71 @@
+import { expect, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
+import fs from "node:fs";
+import { authFile, type Role } from "./accounts";
+
+/** A page signed in as a role, in its own browser context. */
+export async function pageAs(browser: Browser, role: Role, viewport = { width: 1440, height: 900 }) {
+  const context = await browser.newContext({ storageState: authFile(role), viewport, timezoneId: "Africa/Lagos", locale: "en-GB" });
+  return context.newPage();
+}
+
+/**
+ * API calls as a role, reusing the session the setup project saved. The sign-in endpoint is
+ * rate limited (20 tries in 15 minutes), so tests never sign in through the API.
+ */
+export async function apiAs(request: APIRequestContext, role: Role) {
+  const state = JSON.parse(fs.readFileSync(authFile(role), "utf8")) as { cookies: { name: string; value: string }[] };
+  const token = state.cookies.find((cookie) => cookie.name.endsWith("access_token"))?.value;
+  if (!token) throw new Error(`No saved session for ${role}; run the setup project`);
+  const headers = { authorization: `Bearer ${token}` };
+  return {
+    get: async <T = unknown>(url: string) => ((await (await request.get(`/api${url}`, { headers })).json()).data as T),
+    put: async (url: string, data: unknown) => request.put(`/api${url}`, { headers, data }),
+    post: async (url: string, data: unknown) => request.post(`/api${url}`, { headers, data }),
+  };
+}
+
+/** The id of the demo job for a plate (newest first). */
+export async function jobIdByPlate(request: APIRequestContext, plate: string): Promise<string> {
+  const api = await apiAs(request, "advisor");
+  const list = await api.get<{ jobCards: { id: string; vehicle?: { registrationNumber?: string | null } }[] }>(
+    `/service/job-cards?search=${encodeURIComponent(plate)}&limit=10`,
+  );
+  const job = list.jobCards.find((row) => row.vehicle?.registrationNumber === plate);
+  if (!job) throw new Error(`No job card for ${plate}`);
+  return job.id;
+}
+
+const FORBIDDEN: [string, RegExp][] = [
+  ["undefined", /\bundefined\b/],
+  ["null", /\bnull\b/],
+  ["NaN", /\bNaN\b/],
+  ["raw code", /\b(CHECK_IN|QUALITY_CHECK|NOT_WORKING|THREE_QUARTER|IN_PROGRESS|WAITING_PARTS|SEND_TO_[A-Z_]+|WorkshopManager|ServiceAdviser)\b/],
+  ["dash, middle dot or ellipsis", /[–—·…]/],
+  ["replacement character", /�/],
+  ["garbled naira", /â‚¦|Ã/],
+  ["emoji", /\p{Extended_Pictographic}/u],
+  ["question-mark placeholder", /(^|\s)\?(\s|$)/],
+];
+
+/** Fails when the visible page shows any of the always-wrong texts from AGENTS.md. */
+export async function expectCleanText(page: Page, where: string, scope?: Locator) {
+  // The page content and any open dialog (or just the given part); the app shell is checked on its own.
+  const parts = await (scope ?? page.locator("main, [role=dialog]")).allInnerTexts();
+  const text = parts.join("\n");
+  const problems = FORBIDDEN.filter(([, rx]) => rx.test(text)).map(([name, rx]) => `${name}: "${text.match(rx)?.[0]}" near "${text.slice(Math.max(0, (text.match(rx)?.index ?? 0) - 40), (text.match(rx)?.index ?? 0) + 40).replace(/\s+/g, " ")}"`);
+  expect(problems, `${where} shows forbidden text`).toEqual([]);
+}
+
+/** No sideways scrolling at the current width. */
+export async function expectNoHorizontalOverflow(page: Page, where: string) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, `${where} scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1);
+}
+
+/** Saves a screenshot into the results folder, for the phase report. */
+export async function shot(page: Page, name: string) {
+  // The app scrolls inside its content area, so a full-page shot would be mostly blank.
+  await page.screenshot({ path: `e2e/.results/screens/${name}.png` });
+}
+
+export const WIDTHS = [1440, 1024, 768, 390] as const;

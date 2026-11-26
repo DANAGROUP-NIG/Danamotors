@@ -29,6 +29,18 @@ export function hasJobBill(card: { billedAt?: string | null; status: string; inv
     (invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()),
   );
 }
+/** Readable words for each job status, in sentence case. The one mapping for status text. */
+export const JOB_STATUS_WORDS: Record<string, string> = {
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  WAITING_PARTS: "Waiting for parts",
+  QC: "Quality check",
+  READY: "Ready",
+  BILLED: "Billed",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
+
 export const JOB_CARD_STATUS_LABELS = Object.fromEntries(
-  Object.keys(JOB_CARD_STATUS_TONES).map((status) => [status, canonicalJobStatus(status).replaceAll("_", " ")]),
+  Object.keys(JOB_CARD_STATUS_TONES).map((status) => [status, JOB_STATUS_WORDS[canonicalJobStatus(status)] ?? "Status not recorded"]),
 ) as Record<JobCardStatus, string>;

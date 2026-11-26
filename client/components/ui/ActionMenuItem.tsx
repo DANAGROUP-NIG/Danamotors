@@ -35,6 +35,7 @@ export function ActionMenuItem({
   return (
     <button
       type="button"
+      role="menuitem"
       disabled={disabled}
       onClick={onClick}
       className={cn(

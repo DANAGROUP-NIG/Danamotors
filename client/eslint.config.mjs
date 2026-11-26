@@ -5,7 +5,7 @@ import reactPlugin from "eslint-plugin-react";
 
 export default tseslint.config(
   {
-    ignores: [".next/**", "node_modules/**"],
+    ignores: [".next/**", "node_modules/**", "e2e/.report/**", "e2e/.results/**", "e2e/.auth/**"],
   },
   ...tseslint.configs.recommended,
   {

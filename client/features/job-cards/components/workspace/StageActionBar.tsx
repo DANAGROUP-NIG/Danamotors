@@ -62,24 +62,25 @@ export function StageActionBar({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {back && (
-            <Button type="button" variant="outline" onClick={back.onClick} disabled={busy}>
+            <Button type="button" variant="outline" onClick={back.onClick} disabled={busy} aria-label={back.label} title={back.label}>
               <ArrowLeft aria-hidden="true" />
-              {back.label}
+              {/* Phones show the icon only, so the bar stays on one line. */}
+              <span className="hidden sm:inline">{back.label}</span>
             </Button>
           )}
           {onSaveDraft && (
-            <Button type="button" variant="outline" onClick={onSaveDraft} disabled={busy}>
+            <Button type="button" variant="outline" onClick={onSaveDraft} disabled={busy} aria-label={savingDraft ? "Saving draft" : "Save draft"} title="Save draft">
               {savingDraft ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
-              {savingDraft ? "Saving draft" : "Save draft"}
+              <span className="hidden sm:inline">{savingDraft ? "Saving draft" : "Save draft"}</span>
             </Button>
           )}
           {danger.length > 0 && (
             <ActionMenu
               align="start"
               trigger={
-                <Button type="button" variant="outline" disabled={busy}>
+                <Button type="button" variant="outline" disabled={busy} aria-label="More" title="More">
                   <MoreHorizontal aria-hidden="true" />
-                  More
+                  <span className="hidden sm:inline">More</span>
                 </Button>
               }
             >
@@ -95,7 +96,7 @@ export function StageActionBar({
           )}
           {status}
         </div>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:basis-auto">
           {blocked && (
             <p id={reasonId} className="min-w-0 max-w-xl flex-1 basis-60 text-right text-sm text-muted-foreground">
               {blocked}
@@ -108,15 +109,16 @@ export function StageActionBar({
             </Button>
           ))}
           {next ? (
-            <Button type={next.form ? "submit" : "button"} form={next.form} disabled={busy} onClick={next.onClick}>
+            <Button type={next.form ? "submit" : "button"} form={next.form} disabled={busy} onClick={next.onClick} className="w-full sm:w-auto">
               {next.pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
               {next.pending ? (next.pendingLabel ?? "Saving") : next.label}
             </Button>
           ) : (
             primary && (
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
                 <Button
                   type="button"
+                  className="w-full sm:w-auto"
                   disabled={!primary.enabled || busy}
                   aria-describedby={[blocked ? reasonId : null, note && primary.enabled ? noteId : null].filter(Boolean).join(" ") || undefined}
                   onClick={() => onAction(primary.action)}

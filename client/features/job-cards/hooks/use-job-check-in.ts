@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/apiClient";
 import { api } from "@/lib/api/axios";
+import { getAccessTokenFromCookie } from "@/lib/auth/session";
 import { apiErrorMessage } from "@/features/warranty/lib/warranty-format";
 import { jobCardKeys } from "../api/job-card.keys";
 import { dataUrlBytes, fitPhoto, PHOTO_MAX_BYTES, type SaveState } from "../lib/check-in.logic";
@@ -46,6 +47,8 @@ export function useSaveCheckInDetails(id: string) {
   const client = useQueryClient();
   const refresh = useRefreshCheckIn(id);
   return useMutation({
+    // Offline, fail at once and show the message (inputs are kept) rather than wait silently.
+    networkMode: "always",
     mutationFn: (body: CheckInDetailsInput) => apiPut<JobCheckIn, CheckInDetailsInput>(`/service/job-cards/${id}/check-in/details`, body),
     onSuccess: async (checkIn) => {
       client.setQueryData(checkInKey(id), checkIn);
@@ -57,6 +60,8 @@ export function useSaveCheckInDetails(id: string) {
 export function useAddDamageMark(id: string) {
   const refresh = useRefreshCheckIn(id);
   return useMutation({
+    // Offline, fail at once and show the message (inputs are kept) rather than wait silently.
+    networkMode: "always",
     mutationFn: (body: DamageMarkInput) => apiPost<DamageMark, DamageMarkInput>(`/service/job-cards/${id}/check-in/damage-marks`, body),
     onSuccess: refresh,
   });
@@ -65,6 +70,8 @@ export function useAddDamageMark(id: string) {
 export function useRemoveDamageMark(id: string) {
   const refresh = useRefreshCheckIn(id);
   return useMutation({
+    // Offline, fail at once and show the message (inputs are kept) rather than wait silently.
+    networkMode: "always",
     mutationFn: (markId: string) => apiDelete<null>(`/service/job-cards/${id}/check-in/damage-marks/${markId}`),
     onSuccess: refresh,
   });
@@ -73,6 +80,8 @@ export function useRemoveDamageMark(id: string) {
 export function useUploadPhoto(id: string) {
   const refresh = useRefreshCheckIn(id);
   return useMutation({
+    // Offline, fail at once and show the message (inputs are kept) rather than wait silently.
+    networkMode: "always",
     mutationFn: (body: PhotoInput) => apiPost<JobPhoto, PhotoInput>(`/service/job-cards/${id}/photos`, body),
     onSuccess: refresh,
   });
@@ -81,6 +90,8 @@ export function useUploadPhoto(id: string) {
 export function useRemovePhoto(id: string) {
   const refresh = useRefreshCheckIn(id);
   return useMutation({
+    // Offline, fail at once and show the message (inputs are kept) rather than wait silently.
+    networkMode: "always",
     mutationFn: (photoId: string) => apiDelete<null>(`/service/job-cards/${id}/photos/${photoId}`),
     onSuccess: refresh,
   });
@@ -164,13 +175,14 @@ export function useWalkAroundAutosave(id: string, initial: WalkAroundDraft & { v
     const body = { ...latest.current, expectedVersion: version.current };
     setState({ kind: "saving" });
     const run = apiPut<{ version: number; savedAt: string }, typeof body>(`/service/job-cards/${id}/check-in/walk-around`, body)
-      .then(async (result) => {
+      .then((result) => {
         version.current = result.version;
         setState({ kind: "saved", at: result.savedAt });
         client.setQueryData<JobCheckIn>(checkInKey(id), (current) =>
           current ? { ...current, record: { ...current.record, ...body, version: result.version, savedAt: result.savedAt } } : current,
         );
-        await refresh();
+        // Not awaited: a refresh that overlaps another (a damage mark, a photo) must never hold up the next save.
+        void refresh();
       })
       .catch((error: unknown) => {
         // Keep the changes and mark them unsaved, so a retry sends them again.
@@ -226,6 +238,26 @@ export function useWalkAroundAutosave(id: string, initial: WalkAroundDraft & { v
     setDraft(next);
     setState(fresh.record.savedAt ? { kind: "saved", at: fresh.record.savedAt } : { kind: "idle" });
   }, [client, id]);
+
+  // Closing or reloading the page within the autosave delay: send what is pending with a request
+  // that outlives the page (keepalive), so a quick refresh never loses the last tap.
+  useEffect(() => {
+    const flushOnLeave = () => {
+      if (!editable || !dirty.current || inFlight.current) return;
+      const token = getAccessTokenFromCookie();
+      dirty.current = false;
+      void fetch(`/api/service/job-cards/${id}/check-in/walk-around`, {
+        method: "PUT",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...latest.current, expectedVersion: version.current }),
+      }).catch(() => {
+        dirty.current = true;
+      });
+    };
+    window.addEventListener("pagehide", flushOnLeave);
+    return () => window.removeEventListener("pagehide", flushOnLeave);
+  }, [editable, id]);
 
   // Save anything pending when the step is left (switching tabs unmounts it).
   useEffect(

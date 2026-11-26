@@ -33,7 +33,7 @@ export function DataTablePagination({
       )}
     >
       <p className="text-sm text-muted-foreground">
-        Showing {start}–{end} of {total}
+        Showing {start} to {end} of {total}
       </p>
       <div className="flex gap-1">
         <Button

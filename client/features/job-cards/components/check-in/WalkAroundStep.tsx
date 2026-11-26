@@ -205,9 +205,10 @@ function ChecklistGrid({
                 aria-label={`${item.label}: ${view.label}`}
                 onClick={() => set(item.code, nextChecklistState(state))}
                 onKeyDown={(event) => onKey(event, item.code)}
-                className="flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-card"
+                className="flex min-h-12 w-full flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-card"
               >
-                <span className="min-w-0 break-words">{item.label}</span>
+                {/* Whole words only: the state label moves under the name when the chip is narrow. */}
+                <span className="min-w-0 break-normal">{item.label}</span>
                 <StatusBadge status={view.label} tone={view.tone} className="shrink-0 text-xs normal-case" />
               </button>
             </li>
@@ -303,7 +304,7 @@ function DamageCard({ checkIn, editable }: { checkIn: JobCheckIn; editable: bool
 
   return (
     <StageCard title="Body and paint" description={editable ? "Tap the car to mark damage." : undefined}>
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[minmax(0,200px)_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)] lg:grid-cols-1">
         <CarDiagram marks={checkIn.damageMarks} draft={draft} editable={editable && !saving} onTap={start} onMoveDraft={setDraft} />
         <div className="min-w-0 space-y-3">
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Damage types">
@@ -317,7 +318,7 @@ function DamageCard({ checkIn, editable }: { checkIn: JobCheckIn; editable: bool
             ))}
           </ul>
           {editable && !draft && (
-            <Button type="button" variant="outline" onClick={() => start({ x: 50, y: 50 })}>
+            <Button type="button" variant="outline" className="h-auto min-h-10 whitespace-normal text-left" onClick={() => start({ x: 50, y: 50 })}>
               <Plus aria-hidden="true" />
               Add a mark with the keyboard
             </Button>

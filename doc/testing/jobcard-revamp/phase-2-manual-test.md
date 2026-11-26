@@ -67,7 +67,7 @@ Sections A, C, D, E and F change their jobs. After testing, ask the developer to
    Expected: the booking page with a **Service booking** section.
 3. In the **Service booking** section, click **Convert to job card**.
    Expected: a window with the job card opening terms and a tick box.
-4. Tick the box and click **Continue to job card**.
+4. Scroll to the end of the terms in the window (the text under them says **Scroll to the bottom of the terms to show the consent checkbox.**). Tick the box that appears and click **Continue to job card**.
    Expected: the **Open job card** window. At the top it says **Job number assigned on save** and today's date and time, like **26 Nov 2026, 10:42**.
 5. Look at the window.
    Expected: one page with **Vehicle**, **Warranty and campaign check**, the customer card, **Customer requests** and **Promised delivery and advisor**. There is **no Bay**, **no Technician**, **no Engineer**, **no service charge** and **no amounts (₦)** anywhere on it. The two requests from the booking are already filled in: **Periodic service (20,000 km)** and **Rattle from the rear when driving over bumps**.
@@ -246,9 +246,9 @@ Make the browser tablet size (Responsive, 1024 by 768).
 Make the browser **iPhone 12 Pro** size and open **KJA-482TX** as the **Service advisor** (reload the demo data first if needed).
 
 1. Look at the page.
-   Expected: no sideways scrolling. The header shows the plate, model, badge and owner line. The stepper shows **Step 1 of 8: Check-in** with a thin progress bar.
+   Expected: no sideways scrolling. The header shows the plate, model, badge and owner line, and scrolls away with the page (on phones it does not stay fixed, to leave room for the step). The stepper shows **Step 1 of 8: Check-in** with a thin progress bar.
 2. Look at the three tabs.
-   Expected: **Details**, **Walk-around** and **Customer consent** side by side; long words are cut short rather than pushing the page wider.
+   Expected: the current part shows its full name (for example **Walk-around**); the other two show only their tick or number. Tapping one opens it and shows its name.
 3. Open **Details**.
    Expected: the cards are in one column, one under another. Every box fits the screen.
 4. Open **Walk-around**.
@@ -256,7 +256,7 @@ Make the browser **iPhone 12 Pro** size and open **KJA-482TX** as the **Service 
 5. Open **Customer consent**.
    Expected: one column. The signature box fills the width and you can sign with a finger or mouse. **Sign and accept** is full width.
 6. Scroll down.
-   Expected: the bar stays at the bottom of the screen. Its buttons wrap onto two lines rather than going off screen.
+   Expected: the bar stays at the bottom of the screen. The first row has small buttons with icons only (back arrow, the three dots for **More**, and the **Save draft** disk on Details), plus the **Saved** time on Walk-around. The main button fills the second row. Holding the mouse over an icon button shows its name.
 
 **Pass if:** everything fits in one column with no sideways scrolling and every button can be reached.
 

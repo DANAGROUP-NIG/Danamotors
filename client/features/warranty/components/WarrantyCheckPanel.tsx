@@ -5,7 +5,8 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, CircleAlert, CircleHelp, Info, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { COVERAGE_SOURCE_LABELS, fmtDate, fmtKm } from "../lib/warranty-format";
+import { formatDate } from "@/lib/format";
+import { COVERAGE_SOURCE_LABELS, fmtKm } from "../lib/warranty-format";
 import type { OpenCampaign, WarrantyCheck } from "../types/warranty.types";
 import { AlertBanner, type BannerTone } from "./ui";
 
@@ -13,7 +14,7 @@ import { AlertBanner, type BannerTone } from "./ui";
 export function CoverageBanner({ check, variant = "jobcard" }: { check: WarrantyCheck; variant?: "jobcard" | "checkin" }) {
   const c = check.coverage;
   if (c.status === "ACTIVE") {
-    const left = [c.expiresOn && `Expires ${fmtDate(c.expiresOn)}`, c.remainingKm != null && `${fmtKm(c.remainingKm)} remaining`].filter(Boolean).join(" · ");
+    const left = [c.expiresOn && `Expires ${formatDate(c.expiresOn)}`, c.remainingKm != null && `${fmtKm(c.remainingKm)} remaining`].filter(Boolean).join(", ");
     return (
       <AlertBanner
         tone="emerald"
@@ -32,10 +33,10 @@ export function CoverageBanner({ check, variant = "jobcard" }: { check: Warranty
         {km ? (
           <p>
             {fmtKm(c.mileage)} exceeds the {fmtKm(c.kmLimit)} limit
-            {c.expiresOn && !check.coverage.reasons.includes("DATE_LIMIT_PASSED") ? ` (date limit would run to ${fmtDate(c.expiresOn)})` : ""}.
+            {c.expiresOn && !check.coverage.reasons.includes("DATE_LIMIT_PASSED") ? ` (date limit would run to ${formatDate(c.expiresOn)})` : ""}.
           </p>
         ) : (
-          <p>The warranty ended on {fmtDate(c.expiresOn)}.</p>
+          <p>The warranty ended on {formatDate(c.expiresOn)}.</p>
         )}
         <p>Work will be charged to the customer unless goodwill is approved.</p>
       </AlertBanner>

@@ -1,3 +1,4 @@
+import { JOB_STATUS_WORDS } from "../types/job-card-status";
 import { belongingsText, damageSentence, fuelLabel } from "./check-in.logic";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { NOT_PROVIDED, formatDateTime, formatKm, formatMoney, formatRelative } from "@/lib/format";
@@ -290,20 +291,8 @@ export function customerName(customer: JobCard["customer"] | null | undefined): 
 }
 
 
-/** Readable words for the older job status, for the Activity tab. */
-const STATUS_WORDS: Record<string, string> = {
-  OPEN: "Open",
-  IN_PROGRESS: "In progress",
-  WAITING_PARTS: "Waiting for parts",
-  QC: "Quality check",
-  READY: "Ready",
-  BILLED: "Billed",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-};
-
 export function jobStatusWords(canonicalStatus: string | null | undefined): string {
-  return (canonicalStatus && STATUS_WORDS[canonicalStatus]) || "Status not recorded";
+  return (canonicalStatus && JOB_STATUS_WORDS[canonicalStatus]) || "Status not recorded";
 }
 
 /** The invoice badge: one label and tone per invoice status, never the raw code. */

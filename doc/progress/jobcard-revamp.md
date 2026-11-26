@@ -118,3 +118,17 @@ Branch `feature/jobcard-revamp-p2-checkin`, from the phase 1 branch.
 
 - `booking.integration.test.ts` created its Prisma client from `server/.env` before reading `TEST_DATABASE_URL`, so its fixtures went to the shared database. Fixed. Today's two runs left 4 empty fixture branches ("Booking fixture/other 1795677540341" and "1795677633174") and 2 `@example.test` users there; not deleted, waiting for the owner's go-ahead. Several other integration suites set the database after their imports; they did not write to the server in this session but should be checked.
 - Middle dots in the warranty job notification, an em dash in the service type picker, and "..." in loading texts of the reused opening components.
+
+## Browser tests for phases 0 to 2 (26 Nov 2026)
+
+Playwright (`@playwright/test` 1.65.0, Chromium) now drives the real screens: `client/e2e/`, see `client/e2e/README.md`. 36 tests: the job card list (phase 0); the frame at every step, finished steps, Job file, cancel dialog, page states, other roles and 4 widths (phase 1); and check-in following the phase 2 guide (booking to job, Details errors, walk-around with marks, checklist, photo and reload, consent errors, signing, signed copy, handoff and notification, read-only and blocked views, offline signature and autosave, phone layout, keyboard). All 36 pass from a fresh database.
+
+Defects the browser tests found and fixed:
+- Walk-around changes were lost when the page was reloaded within the 1.2-second autosave delay; a save also waited on the page refresh. Pending changes are now sent with a keep-alive request when the page is left, and saves never wait on refreshes.
+- Signing showed no success message (the form unmounts before its callback). Offline, signing and check-in saves spun forever instead of failing with a message (paused mutations); they now fail at once and keep the input.
+- "Add at least one customer request" never appeared (array error on `.root`), in Details and in the opening form.
+- Badges read "Check-In" and "Non-Warranty" (CSS capitalisation); the list's Status column showed raw codes ("OPEN"). One sentence-case status mapping now.
+- At 1024 px the job header took half the screen; the promised date moves under the owner line below 1280 px. On phones the header scrolls away, the bar's small buttons are icon-only and the main button has its own row, and only the current check-in part shows its name.
+- Checklist chips broke words in the middle at tablet width; the damage card's keyboard button overflowed.
+- Shared fixes: menu items now have `role="menuitem"`; pagination read "Showing 1–10"; the sidebar and dashboard showed raw role codes, an emoji and a middle dot; the warranty panel used a middle dot and a non-standard date.
+- The booking consent window needs a scroll to the end of the terms; guide step A4 now says so.

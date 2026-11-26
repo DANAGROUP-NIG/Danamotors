@@ -157,21 +157,20 @@ function CustomerConsentForm({ jobCardId, consent }: { jobCardId: string; consen
     setErrors(problems);
     if (Object.keys(problems).length || !signature) return;
     setFailure(null);
-    sign.mutate(
-      {
+    // Awaited rather than per-call callbacks: the form is replaced by the signed panel as soon as the
+    // signature saves, and callbacks of an unmounted form would never run.
+    sign
+      .mutateAsync({
         accepted: true,
         expectedHash: consent.expectedHash,
         idempotencyKey: key,
         signerName: signer === "OWNER" ? scope.customerName : name.trim(),
         ...(signer === "REPRESENTATIVE" ? { relationship: relationship.trim(), signerPhone: phone.trim() } : {}),
         signatureImage: signature,
-      },
-      {
-        onSuccess: () => toast.success(`Customer consent signed for job ${scope.jobNumber}`),
-        // Everything entered stays on screen, including the signature, so Sign and accept can be pressed again.
-        onError: (error) => setFailure(apiErrorMessage(error, "The signature was not saved. Check your connection and press Sign and accept again.")),
-      },
-    );
+      })
+      .then(() => toast.success(`Customer consent signed for job ${scope.jobNumber}`))
+      // Everything entered stays on screen, including the signature, so Sign and accept can be pressed again.
+      .catch((error: unknown) => setFailure(apiErrorMessage(error, "The signature was not saved. Check your connection and press Sign and accept again.")));
   }
 
   return (

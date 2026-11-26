@@ -1,6 +1,7 @@
 "use client";
 
 //userData Store
+import { roleLabel } from "@/lib/role-label";
 import { useAuthStore } from "@/store/auth.store";
 
 //icons
@@ -24,10 +25,10 @@ export default function PageHeader(props: IAppProps) {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="text-xl font-bold text-foreground">
-          Welcome back, {user?.firstName} 👋
+          Welcome back, {user?.firstName}
         </h1>
-        <p className="mt-0.5 text-sm text-muted-foreground capitalize">
-          {user?.role} · {today}
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {roleLabel(user?.role)}, {today}
         </p>
       </div>
       <div className="flex items-center gap-2">

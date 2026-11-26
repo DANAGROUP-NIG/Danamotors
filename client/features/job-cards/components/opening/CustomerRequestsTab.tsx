@@ -194,7 +194,8 @@ export function CustomerRequestsTab(
           ].map(
             ([label, amount]) => <div key={String(label)}><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(Number(amount))}</p></div>,
           )}</div>}
-        {errors.complaints?.message && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints.message}</p>}
+        {/* A list-level error (no requests at all) arrives on .root from the field array, or on .message. */}
+        {(errors.complaints?.message ?? errors.complaints?.root?.message) && <p role="alert" className="mt-3 text-sm text-destructive">{errors.complaints?.message ?? errors.complaints?.root?.message}</p>}
       </OpeningCard>{showLastVisit && <LastVisitCard id={lastJobId} />}</div>
   );
 }

@@ -240,8 +240,9 @@ export function JobCardsTable() {
       header: "Status",
       render: (jc) => (
         <StatusBadge
-          status={STATUS_LABELS[jc.status]}
-          tone={STATUS_TONES[jc.status]}
+          status={STATUS_LABELS[jc.status] ?? "Status not recorded"}
+          tone={STATUS_TONES[jc.status] ?? "gray"}
+          className="normal-case"
         />
       ),
     },
@@ -250,7 +251,7 @@ export function JobCardsTable() {
       render: (jc) => {
         const step = jc.stage ? jobStepBadge(jc.stage, jc.status) : null;
         return step ? (
-          <StatusBadge status={step.label} tone={step.tone} />
+          <StatusBadge status={step.label} tone={step.tone} className="normal-case" />
         ) : (
           <span className="text-muted-foreground">{NOT_PROVIDED}</span>
         );

@@ -36,7 +36,7 @@ export function InvoicesTable({ invoices }: { invoices: JobCardInvoice[] }) {
                 <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{formatMoney(invoice.total)}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{formatMoney(invoice.outstandingAmount)}</td>
                 <td className="py-2">
-                  <StatusBadge status={badge.label} tone={badge.tone} className="text-xs" />
+                  <StatusBadge status={badge.label} tone={badge.tone} className="text-xs normal-case" />
                 </td>
               </tr>
             );

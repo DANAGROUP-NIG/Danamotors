@@ -1,4 +1,5 @@
 "use client";
+import { roleLabel as formatRole } from "@/lib/role-label";
 import Link from "next/link";
 import { cn, isActive } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -554,7 +555,7 @@ export default function SideNav({
                   {user?.firstName} {user?.lastName}
                 </p>
                 <p className="truncate text-sm capitalize text-white/50">
-                  {roleLabel ?? user?.role ?? "Workshop Manager"}
+                  {roleLabel ?? formatRole(user?.role)}
                 </p>
               </div>
             )}
