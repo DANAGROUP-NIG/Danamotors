@@ -30,15 +30,15 @@ A new job card now starts at step 1, **Check-in**, and the service advisor compl
 | Service manager | servicemanager@kiamotors.com | |
 | Abuja branch administrator | admin.abuja@kiamotors.com | |
 
-**Demo jobs.** All are at the main branch. Find each one by typing its plate in the search box at the top of the **Job Cards** list. To open a job, click the three-dot **Actions** button at the end of its row, then **View details**. Job numbers are made by the system, so write each one down the first time you see it.
+**Demo jobs.** All are at the main branch. Find each one by typing its plate in the search box at the top of the **Job Cards** list. To open a job, click the three-dot **Actions** button at the end of its row, then **View details**. Job numbers are made by the system. The numbers below are the ones on the test site; on another copy of the data, write each one down the first time you see it.
 
-| Plate | Customer | Where it is | Used in section |
-|---|---|---|---|
-| KJA-482TX | Adaeze Okafor | Check-in, nothing recorded on the walk-around yet. Last reading 43,100 km | B, C, D, F, H, I |
-| KJA-521ST | Tobi Adeyemi | Check-in, walk-around done, waiting for the customer to sign. Last reading 24,600 km | E, G |
-| LSR-522ST | Lakeside Courier Services Ltd | Check-in, signed, ready to send | F |
-| KJA-523ST | Adaeze Okafor | A booking, not yet a job card | A |
-| LSR-512ST | | Diagnosis (already past check-in) | G |
+| Plate | Job number on the test site | Customer | Where it is | Used in section |
+|---|---|---|---|---|
+| KJA-482TX | 2026000033 | Adaeze Okafor | Check-in, nothing recorded on the walk-around yet. Last reading 43,100 km | B, C, D, F, H, I |
+| KJA-521ST | 2026000043 | Tobi Adeyemi | Check-in, walk-around done, waiting for the customer to sign. Last reading 24,600 km | E, G |
+| LSR-522ST | 2026000044 | Lakeside Courier Services Ltd | Check-in, signed, ready to send | F |
+| KJA-523ST | Not yet a job | Adaeze Okafor | A booking, not yet a job card | A |
+| LSR-512ST | 2026000034 | | Diagnosis (already past check-in) | G |
 
 Sections A, C, D, E and F change their jobs. After testing, ask the developer to reload the demo data before you test them again.
 

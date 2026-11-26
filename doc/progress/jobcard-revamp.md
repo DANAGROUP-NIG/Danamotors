@@ -100,6 +100,7 @@ Branch `feature/jobcard-revamp-p2-checkin`, from the phase 1 branch.
 - [x] Deleted: `JobOpeningConsentCard`, `OtherDetailsTab`, the opening form's tabs, Find, Load estimate, bay, engineer, opening estimate, service charge, A/C type, in-house, remarks, tyres, battery, custom field and the placeholder delivery card; `openingLabels`; `JobCard.checklist`; the unused `CHECK_IN_SIGNATURE` reason.
 - [x] Demo seed: walk-around and signature for jobs past check-in, JC-S11, JC-S12, a booking for KJA-523ST, earlier readings for the check-in vehicles, and the audited odometer reset when testers raised a demo vehicle's reading. Run twice from scratch on local databases.
 - [x] Docs: `doc/job-cards.md` ("Check-in (phase 2)"), `doc/workshop.md`, `doc/demo-data.md`, `doc/testing/jobcard-revamp/phase-2-manual-test.md`.
+- [x] Server database: demo seed run on 26 Nov 2026 with `--second-branch="Abuja Branch"` (Dana Motors Demo has no advisor or technician there). All phase 2 data is in: JC-S01 2026000033 (KJA-482TX) to JC-S12 2026000044, and the KJA-523ST booking. The run then stopped at the PDI demo: no active Engineer at Main Branch on the server (not a phase 2 problem).
 - [ ] Browser screenshots: not taken. See "Verification".
 
 ### Tests (26 Nov 2026)
