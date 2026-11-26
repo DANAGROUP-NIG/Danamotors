@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { BadRequestError } from '../../shared/errors/appError';
 
@@ -24,4 +25,13 @@ export async function resolveJobComplaints(db: Prisma.TransactionClient, request
     return { complaintCodeId: complaint?.id, defectCode: defect?.code ?? complaint?.code ?? row.defectCode,
       description, spare: row.spare ?? 0, oil: row.oil ?? 0, labour: row.labour ?? 0 };
   });
+}
+
+/**
+ * Request rows are listed by id, so new rows get ascending ids in the order they were entered.
+ * Pair the result with resolveJobComplaints' rows before saving.
+ */
+export function withOrderedIds<T>(rows: T[]): (T & { id: string })[] {
+  const ids = rows.map(() => randomUUID()).sort();
+  return rows.map((row, index) => ({ ...row, id: ids[index] }));
 }

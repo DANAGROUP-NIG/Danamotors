@@ -48,7 +48,7 @@ Only `server/src/modules/service/job-stage.writer.ts` writes the stage columns. 
 | `GET /service/job-cards/:id/workspace` | `jobcard:read`, job branch | Step, owner and since when, current sub-step, the actions this user can take (each enabled or with plain-English reasons), up to 3 alerts, one line per finished step, read-only flag, cancellation details |
 | `POST /service/job-cards/:id/stage` | `jobcard:update`, job branch | `{ action, note?, requestId }`. Runs one action under the job lock |
 
-Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs a customer request and the check-in signature), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (diagnosis onward, workshop roles; needs an assigned technician), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
+Actions: `SEND_TO_SUPERVISOR` (check-in to diagnosis, advisor; needs Details, Walk-around and Customer consent complete, see "Check-in (phase 2)"), `SEND_TO_WARRANTY` or `SEND_TO_ADVISOR` (diagnosis onward, workshop roles; needs an assigned technician), `WARRANTY_TO_ADVISOR` (warranty officer), `RELEASE_TO_REPAIR` (advisor or supervisor; needs the technician, the check-in signature, an approved estimate and a positive advance), `PAUSE_FOR_PARTS`, `RESUME_REPAIR`, `SEND_TO_QC` (workshop roles, the assigned technician only), `QC_PASSED_TO_ADVISOR` (supervisor; QC passed), `RETURN_TO_REPAIR` (supervisor; QC failed), `MARK_READY` (service advisor only; QC passed and campaign answers recorded), `SEND_TO_DELIVERY` (advisor; billed or credit approved), `CANCEL` (the roles that could cancel before, before billing, with a reason).
 
 Actions that change the status run through `JobCardWorkflowService.updateInTx`, so the estimate approval and advance gates, QC checks, billing readiness, status history and status notifications all still apply. A blocked move returns 409 `STAGE_ACTION_BLOCKED` with `details.reasons`; the wrong role or another technician gets 403 `STAGE_ACTION_FORBIDDEN`; a missing job 404; invalid input 400 naming the field. Repeating a request ID returns the current workspace without acting again; reusing it for another action returns 409 `STAGE_REQUEST_REUSED`. PDI jobs keep their own screens and refuse stage actions.
 
@@ -74,7 +74,8 @@ Moves that change the status are announced by the existing status notification r
 
 | Step | Content until its phase replaces it |
 |---|---|
-| Check-in, Estimate | Job-opening approval, estimate, advance |
+| Check-in | Replaced in phase 2: Details, Walk-around and Customer consent (see "Check-in (phase 2)") |
+| Estimate | Customer consent (only when missing or out of date), estimate, advance |
 | Diagnosis | Technician assignment, findings and work done, then opening approval, estimate, advance |
 | Warranty | Warranty at creation, who pays for each line |
 | Repair | Request part, Service transactions, issued parts and collection, recorded labour, technician |
@@ -92,6 +93,45 @@ Moves that change the status are announced by the existing status notification r
 The old "Workshop actions" form was split into the step sections above. Its status dropdown no longer offers Start work, Send for QC, Wait for parts, Mark ready or Cancel, because the action bar does these through the stage service; that stops a job skipping steps. Delivery (status DELIVERED with late reasons) stays in the Deliver the vehicle section until phase 9.
 
 API additions to `GET /service/job-cards/:id/workspace`: `warrantyJob` (vehicle covered when the job opened, or a warranty case exists; `TODO(confirm)` goodwill-only jobs), `activity` (step changes, newest first, with actor, new owner and note) and `previousVisits` (the vehicle's last two earlier service jobs at any branch, not cancelled and not PDI). A user without `jobcard:update` gets no actions and a read-only step, matching the check on `POST /stage`.
+
+### Check-in (phase 2)
+
+A new job starts at **Check-in**, owned by its service advisor. Check-in has three parts, shown as tabs with a tick when each is complete. The bar at the bottom moves between them and, at the end, sends the job to the workshop supervisor.
+
+**Opening a job** now asks only for what is needed to create it: vehicle and mileage (with the audited odometer replacement), customer, service type, warranty and campaign acknowledgement, repeat check, customer requests (no amounts), promised date and time, and the advisor receiving the vehicle. Bay and technician are no longer needed; the workshop supervisor sets them in Diagnosis. The old opening estimate fields, service charge override, engineer, bay, A/C type, in-house flag, remarks, tyres, battery, custom field, "Find" and "Load estimate" are gone from the form. The server still accepts tyres, battery and A/C type for PDI jobs, which open through the same service.
+
+| Part | What the advisor records | Complete when |
+|---|---|---|
+| Details | Bill to, mileage (not below the reading before this visit unless the odometer was replaced, with a reason), service type, promised delivery (Lagos time, in the future), customer requests with optional complaint codes, instructions to the technician | Mileage, service type, a future promised delivery and at least one request are saved |
+| Walk-around | Fuel level (5 large buttons), damage marks on a top-down car drawing (Crack, Dent or Scratch, optional note and photo; tap to place, or "Add a mark with the keyboard" and arrow keys), the 25 paper-card checklist items (tap cycles Present, Missing, Not working; P, M or N on the keyboard; "Mark the rest present"), checklist notes, service book seen and stamps (0 to 12), no valuables and items left, 5 photos (Front, Rear, Left, Right, Odometer) | Fuel level recorded and all 25 items checked |
+| Customer consent | Customer-facing: vehicle, mileage, fuel, damage in plain words ("Scratch on rear bumper, dent on front right door"), missing and not-working items, requests, promised date, the JOB_CARD terms as numbered clauses in a scroll box, an acceptance tick, Owner or Representative (name, phone and relationship), and the signature pad. No prices, codes or staff notes. | The customer has signed the current details |
+
+The walk-around saves itself about a second after each change and shows "Saved 10:42". If a save fails, the changes stay on screen with "Not saved" and **Retry**; nothing is lost. If another screen saved a newer version, the save is refused and **Load the latest** replaces this screen's changes with the newer ones.
+
+**Gates.** `SEND_TO_SUPERVISOR` lists every missing item as a reason, naming the part that fixes it, for example "Record the fuel level on Walk-around." or "Get the customer's signature on Customer consent.". The workspace sub-step is DETAILS, WALK_AROUND, CUSTOMER_CONSENT or SEND_TO_WORKSHOP. Handing off moves the job to Diagnosis, owned by the workshop supervisor role (WorkshopManager, `TODO(confirm)`), records who completed check-in and when, and sends the `STAGE_HANDOFF` notice. After that, check-in is read-only.
+
+**Who can change it.** Only the check-in roles (service advisor, service manager, admin) with `jobcard:update`, while the job is at Check-in. Everyone else sees it read-only with the waiting banner. Collecting the signature also needs `estimate:sign`, and viewing or printing the signed copy needs `estimate:print`.
+
+**Signed document, version 2.** The customer signs the existing job-opening signature (`JobOpeningSignature`), now version 2: its scope adds the walk-around (fuel, checklist states with labels, notes, service book, belongings, damage marks with rounded coordinates, and each photo's SHA-256), so the evidence hash covers it. A representative's phone is stored in `signerPhone` and joins the evidence hash only when present. Version 1 signatures are compared with the version 1 scope, so they still verify and stay current. Changing Details or the walk-around after signing makes the signature out of date ("Details changed after the customer signed. Ask the customer to sign again on Customer consent."). At check-in the server refuses a signature until Details and Walk-around are complete (409 `CHECK_IN_INCOMPLETE`). The signed copy (**View signed copy**, **Print**) shows the vehicle condition at check-in. A job past check-in whose consent is missing or out of date shows the same consent step under "Customer consent needed".
+
+**Terms.** The clauses come from **Settings > Terms & Conditions**, document **Job card**. They are not built into the app. If none are set, the consent step says so and **Sign and accept** stays disabled. `TODO(confirm)`: the server still accepts a signature with no terms, as before.
+
+**Photos.** There was no upload or file storage in the app. Photos are stored in the database (`JobPhoto`: bytes, content type, size, width, height, SHA-256), like signatures, so there is no new service or dependency. The browser resizes a photo to 1600 pixels on its longest side and sends a JPEG data URL. The server accepts JPEG, PNG or WebP, at most 2 MB and 4096 pixels a side, reads the size from the file header, and refuses anything else with a message on the field. Photo bytes are never in job or check-in responses; each photo is fetched from its own endpoint with the sign-in header, branch-checked, `Cache-Control: private` and `nosniff`. A check-in slot holds one photo and a new one replaces it. Later phases add categories (`JobPhotoCategory`) for findings and service book stamps.
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/:id/check-in` | `jobcard:read`, job branch | Record, marks, photo list, 25 items, reading before this visit, gate reasons, consent state, editable flag |
+| `PUT /service/job-cards/:id/check-in/details` | `jobcard:update`, check-in role, job at check-in | Save Details. Audited `JOB_CHECK_IN_DETAILS_SAVED` (fields changed; mileage from and to, odometer reason) |
+| `PUT /service/job-cards/:id/check-in/walk-around` | same | Autosave with `expectedVersion`; 409 `CHECK_IN_VERSION` on a newer save. Audited `JOB_WALK_AROUND_SAVED` |
+| `POST /service/job-cards/:id/check-in/damage-marks` | same | `requestId` (repeat returns the same mark), type, x and y 0 to 100, note, damage `photoId`. Audited |
+| `DELETE /service/job-cards/:id/check-in/damage-marks/:markId` | same | Removes the mark and its photo. Audited |
+| `POST /service/job-cards/:id/photos` | same | `requestId`, category, slot, image. Audited with size and hash, never the image |
+| `GET /service/job-cards/:id/photos/:photoId` | `jobcard:read`, job branch | The image |
+| `DELETE /service/job-cards/:id/photos/:photoId` | same as POST | Removes a photo. Audited |
+
+Every write takes the job row lock first, like the workflow. A check-in write on a job past check-in returns 409 `CHECK_IN_LOCKED`; the wrong role 403 `CHECK_IN_LOCKED`.
+
+**Data.** Migration `20261126054810_jobcard_check_in` adds `JobCheckIn` (one per job), `JobDamageMark` (x and y `Decimal(5,2)` with 0 to 100 checks), `JobPhoto` and the enums `FuelLevel`, `DamageType` and `JobPhotoCategory`; adds `JobOpeningSignature.signerPhone`; moves any free text in `JobCard.checklist` to `JobCheckIn.checklistNote` and drops `JobCard.checklist`. The internal picking list reads the checklist note instead. Customer requests are now created with ascending ids, so they keep the order they were entered in. The job card response includes the check-in record (without photos) and the damage marks, for the finished step summary and later phases.
 
 ### Vehicles with multiple job cards (issue 142)
 

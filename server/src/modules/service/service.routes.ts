@@ -1,6 +1,7 @@
 import { recordJobDeposit } from "./job-deposit.service";
 import { listMultiJobVehicles, multiJobBranch, multiJobVehiclesQuery } from "./multi-job-vehicles";
 import { jobOpeningSignatureRoutes } from "./job-opening-signature.routes";
+import { jobCheckInRoutes, jobPhotoRoutes } from "./job-check-in.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -53,6 +54,8 @@ const controller = new ServiceController();
 
 router.use(authMiddleware);
 router.use("/job-cards/:id/opening-consent", jobOpeningSignatureRoutes);
+router.use("/job-cards/:id/check-in", jobCheckInRoutes);
+router.use("/job-cards/:id/photos", jobPhotoRoutes);
 router.get(
   "/staff",
   requirePermission(PERMISSIONS.JOBCARD_READ),
@@ -512,13 +515,12 @@ router.delete(
  *               description: { type: string, example: Brake inspection }
  *               serviceTypeId: { type: string, format: uuid, description: Eligible WorkshopMaster SERVICE_TYPE for this vehicle model }
  *               serviceId: { type: string, format: uuid, description: Optional separate appointment service; does not set the opening charge }
- *               bayId: { type: string, format: uuid }
+ *               bayId: { type: string, format: uuid, description: Optional. The workshop supervisor sets the bay in Diagnosis. }
  *               serviceAdvisorId: { type: string, format: uuid }
  *               technicianId: { type: string, format: uuid, description: Optional legacy assignment input. Use the workshop assign endpoint for normal assignment. }
  *               teamId: { type: string, format: uuid, description: Optional legacy team input }
  *               mileage: { type: integer, minimum: 0, example: 12500 }
  *               promisedAt: { type: string, format: date-time }
- *               checklist: { type: string, maxLength: 5000 }
  *               acType: { type: string, enum: [FACTORY, DEALER, NONE] }
  *               batteryMakeId: { type: string, format: uuid }
  *               batteryNumber: { type: string, maxLength: 100 }

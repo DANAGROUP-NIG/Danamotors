@@ -12,6 +12,7 @@ import { assertDepositPaid } from "./job-deposit.service";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
 import { assertApprovedOperation } from "./estimate-approval";
 import { JobCardWorkflowService } from "./job-card-workflow.service";
+import { loadCheckInGates } from "./job-check-in.service";
 import { moveStage } from "./job-stage.writer";
 import {
   ACTION_RULES,
@@ -73,10 +74,12 @@ async function gateProblem(check: () => Promise<unknown>): Promise<string | null
   }
 }
 
-const GATED_STAGES = new Set(["CHECK_IN", "ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING"]);
+// Check-in has its own gates (loadCheckInGates); these stages use the existing work-start gates.
+const GATED_STAGES = new Set(["ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING"]);
 
-async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob): Promise<StageFacts> {
+async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: Date = new Date()): Promise<StageFacts> {
   const gated = GATED_STAGES.has(job.stage);
+  const checkInGates = job.stage === "CHECK_IN" ? await loadCheckInGates(tx, job.id, now) : null;
   const [openingSignatureProblem, approvalProblem, depositProblem] = gated
     ? await Promise.all([
         job.openingSignatureRequired ? gateProblem(() => assertSignedJobOpening(tx, job.id)) : null,
@@ -91,6 +94,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob): Prom
     technicianId: job.technicianId,
     complaintCount: job._count.complaints,
     openingSignatureProblem,
+    checkInGates,
     approvalProblem,
     depositProblem,
     warrantyRelevant:
@@ -124,7 +128,7 @@ export class JobStageService {
       async (tx) => {
         const job = await tx.jobCard.findUnique({ where: { id }, select: workspaceJob });
         if (!job) throw new NotFoundError("Job card not found");
-        const facts = await stageFacts(tx, job);
+        const facts = await stageFacts(tx, job, now);
         const events = await tx.jobStageEvent.findMany({
           where: { jobCardId: id },
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -224,6 +228,13 @@ export class JobStageService {
         const ctx = { action: input.action, requestId: input.requestId, note };
         if (!check.toStatus) {
           await moveStage(tx, id, check.to, actor.id, ctx);
+          // Check-in is finished: record who completed it and when.
+          if (input.action === "SEND_TO_SUPERVISOR")
+            await tx.jobCheckIn.upsert({
+              where: { jobCardId: id },
+              create: { jobCardId: id, completedAt: new Date(), completedById: actor.id },
+              update: { completedAt: new Date(), completedById: actor.id },
+            });
           return;
         }
         try {

@@ -143,15 +143,15 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 | JC-05 | Sportage / Main | **Open, unassigned** (team only). Repeat of JC-02 | Check-in | Rev 1 **sent back**, rev 2 **pending** | none | **REJECTED** |
 | TEST-01 / TEST-02 | TEST vehicles / Main, Dana Motors Demo | Open | Check-in | none | none | OPEN, empty |
 
-Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). The check-in signature is captured on screen from the job card revamp's phase 2; until then, demo jobs past check-in are recorded without it, like jobs opened before signed consent existed (`TODO(confirm)`).
+Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
 
-**Staged job card: one job at every step (JC-S01 to JC-S10)**
+**Staged job card: one job at every step (JC-S01 to JC-S12)**
 
 Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all at the main branch, each on its own vehicle. Periodic service labour only, no parts.
 
 | Key | Plate | Step | State |
 |---|---|---|---|
-| JC-S01 | KJA-482TX (Sportage, in warranty) | Check-in | Three customer requests; check-in signature not yet captured, so it cannot be sent on |
+| JC-S01 | KJA-482TX (Sportage, in warranty) | Check-in, Walk-around | Just opened: three customer requests, nothing on the walk-around yet. Last recorded reading 43,100 km |
 | JC-S02 | LSR-512ST | Diagnosis | No technician yet (team only): waiting for the workshop supervisor to assign one |
 | JC-S03 | LSR-513ST | Diagnosis | Technician assigned, recording findings |
 | JC-S04 | KJA-514ST (Sportage, in warranty) | Warranty | Waiting for the warranty officer |
@@ -161,6 +161,10 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S08 | LSR-518ST | Billing | QC passed, waiting for the advisor to mark it ready |
 | JC-S09 | LSR-519ST | Delivery | Billed ₦31,550, balance ₦21,550 |
 | JC-S10 | LSR-520ST | Cancelled | Cancelled at the estimate: "Customer took the vehicle elsewhere" |
+| JC-S11 | KJA-521ST (Sportage, in warranty) | Check-in, Customer consent | Details and walk-around done, waiting for Tobi Adeyemi to sign. Last recorded 24,600 km |
+| JC-S12 | LSR-522ST | Check-in, ready to send | Signed by the owner, Lakeside Courier Services Ltd; ready to send to the workshop supervisor |
+
+A booking for **KJA-523ST** (Sportage, Adaeze Okafor, last recorded 16,050 km, two requests) is left open at the main branch so testers can open a job card from it.
 
 Every estimate has parts (genuine and local) and labour: coded operations, plus general labour with a free-text description. The bills are created by the billing service. They take VAT on labour and service charge and the round-off from the branch settings (defaults: 7.5% VAT, rounded down to the nearest ₦10). The totals quoted in these docs assume the defaults; a branch with other settings shows different totals. JC-01's bill is paid by a cash receipt, and JC-02 was delivered on approved credit.
 

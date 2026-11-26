@@ -710,6 +710,10 @@ model JobCard {
   openingSignatureRequired Boolean               @default(true)
   openingSignatures        JobOpeningSignature[]
   openingConsent           Json?
+  /// Check-in record (fuel, checklist, belongings, instructions), damage marks and photos (job card revamp phase 2).
+  checkIn                  JobCheckIn?
+  damageMarks              JobDamageMark[]
+  photos                   JobPhoto[]
   advanceReceipts          Receipt[]             @relation("JobAdvances")
   consolidatedInvoices     Invoice[]             @relation("WarrantyJobBills")
   depositReceiptId         String?               @unique
@@ -796,7 +800,6 @@ model JobCard {
   batteryNumber   String?
   customField1    String?
   acType          String?
-  checklist       String?
   estimatedParts  Float?
   estimatedOil    Float?
   estimatedLabour Float?
@@ -884,6 +887,8 @@ model JobOpeningSignature {
   snapshot       Json
   signerName     String
   relationship   String?
+  /// Phone number of a representative signing for the customer. Null for the owner and for older signatures.
+  signerPhone    String?
   capturedById   String
   signedAt       DateTime @default(now())
   signatureImage String   @db.Text
@@ -2441,6 +2446,91 @@ enum JobStage {
 }
 
 /// One row per stage move or owner handoff on a job card. requestId makes client retries idempotent.
+enum FuelLevel {
+  EMPTY
+  QUARTER
+  HALF
+  THREE_QUARTER
+  FULL
+}
+
+enum DamageType {
+  CRACK
+  DENT
+  SCRATCH
+}
+
+/// What a job photo is for. Later phases add their own categories (findings, service book stamps).
+enum JobPhotoCategory {
+  CHECK_IN
+  DAMAGE
+}
+
+/// The service advisor's check-in record, one per job. Written only while the job is at check-in.
+model JobCheckIn {
+  jobCardId                String     @id
+  jobCard                  JobCard    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  fuelLevel                FuelLevel?
+  /// Keyed by checklist item code (job-check-in.logic.ts); each value PRESENT, MISSING or NOT_WORKING.
+  checklist                Json       @default("{}")
+  checklistNote            String?
+  serviceBookSeen          Boolean    @default(false)
+  serviceBookStamps        Int?
+  noValuables              Boolean    @default(false)
+  belongingsNote           String?
+  instructionsToTechnician String?
+  /// Optimistic version for the walk-around autosave.
+  version                  Int        @default(0)
+  updatedById              String?
+  updatedAt                DateTime   @updatedAt
+  createdAt                DateTime   @default(now())
+  /// Set when the advisor sends the job to the workshop supervisor.
+  completedAt              DateTime?
+  completedById            String?
+}
+
+/// A body or paint mark on the top-down diagram. x and y are percentages of the diagram (0 to 100).
+model JobDamageMark {
+  id          String     @id @default(uuid())
+  jobCardId   String
+  jobCard     JobCard    @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  type        DamageType
+  x           Decimal    @db.Decimal(5, 2)
+  y           Decimal    @db.Decimal(5, 2)
+  note        String?
+  photoId     String?    @unique
+  photo       JobPhoto?  @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  requestId   String
+  createdById String
+  createdAt   DateTime   @default(now())
+
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, createdAt])
+}
+
+/// A photo stored in the database. Bytes are served only by the photo endpoint, never in job responses.
+model JobPhoto {
+  id          String           @id @default(uuid())
+  jobCardId   String
+  jobCard     JobCard          @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  category    JobPhotoCategory
+  /// For check-in photos: FRONT, REAR, LEFT, RIGHT or ODOMETER. Null for other categories.
+  slot        String?
+  contentType String
+  byteSize    Int
+  width       Int
+  height      Int
+  sha256      String           @db.Char(64)
+  data        Bytes
+  requestId   String
+  createdById String
+  createdAt   DateTime         @default(now())
+  damageMark  JobDamageMark?
+
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, category])
+}
+
 model JobStageEvent {
   id        String    @id @default(uuid())
   jobCardId String

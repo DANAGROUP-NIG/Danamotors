@@ -1,5 +1,6 @@
-export type SignedOpeningDocument = {
-  version: 1;
+import type { SignedCheckIn } from "./job-check-in.types";
+
+type OpeningDocumentBase = {
   termsVersion: string;
   statement: string;
   terms: string[];
@@ -27,11 +28,20 @@ export type SignedOpeningDocument = {
     }[];
   };
 };
+/**
+ * Version 1 was signed before check-in existed. Version 2 (phase 2) also holds the walk-around
+ * the customer confirmed: fuel, checklist, damage marks, belongings and photos.
+ */
+export type SignedOpeningDocument =
+  | (OpeningDocumentBase & { version: 1 })
+  | (Omit<OpeningDocumentBase, "scope"> & { version: 2; scope: OpeningDocumentBase["scope"] & { checkIn: SignedCheckIn } });
 export type OpeningSignature = {
   id: string;
   revision: number;
   signerName: string;
   relationship: string | null;
+  /** A representative's phone. Null for the owner and for older signatures. */
+  signerPhone?: string | null;
   signedAt: string;
 };
 export type JobOpeningConsent = {
@@ -46,6 +56,7 @@ export type OpeningSignatureInput = {
   idempotencyKey: string;
   signerName: string;
   relationship?: string;
+  signerPhone?: string;
   signatureImage: string;
 };
 export type JobOpeningPrint = {

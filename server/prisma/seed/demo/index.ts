@@ -37,6 +37,7 @@ import { seedPsf } from "./psf";
 import { resetTestCases } from "./reset";
 import { printSummary } from "./summary";
 import { CAMPAIGNS, DEMO_TAG, JOBS, STAGE_JOBS } from "./fixtures";
+import { seedStageBooking } from "./check-in";
 
 const USAGE = "Usage: npm run prisma:seed:demo -- [--reset-test] [--pdi-only] [--repeat-only] [--csc-only] [--late-only] [--psf-only] [--allow-database=<name>] [--main-branch=<name>] [--second-branch=<name>]";
 
@@ -160,6 +161,9 @@ async function main() {
     done.set(job.id, result);
     console.log(`job card ${result.jobNumber}`);
   }
+
+  // Check-in (phase 2): a booking ready to open as a job card.
+  await seedStageBooking(ctx, ref, parties);
 
   // Service MIS reports (#97): finished job history across every service category.
   await seedMis(ctx, ref);

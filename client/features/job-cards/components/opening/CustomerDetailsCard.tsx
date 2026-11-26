@@ -30,7 +30,7 @@ export function CustomerDetailsCard(
         rel="noopener noreferrer"
         className="text-sm font-medium text-primary underline">Edit customer profile</Link>}>
       <div className="mb-4">{lookup}</div>
-      {loading && <p role="status" className="mb-3 text-sm text-muted-foreground">Loading customer details...</p>}
+      {loading && <p role="status" className="mb-3 text-sm text-muted-foreground">Loading customer details</p>}
       {error && <p role="alert" className="mb-3 text-sm text-destructive">Could not load customer. <button type="button" className="underline" onClick={retry}>Retry</button></p>}
       {!customer && !loading && !error && <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">Search by name, mobile number or registration to select a customer.</p>}
       {customer && <div className="space-y-4"><div className={openingGrid}>

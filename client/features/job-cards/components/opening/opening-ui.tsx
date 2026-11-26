@@ -202,11 +202,6 @@ export function CurrencyInput({
 }
 
 // TODO(confirm): replace the legacy unknown label when its business meaning is agreed.
-export const openingLabels = {
-  customField: "Custom Field (TBD)",
-  tyres: ["Tyre 1", "Tyre 2", "Tyre 3", "Tyre 4", "Tyre 5"],
-};
-
 export function OpeningTimePicker({ value = "", onChange, onBlur, invalid }: {
   value?: string;
   onChange: (value: string) => void;

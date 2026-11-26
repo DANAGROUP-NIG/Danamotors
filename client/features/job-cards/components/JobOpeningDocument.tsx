@@ -1,4 +1,5 @@
-import { lagosDate } from "@/features/service-transactions/transaction.logic";
+import { formatDateTime, formatKm, NOT_PROVIDED } from "@/lib/format";
+import { CHECKLIST_STATE_VIEW, belongingsText, damageLine, fuelLabel } from "../lib/check-in.logic";
 import type { SignedOpeningDocument } from "../types/job-opening-consent.types";
 
 /** The same saved customer-facing scope is reviewed before signing and printed afterwards. */
@@ -25,29 +26,23 @@ export function JobOpeningDocument({
         </div>
         <div>
           <dt className="font-medium">Registration</dt>
-          <dd>{scope.registration || "N/A"}</dd>
+          <dd>{scope.registration || NOT_PROVIDED}</dd>
         </div>
         <div>
           <dt className="font-medium">VIN</dt>
-          <dd className="break-all">{scope.vin || "N/A"}</dd>
+          <dd className="break-all">{scope.vin || NOT_PROVIDED}</dd>
         </div>
         <div>
           <dt className="font-medium">Mileage</dt>
-          <dd>
-            {scope.mileage === null
-              ? "N/A"
-              : scope.mileage.toLocaleString("en-NG")}
-          </dd>
+          <dd>{formatKm(scope.mileage)}</dd>
         </div>
         <div>
           <dt className="font-medium">Opened</dt>
-          <dd>{lagosDate(scope.openedAt)}</dd>
+          <dd>{formatDateTime(scope.openedAt)}</dd>
         </div>
         <div>
           <dt className="font-medium">Promised delivery</dt>
-          <dd>
-            {scope.promisedAt ? lagosDate(scope.promisedAt) : "Not provided"}
-          </dd>
+          <dd>{formatDateTime(scope.promisedAt)}</dd>
         </div>
         <div>
           <dt className="font-medium">Service</dt>
@@ -75,6 +70,7 @@ export function JobOpeningDocument({
           </p>
         )}
       </section>
+      {document.version === 2 && <SignedWalkAround checkIn={document.scope.checkIn} />}
       <section className="space-y-2 text-sm">
         <h3 className="font-semibold">Job-opening consent</h3>
         <p>{document.statement}</p>
@@ -94,5 +90,65 @@ export function JobOpeningDocument({
         )}
       </section>
     </div>
+  );
+}
+
+type SignedCheckIn = Extract<SignedOpeningDocument, { version: 2 }>["scope"]["checkIn"];
+
+/** The walk-around the customer confirmed (signed documents from phase 2 on). */
+function SignedWalkAround({ checkIn }: { checkIn: SignedCheckIn }) {
+  return (
+    <section className="space-y-3 text-sm" style={{ breakInside: "avoid" }}>
+      <h3 className="font-semibold">Vehicle condition at check-in</h3>
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="font-medium">Fuel level</dt>
+          <dd>{fuelLabel(checkIn.fuelLevel)}</dd>
+        </div>
+        <div>
+          <dt className="font-medium">Service book</dt>
+          <dd>
+            {checkIn.serviceBookSeen
+              ? `Seen, ${checkIn.serviceBookStamps ?? 0} stamps this warranty year`
+              : "Not seen"}
+          </dd>
+        </div>
+        <div>
+          <dt className="font-medium">Belongings</dt>
+          <dd className="wrap-break-word">{belongingsText(checkIn)}</dd>
+        </div>
+        <div>
+          <dt className="font-medium">Photos taken</dt>
+          <dd>{checkIn.photos.length}</dd>
+        </div>
+      </dl>
+      <div>
+        <h4 className="font-medium">Damage noted</h4>
+        {checkIn.damageMarks.length ? (
+          <ul className="list-disc pl-5">
+            {checkIn.damageMarks.map((mark) => (
+              <li key={mark.id}>
+                {damageLine(mark)}
+                {mark.note ? `: ${mark.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No damage noted</p>
+        )}
+      </div>
+      <div>
+        <h4 className="font-medium">Checklist</h4>
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-3 print:grid-cols-3">
+          {checkIn.checklist.map((item) => (
+            <li key={item.code} className="flex justify-between gap-2 border-b border-border py-0.5">
+              <span>{item.label}</span>
+              <span className="font-medium">{CHECKLIST_STATE_VIEW[item.state ?? "UNSET"].label}</span>
+            </li>
+          ))}
+        </ul>
+        {checkIn.checklistNote && <p className="mt-2 whitespace-pre-wrap wrap-break-word">Notes: {checkIn.checklistNote}</p>}
+      </div>
+    </section>
   );
 }

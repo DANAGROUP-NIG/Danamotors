@@ -37,7 +37,7 @@ import { ROLES } from "../../shared/constants/roles";
 import { nextDocumentNumber } from "../finance/document-number";
 import { requireMaster } from "../workshop/workshop-master.service";
 import { ServiceTypeService } from "../workshop/service-type.service";
-import { resolveJobComplaints } from "./job-card-complaints";
+import { resolveJobComplaints, withOrderedIds } from "./job-card-complaints";
 import { jobOpeningBody, jobUpdateBody } from "./service.validation";
 import {
   NOTIFICATION_TYPES,
@@ -380,7 +380,7 @@ export class JobCardWorkflowService {
             ).withCode("FIELD_VALIDATION", { field: "appointmentId" });
         }
 
-        await openingField("bayId", () => requireMaster(tx, data.bayId, "BAY"));
+        if (data.bayId) await openingField("bayId", () => requireMaster(tx, data.bayId!, "BAY"));
 
       const serviceType = await openingField("serviceTypeId", async () => {
         const option = await new ServiceTypeService().requireAvailable(tx, vehicle.id, data.serviceTypeId, new Date(), jobType);
@@ -532,7 +532,7 @@ export class JobCardWorkflowService {
             : await nextDocumentNumber(tx, "JOB_CARD"),
 
             complaints: {
-              create: complaints,
+              create: withOrderedIds(complaints),
             },
 
             statusHistory: {
@@ -1036,7 +1036,7 @@ async function notifyWarrantyJob(result: {
     await notifyWarrantyOfficers(branch.id, {
       type: NOTIFICATION_TYPES.WARRANTY_JOB_CREATED,
       title: "Warranty job opened",
-      message: `${who} · ${car} · VIN ${vehicle.vin} · ${km} · job card ${card.jobNumber} at ${branch.name}. Complaint: ${card.description}. Case ${warrantyCase.caseNumber} opened.`,
+      message: `${who}, ${car}, VIN ${vehicle.vin}, ${km}, job card ${card.jobNumber} at ${branch.name}. Complaint: ${card.description}. Case ${warrantyCase.caseNumber} opened.`,
       link: `/warranty/${warrantyCase.id}`,
       branchId: branch.id,
     });

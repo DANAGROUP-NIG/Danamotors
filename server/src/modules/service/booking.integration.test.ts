@@ -1,3 +1,7 @@
+// Point Prisma at the disposable database before any module creates the client. Without this,
+// the validation import below created it from server/.env and the fixtures went to the shared database.
+const testUrl = process.env.TEST_DATABASE_URL;
+if (testUrl && ["localhost", "127.0.0.1"].includes(new URL(testUrl).hostname)) process.env.DATABASE_URL = testUrl;
 import { PrismaClient } from "@prisma/client";
 import { createAppointmentSchema, updateAppointmentSchema } from './service.validation';
 import type { ServiceService } from "./service.service";

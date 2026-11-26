@@ -112,7 +112,9 @@ test("finished steps with no recorded data read Not provided instead of looking 
     { label: "Service type", value: "Not provided" },
     { label: "Promised delivery", value: "Not provided" },
     { label: "Customer requests", value: "Not provided" },
-    { label: "Job-opening approval", value: "Not provided" },
+    { label: "Instructions to technician", value: "Not provided" },
+    { label: "Walk-around", value: "Not provided" },
+    { label: "Customer consent", value: "Not provided" },
   ]);
   assert.deepEqual(plain(frame.stageDetails("ESTIMATE", legacyJob)), [{ label: "Estimate", value: "Not provided" }]);
   for (const stage of ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE", "REPAIR", "QUALITY_CHECK", "BILLING", "DELIVERY"]) {
@@ -130,6 +132,18 @@ test("finished steps show the recorded facts in plain words", () => {
     promisedAt: "2026-11-28T15:00:00Z",
     complaints: [{ description: "Noise from front left wheel when braking" }, { description: "AC not cooling well" }],
     openingSignatureCurrent: true,
+    checkIn: {
+      fuelLevel: "HALF",
+      checklist: { HUB_CAPS: "MISSING", AC_WORKING: "NOT_WORKING", CLOCK: "PRESENT" },
+      checklistNote: null,
+      serviceBookSeen: true,
+      serviceBookStamps: 3,
+      noValuables: true,
+      belongingsNote: "Umbrella in boot",
+      instructionsToTechnician: "Check the front left brake.",
+      completedAt: "2026-11-25T08:40:00Z",
+    },
+    damageMarks: [{ id: "m", type: "SCRATCH", x: "50.00", y: "95.00" }],
     qcStatus: "PASSED",
     estimates: [{ id: "e", version: 2, status: "Approved", amount: 152112.5, currency: "NGN", description: "Estimate", approvals: [], lines: [] }],
   };
@@ -138,7 +152,12 @@ test("finished steps show the recorded facts in plain words", () => {
   assert.equal(checkIn.Mileage, "48,250 km");
   assert.equal(checkIn["Promised delivery"], "28 Nov 2026, 16:00");
   assert.equal(checkIn["Customer requests"], "Noise from front left wheel when braking; AC not cooling well");
-  assert.equal(checkIn["Job-opening approval"], "Signed by the customer");
+  assert.equal(checkIn["Customer consent"], "Signed by the customer");
+  assert.equal(checkIn["Instructions to technician"], "Check the front left brake.");
+  assert.equal(checkIn["Fuel level"], "Half (1/2)");
+  assert.equal(checkIn["Damage noted"], "Scratch on rear bumper");
+  assert.equal(checkIn.Checklist, "1 missing, 1 not working");
+  assert.equal(checkIn.Belongings, "No valuables. Items left: Umbrella in boot");
   assert.deepEqual(plain(frame.stageDetails("ESTIMATE", job)), [
     { label: "Estimate", value: "Revision 2" },
     { label: "Customer decision", value: "Approved" },

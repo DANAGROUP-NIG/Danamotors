@@ -1,3 +1,4 @@
+import type { Checklist, DamageType, FuelLevel } from "./job-check-in.types";
 import type { JobCardStatus } from "./job-card-status";
 import type { JobStage } from "./job-workspace.types";
 import type {
@@ -178,9 +179,22 @@ export type JobCard = {
   batteryMake?: string | null;
   batteryNumber?: string | null;
   customField1?: string | null;
-  checklist?: string | null;
   remarks?: string | null;
   customerRemarks?: string | null;
+  /** The check-in record (phase 2), without photos. Null until the advisor records it. */
+  checkIn?: {
+    fuelLevel: FuelLevel | null;
+    checklist: Checklist;
+    checklistNote: string | null;
+    serviceBookSeen: boolean;
+    serviceBookStamps: number | null;
+    noValuables: boolean;
+    belongingsNote: string | null;
+    instructionsToTechnician: string | null;
+    completedAt: string | null;
+  } | null;
+  /** x and y arrive as decimal strings (percentages of the diagram). */
+  damageMarks?: { id: string; type: DamageType; x: number | string; y: number | string }[];
   serviceAdvisor?: { firstName: string; lastName: string } | null;
   deliveryAdvisor?: { firstName: string; lastName: string } | null;
   estimatedParts?: number | null;
@@ -223,6 +237,7 @@ export type JobCard = {
   complaints?: {
     id: string;
     description: string;
+    complaintCodeId?: string | null;
     defectCode?: string | null;
     spare?: number;
     oil?: number;

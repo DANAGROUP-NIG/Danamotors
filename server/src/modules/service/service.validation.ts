@@ -155,7 +155,8 @@ export const jobOpeningBody = z
     odometerReplaced: z.boolean().optional(),
     odometerReplacedReason: z.string().trim().max(300).optional(),
     ...acknowledgementFields,
-    bayId: z.string().uuid(),
+    // The workshop supervisor sets the bay and technician in Diagnosis; both stay optional at opening.
+    bayId: z.string().uuid().optional(),
     serviceAdvisorId: z.string().uuid(),
     engineerId: z.string().uuid().optional(),
     technicianId: z.string().uuid().optional(),
@@ -185,7 +186,6 @@ export const jobOpeningBody = z
     batteryNumber: z.string().trim().toUpperCase().max(100).optional(),
     customField1: z.string().trim().max(500).optional(),
     acType: z.enum(["FACTORY", "DEALER", "NONE"]).optional(),
-    checklist: z.string().trim().max(5000).optional(),
     estimatedParts: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
     estimatedOil: z.number().min(0).max(1e12).multipleOf(0.01).optional(),
     estimatedLabour: z.number().min(0).max(1e12).multipleOf(0.01).optional(),

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/**
+ * Opening a job card: only what is needed to create it. Bay and technician are set by the
+ * workshop supervisor in Diagnosis; the walk-around and the customer's signature are taken at check-in.
+ */
 export const createJobCardSchema = z
   .object({
     openingConsent: z.object({ accepted: z.literal(true), termsHash: z.string().regex(/^[a-f0-9]{64}$/) }).optional(),
@@ -9,9 +13,7 @@ export const createJobCardSchema = z
     vehicleId: z.string().uuid("Select a vehicle"),
     serviceId: z.union([z.string().uuid(), z.literal("")]).optional(),
     serviceTypeId: z.string().uuid("Select a service type"),
-    bayId: z.string().uuid("Select a bay"),
-    serviceAdvisorId: z.string().uuid("Select a service advisor"),
-    engineerId: z.union([z.string().uuid(), z.literal("")]).optional(),
+    serviceAdvisorId: z.string().uuid("Select the service advisor receiving the vehicle"),
     mileage: z
       .number({ invalid_type_error: "Enter the current odometer reading" })
       .int()
@@ -42,51 +44,11 @@ export const createJobCardSchema = z
       )
       .min(1, "Add at least one customer request")
       .max(100),
+    // From a booking; the server copies the booking's own value.
     acFitted: z.boolean().optional(),
-    inHouse: z.boolean().optional(),
     isRepeat: z.boolean().optional(),
     previousJobId: z.string().optional(),
     repeatReason: z.string().trim().max(2000).optional(),
-    remarks: z.string().max(500, "Keep remarks to 500 characters").optional(),
-    tyres: z
-      .array(
-        z.object({
-          makeId: z.string().optional(),
-          number: z.string().trim().max(100).optional(),
-        }),
-      )
-      .length(5),
-    batteryMakeId: z.string().optional(),
-    batteryNumber: z.string().trim().max(100).optional(),
-    customField1: z.string().max(500).optional(),
-    acType: z.enum(["FACTORY", "DEALER", "NONE"]).optional(),
-    checklist: z.string().max(5000).optional(),
-    estimatedParts: z.coerce
-      .number()
-      .min(0)
-      .max(1e12)
-      .multipleOf(0.01)
-      .optional(),
-    estimatedOil: z.coerce
-      .number()
-      .min(0)
-      .max(1e12)
-      .multipleOf(0.01)
-      .optional(),
-    estimatedLabour: z.coerce
-      .number()
-      .min(0)
-      .max(1e12)
-      .multipleOf(0.01)
-      .optional(),
-    serviceCharge: z.coerce
-      .number()
-      .min(0)
-      .max(1e12)
-      .multipleOf(0.01)
-      .optional(),
-    estimatedHours: z.coerce.number().nonnegative().optional(),
-    estimatedCost: z.coerce.number().nonnegative().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.appointmentId && !v.openingConsent) ctx.addIssue({ code: 'custom', path: ['openingConsent'], message: 'Review and accept the job opening terms first' });

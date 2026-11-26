@@ -52,6 +52,8 @@ app.use("/api/handheld", express.json({ limit: "2mb" }));
 app.use("/api/inventory/part-catalogue/import", express.json({ limit: "2mb" }));
 // Mobis price bulletins (a few thousand part numbers and list prices).
 app.use("/api/finance/mobis-pricing", express.json({ limit: "5mb" }));
+// Job photos arrive as data URLs of up to 2 MB (job-check-in.logic.ts).
+app.use("/api/service/job-cards/:id/photos", express.json({ limit: "3mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -1,3 +1,4 @@
+import { belongingsText, damageSentence, fuelLabel } from "./check-in.logic";
 import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { NOT_PROVIDED, formatDateTime, formatKm, formatMoney, formatRelative } from "@/lib/format";
 import { COVERAGE_LABELS, CASE_STATUS_LABELS } from "@/features/warranty/lib/warranty-format";
@@ -117,8 +118,10 @@ export function stageDetails(stage: JobStep, job: JobCard): DetailRow[] {
           label: "Customer requests",
           value: job.complaints?.length ? job.complaints.map((complaint) => complaint.description).join("; ") : NOT_PROVIDED,
         },
+        { label: "Instructions to technician", value: text(job.checkIn?.instructionsToTechnician) },
+        ...checkInRows(job),
         {
-          label: "Job-opening approval",
+          label: "Customer consent",
           value: job.openingSignatureCurrent ? "Signed by the customer" : job.openingSignatureRequired ? "Not signed" : NOT_PROVIDED,
         },
       ];
@@ -177,6 +180,20 @@ export function stageDetails(stage: JobStep, job: JobCard): DetailRow[] {
         { label: "Gate pass", value: text(job.gatePassNumber) },
       ];
   }
+}
+
+/** The walk-around in a few words. Item names are in the signed copy; here only the counts. */
+function checkInRows(job: JobCard): DetailRow[] {
+  const record = job.checkIn;
+  if (!record || !record.fuelLevel) return [{ label: "Walk-around", value: NOT_PROVIDED }];
+  const states = Object.values(record.checklist ?? {});
+  const count = (state: string) => states.filter((value) => value === state).length;
+  return [
+    { label: "Fuel level", value: fuelLabel(record.fuelLevel) },
+    { label: "Damage noted", value: damageSentence((job.damageMarks ?? []).map((mark) => ({ type: mark.type, x: Number(mark.x), y: Number(mark.y) }))) },
+    { label: "Checklist", value: `${count("MISSING")} missing, ${count("NOT_WORKING")} not working` },
+    { label: "Belongings", value: belongingsText(record) },
+  ];
 }
 
 /** The one-line summary plus its details, for each finished step. */

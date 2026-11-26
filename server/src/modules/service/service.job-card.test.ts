@@ -171,11 +171,15 @@ describe("JobCard workflow", () => {
     });
   });
 
+  it("opens without a bay or technician: the workshop supervisor sets them in Diagnosis", () => {
+    const { bayId: _bay, ...body } = input as Record<string, unknown>;
+    expect(createJobCardSchema.safeParse({ body }).success).toBe(true);
+  });
+
   it.each([
     "customerId",
     "vehicleId",
     "serviceTypeId",
-    "bayId",
     "serviceAdvisorId",
     "mileage",
     "promisedAt",
@@ -353,7 +357,7 @@ describe("JobCard workflow", () => {
     }) }));
   });
 
-  it("calculates the opening estimate from its breakdown and persists the checklist", async () => {
+  it("calculates the opening estimate from its breakdown", async () => {
     await new ServiceService().createJobCard({
       ...input,
       createdById: id,
@@ -362,12 +366,10 @@ describe("JobCard workflow", () => {
       estimatedLabour: 50,
       serviceCharge: 5,
       estimatedCost: 9999,
-      checklist: "Inspect brakes and tyres",
     });
     expect(prisma.jobCard.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         estimatedCost: 65.3,
-        checklist: "Inspect brakes and tyres",
         estimatedParts: 10.1,
       }),
     });

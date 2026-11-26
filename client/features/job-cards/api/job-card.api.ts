@@ -43,15 +43,12 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
   return data.jobCard;
 }
 
+/** Opening a job card: only what is needed to create it (job card revamp phase 2). */
 export interface CreateJobCardPayload {
-  engineerId?: string;
   branchName: string;
   serviceId?: string;
   serviceTypeId: string;
-  bayId: string;
   serviceAdvisorId: string;
-  technicianId?: string;
-  teamId?: string;
   mileage: number;
   promisedAt: string;
   complaints: {
@@ -70,21 +67,7 @@ export interface CreateJobCardPayload {
   openingConsent?: { accepted: true; termsHash: string };
   customerId?: string;
   vehicleId?: string;
-  tyres?: { makeId?: string; number?: string }[];
-  batteryMakeId?: string;
-  batteryNumber?: string;
-  customField1?: string;
-  acType?: "FACTORY" | "DEALER" | "NONE";
-  checklist?: string;
-  estimatedParts?: number;
-  estimatedOil?: number;
-  estimatedLabour?: number;
-  serviceCharge?: number;
   acFitted?: boolean;
-  inHouse?: boolean;
-  remarks?: string;
-  estimatedHours?: number;
-  estimatedCost?: number;
   odometerReplaced?: boolean;
   odometerReplacedReason?: string;
   /** The adviser informed the customer of the warranty coverage. */
