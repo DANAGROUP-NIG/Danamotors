@@ -40,6 +40,7 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       code: branch.code ?? "",
       shortName: branch.shortName ?? "",
       parentBranchId: branch.parentBranchId ?? "",
+      roundMrnTotal: !!branch.roundMrnTotal,
     },
   });
   const { data: detail } = useBranch(branch.id);
@@ -57,16 +58,18 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       code: branch.code ?? "",
       shortName: branch.shortName ?? "",
       parentBranchId: branch.parentBranchId ?? "",
+      roundMrnTotal: !!branch.roundMrnTotal,
     });
   }, [branch, reset]);
 
   function onSubmit(values: UpdateBranchFormValues) {
-    const { code, shortName, parentBranchId, ...rest } = values;
+    const { code, shortName, parentBranchId, roundMrnTotal, ...rest } = values;
     const payload = {
       ...(Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== "" && v !== undefined)) as Omit<
         UpdateBranchFormValues,
-        "code" | "shortName" | "parentBranchId"
+        "code" | "shortName" | "parentBranchId" | "roundMrnTotal"
       >),
+      roundMrnTotal: !!roundMrnTotal,
       // Empty clears these, so they are always sent.
       code: code?.trim() ? code.trim().toUpperCase() : null,
       shortName: shortName?.trim() || null,
@@ -107,6 +110,10 @@ export function BranchEditForm({ branch, onSuccess }: BranchEditFormProps) {
       </div>
 
       <BranchPlacementFields register={register} errors={errors} selfId={branch.id} hasSubLocations={hasSubLocations} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" {...register("roundMrnTotal")} />
+        Round vendor MRN totals to the naira (legacy: on at CPD and Abuja; a location follows its branch)
+      </label>
 
       <Button type="submit" disabled={update.isPending} size="sm">
         {update.isPending ? "Saving…" : "Save changes"}

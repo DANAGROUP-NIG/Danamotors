@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { useBranchStore } from "@/store/branch.store";
 import {
   getBillableJobCardsRequest,
@@ -142,10 +143,10 @@ export function InvoiceCreateForm({ onSuccess }: InvoiceCreateFormProps) {
       {jobCardId && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Parts discount (%)">
-            <input type="number" min="0" max="100" step="0.01" className={inputCls} disabled={Boolean(bill && !hasParts)} value={partsDiscountPercent} onChange={(event) => setPartsDiscountPercent(Number(event.target.value))} />
+            <NumberInput min="0" max="100" step="0.01" className={inputCls} disabled={Boolean(bill && !hasParts)} value={partsDiscountPercent} onValueChange={(v) => setPartsDiscountPercent(v ?? 0)} />
           </Field>
           <Field label="Labour discount (%)">
-            <input type="number" min="0" max="100" step="0.01" className={inputCls} value={labourDiscountPercent} onChange={(event) => setLabourDiscountPercent(Number(event.target.value))} />
+            <NumberInput min="0" max="100" step="0.01" className={inputCls} value={labourDiscountPercent} onValueChange={(v) => setLabourDiscountPercent(v ?? 0)} />
           </Field>
           <Field label="Service advisor">
             <select className={inputCls} value={effectiveAdvisorId} onChange={(event) => setServiceAdvisorId(event.target.value)} required>

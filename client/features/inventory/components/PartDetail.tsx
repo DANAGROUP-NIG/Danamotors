@@ -122,7 +122,7 @@ function FamilyRow({ part, current }: { part: PartMaster; current?: boolean }) {
         {current ? (
           <span className="font-mono text-sm font-medium text-slate-800">{part.partNumber} (this part)</span>
         ) : (
-          <Link href={`/inventory/${part.id}`} className="font-mono text-sm font-medium text-primary hover:underline">
+          <Link href={`/part-master/${part.id}`} className="font-mono text-sm font-medium text-primary hover:underline">
             {part.partNumber}
           </Link>
         )}
@@ -179,7 +179,7 @@ export function PartDetail({ id }: { id: string }) {
   if (error || !part) {
     return (
       <div className="px-4 py-10 lg:px-6">
-        <Link href="/inventory" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/part-master" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to Inventory
         </Link>
         <p className="text-sm text-red-500">Part not found.</p>
@@ -194,7 +194,7 @@ export function PartDetail({ id }: { id: string }) {
   return (
     <div className="px-4 py-6 lg:px-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Link href="/inventory" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/part-master" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft className="size-4" /> Back to Inventory
         </Link>
         <div className="flex flex-wrap gap-2">
@@ -255,7 +255,7 @@ export function PartDetail({ id }: { id: string }) {
               {sourceOf && (
                 <p className="mt-1 text-sm text-slate-500">
                   {partSourceLabel(part.partFlag)} source of{" "}
-                  <Link href={`/inventory/${sourceOf.id}`} className="font-mono font-medium text-primary hover:underline">
+                  <Link href={`/part-master/${sourceOf.id}`} className="font-mono font-medium text-primary hover:underline">
                     {sourceOf.partNumber}
                   </Link>
                 </p>
@@ -263,7 +263,7 @@ export function PartDetail({ id }: { id: string }) {
               {part.role === "ALTERNATE" && mainPart && (
                 <p className="mt-1 text-sm text-slate-500">
                   Alternate for{" "}
-                  <Link href={`/inventory/${mainPart.id}`} className="font-mono font-medium text-primary hover:underline">
+                  <Link href={`/part-master/${mainPart.id}`} className="font-mono font-medium text-primary hover:underline">
                     {mainPart.partNumber}
                   </Link>
                 </p>
@@ -513,7 +513,7 @@ export function PartDetail({ id }: { id: string }) {
           del.mutate(part.id, {
             onSuccess: () => {
               setConfirmDelete(false);
-              router.push("/inventory");
+              router.push("/part-master");
             },
             onError: () => setConfirmDelete(false),
           })

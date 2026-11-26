@@ -4,9 +4,10 @@ import { MitStatus, TransportMode } from "@prisma/client";
 const uuid = (label: string) => z.string().uuid(`Invalid ${label}`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 
-// Legacy MIT received modes are air, ship and road.
-const receivedMode = z.enum([TransportMode.AIR, TransportMode.SEA, TransportMode.ROAD], {
-  errorMap: () => ({ message: "Received mode must be AIR, SEA (ship) or ROAD" }),
+// Legacy MIT received modes (MATERIALINTRANSITHEAD.DispatchMode since 2021): 3 courier 181, 2 air 87, 1 sea 5.
+// Road was never used but is kept by decision (2026-11-25).
+const receivedMode = z.enum([TransportMode.COURIER, TransportMode.AIR, TransportMode.SEA, TransportMode.ROAD], {
+  errorMap: () => ({ message: "Received mode must be COURIER, AIR, SEA (ship) or ROAD" }),
 });
 
 export const importMitSchema = z.object({
@@ -79,5 +80,6 @@ export const listMobisMitsSchema = z.object({
   query: z.object({
     status: z.nativeEnum(MitStatus).optional(),
     search: z.string().trim().max(50).optional(),
+    branchId: z.string().uuid().optional(),
   }),
 });

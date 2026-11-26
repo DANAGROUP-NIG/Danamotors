@@ -71,6 +71,7 @@ const TYPE_LABEL: Record<string, string> = {
   ADJUSTMENT: "SAN",
   ISSUED: "Issue",
   TRANSFER_OUT: "STN",
+  VENDOR_RETURN: "MRN return",
 };
 
 export const partColumns = (p: Pick<Part, "partNumber" | "name" | "priceCategoryCode">) => ({ partNumber: p.partNumber, description: p.name, category: p.priceCategoryCode });
@@ -204,7 +205,7 @@ export class StockReportService {
   /** Document, party and invoice for each movement, from what it references. */
   private async documents(movements: Movement[]): Promise<(m: Movement) => Doc> {
     const ids = (...types: string[]) => [...new Set(movements.filter((m) => types.includes(m.type) && m.referenceId).map((m) => m.referenceId!))];
-    const [mrns, stns, invoices, returns, issuances] = await Promise.all([
+    const [mrns, stns, invoices, returns, issuances, vendorReturns] = await Promise.all([
       prisma.materialReceiptNote.findMany({
         where: { id: { in: ids("RECEIVED", "TRANSFER_IN") } },
         select: {
@@ -227,9 +228,13 @@ export class StockReportService {
         where: { id: { in: ids("ISSUED", "RETURNED") } },
         select: { id: true, jobCard: { select: { jobNumber: true, vehicle: { select: { registrationNumber: true } } } } },
       }),
+      prisma.vendorReturn.findMany({
+        where: { id: { in: ids("VENDOR_RETURN") } },
+        select: { id: true, returnNumber: true, vendor: customerSelect, mrn: { select: { mrnNumber: true, receiptDate: true } } },
+      }),
     ]);
     const index = <T extends { id: string }>(list: T[]) => new Map(list.map((x) => [x.id, x]));
-    const [mrn, stn, invoice, saleReturn, issuance] = [index(mrns), index(stns), index(invoices), index(returns), index(issuances)];
+    const [mrn, stn, invoice, saleReturn, issuance, vendorReturn] = [index(mrns), index(stns), index(invoices), index(returns), index(issuances), index(vendorReturns)];
     const doc = (type: string, number: string | null, party: string | null, invoiceNo: string | null = null, invoiceDate: Date | null = null): Doc => ({
       type,
       number,
@@ -247,6 +252,8 @@ export class StockReportService {
       if (m.type === "RECEIVED" && r) return doc("MRN", r.mrnNumber, r.vendor, r.invoiceNumber, r.mit?.invoiceDate ?? null);
       if (m.type === "TRANSFER_IN" && r) return doc("SRN", r.mrnNumber, r.sourceBranch?.name ?? null, r.stn?.stnNumber ?? null, r.stn?.documentDate ?? null);
       if (m.type === "TRANSFER_OUT" && s) return doc("STN", s.stnNumber, s.destinationBranch.name);
+      const vr = m.type === "VENDOR_RETURN" ? vendorReturn.get(ref) : undefined;
+      if (vr) return doc("MRN return", vr.returnNumber, partyName(vr.vendor), vr.mrn.mrnNumber, vr.mrn.receiptDate);
       if (m.type === "ISSUED" && i) return doc("Counter sale", i.invoiceNumber, partyName(i.customer), i.invoiceNumber, i.issuedDate);
       if (m.type === "RETURNED" && sr) {
         const bill = sr.counterSale.invoice;

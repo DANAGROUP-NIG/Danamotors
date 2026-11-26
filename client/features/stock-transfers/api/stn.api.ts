@@ -1,5 +1,6 @@
-import { apiGet, apiPost } from "@/lib/api/apiClient";
+import { apiGet, apiPatch, apiPost } from "@/lib/api/apiClient";
 import type {
+  EditStnPayload,
   DirectStnPayload,
   DispatchStnPayload,
   ReceiveIndentPayload,
@@ -32,6 +33,16 @@ export async function dispatchStnRequest(payload: DispatchStnPayload) {
 /** Free stock sent without an indent. */
 export async function directStnRequest(payload: DirectStnPayload) {
   return (await apiPost<{ stn: StnDetail }>(`${BASE}/direct`, payload)).stn;
+}
+
+/** Before any MRN: stock goes back to the sender, indent lines back on back order. */
+export async function cancelStnRequest(id: string, reason: string) {
+  return (await apiPatch<{ stn: StnDetail }>(`${BASE}/${id}/cancel`, { reason })).stn;
+}
+
+/** Before any MRN: issued quantities and the tax form (legacy STN edit). */
+export async function editStnRequest(id: string, payload: EditStnPayload) {
+  return (await apiPatch<{ stn: StnDetail }>(`${BASE}/${id}/edit`, payload)).stn;
 }
 
 export async function receiveStnRequest(id: string, payload: ReceiveIndentPayload) {

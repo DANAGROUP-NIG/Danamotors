@@ -11,25 +11,38 @@ actions and the system carries the order through:
 | --- | --- | --- |
 | 1. Customer purchase order | Part Sale → Customer Orders → **New CPO** | Choose the customer and parts. Rates come from the Part Master retail rate. "Pick free stock now" reserves what is available. |
 | 2. Pick | CPO detail → **Pick free stock** | Reserves free stock for open lines at any time. **Release picked** gives it back. |
-| 3. Bill | CPO detail → **Bill**, or Counter Sales → **New counter sale** | Bills ticked lines from one or more of the customer's open CPOs. Picked units are issued first, then free stock. |
+| 3. Bill | CPO detail → **Bill**, or Counter Sales → **New counter sale** | Bills ticked lines from one or more of the customer's open CPOs (picked units first, then free stock), parts with no CPO (free stock, at the Part Master retail rate), or both. |
 | 4. Return | Bill detail → **Sale return** | Puts the parts back into stock and credits the customer. |
 
 ## Pricing
 
-The legacy CPD bills and returns use the following formula. The unit tests check it against
-real CPD bills.
+Legacy counter-sale bills and returns use the following formula, per line. The unit tests check it
+against real legacy bills to the kobo: CPD 2026000010, Lagos 2024000016 (trade discount, cash
+discount and handling) and 2024000006, ABJ 2025000002 (line discount).
 
 ```
 line gross     = quantity × retail rate
-cash discount  = gross × cash discount %         (one % for the whole bill)
-VAT            = (gross − discount) × 7.5%       (taxable parts only)
-net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦10
+trade discount = gross × line trade discount %                  (legacy csissue.discountper)
+cash discount  = (gross − trade) × bill cash discount %          (one % for the whole bill)
+handling       = (gross − trade − cash) × line handling %        (legacy csissue.handlingper)
+VAT            = (gross − trade − cash + handling) × 7.5%        (taxable parts, tax type Sale only)
+net amount     = Σ (gross − trade − cash + handling + VAT), rounded DOWN to the nearest ₦10
 ```
 
 - The cash discount can be entered as a percentage or as an amount. An amount is converted to
   the percentage it represents (legacy `CashDiscAmtorPer`), because CPD often sells at a
   negotiated price. A 100% discount gives a free-of-charge bill.
-- Handling charges are not applied. Every CPD bill since 2022 has 0% handling.
+- **Tax type** (legacy tax form): **Sale (VAT)**, form L, the default; or **Transfer without VAT**
+  (TRNSFR WO/V), form X, which charges no VAT on any line. Lagos used form X up to 2026 for
+  diesel engine oil to group units (Allen 5, Ilupeju, Dana Air), CPD last in 2024. The
+  datewise register and the tax annexure show a block per form, as legacy did.
+- **Trade discount** is typed per line (Disc %), default 0. Legacy never defaulted it from the
+  category: Lagos's category discount is 50% but its lines carry 0% or a typed 8%; ABJ typed 5–30%.
+- **Handling**: with the bill's **Charge handling** box ticked (the default, as on every legacy
+  bill), each line's Hdl % defaults to its part category's handling % at the selling branch
+  (Settings → Part Categories; Lagos 9% on categories A, B, C and E, 0% on oil and tools) and can be
+  changed. Unticked, no handling is charged. CPD and ABJ have charged none since 2022.
+- A cash discount entered as an amount is the % of the value after the trade discount.
 - A return is priced like the bill line it reverses, with the same discount % and VAT, and
   the same ₦10 rounding.
 
@@ -45,7 +58,9 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
   "Service and Parts" receipts). The legacy parts module had no receipt logic of its own: it
   shared the Service receipt screens, and CPD took no receipts in the legacy system.
 - **Tally**: counter-sale bills are exported as Sales vouchers. They use the job-bill
-  mappings: `PARTS_SALES`, `PARTS_DISCOUNT`, `VAT` and `ROUND_OFF`.
+  mappings: `PARTS_SALES`, `PARTS_DISCOUNT` (cash and trade discount), `PARTS_HANDLING`, `VAT` and
+  `ROUND_OFF`. A bill with handling is skipped, with a "Missing Tally account mapping" reason, until
+  `PARTS_HANDLING` is mapped.
 - **Returns** create a credit note with type `SALE_RETURN`. The credit note is set off
   against the bill's outstanding through a party adjustment with source `SALE_RETURN`. If the
   credit is larger than what is still due, the rest stays as customer credit. These credit
@@ -56,7 +71,11 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
 
 ## Rules
 
-- **One customer and one selling branch per bill.** A bill may combine lines from several CPOs.
+- **One customer and one selling branch per bill.** A bill may combine lines from several CPOs
+  and parts with no CPO. Legacy Lagos billed without a CPO (every Lagos bill since 2022), so a CPO
+  is not required. Any part source can be sold, local-purchase parts included.
+- **Sales executive** (legacy Counter Sale dropdown, filled on most CPD bills): chosen from the
+  active staff of the selling branch. It defaults to the user who bills.
 - **No overselling.** A line can be billed only up to its picked quantity plus free stock.
   Database checks stop a CPO line from picking, billing or cancelling more than was ordered,
   and stop a bill line from being returned more than once.
@@ -80,7 +99,7 @@ net amount     = Σ (gross − discount + VAT), rounded DOWN to the nearest ₦1
 
 ## API
 
-All endpoints are under `/api/part-sale`: `GET /customers`, `GET /parts`,
+All endpoints are under `/api/part-sale`: `GET /customers`, `GET /parts`, `GET /sales-executives`,
 `GET|POST /orders`, `GET /orders/:id`, `PATCH /orders/:id/pick|release|cancel`,
 `GET|POST /counter-sales`, `GET /counter-sales/:id`, `PATCH /counter-sales/:id/cancel`,
 `POST /counter-sales/:id/returns` and `GET /returns`. Request examples are in Swagger under
@@ -100,19 +119,58 @@ The rest of the legacy data is covered elsewhere or not included:
 
 - OrderType `I` CPOs and counter-sale trantypes `M` and `R` are branch orders and STNs. The
   [stock transfer](./stock-transfers.md) workflow covers them.
-- **Dispatch Challan** and **Challan Return** are not part of CPD part sale. In AutoEnhancer
-  they record unbilled issues of fuel and consumables (petrol, diesel, gloves) to internal
-  group cost centres. They will be built separately as an internal issue.
-  The legacy **Dispatch Challan Register** to rebuild with them: filters date range, **Spare / Oil /
-  Both** and **Pending / All**; one challan per heading (date, challan number, customer code and name
-  as the cost centre, gate pass issued) with its lines (part number, description, UOM, quantity, rate,
-  amount) and a sub total per challan.
+- **Dispatch Challan** and **Challan Return** are built as their own module; see
+  [Dispatch challans](#dispatch-challans) below.
+
+## Dispatch challans
+
+Legacy AutoEnhancer **Dispatch Challan** and **Dispatch Challan Return** (`challanhead`/`challandetail`,
+`ChallanRetHead`/`ChallanRetDetail`). A challan is an unbilled issue of fuel and consumables to an
+internal cost centre. Kia Plaza issues about 1,100 a year from stores A and QS: petrol and diesel
+make up 90% of them, then software, cotton waste, oil and gloves. They go to the KP associate vehicles,
+customer vehicles, PDI, KP1 admin, Allen 5, VI showroom, the workshop groups, UVAL, Dana Air and the gensets.
+In all three legacy databases, one challan was ever billed (CPD, 2016).
+
+As in legacy, the store chooses per document: a group unit can be billed on a counter sale
+(Transfer without VAT, as Lagos billed diesel engine oil to Allen 5 and Dana Air) or issued on a
+challan (as Lagos issued petrol and diesel to the same units). Challans can issue any part
+source; 921 of Lagos's 943 challan lines in 2025 were local-purchase parts.
+
+| Step | Screen | What happens |
+| --- | --- | --- |
+| Issue | Part Sale → Dispatch Challans → **New challan** | Choose the cost centre (a party, searched by code or name) and the parts. Each line takes free stock (on hand less reserved) out of the branch at the part's retail rate. The challan gets a number (`2026000001`) and a gate pass from the shared series. |
+| Return | Challan detail → **Challan return** | Return chosen quantities, or **Full return** for everything still out. The stock goes back at the challan's rate. |
+
+- **API**: `/api/dispatch-challans`: `GET|POST /`, `GET /:id`, `POST /:id/returns`, `GET /returns`,
+  and the pickers `GET /cost-centres` and `GET /parts`.
+- **Permissions**: `challan:read` (Admin, store managers, Accountant, Auditor), `challan:issue` and
+  `challan:return` (Admin, General and Branch Store Managers).
+- **Stock**: the challan writes `ISSUED` stock transactions and the return `RETURNED`, with the
+  challan or return id as the reference. A database check stops a line returning more than it issued.
+- **Reports**: the **Dispatch Challan Register**; a **Challans** section on the Checklist for Issues
+  (legacy CHALLAN section); the Consumption Report's consumable issue column, at the challan's rate.
+- **Migration**: no challan history is migrated. The cost centres on challans from the last five
+  years are migrated as parties, so they can be chosen at go-live.
+- **Not built**: cancelling a challan (legacy never cancelled one; a full return undoes it), the
+  and the pick list for challans.
+- **Print**: the challan prints as a formal document (company and branch header, challan number,
+  date and gate pass, the cost centre, lines, returns so far, and signature lines for the store,
+  the receiver and security). `ChallanPrint.tsx`.
+
+## Printing
+
+Print on a counter sale prints the bill (`CounterSalePrint.tsx`): company name, TIN and RC number
+(Settings → Company) with the branch address and phone; bill number, date, gate pass and due date;
+the customer; CPO, customer reference, sales executive and despatch details; the lines with VAT %;
+gross, cash discount, VAT, round-off and net amount, with the amount in words; the COUNTER_SALE terms
+(Settings → Terms & Conditions); and signature lines. A cancelled bill prints as cancelled. On screen
+the page is unchanged; the print layout shows only on paper. The header, amount in words and
+signatures are shared in `client/components/print/`.
 
 ## Not yet built
 
 - Tally export of sale-return credit notes. Someone in accounts needs to decide which ledger
   a sale return posts to.
-- A printed bill layout. The detail pages print the screen view for now.
 
 ## Tests
 

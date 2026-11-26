@@ -4,6 +4,8 @@ import { inventoryKeys } from "@/features/inventory/api/inventory.keys";
 import { notificationKeys } from "@/features/notification/api/notification.keys";
 import { indentKeys } from "../api/indent.keys";
 import {
+  cancelStnRequest,
+  editStnRequest,
   directStnRequest,
   dispatchStnRequest,
   getStnRequest,
@@ -13,6 +15,7 @@ import {
 } from "../api/stn.api";
 import { apiErrorMessage } from "./use-indent-mutations";
 import type {
+  EditStnPayload,
   DirectStnPayload,
   DispatchStnPayload,
   ReceiveIndentPayload,
@@ -57,6 +60,20 @@ export const useDirectStn = () =>
     (payload: DirectStnPayload) => directStnRequest(payload),
     (stn) => `Direct STN ${stn.stnNumber} dispatched`,
     "Failed to send the direct STN",
+  );
+
+export const useCancelStn = () =>
+  useStnMutation(
+    ({ id, reason }: { id: string; reason: string }) => cancelStnRequest(id, reason),
+    (stn) => `STN ${stn.stnNumber} cancelled; the stock is back at ${stn.sourceBranch.name}`,
+    "Failed to cancel the STN",
+  );
+
+export const useEditStn = () =>
+  useStnMutation(
+    ({ id, body }: { id: string; body: EditStnPayload }) => editStnRequest(id, body),
+    (stn) => `STN ${stn.stnNumber} changed`,
+    "Failed to change the STN",
   );
 
 export const useReceiveStn = () =>

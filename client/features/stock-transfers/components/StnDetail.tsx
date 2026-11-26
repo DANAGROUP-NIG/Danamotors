@@ -3,7 +3,7 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Boxes, PackageCheck, Printer } from "lucide-react";
+import { ArrowLeft, Ban, Boxes, PackageCheck, PencilLine, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ModalFame from "@/components/modals/ModalFame";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
@@ -12,10 +12,13 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { INVENTORY_PERMISSIONS } from "@/features/auth/roles";
 import { useStn } from "../hooks/use-stns";
 import { ReceiveStnForm } from "./IndentDialogs";
+import { CancelStnDialog, EditStnDialog } from "./StnChangeDialogs";
+import { PackingListPrint, StnPrint, usePrintChoice } from "./TransferPrints";
 import { DiscrepancyPanel } from "@/features/stock-discrepancy/components/DiscrepancyPanel";
 import {
   STN_STATUS_LABELS,
   STN_STATUS_TONES,
+  STN_TAX_FORMS,
   TRANSPORT_MODE_LABELS,
   fmtCurrency,
   fmtDate,
@@ -40,6 +43,8 @@ export function StnDetail({ id }: { id: string }) {
   const { data: stn, isLoading, error } = useStn(id);
   const { user, isSuperAdmin, hasPermission } = useAuth();
   const [receiving, setReceiving] = useState(false);
+  const [changing, setChanging] = useState<"cancel" | "edit" | null>(null);
+  const printing = usePrintChoice<"stn" | "packing">();
 
   if (isLoading) {
     return <LoadingSkeleton variant="detail" />;
@@ -60,6 +65,12 @@ export function StnDetail({ id }: { id: string }) {
     (stn.status === "DISPATCHED" || stn.status === "PARTIALLY_RECEIVED") &&
     (crossBranch || user?.branchId === stn.destinationBranchId) &&
     hasPermission(INVENTORY_PERMISSIONS.TRANSFER_RECEIVE);
+  // Legacy STN cancel / edit: the sender, only before the receiving branch generates any MRN.
+  const canChange =
+    stn.status === "DISPATCHED" &&
+    stn.mrns.length === 0 &&
+    (crossBranch || user?.branchId === stn.sourceBranchId) &&
+    hasPermission(INVENTORY_PERMISSIONS.TRANSFER_DISPATCH);
   const caseOf = (lineId: string) => stn.cases.filter((c) => c.lines.some((l) => l.stnLineId === lineId)).map((c) => c.caseNumber);
 
   return (
@@ -69,9 +80,24 @@ export function StnDetail({ id }: { id: string }) {
           <ArrowLeft className="size-4" /> Back to STNs
         </Link>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.print()}>
-            <Printer className="size-4" /> Print
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => printing.print("stn")}>
+            <Printer className="size-4" /> Print STN
           </Button>
+          {stn.packingList && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => printing.print("packing")}>
+              <Printer className="size-4" /> Print packing list cum gate pass
+            </Button>
+          )}
+          {canChange && (
+            <>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setChanging("edit")}>
+                <PencilLine className="size-4" /> Change
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5 text-red-600" onClick={() => setChanging("cancel")}>
+                <Ban className="size-4" /> Cancel STN
+              </Button>
+            </>
+          )}
           {canReceive && (
             <Button size="sm" className="gap-1.5" onClick={() => setReceiving(true)}>
               <PackageCheck className="size-4" /> Generate MRN
@@ -80,7 +106,8 @@ export function StnDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="space-y-5">
+      {/* On paper the formal STN or packing list cum gate pass replaces the screen view. */}
+      <div className="space-y-5 print:hidden">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -98,11 +125,29 @@ export function StnDetail({ id }: { id: string }) {
             <DetailField label="STN date" value={fmtDate(stn.documentDate)} />
             <DetailField label="Dispatched by" value={personName(stn.dispatchedBy)} />
             <DetailField label="Mode of transport" value={stn.transportMode ? TRANSPORT_MODE_LABELS[stn.transportMode] : null} />
-            <DetailField label="Tax form" value={stn.taxForm} />
-            <DetailField label="Qty / value" value={`${stn.totalQuantity} · ${fmtCurrency(stn.totalValue)}`} />
+            <DetailField label="Tax form" value={stn.taxForm ? (STN_TAX_FORMS[stn.taxForm as keyof typeof STN_TAX_FORMS] ?? stn.taxForm) : null} />
+            <DetailField
+              label="Qty / value"
+              value={
+                stn.taxAmount > 0
+                  ? `${stn.totalQuantity} · ${fmtCurrency(stn.totalValue)} + VAT ${fmtCurrency(stn.taxAmount)} = ${fmtCurrency(stn.totalValue + stn.taxAmount)}`
+                  : `${stn.totalQuantity} · ${fmtCurrency(stn.totalValue)}`
+              }
+            />
             <DetailField label="Gate pass" value={stn.packingList?.gatePassNumber} />
             <DetailField label="Packing list" value={stn.packingList?.packingNumber} />
             <DetailField label="Waybill / courier" value={[stn.packingList?.waybillNumber, stn.packingList?.courierName].filter(Boolean).join(" · ") || null} />
+            <DetailField
+              label="Courier date / weight"
+              value={
+                [
+                  stn.packingList?.courierDate && fmtDate(stn.packingList.courierDate),
+                  stn.packingList?.consignmentWeight != null && `${stn.packingList.consignmentWeight} kg`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || null
+              }
+            />
             <DetailField
               wide
               label="Indents"
@@ -123,6 +168,25 @@ export function StnDetail({ id }: { id: string }) {
             />
             {stn.remarks && <DetailField wide label="Remarks" value={stn.remarks} />}
           </div>
+          {stn.status === "CANCELLED" && (
+            <p className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Cancelled by {personName(stn.cancelledBy)} on {fmtDate(stn.cancelledAt)}: {stn.cancellationReason}. The stock went back to{" "}
+              {stn.sourceBranch.name}; the cases, packing list and gate pass are void.
+            </p>
+          )}
+          {stn.edits.length > 0 && (
+            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium">Changed after dispatch</p>
+              <ul className="mt-1 space-y-0.5">
+                {stn.edits.map((e) => (
+                  <li key={e.id}>
+                    {fmtDateTime(e.createdAt)} · {personName(e.editedBy)}:{" "}
+                    {e.partNumber ? `${e.partNumber} ${e.oldQuantity} → ${e.newQuantity}` : `tax form ${e.oldTaxForm} → ${e.newTaxForm}`} ({e.reason})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -209,6 +273,11 @@ export function StnDetail({ id }: { id: string }) {
           ))}
         </div>
       </div>
+
+      {printing.doc === "stn" && <StnPrint stn={stn} />}
+      {printing.doc === "packing" && <PackingListPrint stn={stn} />}
+      {changing === "cancel" && <CancelStnDialog stn={stn} onClose={() => setChanging(null)} />}
+      {changing === "edit" && <EditStnDialog stn={stn} onClose={() => setChanging(null)} />}
 
       {receiving && (
         <ModalFame isOpen onClose={() => setReceiving(false)} title={`Receive STN ${stn.stnNumber}`}>

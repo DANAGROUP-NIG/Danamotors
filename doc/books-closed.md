@@ -58,7 +58,8 @@ closed date:
 | PartIssuance | `issuedAt` | date, branch, part, quantity, job card |
 | PartReturn | `returnedAt` | date, issue, quantity, rate, amount |
 | CounterSaleReturn | `returnDate` | date, branch, all amounts |
-| MaterialReceiptNote (MRN) | `receiptDate` | date, branch, received / damaged / short, value |
+| MaterialReceiptNote (MRN) | `receiptDate` | date, branch, received / damaged / short, value, VAT, round-off, net amount |
+| VendorReturn (MRN return) | `returnDate` | date, branch, vendor, quantity, value, VAT, round-off, net amount |
 | StockTransferNote (STN) | `documentDate` | date, branches, quantity, value, cancelling |
 | MaterialInTransit (MIT) | `transitDate` | date, branch, quantity, amount, `cancelledAt` |
 | PartRequisition | `requisitionDate` | date, branch, charge type, `cancelledAt` |

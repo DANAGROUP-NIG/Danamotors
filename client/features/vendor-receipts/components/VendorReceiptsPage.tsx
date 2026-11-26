@@ -35,7 +35,7 @@ export function VendorReceiptsPage() {
     {
       header: "MRN #",
       render: (r) => (
-        <Link href={`/inventory/vendor-receipts/${r.id}`} className="font-mono text-sm font-medium hover:underline">
+        <Link href={`/inventory/mrn/${r.id}`} className="font-mono text-sm font-medium hover:underline">
           {r.mrnNumber}
         </Link>
       ),
@@ -46,7 +46,16 @@ export function VendorReceiptsPage() {
     { header: "Received", className: "whitespace-nowrap", render: (r) => <span className="text-muted-foreground">{fmtDate(r.receiptDate)}</span> },
     { header: "Branch", render: (r) => <span className="text-muted-foreground">{r.receivingBranch.name}</span> },
     { header: "Lines / Qty", render: (r) => <span className="text-muted-foreground">{r._count.lines} / {r.totalReceived}</span> },
-    { header: "Value", render: (r) => <span className="text-muted-foreground">{fmtNaira(r.totalValue)}</span> },
+    { header: "Tax form", render: (r) => <span className="text-muted-foreground">{r.taxForm ?? "—"}</span> },
+    {
+      header: "Net amount",
+      render: (r) => (
+        <span className="text-muted-foreground">
+          {fmtNaira(r.netAmount)}
+          {r._count.returns > 0 && <span className="block text-xs">{r._count.returns} return(s)</span>}
+        </span>
+      ),
+    },
     {
       header: "Actions",
       className: "text-right",
@@ -54,7 +63,7 @@ export function VendorReceiptsPage() {
       render: (r) => (
         <DataTableRowActions
           item={r}
-          actions={[{ id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/vendor-receipts/${r.id}`) }]}
+          actions={[{ id: "view", label: "View details", icon: <Eye className="size-4" />, onClick: () => router.push(`/inventory/mrn/${r.id}`) }]}
         />
       ),
     },
@@ -63,12 +72,12 @@ export function VendorReceiptsPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
-        title="Vendor receipts"
-        description="Parts bought from vendors other than Mobis: local, second-hand and repaired parts. Posting adds the stock and sets each part's dealer and retail rate."
+        title="Material Receipt Notes (MRN)"
+        description="Parts bought from vendors other than Mobis: local, second-hand and repaired parts. Posting adds the stock; local, used and repaired records take the cost as their dealer rate."
         actions={
           canReceive && (
             <Button asChild size="sm" className="gap-1.5">
-              <Link href="/inventory/vendor-receipts/new">
+              <Link href="/inventory/mrn/new">
                 <Plus className="size-4" />
                 New receipt
               </Link>
@@ -79,7 +88,7 @@ export function VendorReceiptsPage() {
 
       {isError ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load vendor receipts.</CardContent>
+          <CardContent className="py-12 text-center text-sm text-red-500">Failed to load MRNs.</CardContent>
         </Card>
       ) : (
         <DataTable
@@ -87,7 +96,7 @@ export function VendorReceiptsPage() {
           data={paged}
           isLoading={isLoading}
           isFetching={isFetching}
-          emptyMessage={committed ? "No vendor receipts match." : "No vendor receipts yet. Use New receipt to post one."}
+          emptyMessage={committed ? "No MRNs match." : "No MRNs yet. Use New receipt to post one."}
           rowKey={(r) => r.id}
           page={page}
           pageSize={PAGE_SIZE}
@@ -113,7 +122,11 @@ export function VendorReceiptsPage() {
       )}
 
       <p className="text-sm text-muted-foreground">
-        Mobis invoices are received under MIT. Returns to vendors are not recorded here yet.
+        Mobis invoices are received under MIT. To send parts back, open the MRN and use Return to vendor; past returns are under{" "}
+        <Link href="/inventory/mrn-returns" className="text-primary hover:underline">
+          MRN returns
+        </Link>
+        .
       </p>
     </div>
   );

@@ -42,7 +42,7 @@ Audit, Audit by Audit Head, Audit by Visiting Management); see [Stock audit](#st
 ## Handheld (HHDC)
 
 The handheld is a Motorola MC3190 (Windows CE 6.0, .NET Compact Framework 3.5). Two programs in
-`dana_projects/hhdc/` (a sibling of this repo, not inside it) replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`.
+`hhdc/` in this repository replace the legacy PC side (PSTbatch / PhysicalStock) and `HHDC.exe`.
 
 **Since 2026-10-28 a sheet is sent and posted on its own page** (Send to handheld, then Post), like the indent, CPO and
 MIT jobs: the sheet becomes a handheld job (`COUNT_SHEET`) that waits for the next handheld docked at the branch, and
@@ -104,7 +104,7 @@ How it works:
 Build and test (no Visual Studio; only the free `csc.exe` of .NET Framework 4):
 
 ```powershell
-cd ..\hhdc             # dana_projects\hhdc, next to this repo (not inside it)
+cd hhdc               # from the repo root
 .\build.ps1            # builds both programs and runs the unit tests
 .\build.ps1 -UiTest    # also drives the real device exe through a counting session on this PC
 ```

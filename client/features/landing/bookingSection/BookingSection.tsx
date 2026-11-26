@@ -1,25 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Calendar, Clock, MapPin, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Field, inputCls } from "@/components/forms/FormField";
-import { useBranches } from "@/features/branches/hooks/use-branches";
-import { useCreateEnquiry } from "@/features/enquiry/hooks/use-create-enquiry";
-import {
-  createEnquirySchema,
-  type CreateEnquiryFormValues,
-} from "@/features/enquiry/schemas/enquiry.schema";
-import { BookingDatePicker } from "./BookingDatePicker";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
+import { Field, inputCls } from '@/components/forms/FormField';
+import { NumberInput } from '@/components/forms/NumberInput';
+import { useBranches } from '@/features/branches/hooks/use-branches';
+import { useCreateEnquiry } from '@/features/enquiry/hooks/use-create-enquiry';
+import { createEnquirySchema, type CreateEnquiryFormValues } from '@/features/enquiry/schemas/enquiry.schema';
+import { BookingDatePicker } from './BookingDatePicker';
+
+const yearOrUndefined = (value: string) => (value === '' ? undefined : Number(value));
 
 function withTime(date: Date, time: string) {
   const [hours, minutes] = time.split(":").map(Number);
@@ -75,7 +70,7 @@ export default function BookingSection() {
     const payload = {
       ...values,
       preferredDate: withTime(selectedDate, selectedTime).toISOString(),
-      vehicleYear: values.vehicleYear ? Number(values.vehicleYear) : undefined,
+      email: values.email || undefined,
       vehicleMake: values.vehicleMake || undefined,
       vehicleModel: values.vehicleModel || undefined,
       vehicleRegNumber: values.vehicleRegNumber || undefined,
@@ -232,10 +227,7 @@ export default function BookingSection() {
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field
-                        label="Email Address *"
-                        error={errors.email?.message}
-                      >
+                      <Field label="Email Address (optional)" error={errors.email?.message}>
                         <input
                           id="enquiry-email"
                           type="email"
@@ -260,16 +252,13 @@ export default function BookingSection() {
                       </Field>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <Field
-                        label="Vehicle Make"
-                        error={errors.vehicleMake?.message}
-                      >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Vehicle Make" error={errors.vehicleMake?.message}>
                         <input
                           id="enquiry-make"
                           className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Kia"
-                          {...register("vehicleMake")}
+                          {...register('vehicleMake')}
                         />
                       </Field>
                       <Field
@@ -280,37 +269,40 @@ export default function BookingSection() {
                           id="enquiry-model"
                           className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
                           placeholder="e.g. Rio"
-                          {...register("vehicleModel")}
+                          {...register('vehicleModel')}
                         />
                       </Field>
-                      <Field
-                        label="Reg. Number"
-                        error={errors.vehicleRegNumber?.message}
-                      >
+                      <Field label="Model Year (year made, not bought)" error={errors.vehicleYear?.message}>
+                        <NumberInput
+                          id="enquiry-year"
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
+                          placeholder="e.g. 2020"
+                          min="1900"
+                          max={String(new Date().getFullYear() + 1)}
+                          {...register('vehicleYear', { setValueAs: yearOrUndefined })}
+                        />
+                      </Field>
+                      <Field label="Reg. Number" error={errors.vehicleRegNumber?.message}>
                         <input
                           id="enquiry-reg"
-                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}
+                          className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30 uppercase placeholder:normal-case`}
                           placeholder="e.g. LND 123 AB"
-                          {...register("vehicleRegNumber")}
+                          autoCapitalize="characters"
+                          {...register('vehicleRegNumber')}
                         />
                       </Field>
                     </div>
-                    <Field
-                      label="VIN (Vehicle Identification Number)"
-                      error={errors.vin?.message}
-                    >
+                    <Field label="VIN (Vehicle Identification Number)" error={errors.vin?.message}>
                       <input
                         id="enquiry-vin"
-                        className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30 uppercase`}
-                        placeholder="e.g. 1HGCM82633A123456"
+                        className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30 uppercase placeholder:normal-case`}
+                        placeholder="e.g. KNADN512AL6123456"
                         maxLength={17}
-                        {...register("vin")}
+                        autoCapitalize="characters"
+                        {...register('vin')}
                       />
                     </Field>
-                    <Field
-                      label="Preferred Branch *"
-                      error={errors.branchId?.message}
-                    >
+                    <Field label="Preferred Branch *" error={errors.branchId?.message}>
                       <select
                         id="enquiry-branch"
                         className={`${inputCls} bg-background/80 focus-visible:ring-blue-500/30`}

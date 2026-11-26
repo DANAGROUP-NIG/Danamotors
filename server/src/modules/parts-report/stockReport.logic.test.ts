@@ -1,4 +1,4 @@
-import { bandLabels, bandOf, StockValuation, untrackedOpening } from "./stockReport.logic";
+import { bandLabels, bandOf, reorderPlan, StockValuation, untrackedOpening } from "./stockReport.logic";
 
 const day = (d: string) => new Date(`${d}T10:00:00+01:00`);
 
@@ -94,5 +94,21 @@ describe("bandOf", () => {
     const limits = [10000, 20000, 40000, 60000, 100000];
     expect([0, 10000, 10001, 59999, 100000, 100001].map((km) => bandOf(km, limits))).toEqual([0, 0, 1, 3, 4, 5]);
     expect(bandLabels(limits, "km")[5]).toBe("Above 100000 km");
+  });
+
+  it("reproduces the legacy Reorder Level Report (Kia Plaza, as on 05/06/2026, 3 months)", () => {
+    // Without STN: 263202A501 14 used, stock 1; 263202R000 1 used, stock 0; CAA0 4 used, stock 3 (not listed).
+    expect(reorderPlan(14, 90, null, 1, 0)).toEqual({ average: 4.67, minLevel: 4.67, reorderLevel: 4.67, orderQty: 4 });
+    expect(reorderPlan(1, 90, null, 0, 0)).toEqual({ average: 0.33, minLevel: 0.33, reorderLevel: 0.33, orderQty: 1 });
+    expect(reorderPlan(4, 90, null, 3, 0)).toBeNull();
+    // With STN: CAA0 4 + 15 = 19, stock 3 → 6.33, order 4; N000 4 + 5 = 9, stock 6 → nothing to order.
+    expect(reorderPlan(19, 90, null, 3, 0)).toEqual({ average: 6.33, minLevel: 6.33, reorderLevel: 6.33, orderQty: 4 });
+    expect(reorderPlan(9, 90, null, 6, 0)).toBeNull();
+    // No consumption: not listed. A back order counts as already ordered. Entered re-order qty replaces the formula.
+    expect(reorderPlan(0, 90, null, 0, 0)).toBeNull();
+    expect(reorderPlan(14, 90, null, 1, 2)).toMatchObject({ orderQty: 2 });
+    expect(reorderPlan(0, 90, 10, 3, 0)).toEqual({ average: 0, minLevel: 10, reorderLevel: 10, orderQty: 7 });
+    // Abuja's period is 12 months.
+    expect(reorderPlan(24, 365, null, 0, 0)).toMatchObject({ average: 2, orderQty: 2 });
   });
 });

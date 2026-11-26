@@ -32,7 +32,6 @@ describeDb("Stock reports (database)", () => {
     const sales = new (require("../part-sale/partSale.service").PartSaleService)();
     const transfers = new (require("../stock-transfer/stockTransfer.service").StockTransferService)();
     const mobis = new (require("../mobis-purchase/mobisPurchase.service").MobisPurchaseService)();
-    const inventory = new (require("../inventory/inventory.service").InventoryService)();
 
     const role = await prisma.role.upsert({ where: { name: "GeneralStoreManager" }, update: {}, create: { name: "GeneralStoreManager" } });
     cpd = await prisma.branch.create({ data: { name: `CPD Stock ${run}` } });
@@ -85,8 +84,16 @@ describeDb("Stock reports (database)", () => {
     const backOrdered = await transfers.createIndent({ requestingBranchId: plaza.id, sourceBranchId: cpd.id, lines: [{ partId: joint.id, stockQuantity: 5 }] }, user.id);
     await transfers.approveIndent(backOrdered.id, user.id, { pickerName: "MUSA" });
 
-    // Oil taken out with nothing in stock.
-    await inventory.adjustStock({ branchId: cpd.id, partId: oil.id, quantity: -2, type: "ADJUSTMENT", notes: "Damaged in store", recordedById: user.id });
+    // Oil taken out with nothing in stock. Stock adjustments now refuse this, so the movement is written as
+    // migrated legacy data would carry it (legacy let stock go negative).
+    await prisma.inventoryStock.upsert({
+      where: { branchId_partId: { branchId: cpd.id, partId: oil.id } },
+      update: { quantity: { decrement: 2 } },
+      create: { branchId: cpd.id, partId: oil.id, quantity: -2 },
+    });
+    await prisma.stockTransaction.create({
+      data: { branchId: cpd.id, partId: oil.id, quantity: -2, type: "ADJUSTMENT", notes: "Damaged in store", recordedById: user.id },
+    });
   });
 
   afterAll(async () => {

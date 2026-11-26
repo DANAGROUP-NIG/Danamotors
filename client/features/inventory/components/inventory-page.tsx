@@ -139,7 +139,7 @@ export function InventoryPage() {
   return (
     <div className="flex flex-col gap-5 p-4 lg:p-6">
       <PageHeader
-        title="Inventory"
+        title="Part Master"
         description={description}
         actions={
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">

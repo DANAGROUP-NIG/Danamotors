@@ -11,6 +11,7 @@ import { useCreateSourceRecord } from "../hooks/use-part-mutations";
 import { PART_SOURCE_CODES, partSourceLabel } from "../lib/part-codes";
 import { PartStatusBadge, fmtNaira } from "./PartStatusBadge";
 import type { PartMaster } from "../types/inventory.types";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 // Local, used and repaired records are priced like legacy local purchases (category L, 1.5x).
 const BRANCH_BOUGHT = ["L", "U", "R"];
@@ -76,7 +77,7 @@ function AddSourceForm({ main, usedSources, onDone }: { main: PartMaster; usedSo
           <input className={`${inputCls} font-mono`} value={partNumber} onChange={(event) => setPartNumber(event.target.value)} />
         </Field>
         <Field label="Dealer rate (cost)">
-          <input type="number" min="0.01" step="0.01" className={inputCls} value={dealerRate} onChange={(event) => setDealerRate(event.target.value)} />
+          <NumberInput min="0.01" step="0.01" className={inputCls} value={dealerRate} onChange={(event) => setDealerRate(event.target.value)} />
         </Field>
         <Field label="Part category">
           <select className={inputCls} value={category} onChange={(event) => setCategory(event.target.value)}>
@@ -118,7 +119,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
       {isSourceRecord && main ? (
         <p className="text-sm text-slate-600">
           This is the {partSourceLabel(part.partFlag).toLowerCase()} record of{" "}
-          <Link href={`/inventory/${main.id}`} className="font-mono font-medium text-primary hover:underline">
+          <Link href={`/part-master/${main.id}`} className="font-mono font-medium text-primary hover:underline">
             {main.partNumber}
           </Link>
           . It has its own stock and price; estimates and issues choose it explicitly.
@@ -152,7 +153,7 @@ export function PartSources({ part, branchId, branchName, canCreate }: { part: P
                   {record.id === part.id ? (
                     <span className="font-mono font-medium text-slate-800">{record.partNumber} (this part)</span>
                   ) : (
-                    <Link href={`/inventory/${record.id}`} className="font-mono font-medium text-primary hover:underline">
+                    <Link href={`/part-master/${record.id}`} className="font-mono font-medium text-primary hover:underline">
                       {record.partNumber}
                     </Link>
                   )}

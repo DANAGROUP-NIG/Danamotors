@@ -11,6 +11,7 @@ import { Field, inputCls } from "@/components/forms/FormField";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranches } from "@/features/branches/hooks/use-branches";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 type Category = { code: string; description: string; markupMultiplier: number; isActive: boolean };
 type BranchSetting = { branchId: string; discountPercent: number; handlingPercent: number; directCostPercent: number; operationalCostPercent: number };
@@ -54,7 +55,7 @@ function BranchPercentages({ code, canManage }: { code: string; canManage: boole
         { header: "Branch", render: row => row.name },
         ...percents.map(([key, label]) => ({ header: label, render: (row: { id: string }) => {
           const values = drafts[row.id] ?? stored(row.id);
-          return <input aria-label={label} className={`${inputCls} h-8 w-24`} type="number" min="0" max="100" step="0.01" disabled={!canManage}
+          return <NumberInput aria-label={label} className={`${inputCls} h-8 w-24`} min="0" max="100" step="0.01" disabled={!canManage}
             value={values[key]} onChange={event => setDrafts({ ...drafts, [row.id]: { ...values, [key]: event.target.value } })} />;
         } })),
         { header: "Actions", render: row => canManage && <Button type="button" variant="outline" size="sm" disabled={!drafts[row.id] || save.isPending}
@@ -104,7 +105,7 @@ export function PartCategoriesPage() {
           value={form.code} onChange={event => setForm({ ...form, code: event.target.value.toUpperCase() })} /></Field>
         <Field label="Description"><input className={inputCls} required maxLength={100} disabled={!canManage}
           value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></Field>
-        <Field label="Retail multiplier (margin)"><input className={inputCls} required type="number" min="0.0001" step="any" disabled={!canManage}
+        <Field label="Retail multiplier (margin)"><NumberInput className={inputCls} required min="0.0001" step="any" disabled={!canManage}
           value={form.markupMultiplier} onChange={event => setForm({ ...form, markupMultiplier: event.target.value })} /></Field>
         <p className="text-sm text-muted-foreground md:col-span-3">
           Retail rate = dealer rate × multiplier. For example a dealer rate of ₦1,000 gives a retail rate of

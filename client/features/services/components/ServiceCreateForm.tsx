@@ -9,6 +9,7 @@ import {
   createServiceSchema,
   type CreateServiceFormValues,
 } from "../schemas/service-catalog.schema";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 interface ServiceCreateFormProps {
   onSuccess?: () => void;
@@ -78,8 +79,7 @@ export function ServiceCreateForm({
           />
         </Field>
         <Field label="Duration (minutes)" error={errors.durationMins?.message}>
-          <input
-            type="number"
+          <NumberInput
             className={inputCls}
             placeholder="e.g. 120"
             {...register("durationMins")}
@@ -88,8 +88,7 @@ export function ServiceCreateForm({
       </div>
 
       <Field label="Price" error={errors.price?.message}>
-        <input
-          type="number"
+        <NumberInput
           step="0.01"
           className={inputCls}
           placeholder="e.g. 85000"

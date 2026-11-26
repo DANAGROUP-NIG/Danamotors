@@ -5,6 +5,7 @@ import { isAxiosError } from "axios";
 import { apiGet, apiPut } from "@/lib/api/apiClient";
 import { PageHeader } from "@/components/headers/page-header";
 import { Field, inputCls } from "@/components/forms/FormField";
+import { NumberInput } from "@/components/forms/NumberInput";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useBranches } from "@/features/branches/hooks/use-branches";
@@ -125,9 +126,9 @@ function BranchRules({ canManage }: { canManage: boolean }) {
         <legend className="text-sm font-semibold">{group.title}</legend>
         <p className="text-sm text-muted-foreground">{group.note}</p>
         <div className="grid gap-3 md:grid-cols-3">{group.fields.map(([key, label, step]) => <Field key={key} label={label}>
-          <input className={inputCls} type="number" min={key === "vorOrderDays" || key === "labourVatPercent" ? 0 : 1} step={step}
-            required={key !== "repeatWindowKm"} value={form[key] ?? ""}
-            onChange={event => setForm({ ...form, [key]: event.target.value === "" ? null : Number(event.target.value) })} /></Field>)}</div>
+          <NumberInput className={inputCls} min={key === "vorOrderDays" || key === "labourVatPercent" ? 0 : 1} step={step}
+            required={key !== "repeatWindowKm"} value={form[key]}
+            onValueChange={v => setForm({ ...form, [key]: v })} /></Field>)}</div>
         {group.fields.some(([key]) => key === "repeatWindowDays") && <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.printRepeatBlock ?? true} onChange={event => setForm({ ...form, printRepeatBlock: event.target.checked })} />
           Print the repeat block (previous job, days and km since, reasons) on the job card

@@ -42,7 +42,7 @@ function toExportableRow(e: Enquiry): ExportableEnquiryRow {
   return {
     id: e.id,
     customer: `${e.firstName} ${e.lastName}`.trim(),
-    email: e.email,
+    email: e.email ?? "",
     phone: e.phoneNumber,
     vehicle: vehicleLabel(e),
     preferredDate: formatDate(e.preferredDate),

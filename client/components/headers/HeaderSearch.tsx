@@ -10,7 +10,7 @@ const ROUTE_MAP: Record<keyof SearchResults, string> = {
   customers: "/customers",
   vehicles: "/vehicles",
   jobCards: "/job-cards",
-  spareParts: "/inventory",
+  spareParts: "/part-master",
   users: "/users",
 };
 

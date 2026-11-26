@@ -39,6 +39,18 @@ export class PartSaleController {
     ok(res, { parts: await this.service.searchParts(String(req.query.search), branchId) });
   });
 
+  listSalesExecutives = handle(async (req, res) => {
+    const branchId = String(req.query.branchId);
+    assertInventoryBranchAccess(req, [branchId]);
+    ok(res, { executives: await this.service.listSalesExecutives(branchId) });
+  });
+
+  handlingRates = handle(async (req, res) => {
+    const branchId = String(req.query.branchId);
+    assertInventoryBranchAccess(req, [branchId]);
+    ok(res, { rates: await this.service.handlingRates(branchId) });
+  });
+
   // ── Customer purchase orders ──
 
   createOrder = handle(async (req, res) => {

@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueries } from "@tanstack/react-query";
 import { indentKeys } from "../api/indent.keys";
 import {
   getIndentRequest,
@@ -14,6 +14,13 @@ export function useIndents(params: IndentListParams = {}, enabled = true) {
     queryFn: () => getIndentsRequest(params),
     enabled,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Several indents at once (e.g. the picked indents shipped together on one STN). */
+export function useIndentDetails(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({ queryKey: indentKeys.detail(id), queryFn: () => getIndentRequest(id) })),
   });
 }
 

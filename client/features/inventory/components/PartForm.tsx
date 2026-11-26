@@ -16,6 +16,7 @@ import { MasterOptions } from "@/components/forms/MasterOptions";
 import { partMasterSchema, type PartMasterFormInput, type PartMasterFormValues } from "../schemas/inventory.schema";
 import type { PartMaster, PartMasterPayload } from "../types/inventory.types";
 import { codeLabel, PART_FLAG_LABELS, PART_TYPE_LABELS } from "../lib/part-codes";
+import { NumberInput } from "@/components/forms/NumberInput";
 
 export const UOM_OPTIONS = ["UNIT", "PCS", "SET", "PAIR", "LITRE", "KG", "METRE", "BOX", "KIT"];
 
@@ -231,7 +232,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             <MasterOptions id="part-uoms" kind="UOM" extra={UOM_OPTIONS} />
           </Field>
           <Field label="Dealer rate (₦)" error={errors.unitRate?.message}>
-            <input type="number" step="0.01" min={0} className={inputCls} {...register("unitRate")} />
+            <NumberInput step="0.01" min={0} className={inputCls} {...register("unitRate")} />
           </Field>
           <Field label="Part category" error={errors.priceCategoryCode?.message}>
             <select className={inputCls} {...register("priceCategoryCode")}>
@@ -246,8 +247,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             </select>
           </Field>
           <Field label="Retail rate (₦)" error={errors.retailRate?.message}>
-            <input
-              type="number"
+            <NumberInput
               step="0.01"
               min={0}
               className={inputCls}
@@ -299,8 +299,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             </span>
           </label>
           <Field label="Warranty rate (₦, optional)" error={errors.warrantyRate?.message}>
-            <input
-              type="number"
+            <NumberInput
               step="0.01"
               min={0}
               className={inputCls}
@@ -327,13 +326,13 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
             <input className={inputCls} placeholder="e.g. CRT, RIO" {...register("applicableModels")} />
           </Field>
           <Field label="MOQ (optional)" error={errors.moq?.message}>
-            <input type="number" min={0} step="any" className={inputCls} {...register("moq")} />
+            <NumberInput min={0} step="any" className={inputCls} {...register("moq")} />
           </Field>
           <Field label="Conversion factor" error={errors.conversionFactor?.message}>
-            <input type="number" min={0} step="any" className={inputCls} {...register("conversionFactor")} />
+            <NumberInput min={0} step="any" className={inputCls} {...register("conversionFactor")} />
           </Field>
           <Field label="Base rate, foreign currency (optional)" error={errors.basicRate?.message}>
-            <input type="number" min={0} step="0.01" className={inputCls} {...register("basicRate")} />
+            <NumberInput min={0} step="0.01" className={inputCls} {...register("basicRate")} />
           </Field>
           <Field label="NSP date (optional)" error={errors.nspDate?.message}>
             <input type="date" className={inputCls} {...register("nspDate")} />
@@ -354,13 +353,13 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
         <p className={sectionTitle}>Stock levels</p>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Min level (optional)" error={errors.minLevel?.message}>
-            <input type="number" min={0} className={inputCls} {...register("minLevel")} />
+            <NumberInput min={0} className={inputCls} {...register("minLevel")} />
           </Field>
           <Field label="Max level (optional)" error={errors.maxLevel?.message}>
-            <input type="number" min={0} className={inputCls} {...register("maxLevel")} />
+            <NumberInput min={0} className={inputCls} {...register("maxLevel")} />
           </Field>
           <Field label="Reorder qty (optional)" error={errors.reorderQty?.message}>
-            <input type="number" min={0} className={inputCls} {...register("reorderQty")} />
+            <NumberInput min={0} className={inputCls} {...register("reorderQty")} />
           </Field>
         </div>
       </div>
@@ -378,8 +377,7 @@ export function PartForm({ part, onSuccess }: PartFormProps) {
               {branches.map((b) => (
                 <label key={b.id} className="grid grid-cols-[1fr_96px] items-center gap-2">
                   <span className="truncate text-sm text-foreground">{b.name}</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     className={inputCls}
                     placeholder="0"

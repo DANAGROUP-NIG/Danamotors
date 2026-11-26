@@ -41,7 +41,12 @@ import { NotificationPayload, NotificationService } from "../notification/notifi
 import { reportEnd, reportStart } from "../finance/party-report";
 import { cancelSentHandheldDocuments } from "../handheld/handheld.hooks";
 import { indentablePartWhere, indentProblem } from "../inventory/partSource";
+import { config } from "../../config";
 import {
+  DEFAULT_STN_TAX_FORM,
+  checkStnLineEdit,
+  resizeCaseLines,
+  stnLineVat,
   DOC_TYPES,
   DocType,
   PENDING_SUPPLY_STATUSES,
@@ -63,6 +68,8 @@ import {
 type Tx = Prisma.TransactionClient;
 
 const TX_OPTIONS = { timeout: 30_000, maxWait: 10_000 };
+/** VAT on an STN under a VAT tax form (legacy L, Z): the same 7.5% as bills. */
+const VAT_RATE = config.JOB_BILL_VAT_RATE;
 
 export const TRANSFER_NOTIFICATION_TYPES = {
   INDENT_SUBMITTED: "INDENT_SUBMITTED",
@@ -78,12 +85,16 @@ export const TRANSFER_NOTIFICATION_TYPES = {
   TRANSFER_RECEIVED: "TRANSFER_RECEIVED",
   TRANSFER_DISCREPANCY: "TRANSFER_DISCREPANCY",
   LOW_STOCK: "LOW_STOCK",
+  STN_CANCELLED: "STN_CANCELLED",
+  STN_EDITED: "STN_EDITED",
 } as const;
 
 // ── Shared selects ───────────────────────────────────────────────────────────
 
 const userSelect = { select: { id: true, firstName: true, lastName: true } } as const;
 const branchSelect = { select: { id: true, name: true } } as const;
+/** Branch with its address and phone, for the printed pick list, STN and packing list cum gate pass. */
+const branchPrintSelect = { select: { id: true, name: true, address: true, city: true, state: true, phoneNumber: true } } as const;
 const partSelect = {
   select: {
     id: true,
@@ -104,8 +115,8 @@ const partSelect = {
 } as const;
 
 const indentDetailInclude = {
-  requestingBranch: branchSelect,
-  sourceBranch: branchSelect,
+  requestingBranch: branchPrintSelect,
+  sourceBranch: branchPrintSelect,
   requestedBy: userSelect,
   approvedBy: userSelect,
   rejectedBy: userSelect,
@@ -185,6 +196,7 @@ export interface DispatchIndentInput {
   courierName?: string;
   consignmentWeight?: number;
   packerName?: string;
+  courierDate?: Date;
   lines?: DispatchOverride[];
   cases?: CaseInput[];
 }
@@ -205,7 +217,10 @@ export interface DirectStnInput {
   courierName?: string;
   consignmentWeight?: number;
   packerName?: string;
+  courierDate?: Date;
   lines: { partId: string; quantity: number }[];
+  /** Several cases (legacy Case Creation); everything in one case when left out. */
+  cases?: { packerName?: string; weight?: number; lines: { partId: string; quantity: number }[] }[];
 }
 
 export interface ReceiveIndentInput {
@@ -325,13 +340,15 @@ async function lockIndent(tx: Tx, indentId: string): Promise<IndentStatus> {
 
 /**
  * Re-derives an approved indent's status from its quantities (open pick, shipped,
- * received) and records the change. Used after dispatch, receipt and closing.
+ * received) and records the change. Used after dispatch, receipt and closing. A `note`
+ * (e.g. an STN cancelled or edited) is recorded on the last entry, even when the status stays.
  */
 async function refreshIndentStatus(
   tx: Tx,
   indentId: string,
   actorId: string,
   steps: { to: IndentStatus; remarks?: string | null }[] = [],
+  note?: string,
 ): Promise<IndentStatus> {
   const current = await lockIndent(tx, indentId);
   const [lines, openPick, stnLines] = await Promise.all([
@@ -356,6 +373,10 @@ async function refreshIndentStatus(
   const last = history.length ? history[history.length - 1].to : current;
   if (next === IndentStatus.COMPLETED && last !== IndentStatus.RECEIVED) history.push({ to: IndentStatus.RECEIVED });
   if ((history.length ? history[history.length - 1].to : current) !== next) history.push({ to: next });
+  if (note) {
+    if (history.length) history[history.length - 1] = { ...history[history.length - 1], remarks: note };
+    else history.push({ to: current, remarks: note });
+  }
   if (next !== current) {
     await tx.branchIndent.update({
       where: { id: indentId },
@@ -561,12 +582,15 @@ export class StockTransferService {
     requestingBranchId?: string;
     sourceBranchId?: string;
     limit?: number;
+    /** Every part source, for selling or issuing from the branch's own stock (counter sales, CPOs, challans). */
+    allSources?: boolean;
   }) {
     const parts = await prisma.sparePart.findMany({
       where: {
         partStatus: PartStatus.ACTIVE,
-        // Local, used and repaired records are bought by the branch, never transferred.
-        ...indentablePartWhere,
+        // Local, used and repaired records are bought by the branch, never transferred. A branch still
+        // sells and issues them: legacy Lagos challans are almost all local parts (petrol, diesel).
+        ...(params.allSources ? {} : indentablePartWhere),
         OR: [
           { partNumber: { contains: params.search, mode: "insensitive" } },
           { name: { contains: params.search, mode: "insensitive" } },
@@ -1294,6 +1318,7 @@ export class StockTransferService {
       );
       const casePlans = planCases(dispatched, input.cases, input.packerName);
       const now = new Date();
+      const taxForm = input.taxForm ?? DEFAULT_STN_TAX_FORM;
 
       // Deduct stock exactly once and release the reservation for every picked line.
       const lowStock: LowStockItem[] = [];
@@ -1328,6 +1353,7 @@ export class StockTransferService {
         .filter((l) => (dispatched.get(l.id) ?? 0) > 0)
         .map((l) => {
           const qty = dispatched.get(l.id)!;
+          const amount = roundMoney(l.part.unitPrice * qty);
           return {
             indentLineId: l.indentLineId,
             pickingLineId: l.id,
@@ -1336,7 +1362,8 @@ export class StockTransferService {
             isAlternate: l.isAlternate,
             quantity: qty,
             unitRate: l.part.unitPrice,
-            amount: roundMoney(l.part.unitPrice * qty),
+            amount,
+            ...stnLineVat(taxForm, l.part.taxable, amount, VAT_RATE),
           };
         });
       const stn = await tx.stockTransferNote.create({
@@ -1347,12 +1374,13 @@ export class StockTransferService {
           destinationBranchId: requestingBranchId,
           status: StnStatus.DISPATCHED,
           documentDate: now,
-          taxForm: input.taxForm,
+          taxForm,
           transportMode: input.transportMode,
           remarks: input.remarks,
           stockDeducted: true,
           totalQuantity: stnLineData.reduce((sum, l) => sum + l.quantity, 0),
           totalValue: roundMoney(stnLineData.reduce((sum, l) => sum + l.amount, 0)),
+          taxAmount: roundMoney(stnLineData.reduce((sum, l) => sum + l.taxAmount, 0)),
           createdById: actorId,
           dispatchedById: actorId,
           dispatchedAt: now,
@@ -1426,7 +1454,7 @@ export class StockTransferService {
 
   /**
    * Direct STN: CPD sends free stock to a branch without an indent (legacy STNs with no
-   * order, such as the monthly Microcat recharge). Everything ships in one case.
+   * order, such as the monthly Microcat recharge). One case unless several are given.
    */
   async createDirectStn(input: DirectStnInput, actorId: string) {
     if (input.sourceBranchId === input.destinationBranchId) {
@@ -1444,12 +1472,18 @@ export class StockTransferService {
       const part = parts.find((p) => p.id === line.partId);
       if (!part) throw new NotFoundError(`Part ${line.partId} not found`);
       if (part.partStatus !== PartStatus.ACTIVE) throw new BadRequestError(`Part ${part.partNumber} is blocked`);
-      const problem = indentProblem(part);
-      if (problem) throw new BadRequestError(problem);
+      // Any source can go on a direct STN: Kia Plaza sends its local (L) stock to VI, QS and UG this way.
       if (!Number.isInteger(line.quantity) || line.quantity <= 0) {
         throw new BadRequestError(`${part.partNumber}: quantity must be a whole number above zero`);
       }
     }
+
+    // Cases are planned by part: each part's case quantities must add up to what it sends.
+    const casePlans = planCases(
+      new Map(input.lines.map((l) => [l.partId, l.quantity])),
+      input.cases?.map((c) => ({ ...c, lines: c.lines.map((l) => ({ pickingLineId: l.partId, quantity: l.quantity })) })),
+      input.packerName,
+    );
 
     const result = await prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -1469,14 +1503,17 @@ export class StockTransferService {
       }
 
       const stnNumber = await nextDocumentNumber(tx, DOC_TYPES.STN, now);
+      const taxForm = input.taxForm ?? DEFAULT_STN_TAX_FORM;
       const stnLineData = input.lines.map((line) => {
         const part = parts.find((p) => p.id === line.partId)!;
+        const amount = roundMoney(part.unitPrice * line.quantity);
         return {
           requestedPartId: part.id,
           partId: part.id,
           quantity: line.quantity,
           unitRate: part.unitPrice,
-          amount: roundMoney(part.unitPrice * line.quantity),
+          amount,
+          ...stnLineVat(taxForm, part.taxable, amount, VAT_RATE),
         };
       });
       const stn = await tx.stockTransferNote.create({
@@ -1486,12 +1523,13 @@ export class StockTransferService {
           destinationBranchId: input.destinationBranchId,
           status: StnStatus.DISPATCHED,
           documentDate: now,
-          taxForm: input.taxForm,
+          taxForm,
           transportMode: input.transportMode,
           remarks: input.remarks,
           stockDeducted: true,
           totalQuantity: stnLineData.reduce((sum, l) => sum + l.quantity, 0),
           totalValue: roundMoney(stnLineData.reduce((sum, l) => sum + l.amount, 0)),
+          taxAmount: roundMoney(stnLineData.reduce((sum, l) => sum + l.taxAmount, 0)),
           createdById: actorId,
           dispatchedById: actorId,
           dispatchedAt: now,
@@ -1516,13 +1554,17 @@ export class StockTransferService {
         now,
         actorId,
         input,
-        cases: [{ packerName: input.packerName, lines: stn.lines.map((l) => ({ stnLineId: l.id, quantity: l.quantity })) }],
+        cases: casePlans.map((c) => ({
+          packerName: c.packerName,
+          weight: c.weight,
+          lines: c.lines.map((l) => ({ stnLineId: stn.lines.find((s) => s.partId === l.pickingLineId)!.id, quantity: l.quantity })),
+        })),
       });
       return {
         stnId: stn.id,
         stnNumber,
         ...packing,
-        caseCount: 1,
+        caseCount: casePlans.length,
         totalQuantity: stn.totalQuantity,
         sourceBranchId: input.sourceBranchId,
         destinationBranchId: input.destinationBranchId,
@@ -1543,7 +1585,14 @@ export class StockTransferService {
       branchId: string;
       now: Date;
       actorId: string;
-      input: { transportMode?: TransportMode; waybillNumber?: string; courierName?: string; consignmentWeight?: number; remarks?: string };
+      input: {
+        transportMode?: TransportMode;
+        waybillNumber?: string;
+        courierName?: string;
+        consignmentWeight?: number;
+        courierDate?: Date;
+        remarks?: string;
+      };
       cases: { packerName?: string; weight?: number; lines: { stnLineId: string; quantity: number }[] }[];
     },
   ) {
@@ -1562,6 +1611,7 @@ export class StockTransferService {
         dispatchMode: input.transportMode,
         waybillNumber: input.waybillNumber,
         courierName: input.courierName,
+        courierDate: input.courierDate ?? now,
         consignmentWeight:
           input.consignmentWeight ?? (caseWeights.some((w) => w > 0) ? caseWeights.reduce((a, b) => a + b, 0) : null),
         packingDate: now,
@@ -1587,6 +1637,249 @@ export class StockTransferService {
       });
     }
     return { packingNumber, gatePassNumber, waybillNumber: input.waybillNumber ?? null };
+  }
+
+  // ── 4b. Cancel or edit an STN before anything is received (legacy STN Cancel / Edit) ──
+
+  /** Locks a dispatched STN with no MRN against it, the only kind legacy let users cancel or edit. */
+  private async lockOpenStn(tx: Tx, stnId: string, action: "cancelled" | "edited") {
+    const locked = await tx.$queryRaw<{ status: StnStatus }[]>`
+      SELECT "status" FROM "StockTransferNote" WHERE "id" = ${stnId} FOR UPDATE`;
+    if (!locked[0]) throw new NotFoundError("STN not found");
+    if (locked[0].status !== StnStatus.DISPATCHED) {
+      throw new ConflictError(
+        `STN is ${locked[0].status.toLowerCase().replace("_", " ")}; only a dispatched STN with nothing received can be ${action}`,
+      );
+    }
+    const stn = await tx.stockTransferNote.findUniqueOrThrow({
+      where: { id: stnId },
+      include: {
+        lines: { include: { part: { select: { id: true, partNumber: true, taxable: true } } } },
+        cases: { orderBy: { caseNumber: "asc" }, include: { lines: true } },
+        packingList: { select: { id: true } },
+        indents: { select: { id: true, indentNumber: true, requestedById: true } },
+        _count: { select: { mrns: true } },
+      },
+    });
+    if (stn._count.mrns > 0 || stn.lines.some((l) => l.receivedQuantity + l.damagedQuantity + l.shortQuantity > 0)) {
+      throw new ConflictError(`An MRN has been generated against STN ${stn.stnNumber}; it can no longer be ${action}`);
+    }
+    // Indents next, in id order, as dispatch locks them.
+    for (const indent of [...stn.indents].sort((a, b) => a.id.localeCompare(b.id))) await lockIndent(tx, indent.id);
+    return stn;
+  }
+
+  /** Puts units back into the sender's stock (`change` > 0) or sends more of its free stock (`change` < 0). */
+  private async moveSenderStock(tx: Tx, branchId: string, partId: string, partNumber: string, change: number) {
+    const stock = await lockStock(tx, branchId, partId);
+    if (change < 0) {
+      const free = stock ? stock.quantity - stock.reservedQuantity : 0;
+      if (!stock || -change > free) {
+        throw new BadRequestError(`Only ${Math.max(0, free)} more unit(s) of ${partNumber} are free to send`);
+      }
+      await tx.inventoryStock.update({ where: { id: stock.id }, data: { quantity: { decrement: -change } } });
+    } else if (stock) {
+      await tx.inventoryStock.update({ where: { id: stock.id }, data: { quantity: { increment: change } } });
+    } else {
+      await tx.inventoryStock.create({ data: { branchId, partId, quantity: change } });
+    }
+  }
+
+  /**
+   * Cancels a dispatched STN before the receiving branch generates any MRN (legacy: wrong branch,
+   * part not sent). The stock goes back to the sender, indent lines go back on back order to be
+   * picked again, and the cases, packing list and gate pass are void. The STN keeps its number.
+   */
+  async cancelStn(stnId: string, actorId: string, reason: string) {
+    const result = await prisma.$transaction(async (tx) => {
+      const stn = await this.lockOpenStn(tx, stnId, "cancelled");
+      const now = new Date();
+      for (const line of [...stn.lines].sort((a, b) => a.partId.localeCompare(b.partId))) {
+        await this.moveSenderStock(tx, stn.sourceBranchId, line.partId, line.part.partNumber, line.quantity);
+        if (line.indentLineId) {
+          await tx.branchIndentLine.update({
+            where: { id: line.indentLineId },
+            data: { dispatchedQuantity: { decrement: line.quantity }, backOrderQuantity: { increment: line.quantity } },
+          });
+        }
+      }
+      // A positive STN movement offsets the dispatch, so stock and consumption reports net to zero.
+      await tx.stockTransaction.createMany({
+        data: stn.lines.map((line) => ({
+          branchId: stn.sourceBranchId,
+          partId: line.partId,
+          type: "TRANSFER_OUT",
+          quantity: line.quantity,
+          referenceId: stn.id,
+          notes: `STN ${stn.stnNumber} cancelled: ${reason}`,
+          recordedById: actorId,
+        })),
+      });
+      await tx.stockTransferNote.update({
+        where: { id: stn.id },
+        data: { status: StnStatus.CANCELLED, cancelledAt: now, cancelledById: actorId, cancellationReason: reason },
+      });
+      await tx.transferCase.updateMany({ where: { stnId: stn.id }, data: { status: TransferCaseStatus.CANCELLED } });
+      if (stn.packingList) {
+        await tx.packingList.update({ where: { id: stn.packingList.id }, data: { status: PackingListStatus.CANCELLED } });
+      }
+      for (const indent of stn.indents) {
+        await refreshIndentStatus(tx, indent.id, actorId, [], `STN ${stn.stnNumber} cancelled: ${reason}. Its units are back on back order.`);
+      }
+      return stn;
+    }, TX_OPTIONS);
+
+    await this.notifyStnChanged(result, "cancelled", reason);
+    return this.getStn(stnId);
+  }
+
+  /**
+   * Corrects a dispatched STN before any MRN (legacy CSSTNEditLog): the issued quantity of its lines
+   * and its tax form. More units come from the indent's back order (or, on a direct STN, free stock);
+   * fewer go back to it. A line set to 0 is taken off the STN. Cases follow: extra units go into the
+   * first case holding the part, removed units come out of the last case first.
+   */
+  async editStn(
+    stnId: string,
+    actorId: string,
+    input: { reason: string; taxForm?: string; lines?: { stnLineId: string; quantity: number }[] },
+  ) {
+    const result = await prisma.$transaction(async (tx) => {
+      const stn = await this.lockOpenStn(tx, stnId, "edited");
+      const changes = new Map((input.lines ?? []).map((l) => [l.stnLineId, l.quantity]));
+      for (const id of changes.keys()) {
+        if (!stn.lines.some((l) => l.id === id)) throw new BadRequestError("A line to change is not on this STN");
+      }
+      const oldForm = stn.taxForm ?? DEFAULT_STN_TAX_FORM;
+      const taxForm = input.taxForm ?? oldForm;
+      const changed = stn.lines.filter((l) => changes.has(l.id) && changes.get(l.id) !== l.quantity);
+      if (taxForm === oldForm && !changed.length) throw new BadRequestError("Nothing to change");
+      if (stn.lines.every((l) => (changes.get(l.id) ?? l.quantity) === 0)) {
+        throw new BadRequestError("Every quantity would be 0; cancel the STN instead");
+      }
+
+      const edits: Prisma.StockTransferNoteEditCreateManyInput[] = [];
+      const movements: Prisma.StockTransactionCreateManyInput[] = [];
+      for (const line of [...changed].sort((a, b) => a.partId.localeCompare(b.partId))) {
+        const newQuantity = changes.get(line.id)!;
+        const indentLine = line.indentLineId
+          ? await tx.branchIndentLine.findUniqueOrThrow({ where: { id: line.indentLineId }, select: { backOrderQuantity: true } })
+          : null;
+        const delta = checkStnLineEdit(
+          { partNumber: line.part.partNumber, quantity: line.quantity, accounted: 0 },
+          newQuantity,
+          indentLine?.backOrderQuantity ?? null,
+        );
+        await this.moveSenderStock(tx, stn.sourceBranchId, line.partId, line.part.partNumber, -delta);
+        if (line.indentLineId) {
+          await tx.branchIndentLine.update({
+            where: { id: line.indentLineId },
+            data: { dispatchedQuantity: { increment: delta }, backOrderQuantity: { decrement: delta } },
+          });
+        }
+        const caseLines = stn.cases.flatMap((c) =>
+          c.lines.filter((cl) => cl.stnLineId === line.id).map((cl) => ({ id: cl.id, caseId: c.id, quantity: cl.quantity })),
+        );
+        for (const cl of resizeCaseLines(caseLines, newQuantity)) {
+          if (cl.quantity === 0) await tx.transferCaseLine.delete({ where: { id: cl.id } });
+          else await tx.transferCaseLine.update({ where: { id: cl.id }, data: { quantity: cl.quantity } });
+        }
+        if (newQuantity === 0) await tx.stockTransferNoteLine.delete({ where: { id: line.id } });
+        else await tx.stockTransferNoteLine.update({ where: { id: line.id }, data: { quantity: newQuantity } });
+
+        movements.push({
+          branchId: stn.sourceBranchId,
+          partId: line.partId,
+          type: "TRANSFER_OUT",
+          quantity: -delta,
+          referenceId: stn.id,
+          notes: `STN ${stn.stnNumber} edited: ${line.part.partNumber} ${line.quantity} → ${newQuantity} (${input.reason})`,
+          recordedById: actorId,
+        });
+        edits.push({
+          stnId: stn.id,
+          partId: line.partId,
+          partNumber: line.part.partNumber,
+          oldQuantity: line.quantity,
+          newQuantity,
+          reason: input.reason,
+          editedById: actorId,
+        });
+      }
+      if (taxForm !== oldForm) {
+        edits.push({ stnId: stn.id, oldTaxForm: oldForm, newTaxForm: taxForm, reason: input.reason, editedById: actorId });
+      }
+
+      // A case left with no parts goes; the others carry their new totals.
+      for (const c of stn.cases) {
+        const left = await tx.transferCaseLine.aggregate({ where: { caseId: c.id }, _sum: { quantity: true } });
+        const total = left._sum.quantity ?? 0;
+        if (total === 0) await tx.transferCase.delete({ where: { id: c.id } });
+        else if (total !== c.totalQuantity) await tx.transferCase.update({ where: { id: c.id }, data: { totalQuantity: total } });
+      }
+
+      // Amounts and VAT for every line that is left, under the (possibly new) tax form.
+      const lines = await tx.stockTransferNoteLine.findMany({ where: { stnId: stn.id }, include: { part: { select: { taxable: true } } } });
+      let totalValue = 0;
+      let taxAmount = 0;
+      for (const l of lines) {
+        const amount = roundMoney(l.unitRate * l.quantity);
+        const vat = stnLineVat(taxForm, l.part.taxable, amount, VAT_RATE);
+        totalValue += amount;
+        taxAmount += vat.taxAmount;
+        if (amount !== l.amount || vat.vatPercent !== l.vatPercent || vat.taxAmount !== l.taxAmount) {
+          await tx.stockTransferNoteLine.update({ where: { id: l.id }, data: { amount, ...vat } });
+        }
+      }
+      await tx.stockTransferNote.update({
+        where: { id: stn.id },
+        data: {
+          taxForm,
+          totalQuantity: lines.reduce((s, l) => s + l.quantity, 0),
+          totalValue: roundMoney(totalValue),
+          taxAmount: roundMoney(taxAmount),
+        },
+      });
+      if (movements.length) await tx.stockTransaction.createMany({ data: movements });
+      await tx.stockTransferNoteEdit.createMany({ data: edits });
+
+      const summary = [
+        ...edits.filter((e) => e.partNumber).map((e) => `${e.partNumber} ${e.oldQuantity} → ${e.newQuantity}`),
+        ...(taxForm !== oldForm ? [`tax form ${oldForm} → ${taxForm}`] : []),
+      ].join(", ");
+      for (const indent of stn.indents) {
+        await refreshIndentStatus(tx, indent.id, actorId, [], `STN ${stn.stnNumber} edited: ${summary} (${input.reason})`);
+      }
+      return { ...stn, summary };
+    }, TX_OPTIONS);
+
+    await this.notifyStnChanged(result, "edited", `${result.summary} (${input.reason})`);
+    return this.getStn(stnId);
+  }
+
+  /** Tells the receiving branch (and the requesters) that an STN in transit was cancelled or changed. */
+  private async notifyStnChanged(
+    stn: { id: string; stnNumber: string; sourceBranchId: string; destinationBranchId: string; indents: { id: string; requestedById: string }[] },
+    what: "cancelled" | "edited",
+    detail: string,
+  ) {
+    const source = await prisma.branch.findUniqueOrThrow({ where: { id: stn.sourceBranchId }, select: { name: true } });
+    await this.notifyAudience(
+      {
+        type: what === "cancelled" ? TRANSFER_NOTIFICATION_TYPES.STN_CANCELLED : TRANSFER_NOTIFICATION_TYPES.STN_EDITED,
+        title: what === "cancelled" ? "STN cancelled" : "STN changed",
+        message:
+          what === "cancelled"
+            ? `${source.name} cancelled STN ${stn.stnNumber}: ${detail}. There is nothing to receive on it.`
+            : `${source.name} changed STN ${stn.stnNumber}: ${detail}. Receive the goods against the corrected STN.`,
+        link: `/transfers/stn/${stn.id}`,
+        branchId: stn.destinationBranchId,
+      },
+      {
+        userIds: stn.indents.map((i) => i.requestedById),
+        roles: [{ role: ROLES.BRANCH_STORE_MANAGER, branchId: stn.destinationBranchId }],
+      },
+    );
   }
 
   // ── 5. Receive: the receiving branch generates an MRN against an STN ─────
@@ -1807,8 +2100,8 @@ export class StockTransferService {
     const doc = await prisma.stockTransferNote.findUnique({
       where: { id },
       include: {
-        sourceBranch: branchSelect,
-        destinationBranch: branchSelect,
+        sourceBranch: branchPrintSelect,
+        destinationBranch: branchPrintSelect,
         createdBy: userSelect,
         dispatchedBy: userSelect,
         indents: { select: { id: true, indentNumber: true, requestedById: true } },
@@ -1825,6 +2118,8 @@ export class StockTransferService {
           orderBy: { createdAt: "asc" },
           include: { receivedBy: userSelect, discrepancyApprovedBy: userSelect, lines: { include: { part: partSelect } } },
         },
+        cancelledBy: userSelect,
+        edits: { orderBy: { createdAt: "asc" }, include: { editedBy: userSelect } },
       },
     });
     if (!doc) throw new NotFoundError("STN not found");
