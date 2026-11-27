@@ -1,8 +1,14 @@
+const currency = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+});
+
 export function formatDate(value?: string | Date | null): string {
-  if (!value) return "—";
+  if (!value) return "Not recorded";
   const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString(undefined, {
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return date.toLocaleDateString("en-NG", {
+    timeZone: "Africa/Lagos",
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -10,10 +16,11 @@ export function formatDate(value?: string | Date | null): string {
 }
 
 export function formatDateTime(value?: string | Date | null): string {
-  if (!value) return "—";
+  if (!value) return "Not recorded";
   const date = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return date.toLocaleString("en-NG", {
+    timeZone: "Africa/Lagos",
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -23,9 +30,6 @@ export function formatDateTime(value?: string | Date | null): string {
 }
 
 export function formatCurrency(amount?: number | null): string {
-  if (amount == null || Number.isNaN(amount)) return "—";
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
+  if (amount == null || !Number.isFinite(amount)) return "Not recorded";
+  return currency.format(amount);
 }

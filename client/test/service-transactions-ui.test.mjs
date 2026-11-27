@@ -98,6 +98,7 @@ function render(
                 labourSlips: [],
               }),
           isError: error,
+          error: typeof error === "object" ? error : undefined,
           isLoading: false,
           refetch: () => {},
         };
@@ -232,6 +233,63 @@ test("requisition stock preview uses the job branch and guards cached data by pe
 
 test("workspace hides all transaction actions without permissions", () =>
   assert.equal(render("ServiceTransactions").html, ""));
+
+test("Technician assignment renders in the selected Labour tab", () => {
+  const { html } = render("ServiceTransactions", {
+    permissions: ["jobcard:read", "requisition:read"],
+    props: { preferredTab: "Labour", labourAssignment: React.createElement("button", null, "Save Technician assignment") },
+  });
+  assert.match(html, /aria-selected="true" id="transaction-tab-Labour"/);
+  assert.match(html, /id="transaction-panel-Labour"[^>]*>.*Save Technician assignment/);
+});
+
+test("a strict requisition stays read-only while parts issuance is blocked", () => {
+  const { html } = render("RequisitionPanel", {
+    permissions: ["requisition:create", "requisition:read"],
+    card: { ...job, partsRequestedAt: "2026-11-26T10:00:00Z" },
+    props: { workflow: { actions: { issueParts: { allowed: false, reason: "Waiting for estimate approval" } } } },
+  });
+  assert.match(html, /Waiting for estimate approval/);
+  assert.doesNotMatch(html, /Save and issue parts/);
+});
+
+test("workflow history deep link selects the History tab and retains QC remarks", () => {
+  const { html } = render("ServiceTransactions", {
+    permissions: ["jobcard:read"],
+    props: { preferredTab: "History", workflow: { history: [
+      { id: "rework", toStatus: "REWORK", actorName: "QC staff", remarks: "Recheck the noise.", createdAt: "2026-11-26T10:00:00Z" },
+    ] } },
+  });
+  assert.match(html, /aria-selected="true" id="transaction-tab-History"/);
+  assert.match(html, /id="transaction-panel-History"[^>]*>.*Rework required.*Recheck the noise./);
+});
+
+test("job workflow renders QC controls only for reviewers and shows recorded activity", () => {
+  const props = {
+    branchId: "branch",
+    jobCardId: "job",
+    query: {
+      isPending: false,
+      isError: false,
+      refetch: () => {},
+      mutation: { isPending: false, mutate: () => {} },
+      data: {
+        stage: "AWAITING_QC",
+        parts: [],
+        history: [{ id: "opened", toStatus: "OPENED", actorName: "Service staff", remarks: null, createdAt: "2026-11-26T10:00:00Z" }],
+        actions: { passQc: { allowed: false, code: "WORKFLOW_ROLE_REQUIRED" }, failQc: { allowed: false, code: "WORKFLOW_ROLE_REQUIRED" } },
+      },
+    },
+  };
+  const options = { props, source: "../../job-cards/components/JobCardWorkflowPanel" };
+  assert.doesNotMatch(render("JobCardWorkflowPanel", options).html, /Record QC pass/);
+  props.query.data.actions = { passQc: { allowed: true }, failQc: { allowed: true } };
+  const { html } = render("JobCardWorkflowPanel", options);
+  assert.match(html, /Record QC pass/);
+  assert.match(html, /Record QC failure/);
+  assert.match(html, /Service staff.*26 Nov 2026/);
+});
+
 test("requisition screen has required/issued quantities and hides unauthorized goodwill", () => {
   const { html } = render("RequisitionPanel", {
     permissions: ["requisition:create", "requisition:read"],
@@ -305,6 +363,15 @@ test("remarks remain editable on delivered jobs with the dedicated permission", 
   }).html;
   assert.equal(readonly.includes("Save remarks"), false);
   assert.ok(readonly.match(/<textarea[^>]*>/)[0].includes("disabled"));
+});
+
+test("remarks reports a server access denial without offering a retry", () => {
+  const { html } = render("RemarksPanel", {
+    permissions: ["jobcard:read", "jobcard:remarks:update"],
+    error: { isAxiosError: true, response: { status: 403 } },
+  });
+  assert.match(html, /You do not have permission to read these remarks/);
+  assert.doesNotMatch(html, /Retry|Save remarks/);
 });
 test("print permission is checked before fetching an internal document", () => {
   const { html, queries } = render("ServiceDocumentPrint", {

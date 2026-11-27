@@ -10,6 +10,7 @@ import { useUpdateUser } from "../hooks/use-update-user";
 import { useRoles } from "../hooks/use-roles";
 import { CopyAccessSelect } from "./copy-access-select";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { staffRoleLabel } from "@/features/auth/roles";
 import { useBranches } from "@/features/branches/hooks/use-branches";
 import {
   updateUserSchema,
@@ -113,7 +114,7 @@ export function UserEditForm({ user, onSuccess }: UserEditFormProps) {
             <option value="">Select role</option>
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
-                {role.name}
+                {staffRoleLabel(role.name)}
               </option>
             ))}
           </select>

@@ -2,41 +2,46 @@
 
 import { cn } from "@/lib/utils";
 import { CheckIcon, Ban } from "lucide-react";
+import {
+  APPOINTMENT_STEPS,
+  type AppointmentProgress,
+} from "../lib/appointment-progress";
 
 interface AppointmentStatusStepperProps {
-  currentStatus: string;
+  currentStatus: AppointmentProgress;
 }
 
-const STATUS_FLOW: readonly string[] = [
-  "Pending",
-  "Checked In",
-  "Inspection",
-  "Awaiting Approval",
-  "In Repair",
-  "Quality Check",
-  "Ready",
-  "Completed",
-];
+const STATUS_FLOW: readonly string[] = APPOINTMENT_STEPS;
+const STOPPED_MESSAGES = {
+  Cancelled: "This appointment has been cancelled",
+  "No Show": "The customer did not attend this appointment",
+  "Linked jobs cancelled":
+    "All job cards linked to this appointment have been cancelled",
+};
 
 export function AppointmentStatusStepper({
   currentStatus,
 }: AppointmentStatusStepperProps) {
-  // Handle cancelled status
-  if (currentStatus === "Cancelled") {
+  if (currentStatus in STOPPED_MESSAGES) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
         <Ban className="size-5 text-destructive" />
         <div>
-          <span className="font-semibold text-destructive">Cancelled</span>
+          <span className="font-semibold text-destructive">
+            {currentStatus}
+          </span>
           <span className="ml-2 text-sm text-muted-foreground">
-            This appointment has been cancelled
+            {STOPPED_MESSAGES[currentStatus as keyof typeof STOPPED_MESSAGES]}
           </span>
         </div>
       </div>
     );
   }
 
-  const currentIndex = STATUS_FLOW.indexOf(currentStatus);
+  const currentIndex =
+    currentStatus === "Completed"
+      ? STATUS_FLOW.length
+      : STATUS_FLOW.indexOf(currentStatus);
   const isCompleted = (index: number) => index < currentIndex;
   const isActive = (index: number) => index === currentIndex;
   const isFuture = (index: number) => index > currentIndex;
@@ -52,7 +57,10 @@ export function AppointmentStatusStepper({
           return (
             <div key={status} className="flex items-center">
               {/* Step Circle */}
-              <div className="flex flex-col items-center">
+              <div
+                className="flex flex-col items-center"
+                aria-current={active ? "step" : undefined}
+              >
                 <div
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-medium transition-all",
@@ -63,7 +71,7 @@ export function AppointmentStatusStepper({
                   )}
                 >
                   {completed ? (
-                    <CheckIcon className="h-5 w-5" />
+                    <CheckIcon aria-hidden="true" className="h-5 w-5" />
                   ) : active ? (
                     <span className="size-2.5 rounded-full bg-blue-500" />
                   ) : (
@@ -79,6 +87,7 @@ export function AppointmentStatusStepper({
                   )}
                 >
                   {status}
+                  {completed && <span className="sr-only">, completed</span>}
                 </span>
               </div>
 

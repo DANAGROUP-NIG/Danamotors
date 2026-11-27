@@ -35,4 +35,13 @@ describe('Portal monthly history privacy', () => {
         expect(query.include.requestedBy.select).toEqual({ id: true });
         expect(query.where.OR).toContainEqual({ invoice: { jobCard: { is: jobScope({}) } } });
     });
+    it('exposes the customer warranty line at zero without exposing catalogue cost', async () => {
+        const warranty = { id: 'part', description: 'Covered part', quantity: 1, rate: 0, amount: 0, isUnderWarranty: true };
+        (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({ id: 'invoice', total: 100, lines: [warranty] });
+        const invoice = await new PortalService().getInvoice('customer', 'invoice');
+        expect(invoice.lines).toContainEqual(warranty);
+        const [query] = (prisma.invoice.findFirst as jest.Mock).mock.calls[0];
+        expect(query.where).toMatchObject({ id: 'invoice', customerId: 'customer' });
+        expect(query.include.lines.select).toEqual({ id: true, description: true, quantity: true, rate: true, amount: true, isUnderWarranty: true });
+    });
 });

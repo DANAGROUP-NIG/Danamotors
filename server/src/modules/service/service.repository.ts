@@ -189,7 +189,7 @@ export class ServiceRepository {
             email: true,
           },
         },
-        jobCards: true,
+        jobCards: { include: { serviceWorkflow: { select: { stage: true } } } },
         requests: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         serviceType: true,
         followUpJob: { select: { id: true, jobNumber: true } },

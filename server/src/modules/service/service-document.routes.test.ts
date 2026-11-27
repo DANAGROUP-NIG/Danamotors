@@ -85,7 +85,7 @@ it("matches additive migration grants to the role defaults used by seed resets",
     .map((match) => `${match[1]}:${match[2]}`)
     .sort();
   const expected = Object.entries(ROLE_PERMISSIONS)
-    .filter(([role]) => !Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role))
+    .filter(([role]) => role !== ROLES.QC_OFFICER && !Object.hasOwn(NEW_DEPARTMENT_ROLE_BASES, role))
     .flatMap(([role, permissions]) =>
       [
         PERMISSIONS.JOBCARD_REMARKS_UPDATE,
@@ -96,4 +96,7 @@ it("matches additive migration grants to the role defaults used by seed resets",
     )
     .sort();
   expect(grants).toEqual(expected);
+  expect(ROLE_PERMISSIONS[ROLES.QC_OFFICER]).toEqual(
+    expect.arrayContaining([PERMISSIONS.JOBCARD_REMARKS_UPDATE, PERMISSIONS.JOBCARD_PICKING_LIST_PRINT]),
+  );
 });

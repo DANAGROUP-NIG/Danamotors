@@ -48,6 +48,7 @@ export const createJobCardSchema = z
     previousJobId: z.string().optional(),
     repeatReason: z.string().trim().max(2000).optional(),
     remarks: z.string().max(500, "Keep remarks to 500 characters").optional(),
+    faultVerification: z.string().trim().max(5000, "Keep fault verification to 5000 characters").optional(),
     tyres: z
       .array(
         z.object({

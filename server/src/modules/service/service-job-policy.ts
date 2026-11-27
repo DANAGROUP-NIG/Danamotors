@@ -78,7 +78,7 @@ export const SERVICE_JOB_ACTIONS = {
     waiting: "Waiting for the parts request",
   },
   startWork: {
-    from: ["PARTS_ISSUED", "REWORK"],
+    from: ["PARTS_ISSUED"],
     to: "IN_PROGRESS",
     roles: technician,
     assignedTechnician: true,

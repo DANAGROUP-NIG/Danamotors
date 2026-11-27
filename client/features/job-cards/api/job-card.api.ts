@@ -2,7 +2,10 @@ import { apiGet, apiPost } from "@/lib/api/apiClient";
 import { API_ROUTES } from "@/lib/constants/apiRoutes";
 import type { JobCard, JobCardListResponse } from "../types/job-card.types";
 
-export async function requestJobCardParts(id: string, requestId: string): Promise<void> {
+export async function requestJobCardParts(
+  id: string,
+  requestId: string,
+): Promise<void> {
   await apiPost(API_ROUTES.service.jobCards.requestParts(id), { requestId });
 }
 
@@ -44,6 +47,7 @@ export async function getJobCardRequest(id: string): Promise<JobCard> {
 }
 
 export interface CreateJobCardPayload {
+  faultVerification?: string;
   branchName: string;
   serviceId?: string;
   serviceTypeId: string;
@@ -94,13 +98,15 @@ export interface CreateJobCardPayload {
 
 export type CreatedJobCard = JobCard & {
   warrantyCase: { id: string; caseNumber: string } | null;
-}
+};
 
 export async function createJobCardRequest(
   data: CreateJobCardPayload,
 ): Promise<CreatedJobCard> {
   const result = await apiPost<{ jobCard: CreatedJobCard }>(
-    data.appointmentId ? `/service/appointments/${data.appointmentId}/convert` : API_ROUTES.service.jobCards.base,
+    data.appointmentId
+      ? `/service/appointments/${data.appointmentId}/convert`
+      : API_ROUTES.service.jobCards.base,
     {
       ...data,
       serviceId: data.serviceId || undefined,

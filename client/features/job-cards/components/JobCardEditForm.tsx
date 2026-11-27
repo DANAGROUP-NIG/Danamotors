@@ -15,13 +15,23 @@ import { WorkshopPicker } from "./WorkshopPicker";
 import type { JobCard } from "../types/job-card.types";
 import { NumberInput } from "@/components/forms/NumberInput";
 
-export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
+export function JobCardEditForm({
+  jobCard,
+  showWorkshopActions = true,
+  ignoreOpeningApproval = false,
+}: {
+  jobCard: JobCard;
+  showWorkshopActions?: boolean;
+  ignoreOpeningApproval?: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const { isAdminOrAbove, hasPermission } = useAuth();
 
   const current = canonicalJobStatus(jobCard.status);
+  // Temporarily bypass the local opening-approval gate on the job card page.
   const openingSigned =
+    ignoreOpeningApproval ||
     !jobCard.openingSignatureRequired ||
     jobCard.openingSignatureCurrent === true;
   const billed = hasJobBill(jobCard);
@@ -147,10 +157,22 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
 
   if (["DELIVERED", "CANCELLED"].includes(current)) return null;
   const actionError = update.error ?? credit.error ?? qc.error;
+  const technicianPicker = !billed && hasPermission("assignment:create") && (
+    <WorkshopPicker
+      label="Assigned technician"
+      endpoint={`/workshop/technicians?branchId=${jobCard.branchId}&activeOnly=true`}
+      collection="technicians"
+      value={technicianId}
+      onChange={setTechnicianId}
+      queryOnly={!showWorkshopActions}
+    />
+  );
+  if (!showWorkshopActions) return technicianPicker || null;
 
   return (
     <form
-      className="grid gap-4 rounded-xl border bg-white p-5 print:hidden"
+      id="workshop-actions"
+      className="grid scroll-mt-48 gap-4 rounded-xl border bg-white p-5 print:hidden"
       inert={update.isPending || credit.isPending || qc.isPending}
       onSubmit={(event) => {
         event.preventDefault();
@@ -158,15 +180,9 @@ export function JobCardEditForm({ jobCard }: { jobCard: JobCard }) {
       }}
     >
       <h2 className="font-semibold">Workshop actions</h2>
-      {!billed && hasPermission("assignment:create") && (
+      {technicianPicker && (
         <div className="grid gap-2">
-          <WorkshopPicker
-            label="Assigned technician"
-            endpoint={`/workshop/technicians?branchId=${jobCard.branchId}&activeOnly=true`}
-            collection="technicians"
-            value={technicianId}
-            onChange={setTechnicianId}
-          />
+          {technicianPicker}
           <Button
             type="button"
             disabled={!technicianId || assign.isPending}

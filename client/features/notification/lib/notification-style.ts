@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   FileText,
   CircleDollarSign,
+  ClipboardCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -58,6 +59,15 @@ export const NOTIFICATION_TYPE_STYLES: Record<
     icon: FileText,
     classes: "bg-teal-50 text-teal-600",
   },
+  ESTIMATE_APPROVED: { icon: BadgeCheck, classes: "bg-muted text-primary" },
+  INSPECTION_SUBMITTED: { icon: ClipboardCheck, classes: "bg-muted text-primary" },
+  WARRANTY_RESOLVED: { icon: FileText, classes: "bg-muted text-primary" },
+  TECHNICIAN_UNASSIGNED: { icon: Wrench, classes: "bg-muted text-primary" },
+  JOBCARD_ASSIGNED: { icon: Wrench, classes: "bg-muted text-primary" },
+  JOBCARD_QC_PASSED: { icon: ClipboardCheck, classes: "bg-muted text-primary" },
+  JOBCARD_QC_FAILED: { icon: AlertTriangle, classes: "bg-muted text-destructive" },
+  PART_REQUESTED: { icon: ShoppingCart, classes: "bg-muted text-primary" },
+  PARTS_ISSUED: { icon: PackageCheck, classes: "bg-muted text-primary" },
   INVOICE_PAID: {
     icon: CircleDollarSign,
     classes: "bg-green-50 text-green-700",

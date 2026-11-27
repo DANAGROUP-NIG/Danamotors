@@ -10,6 +10,7 @@ import prisma from '../../prisma/client';
 import { ROLES, PERMISSIONS } from '../../shared/constants/roles';
 import { drainJobcardNotifications, replayJobcardNotification, sendJobcardReminders, setNotificationActor } from './jobcard-notification-router';
 import { jobWorkUpdate } from '../requisition/requisition-work';
+import { updateServiceJobInspection } from '../service/service-job-inspection';
 
 jest.setTimeout(90_000);
 
@@ -24,7 +25,7 @@ integration('local staging jobcard notification flow', () => {
   beforeAll(async () => {
     const branch = await prisma.branch.create({ data: { name: `notification-staging-${suffix}` } });
     branchId = branch.id;
-    for (const [label, name] of Object.entries({ admin: ROLES.ADMIN, manager: ROLES.WORKSHOP_MANAGER, advisor: ROLES.SERVICE_ADVISOR, tech: ROLES.TECHNICIAN, techB: ROLES.TECHNICIAN, qc: ROLES.ENGINEER, billing: ROLES.BILLING_OFFICER, store: ROLES.BRANCH_STORE_MANAGER, ccu: ROLES.CCU_OFFICER, actor: 'NotificationTestActor', requester: 'NotificationTestRequester' })) {
+    for (const [label, name] of Object.entries({ admin: ROLES.ADMIN, manager: ROLES.WORKSHOP_MANAGER, advisor: ROLES.SERVICE_ADVISOR, tech: ROLES.TECHNICIAN, techB: ROLES.TECHNICIAN, qc: ROLES.ENGINEER, qcOfficer: ROLES.QC_OFFICER, warranty: ROLES.WARRANTY_OFFICER, billing: ROLES.BILLING_OFFICER, store: ROLES.BRANCH_STORE_MANAGER, ccu: ROLES.CCU_OFFICER, actor: 'NotificationTestActor', requester: 'NotificationTestRequester' })) {
       const role = await prisma.role.upsert({ where: { name }, create: { name }, update: {} });
       const user = await prisma.user.create({ data: { email: `${label}-${suffix}@example.invalid`, firstName: label, lastName: 'Test', passwordHash: 'disabled-test-account', roleId: role.id, branchId } });
       users[label] = user.id;
@@ -79,15 +80,15 @@ integration('local staging jobcard notification flow', () => {
     expectUsers(await change({ status: 'IN_PROGRESS' }), ['tech']);
     expectUsers(await change({ status: 'QC' }), ['qc']);
     expectUsers(await change({ qcStatus: 'FAILED', qcNotes: 'Repeat inspection repair' }, users.qc), ['tech', 'advisor', 'manager']);
-    expectUsers(await change({ status: 'IN_PROGRESS' }), ['tech', 'advisor', 'manager']);
+    expectUsers(await change({ status: 'IN_PROGRESS' }), []);
     expectUsers(await change({ status: 'QC', qcStatus: 'PENDING' }), ['qc']);
-    expectUsers(await change({ qcStatus: 'PASSED' }, users.qc), ['advisor']);
+    expectUsers(await change({ qcStatus: 'PASSED' }, users.qc), ['advisor', 'tech']);
     expectUsers(await change({ status: 'READY' }, users.advisor), ['billing', 'ccu']);
     expectUsers(await change({ status: 'BILLED' }, users.billing), ['advisor']);
     expectUsers(await change({ status: 'READY' }, users.billing), ['advisor']);
     expectUsers(await change({ status: 'IN_PROGRESS', qcStatus: 'PENDING' }), ['tech']);
     expectUsers(await change({ status: 'QC' }), ['qc']);
-    expectUsers(await change({ qcStatus: 'PASSED' }), ['advisor']);
+    expectUsers(await change({ qcStatus: 'PASSED' }), ['advisor', 'tech']);
     expectUsers(await change({ status: 'READY' }), ['billing', 'ccu']);
     expectUsers(await change({ status: 'QC', qcStatus: 'PENDING' }), ['qc']); // estimate revision
     await change({ qcStatus: 'PASSED' });
@@ -104,6 +105,47 @@ integration('local staging jobcard notification flow', () => {
     expect(await prisma.jobcardNotificationAudit.count({ where: { jobCardId: cardId, status: 'DELIVERED' } })).toBe(rows.length);
   });
 
+  it('queues a strict inspection once and routes strict QC handoffs to the correct staff', async () => {
+    cardId = await create(true);
+    await prisma.serviceJobWorkflow.create({
+      data: { jobCardId: cardId, stage: 'TECHNICIAN_ASSIGNED', faultVerification: 'Noise verified', faultVerifiedById: users.advisor },
+    });
+    const inspection = { action: 'submitInspection' as const, version: 0, remarks: 'No parts required', noPartsRequired: true, parts: [] };
+    const technician = { userId: users.tech, role: ROLES.TECHNICIAN };
+    const retries = await Promise.all([
+      updateServiceJobInspection(cardId, branchId, technician, inspection),
+      updateServiceJobInspection(cardId, branchId, technician, inspection),
+    ]);
+    expect(retries.map(workflow => workflow.version)).toEqual([1, 1]);
+    await expect(updateServiceJobInspection(cardId, branchId, technician, { ...inspection, remarks: 'Different inspection' }))
+      .rejects.toMatchObject({ code: 'WORKFLOW_VERSION_CONFLICT' });
+    await drainJobcardNotifications(cardId);
+    const inspectionNotifications = await prisma.notification.findMany({ where: { type: 'INSPECTION_SUBMITTED', link: `/job-cards/${cardId}?tab=warranty` } });
+    expectUsers(inspectionNotifications, ['warranty']);
+    expect(inspectionNotifications[0].message).toContain('No parts required');
+
+    const savedBypass = process.env.SERVICE_JOB_WARRANTY_BYPASS_ENABLED;
+    process.env.SERVICE_JOB_WARRANTY_BYPASS_ENABLED = 'true';
+    try {
+      await updateServiceJobInspection(cardId, branchId, { userId: users.advisor, role: ROLES.SERVICE_ADVISOR }, { action: 'bypassWarranty', version: 1 });
+    } finally {
+      if (savedBypass === undefined) delete process.env.SERVICE_JOB_WARRANTY_BYPASS_ENABLED;
+      else process.env.SERVICE_JOB_WARRANTY_BYPASS_ENABLED = savedBypass;
+    }
+    await drainJobcardNotifications(cardId);
+    expectUsers(await prisma.notification.findMany({
+      where: { type: 'WARRANTY_RESOLVED', link: `/job-cards/${cardId}?tab=estimate` },
+    }), ['advisor']);
+
+    expectUsers(await change({ status: 'QC' }, users.tech), ['advisor', 'qcOfficer']);
+    const failed = await change({ status: 'IN_PROGRESS', qcStatus: 'FAILED', qcNotes: 'Repeat inspection repair' }, users.qcOfficer);
+    expectUsers(failed, ['tech', 'advisor', 'manager']);
+    expect(failed.every(row => row.message.includes('Repeat inspection repair') && row.link?.endsWith('?tab=qc'))).toBe(true);
+    expectUsers(await change({ status: 'QC', qcStatus: 'PENDING' }, users.tech), ['advisor', 'qcOfficer']);
+    expectUsers(await change({ qcStatus: 'PASSED' }, users.qcOfficer), ['advisor']);
+    expectUsers(await change({ status: 'READY' }, users.advisor), ['billing']);
+  });
+
   it('handles assigned creation, cancellation, legacy aliases, QC fallback and empty-role fallback', async () => {
     cardId = await create(true);
     expectUsers(await prisma.notification.findMany({ where: { dedupeKey: { startsWith: `jobcard:${cardId}:` } } }), ['tech']);
@@ -111,7 +153,7 @@ integration('local staging jobcard notification flow', () => {
     await change({ status: 'Pending' });
     expect(await prisma.jobcardNotificationAudit.count({ where: { jobCardId: cardId, eventType: 'STATUS' } })).toBe(0);
     expect(await prisma.jobcardNotificationEvent.count({ where: { jobCardId: cardId } })).toBe(initialEvents + 1);
-    expectUsers(await change({ status: 'Quality Check', qualityInspectorId: null }), ['qc']);
+    expectUsers(await change({ status: 'Quality Check', qualityInspectorId: null }), ['qc', 'qcOfficer']);
     await prisma.user.update({ where: { id: users.store }, data: { isActive: false } });
     const warning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {});
     expectUsers(await change({ status: 'WAITING_PARTS' }), ['admin', 'advisor']);

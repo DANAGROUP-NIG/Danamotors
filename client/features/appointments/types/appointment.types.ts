@@ -1,6 +1,11 @@
-import type { CreateJobCardFormValues } from '@/features/job-cards/schemas/job-card.schema';
-export type BookingRequest = CreateJobCardFormValues['complaints'][number];
-export type BookingExtra = { mileage?: number; acFitted?: boolean; followUpJobId?: string | null; requests?: string | BookingRequest[] };
+import type { CreateJobCardFormValues } from "@/features/job-cards/schemas/job-card.schema";
+export type BookingRequest = CreateJobCardFormValues["complaints"][number];
+export type BookingExtra = {
+  mileage?: number;
+  acFitted?: boolean;
+  followUpJobId?: string | null;
+  requests?: string | BookingRequest[];
+};
 export type AppointmentStatus =
   | "Pending"
   | "Checked In"
@@ -13,19 +18,31 @@ export type AppointmentStatus =
   | "Cancelled"
   | "No Show";
 
-
-  export type AppointmentSource = 'WalkIn' | 'OnlineBooking';
+export type AppointmentSource = "WalkIn" | "OnlineBooking";
 
 export type Appointment = {
   bookingNumber?: string | null;
-  bookingStatus?: 'BOOKED' | 'CONVERTED' | 'CANCELLED' | 'NO_SHOW';
+  bookingStatus?: "BOOKED" | "CONVERTED" | "CANCELLED" | "NO_SHOW";
   serviceTypeId?: string | null;
   mileage?: number | null;
   acFitted?: boolean | null;
   followUpJobId?: string | null;
   cancelReason?: string | null;
-  requests?: { id: string; complaintCodeId: string | null; defectCode: string | null; description: string; estimatedParts: string | number; estimatedOil: string | number; estimatedLabour: string | number }[];
-  totals?: { estimatedParts: number; estimatedOil: number; estimatedLabour: number; estimatedTotal: number };
+  requests?: {
+    id: string;
+    complaintCodeId: string | null;
+    defectCode: string | null;
+    description: string;
+    estimatedParts: string | number;
+    estimatedOil: string | number;
+    estimatedLabour: string | number;
+  }[];
+  totals?: {
+    estimatedParts: number;
+    estimatedOil: number;
+    estimatedLabour: number;
+    estimatedTotal: number;
+  };
   id: string;
   customerId: string;
   vehicleId: string;
@@ -62,7 +79,13 @@ export type Appointment = {
     lastName: string;
     email: string;
   } | null;
-  jobCards?: unknown[];
+  jobCards?: {
+    id: string;
+    jobNumber: string;
+    description?: string | null;
+    status: string;
+    serviceWorkflow?: { stage: string } | null;
+  }[];
 };
 
 export type CreateAppointmentPayload = BookingExtra & {

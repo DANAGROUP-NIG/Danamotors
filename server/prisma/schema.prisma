@@ -1517,6 +1517,9 @@ model PurchaseRequest {
 // ============================================================
 
 model PartIssuance {
+  workflowRequestId String?
+  workflowRequestHash String?
+  @@unique([jobCardId, workflowRequestId])
   collectionSignature PartCollectionSignature?
   receivedById String?
   receivedAt DateTime?
@@ -4996,6 +4999,9 @@ model AppointmentRequest {
 }
 
 model PartRequisition {
+  workflowRequestId String?
+  workflowRequestHash String?
+  @@unique([jobCardId, workflowRequestId])
   id                String                @id @default(uuid())
   requisitionNumber String
   requisitionDate   DateTime              @default(now())

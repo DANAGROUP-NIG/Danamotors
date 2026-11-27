@@ -288,6 +288,7 @@ export const updatePurchaseRequestStatusSchema = z.object({
 
 export const createPartIssuanceSchema = z.object({
   body: z.object({
+    requestId: z.string().uuid().optional(),
     sparePartId: z.string().uuid("Invalid spare part ID"),
     branchId: z.string().uuid("Invalid branch ID"),
     jobCardId: z.string().uuid("Invalid job card ID").optional(),

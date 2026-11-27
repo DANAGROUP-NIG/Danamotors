@@ -249,6 +249,7 @@ export type PortalInvoice = {
 };
 
 export type PortalInvoiceDetail = PortalInvoice & {
+  lines?: { id: string; description: string; quantity: number; rate: number; amount: number; isUnderWarranty?: boolean }[];
   receipts?: {
     id: string;
     amount: number;

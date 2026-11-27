@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
 import { useBranchStore } from "@/store/branch.store";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { staffRoleLabel } from "@/features/auth/roles";
 import { useCreateUser } from "../hooks/use-create-user";
 import { useRoles } from "../hooks/use-roles";
 import { CopyAccessSelect } from "./copy-access-select";
@@ -103,7 +104,7 @@ export function UserCreateForm({ onSuccess }: UserCreateFormProps) {
             <option value="">Select role</option>
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
-                {role.name}
+                {staffRoleLabel(role.name)}
               </option>
             ))}
           </select>

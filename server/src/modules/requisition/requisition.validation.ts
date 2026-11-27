@@ -7,6 +7,7 @@ export const requisitionBody = z
   .object({
     branchId: id,
     jobCardId: id,
+    requestId: id.optional(),
     chargeType: z.nativeEnum(ChargeType),
     groupId: id.optional(),
     engineerId: id.optional(),

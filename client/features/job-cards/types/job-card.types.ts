@@ -37,6 +37,7 @@ export type Estimate = {
     referenceId?: string | null;
     /** Part lines: part source code (internal; never shown to customers). */
     partSource?: string | null;
+    isUnderWarranty?: boolean;
     description: string;
     quantity: number;
     rate: number;

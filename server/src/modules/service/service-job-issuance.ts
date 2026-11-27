@@ -1,5 +1,6 @@
 import type { Prisma, ServiceJobWorkflowPart } from "@prisma/client";
 import { ConflictError, ForbiddenError } from "../../shared/errors/appError";
+import { createHash } from "node:crypto";
 import { requireServiceJobAction } from "./service-job-policy";
 
 type IssuanceWorkflow = {
@@ -9,6 +10,20 @@ type IssuanceWorkflow = {
   parts: ServiceJobWorkflowPart[];
 };
 
+export function serviceJobIssuanceFingerprint(actorId: string, input: object) {
+  return createHash("sha256").update(JSON.stringify([actorId, input])).digest("hex");
+}
+
+export function assertServiceJobIssuanceReplay(storedHash: string | null, fingerprint: string) {
+  if (storedHash !== fingerprint) {
+    throw new ConflictError("This issuance request ID was already used for a different request").withCode("ISSUANCE_REQUEST_ID_CONFLICT");
+  }
+}
+
+export function isServiceJobReplacementStage(stage: string) {
+  return ["PARTS_ISSUED", "IN_PROGRESS", "REWORK"].includes(stage);
+}
+
 export async function authorizeServiceJobIssuance(
   tx: Prisma.TransactionClient,
   workflow: IssuanceWorkflow,
@@ -17,7 +32,7 @@ export async function authorizeServiceJobIssuance(
 ) {
   const actor = await tx.user.findUnique({ where: { id: actorId }, include: { role: true } });
   if (!actor?.isActive) throw new ForbiddenError("An active staff account is required to issue parts");
-  const replacement = ["PARTS_ISSUED", "IN_PROGRESS", "REWORK"].includes(workflow.stage);
+  const replacement = isServiceJobReplacementStage(workflow.stage);
   const stage = requireServiceJobAction("issueParts", {
     stage: replacement ? "PARTS_REQUESTED" : workflow.stage,
     technicianId,

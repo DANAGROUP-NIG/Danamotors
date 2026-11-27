@@ -958,6 +958,7 @@ const existingRolePermissions = {
   // Handles estimates, approvals, customer liaison during service
   [ROLES.SERVICE_ADVISOR]: [
     PERMISSIONS.ASSIGNMENT_CREATE,
+    PERMISSIONS.ESTIMATE_CREATE,
     ...PDI_WORKSHOP_PERMISSIONS,
     ...REPEAT_JOB_READ_PERMISSIONS,
     ...MIS_FRONT_OFFICE_REPORTS,

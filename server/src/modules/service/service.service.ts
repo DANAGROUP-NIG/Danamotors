@@ -42,7 +42,7 @@ import {
   jobOpeningBody,
   jobUpdateBody,
 } from "./service.validation";
-import { JobCardWorkflowService } from "./job-card-workflow.service";
+import { JobCardWorkflowService, serviceJobWorkflowEnrollmentEnabled } from "./job-card-workflow.service";
 import prisma from "../../prisma/client";
 import { setNotificationActor } from "../notification/jobcard-notification-router";
 import { ServiceRepository } from "./service.repository";
@@ -256,7 +256,7 @@ export class ServiceService {
       throw new NotFoundError("Appointment not found");
     }
 
-    return bookingView(appointment);
+    return { ...bookingView(appointment), serviceWorkflowRequired: serviceJobWorkflowEnrollmentEnabled() };
   }
 
   async updateAppointment(
@@ -444,7 +444,7 @@ export class ServiceService {
         },
       });
       return bookingView(saved);
-    });
+    }, { timeout: 15000 });
 
     // ── Post-update notifications ─────────────────────────────────────────────
     const notificationService = new NotificationService();

@@ -48,6 +48,8 @@ jest.mock("../../prisma/client", () => ({
     service: {
       findFirst: jest.fn(),
     },
+    sparePart: { findUnique: jest.fn() },
+    serviceJobWorkflow: { update: jest.fn() },
 
     estimate: {
       findMany: jest.fn(),
@@ -333,6 +335,43 @@ describe("JobCard workflow", () => {
         }),
       }),
     );
+  });
+
+  it("prices inspected parts from the catalogue and records warranty parts at zero", async () => {
+    const warrantyPart = "00000000-0000-4000-8000-000000000011";
+    const customerPart = "00000000-0000-4000-8000-000000000012";
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
+      id, status: "OPEN", vehicle: null, serviceWorkflow: {
+        stage: "WARRANTY_RESOLVED", version: 4,
+        parts: [
+          { sparePartId: warrantyPart, quantity: 2, isUnderWarranty: true },
+          { sparePartId: customerPart, quantity: 3, isUnderWarranty: false },
+        ],
+      },
+    });
+    (prisma.sparePart.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ id: warrantyPart, name: "Covered part", retailRate: 101.51, partFlag: "O" })
+      .mockResolvedValueOnce({ id: customerPart, name: "Customer part", retailRate: 23.17, partFlag: "O" });
+    await new ServiceService().addEstimate(id, {
+      description: "Warranty estimate",
+      lines: [
+        { type: "PART", referenceId: warrantyPart, quantity: 2 },
+        { type: "PART", referenceId: customerPart, quantity: 3 },
+      ],
+    }, id);
+    expect(prisma.estimate.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        amount: 69.51,
+        lines: { createMany: { data: [
+          expect.objectContaining({ referenceId: warrantyPart, rate: 0, amount: 0, catalogueRate: 101.51, isUnderWarranty: true }),
+          expect.objectContaining({ referenceId: customerPart, rate: 23.17, amount: 69.51, isUnderWarranty: false }),
+        ] } },
+      }),
+    }));
+    expect(prisma.serviceJobWorkflow.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { jobCardId: id, version: 4 },
+      data: { stage: "ESTIMATE_PREPARED", version: { increment: 1 } },
+    }));
   });
 
   it("carries a workshop-only service charge into the approved estimate without a catalogue lookup", async () => {

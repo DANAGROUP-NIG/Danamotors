@@ -17,8 +17,10 @@ import {
 } from "../../shared/errors/appError";
 import { ROLES } from "../../shared/constants/roles";
 import {
+  assertServiceJobIssuanceReplay,
   authorizeServiceJobIssuance,
   completeServiceJobIssuance,
+  serviceJobIssuanceFingerprint,
 } from "../service/service-job-issuance";
 import { NotificationService } from "../notification/notification.service";
 import { SparePart, PartStatus, PartRole, Prisma } from "@prisma/client";
@@ -1196,6 +1198,7 @@ export class InventoryService {
   // ── Part Issuances ─────────────────────────────────────────────────────
 
   async createPartIssuance(data: {
+    requestId?: string;
     sparePartId: string;
     branchId: string;
     jobCardId?: string;
@@ -1209,7 +1212,7 @@ export class InventoryService {
     if (!sparePart) {
       throw new NotFoundError("Spare part not found");
     }
-    if (sparePart.partStatus !== PartStatus.ACTIVE) {
+    if (sparePart.partStatus !== PartStatus.ACTIVE && !data.requestId) {
       throw new BadRequestError("Blocked parts cannot be issued");
     }
 
@@ -1222,7 +1225,8 @@ export class InventoryService {
       data.sparePartId,
     );
     // Reserved stock is held for picked transfers and cannot be issued.
-    if (!stock || stock.quantity - stock.reservedQuantity < data.quantity) {
+    const hasStock = stock && stock.quantity - stock.reservedQuantity >= data.quantity;
+    if (!hasStock && !data.requestId) {
       throw new BadRequestError("Insufficient available stock at this branch");
     }
 
@@ -1248,6 +1252,7 @@ export class InventoryService {
     const result = await prisma.$transaction(
       async (tx) => {
         await setNotificationActor(tx, data.issuedById);
+        let workflowRequestHash: string | undefined;
         let advanceWorkflow:
           | ((issuanceId: string) => Promise<void>)
           | undefined;
@@ -1259,6 +1264,18 @@ export class InventoryService {
             where: { id: data.jobCardId },
             include: { serviceWorkflow: { include: { parts: true } } },
           });
+          if (card.serviceWorkflow) {
+            if (!data.requestId)
+              throw new BadRequestError("Provide a request ID when issuing parts").withCode("ISSUANCE_REQUEST_ID_REQUIRED");
+            workflowRequestHash = serviceJobIssuanceFingerprint(data.issuedById, data);
+            const recorded = await tx.partIssuance.findUnique({
+              where: { jobCardId_workflowRequestId: { jobCardId: card.id, workflowRequestId: data.requestId } },
+            });
+            if (recorded) {
+              assertServiceJobIssuanceReplay(recorded.workflowRequestHash, workflowRequestHash);
+              return { issuance: recorded, stock: null };
+            }
+          }
           if (
             card.branchId !== data.branchId ||
             card.billedAt ||
@@ -1352,6 +1369,8 @@ export class InventoryService {
             "parts issue",
           );
         }
+        if (sparePart.partStatus !== PartStatus.ACTIVE) throw new BadRequestError("Blocked parts cannot be issued");
+        if (!hasStock) throw new BadRequestError("Insufficient available stock at this branch");
         const updated = await tx.inventoryStock.updateMany({
           where: {
             branchId: data.branchId,
@@ -1370,8 +1389,13 @@ export class InventoryService {
             data: { qcStatus: "PENDING" },
           });
         // partSource is a snapshot of the issued record's source, kept for reporting.
+        const { requestId, ...issuanceData } = data;
         const issuance = await tx.partIssuance.create({
-          data: { ...data, partSource: sparePart.partFlag },
+          data: {
+            ...issuanceData,
+            partSource: sparePart.partFlag,
+            ...(workflowRequestHash ? { workflowRequestId: requestId, workflowRequestHash } : {}),
+          },
         });
         await tx.stockTransaction.create({
           data: {
@@ -1400,7 +1424,7 @@ export class InventoryService {
     );
 
     // The stock mutation has committed; notification failure must not invite a duplicate issue.
-    await this.notifyLowStock(
+    if (result.stock) await this.notifyLowStock(
       data.branchId,
       result.stock.part,
       result.stock.quantity,

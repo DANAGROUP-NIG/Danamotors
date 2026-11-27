@@ -10,7 +10,9 @@ import {
 import { JobCardPartsSection } from "@/features/job-cards/components/JobCardPartsSection";
 import { RepairWorkspacePage } from "@/features/job-cards/components/RepairWorkspacePage";
 import { JobCardEditForm } from "@/features/job-cards/components/JobCardEditForm";
-import { JobOpeningConsentCard } from "@/features/job-cards/components/JobOpeningConsentCard";
+// TEMPORARILY DISABLED: Restore this import and the JobOpeningConsentCard below together.
+// import { JobOpeningConsentCard } from "@/features/job-cards/components/JobOpeningConsentCard";
+import { useJobOpeningConsent } from "@/features/job-cards/hooks/use-job-opening-consent";
 import {
   lagosDate,
   moneyText,
@@ -20,14 +22,24 @@ import { JobCardRepeatPanel } from "@/features/repeat-jobs/components/JobCardRep
 import { JobCardLatePanel } from "@/features/late-deliveries/components/JobCardLatePanel";
 import { RepeatTag } from "@/features/repeat-jobs/components/repeat-ui";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { sumMoney } from "@/features/pdi/lib/pdi.logic";
-import { JobProgressStepper, StatusPill } from "@/features/job-cards/components/repair-workspace-ui";
+import {
+  JobProgressStepper,
+  StatusPill,
+} from "@/features/job-cards/components/repair-workspace-ui";
 import { useJobCard } from "@/features/job-cards";
 import { useRequestJobCardParts } from "@/features/job-cards/hooks/use-request-job-card-parts";
+import { useJobCardWorkflow } from "@/features/job-cards/hooks/use-job-card-workflow";
+import {
+  JobCardTechnicianAssignment,
+  JobCardWorkflowPanel,
+} from "@/features/job-cards/components/JobCardWorkflowPanel";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { canViewJobCardSection } from "@/features/auth/job-card-section-access";
 import {
   ArrowLeft,
   Loader2,
@@ -63,24 +75,59 @@ import { WARRANTY_PERMISSIONS } from "@/features/auth/roles";
 const STATUS_TONES = JOB_CARD_STATUS_TONES;
 
 function fmtDate(iso?: string | null) {
-  return iso && Number.isFinite(Date.parse(iso)) ? lagosDate(iso) : "Not recorded";
+  return iso && Number.isFinite(Date.parse(iso))
+    ? lagosDate(iso)
+    : "Not recorded";
 }
 
 function fmtCurrency(n?: number | null) {
-  return n != null && Number.isFinite(Number(n)) ? moneyText(n) : "Not recorded";
+  return n != null && Number.isFinite(Number(n))
+    ? moneyText(n)
+    : "Not recorded";
 }
 
 export default function JobCardDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const workflowTab = useSearchParams().get("tab");
   const { data: jobCard, isLoading, error } = useJobCard(id);
   const requestParts = useRequestJobCardParts(id);
-  const { hasPermission, isSuperAdmin } = useAuth();
+  const workflowQuery = useJobCardWorkflow(id);
+  const workflow = workflowQuery.data;
+  const hasWorkflow = Boolean(workflow);
+  const useLegacyActions = workflowQuery.isSuccess && workflow === null;
+  const { hasPermission, isSuperAdmin, isHydrated, user } = useAuth();
+  const roles = isHydrated && user
+    ? [user.role, ...("roles" in user && Array.isArray(user.roles)
+      ? user.roles.filter((role): role is string => typeof role === "string")
+      : [])]
+    : [];
+  const showWorkshopActions = canViewJobCardSection(roles, "workshop");
+  const showFinanceSections = canViewJobCardSection(roles, "finance");
+  // Keep the existing opening-consent read while its UI is temporarily disabled.
+  useJobOpeningConsent(id, !isLoading && !error && Boolean(jobCard) && hasPermission("jobcard:read"));
 
   const canManage = hasPermission("jobcard:update");
   const canCreateBill = hasPermission("invoice:job-bill:create");
   const canSeeWarranty =
     isSuperAdmin || hasPermission(WARRANTY_PERMISSIONS.READ);
+
+  useEffect(() => {
+    if (!hasWorkflow || !workflowTab) return;
+    const targets: Record<string, string> = {
+      labour: "transaction-panel-Labour",
+      history: "transaction-panel-History",
+      warranty: "workflow-warranty",
+      estimate: "estimate-approval",
+      parts: "workflow-parts",
+      qc: "workflow-qc",
+      billing: "workflow-billing",
+    };
+    if (targets[workflowTab])
+      document
+        .getElementById(targets[workflowTab])
+        ?.scrollIntoView({ block: "start" });
+  }, [hasWorkflow, workflowTab]);
 
   function handlePrint() {
     window.print();
@@ -108,7 +155,7 @@ export default function JobCardDetailPage() {
   if (isLoading || error || !jobCard)
     return (
       <div className="p-4 lg:p-5">
-        <RepairWorkspacePage id={id} />
+        <RepairWorkspacePage id={id} showAdvancePayments={showFinanceSections} />
       </div>
     );
 
@@ -120,28 +167,46 @@ export default function JobCardDetailPage() {
     : "Not recorded";
   const customerName = jobCard.customer
     ? jobCard.customer.companyName ||
-      `${jobCard.customer.firstName ?? ""} ${jobCard.customer.lastName ?? ""}`.trim() || "Not recorded"
+      `${jobCard.customer.firstName ?? ""} ${jobCard.customer.lastName ?? ""}`.trim() ||
+      "Not recorded"
     : "Not recorded";
   const issuedAmounts = (jobCard.partIssuances ?? []).map(issuanceAmount);
   const totalPartsCost = issuedAmounts.some((amount) => amount == null)
     ? null
     : sumMoney(issuedAmounts);
-  const totalInvoiced = sumMoney((jobCard.invoices ?? [])
-    .filter((invoice) => !["CANCELLED", "CANCELED", "VOID"].includes(invoice.status.toUpperCase()))
-    .map((invoice) => invoice.total));
-  const qcLabel = WORKSPACE_COPY.qcStates[
-    (jobCard.qcStatus?.toUpperCase() ?? "") as keyof typeof WORKSPACE_COPY.qcStates
-  ] ?? "Not recorded";
-  const qcTone = jobCard.qcStatus?.toUpperCase() === "PASSED" ? "emerald"
-    : jobCard.qcStatus?.toUpperCase() === "FAILED" ? "red"
-    : jobCard.qcStatus ? "amber" : "gray";
+  const totalInvoiced = sumMoney(
+    (jobCard.invoices ?? [])
+      .filter(
+        (invoice) =>
+          !["CANCELLED", "CANCELED", "VOID"].includes(
+            invoice.status.toUpperCase(),
+          ),
+      )
+      .map((invoice) => invoice.total),
+  );
+  const qcLabel =
+    WORKSPACE_COPY.qcStates[
+      (jobCard.qcStatus?.toUpperCase() ??
+        "") as keyof typeof WORKSPACE_COPY.qcStates
+    ] ?? "Not recorded";
+  const qcTone =
+    jobCard.qcStatus?.toUpperCase() === "PASSED"
+      ? "emerald"
+      : jobCard.qcStatus?.toUpperCase() === "FAILED"
+        ? "red"
+        : jobCard.qcStatus
+          ? "amber"
+          : "gray";
   const summary = jobCard.advanceSummary;
   const currentStatus = canonicalJobStatus(jobCard.status);
   const latestEstimate = jobCard.estimates?.[0];
-  const needsApproval = latestEstimate?.status !== "Approved" ||
-    latestEstimate.approvals?.some((approval) => approval.signatureState === "invalid");
-  const canReviewWorkshop = canManage && !["DELIVERED", "CANCELLED"].includes(currentStatus);
-
+  const needsApproval =
+    latestEstimate?.status !== "Approved" ||
+    latestEstimate.approvals?.some(
+      (approval) => approval.signatureState === "invalid",
+    );
+  const canReviewWorkshop =
+    canManage && !["DELIVERED", "CANCELLED"].includes(currentStatus);
 
   return (
     <div className="min-w-0 px-4 lg:px-5 print:px-0">
@@ -155,20 +220,36 @@ export default function JobCardDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="break-all text-2xl font-semibold tracking-tight sm:text-3xl">{jobCard.jobNumber}</h1>
+              <h1 className="break-all text-2xl font-semibold tracking-tight sm:text-3xl">
+                {jobCard.jobNumber}
+              </h1>
               <StatusPill
-                label={JOB_CARD_STATUS_LABELS[jobCard.status as JobCardStatus]?.toLowerCase().replace(/^./, (letter) => letter.toUpperCase()) ?? "Status unavailable"}
+                label={
+                  JOB_CARD_STATUS_LABELS[jobCard.status as JobCardStatus]
+                    ?.toLowerCase()
+                    .replace(/^./, (letter) => letter.toUpperCase()) ??
+                  "Status unavailable"
+                }
                 tone={tone}
               />
-              {jobCard.repeatRecord && <RepeatTag status={jobCard.repeatRecord.status} className="text-xs" />}
+              {jobCard.repeatRecord && (
+                <RepeatTag
+                  status={jobCard.repeatRecord.status}
+                  className="text-xs"
+                />
+              )}
             </div>
             <p className="mt-1 break-words text-sm text-muted-foreground">
-              {jobCard.description && <strong className="mr-3 font-medium text-foreground">{jobCard.description}</strong>}
+              {jobCard.description && (
+                <strong className="mr-3 font-medium text-foreground">
+                  {jobCard.description}
+                </strong>
+              )}
               Created {fmtDate(jobCard.createdAt)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 print:hidden">
-            {canReviewWorkshop && (
+            {showWorkshopActions && canReviewWorkshop && useLegacyActions && (
               <Button size="sm" asChild>
                 <a href="#workshop-actions">Workshop actions</a>
               </Button>
@@ -194,6 +275,7 @@ export default function JobCardDetailPage() {
             {(canManage || canCreateBill) && (
               <>
                 {canCreateBill &&
+                  useLegacyActions &&
                   !jobCard.billedAt &&
                   !(jobCard.invoices ?? []).some(
                     (invoice) =>
@@ -213,8 +295,9 @@ export default function JobCardDetailPage() {
                       <Receipt className="size-4" /> Create job bill
                     </Button>
                   )}
-                {(hasPermission("partissuance:create") ||
-                  hasPermission("partreturn:create")) &&
+                {useLegacyActions &&
+                  (hasPermission("partissuance:create") ||
+                    hasPermission("partreturn:create")) &&
                   !hasJobBill(jobCard) &&
                   !["DELIVERED", "CANCELLED"].includes(
                     canonicalJobStatus(jobCard.status),
@@ -240,9 +323,19 @@ export default function JobCardDetailPage() {
             )}
           </div>
         </div>
-        <JobProgressStepper status={jobCard.status} embedded />
+        {useLegacyActions && (
+          <JobProgressStepper status={jobCard.status} embedded />
+        )}
+        <JobCardWorkflowPanel
+          query={workflowQuery}
+          jobCardId={id}
+          customerId={jobCard.customerId}
+          ignoreOpeningApproval
+        />
       </div>
       <div className="space-y-4 py-4 print:hidden">
+        {/* TEMPORARILY DISABLED: Job-opening approval hidden from UI.
+            Restore this block and remove the standalone consent read and approval bypasses.
         <JobOpeningConsentCard
           jobCardId={id}
           embedded
@@ -253,24 +346,79 @@ export default function JobCardDetailPage() {
             )
           }
         />
-        {canReviewWorkshop && jobCard.estimates && !hasJobBill(jobCard) && needsApproval && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <p><strong>Estimate approval required.</strong> Approve the latest estimate before starting or completing work.</p>
-            <a href="#estimate-approval" className="font-medium underline">Review estimate</a>
-          </div>
-        )}
-        <dl aria-label="Job summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryItem label="Estimated cost" value={fmtCurrency(jobCard.estimatedCost)} />
-          <SummaryItem label="Advances received" value={fmtCurrency(summary?.receivedAmount)} />
-          <SummaryItem label={summary?.basis === "INVOICE" ? "Invoice balance" : "Estimated balance"} value={fmtCurrency(summary?.balanceAmount)} />
-          <SummaryItem label="QC status" value={<StatusPill label={qcLabel} tone={qcTone} />} />
+        */}
+        {useLegacyActions &&
+          canReviewWorkshop &&
+          jobCard.estimates &&
+          !hasJobBill(jobCard) &&
+          needsApproval && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p>
+                <strong>Estimate approval required.</strong> Approve the latest
+                estimate before starting or completing work.
+              </p>
+              <a href="#estimate-approval" className="font-medium underline">
+                Review estimate
+              </a>
+            </div>
+          )}
+        <dl
+          aria-label="Job summary"
+          className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+        >
+          <SummaryItem
+            label="Estimated cost"
+            value={fmtCurrency(jobCard.estimatedCost)}
+          />
+          <SummaryItem
+            label="Advances received"
+            value={fmtCurrency(summary?.receivedAmount)}
+          />
+          <SummaryItem
+            label={
+              summary?.basis === "INVOICE"
+                ? "Invoice balance"
+                : "Estimated balance"
+            }
+            value={fmtCurrency(summary?.balanceAmount)}
+          />
+          <SummaryItem
+            label="QC status"
+            value={<StatusPill label={qcLabel} tone={qcTone} />}
+          />
         </dl>
       </div>
 
-      <div className="job-card-print-content grid min-w-0 gap-4 xl:grid-cols-3 print:block"
-        data-job-card-layout>
+      <div
+        className="job-card-print-content grid min-w-0 gap-4 xl:grid-cols-3 print:block"
+        data-job-card-layout
+      >
         <div className="job-card-workspace min-w-0 space-y-4 xl:col-span-2">
-          <RepairWorkspacePage id={id} embedded />
+          {workflowQuery.isSuccess && (
+            <RepairWorkspacePage
+              id={id}
+              embedded
+              workflow={workflow}
+              showAdvancePayments={showFinanceSections}
+              preferredTab={
+                workflowTab === "labour"
+                  ? "Labour"
+                  : workflowTab === "parts"
+                    ? "Requisition"
+                    : workflowTab === "history"
+                      ? "History"
+                      : undefined
+              }
+              labourAssignment={
+                workflow && (
+                  <JobCardTechnicianAssignment
+                    query={workflowQuery}
+                    branchId={jobCard.branchId}
+                  />
+                )
+              }
+            />
+          )}
           {/* Repeat block: previous job, days/km since and the review; prints when the branch setting is on. */}
           <JobCardRepeatPanel
             jobCardId={jobCard.id}
@@ -282,7 +430,10 @@ export default function JobCardDetailPage() {
 
           <CampaignPrintBox jobCard={jobCard} />
 
-          <SectionCard icon={<ClipboardCheck className="size-4" />} title="Opening details">
+          <SectionCard
+            icon={<ClipboardCheck className="size-4" />}
+            title="Opening details"
+          >
             {(jobCard.tyres?.some((tyre) => tyre.make || tyre.number) ||
               jobCard.batteryMake ||
               jobCard.batteryNumber ||
@@ -313,7 +464,9 @@ export default function JobCardDetailPage() {
                 )}
                 {jobCard.customField1 && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Custom field</p>
+                    <p className="text-sm text-muted-foreground">
+                      Custom field
+                    </p>
                     <p className="text-sm">{jobCard.customField1}</p>
                   </div>
                 )}
@@ -341,11 +494,21 @@ export default function JobCardDetailPage() {
 
           <CustomerExplanation text={jobCard.customerRemarks} />
 
-          {canReviewWorkshop && <div id="workshop-actions" className="scroll-mt-48 print:hidden"><JobCardEditForm jobCard={jobCard} /></div>}
+          {useLegacyActions && canReviewWorkshop && (
+            <JobCardEditForm
+              jobCard={jobCard}
+              showWorkshopActions={showWorkshopActions}
+              ignoreOpeningApproval
+            />
+          )}
           <section className="space-y-2 break-words rounded-xl border border-border bg-card p-4 sm:p-5">
             <h2 className="font-semibold">Diagnosis and findings</h2>
             <h3 className="text-sm font-semibold">Customer requests</h3>
-            {!jobCard.complaints?.length && <p className="text-sm text-muted-foreground">No customer requests recorded.</p>}
+            {!jobCard.complaints?.length && (
+              <p className="text-sm text-muted-foreground">
+                No customer requests recorded.
+              </p>
+            )}
             {jobCard.complaints?.map((complaint) => (
               <p key={complaint.id} className="whitespace-pre-wrap text-sm">
                 {complaint.defectCode ? `${complaint.defectCode} - ` : ""}
@@ -365,25 +528,39 @@ export default function JobCardDetailPage() {
                 <h3 className="text-sm font-semibold">
                   Work done and recommendations
                 </h3>
-                <p className="whitespace-pre-wrap text-sm">{jobCard.workDone}</p>
+                <p className="whitespace-pre-wrap text-sm">
+                  {jobCard.workDone}
+                </p>
               </div>
             )}
-            </section>
+          </section>
           <SectionCard icon={<FileText className="size-4" />} title="Activity">
             {jobCard.statusHistory?.length ? (
               <ol className="space-y-3 border-l border-border pl-4">
                 {jobCard.statusHistory.map((entry) => (
                   <li key={entry.id} className="break-words text-sm">
-                    <p className="font-medium">{JOB_CARD_STATUS_LABELS[entry.toStatus as JobCardStatus]?.toLowerCase().replace(/^./, (letter) => letter.toUpperCase()) ?? "Status unavailable"}</p>
+                    <p className="font-medium">
+                      {JOB_CARD_STATUS_LABELS[entry.toStatus as JobCardStatus]
+                        ?.toLowerCase()
+                        .replace(/^./, (letter) => letter.toUpperCase()) ??
+                        "Status unavailable"}
+                    </p>
                     <p className="text-muted-foreground">
                       {fmtDate(entry.createdAt)}
-                      {entry.actor && ` / ${[entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ")}`}
+                      {entry.actor &&
+                        ` / ${[entry.actor.firstName, entry.actor.lastName].filter(Boolean).join(" ")}`}
                     </p>
-                    {entry.remarks && <p className="whitespace-pre-wrap">{entry.remarks}</p>}
+                    {entry.remarks && (
+                      <p className="whitespace-pre-wrap">{entry.remarks}</p>
+                    )}
                   </li>
                 ))}
               </ol>
-            ) : <p className="text-sm text-muted-foreground">No status updates recorded yet.</p>}
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No status updates recorded yet.
+              </p>
+            )}
           </SectionCard>
           {jobCard.gatePassNumber && (
             <section className="job-gate-pass space-y-3 rounded-lg border-2 bg-white p-5">
@@ -448,7 +625,9 @@ export default function JobCardDetailPage() {
                       {insp.findings}
                     </p>
                     {insp.notes && (
-                      <p className="mt-1 text-sm text-muted-foreground">{insp.notes}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {insp.notes}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -462,7 +641,12 @@ export default function JobCardDetailPage() {
               icon={<Package className="size-4" />}
               title={`Parts Issued (${jobCard.partIssuances.length})`}
             >
-              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Issued parts table">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Issued parts table"
+              >
                 <table className="w-full text-sm [&_th]:whitespace-nowrap">
                   <thead className="border-b border-slate-200 bg-slate-50">
                     <tr>
@@ -518,7 +702,12 @@ export default function JobCardDetailPage() {
               icon={<FileText className="size-4" />}
               title={`Invoices (${jobCard.invoices.length})`}
             >
-              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Invoices table">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Invoices table"
+              >
                 <table className="w-full text-sm [&_th]:whitespace-nowrap">
                   <thead className="border-b border-slate-200 bg-slate-50">
                     <tr>
@@ -562,20 +751,34 @@ export default function JobCardDetailPage() {
               </div>
             </SectionCard>
           )}
-
         </div>
-        <div role="region" aria-label="Job context" className="job-card-context min-w-0 space-y-4 xl:self-start print:mt-4">
+        <div
+          role="region"
+          aria-label="Job context"
+          className="job-card-context min-w-0 space-y-4 xl:self-start print:mt-4"
+        >
           {/* ── Customer & Vehicle ── */}
           <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            <SectionCard icon={<User className="size-4" />} title="Customer" disclosure>
+            <SectionCard
+              icon={<User className="size-4" />}
+              title="Customer"
+              disclosure
+            >
               <div className="space-y-2 break-words text-sm">
                 <p className="font-medium">{customerName}</p>
-                <dl><DetailField label="Customer category" value={customerCategoryLabel(jobCard.customer)} /></dl>
+                <dl>
+                  <DetailField
+                    label="Customer category"
+                    value={customerCategoryLabel(jobCard.customer)}
+                  />
+                </dl>
                 <p className="text-muted-foreground">
                   {jobCard.customer?.phoneNumber ?? "Not recorded"}
                 </p>
                 {jobCard.customer?.email && (
-                  <p className="text-muted-foreground">{jobCard.customer.email}</p>
+                  <p className="text-muted-foreground">
+                    {jobCard.customer.email}
+                  </p>
                 )}
                 {jobCard.customer && (
                   <Link
@@ -588,7 +791,11 @@ export default function JobCardDetailPage() {
               </div>
             </SectionCard>
 
-            <SectionCard icon={<Car className="size-4" />} title="Vehicle" disclosure>
+            <SectionCard
+              icon={<Car className="size-4" />}
+              title="Vehicle"
+              disclosure
+            >
               <div className="grid grid-cols-2 gap-2 break-words text-sm">
                 <div>
                   <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
@@ -633,65 +840,148 @@ export default function JobCardDetailPage() {
           </div>
 
           {/* ── Job Specs ── */}
-          <SectionCard icon={<Gauge className="size-4" />} title="Job specifications" disclosure>
+          <SectionCard
+            icon={<Gauge className="size-4" />}
+            title="Job specifications"
+            disclosure
+          >
             <dl className="grid grid-cols-2 gap-3">
-              <DetailField label="Service" value={jobCard.service?.name ?? jobCard.serviceType?.description} />
+              <DetailField
+                label="Service"
+                value={
+                  jobCard.service?.name ?? jobCard.serviceType?.description
+                }
+              />
               <DetailField label="Bay" value={jobCard.bay?.description} />
-              <DetailField label="Appointment" value={fmtDate(jobCard.appointment?.scheduledAt)} />
-              <DetailField label="Promised" value={fmtDate(jobCard.promisedAt)} />
-              <DetailField label="Ready" value={jobCard.readyAt ? fmtDate(jobCard.readyAt) : "Awaiting quality check"} />
-              <DetailField label="Mileage" value={jobCard.mileage != null ? `${jobCard.mileage.toLocaleString("en-NG")} km` : null} />
-              <DetailField label="Estimated hours" value={jobCard.estimatedHours} />
-              <DetailField label="A/C fitted" value={jobCard.acFitted == null ? null : jobCard.acFitted ? "Yes" : "No"} />
-              <DetailField label="In-house" value={jobCard.inHouse == null ? null : jobCard.inHouse ? "Yes" : "No"} />
+              <DetailField
+                label="Appointment"
+                value={fmtDate(jobCard.appointment?.scheduledAt)}
+              />
+              <DetailField
+                label="Promised"
+                value={fmtDate(jobCard.promisedAt)}
+              />
+              <DetailField
+                label="Ready"
+                value={
+                  jobCard.readyAt
+                    ? fmtDate(jobCard.readyAt)
+                    : "Awaiting quality check"
+                }
+              />
+              <DetailField
+                label="Mileage"
+                value={
+                  jobCard.mileage != null
+                    ? `${jobCard.mileage.toLocaleString("en-NG")} km`
+                    : null
+                }
+              />
+              <DetailField
+                label="Estimated hours"
+                value={jobCard.estimatedHours}
+              />
+              <DetailField
+                label="A/C fitted"
+                value={
+                  jobCard.acFitted == null
+                    ? null
+                    : jobCard.acFitted
+                      ? "Yes"
+                      : "No"
+                }
+              />
+              <DetailField
+                label="In-house"
+                value={
+                  jobCard.inHouse == null
+                    ? null
+                    : jobCard.inHouse
+                      ? "Yes"
+                      : "No"
+                }
+              />
               <DetailField label="QC status" value={qcLabel} />
-              <DetailField label="Estimated cost" value={fmtCurrency(jobCard.estimatedCost)} />
+              <DetailField
+                label="Estimated cost"
+                value={fmtCurrency(jobCard.estimatedCost)}
+              />
             </dl>
             {jobCard.qcNotes && (
               <div className="mt-3">
                 <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                   QC Notes
                 </p>
-                <p className="mt-0.5 text-sm text-slate-600">{jobCard.qcNotes}</p>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  {jobCard.qcNotes}
+                </p>
               </div>
             )}
           </SectionCard>
 
-          <SectionCard icon={<Receipt className="size-4" />} title="Cost breakdown" disclosure>
-            <dl className="grid grid-cols-2 gap-3 tabular-nums">
-            {(
-              [
-                ["Estimated parts", jobCard.estimatedParts],
-                ["Estimated oil", jobCard.estimatedOil],
-                ["Estimated labour", jobCard.estimatedLabour],
-                ["Service charge", jobCard.serviceCharge],
-              ] as const
-            )
-              .map(([label, amount]) => (
-                <div key={label}>
-                  <dt className="text-sm text-muted-foreground">{label}</dt>
-                  <dd className="mt-1 text-sm font-medium">
-                    {amount == null ? "Not recorded" : fmtCurrency(amount)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </SectionCard>
-          <SectionCard icon={<User className="size-4" />} title="People and assignment" disclosure>
+          {showFinanceSections && (
+            <SectionCard
+              icon={<Receipt className="size-4" />}
+              title="Cost breakdown"
+              disclosure
+            >
+              <dl className="grid grid-cols-2 gap-3 tabular-nums">
+                {(
+                  [
+                    ["Estimated parts", jobCard.estimatedParts],
+                    ["Estimated oil", jobCard.estimatedOil],
+                    ["Estimated labour", jobCard.estimatedLabour],
+                    ["Service charge", jobCard.serviceCharge],
+                  ] as const
+                ).map(([label, amount]) => (
+                  <div key={label}>
+                    <dt className="text-sm text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {amount == null ? "Not recorded" : fmtCurrency(amount)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </SectionCard>
+          )}
+          <SectionCard
+            icon={<User className="size-4" />}
+            title="People and assignment"
+            disclosure
+          >
             <dl className="grid grid-cols-2 gap-3">
               <DetailField label="Branch" value={jobCard.branch?.name} />
-              <DetailField label="Created by" value={personName(jobCard.createdBy)} />
-              <DetailField label="Received by" value={personName(jobCard.serviceAdvisor)} />
-              <DetailField label="Delivered by" value={personName(jobCard.deliveryAdvisor) ?? "Awaiting delivery"} />
-              <DetailField label="Technician" value={personName(jobCard.technician) ?? "Not assigned"} />
-              <DetailField label="Quality inspector" value={personName(jobCard.qualityInspector) ?? "Not assigned"} />
+              <DetailField
+                label="Created by"
+                value={personName(jobCard.createdBy)}
+              />
+              <DetailField
+                label="Received by"
+                value={personName(jobCard.serviceAdvisor)}
+              />
+              <DetailField
+                label="Delivered by"
+                value={
+                  personName(jobCard.deliveryAdvisor) ?? "Awaiting delivery"
+                }
+              />
+              <DetailField
+                label="Technician"
+                value={personName(jobCard.technician) ?? "Not assigned"}
+              />
+              <DetailField
+                label="Quality inspector"
+                value={personName(jobCard.qualityInspector) ?? "Not assigned"}
+              />
               <DetailField label="Team" value={jobCard.team?.description} />
               <DetailField label="Updated" value={fmtDate(jobCard.updatedAt)} />
             </dl>
           </SectionCard>
           {/* ── Warranty snapshot (warranty:read) & campaigns (every job card user; answering needs jobcard:update) ── */}
           {jobCard.vehicleId && (canSeeWarranty || hasCampaigns) && (
-            <div className={cn("grid gap-5", canSeeWarranty && "md:grid-cols-2")}>
+            <div
+              className={cn("grid gap-5", canSeeWarranty && "md:grid-cols-2")}
+            >
               {canSeeWarranty && <WarrantySnapshotCard jobCard={jobCard} />}
               <LinkedCampaignsCard
                 jobCard={jobCard}
@@ -710,7 +1000,6 @@ export default function JobCardDetailPage() {
 
           {/* ── Who pays for each part and labour line (warranty, goodwill, campaign, customer) ── */}
           <JobCardLinesCard jobCardId={jobCard.id} />
-
         </div>
       </div>
 
@@ -781,14 +1070,26 @@ export default function JobCardDetailPage() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function personName(person?: { firstName: string; lastName: string } | null) {
-  return [person?.firstName, person?.lastName].filter(Boolean).join(" ") || null;
+  return (
+    [person?.firstName, person?.lastName].filter(Boolean).join(" ") || null
+  );
 }
 
-function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
+function SummaryItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4">
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-2 break-words text-base font-semibold tabular-nums sm:text-xl">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-2 break-words text-base font-semibold tabular-nums sm:text-xl">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -804,15 +1105,24 @@ function SectionCard({
   children: React.ReactNode;
   disclosure?: boolean;
 }) {
-  const cardClass = "min-w-0 rounded-xl border border-border bg-card text-card-foreground print:shadow-none";
+  const cardClass =
+    "min-w-0 rounded-xl border border-border bg-card text-card-foreground print:shadow-none";
   const headingClass = "flex items-center gap-2 text-base font-semibold";
   if (disclosure) {
     return (
       <details open className={cn(cardClass, "group")}>
-        <summary className={cn(headingClass, "cursor-pointer list-none p-4 [&::-webkit-details-marker]:hidden")}>
+        <summary
+          className={cn(
+            headingClass,
+            "cursor-pointer list-none p-4 [&::-webkit-details-marker]:hidden",
+          )}
+        >
           {icon}
           {title}
-          <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground group-open:rotate-180 print:hidden" aria-hidden="true" />
+          <ChevronDown
+            className="ml-auto size-4 shrink-0 text-muted-foreground group-open:rotate-180 print:hidden"
+            aria-hidden="true"
+          />
         </summary>
         <div className="px-4 pb-4">{children}</div>
       </details>
@@ -820,7 +1130,10 @@ function SectionCard({
   }
   return (
     <section className={cn(cardClass, "p-4 sm:p-5")}>
-      <h2 className={cn(headingClass, "mb-3")}>{icon}{title}</h2>
+      <h2 className={cn(headingClass, "mb-3")}>
+        {icon}
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -836,7 +1149,9 @@ function DetailField({
   return (
     <div>
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm">{value == null || value === "" ? "Not recorded" : value}</dd>
+      <dd className="mt-0.5 break-words text-sm">
+        {value == null || value === "" ? "Not recorded" : value}
+      </dd>
     </div>
   );
 }
@@ -844,7 +1159,10 @@ function DetailField({
 function returnedQuantity(issuance: PartIssuance) {
   return (issuance.returns ?? []).reduce(
     (sum, partReturn) =>
-      sum + (partReturn.status.toUpperCase() === "REJECTED" ? 0 : partReturn.quantity),
+      sum +
+      (partReturn.status.toUpperCase() === "REJECTED"
+        ? 0
+        : partReturn.quantity),
     0,
   );
 }
@@ -877,7 +1195,9 @@ function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
       <td className="px-3 py-2 text-right tabular-nums text-slate-700">
         {issuance.quantity}
         {returnedQty > 0 && (
-          <span className="ml-1 text-sm text-muted-foreground">(-{returnedQty})</span>
+          <span className="ml-1 text-sm text-muted-foreground">
+            (-{returnedQty})
+          </span>
         )}
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-slate-600">
@@ -894,7 +1214,11 @@ function PartIssuanceRow({ issuance }: { issuance: PartIssuance }) {
 }
 
 function InvoiceRow({ invoice }: { invoice: JobCardInvoice }) {
-  const totalPaid = sumMoney((invoice.payments as { amount: number }[] | undefined)?.map((payment) => payment.amount) ?? []);
+  const totalPaid = sumMoney(
+    (invoice.payments as { amount: number }[] | undefined)?.map(
+      (payment) => payment.amount,
+    ) ?? [],
+  );
   return (
     <tr className="border-t border-slate-100">
       <td className="px-3 py-2 font-medium text-slate-700">
@@ -921,7 +1245,8 @@ function InvoiceRow({ invoice }: { invoice: JobCardInvoice }) {
                 : "bg-blue-50 text-blue-700"
           }`}
         >
-          {invoice.status?.toLowerCase().replaceAll("_", " ") || "Status unavailable"}
+          {invoice.status?.toLowerCase().replaceAll("_", " ") ||
+            "Status unavailable"}
         </span>
       </td>
       <td className="px-3 py-2 text-slate-600">

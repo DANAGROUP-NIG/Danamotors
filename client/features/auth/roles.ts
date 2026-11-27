@@ -1,6 +1,10 @@
 // ─── Role type ────────────────────────────────────────────────────────────────
 // Normalised to lowercase. Add variants here if the API changes casing.
 
+export function staffRoleLabel(name: string) {
+  return name === "QCOfficer" ? "QC Officer" : name;
+}
+
 export type AppRole =
   | "superadmin"
   | "admin"
@@ -11,6 +15,7 @@ export type AppRole =
   | "accountant"
   | "billingofficer"
   | "serviceadviser"
+  | "qcofficer"
   | "technician"
   | "engineer"
   | "ccuofficer"
@@ -357,7 +362,7 @@ export const ENQUIRY_REVIEW_ROLES: AppRole[] = [
   "admin",
   "ccumanager",
   "ccuofficer",
-  "generalccumanager"
+  "generalccumanager",
 ];
 
 // Roles that can create walk-in appointments (service:create)

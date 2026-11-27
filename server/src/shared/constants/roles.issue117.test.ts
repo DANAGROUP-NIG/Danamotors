@@ -38,6 +38,8 @@ const cases: [string, string[]][] = [
     [
       P.JOBCARD_CREATE,
       P.JOBCARD_UPDATE,
+      P.ASSIGNMENT_CREATE,
+      P.ESTIMATE_CREATE,
       P.JOBLABOUR_UPDATE,
       P.ESTIMATE_REVISE,
       P.ESTIMATE_PRINT,

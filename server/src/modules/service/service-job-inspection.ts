@@ -13,6 +13,10 @@ import {
   type ServiceJobAction,
 } from "./service-job-policy";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
+import { hasServiceJobIssuedParts, isServiceJobReplacementStage } from "./service-job-issuance";
+import { assertApprovedOperation, assertRecordedScope } from "./estimate-approval";
+import { assertDepositPaid } from "./job-deposit.service";
+import { assertSignedJobOpening } from "./job-opening-signature.service";
 
 const partSchema = z
   .object({
@@ -50,8 +54,12 @@ export async function readServiceJobInspection(
     where: { id, branchId },
     select: {
       technicianId: true,
+      customerId: true,
       serviceWorkflow: { include: { parts: true } },
-      statusHistory: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+      statusHistory: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: { actor: { select: { firstName: true, lastName: true } } },
+      },
     },
   });
   if (!card) throw new NotFoundError("Job card not found");
@@ -65,18 +73,55 @@ export async function readServiceJobInspection(
     warrantyBypassEnabled:
       process.env.SERVICE_JOB_WARRANTY_BYPASS_ENABLED === "true",
   };
-  return {
-    ...workflow,
-    history: card.statusHistory,
-    actions: Object.fromEntries(
-      (Object.keys(SERVICE_JOB_ACTIONS) as ServiceJobAction[])
-        .filter((action) => action !== "completeWarranty")
-        .map((action) => [
-          action,
-          serviceJobActionAvailability(action, context),
-        ]),
-    ),
-  };
+  const availableActions = (Object.keys(SERVICE_JOB_ACTIONS) as ServiceJobAction[])
+    .filter((action) => action !== "completeWarranty")
+    .map((action) => [action, serviceJobActionAvailability(action, context)] as const);
+  const replacementStage = isServiceJobReplacementStage(workflow.stage);
+  const replacementAction = replacementStage
+    ? serviceJobActionAvailability("issueParts", { ...context, stage: "PARTS_REQUESTED" })
+    : null;
+  const checkFulfilment = replacementAction?.allowed || availableActions.some(([action, result]) =>
+    result.allowed && (action === "startWork" || action === "finishWork"),
+  );
+  const outstanding = checkFulfilment && !(await hasServiceJobIssuedParts(prisma, workflow));
+  const actions = Object.fromEntries(await Promise.all(availableActions.map(async ([action, result]) => {
+    if (action === "issueParts" && replacementAction?.allowed) {
+      return [action, outstanding
+        ? { allowed: true, stage: workflow.stage }
+        : { allowed: false, code: "WORKFLOW_PARTS_FULFILLED", reason: "The approved parts quantities have already been issued" }] as const;
+    }
+    if (!result.allowed) return [action, result] as const;
+    if (outstanding && (action === "startWork" || action === "finishWork")) {
+      return [action, {
+        allowed: false,
+        code: "WORKFLOW_PARTS_OUTSTANDING",
+        reason: "Issue the outstanding approved parts before continuing work",
+      }] as const;
+    }
+    try {
+      if (action === "startWork" || action === "finishWork" || action === "readyForBilling") {
+        await assertSignedJobOpening(prisma, id);
+      }
+      if (action === "startWork" || action === "finishWork" || action === "requestParts") {
+        await assertApprovedOperation(prisma, id, card.customerId, []);
+      }
+      if (action === "startWork") await assertDepositPaid(prisma, id);
+      if (action === "passQc" || action === "readyForBilling") await assertRecordedScope(prisma, id);
+    } catch (error) {
+      if (!(error instanceof BadRequestError) && !(error instanceof ConflictError)) throw error;
+      return [action, {
+        allowed: false,
+        code: error.code ?? "WORKFLOW_PRECONDITION_REQUIRED",
+        reason: error.message,
+      }] as const;
+    }
+    return [action, result] as const;
+  })));
+  const history = card.statusHistory.map(({ actor: recordedBy, ...entry }) => ({
+    ...entry,
+    actorName: [recordedBy.firstName, recordedBy.lastName].filter(Boolean).join(" "),
+  }));
+  return { ...workflow, history, actions };
 }
 
 async function inspectionParts(

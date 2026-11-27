@@ -14,13 +14,15 @@ it.each([PERMISSIONS.ESTIMATE_SIGN, PERMISSIONS.ESTIMATE_REVISE])('allows Servic
 it('backfills estimate revise grants for the same roles as the seed defaults', () => {
   const sql = readFileSync(resolve(__dirname, '../../../prisma/migrations/20261023110000_estimate_revise_permissions/migration.sql'), 'utf8');
   const grantedRoles = [...sql.matchAll(/\('([^']+)', 'estimate:revise'\)/g)].map(match => match[1]).sort();
-  const defaultRoles = Object.entries(ROLE_PERMISSIONS).filter(([, permissions]) => permissions.includes(PERMISSIONS.ESTIMATE_REVISE)).map(([role]) => role).sort();
+  const defaultRoles = Object.entries(ROLE_PERMISSIONS).filter(([role, permissions]) => role !== ROLES.QC_OFFICER && permissions.includes(PERMISSIONS.ESTIMATE_REVISE)).map(([role]) => role).sort();
   expect(grantedRoles).toEqual(defaultRoles);
+  expect(ROLE_PERMISSIONS[ROLES.QC_OFFICER]).toContain(PERMISSIONS.ESTIMATE_REVISE);
 });
 
 it('backfills estimate sign grants for the same roles as the seed defaults', () => {
   const sql = readFileSync(resolve(__dirname, '../../../prisma/migrations/20261023100000_estimate_sign_permissions/migration.sql'), 'utf8');
   const grantedRoles = [...sql.matchAll(/\('([^']+)', 'estimate:sign'\)/g)].map(match => match[1]).sort();
-  const defaultRoles = Object.entries(ROLE_PERMISSIONS).filter(([, permissions]) => permissions.includes(PERMISSIONS.ESTIMATE_SIGN)).map(([role]) => role).sort();
+  const defaultRoles = Object.entries(ROLE_PERMISSIONS).filter(([role, permissions]) => role !== ROLES.QC_OFFICER && permissions.includes(PERMISSIONS.ESTIMATE_SIGN)).map(([role]) => role).sort();
   expect(grantedRoles).toEqual(defaultRoles);
+  expect(ROLE_PERMISSIONS[ROLES.QC_OFFICER]).toContain(PERMISSIONS.ESTIMATE_SIGN);
 });

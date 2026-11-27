@@ -110,6 +110,7 @@ function recordHint(row: PickerRecord) {
 export function WorkshopPicker({
   label,
   hideLabel = false,
+  queryOnly = false,
   endpoint,
   collection,
   value,
@@ -135,6 +136,7 @@ export function WorkshopPicker({
 }: {
   label: string;
   hideLabel?: boolean;
+  queryOnly?: boolean;
   endpoint: string;
   collection: string;
   value?: string;
@@ -217,6 +219,8 @@ export function WorkshopPicker({
     setActive(-1);
     input.current?.focus();
   };
+
+  if (queryOnly) return null;
 
   return (
     <div

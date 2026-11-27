@@ -5,6 +5,7 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { isAxiosError } from "axios";
 import {
   ArrowLeft,
   Loader2,
@@ -32,6 +33,7 @@ import { CheckInDialog } from "@/features/warranty/components/CheckInDialog";
 import { ConfirmDeleteModal } from "@/components/modals/ConfirmDeleteModal";
 import type { Appointment } from "@/features/appointments/types/appointment.types";
 import { AppointmentStatusStepper } from "@/features/appointments/components/AppointmentStatusStepper";
+import { getAppointmentProgress } from "@/features/appointments/lib/appointment-progress";
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-slate-100 text-slate-700",
@@ -70,7 +72,7 @@ const STATUS_TRANSITION_PERMISSIONS: Record<string, string> = {
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { data, isLoading, error } = useAppointment(id);
+  const { data, isLoading, error } = useAppointment(id, true);
   const { hasPermission } = useAuth();
   const update = useUpdateAppointment(id);
   const del = useDeleteAppointment();
@@ -85,8 +87,14 @@ export default function AppointmentDetailPage() {
   }
 
   const appointment = data?.appointment;
+  const errorStatus = isAxiosError(error) ? error.response?.status : undefined;
 
-  if (error || !appointment) {
+  if (
+    !appointment ||
+    errorStatus === 401 ||
+    errorStatus === 403 ||
+    errorStatus === 404
+  ) {
     return (
       <div className="px-4 py-10 lg:px-6">
         <Link
@@ -95,7 +103,13 @@ export default function AppointmentDetailPage() {
         >
           <ArrowLeft className="size-4" /> Back to Appointments
         </Link>
-        <p className="text-sm text-red-500">Appointment not found.</p>
+        <p className="text-sm text-red-500">
+          {errorStatus === 401 || errorStatus === 403
+            ? "You do not have access to this appointment."
+            : errorStatus === 404 || !error
+              ? "Appointment not found."
+              : "Could not load the appointment. Reload the page to try again."}
+        </p>
       </div>
     );
   }
@@ -106,6 +120,7 @@ export default function AppointmentDetailPage() {
 
   const nextStatus = NEXT_STATUS[appointment.status];
   const canTransition =
+    !appointment.jobCards?.length &&
     (appointment.bookingStatus ?? "BOOKED") === "BOOKED" &&
     nextStatus &&
     hasPermission(STATUS_TRANSITION_PERMISSIONS[nextStatus] ?? "");
@@ -175,7 +190,15 @@ export default function AppointmentDetailPage() {
 
         {/* Status Stepper */}
         <div className="mt-8 mb-4">
-          <AppointmentStatusStepper currentStatus={appointment.status} />
+          <AppointmentStatusStepper
+            currentStatus={getAppointmentProgress(appointment)}
+          />
+          {error && (
+            <p role="status" className="px-4 text-sm text-muted-foreground">
+              Could not refresh appointment progress. Showing the last available
+              update.
+            </p>
+          )}
         </div>
 
         <BookingPanel key={appointment.updatedAt} appointment={appointment} />

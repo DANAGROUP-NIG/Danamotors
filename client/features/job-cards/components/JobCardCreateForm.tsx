@@ -205,13 +205,14 @@ export function JobCardCreateForm({
 
     queryFn: () =>
       apiGet<{
-        appointment: PickerRecord;
+        appointment: PickerRecord & { serviceWorkflowRequired?: boolean };
       }>(`/service/appointments/${appointmentId}`),
 
     enabled: !!appointmentId,
   });
 
   const customer = customerQuery.data;
+  const strictOpening = bookingQuery.data?.appointment.serviceWorkflowRequired === true;
   const vehicle = vehicleQuery.data?.vehicle;
 
   // Warranty & campaign check: runs once the vehicle and mileage are known. A covered
@@ -477,6 +478,11 @@ export function JobCardCreateForm({
 
   const submit = handleSubmit(
     (values) => {
+      if (strictOpening && !values.faultVerification?.trim()) {
+        setError("faultVerification", { type: "required", message: "Record the verified faults before opening the job card." });
+        setTab("Vehicle Details");
+        return;
+      }
       if (values.promisedDate < minimumPromisedDate) {
         setError("promisedDate", {
           type: "min",
@@ -501,6 +507,8 @@ export function JobCardCreateForm({
       create.mutate(
         {
           ...data,
+          technicianId: strictOpening ? undefined : data.technicianId,
+          faultVerification: values.faultVerification?.trim() || undefined,
           odometerReplaced: replaced || undefined,
           odometerReplacedReason: replaced
             ? odometerReplacedReason?.trim()
@@ -1234,7 +1242,7 @@ export function JobCardCreateForm({
                       </OpeningField>
                     )}
                   />
-                  <Controller
+                  {!strictOpening && <Controller
                     name="technicianId"
                     control={control}
                     render={({ field }) => (
@@ -1249,7 +1257,7 @@ export function JobCardCreateForm({
                         error={errors.technicianId?.message}
                       />
                     )}
-                  />
+                  />}
 
                   <Controller
                     name="serviceAdvisorId"
@@ -1350,6 +1358,14 @@ export function JobCardCreateForm({
                   />
                 </div>
                 <div className="mt-4">
+                  {appointmentId && <OpeningField label={strictOpening ? "Fault verification (required)" : "Fault verification"} error={errors.faultVerification?.message}>
+                    <textarea
+                      className={`${openingInput} h-24 resize-y py-2`}
+                      maxLength={5000}
+                      {...register("faultVerification")}
+                    />
+                    <span className="text-sm text-muted-foreground">Record which reported faults you verified on the vehicle.</span>
+                  </OpeningField>}
                   <OpeningField label="Remarks" error={errors.remarks?.message}>
                     <textarea
                       className={`${openingInput} h-24 resize-y py-2`}

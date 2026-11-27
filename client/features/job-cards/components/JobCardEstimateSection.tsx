@@ -25,6 +25,7 @@ import { WorkshopPicker } from "./WorkshopPicker";
 import { canonicalJobStatus, hasJobBill } from "../types/job-card-status";
 import { jobCardKeys } from "../api/job-card.keys";
 import type { CustomerApproval, JobCard } from "../types/job-card.types";
+import type { JobCardWorkflow } from "../hooks/use-job-card-workflow";
 
 type Line = {
   type: "COMPLAINT" | "PART" | "LABOUR" | "SERVICE";
@@ -57,7 +58,7 @@ function SignatureEvidence({
   );
 }
 
-export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
+export function JobCardEstimateSection({ jobCard, workflow }: { jobCard: JobCard; workflow?: JobCardWorkflow | null }) {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   // Must match the server's serviceChargeReference: service type first, then service.
@@ -126,6 +127,19 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
   const duplicatePart = new Set(partKeys).size !== partKeys.length;
   const error = create.error;
   const busy = create.isPending;
+  const mayPrepare = !workflow || workflow.actions.prepareEstimate?.allowed === true;
+  const maySign = !workflow || workflow.stage === "ESTIMATE_PREPARED";
+  const inspectedParts = new Map(workflow?.parts.map(part => [part.sparePartId, part]));
+  function openEditor() {
+    if (workflow) {
+      setLines([
+        ...(serviceReference ? [{ type: "SERVICE" as const, referenceId: serviceReference, description: serviceDescription, quantity: 1 }] : []),
+        ...workflow.parts.map(part => ({ type: "PART" as const, referenceId: part.sparePartId, description: part.name, quantity: part.quantity })),
+      ]);
+      setType("LABOUR");
+    }
+    setEditing(true);
+  }
   function revise() {
     const draft: Line[] =
       latest?.lines?.map((line) => ({
@@ -148,6 +162,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
       });
     setUpfrontPaymentPercent(String(latest?.upfrontPaymentPercent ?? 60));
     setLines(draft);
+    if (workflow) setType("LABOUR");
     setEditing(true);
   }
   const view = latest ? toEstimateViewModel(latest) : undefined;
@@ -168,7 +183,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
         printAction={printAction}
         actions={
           <>
-            {open &&
+            {open && maySign &&
               !editing &&
               latest &&
               !latest.approvals?.length &&
@@ -189,21 +204,27 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                 {COPY.viewSignature}
               </Button>
             )}
-            {open && !editing && latest && hasPermission("estimate:revise") && (
+            {open && mayPrepare && !editing && latest && hasPermission("estimate:revise") && (
               <Button variant="outline" onClick={revise}>
                 {COPY.revise}
               </Button>
             )}
-            {open &&
+            {open && mayPrepare &&
               !latest &&
               !editing &&
               hasPermission("estimate:create") && (
-                <Button onClick={() => setEditing(true)}>{COPY.create}</Button>
+                <Button onClick={openEditor}>{COPY.create}</Button>
               )}
           </>
         }
       >
-        {open &&
+        {workflow && !latest && !mayPrepare && <p className="text-sm text-muted-foreground">
+          {workflow.warrantySource ? "The Service Adviser prepares the estimate." : "Estimate preparation opens after warranty is resolved."}
+        </p>}
+        {latest?.lines?.some(line => line.isUnderWarranty) && <ul className="space-y-1 text-sm">
+          {latest.lines.filter(line => line.isUnderWarranty).map(line => <li key={line.id}>{line.description}, Warranty, {formatEstimateMoney(0, latest.currency ?? "NGN")}</li>)}
+        </ul>}
+        {open && mayPrepare &&
           editing &&
           hasPermission(latest ? "estimate:revise" : "estimate:create") && (
             <div className="grid gap-3 print:hidden" inert={busy}>
@@ -260,8 +281,9 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                     {line.type === "SERVICE"
                       ? `${COPY.separator}${formatEstimateMoney(jobCard.serviceCharge ?? 0, latest?.currency ?? "NGN")}`
                       : ""}
+                    {line.referenceId && inspectedParts.get(line.referenceId)?.isUnderWarranty ? ` Warranty, ${formatEstimateMoney(0, latest?.currency ?? "NGN")}` : ""}
                   </span>
-                  {line.type === "PART" && line.referenceId && (
+                  {!workflow && line.type === "PART" && line.referenceId && (
                     <PartSourceSelect
                       partId={line.referenceId}
                       branchId={jobCard.branchId}
@@ -280,7 +302,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                       }
                     />
                   )}
-                  {line.type !== "SERVICE" && (
+                  {line.type !== "SERVICE" && !(workflow && line.type === "PART") && (
                     <button
                       type="button"
                       onClick={() =>
@@ -303,7 +325,7 @@ export function JobCardEstimateSection({ jobCard }: { jobCard: JobCard }) {
                     setReferenceId("");
                   }}
                 >
-                  <option value="PART">{COPY.editor.part}</option>
+                  {!workflow && <option value="PART">{COPY.editor.part}</option>}
                   <option value="LABOUR">{COPY.editor.operation}</option>
                 </select>
               </Field>

@@ -7,7 +7,7 @@ import {
 import { assertPdiDocumentChange } from "../pdi/pdi.settings.service";
 import { jobWorkUpdate } from "./requisition-work";
 import { assertPartsRequested } from "../service/jobcard-parts-request.logic";
-import { authorizeServiceJobIssuance, completeServiceJobIssuance } from "../service/service-job-issuance";
+import { assertServiceJobIssuanceReplay, authorizeServiceJobIssuance, completeServiceJobIssuance, serviceJobIssuanceFingerprint } from "../service/service-job-issuance";
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { ChargeType, JobCardType, PartStatus, Prisma } from "@prisma/client";
@@ -153,10 +153,24 @@ export class RequisitionService {
           throw new BadRequestError(
             "Job card must belong to the requisition branch",
           );
-        assertRequisitionJob(job);
         assertJobTypeAccess(job, actor);
         const pdi = job.jobType === JobCardType.PDI;
         const workflow = job.serviceWorkflow;
+        let workflowRequestHash: string | undefined;
+        if (workflow) {
+          if (!input.requestId)
+            throw new BadRequestError("Provide a request ID when issuing parts").withCode("ISSUANCE_REQUEST_ID_REQUIRED");
+          workflowRequestHash = serviceJobIssuanceFingerprint(actor.userId, input);
+          const recorded = await tx.partRequisition.findUnique({
+            where: { jobCardId_workflowRequestId: { jobCardId: job.id, workflowRequestId: input.requestId } },
+            select: { id: true, workflowRequestHash: true },
+          });
+          if (recorded) {
+            assertServiceJobIssuanceReplay(recorded.workflowRequestHash, workflowRequestHash);
+            return this.get(recorded.id, actor, tx);
+          }
+        }
+        assertRequisitionJob(job);
         const issuanceStage = workflow
           ? await authorizeServiceJobIssuance(tx, workflow, job.technicianId, actor.userId)
           : null;
@@ -334,6 +348,7 @@ export class RequisitionService {
           data: {
             branchId: input.branchId,
             jobCardId: job.id,
+            ...(workflowRequestHash ? { workflowRequestId: input.requestId, workflowRequestHash } : {}),
             chargeType: input.chargeType,
             groupId: input.groupId,
             engineerId: input.engineerId,

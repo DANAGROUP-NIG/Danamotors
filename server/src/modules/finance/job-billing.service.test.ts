@@ -5,7 +5,7 @@ jest.mock("../../prisma/client", () => ({
     $queryRaw: jest.fn(),
     jobCard: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn() },
-    invoice: { create: jest.fn(), update: jest.fn() },
+    invoice: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     receipt: { findMany: jest.fn(), update: jest.fn() },
     receiptAllocation: { create: jest.fn() },
     auditLog: { create: jest.fn() },
@@ -19,6 +19,7 @@ jest.mock("../../prisma/client", () => ({
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
 import { JobBillingService } from "./job-billing.service";
+import { FinanceService } from "./finance.service";
 import { ROLES } from "../../shared/constants/roles";
 
 const input = {
@@ -135,6 +136,37 @@ describe("Job billing after delivery on credit", () => {
         remarks: expect.stringContaining("Job bill"),
       }),
     );
+  });
+
+  it("retains a warranty invoice line at zero and excludes it from customer print lines", async () => {
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
+      ...card,
+      partIssuances: [{
+        id: "issue", sparePartId: "covered", quantity: 2, returns: [],
+        jobCardLine: { id: "line", chargeType: "WARRANTY" },
+        sparePart: { partNumber: "C01", name: "Covered part", partFlag: "O", retailRate: 97.35, taxCategory: "A", taxable: true },
+      }],
+      estimates: [{
+        ...approved,
+        lines: [...approved.lines, { type: "PART", referenceId: "covered", description: "Covered part", quantity: 2, rate: 0, amount: 0, isUnderWarranty: true }],
+      }],
+    });
+    const service = new JobBillingService();
+    const withWarranty = await service.previewJobBill(input);
+    expect(withWarranty.review.canBill).toBe(true);
+    await service.createJobBill(input);
+    const bill = (prisma.invoice.create as jest.Mock).mock.calls[0][0].data;
+    expect(bill.lines.createMany.data).toContainEqual(expect.objectContaining({
+      partId: "covered", rate: 0, amount: 0, isUnderWarranty: true,
+    }));
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(card);
+    expect(withWarranty.totals).toEqual((await service.previewJobBill(input)).totals);
+    const lines = bill.lines.createMany.data.map((line: object, index: number) => ({ id: String(index), ...line }));
+    (prisma.invoice.findUnique as jest.Mock).mockResolvedValue({ id: "invoice", total: bill.total, lines });
+    const invoice = await new FinanceService().getInvoice("invoice");
+    expect(invoice.lines).toHaveLength(invoice.printLines.length + 1);
+    expect(invoice.printLines).not.toContainEqual(expect.objectContaining({ isUnderWarranty: true }));
+    expect(invoice.total).toBe(bill.total);
   });
 
   it("keeps unfinished QC out of the branch-scoped billable job selector", async () => {

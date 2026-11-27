@@ -7,10 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/headers/page-header";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/features/customer-portal/components/StatusBadge";
-import { EmptyState, SimpleTable } from "@/features/customer-portal/components/portal-ui";
-import { usePortalInvoice, usePortalCredit } from "@/features/customer-portal/hooks/use-portal";
+import {
+  EmptyState,
+  SimpleTable,
+} from "@/features/customer-portal/components/portal-ui";
+import {
+  usePortalInvoice,
+  usePortalCredit,
+} from "@/features/customer-portal/hooks/use-portal";
 import { CreditApplicationActions } from "@/features/customer-portal/components/CreditApplicationActions";
-import { formatCurrency, formatDate } from "@/features/customer-portal/lib/format";
+import {
+  formatCurrency,
+  formatDate,
+} from "@/features/customer-portal/lib/format";
 
 export default function PortalInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -63,11 +72,15 @@ export default function PortalInvoiceDetailPage() {
               </div>
               <div>
                 <dt className="text-muted-foreground">Subtotal</dt>
-                <dd className="mt-1 font-medium">{formatCurrency(invoice.subtotal)}</dd>
+                <dd className="mt-1 font-medium">
+                  {formatCurrency(invoice.subtotal)}
+                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Tax</dt>
-                <dd className="mt-1 font-medium">{formatCurrency(invoice.tax)}</dd>
+                <dd className="mt-1 font-medium">
+                  {formatCurrency(invoice.tax)}
+                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Total</dt>
@@ -77,14 +90,31 @@ export default function PortalInvoiceDetailPage() {
               </div>
               <div>
                 <dt className="text-muted-foreground">Issued</dt>
-                <dd className="mt-1 font-medium">{formatDate(invoice.issuedDate)}</dd>
+                <dd className="mt-1 font-medium">
+                  {formatDate(invoice.issuedDate)}
+                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Due date</dt>
-                <dd className="mt-1 font-medium">{formatDate(invoice.dueDate)}</dd>
+                <dd className="mt-1 font-medium">
+                  {formatDate(invoice.dueDate)}
+                </dd>
               </div>
             </dl>
-            <div className="mt-4 flex flex-wrap gap-6 text-sm"><span>Paid: <strong>{formatCurrency(Math.max(invoice.total - invoice.outstandingAmount, 0))}</strong></span><span>Outstanding: <strong>{formatCurrency(invoice.outstandingAmount)}</strong></span></div>
+            <div className="mt-4 flex flex-wrap gap-6 text-sm">
+              <span>
+                Paid:{" "}
+                <strong>
+                  {formatCurrency(
+                    Math.max(invoice.total - invoice.outstandingAmount, 0),
+                  )}
+                </strong>
+              </span>
+              <span>
+                Outstanding:{" "}
+                <strong>{formatCurrency(invoice.outstandingAmount)}</strong>
+              </span>
+            </div>
             {invoice.notes && (
               <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {invoice.notes}
@@ -114,7 +144,62 @@ export default function PortalInvoiceDetailPage() {
         </Card>
       </div>
 
-      {!!invoice.allocations?.length && <Card><CardHeader><CardTitle>Applied receipts and credits</CardTitle></CardHeader><CardContent><SimpleTable headers={["Document", "Applied amount", "Date"]} rows={invoice.allocations.filter(row => row.receipt?.status !== "CANCELLED" && row.creditNote?.status !== "CANCELLED").map(row => [row.receipt?.receiptNumber ?? row.creditNote?.number ?? "Credit", formatCurrency(row.amount), formatDate(row.adjustedAt)])} /></CardContent></Card>}
+      {!!invoice.lines?.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoice items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border">
+              {invoice.lines.map((line) => (
+                <li
+                  key={line.id}
+                  className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="break-words font-medium">
+                      {line.description}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Quantity {line.quantity}
+                      {line.isUnderWarranty ? ", Warranty" : ""}
+                    </p>
+                  </div>
+                  <p className="ml-auto text-right font-medium tabular-nums">
+                    {formatCurrency(line.amount)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {!!invoice.allocations?.length && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Applied receipts and credits</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SimpleTable
+              headers={["Document", "Applied amount", "Date"]}
+              rows={invoice.allocations
+                .filter(
+                  (row) =>
+                    row.receipt?.status !== "CANCELLED" &&
+                    row.creditNote?.status !== "CANCELLED",
+                )
+                .map((row) => [
+                  row.receipt?.receiptNumber ??
+                    row.creditNote?.number ??
+                    "Credit",
+                  formatCurrency(row.amount),
+                  formatDate(row.adjustedAt),
+                ])}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {invoice.receipts && invoice.receipts.length > 0 && (
         <Card>
@@ -161,7 +246,10 @@ export default function PortalInvoiceDetailPage() {
                 </thead>
                 <tbody>
                   {invoice.creditApplications.map((app) => (
-                    <tr key={app.id} className="border-b border-border/60 last:border-0">
+                    <tr
+                      key={app.id}
+                      className="border-b border-border/60 last:border-0"
+                    >
                       <td className="px-3 py-3 font-semibold">
                         {formatCurrency(app.amount)}
                       </td>

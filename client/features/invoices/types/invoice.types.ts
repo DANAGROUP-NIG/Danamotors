@@ -35,6 +35,7 @@ export type InvoiceReceipt = {
 };
 
 export type InvoiceLine = {
+  isUnderWarranty?: boolean;
   id: string;
   type: "PART" | "LABOUR" | "SERVICE";
   description: string;
@@ -53,9 +54,20 @@ export type InvoiceReceiptAllocation = {
 };
 
 export type Invoice = {
-  jobCards?: { id: string; jobNumber: string; customerRemarks?: string | null }[];
+  jobCards?: {
+    id: string;
+    jobNumber: string;
+    customerRemarks?: string | null;
+  }[];
   billType?: string | null;
-  vatBreakdown?: {category:string;rate:string|number;saleAmount:string|number;discount:string|number;taxableAmount:string|number;vat:string|number}[];
+  vatBreakdown?: {
+    category: string;
+    rate: string | number;
+    saleAmount: string | number;
+    discount: string | number;
+    taxableAmount: string | number;
+    vat: string | number;
+  }[];
   id: string;
   customerId: string;
   jobCardId?: string;
@@ -96,6 +108,7 @@ export type Invoice = {
   receipts: InvoiceReceipt[];
   allocations: InvoiceReceiptAllocation[];
   lines: InvoiceLine[];
+  printLines?: InvoiceLine[];
   serviceAdvisor?: { id: string; firstName: string; lastName: string } | null;
 };
 

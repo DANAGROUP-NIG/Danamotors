@@ -239,6 +239,10 @@ export type JobOpeningOptions = {
   pdiRegistration?: string;
 };
 
+export function serviceJobWorkflowEnrollmentEnabled() {
+  return process.env.SERVICE_JOB_WORKFLOW_ENABLED === "true";
+}
+
 export class JobCardWorkflowService {
   async open(
     input: z.infer<typeof jobOpeningBody> & {
@@ -254,8 +258,7 @@ export class JobCardWorkflowService {
     const data = jobOpeningBody.parse(body);
     const jobType = options.jobType ?? JobCardType.SERVICE;
     const pdi = jobType === JobCardType.PDI;
-    const enrollInWorkflow =
-      !pdi && process.env.SERVICE_JOB_WORKFLOW_ENABLED === "true";
+    const enrollInWorkflow = !pdi && serviceJobWorkflowEnrollmentEnabled();
     if (enrollInWorkflow) {
       if (!data.appointmentId)
         throw new BadRequestError(

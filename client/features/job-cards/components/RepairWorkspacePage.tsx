@@ -13,8 +13,10 @@ import {
 } from "./repair-workspace-ui";
 import { WORKSPACE_COPY as COPY } from "./repair-workspace-copy";
 import { cn } from "@/lib/utils";
+import type { JobCardWorkflow } from "../hooks/use-job-card-workflow";
+import type { ReactNode } from "react";
 
-export function RepairWorkspacePage({ id, embedded = false }: { id: string; embedded?: boolean }) {
+export function RepairWorkspacePage({ id, embedded = false, workflow, preferredTab, labourAssignment, showAdvancePayments = true }: { id: string; embedded?: boolean; workflow?: JobCardWorkflow | null; preferredTab?: "Labour" | "Requisition" | "History"; labourAssignment?: ReactNode; showAdvancePayments?: boolean }) {
   const { data: jobCard, isLoading, error, refetch } = useJobCard(id);
   if (isLoading)
     return <LoadingSkeleton variant="workspace" label={COPY.loading} />;
@@ -31,10 +33,12 @@ export function RepairWorkspacePage({ id, embedded = false }: { id: string; embe
     <section className={cn("min-w-0 text-foreground print:hidden", embedded ? "space-y-4" : "space-y-7 rounded-2xl border border-border bg-muted/40 p-4 sm:p-6")}>
       {!embedded && <WorkspaceHeader status={jobCard.status} />}
       {!embedded && <JobProgressStepper status={jobCard.status} />}
-      <ServiceTransactions job={jobCard} embedded={embedded} />
-      {(jobCard.advanceSummary || jobCard.advanceReceipts) && <JobAdvanceSection jobCard={jobCard} embedded={embedded} open={!hasJobBill(jobCard) && !['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))} />}
+      <div id="workflow-parts" className="scroll-mt-28">
+        <ServiceTransactions key={preferredTab ?? "default"} job={jobCard} embedded={embedded} workflow={workflow} preferredTab={preferredTab} labourAssignment={labourAssignment} />
+      </div>
+      {showAdvancePayments && (jobCard.advanceSummary || jobCard.advanceReceipts) && (!workflow || Boolean(jobCard.estimates?.length)) && <JobAdvanceSection jobCard={jobCard} embedded={embedded} open={!hasJobBill(jobCard) && !['BILLED', 'DELIVERED', 'CANCELLED'].includes(canonicalJobStatus(jobCard.status))} />}
       {jobCard.estimates ? (
-        <JobCardEstimateSection jobCard={jobCard} />
+        <JobCardEstimateSection jobCard={jobCard} workflow={workflow} />
       ) : (
         <p
           className={cn(
