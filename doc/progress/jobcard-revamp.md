@@ -280,7 +280,7 @@ Built on Jayking (no phase branch, at the owner's request).
 - [x] Server: `job-quality-check.logic.ts`, `job-qc-state.ts`, `job-quality-check.service.ts` and routes; `JobStageService.actInTx`; every QC reader moved to the inspection (workflow, stage writer and logic, billing readiness and list, requisitions, labour, inventory issue, estimate revision, PDI, portal, notifications); old `PATCH /workshop/qc/:id` and `POST /service/job-cards/:id/inspections` removed; QC review notices queued with the inspection; the notification trigger no longer watches the dropped columns.
 - [x] Client: `lib/quality-check.logic.ts`, `use-job-quality-check.ts`, `components/quality-check/` (QualityCheckStep, QualityCheckForm, FailReturnDialog, QcHistory); returned tag on reopened lines (technician and advisor views, banner for the advisor too); Activity names passed and failed checks; Inspections list shows quality checks; old QC section, hook, schema and copy file deleted.
 - [x] Demo seed: JC-S26 to JC-S28 on a local copy (`dana_demo_p7`, the e2e template now).
-- [ ] Server database: see "Server database incident" below.
+- [x] Server database: see "Server database incident" below.
 - [x] Docs: `doc/job-cards.md` ("Quality check (phase 7)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-7-manual-test.md`.
 
 ### Tests (27 Nov 2026)
@@ -292,7 +292,7 @@ Built on Jayking (no phase branch, at the owner's request).
 ### Server database incident (27 Nov 2026)
 
 - At 11:25 UTC a full `prisma migrate deploy` of this working tree's migrations ran against the shared server database. It applied the three held drops (`20261126125424_jobcard_drop_observations`, `20261127090200_jobcard_drop_opening_estimate`, `20261127180200_jobcard_drop_qc_columns`) and the phase 7 migrations. None of the phase 7 session's commands targeted the server at that time (every deploy had an explicit local URL); the source could not be traced.
-- At 12:13 UTC branch `feat/issue-144-booking-customer-details` added `20261127130000_repair_job_card_inspection_columns`, which put the dropped columns back, empty, with `Inspection.findings` required and no default. The phase 7 code does not write that column, so the quality check, PDI vehicle ready and the demo seed fail on the server until that is resolved. Waiting for the owner's decision before changing the server again.
+- At 12:13 UTC branch `feat/issue-144-booking-customer-details` added `20261127130000_repair_job_card_inspection_columns`, which put the dropped columns back, empty, with `Inspection.findings` required and no default. The phase 7 code does not write that column, so the quality check, PDI vehicle ready and the demo seed fail on the server until that is resolved. Owner's decision: add a default. Migration `20261127190000_inspection_findings_default` (guarded, no-op where the column is gone) was applied to the server, then the demo seed was run there: JC-S26 2026000060 (LSR-537ST), JC-S27 2026000061 (LSR-538ST) and JC-S28 2026000062 (LSR-539ST) are in place. The run then stopped at the PDI demo ("PDI demo needs an active Engineer at Main Branch"): the server still has no Engineer accounts, as noted since phase 3; not a phase 7 problem.
 
 ### Found and fixed in passing
 

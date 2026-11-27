@@ -9,7 +9,7 @@ Step 6 of a job card, **Quality check**, is rebuilt. The workshop supervisor now
 **Address.** Open the test site address your administrator gave you. If you are testing on the developer's computer, open `http://localhost:3000`.
 
 **Words used in this guide.**
-- **Job card**: the record of one vehicle visit to the workshop. Each one has a job number, for example 2026000042.
+- **Job card**: the record of one vehicle visit to the workshop. Each one has a job number, for example 2026000060.
 - **Step**: where the job is now. There are 8: Check-in, Diagnosis, Warranty, Estimate, Repair, Quality check, Billing and Delivery, shown as numbered circles near the top of the job (on a phone, as "Step 6 of 8: Quality check" with a bar).
 - **Work item** (or work line): one piece of approved work, for example "Replace front brake pads".
 - **Quality check**: step 6, where the workshop supervisor checks the work before the vehicle is billed.
@@ -28,13 +28,13 @@ Step 6 of a job card, **Quality check**, is rebuilt. The workshop supervisor now
 | Technician (assigned to the demo jobs) | tech1@danamotors.com | Tunde Akinyemi | tech1@kiamotors.com (Tunde Akinyemi) |
 | Service advisor | advisor1@danamotors.com | Chidi Eze | advisor1@kiamotors.com (Chidi Eze) |
 
-**Demo jobs.** All are at **Main Branch**. To open one, use **Job Cards** in the left menu, type the plate in the search box, then click the three-dot **Actions** button at the end of the row and **View details**. The job numbers below are the ones on the developer's computer; on the test site, find the job by its plate.
+**Demo jobs.** All are at **Main Branch**. To open one, use **Job Cards** in the left menu, type the plate in the search box, then click the three-dot **Actions** button at the end of the row and **View details**. The job numbers are the ones on the test site; on the developer's computer they are in brackets.
 
-| Plate | Job number (developer's computer) | Where it is | Used in section |
+| Plate | Job number | Where it is | Used in section |
 |---|---|---|---|
-| LSR-537ST | 2026000042 | Quality check. "PAID SERVICE" and "Replace front brake pads" both done. Check-in reading 48,262 km | A, B, C, D, E |
-| LSR-538ST | 2026000043 | Back in Repair. The supervisor failed the brake pads with the note "Brake still noisy at low speed. Recheck front left caliper slider." | D |
-| LSR-539ST | 2026000044 | Quality check, second time. Failed once on the brake pads, redone by the technician | F, G, H |
+| LSR-537ST | 2026000060 (2026000042) | Quality check. "PAID SERVICE" and "Replace front brake pads" both done. Check-in reading 48,262 km | A, B, C, D, E |
+| LSR-538ST | 2026000061 (2026000043) | Back in Repair. The supervisor failed the brake pads with the note "Brake still noisy at low speed. Recheck front left caliper slider." | D |
+| LSR-539ST | 2026000062 (2026000044) | Quality check, second time. Failed once on the brake pads, redone by the technician | F, G, H |
 
 Sections A to E and H change their jobs. After testing, ask the developer to reload the demo data before you test them again.
 
@@ -93,7 +93,7 @@ Do not press Pass. Leave the page as it is for section C.
 Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pads" marked **Fail**.
 
 1. Click **Fail and return to technician** in the bar.
-   - **Expected:** a window **Fail and return to technician** opens: "Job 2026000042 goes back to the technician with your note. The work you tick is reopened." Under **Work that failed** (red star) both work items are listed and "Replace front brake pads" is ticked. A box **What must the technician fix** (red star) with "The technician sees this note on the job and in My jobs." under it.
+   - **Expected:** a window **Fail and return to technician** opens: "Job 2026000060 goes back to the technician with your note. The work you tick is reopened." Under **Work that failed** (red star) both work items are listed and "Replace front brake pads" is ticked. A box **What must the technician fix** (red star) with "The technician sees this note on the job and in My jobs." under it.
 2. Click **Return to technician** without typing anything.
    - **Expected:** red text under the box: "Write what the technician must fix." The window stays open.
 3. Untick "Replace front brake pads" and click **Return to technician**.
@@ -105,7 +105,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 6. Press **Esc**.
    - **Expected:** the window stays open and your text is still there.
 7. Click **Return to technician**.
-   - **Expected:** the button shows a spinning icon and "Returning the job" for a moment. A green toast: "Job 2026000042 returned to the technician." The window closes. The step heading changes to **Step 5 of 8: Repair**, the header badge reads **In repair** and "With: Tunde Akinyemi (Technician) since (now)". A red banner "Returned from quality check" shows "Returned by Rotimi Ajayi, (date and time)." and "Note: Brake still noisy at low speed. Recheck front left caliper slider."
+   - **Expected:** the button shows a spinning icon and "Returning the job" for a moment. A green toast: "Job 2026000060 returned to the technician." The window closes. The step heading changes to **Step 5 of 8: Repair**, the header badge reads **In repair** and "With: Tunde Akinyemi (Technician) since (now)". A red banner "Returned from quality check" shows "Returned by Rotimi Ajayi, (date and time)." and "Note: Brake still noisy at low speed. Recheck front left caliper slider."
 
 **Pass if:** the fail needs a note and a failed item, the window never closes by itself, and the job goes back to Repair with the technician.
 
@@ -114,7 +114,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 1. Sign out, set the browser to **iPhone 12 Pro**, and sign in as the **Technician**.
    - **Expected:** the dashboard opens. The bell at the top shows a new notice.
 2. Click the bell.
-   - **Expected:** a notice for job 2026000042 that says "QC failed. Review the job card for rework".
+   - **Expected:** a notice for job 2026000060 that says "QC failed. Review the job card for rework".
 3. Open **My jobs** (bottom menu or side menu).
    - **Expected:** under **Today**, the card for **LSR-537ST** shows a red **Returned from quality check** label and the note "Brake still noisy at low speed. Recheck front left caliper slider." The card for **LSR-538ST** shows the same label and note.
 4. Open **LSR-537ST** from its card.
@@ -126,7 +126,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 7. Click **Done**.
    - **Expected:** a green toast "Replace front brake pads marked done". The item shows **Done** and the time. The red "Returned from quality check" label on the item is gone.
 8. Click **Send for quality check**.
-   - **Expected:** a green toast "Job 2026000042 sent to workshop supervisor". The step heading becomes **Step 6 of 8: Quality check** and the header says "With: Workshop supervisor since (now)".
+   - **Expected:** a green toast "Job 2026000060 sent to workshop supervisor". The step heading becomes **Step 6 of 8: Quality check** and the header says "With: Workshop supervisor since (now)".
 
 **Pass if:** the technician sees who returned the job, when and why, only the failed item is reopened, and the job goes back to the supervisor.
 
@@ -141,7 +141,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 4. Sign in the signing box.
    - **Expected:** **Pass quality check** can be pressed.
 5. Click **Pass quality check**.
-   - **Expected:** the button shows a spinning icon and "Sending" for a moment, then a green toast: "Quality check passed on job 2026000042. The service advisor has the job." The step heading becomes **Step 7 of 8: Billing** and the header says "With: Chidi Eze (Service advisor) since (now)". The finished steps list shows "Quality check completed by Rotimi Ajayi, (date and time)."
+   - **Expected:** the button shows a spinning icon and "Sending" for a moment, then a green toast: "Quality check passed on job 2026000060. The service advisor has the job." The step heading becomes **Step 7 of 8: Billing** and the header says "With: Chidi Eze (Service advisor) since (now)". The finished steps list shows "Quality check completed by Rotimi Ajayi, (date and time)."
 6. Click the finished step line **Quality check completed by ...** to open it.
    - **Expected:** "Result: Passed", "Checked: (date and time)", "Notes: Not provided".
 7. Click **Job file**, then the **Activity** tab.
@@ -149,7 +149,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 8. Press **Esc**.
    - **Expected:** the Job file panel closes.
 9. Sign in as the **Service advisor** and click the bell.
-   - **Expected:** a notice "Job sent to you" for job 2026000042, step Billing.
+   - **Expected:** a notice "Job sent to you" for job 2026000060, step Billing.
 
 **Pass if:** the pass needs every item, the km, the general checks and a signature; the job moves to Billing with the advisor; and both the failed and the passed check are in the history.
 
@@ -186,7 +186,7 @@ Stay on job **LSR-537ST** as the Workshop manager, with "Replace front brake pad
 7. Click **Pass quality check**.
    - **Expected:** a red toast and a red box under the cards explaining the quality check was not saved, for example "The quality check was not saved. Check your connection and try again. Your entries are kept." Everything you entered is still there, including the signature.
 8. Go back online (Network tab, **No throttling**, or Wi-Fi on) and click **Pass quality check** again.
-   - **Expected:** the green toast "Quality check passed on job 2026000044. The service advisor has the job." and **Step 7 of 8: Billing**.
+   - **Expected:** the green toast "Quality check passed on job 2026000062. The service advisor has the job." and **Step 7 of 8: Billing**.
 
 **Pass if:** the page fits every size, works with the keyboard, and keeps your entries when the connection drops.
 
