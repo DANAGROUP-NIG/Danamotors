@@ -26,11 +26,13 @@ import { nextDocumentNumber } from "./document-number";
 import { lineAmount, money, sumMoney } from "./money";
 import { applyJobAdvances } from "./job-advance";
 import { lockParty } from "./party-account.service";
-import { assertJobBillingReady, BILLABLE_STATUSES, QC_NOT_REQUIRED } from "./job-billing.logic";
+import { assertJobBillingReady, BILLABLE_STATUSES } from "./job-billing.logic";
+import { QC_PASSED_WHERE, QC_STATE_SELECT, qcStateFrom } from "../service/job-qc-state";
 
 const JOB_BILL_INCLUDE = {
   estimates: latestEstimateQuery,
   estimationCharge: { select: { id: true, status: true, amount: true } },
+  inspections: QC_STATE_SELECT.inspections,
   customer: true,
   serviceType: true,
   service: { select: { name: true } },
@@ -190,7 +192,7 @@ export class JobBillingService {
   ) {
     if (jobCard.jobType === "PDI")
       throw new BadRequestError("PDI jobs are billed from the PDI menu");
-    assertJobBillingReady({ ...jobCard, estimationChargeAdded: jobCard.estimationCharge?.status === "ADDED" });
+    assertJobBillingReady({ ...jobCard, qcState: qcStateFrom(jobCard) });
     if (
       jobCard.billedAt ||
       jobCard.invoices.some((invoice) => isActiveBillStatus(invoice.status))
@@ -370,8 +372,8 @@ export class JobBillingService {
         AND: [
           {
             OR: [
-              { qcStatus: { equals: "PASSED", mode: "insensitive" } },
-              { qcStatus: QC_NOT_REQUIRED, estimationCharge: { status: "ADDED" } },
+              QC_PASSED_WHERE,
+              { inspections: { none: { supersededAt: null } }, estimationCharge: { status: "ADDED" } },
             ],
           },
         ],

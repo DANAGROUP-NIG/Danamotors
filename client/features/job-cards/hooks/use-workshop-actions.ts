@@ -1,7 +1,7 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiPatch, apiPost, apiPut } from "@/lib/api/apiClient";
+import { apiPost, apiPut } from "@/lib/api/apiClient";
 import { jobCardKeys } from "../api/job-card.keys";
 
 /** Saved work done and charges. Only changed values are sent. */
@@ -51,14 +51,6 @@ export function useWorkshopActions(jobCardId: string, jobNumber: string) {
     },
   });
 
-  const recordQc = useMutation({
-    mutationFn: (input: { qcStatus: "PASSED" | "FAILED"; qcNotes: string }) => apiPatch(`/workshop/qc/${jobCardId}`, input),
-    onSuccess: async (_data, input) => {
-      toast.success(input.qcStatus === "PASSED" ? `Quality check passed on job ${jobNumber}` : `Quality check failure recorded on job ${jobNumber}`);
-      await refresh();
-    },
-  });
-
   const deliver = useMutation({
     mutationFn: (input: DeliveryInput) => apiPut(`/service/job-cards/${jobCardId}`, { status: "DELIVERED", ...input }),
     onSuccess: async () => {
@@ -75,5 +67,5 @@ export function useWorkshopActions(jobCardId: string, jobNumber: string) {
     },
   });
 
-  return { assign, saveWorkDone, recordQc, deliver, approveCredit };
+  return { assign, saveWorkDone, deliver, approveCredit };
 }

@@ -17,6 +17,7 @@ import { requisitionFooter } from '../requisition/requisition.logic';
 import { chargeTypeTotals, defectTotals, pdiBillTypeOf, pdiPrintTitle, type PdiLockedDocument } from './pdi.logic';
 import { assertPdiDocumentChange, getPdiSettings } from './pdi.settings.service';
 import type { PdiDocumentListQuery, PdiListQuery, PdiOpenInput, PdiUpdateInput, PdiVehicleInput } from './pdi.validation';
+import { supersedeCurrentInspection } from '../service/job-qc-state';
 
 export interface PdiActor {
   userId: string;
@@ -332,7 +333,8 @@ export class PdiService {
     if (from === 'OPEN') history.push({ jobCardId: job.id, fromStatus: 'OPEN', toStatus: 'IN_PROGRESS', actorId, remarks: 'PDI work started' });
     history.push({ jobCardId: job.id, fromStatus: from === 'OPEN' ? 'IN_PROGRESS' : from, toStatus: 'QC', actorId, remarks: 'PDI work done' });
     await tx.jobCardStatusHistory.createMany({ data: history });
-    await tx.jobCard.update({ where: { id: job.id }, data: { status: 'QC', qcStatus: 'PENDING', workDone: workDone?.trim() || job.workDone || 'PDI work done', completedAt: new Date() } });
+    await supersedeCurrentInspection(tx, job.id);
+    await tx.jobCard.update({ where: { id: job.id }, data: { status: 'QC', workDone: workDone?.trim() || job.workDone || 'PDI work done', completedAt: new Date() } });
     // PDI keeps its own screens; its stage still follows its status.
     await syncStage(tx, job.id, actorId);
     const last = await tx.jobCardStatusHistory.findFirst({ where: { jobCardId: job.id, toStatus: 'QC' }, orderBy: { createdAt: 'desc' }, select: { id: true } });
@@ -349,7 +351,10 @@ export class PdiService {
       await completeCampaignVehiclesForJobCard(tx, id);
       const now = new Date();
       await tx.jobCardStatusHistory.create({ data: { jobCardId: id, fromStatus: 'QC', toStatus: 'READY', actorId: actor.userId, remarks: remarks?.trim() || 'PDI vehicle ready' } });
-      const ready = await tx.jobCard.update({ where: { id }, data: { status: 'READY', qcStatus: 'PASSED', qcNotes: remarks?.trim() || 'PDI inspection passed', readyAt: now } });
+      // The PDI is the inspection: it is recorded as the job's passed quality check.
+      await supersedeCurrentInspection(tx, id, now);
+      await tx.inspection.create({ data: { jobCardId: id, inspectorId: actor.userId, result: 'PASSED', notes: remarks?.trim() || 'PDI inspection passed', createdAt: now } });
+      const ready = await tx.jobCard.update({ where: { id }, data: { status: 'READY', readyAt: now } });
       await syncStage(tx, id, actor.userId);
       return ready;
     }, { maxWait: 5000, timeout: 15000 });

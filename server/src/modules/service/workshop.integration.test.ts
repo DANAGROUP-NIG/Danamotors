@@ -10,7 +10,6 @@ jest.mock("../notification/notification.service", () => ({
 }));
 
 import { ReceiptService } from '../finance/receipt.service';
-import { WorkshopService } from '../workshop/workshop.service';
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../prisma/client";
@@ -239,7 +238,7 @@ integration("Workshop database flow", () => {
               user.id,
             );
 
-            await new WorkshopService().updateQC(job.id, "PASSED", "Checked");
+            await prisma.inspection.create({ data: { jobCardId: job.id, result: "PASSED", notes: "Checked" } });
             await jobs.updateJobCard(
               job.id,
               {

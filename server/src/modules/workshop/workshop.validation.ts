@@ -28,13 +28,3 @@ export const updateJobProgressSchema = z.object({
     status: jobCardStatus.optional(),
   }),
 });
-
-export const qcUpdateSchema = z.object({
-  params: z.object({
-    id: z.string().uuid("Invalid job card ID"),
-  }),
-  body: z.object({
-    qcStatus: z.enum(["PASSED", "FAILED", "PENDING"]),
-    qcNotes: z.string().optional(),
-  }),
-});

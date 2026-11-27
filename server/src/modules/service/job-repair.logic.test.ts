@@ -224,7 +224,7 @@ describe("stage rules use the repair gate", () => {
   const facts = {
     stage: "REPAIR" as const,
     status: "IN_PROGRESS",
-    qcStatus: null,
+    qcState: "PENDING" as const,
     technicianId: "tech",
     complaintCount: 1,
     openingSignatureProblem: null,

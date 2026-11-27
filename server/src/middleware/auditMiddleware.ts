@@ -49,7 +49,6 @@ const ACTION_MAP: Record<string, string> = {
   // ── Service — Job Cards ──────────────────────────────────────────────────
   'POST /api/service/job-cards': 'JOB_CARD_CREATE',
   'PUT /api/service/job-cards': 'JOB_CARD_UPDATE',
-  'POST /api/service/job-cards/inspections': 'JOB_CARD_INSPECTION_CREATE',
   'POST /api/service/job-cards/estimates': 'JOB_CARD_ESTIMATE_CREATE',
 
   // ── Service — Estimates ──────────────────────────────────────────────────

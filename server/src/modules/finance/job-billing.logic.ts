@@ -1,17 +1,14 @@
 import { BadRequestError } from "../../shared/errors/appError";
+import type { QcState } from "../service/job-quality-check.logic";
 
 export const BILLABLE_STATUSES = ["READY", "Ready", "Completed"];
-
-/** The quality check status of a job billed only for the estimation charge: there was no work to check. */
-export const QC_NOT_REQUIRED = "NOT_REQUIRED";
 
 /** Readiness is rechecked at billing time, including delivered-on-credit work. */
 export function assertJobBillingReady(job: {
   status: string;
-  qcStatus: string | null;
+  /** From the job's current inspection (qcStateFrom). NOT_REQUIRED: only the estimation charge is billed. */
+  qcState: QcState;
   creditApprovedById: string | null;
-  /** The customer declined all work and the estimation charge was added: there was no work to check. */
-  estimationChargeAdded?: boolean;
 }): void {
   const ready = BILLABLE_STATUSES.includes(job.status);
   const deliveredOnCredit =
@@ -23,8 +20,8 @@ export function assertJobBillingReady(job: {
   }
   // TODO(confirm): historical completed jobs without QC evidence remain blocked;
   // do not infer a passed inspection from a legacy status alone.
-  if (job.estimationChargeAdded && job.qcStatus === QC_NOT_REQUIRED) return;
-  if (job.qcStatus?.toUpperCase() !== "PASSED") {
+  if (job.qcState === "NOT_REQUIRED") return;
+  if (job.qcState !== "PASSED") {
     throw new BadRequestError(
       "Record a passed quality check on the job card before billing",
     );

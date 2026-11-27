@@ -153,14 +153,12 @@ export default async function seedCustomerPortal(
           vehicleId: vehicle.id,
           branchId: branch.id,
           jobNumber,
-          description: `${v.year} ${v.make} ${v.model} — routine service and inspection`,
+          description: `${v.year} ${v.make} ${v.model}, routine service and inspection`,
           // Canonical lifecycle status, with the stage that status implies (job-stage.logic.ts).
           status: jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN",
           stage: stageForLegacyStatus(jobSeq % 2 === 0 ? "IN_PROGRESS" : "OPEN"),
           progress: jobSeq % 2 === 0 ? 45 : 10,
           estimatedHours: 6,
-          estimatedCost: 85000,
-          qcStatus: "Pending",
         },
       });
 

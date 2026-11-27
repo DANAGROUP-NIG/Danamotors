@@ -27,7 +27,7 @@ const TECH = "tech-1";
 const facts = (overrides: Partial<StageFacts> = {}): StageFacts => ({
   stage: "CHECK_IN",
   status: "OPEN",
-  qcStatus: "PENDING",
+  qcState: "PENDING",
   technicianId: TECH,
   complaintCount: 2,
   openingSignatureProblem: null,
@@ -131,11 +131,11 @@ describe("legacyStatusForStage", () => {
 
 describe("reconcileStage keeps the stage in step with any status change", () => {
   it.each([
-    ["CHECK_IN", "OPEN", null, false, "CHECK_IN"],
-    ["DIAGNOSIS", "OPEN", null, false, "DIAGNOSIS"],
-    ["ESTIMATE", "IN_PROGRESS", null, false, "REPAIR"],
-    ["CHECK_IN", "IN_PROGRESS", null, false, "REPAIR"],
-    ["REPAIR", "WAITING_PARTS", null, false, "REPAIR"],
+    ["CHECK_IN", "OPEN", "PENDING", false, "CHECK_IN"],
+    ["DIAGNOSIS", "OPEN", "PENDING", false, "DIAGNOSIS"],
+    ["ESTIMATE", "IN_PROGRESS", "PENDING", false, "REPAIR"],
+    ["CHECK_IN", "IN_PROGRESS", "PENDING", false, "REPAIR"],
+    ["REPAIR", "WAITING_PARTS", "PENDING", false, "REPAIR"],
     ["REPAIR", "QC", "PENDING", false, "QUALITY_CHECK"],
     ["QUALITY_CHECK", "IN_PROGRESS", "PENDING", false, "REPAIR"],
     ["BILLING", "QC", "PASSED", false, "BILLING"],
@@ -148,9 +148,9 @@ describe("reconcileStage keeps the stage in step with any status change", () => 
     ["DELIVERY", "DELIVERED", "PASSED", false, "CLOSED"],
     ["BILLING", "DELIVERED", "PASSED", true, "CLOSED"],
     ["BILLING", "IN_PROGRESS", "PENDING", false, "REPAIR"],
-    ["ESTIMATE", "CANCELLED", null, false, "CANCELLED"],
-    ["CLOSED", "OPEN", null, false, "ESTIMATE"],
-    ["REPAIR", "Weird", null, false, "REPAIR"],
+    ["ESTIMATE", "CANCELLED", "PENDING", false, "CANCELLED"],
+    ["CLOSED", "OPEN", "PENDING", false, "ESTIMATE"],
+    ["REPAIR", "Weird", "PENDING", false, "REPAIR"],
   ] as const)("%s + %s (QC %s, credit %s) is %s", (current, status, qc, credit, expected) => {
     const stage = reconcileStage(current, status, qc, credit);
     expect(stage).toBe(expected);
@@ -320,28 +320,28 @@ describe("allowed and blocked moves", () => {
   });
 
   it("quality check: pass goes to the advisor, fail goes back to the technician", () => {
-    const pending = facts({ stage: "QUALITY_CHECK", status: "QC", qcStatus: "PENDING" });
+    const pending = facts({ stage: "QUALITY_CHECK", status: "QC", qcState: "PENDING" });
     const views = availableActions(pending, supervisor);
     expect(views.find((view) => view.action === "QC_PASSED_TO_ADVISOR")).toMatchObject({
       kind: "primary", enabled: false, reasons: ["Record a passed quality check before sending the job to the service advisor."],
     });
-    const failed = facts({ stage: "QUALITY_CHECK", status: "QC", qcStatus: "FAILED" });
+    const failed = facts({ stage: "QUALITY_CHECK", status: "QC", qcState: "FAILED" });
     expect(availableActions(failed, supervisor).find((view) => view.kind === "primary")?.action).toBe("RETURN_TO_REPAIR");
     expect(checkStageAction("RETURN_TO_REPAIR", failed, supervisor)).toEqual({ ok: true, to: "REPAIR", toStatus: "IN_PROGRESS" });
-    expect(checkStageAction("QC_PASSED_TO_ADVISOR", facts({ stage: "QUALITY_CHECK", status: "QC", qcStatus: "passed" }), supervisor)).toEqual({
+    expect(checkStageAction("QC_PASSED_TO_ADVISOR", facts({ stage: "QUALITY_CHECK", status: "QC", qcState: "PASSED" }), supervisor)).toEqual({
       ok: true, to: "BILLING", toStatus: undefined,
     });
     expect(checkStageAction("QC_PASSED_TO_ADVISOR", failed, technician)).toMatchObject({ ok: false, kind: "forbidden" });
   });
 
   it("billing: only the service advisor marks ready, then credit or a bill sends it to delivery", () => {
-    const billingQc = facts({ stage: "BILLING", status: "QC", qcStatus: "PASSED" });
+    const billingQc = facts({ stage: "BILLING", status: "QC", qcState: "PASSED" });
     expect(checkStageAction("MARK_READY", billingQc, advisor)).toEqual({ ok: true, to: "BILLING", toStatus: "READY" });
     expect(checkStageAction("MARK_READY", billingQc, { id: "admin", role: ROLES.ADMIN })).toMatchObject({ ok: false, kind: "forbidden" });
     expect(checkStageAction("MARK_READY", { ...billingQc, unansweredCampaigns: 1 }, advisor)).toEqual({
       ok: false, kind: "blocked", reasons: ["Record whether the campaign work was done for each campaign on this job."],
     });
-    const ready = facts({ stage: "BILLING", status: "READY", qcStatus: "PASSED" });
+    const ready = facts({ stage: "BILLING", status: "READY", qcState: "PASSED" });
     expect(checkStageAction("SEND_TO_DELIVERY", ready, advisor)).toEqual({
       ok: false, kind: "blocked", reasons: ["Create the bill or record credit approval before delivery."],
     });
@@ -383,7 +383,7 @@ describe("sub-step, alerts and summaries", () => {
     expect(currentSubStep(facts({ stage: "ESTIMATE", approvalProblem: "x" }))).toBe("ESTIMATE_APPROVAL");
     expect(currentSubStep(facts({ stage: "ESTIMATE", depositProblem: "x" }))).toBe("ADVANCE_PAYMENT");
     expect(currentSubStep(facts({ stage: "REPAIR", status: "WAITING_PARTS" }))).toBe("WAITING_PARTS");
-    expect(currentSubStep(facts({ stage: "QUALITY_CHECK", status: "QC", qcStatus: "FAILED" }))).toBe("QC_FAILED");
+    expect(currentSubStep(facts({ stage: "QUALITY_CHECK", status: "QC", qcState: "FAILED" }))).toBe("QC_FAILED");
     expect(currentSubStep(facts({ stage: "BILLING", status: "READY" }))).toBe("INVOICE");
     expect(currentSubStep(facts({ stage: "CLOSED", status: "DELIVERED" }))).toBeNull();
   });

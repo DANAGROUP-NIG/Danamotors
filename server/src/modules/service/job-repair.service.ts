@@ -54,8 +54,6 @@ const jobSelect = {
   deliveryAdvisorId: true,
   createdById: true,
   customerId: true,
-  qcStatus: true,
-  qcNotes: true,
   promisedAt: true,
   warrantyDecisionReason: true,
   technician: { select: { firstName: true, lastName: true } },
@@ -293,6 +291,8 @@ export class JobRepairService {
         startedAt: line.startedAt,
         doneAt: line.doneAt,
         secondsWorked: secondsWorked(line, now),
+        // Reopened by a failed quality check (phase 7) and not done again yet.
+        returnedFromQc: !!line.reopenedAt && line.status !== "DONE",
       })),
       qualityCheckProblems: job.stage === "REPAIR" ? await prisma.$transaction((tx) => loadRepairProblems(tx, jobId)) : [],
       findings,
@@ -311,7 +311,7 @@ export class JobRepairService {
       // A failed quality check sends the job back (phase 7): who, when and the note.
       returnedFromQc:
         returned?.action === "RETURN_TO_REPAIR"
-          ? { by: fullName(returned.actor), at: returned.createdAt, note: returned.note ?? job.qcNotes ?? null }
+          ? { by: fullName(returned.actor), at: returned.createdAt, note: returned.note ?? null }
           : null,
     };
   }
@@ -468,7 +468,6 @@ export class JobRepairService {
         stage: true,
         status: true,
         promisedAt: true,
-        qcNotes: true,
         bay: { select: { code: true, description: true } },
         vehicle: { select: { registrationNumber: true, model: true, year: true } },
         diagnosis: { select: { returnedAt: true, submittedAt: true } },
@@ -508,7 +507,7 @@ export class JobRepairService {
           stage: row.stage,
           status: row.status,
           promisedAt: row.promisedAt,
-          returnedFromQc: returnedFromQc ? { note: last?.note ?? row.qcNotes ?? null, at: last?.createdAt ?? null } : null,
+          returnedFromQc: returnedFromQc ? { note: last?.note ?? null, at: last?.createdAt ?? null } : null,
           sentForQcAt: query.tab === "DONE" && last?.toStage === "QUALITY_CHECK" ? last.createdAt : null,
           next: action,
         };

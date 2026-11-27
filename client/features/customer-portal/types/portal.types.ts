@@ -125,7 +125,8 @@ export type PortalJobCard = {
   estimatedHours?: number | null;
   estimatedCost?: number | null;
   progress?: number | null;
-  qcStatus?: string | null;
+  /** The job's quality check result. */
+  qualityCheck: "PENDING" | "PASSED" | "FAILED" | "NOT_REQUIRED";
   assignedTo?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -142,9 +143,8 @@ export type PortalJobCard = {
   }[];
   inspections: {
     id: string;
-    findings: string;
-    status: string;
-    passed: boolean | null;
+    result: "PASSED" | "FAILED";
+    createdAt: string;
   }[];
 };
 

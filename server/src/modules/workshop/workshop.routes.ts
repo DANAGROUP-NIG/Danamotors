@@ -10,7 +10,6 @@ import { PERMISSIONS } from "../../shared/constants/roles";
 import {
   assignTechnicianSchema,
   updateJobProgressSchema,
-  qcUpdateSchema,
   receivePartsSchema,
 } from "./workshop.validation";
 const router = Router();
@@ -107,38 +106,6 @@ router.use(authMiddleware);
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/StandardResponse'
- *
- * /workshop/qc/{id}:
- *   patch:
- *     tags:
- *       - Workshop
- *     summary: Update quality control (QC) status
- *     description: Requires qcstatus:update and job branch access. A changed pass or fail outcome is audited and queued for background notification.
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *         description: Job card ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [qcStatus]
- *             properties:
- *               qcStatus: { type: string, enum: [PASSED, FAILED, PENDING] }
- *               qcNotes: { type: string }
- *     responses:
- *       200:
- *         description: QC status updated
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
  */
 /**
  * @openapi
@@ -208,12 +175,6 @@ router.patch(
   requirePermission(PERMISSIONS.JOBPROGRESS_UPDATE),
   validateRequest(updateJobProgressSchema),
   controller.updateProgress,
-);
-router.patch(
-  "/qc/:id",
-  requirePermission(PERMISSIONS.QCSTATUS_UPDATE),
-  validateRequest(qcUpdateSchema),
-  controller.updateQC,
 );
 
 export default router;

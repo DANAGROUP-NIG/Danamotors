@@ -6,9 +6,13 @@ import type { WorkshopService } from '../workshop/workshop.service';
 import type { LabourService } from './labour.service';
 import type { JobCardLineService } from '../job-card-line/jobCardLine.service';
 import type { JobBillingService } from '../finance/job-billing.service';
+import type { JobQualityCheckService } from './job-quality-check.service';
+import { QC_GENERAL_CHECKS } from './job-quality-check.logic';
 import type { StageAction } from './job-stage.logic';
 import { stageAllowsStatus } from './job-stage.logic';
 import { CHECKLIST_ITEMS } from './job-check-in.logic';
+
+const SIGNATURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
 
 const database = process.env.TEST_DATABASE_URL;
 const describeDb = database ? describe : describe.skip;
@@ -19,6 +23,9 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
   let stages: JobStageService;
   let workflow: JobCardWorkflowService;
   let workshop: WorkshopService;
+  let qc: JobQualityCheckService;
+  let qcState: typeof import('./job-qc-state');
+  let setQcResult: typeof import('./job-qc-state.fixtures').setQcResult;
   let labour: LabourService;
   let lines: JobCardLineService;
   let billing: JobBillingService;
@@ -39,6 +46,9 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     stages = new (require('./job-stage.service').JobStageService)();
     workflow = new (require('./job-card-workflow.service').JobCardWorkflowService)();
     workshop = new (require('../workshop/workshop.service').WorkshopService)();
+    qc = new (require('./job-quality-check.service').JobQualityCheckService)();
+    qcState = require('./job-qc-state');
+    setQcResult = require('./job-qc-state.fixtures').setQcResult;
     labour = new (require('./labour.service').LabourService)();
     lines = new (require('../job-card-line/jobCardLine.service').JobCardLineService)();
     billing = new (require('../finance/job-billing.service').JobBillingService)();
@@ -101,7 +111,16 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
 
   const act = (id: string, action: StageAction, who: keyof typeof users, note?: string, requestId = randomUUID()) =>
     stages.act(id, { action, note, requestId }, users[who]);
-  const current = (id: string) => db.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, status: true, stageOwnerId: true, stageOwnerRole: true, qcStatus: true } });
+  const current = (id: string) => db.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, status: true, stageOwnerId: true, stageOwnerRole: true } });
+  /** The supervisor passes the quality check (phase 7): every line, the general checks, road test and signature. */
+  async function passQc(id: string) {
+    const workLines = await db.jobWorkLine.findMany({ where: { jobCardId: id }, select: { id: true } });
+    await qc.record(id, { ...users.supervisor, branchId, permissions: ['jobcard:update', 'qcstatus:update'] }, {
+      requestId: randomUUID(), outcome: 'PASS', lines: workLines.map(line => ({ workLineId: line.id, result: 'PASS' as const })),
+      general: QC_GENERAL_CHECKS.map(check => ({ code: check.code, passed: true })), acOutletTempC: 6,
+      roadTestStartKm: 48_250, roadTestEndKm: 48_258, roadTestNotes: null, notes: null, signatureImage: SIGNATURE,
+    });
+  }
   async function expectAt(id: string, stage: JobStage, status: string) {
     const row = await current(id);
     expect({ stage: row.stage, status: row.status }).toEqual({ stage, status });
@@ -144,8 +163,7 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await db.jobWorkLine.updateMany({ where: { jobCardId: card.id }, data: { status: 'DONE', doneAt: new Date() } });
     await act(card.id, 'SEND_TO_QC', 'technician');
     await expectAt(card.id, 'QUALITY_CHECK', 'QC');
-    await workshop.updateQC(card.id, 'PASSED', 'Road test passed', users.supervisor.id);
-    await act(card.id, 'QC_PASSED_TO_ADVISOR', 'supervisor');
+    await passQc(card.id);
     expect(await expectAt(card.id, 'BILLING', 'QC')).toMatchObject({ stageOwnerId: users.advisor.id, stageOwnerRole: 'ServiceAdviser' });
 
     await act(card.id, 'MARK_READY', 'advisor');
@@ -180,7 +198,8 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     const card = await job('REPAIR', 'IN_PROGRESS');
     await labour.addJobCardLine(card.id, { labourItemId, technicianId: users.technician.id }, users.technician.id);
     await db.$transaction(tx => lines.syncLines(tx, card.id));
-    await db.jobCard.update({ where: { id: card.id }, data: { status: 'READY', stage: 'BILLING', qcStatus: 'PASSED' } });
+    await db.jobCard.update({ where: { id: card.id }, data: { status: 'READY', stage: 'BILLING' } });
+    await setQcResult(db, card.id, 'PASSED');
     await db.receipt.deleteMany({ where: { advanceJobCardId: card.id } });
 
     const blocked = await stages.workspace(card.id, users.advisor);
@@ -288,18 +307,17 @@ describeDb('Staged job card on isolated local PostgreSQL', () => {
     await workflow.update(open.id, { status: 'IN_PROGRESS' }, users.technician.id);
     await expectAt(open.id, 'REPAIR', 'IN_PROGRESS');
 
-    // A QC result changed after the handoff returns the job to quality check.
-    const passed = await job('BILLING', 'QC', { qcStatus: 'PASSED' });
-    await workshop.updateQC(passed.id, 'FAILED', 'Brake judder on road test', users.supervisor.id);
-    await expectAt(passed.id, 'QUALITY_CHECK', 'QC');
-
-    // New labour after the handoff needs a fresh QC.
-    const relabour = await job('BILLING', 'QC', { qcStatus: 'PASSED' });
+    // New labour after the handoff needs a fresh QC: the passed check is superseded.
+    const relabour = await job('BILLING', 'QC');
+    await setQcResult(db, relabour.id, 'PASSED');
     await labour.addJobCardLine(relabour.id, { labourItemId, technicianId: users.technician.id }, users.technician.id);
-    expect(await expectAt(relabour.id, 'QUALITY_CHECK', 'QC')).toMatchObject({ qcStatus: 'PENDING' });
+    await expectAt(relabour.id, 'QUALITY_CHECK', 'QC');
+    expect(await qcState.loadQcState(db, relabour.id)).toBe('PENDING');
+    expect(await db.inspection.count({ where: { jobCardId: relabour.id } })).toBe(1);
 
     // Changed issued work on a ready job reopens it for repair.
-    const ready = await job('BILLING', 'READY', { qcStatus: 'PASSED' });
+    const ready = await job('BILLING', 'READY');
+    await setQcResult(db, ready.id, 'PASSED');
     const { applyJobWorkChange } = require('../requisition/requisition-work') as typeof import('../requisition/requisition-work');
     await db.$transaction(tx => applyJobWorkChange(tx, { id: ready.id, status: 'READY', openingSignatureRequired: false }, users.advisor.id));
     await expectAt(ready.id, 'REPAIR', 'IN_PROGRESS');

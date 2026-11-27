@@ -6,6 +6,7 @@ import { jobDiagnosisRoutes } from "./job-diagnosis.routes";
 import { jobWarrantyRoutes } from "./job-warranty.routes";
 import { jobEstimateRoutes } from "./job-estimate.routes";
 import { jobRepairRoutes, myJobsRoutes } from "./job-repair.routes";
+import { jobQualityCheckRoutes } from "./job-quality-check.routes";
 import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
@@ -38,7 +39,6 @@ import {
   createJobCardSchema,
   listJobCardsSchema,
   updateJobCardSchema,
-  createInspectionSchema,
   createEstimateSchema,
   createApprovalSchema,
   serviceIdParamSchema,
@@ -63,6 +63,7 @@ router.use("/job-cards/:id/diagnosis", jobDiagnosisRoutes);
 router.use("/job-cards/:id/warranty", jobWarrantyRoutes);
 router.use("/job-cards/:id/estimate", jobEstimateRoutes);
 router.use("/job-cards/:id/repair", jobRepairRoutes);
+router.use("/job-cards/:id/quality-check", jobQualityCheckRoutes);
 router.use("/my-jobs", myJobsRoutes);
 router.get(
   "/staff",
@@ -664,43 +665,13 @@ router.delete(
  *   get:
  *     tags:
  *       - Inspections & Estimates
- *     summary: List all inspections
+ *     summary: List quality checks (inspections)
+ *     description: Requires inspection:read. Query result=PASSED or FAILED, search (notes, job number, customer), page, limit. Branch-scoped.
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Inspection list
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/StandardResponse'
- *
- * /service/job-cards/{id}/inspections:
- *   post:
- *     tags:
- *       - Inspections & Estimates
- *     summary: Add inspection to job card
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *         description: Job card ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [findings]
- *             properties:
- *               findings: { type: string }
- *               checklist: { type: object, additionalProperties: true }
- *     responses:
- *       201:
- *         description: Inspection created
  *         content:
  *           application/json:
  *             schema:
@@ -1050,12 +1021,6 @@ router.get(
   "/inspections",
   requirePermission(PERMISSIONS.INSPECTION_READ),
   controller.listInspections,
-);
-router.post(
-  "/job-cards/:id/inspections",
-  requirePermission(PERMISSIONS.INSPECTION_CREATE),
-  validateRequest(createInspectionSchema),
-  controller.addInspection,
 );
 router.get(
   "/estimates",

@@ -171,7 +171,6 @@ suite("service document actions on disposable localhost", () => {
         status,
         workDone: job.workDone,
         mileage: job.mileage,
-        qcStatus: job.qcStatus,
       });
       expect((await service.getRemarks("job", job.id, actor)).remarks).toBe(
         "Amended job remarks",

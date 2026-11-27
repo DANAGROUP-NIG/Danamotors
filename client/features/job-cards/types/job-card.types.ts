@@ -10,12 +10,13 @@ import type {
 } from "@/features/warranty/types/warranty.types";
 export type { JobCardStatus } from "./job-card-status";
 
+/** A quality check on the job (phase 7). The current one (supersededAt null) is the job's QC result. */
 export type Inspection = {
   id: string;
-  findings: string;
-  passed: boolean;
-  status: string;
-  notes?: string;
+  result: "PASSED" | "FAILED";
+  notes: string | null;
+  createdAt: string;
+  supersededAt: string | null;
 };
 
 export type Estimate = {
@@ -262,8 +263,6 @@ export type JobCard = {
   stage?: JobStage;
   estimatedHours: number;
   progress: number;
-  qcStatus: string;
-  qcNotes?: string;
   branchId: string;
   engineerId?: string;
   technicianId?: string;

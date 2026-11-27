@@ -61,7 +61,8 @@ const card = {
   customerId: "customer",
   branchId: "branch",
   status: "DELIVERED",
-  qcStatus: "PASSED",
+  // The current inspection (phase 7): a passed quality check.
+  inspections: [{ result: "PASSED" }],
   creditApprovedById: "admin",
   gatePassNumber: "GP-1",
   deliveredAt: new Date("2026-01-01"),
@@ -151,8 +152,8 @@ describe("Job billing after delivery on credit", () => {
           AND: [
             {
               OR: [
-                { qcStatus: { equals: "PASSED", mode: "insensitive" } },
-                { qcStatus: "NOT_REQUIRED", estimationCharge: { status: "ADDED" } },
+                { inspections: { some: { supersededAt: null, result: "PASSED" } } },
+                { inspections: { none: { supersededAt: null } }, estimationCharge: { status: "ADDED" } },
               ],
             },
           ],
@@ -198,7 +199,7 @@ describe("Job billing after delivery on credit", () => {
       (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
         ...card,
         status: "READY",
-        qcStatus,
+        inspections: qcStatus === "FAILED" ? [{ result: "FAILED" }] : [],
       });
       const service = new JobBillingService();
       await expect(service.previewJobBill(input)).rejects.toThrow(
@@ -222,7 +223,7 @@ describe("Job billing after delivery on credit", () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue(first);
     (prisma.jobCard.findMany as jest.Mock).mockResolvedValue([
       first,
-      { ...first, id: "job2", qcStatus: "FAILED" },
+      { ...first, id: "job2", inspections: [{ result: "FAILED" }] },
     ]);
     await expect(
       new JobBillingService().createJobBill({
@@ -241,7 +242,7 @@ describe("Job billing after delivery on credit", () => {
     expect((await service.previewJobBill(input)).review.canBill).toBe(true);
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({
       ...first,
-      qcStatus: "PENDING",
+      inspections: [],
     });
     await expect(service.createJobBill(input)).rejects.toThrow(
       "passed quality check",

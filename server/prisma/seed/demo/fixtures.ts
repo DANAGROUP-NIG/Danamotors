@@ -162,6 +162,11 @@ export const VEHICLES = {
   stgRepairWork: { vin: "KNAPX81DMS7000524", registrationNumber: "KJA-534ST", customer: "okafor", model: "SPORTAGE", saleDaysAgo: 90 },
   stgRepairFinding: { vin: "KNAPM81DMK7000525", registrationNumber: "LSR-535ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2200 },
   stgRepairSupp: { vin: "KNAPM81DMK7000526", registrationNumber: "LSR-536ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2200 },
+  // Quality check (phase 7): all work done and waiting for the check; failed and returned to the
+  // technician; repaired after a failed check and back for a second check.
+  stgQcReady: { vin: "KNAPM81DMK7000527", registrationNumber: "LSR-537ST", customer: "okafor", model: "SORENTO", saleDaysAgo: 2300 },
+  stgQcReturned: { vin: "KNAPM81DMK7000528", registrationNumber: "LSR-538ST", customer: "lakeside", model: "SORENTO", saleDaysAgo: 2250 },
+  stgQcSecond: { vin: "KNAPM81DMK7000529", registrationNumber: "LSR-539ST", customer: "adeyemi", model: "SORENTO", saleDaysAgo: 2400 },
 } satisfies Record<string, VehicleFixture>;
 
 export type VehicleKey = keyof typeof VEHICLES;
@@ -324,6 +329,13 @@ export interface RepairFixture {
   supplementary?: "prepared" | "presented";
 }
 
+/** Quality check (phase 7): the supervisor fails the check first, returning these lines to the technician. */
+export interface QualityCheckFixture {
+  fail: { note: string; lines: (LabourKey | "serviceType")[] };
+  /** The technician redoes the failed work and sends the job for a second check. */
+  redone: boolean;
+}
+
 export interface DiagnosisFixture {
   /** confirmed: the engineer confirms these findings and routing moves the job on (to the warranty check). */
   stop: "findings" | "review" | "returned" | "confirmed";
@@ -367,6 +379,8 @@ export interface JobFixture {
   estimateStep?: "prepared" | "presented" | "approved";
   /** Repair (phase 6): how far the technician got with the work list, and a finding raised during repair. */
   repair?: RepairFixture;
+  /** Quality check (phase 7): a failed check before the job stops. */
+  qualityCheck?: QualityCheckFixture;
   /** An earlier odometer reading for a vehicle with no visits yet, so check-in shows "Last recorded". */
   priorMileage?: number;
   /** The answer recorded for linked campaigns (FPC) before READY; without it a FREE line must pre-set it. */
@@ -659,7 +673,7 @@ const serviceEstimate = (decided: boolean): EstimateFixture => ({
 const stageJob = (
   id: string,
   vehicle: VehicleKey,
-  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair"> & {
+  fields: Pick<JobFixture, "description" | "complaints" | "mileage" | "withTechnician" | "target" | "checkIn" | "priorMileage" | "diagnosis" | "estimateStep" | "repair" | "qualityCheck"> & {
     /** Repair jobs priced from their diagnosis record labour through the work list, not as legacy lines. */
     labour?: [LabourKey, number][];
     issues?: [PartKey, number][];
@@ -686,6 +700,7 @@ const stageJob = (
   diagnosis: fields.diagnosis,
   estimateStep: fields.estimateStep,
   repair: fields.repair,
+  qualityCheck: fields.qualityCheck,
   priorMileage: fields.priorMileage,
   startDaysAgo: 0,
   spanHours: 0,
@@ -910,6 +925,47 @@ export const STAGE_JOBS: JobFixture[] = [
       findings: [{ request: 0, text: "Front pads worn to 2 mm.", labour: ["brakePads"], parts: [["brakePads", 1]] }],
     },
     repair: { started: ["brakePads"], finding: { text: "Rear wiper blade torn.", parts: [["wiperBlade", 1]], labour: ["wiper"] }, supplementary: "presented" },
+  }),
+  // Quality check (phase 7): every work line done and sent for the check; the supervisor checks it.
+  stageJob("JC-S26", "stgQcReady", {
+    description: "50,000 km periodic service. Noise from the front left wheel when braking.",
+    complaints: ["Periodic service (50,000 km)", "Noise from front left wheel when braking"],
+    mileage: 48_262, withTechnician: true, target: "IN_PROGRESS", stop: "QUALITY_CHECK", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+        { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+      ],
+    },
+  }),
+  // The supervisor failed the check on the brake pads: the job is back with the technician.
+  stageJob("JC-S27", "stgQcReturned", {
+    description: "Periodic service. Brakes noisy at low speed.",
+    complaints: ["Periodic service (50,000 km)", "Brakes noisy at low speed"],
+    mileage: 51_840, withTechnician: true, target: "IN_PROGRESS", stop: "QUALITY_CHECK", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+        { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+      ],
+    },
+    qualityCheck: { fail: { note: "Brake still noisy at low speed. Recheck front left caliper slider.", lines: ["brakePads"] }, redone: false },
+  }),
+  // Failed once, repaired, and back for a second check: the history shows the failed check.
+  stageJob("JC-S28", "stgQcSecond", {
+    description: "Periodic service. Squeal from the front brakes.",
+    complaints: ["Periodic service (50,000 km)", "Squeal from the front brakes"],
+    mileage: 49_115, withTechnician: true, target: "IN_PROGRESS", stop: "QUALITY_CHECK", estimate: "none", estimateStep: "approved", labour: [], issues: [["brakePads", 1], ["engineOil", 1]],
+    diagnosis: {
+      stop: "confirmed",
+      findings: [
+        { request: 0, text: "Due for the 50,000 km service.", labour: [], parts: [["engineOil", 1]] },
+        { request: 1, text: "Front pads worn to 2 mm. Caliper slider dry.", labour: ["brakePads"], parts: [["brakePads", 1]] },
+      ],
+    },
+    qualityCheck: { fail: { note: "Pads squeal under light braking. Clean and grease the caliper sliders.", lines: ["brakePads"] }, redone: true },
   }),
   stageJob("JC-S12", "stgSigned", {
     description: "Clicking noise when turning the steering fully.",

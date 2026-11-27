@@ -1,7 +1,7 @@
 import { drainJobcardNotifications } from "../notification/jobcard-notification-router";
 import { JOB_TRANSITION_ROLES, assertTransitionRole } from "./job-transitions";
 import { assertAdvanceOrExempt } from "./job-deposit.service";
-import { QC_NOT_REQUIRED } from "../finance/job-billing.logic";
+import { loadQcState, supersedeCurrentInspection } from "./job-qc-state";
 import { assertSignedJobOpening } from "./job-opening-signature.service";
 import { syncStage, type StageContext } from "./job-stage.writer";
 import {
@@ -741,8 +741,9 @@ export class JobCardWorkflowService {
             throw new BadRequestError(
               "Only a job whose customer declined all work, with the estimation charge added, can go to billing without repair",
             );
-          update.qcStatus = QC_NOT_REQUIRED;
         }
+        // Read only when a move needs it: marking ready, or returning a failed check to repair.
+        const qcState = () => loadQcState(tx, id);
         if (
           !declinedToBilling &&
           data.status &&
@@ -758,7 +759,7 @@ export class JobCardWorkflowService {
         if (
           !declinedToBilling &&
           data.status === "READY" &&
-          current.qcStatus?.toUpperCase() !== "PASSED"
+          (await qcState()) !== "PASSED"
         )
           throw new BadRequestError(
             "Record a passed quality check before marking the job Ready",
@@ -782,7 +783,7 @@ export class JobCardWorkflowService {
           if (
             from === "QC" &&
             data.status === "IN_PROGRESS" &&
-            current.qcStatus?.toUpperCase() !== "FAILED"
+            (await qcState()) !== "FAILED"
           )
             throw new BadRequestError(
               "QC must fail before returning the job for rework",
@@ -844,9 +845,8 @@ export class JobCardWorkflowService {
             await completeCampaignVehiclesForJobCard(tx, id);
           }
 
-          if (from === "QC" && data.status === "IN_PROGRESS") {
-            update.qcStatus = "PENDING";
-          }
+          // The failed check stays in the history; the next check starts fresh.
+          if (from === "QC" && data.status === "IN_PROGRESS") await supersedeCurrentInspection(tx, id, now);
           update.status = data.status;
 
           await tx.jobCardStatusHistory.create({

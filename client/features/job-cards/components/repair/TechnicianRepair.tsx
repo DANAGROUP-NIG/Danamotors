@@ -253,6 +253,7 @@ function WorkLineRow({
             <StatusBadge status={done && line.doneAt ? `Done ${formatTime(line.doneAt)}` : badge.label} tone={badge.tone} className="text-xs normal-case" />
             {PAYER_TAG[line.payer] && <StatusBadge status={PAYER_TAG[line.payer]!} tone="purple" className="text-xs normal-case" />}
             {line.supplementary && <StatusBadge status="Added during repair" tone="gray" className="text-xs normal-case" />}
+            {line.returnedFromQc && <StatusBadge status="Returned from quality check" tone="red" className="text-xs normal-case" />}
           </div>
           {(line.status === "IN_PROGRESS" || line.secondsWorked > 0) && !done && (
             <p className="text-xs text-muted-foreground">Time worked: {timeWorkedText(line.secondsWorked)}</p>

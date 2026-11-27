@@ -14,14 +14,10 @@ import { DiagnosisStep } from "../diagnosis/DiagnosisStep";
 import { WarrantyStep } from "../warranty/WarrantyStep";
 import { EstimateStep } from "../estimate/EstimateStep";
 import { RepairStep } from "../repair/RepairStep";
+import { QualityCheckStep } from "../quality-check/QualityCheckStep";
 import { InvoicesTable } from "./InvoicesTable";
 import { StageCard } from "./StageCard";
-import {
-  CreditApprovalSection,
-  DeliverySection,
-  QualityCheckSection,
-  WorkDoneSection,
-} from "./WorkshopSections";
+import { CreditApprovalSection, DeliverySection } from "./WorkshopSections";
 
 const ACTIVE_INVOICE = (status: string) => !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
 
@@ -64,13 +60,8 @@ export function StageContent({
       // PDI jobs keep their own screens; everything else uses the staged repair (phase 6).
       return workspace.jobType === "PDI" ? null : <RepairStep job={job} workspace={workspace} bar={bar} onOpenTab={onOpenTab} />;
     case "QUALITY_CHECK":
-      // TODO(phase 7): replaced by the quality check screen with road test and certification.
-      return (
-        <>
-          <QualityCheckSection job={job} />
-          <WorkDoneSection job={job} />
-        </>
-      );
+      // PDI jobs keep their own screens; everything else uses the staged quality check (phase 7).
+      return workspace.jobType === "PDI" ? null : <QualityCheckStep job={job} workspace={workspace} bar={bar} />;
     case "BILLING":
       // TODO(phase 8): replaced by mark ready, storage, estimated against actual, invoice and payment.
       return (

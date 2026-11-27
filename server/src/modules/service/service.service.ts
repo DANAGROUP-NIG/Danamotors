@@ -52,7 +52,7 @@ import {
 import { JobCardWorkflowService } from "./job-card-workflow.service";
 import prisma from "../../prisma/client";
 import { setNotificationActor } from "../notification/jobcard-notification-router";
-import { ServiceRepository } from "./service.repository";
+import { ServiceRepository, inspectionListWhere, type InspectionListFilter } from "./service.repository";
 import {
   NotFoundError,
   ConflictError,
@@ -67,6 +67,7 @@ import {
   findOpenCampaigns,
   loadVehicleForWarranty,
 } from "../warranty/warranty.coverage";
+import { supersedeCurrentInspection } from "./job-qc-state";
 
 /**
  * Valid status transitions for a ServiceAppointment.
@@ -501,7 +502,7 @@ export class ServiceService {
           type: "APPOINTMENT_CHECKED_IN",
           title:
             checkInCampaigns.length > 0
-              ? "Checked in — open campaign"
+              ? "Checked in, open campaign"
               : "Appointment checked in",
           message:
             `${customerName} has checked in at ${branchName}.` +
@@ -896,31 +897,6 @@ export class ServiceService {
     return new JobCardWorkflowService().update(id, data, actorId);
   }
 
-  async addInspection(
-    jobCardId: string,
-    data: {
-      inspectorId?: string;
-      findings: string;
-      passed?: boolean;
-      status?: string;
-      notes?: string;
-    },
-  ) {
-    const card = await this.serviceRepository.findJobCardById(jobCardId);
-    if (!card) {
-      throw new NotFoundError("Job card not found");
-    }
-
-    return this.serviceRepository.addInspection({
-      jobCardId,
-      inspectorId: data.inspectorId,
-      findings: data.findings,
-      passed: data.passed,
-      status: data.status,
-      notes: data.notes,
-    });
-  }
-
   /**
    * Creates the next estimate revision, or (draft: true) saves the undecided draft revision in place.
    * Prices come from the catalogue: parts at retail rate, labour at the vehicle model's rate, the
@@ -1183,10 +1159,10 @@ export class ServiceService {
         }
         // A new scope needs a fresh QC result and fresh credit authorization.
         const reopening = canonicalJobStatus(card.status) === "READY";
+        await supersedeCurrentInspection(tx, jobCardId);
         await tx.jobCard.update({
           where: { id: jobCardId },
           data: {
-            qcStatus: "PENDING",
             creditApprovedById: null,
             ...(reopening
               ? {
@@ -1526,56 +1502,15 @@ export class ServiceService {
     return this.serviceRepository.getApprovals(estimateId);
   }
 
-  async listInspections(params?: {
-    page?: number;
-    limit?: number;
-    branchId?: string;
-    status?: string;
-    search?: string;
-  }) {
+  async listInspections(params?: InspectionListFilter & { page?: number; limit?: number }) {
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 10;
     const skip = (page - 1) * limit;
-
-    const where: Record<string, unknown> = {};
-    if (params?.branchId) where.jobCard = { branchId: params.branchId };
-    if (params?.status) where.status = params.status;
-
-    if (params?.search) {
-      where.OR = [
-        { findings: { contains: params.search, mode: "insensitive" } },
-        { notes: { contains: params.search, mode: "insensitive" } },
-        {
-          jobCard: {
-            jobNumber: { contains: params.search, mode: "insensitive" },
-          },
-        },
-        {
-          jobCard: {
-            customer: {
-              firstName: { contains: params.search, mode: "insensitive" },
-            },
-          },
-        },
-        {
-          jobCard: {
-            customer: {
-              lastName: { contains: params.search, mode: "insensitive" },
-            },
-          },
-        },
-      ];
-    }
+    const filter = { branchId: params?.branchId, result: params?.result, search: params?.search };
 
     const [inspections, total] = await Promise.all([
-      this.serviceRepository.listInspections({
-        skip,
-        take: limit,
-        branchId: params?.branchId,
-        status: params?.status,
-        search: params?.search,
-      }),
-      prisma.inspection.count({ where }),
+      this.serviceRepository.listInspections({ ...filter, skip, take: limit }),
+      prisma.inspection.count({ where: inspectionListWhere(filter) }),
     ]);
 
     return {

@@ -44,7 +44,6 @@ it.each(["OPEN", "WAITING_PARTS", "QC"])(
       status,
       customerId: "customer",
       invoices: [],
-      qcStatus: "FAILED",
     });
     await expect(
       new JobCardWorkflowService().update(
@@ -64,7 +63,7 @@ it("also blocks automatic reopening from parts, returns or labour edits without 
   (prisma.receipt.findFirst as jest.Mock).mockResolvedValue({ id: "receipt" });
   await expect(
     jobWorkUpdate(prisma, { id: "job", status: "READY" }, "actor"),
-  ).resolves.toMatchObject({ status: "IN_PROGRESS", qcStatus: "PENDING" });
+  ).resolves.toMatchObject({ status: "IN_PROGRESS" });
 });
 
 it("does not accept a payment or estimate approval as a substitute for a new-job opening signature", async () => {

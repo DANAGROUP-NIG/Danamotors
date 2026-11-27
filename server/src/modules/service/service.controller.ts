@@ -495,36 +495,6 @@ export class ServiceController {
     }
   };
 
-  addInspection = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      if (
-        req.user?.role === ROLES.CCU_OFFICER ||
-        req.user?.role === ROLES.CCU_MANAGER
-      ) {
-        throw new ForbiddenError("Only workshop roles can add inspections");
-      }
-      const { id } = req.params;
-      const card = await prisma.jobCard.findUnique({
-        where: { id },
-        select: { branchId: true },
-      });
-      assertBranchOwnership(req, card?.branchId);
-      const result = await this.serviceService.addInspection(id, req.body);
-      res.status(201).json({
-        status: "success",
-        statusCode: 201,
-        message: "Inspection added successfully",
-        data: { inspection: result },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
   addEstimate = async (
     req: Request,
     res: Response,
@@ -641,7 +611,7 @@ export class ServiceController {
       const page = zCoerceNumber(req.query.page, 1);
       const limit = zCoerceNumber(req.query.limit, 10);
       const search = req.query.search as string | undefined;
-      const status = req.query.status as string | undefined;
+      const result = req.query.result as string | undefined;
       let branchId = req.query.branchId as string | undefined;
 
       if (req.user && !canAccessAllBranches(req.user)) {
@@ -650,16 +620,8 @@ export class ServiceController {
         branchId = req.user.branchId;
       }
 
-      const result = await this.serviceService.listInspections({
-        page,
-        limit,
-        branchId,
-        search,
-        status,
-      });
-      res
-        .status(200)
-        .json({ status: "success", statusCode: 200, data: result });
+      const data = await this.serviceService.listInspections({ page, limit, branchId, search, result });
+      res.status(200).json({ status: "success", statusCode: 200, data });
     } catch (error) {
       next(error);
     }

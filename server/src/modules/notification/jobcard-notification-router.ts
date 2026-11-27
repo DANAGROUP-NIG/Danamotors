@@ -15,13 +15,32 @@ const jobSnapshot = z.object({
   technicianId: z.string().nullable(), qualityInspectorId: z.string().nullable(),
   serviceAdvisorId: z.string().nullable(), deliveryAdvisorId: z.string().nullable(),
   createdById: z.string().nullable(), customerId: z.string().nullable(),
-  qcStatus: z.string().nullable(), qcNotes: z.string().nullable(), promisedAt: z.string().nullable().transform((value, context) => {
+  stage: z.string().nullable().optional(), promisedAt: z.string().nullable().transform((value, context) => {
     if (value === null) return null;
     const date = notificationInstant(value);
     if (!Number.isFinite(date.getTime())) { context.addIssue({ code: 'custom', message: 'Invalid promised date in notification snapshot' }); return z.NEVER; }
     return date.toISOString();
   }),
 });
+
+const QC_REVIEW_EVENTS = ['QC_PASSED', 'QC_FAILED'] as const;
+
+/**
+ * A recorded quality check (phase 7) queues the existing QC review notice with the inspection, in the
+ * same transaction: QC_FAILED to the technician assigned now (plus advisor and supervisors), QC_PASSED
+ * to the technician. One event per inspection, so a retry never sends it twice.
+ */
+export async function queueQcReviewNotification(
+  tx: Prisma.TransactionClient,
+  card: Pick<NotificationJob, 'id' | 'branchId' | 'jobNumber' | 'status' | 'technicianId' | 'qualityInspectorId' | 'serviceAdvisorId' | 'deliveryAdvisorId' | 'createdById' | 'customerId' | 'promisedAt' | 'stage'>,
+  event: typeof QC_REVIEW_EVENTS[number],
+  inspectionId: string,
+  actorId: string,
+) {
+  const id = `qc:${card.id}:${inspectionId}`;
+  const after = { ...card, notificationEvent: event } satisfies Prisma.InputJsonObject;
+  await tx.jobcardNotificationEvent.upsert({ where: { id }, create: { id, jobCardId: card.id, actorId, after }, update: {} });
+}
 
 function warning(message: string) {
   process.emitWarning(message, { code: 'JOBCARD_NOTIFICATION_WARNING' });
@@ -98,7 +117,7 @@ async function deliver(tx: Prisma.TransactionClient, row: JobcardNotificationEve
     targets = routeJobNotification(event, before, card);
   }
   const stale = canonicalNotificationStatus(live.status) !== canonicalNotificationStatus(card.status)
-    || live.technicianId !== card.technicianId || live.qcStatus?.toUpperCase() !== card.qcStatus?.toUpperCase()
+    || live.technicianId !== card.technicianId
     || live.qualityInspectorId !== card.qualityInspectorId || live.serviceAdvisorId !== card.serviceAdvisorId
     || live.deliveryAdvisorId !== card.deliveryAdvisorId;
   if (live.branchId !== card.branchId || (stale && !isQcReview)) {
@@ -186,7 +205,8 @@ export async function processJobcardNotification(row: JobcardNotificationEvent, 
             return;
           }
         }
-        const events = timerEvent ? [timerEvent] : notificationEvents(before, card);
+        const qcReview = QC_REVIEW_EVENTS.find(event => event === metadata.notificationEvent);
+        const events = timerEvent ? [timerEvent] : qcReview ? [qcReview] : notificationEvents(before, card);
         for (const event of events) await deliver(tx, current, event, before, card, now);
         await tx.jobcardNotificationEvent.update({ where: { id: row.id }, data: { processedAt: new Date() } });
       }, { maxWait: 5000, timeout: 15000 });

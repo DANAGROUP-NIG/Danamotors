@@ -10,6 +10,7 @@ import { EmptyState, SimpleTable } from "@/features/customer-portal/components/p
 import { StatusBadge } from "@/features/customer-portal/components/StatusBadge";
 import { EstimateApprovalActions } from "@/features/customer-portal/components/EstimateApprovalActions";
 import { usePortalJobCard } from "@/features/customer-portal/hooks/use-portal";
+import { QC_RESULT_BADGE, QC_STATE_LABEL } from "@/features/job-cards/lib/quality-check.logic";
 import { formatCurrency, formatDate, formatDateTime } from "@/features/customer-portal/lib/format";
 
 export default function PortalServiceHistoryDetailPage() {
@@ -29,7 +30,7 @@ export default function PortalServiceHistoryDetailPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader
           title={job.jobNumber}
-          description={`${job.vehicle ? `${job.vehicle.make ?? ""} ${job.vehicle.model ?? ""}`.trim() : "Vehicle"} · ${job.branch?.name ?? ""}`}
+          description={`${job.vehicle ? `${job.vehicle.make ?? ""} ${job.vehicle.model ?? ""}`.trim() : "Vehicle"}${job.branch?.name ? `, ${job.branch.name}` : ""}`}
         />
         <Button variant="outline" size="sm" asChild>
           <Link href="/portal/service-history">Back to service history</Link>
@@ -51,23 +52,23 @@ export default function PortalServiceHistoryDetailPage() {
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Progress</dt>
-                <dd className="font-medium">{job.progress != null ? `${job.progress}%` : "—"}</dd>
+                <dd className="font-medium">{job.progress != null ? `${job.progress}%` : "Not recorded"}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Quality check</dt>
-                <dd className="font-medium">{job.qcStatus ?? "—"}</dd>
+                <dd className="font-medium">{QC_STATE_LABEL[job.qualityCheck]}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Technician</dt>
                 <dd className="font-medium">
                   {job.technician
                     ? `${job.technician.firstName} ${job.technician.lastName}`
-                    : "—"}
+                    : "Not recorded"}
                 </dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Branch</dt>
-                <dd className="font-medium">{job.branch?.name ?? "—"}</dd>
+                <dd className="font-medium">{job.branch?.name ?? "Not recorded"}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-muted-foreground">Opened</dt>
@@ -143,22 +144,21 @@ export default function PortalServiceHistoryDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Inspections</CardTitle>
+            <CardTitle>Quality checks</CardTitle>
           </CardHeader>
           <CardContent>
             {job.inspections.length > 0 ? (
               <SimpleTable
-                headers={["Findings", "Status", "Passed"]}
+                headers={["Checked", "Result"]}
                 rows={job.inspections.map((inspection) => [
-                  <span key={inspection.id} className="max-w-[240px]">
-                    {inspection.findings}
+                  <span key={inspection.id} className="tabular-nums">
+                    {formatDateTime(inspection.createdAt)}
                   </span>,
-                  <StatusBadge key={`s-${inspection.id}`} status={inspection.status} />,
-                  inspection.passed == null ? "—" : inspection.passed ? "Yes" : "No",
+                  <StatusBadge key={`s-${inspection.id}`} status={QC_RESULT_BADGE[inspection.result].label} />,
                 ])}
               />
             ) : (
-              <EmptyState message="No inspections recorded" />
+              <EmptyState message="No quality checks recorded yet" />
             )}
           </CardContent>
         </Card>

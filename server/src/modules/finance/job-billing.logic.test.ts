@@ -1,6 +1,6 @@
 import { assertJobBillingReady } from "./job-billing.logic";
 
-const ready = { status: "READY", qcStatus: "PASSED", creditApprovedById: null };
+const ready = { status: "READY", qcState: "PASSED" as const, creditApprovedById: null };
 it.each(["OPEN", "IN_PROGRESS", "WAITING_PARTS", "QC", "BILLED", "CANCELLED"])(
   "rejects unfinished or closed status %s even with a passed QC",
   (status) => {
@@ -13,10 +13,10 @@ it.each(["READY", "Ready", "Completed"])(
   "accepts existing ready alias %s only with a passed QC",
   (status) => {
     expect(() =>
-      assertJobBillingReady({ ...ready, status, qcStatus: "Passed" }),
+      assertJobBillingReady({ ...ready, status, qcState: "PASSED" }),
     ).not.toThrow();
     expect(() =>
-      assertJobBillingReady({ ...ready, status, qcStatus: null }),
+      assertJobBillingReady({ ...ready, status, qcState: "PENDING" }),
     ).toThrow("passed quality check");
   },
 );
@@ -38,7 +38,7 @@ it.each(["DELIVERED", "Closed"])(
         ...ready,
         status,
         creditApprovedById: "approval",
-        qcStatus: "FAILED",
+        qcState: "FAILED",
       }),
     ).toThrow("passed quality check");
   },

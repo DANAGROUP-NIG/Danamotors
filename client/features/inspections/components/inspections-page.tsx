@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ClipboardCheck,
   Download,
   FileSpreadsheet,
-  Link2,
   Mail,
   MessageCircle,
   SearchX,
@@ -23,7 +23,6 @@ import { DataTableBulkToolbar } from "@/components/ui/table-components/DataTable
 import { PageHeader } from "@/components/headers/page-header";
 import { useDataTableSelection } from "@/hooks/use-data-table-selection";
 import {
-  copyToClipboard,
   downloadCsv,
   downloadExcel,
   openMailto,
@@ -31,49 +30,47 @@ import {
   shareItems,
 } from "@/lib/table-actions";
 import { useBranchStore } from "@/store/branch.store";
+import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
+import { formatDate, formatDateTime, NOT_PROVIDED } from "@/lib/format";
+import { QC_RESULT_BADGE } from "@/features/job-cards/lib/quality-check.logic";
 import { useInspections } from "../hooks/use-inspections";
 import type { Inspection } from "../types/inspection.types";
 
 const PAGE_SIZE = 10;
 
-const STATUS_FILTERS = ["", "Pending", "Passed", "Failed", "Completed"] as const;
-const STATUS_LABELS: Record<string, string> = {
-  "": "All",
-  Pending: "Pending",
-  Passed: "Passed",
-  Failed: "Failed",
-  Completed: "Completed",
-};
-const STATUS_FILTER_OPTIONS = STATUS_FILTERS.map((s) => ({ label: STATUS_LABELS[s], value: s }));
+const RESULT_FILTER_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Passed", value: "PASSED" },
+  { label: "Failed", value: "FAILED" },
+];
 
-const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-amber-50 text-amber-700",
-  Passed: "bg-emerald-50 text-emerald-700",
-  Failed: "bg-red-50 text-red-600",
-  Completed: "bg-blue-50 text-blue-700",
-};
+const person = (value: Inspection["inspector"]) => (value ? `${value.firstName} ${value.lastName}`.trim() : NOT_PROVIDED);
 
 function formatVehicle(inspection: Inspection): string {
   const { vehicle } = inspection.jobCard;
-  return [vehicle.make, vehicle.model].filter(Boolean).join(" ") || vehicle.vin;
+  const name = [vehicle.make, vehicle.model].filter(Boolean).join(" ") || vehicle.vin;
+  return vehicle.registrationNumber ? `${vehicle.registrationNumber}, ${name}` : name;
 }
 
 function formatInspectionText(i: Inspection) {
-  const vehicle = formatVehicle(i);
-  const registration = i.jobCard.vehicle.registrationNumber
-    ? ` · ${i.jobCard.vehicle.registrationNumber}`
-    : "";
-  return `*Inspection Report – ${new Date(i.createdAt).toLocaleDateString()}*\nJob: ${i.jobCard.jobNumber}\nVehicle: ${vehicle}${registration}\nBranch: ${i.jobCard.branch.name}\nOutcome: ${i.status}\nFindings: ${i.findings}`;
+  return [
+    `Quality check, ${formatDateTime(i.createdAt)}`,
+    `Job: ${i.jobCard.jobNumber}`,
+    `Vehicle: ${formatVehicle(i)}`,
+    `Branch: ${i.jobCard.branch.name}`,
+    `Result: ${QC_RESULT_BADGE[i.result].label}`,
+    `Checked by: ${person(i.inspector)}`,
+    `Notes: ${i.notes ?? NOT_PROVIDED}`,
+  ].join("\n");
 }
 
 function exportRows(inspections: Inspection[]) {
   return inspections.map((i) => ({
-    reportDate: new Date(i.createdAt).toLocaleDateString(),
+    checkedAt: formatDateTime(i.createdAt),
     jobNumber: i.jobCard.jobNumber,
     vehicle: formatVehicle(i),
-    registrationNumber: i.jobCard.vehicle.registrationNumber ?? "",
-    findings: i.findings,
-    outcome: i.status,
+    result: QC_RESULT_BADGE[i.result].label,
+    inspector: person(i.inspector),
     notes: i.notes ?? "",
     branch: i.jobCard.branch.name,
   }));
@@ -81,19 +78,18 @@ function exportRows(inspections: Inspection[]) {
 
 function exportColumns() {
   return [
-    { key: "reportDate", label: "Report Date" },
-    { key: "jobNumber", label: "Job #" },
+    { key: "checkedAt", label: "Checked" },
+    { key: "jobNumber", label: "Job number" },
     { key: "vehicle", label: "Vehicle" },
-    { key: "registrationNumber", label: "Registration" },
-    { key: "findings", label: "Findings" },
-    { key: "outcome", label: "Outcome" },
+    { key: "result", label: "Result" },
+    { key: "inspector", label: "Checked by" },
     { key: "notes", label: "Notes" },
     { key: "branch", label: "Branch" },
   ];
 }
 
 function exportFilename() {
-  return `inspections-${new Date().toISOString().split("T")[0]}`;
+  return `quality-checks-${formatDate(new Date().toISOString()).replace(/\s/g, "-")}`;
 }
 
 function ExportInspectionsButton({ branchId }: { branchId?: string }) {
@@ -134,7 +130,7 @@ function ExportInspectionsButton({ branchId }: { branchId?: string }) {
 
 export function InspectionsPage() {
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [resultFilter, setResultFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -142,7 +138,7 @@ export function InspectionsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, debouncedSearch, activeBranch?.id]);
+  }, [resultFilter, debouncedSearch, activeBranch?.id]);
 
   function commitSearch() {
     setDebouncedSearch(search);
@@ -157,7 +153,7 @@ export function InspectionsPage() {
   const { data, isLoading, isError, isFetching } = useInspections({
     page,
     limit: PAGE_SIZE,
-    status: statusFilter || undefined,
+    result: resultFilter || undefined,
     search: debouncedSearch || undefined,
     branchId: activeBranch?.id,
   });
@@ -182,7 +178,7 @@ export function InspectionsPage() {
   function shareSelected(items: Inspection[]) {
     const text = items.map(formatInspectionText).join("\n\n---\n\n");
     shareItems({
-      title: `${items.length} Dana Motors Inspection${items.length === 1 ? "" : "s"}`,
+      title: `${items.length} Dana Motors quality check${items.length === 1 ? "" : "s"}`,
       text,
     });
   }
@@ -190,7 +186,7 @@ export function InspectionsPage() {
   function emailSelected(items: Inspection[]) {
     const body = items.map(formatInspectionText).join("\n\n---\n\n");
     openMailto({
-      subject: `${items.length} Inspection${items.length === 1 ? "" : "s"} from Dana Motors`,
+      subject: `${items.length} quality check${items.length === 1 ? "" : "s"} from Dana Motors`,
       body,
     });
   }
@@ -202,38 +198,39 @@ export function InspectionsPage() {
 
   const columns: Column<Inspection>[] = [
     {
-      header: "Report",
+      header: "Checked",
       render: (i) => (
         <div className="flex items-center gap-2">
-          <ClipboardCheck className="size-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{new Date(i.createdAt).toLocaleDateString()}</span>
+          <ClipboardCheck className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">{formatDateTime(i.createdAt)}</span>
         </div>
       ),
     },
     {
-      header: "Job #",
-      render: (i) => <span className="font-mono text-sm font-medium">{i.jobCard.jobNumber}</span>,
+      header: "Job number",
+      render: (i) => (
+        <Link href={`/job-cards/${i.jobCard.id}`} className="font-mono text-sm font-medium text-primary underline-offset-2 hover:underline">
+          {i.jobCard.jobNumber}
+        </Link>
+      ),
     },
     {
       header: "Vehicle",
-      render: (i) => (
-        <span className="text-muted-foreground">
-          {formatVehicle(i)}
-          {i.jobCard.vehicle.registrationNumber ? ` · ${i.jobCard.vehicle.registrationNumber}` : ""}
-        </span>
-      ),
+      render: (i) => <span className="text-muted-foreground">{formatVehicle(i)}</span>,
     },
     {
-      header: "Findings",
-      render: (i) => (
-        <span className="line-clamp-1 max-w-[260px] text-muted-foreground">{i.findings}</span>
-      ),
+      header: "Result",
+      render: (i) => <StatusBadge status={QC_RESULT_BADGE[i.result].label} tone={QC_RESULT_BADGE[i.result].tone} className="text-xs normal-case" />,
     },
     {
-      header: "Outcome",
+      header: "Checked by",
+      render: (i) => <span className="text-sm">{person(i.inspector)}</span>,
+    },
+    {
+      header: "Notes",
       render: (i) => (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-sm font-medium capitalize ${STATUS_COLORS[i.status] || ""}`}>
-          {i.status}
+        <span className="line-clamp-1 max-w-[260px] text-muted-foreground" title={i.notes ?? undefined}>
+          {i.notes ?? NOT_PROVIDED}
         </span>
       ),
     },
@@ -255,37 +252,19 @@ export function InspectionsPage() {
               id: "share",
               label: "Share",
               icon: <Share2 className="size-4" />,
-              onClick: () =>
-                shareItems({
-                  title: `Inspection ${i.jobCard.jobNumber}`,
-                  text: formatInspectionText(i),
-                }),
+              onClick: () => shareItems({ title: `Quality check ${i.jobCard.jobNumber}`, text: formatInspectionText(i) }),
             },
             {
               id: "email",
               label: "Email",
               icon: <Mail className="size-4" />,
-              onClick: () =>
-                openMailto({
-                  subject: `Inspection ${i.jobCard.jobNumber}`,
-                  body: formatInspectionText(i),
-                }),
+              onClick: () => openMailto({ subject: `Quality check ${i.jobCard.jobNumber}`, body: formatInspectionText(i) }),
             },
             {
               id: "whatsapp",
               label: "WhatsApp",
               icon: <MessageCircle className="size-4" />,
               onClick: () => openWhatsApp({ message: formatInspectionText(i) }),
-            },
-            {
-              id: "copy-link",
-              label: "Copy link",
-              icon: <Link2 className="size-4" />,
-              onClick: () =>
-                copyToClipboard(
-                  `${window.location.origin}/inspections/${i.id}`,
-                  "Inspection link copied",
-                ),
             },
           ]}
         />
@@ -296,11 +275,11 @@ export function InspectionsPage() {
   if (isError) {
     return (
       <div className="flex flex-col gap-5 p-4 lg:p-6">
-        <PageHeader title="Inspections" description="Vehicle inspection reports and findings." />
+        <PageHeader title="Inspections" description="Quality checks recorded on job cards." />
         <Card>
           <CardContent className="py-12 text-center">
-            <SearchX className="mx-auto mb-3 size-8 text-muted-foreground" />
-            <p className="text-sm text-red-500">Failed to load inspections.</p>
+            <SearchX className="mx-auto mb-3 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm text-destructive">The quality checks could not be loaded. Check your connection and refresh the page.</p>
           </CardContent>
         </Card>
       </div>
@@ -313,8 +292,8 @@ export function InspectionsPage() {
         title="Inspections"
         description={
           data?.meta?.total != null
-            ? `${data.meta.total} ${data.meta.total === 1 ? "inspection" : "inspections"} on record`
-            : "Vehicle inspection reports and findings."
+            ? `${data.meta.total} ${data.meta.total === 1 ? "quality check" : "quality checks"} recorded on job cards`
+            : "Quality checks recorded on job cards."
         }
         actions={<ExportInspectionsButton branchId={activeBranch?.id} />}
       />
@@ -325,9 +304,9 @@ export function InspectionsPage() {
         isLoading={isLoading}
         isFetching={isFetching}
         emptyMessage={
-          statusFilter || debouncedSearch
-            ? "No inspections match the current filters."
-            : "No inspection reports yet."
+          resultFilter || debouncedSearch
+            ? "No quality checks match the current filters. Clear the search or choose All."
+            : "No quality checks yet. They appear here when a supervisor passes or fails a job at the quality check."
         }
         rowKey={(i) => i.id}
         skeletonRowCount={5}
@@ -344,10 +323,10 @@ export function InspectionsPage() {
             onSearchChange={setSearch}
             onSearch={commitSearch}
             onClearSearch={clearSearch}
-            placeholder="Search by job # or findings…"
+            placeholder="Search by job number, customer or notes"
             isLoading={isLoading}
             isFetching={isFetching}
-            filters={<DataTableFilterChips options={STATUS_FILTER_OPTIONS} selected={statusFilter} onChange={setStatusFilter} />}
+            filters={<DataTableFilterChips options={RESULT_FILTER_OPTIONS} selected={resultFilter} onChange={setResultFilter} />}
           />
 
           <DataTableBulkToolbar

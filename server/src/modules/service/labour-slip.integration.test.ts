@@ -6,6 +6,8 @@ import type { LabourService } from './labour.service';
 import type { JobCardLineService } from '../job-card-line/jobCardLine.service';
 import type { JobBillingService } from '../finance/job-billing.service';
 import type { JobCardWorkflowService } from './job-card-workflow.service';
+import { setQcResult } from "./job-qc-state.fixtures";
+import { loadQcState } from "./job-qc-state";
 
 const database = process.env.TEST_DATABASE_URL;
 const describeDb = database ? describe : describe.skip;
@@ -129,7 +131,7 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
       await workflow.update(card.id, { status: 'QC' }, actor.userId);
       await expect(workflow.update(card.id, { status: 'READY' }, actor.userId)).rejects.toThrow('passed quality check');
       expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'QC', readyAt: null });
-      await db.jobCard.update({ where: { id: card.id }, data: { qcStatus: 'PASSED' } });
+      await setQcResult(db, card.id, 'PASSED');
       await db.jobCardCampaign.updateMany({ where: { jobCardId: card.id }, data: { attended: false, notAttendedReason: 'Not part of the synthetic fixed-price operation' } });
       const ready = await workflow.update(card.id, { status: 'READY', workDone: 'Synthetic fixed-price operation completed' }, actor.userId);
       expect(ready.status).toBe('READY');
@@ -198,12 +200,16 @@ describeDb('Labour slips on isolated local PostgreSQL', () => {
 
   it('reopens READY jobs when labour changes, so the checkbox cannot keep stale QC approval', async () => {
     const card = await job('READY');
-    await db.jobCard.update({ where: { id: card.id }, data: { qcStatus: 'PASSED', readyAt: new Date() } });
+    await db.jobCard.update({ where: { id: card.id }, data: { readyAt: new Date() } });
+    await setQcResult(db, card.id, 'PASSED');
     const slip = await create(card.id);
-    expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'IN_PROGRESS', qcStatus: 'PENDING', readyAt: null });
-    await db.jobCard.update({ where: { id: card.id }, data: { status: 'READY', qcStatus: 'PASSED', readyAt: new Date() } });
+    expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'IN_PROGRESS', readyAt: null });
+    expect(await loadQcState(db, card.id)).toBe('PENDING');
+    await db.jobCard.update({ where: { id: card.id }, data: { status: 'READY', readyAt: new Date() } });
+    await setQcResult(db, card.id, 'PASSED');
     await service.save(slip.id, line({ chargedHours: 2 }), actor, slip.lines[0].id);
-    expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'IN_PROGRESS', qcStatus: 'PENDING', readyAt: null });
+    expect(await db.jobCard.findUnique({ where: { id: card.id } })).toMatchObject({ status: 'IN_PROGRESS', readyAt: null });
+    expect(await loadQcState(db, card.id)).toBe('PENDING');
   });
 
   it('shares approved fixed-operation quantities correctly with the legacy labour writer', async () => {

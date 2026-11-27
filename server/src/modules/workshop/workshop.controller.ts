@@ -111,32 +111,6 @@ export class WorkshopController {
       next(error);
     }
   };
-
-  updateQC = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { qcStatus, qcNotes } = req.body;
-      await assertJobAccess(req);
-      const result = await this.workshopService.updateQC(
-        id,
-        qcStatus,
-        qcNotes,
-        req.user?.userId,
-      );
-      res.status(200).json({
-        status: "success",
-        statusCode: 200,
-        message: "QC status updated successfully",
-        data: { jobCard: result },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
 }
 
 export default WorkshopController;

@@ -32,9 +32,3 @@ export const creditApprovalSchema = z.object({
   remarks: z.string().trim().min(1, "Enter why delivery on credit is approved.").max(2000, "Keep the reason to 2,000 characters or fewer."),
 });
 export type CreditApprovalValues = z.infer<typeof creditApprovalSchema>;
-
-/** Notes recorded with a quality check result. */
-export const qcNotesSchema = z.object({
-  qcNotes: z.string().max(2000, "Keep the quality-check findings to 2,000 characters or fewer."),
-});
-export type QcNotesValues = z.infer<typeof qcNotesSchema>;

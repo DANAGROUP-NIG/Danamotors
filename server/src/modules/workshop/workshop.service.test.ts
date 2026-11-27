@@ -15,11 +15,10 @@ describe('JobCard workshop actions', () => {
     expect(update).toHaveBeenCalledWith('card', { status: 'READY' }, 'actor');
   });
 
-  it('blocks progress, QC and assignment after billing', async () => {
+  it('blocks progress and assignment after billing', async () => {
     jest.spyOn(WorkshopRepository.prototype, 'findJobCardById').mockResolvedValue({ billedAt: new Date() } as any);
     const service = new WorkshopService();
     await expect(service.updateProgress('card', 50)).rejects.toThrow('Billed');
-    await expect(service.updateQC('card', 'Passed')).rejects.toThrow('Billed');
     await expect(service.assignTechnician('card', 'tech')).rejects.toThrow('Billed');
   });
 

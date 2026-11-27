@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, inputCls } from "@/components/forms/FormField";
@@ -17,14 +17,11 @@ import type { JobCard } from "../../types/job-card.types";
 import {
   creditApprovalSchema,
   deliverySchema,
-  qcNotesSchema,
   workDoneSchema,
   type CreditApprovalValues,
   type DeliveryValues,
-  type QcNotesValues,
   type WorkDoneValues,
 } from "../../schemas/workshop-actions.schema";
-import { WORKSPACE_COPY } from "../repair-workspace-copy";
 import { WorkshopPicker } from "../WorkshopPicker";
 import { DetailList, StageCard } from "./StageCard";
 
@@ -136,62 +133,6 @@ export function WorkDoneSection({ job }: { job: JobCard }) {
           </Button>
         </div>
       </form>
-    </StageCard>
-  );
-}
-
-/** Quality check: record pass or fail with notes, and the inspections recorded so far. */
-export function QualityCheckSection({ job }: { job: JobCard }) {
-  const { hasPermission } = useAuth();
-  const { recordQc } = useWorkshopActions(job.id, job.jobNumber);
-  const form = useForm<QcNotesValues>({ resolver: zodResolver(qcNotesSchema), defaultValues: { qcNotes: job.qcNotes ?? "" } });
-  const canRecord = canonicalJobStatus(job.status) === "QC" && hasPermission("qcstatus:update");
-  const result = WORKSPACE_COPY.qcStates[(job.qcStatus?.toUpperCase() ?? "") as keyof typeof WORKSPACE_COPY.qcStates] ?? "Not recorded";
-  const record = (qcStatus: "PASSED" | "FAILED") =>
-    form.handleSubmit((values) => {
-      if (!recordQc.isPending) recordQc.mutate({ qcStatus, qcNotes: values.qcNotes });
-    })();
-  return (
-    <StageCard title="Quality check" description="Record the result here, then use the button at the bottom of the page to pass the job on.">
-      <DetailList rows={[{ label: "Result", value: result }, { label: "Quality inspector", value: fullName(job.qualityInspector) }]} />
-      {canRecord && (
-        <form className="grid gap-3" onSubmit={(event) => event.preventDefault()} noValidate>
-          <Field label="Quality-check findings" error={form.formState.errors.qcNotes?.message}>
-            <textarea className={`${inputCls} h-24 py-2`} maxLength={2000} disabled={recordQc.isPending} {...form.register("qcNotes")} />
-          </Field>
-          <ErrorText error={recordQc.error} fallback="Could not record the quality check. Try again." />
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={recordQc.isPending} onClick={() => record("PASSED")}>
-              <CheckCircle aria-hidden="true" />
-              Record QC pass
-            </Button>
-            <Button type="button" variant="outline" disabled={recordQc.isPending} onClick={() => record("FAILED")}>
-              <XCircle aria-hidden="true" />
-              Record QC failure
-            </Button>
-          </div>
-        </form>
-      )}
-      {!!job.inspections?.length && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold">Inspections recorded ({job.inspections.length})</h3>
-          <ul className="space-y-2">
-            {job.inspections.map((inspection) => (
-              <li key={inspection.id} className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm">
-                {inspection.passed ? (
-                  <CheckCircle className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" />
-                ) : (
-                  <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" aria-hidden="true" />
-                )}
-                <div className="min-w-0">
-                  <p className="font-medium">{inspection.passed ? "Passed" : "Failed"}</p>
-                  <p className="break-words text-muted-foreground">{inspection.findings || inspection.notes || NOT_PROVIDED}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </StageCard>
   );
 }

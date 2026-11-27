@@ -16,7 +16,7 @@ const job = {
   branchId: "branch",
   jobNumber: "JOB-001",
   status: "OPEN",
-  qcStatus: "Pending",
+  inspections: [],
   vehicleId: "vehicle",
   vehicle: {
     registrationNumber: "REG-001",
@@ -287,7 +287,7 @@ test("labour screen keeps a single technician or employee assignment and separat
   assert.match(html, /<button[^>]*disabled=""[^>]*>Mark vehicle ready/);
   const ready = render("LabourPanel", {
     permissions: ["jobcard:update"],
-    card: { ...job, status: "QC", qcStatus: "PASSED" },
+    card: { ...job, status: "QC", inspections: [{ id: "q", result: "PASSED", notes: null, createdAt: "2026-11-27T16:00:00Z", supersededAt: null }] },
   }).html;
   const button = ready.match(/<button[^>]*>Mark vehicle ready/)[0];
   assert.equal(button.includes('disabled=""'), false);

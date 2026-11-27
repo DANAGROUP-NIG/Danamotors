@@ -2,7 +2,7 @@ import { ROLES, PERMISSIONS } from '../../shared/constants/roles';
 import { promisedReminderEvents, notificationDueLabel } from './jobcard-notification-policy';
 import { actionTargets, canonicalNotificationStatus, isWorkingTime, notificationEvents, notificationPolicy, reminderEvents, routeJobNotification, type NotificationJob } from './jobcard-notification-policy';
 
-const card: NotificationJob = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'OPEN', technicianId: 'tech', qualityInspectorId: 'inspector', serviceAdvisorId: 'advisor', deliveryAdvisorId: 'delivery', createdById: 'requester', customerId: 'customer', qcStatus: 'PENDING', qcNotes: null, promisedAt: null };
+const card: NotificationJob = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'OPEN', technicianId: 'tech', qualityInspectorId: 'inspector', serviceAdvisorId: 'advisor', deliveryAdvisorId: 'delivery', createdById: 'requester', customerId: 'customer', promisedAt: null };
 const target = (from: string, to: string) => routeJobNotification('STATUS', { ...card, status: from }, { ...card, status: to });
 
 it.each([[24, ['PROMISED_24H']], [12.01, ['PROMISED_24H']], [12, ['PROMISED_12H']], [1, ['PROMISED_12H']], [0, []], [-1, []], [25, []]])('selects the most urgent pending promised window at %s hours', (hours, expected) => {
@@ -56,19 +56,18 @@ it('routes only the assigned inspector, falling back to QC permission only when 
   expect(routeJobNotification('STATUS', card, { ...card, status: 'QC', qualityInspectorId: null })).toEqual([{ permission: PERMISSIONS.QCSTATUS_UPDATE, intent: 'Inspect completed work' }]);
 });
 
-it('routes QC changes separately and suppresses repeated results/alias-only changes', () => {
+it('routes the QC review notices queued with the inspection (phase 7)', () => {
   const qc = { ...card, status: 'QC' };
-  const passed = { ...qc, qcStatus: 'PASSED' };
-  expect(notificationEvents(qc, passed)).toEqual(['QC_PASSED']);
-  expect(routeJobNotification('QC_PASSED', qc, passed).map(row => row.userId)).toEqual(['advisor', 'tech']);
-  expect(routeJobNotification('QC_PASSED', qc, { ...passed, serviceAdvisorId: null })[0]?.role).toBe(ROLES.SERVICE_ADVISOR);
-  expect(notificationEvents(qc, { ...qc, qcStatus: 'FAILED' })).toEqual(['QC_FAILED']);
-  expect(routeJobNotification('QC_FAILED', qc, { ...qc, qcStatus: 'FAILED' }).map(row => row.userId ?? row.role)).toEqual(['tech', 'advisor', ROLES.WORKSHOP_MANAGER]);
-  expect(routeJobNotification('QC_PASSED', qc, { ...passed, technicianId: null }).map(row => row.userId)).toEqual(['advisor']);
-  expect(routeJobNotification('QC_FAILED', qc, { ...qc, technicianId: null }).map(row => row.userId ?? row.role)).toEqual(['advisor', ROLES.WORKSHOP_MANAGER]);
-  expect(notificationEvents({ ...qc, qcStatus: 'FAILED' }, qc)).toEqual(['QC_REVIEW_REQUIRED']);
-  expect(notificationEvents(qc, { ...qc, qcStatus: 'FAILED' })).toEqual(['QC_FAILED']);
-  expect(notificationEvents(passed, { ...passed, qcNotes: 'Additional note' })).toEqual([]);
+  const passed = { ...qc, stage: 'BILLING' };
+  // The step handoff tells the service advisor; the passed notice goes to the technician only.
+  expect(routeJobNotification('QC_PASSED', qc, passed).map(row => row.userId)).toEqual(['tech']);
+  expect(routeJobNotification('QC_PASSED', qc, { ...passed, technicianId: null })).toEqual([]);
+  const returned = { ...card, status: 'IN_PROGRESS', stage: 'REPAIR' };
+  expect(routeJobNotification('QC_FAILED', qc, returned).map(row => row.userId ?? row.role)).toEqual(['tech', 'advisor', ROLES.WORKSHOP_MANAGER]);
+  expect(routeJobNotification('QC_FAILED', qc, { ...returned, technicianId: null }).map(row => row.userId ?? row.role)).toEqual(['advisor', ROLES.WORKSHOP_MANAGER]);
+  // Job row changes never produce QC review events, and returning from QC adds no status handoff.
+  expect(notificationEvents(qc, passed)).toEqual([]);
+  expect(routeJobNotification('STATUS', qc, returned)).toEqual([]);
   expect(notificationEvents(card, { ...card, status: 'Pending' })).toEqual([]);
 });
 
@@ -83,8 +82,8 @@ it('hands pending QC to a reassigned inspector and handles a QC reset without du
   const after = { ...before, qualityInspectorId: 'new-inspector' };
   expect(notificationEvents(before, after)).toEqual(['QC_REVIEW_REQUIRED']);
   expect(routeJobNotification('QC_REVIEW_REQUIRED', before, after)[0]?.userId).toBe('new-inspector');
-  expect(notificationEvents({ ...before, qcStatus: 'PASSED' }, before)).toEqual(['QC_REVIEW_REQUIRED']);
-  expect(notificationEvents({ ...before, status: 'READY', qcStatus: 'PASSED' }, after)).toEqual(['STATUS']);
+  expect(notificationEvents({ ...before, stage: 'BILLING' }, { ...after, stage: 'BILLING' })).toEqual([]);
+  expect(notificationEvents({ ...before, status: 'READY' }, after)).toEqual(['STATUS']);
 });
 
 it('reminds at 4 hours and escalates at 8 with configurable shortened timers', () => {
@@ -103,5 +102,5 @@ it('does not remind outside working hours or when nobody has an action', () => {
     expect(actionTargets({ ...card, status })).toEqual([]);
     expect(reminderEvents(new Date('2026-11-01'), new Date('2026-11-12T12:00:00Z'), { ...card, status })).toEqual([]);
   }
-  expect(routeJobNotification('REMINDER', card, { ...card, status: 'QC', qcStatus: 'PASSED' }).map(row => row.userId)).toEqual(['advisor']);
+  expect(routeJobNotification('REMINDER', card, { ...card, status: 'QC', stage: 'BILLING' }).map(row => row.userId)).toEqual(['advisor']);
 });

@@ -4,7 +4,7 @@ import type { StatusTone } from "@/components/ui/table-components/StatusBadge";
 import { NOT_PROVIDED, formatDateTime, formatKm, formatMoney, formatRelative } from "@/lib/format";
 import { COVERAGE_LABELS, CASE_STATUS_LABELS } from "@/features/warranty/lib/warranty-format";
 import { estimateStateLabel } from "./estimate.logic";
-import { WORKSPACE_COPY } from "../components/repair-workspace-copy";
+import { QC_RESULT_BADGE } from "./quality-check.logic";
 import type { JobCard } from "../types/job-card.types";
 import type {
   JobStage,
@@ -102,7 +102,6 @@ const person = (value: { firstName: string; lastName: string } | null | undefine
 const text = (value: string | null | undefined) => (value && value.trim() ? value.trim() : NOT_PROVIDED);
 export const yesNo = (value: boolean | null | undefined) => (value == null ? NOT_PROVIDED : value ? "Yes" : "No");
 
-const QC_RESULT: Record<string, string> = WORKSPACE_COPY.qcStates;
 const ACTIVE_INVOICE = (status: string) => !["CANCELLED", "CANCELED", "VOID"].includes(status.toUpperCase());
 
 /**
@@ -169,12 +168,15 @@ export function stageDetails(stage: JobStep, job: JobCard): DetailRow[] {
         { label: "Labour lines recorded", value: String(job.labourLines?.length ?? 0) },
         { label: "Parts issued", value: String(job.partIssuances?.length ?? 0) },
       ];
-    case "QUALITY_CHECK":
+    case "QUALITY_CHECK": {
+      const latestCheck = [...(job.inspections ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
       return [
-        { label: "Result", value: QC_RESULT[job.qcStatus?.toUpperCase() ?? ""] ?? NOT_PROVIDED },
-        { label: "Quality inspector", value: person(job.qualityInspector) },
-        { label: "Notes", value: text(job.qcNotes) },
+        // The latest quality check (a passed check after a fail is the latest).
+        { label: "Result", value: latestCheck ? QC_RESULT_BADGE[latestCheck.result].label : NOT_PROVIDED },
+        { label: "Checked", value: latestCheck ? formatDateTime(latestCheck.createdAt) : NOT_PROVIDED },
+        { label: "Notes", value: text(latestCheck?.notes) },
       ];
+    }
     case "BILLING": {
       const invoices = (job.invoices ?? []).filter((invoice) => ACTIVE_INVOICE(invoice.status));
       return [
@@ -275,6 +277,9 @@ export function activityLine(entry: StageActivity): string {
     const label = entry.action && entry.action in ACTION_LABELS ? ACTION_LABELS[entry.action as keyof typeof ACTION_LABELS] : null;
     return label ? `${label} (${to})` : `Step owner changed (${to})`;
   }
+  // The quality check's result, so the history shows each check (phase 7).
+  if (entry.action === "QC_PASSED_TO_ADVISOR") return `Quality check passed. Moved to ${to}`;
+  if (entry.action === "RETURN_TO_REPAIR") return `Quality check failed. Returned to ${to}`;
   return `Moved from ${STAGE_LABELS[entry.fromStage]} to ${to}`;
 }
 

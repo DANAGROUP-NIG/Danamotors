@@ -1,7 +1,6 @@
 import { notifyWorkshopEvent } from "../notification/workshop-notifications";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { setNotificationActor } from "../notification/jobcard-notification-router";
-import { assertRecordedScope } from "../service/estimate-approval";
 import { Prisma } from "@prisma/client";
 import { collectionContentHash } from "./part-collection";
 import { assertSignaturePng } from "../service/estimate-signature";
@@ -363,75 +362,6 @@ export class WorkshopService {
       id,
       jobUpdateBody.parse({ status: canonicalJobStatus(status) }),
       actorId,
-    );
-  }
-
-  async updateQC(
-    id: string,
-    qcStatus: string,
-    qcNotes?: string,
-    actorId?: string,
-  ) {
-    const jobCard = await this.workshopRepository.findJobCardById(id);
-    if (!jobCard) {
-      throw new NotFoundError("Job card not found");
-    }
-
-    if (jobCard.billedAt)
-      throw new BadRequestError("Billed job cards cannot be edited");
-    if (
-      ["READY", "DELIVERED", "CANCELLED"].includes(
-        canonicalJobStatus(jobCard.status),
-      )
-    )
-      throw new BadRequestError("This job card is no longer open");
-    return prisma.$transaction(
-      async (tx) => {
-        await setNotificationActor(tx, actorId);
-        await tx.$queryRaw(
-          Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`,
-        );
-        const current = await tx.jobCard.findUniqueOrThrow({ where: { id } });
-        if (
-          current.billedAt ||
-          ["READY", "BILLED", "DELIVERED", "CANCELLED"].includes(
-            canonicalJobStatus(current.status),
-          )
-        )
-          throw new BadRequestError("This job card is no longer open");
-        if (canonicalJobStatus(current.status) !== "QC")
-          throw new BadRequestError(
-            "Send this job for QC before recording a review",
-          );
-        if (
-          current.qcStatus === qcStatus &&
-          (current.qcNotes ?? "") === (qcNotes ?? "")
-        )
-          return current;
-        if (qcStatus === "PASSED") await assertRecordedScope(tx, id);
-        const reviewed = await tx.jobCard.update({
-          where: { id },
-          data: { qcStatus, qcNotes },
-        });
-        // A changed QC result after the handoff to billing returns the job to the quality check step.
-        await syncStage(tx, id, actorId ?? null);
-        if (actorId && current.qcStatus !== qcStatus) {
-          await tx.auditLog.create({
-            data: {
-              userId: actorId,
-              action: "JOB_QC_OUTCOME_CHANGED",
-              details: JSON.stringify({
-                jobCardId: id,
-                branchId: current.branchId,
-                previousOutcome: current.qcStatus,
-                outcome: qcStatus,
-              }),
-            },
-          });
-        }
-        return reviewed;
-      },
-      { maxWait: 5000, timeout: 15000 },
     );
   }
 }

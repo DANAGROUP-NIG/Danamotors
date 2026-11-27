@@ -145,7 +145,7 @@ Opening stock enters as a `RECEIVED` stock movement. The seeded job cards then i
 
 Jobs that start work go through the staged job card: check-in, diagnosis, the warranty check when the vehicle needs it, the estimate, then repair. The cashier records a **₦10,000 advance** (or the suggested amount if lower) before work starts, and the technician presses **Request parts** before the store issues parts (without a store officer at the branch the request time is recorded). Every job that leaves check-in has its walk-around recorded through the check-in service (half a tank, hub caps missing, AC not working, service book seen with 3 stamps, umbrella in boot, a scratch on the rear bumper and a dent on the front right door) and instructions to the technician. Jobs seeded today (the JC-S jobs) are also signed by the owner on screen, with a drawn demo signature. The historical scenario jobs are re-dated after seeding, which would change the opening date the customer signed, so they are recorded like jobs from before signed consent (`TODO(confirm)`).
 
-**Staged job card: one job at every step (JC-S01 to JC-S25)**
+**Staged job card: one job at every step (JC-S01 to JC-S28)**
 
 Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all at the main branch, each on its own vehicle. Periodic service labour only, no parts.
 
@@ -176,6 +176,9 @@ Customer `DEMO-C05` Adaeze Okafor (fictional) and existing demo customers, all a
 | JC-S23 | KJA-534ST (Sportage, sold about 90 days ago) | Repair, work in progress | Phase 6. Approved by phone and released. The service line is done, Replace front brake pads is in progress, the AC check (warranty) waits for the compressor. Brake pads and engine oil are issued and ready to collect (2 of 3); the AC compressor is requested and not issued |
 | JC-S24 | LSR-535ST (Sorento, out of warranty) | Repair, new finding | Phase 6. The service and the brake work are done. The technician found a torn rear wiper blade (part and labour): the advisor sees the banner and prepares the supplementary estimate. Send for quality check waits for it |
 | JC-S25 | LSR-536ST (Sorento, out of warranty) | Repair, supplementary estimate presented | Phase 6. Brake work in progress; the supplementary estimate, revision 2 (rear wiper blade and its labour), is presented and waits for the customer's approval on the tablet or by phone |
+| JC-S26 | LSR-537ST (Sorento, out of warranty) | Quality check | Phase 7. 50,000 km service and front brake pads, both done and sent for the quality check by the technician. Check-in reading 48,262 km, the road test start the supervisor sees |
+| JC-S27 | LSR-538ST (Sorento, out of warranty) | Repair, returned from the quality check | Phase 7. The supervisor failed the brake pads ("Brake still noisy at low speed. Recheck front left caliper slider."): the job is back with the technician, the brake line reopened and the service line still done |
+| JC-S28 | LSR-539ST (Sorento, out of warranty) | Quality check, second check | Phase 7. Failed once on the brake pads, the technician redid them and sent the job back: the quality check shows the earlier failed check in its history |
 
 Jobs past diagnosis (JC-S04 onward and the scenario jobs) are diagnosed through the services: the workshop supervisor assigns the technician and a bay (bays A1 to A4 are added when missing), the technician records a finding per request with the periodic service labour, and the service engineer confirms. The service engineer is an active Engineer at the branch, or the admin where the branch has none (`TODO(confirm)`); the seed never creates users.
 

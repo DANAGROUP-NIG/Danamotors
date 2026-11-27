@@ -32,7 +32,8 @@ export type JobCardWithRelations = JobCard & {
   })[];
   consolidatedInvoices?: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
   invoices: { id: string; invoiceNumber: string; status: string; total: number; issuedDate: Date }[];
-  inspections: { id: string; findings: string; status: string; passed: boolean | null }[];
+  inspections: { id: string; result: 'PASSED' | 'FAILED'; createdAt: Date; supersededAt: Date | null }[];
+  estimationCharge: { status: string } | null;
 };
 
 const PORTAL_LATEST_ESTIMATE = {
@@ -119,8 +120,10 @@ export class PortalRepository {
           },
         },
         inspections: {
-          select: { id: true, findings: true, status: true, passed: true },
+          select: { id: true, result: true, createdAt: true, supersededAt: true },
+          orderBy: { createdAt: 'desc' },
         },
+        estimationCharge: { select: { status: true } },
       },
       orderBy: { createdAt: 'desc' },
     }) as Promise<JobCardWithRelations[]>;
@@ -171,8 +174,10 @@ export class PortalRepository {
           },
         },
         inspections: {
-          select: { id: true, findings: true, status: true, passed: true, notes: true },
+          select: { id: true, result: true, createdAt: true, supersededAt: true },
+          orderBy: { createdAt: 'desc' },
         },
+        estimationCharge: { select: { status: true } },
       },
     }) as Promise<JobCardWithRelations | null>;
   }

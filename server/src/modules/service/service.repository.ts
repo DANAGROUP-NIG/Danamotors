@@ -3,8 +3,8 @@ import { BookingCreate, createBooking } from "./booking.persistence";
 import prisma from "../../prisma/client";
 import { jobStatusFilter } from "./job-card-workflow.service";
 import {
+  Prisma,
   ServiceAppointment,
-  Inspection,
   Estimate,
   CustomerApproval,
 } from "@prisma/client";
@@ -515,17 +515,6 @@ export class ServiceRepository {
   }
 
 
-  async addInspection(data: {
-    jobCardId: string;
-    inspectorId?: string;
-    findings: string;
-    passed?: boolean;
-    status?: string;
-    notes?: string;
-  }): Promise<Inspection> {
-    return prisma.inspection.create({ data });
-  }
-
   async addEstimate(data: {
     jobCardId: string;
     description: string;
@@ -553,59 +542,14 @@ export class ServiceRepository {
     });
   }
 
-  async listInspections(params: {
-    skip?: number;
-    take?: number;
-    branchId?: string;
-    status?: string;
-    search?: string;
-  }) {
-    const where: Record<string, unknown> = {};
-
-    if (params.branchId) {
-      where.jobCard = { branchId: params.branchId };
-    }
-
-    if (params.status) {
-      if (
-        ["BOOKED", "CONVERTED", "CANCELLED", "NO_SHOW"].includes(params.status)
-      )
-        where.bookingStatus = params.status;
-      else where.status = params.status;
-    }
-
-    if (params.search) {
-      where.OR = [
-        { findings: { contains: params.search, mode: "insensitive" } },
-        { bookingNumber: { contains: params.search, mode: "insensitive" } },
-        { notes: { contains: params.search, mode: "insensitive" } },
-        {
-          jobCard: {
-            jobNumber: { contains: params.search, mode: "insensitive" },
-          },
-        },
-        {
-          jobCard: {
-            customer: {
-              firstName: { contains: params.search, mode: "insensitive" },
-            },
-          },
-        },
-        {
-          jobCard: {
-            customer: {
-              lastName: { contains: params.search, mode: "insensitive" },
-            },
-          },
-        },
-      ];
-    }
-
+  async listInspections(params: InspectionListFilter & { skip?: number; take?: number }) {
+    const where = inspectionListWhere(params);
     return prisma.inspection.findMany({
       where,
       skip: params.skip,
       take: params.take,
       include: {
+        inspector: { select: { id: true, firstName: true, lastName: true } },
         jobCard: {
           select: {
             id: true,
@@ -709,4 +653,28 @@ export class ServiceRepository {
       orderBy: { createdAt: "desc" },
     });
   }
+}
+
+export interface InspectionListFilter {
+  branchId?: string;
+  /** PASSED or FAILED. */
+  result?: string;
+  search?: string;
+}
+
+/** Quality checks list: branch, result, and a search on notes, job number or customer name. */
+export function inspectionListWhere(params: InspectionListFilter): Prisma.InspectionWhereInput {
+  const where: Prisma.InspectionWhereInput = {};
+  if (params.branchId) where.jobCard = { branchId: params.branchId };
+  if (params.result === "PASSED" || params.result === "FAILED") where.result = params.result;
+  if (params.search) {
+    const search = { contains: params.search, mode: "insensitive" as const };
+    where.OR = [
+      { notes: search },
+      { jobCard: { jobNumber: search } },
+      { jobCard: { customer: { firstName: search } } },
+      { jobCard: { customer: { lastName: search } } },
+    ];
+  }
+  return where;
 }

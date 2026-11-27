@@ -5,6 +5,8 @@ import type { RequisitionActor } from "./requisition.logic";
 import type { JobBillingService } from "../finance/job-billing.service";
 import type { JobCardLineService } from "../job-card-line/jobCardLine.service";
 import type { InventoryService } from "../inventory/inventory.service";
+import { setQcResult } from "../service/job-qc-state.fixtures";
+import { loadQcState } from "../service/job-qc-state";
 
 const database = process.env.TEST_DATABASE_URL;
 const describeDb = database ? describe : describe.skip;
@@ -281,10 +283,8 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
       const sync: JobCardLineService =
         new (require("../job-card-line/jobCardLine.service").JobCardLineService)();
       await db.$transaction((tx) => sync.syncLines(tx, job.id));
-      await db.jobCard.update({
-        where: { id: job.id },
-        data: { status: "READY", qcStatus: "PASSED" },
-      });
+      await db.jobCard.update({ where: { id: job.id }, data: { status: "READY" } });
+    await setQcResult(db, job.id, "PASSED");
       const billing: JobBillingService =
         new (require("../finance/job-billing.service").JobBillingService)();
       const invoice = await billing.createJobBill({
@@ -352,10 +352,8 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
         true,
       );
       if (type === "CUSTOMER") {
-        await db.jobCard.update({
-          where: { id: job.id },
-          data: { status: "READY", qcStatus: "PASSED" },
-        });
+        await db.jobCard.update({ where: { id: job.id }, data: { status: "READY" } });
+    await setQcResult(db, job.id, "PASSED");
         const billing: JobBillingService =
           new (require("../finance/job-billing.service").JobBillingService)();
         await expect(
@@ -641,30 +639,26 @@ describeDb("Item return slips on isolated local PostgreSQL", () => {
 
   it("reopens ready jobs for QC when returning or cancelling returned parts", async () => {
     const { job, document, line } = await issue("CUSTOMER");
-    await db.jobCard.update({
-      where: { id: job.id },
-      data: { status: "READY", qcStatus: "PASSED", readyAt: new Date() },
-    });
+    await db.jobCard.update({ where: { id: job.id }, data: { status: "READY", readyAt: new Date() } });
+    await setQcResult(db, job.id, "PASSED");
     const slip = await create(document.id, line.id);
     expect(
       await db.jobCard.findUnique({ where: { id: job.id } }),
     ).toMatchObject({
       status: "IN_PROGRESS",
-      qcStatus: "PENDING",
       readyAt: null,
     });
-    await db.jobCard.update({
-      where: { id: job.id },
-      data: { status: "READY", qcStatus: "PASSED", readyAt: new Date() },
-    });
+    expect(await loadQcState(db, job.id)).toBe("PENDING");
+    await db.jobCard.update({ where: { id: job.id }, data: { status: "READY", readyAt: new Date() } });
+    await setQcResult(db, job.id, "PASSED");
     await returns.cancel(slip.id, "Undo", actor);
     expect(
       await db.jobCard.findUnique({ where: { id: job.id } }),
     ).toMatchObject({
       status: "IN_PROGRESS",
-      qcStatus: "PENDING",
       readyAt: null,
     });
+    expect(await loadQcState(db, job.id)).toBe("PENDING");
   });
 
   it("keeps old bare PartReturn rows readable", async () => {

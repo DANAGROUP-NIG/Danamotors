@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, FileText, Loader2, Wrench } from "lucide-react";
+import { ArrowRight, FileText, Loader2, RotateCcw, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/table-components/StatusBadge";
@@ -53,6 +53,18 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
 
   return (
     <>
+      {step.returnedFromQc && (
+        <div role="status" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <RotateCcw className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Returned from quality check</p>
+            <p>
+              Returned by {step.returnedFromQc.by ?? "the workshop supervisor"}, {formatDateTime(step.returnedFromQc.at)}.
+            </p>
+            {step.returnedFromQc.note && <p className="mt-1">Note: {step.returnedFromQc.note}</p>}
+          </div>
+        </div>
+      )}
       {banner && (
         <div role="status" className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center">
           <Wrench className="size-5 shrink-0" aria-hidden="true" />
@@ -135,6 +147,7 @@ export function RepairMonitor({ job, step, bar, onOpenTab }: { job: JobCard; ste
                           <div className="flex flex-wrap gap-1">
                             <StatusBadge status={WORK_STATUS_BADGE[line.status].label} tone={WORK_STATUS_BADGE[line.status].tone} className="text-xs normal-case" />
                             {PAYER_TAG[line.payer] && <StatusBadge status={PAYER_TAG[line.payer]!} tone="purple" className="text-xs normal-case" />}
+                            {line.returnedFromQc && <StatusBadge status="Returned from quality check" tone="red" className="text-xs normal-case" />}
                           </div>
                           {line.doneAt && <p className="mt-1 text-xs text-muted-foreground">Completed at {formatTime(line.doneAt)}</p>}
                         </td>

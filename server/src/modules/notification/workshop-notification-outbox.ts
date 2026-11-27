@@ -58,7 +58,7 @@ export function workshopRecipients(event: WorkshopEvent, card: { branchId: strin
   return { isActive: true, OR: queries } satisfies Prisma.UserWhereInput;
 }
 
-type WorkshopJob = Pick<JobCard, 'id' | 'branchId' | 'jobNumber' | 'status' | 'technicianId' | 'qualityInspectorId' | 'serviceAdvisorId' | 'deliveryAdvisorId' | 'createdById' | 'customerId' | 'qcStatus' | 'qcNotes' | 'promisedAt'>;
+type WorkshopJob = Pick<JobCard, 'id' | 'branchId' | 'jobNumber' | 'status' | 'technicianId' | 'qualityInspectorId' | 'serviceAdvisorId' | 'deliveryAdvisorId' | 'createdById' | 'customerId' | 'promisedAt'>;
 
 /** Persist with the business write; the existing worker performs delivery after commit. */
 export async function enqueueWorkshopNotification(tx: Prisma.TransactionClient, event: DurableWorkshopEvent, card: WorkshopJob, occurrenceId: string, actorId: string, branchStoreOnly = false, extra: Prisma.InputJsonObject = {}) {
@@ -66,8 +66,8 @@ export async function enqueueWorkshopNotification(tx: Prisma.TransactionClient, 
     id: card.id, branchId: card.branchId, jobNumber: card.jobNumber, status: card.status,
     technicianId: card.technicianId, qualityInspectorId: card.qualityInspectorId,
     serviceAdvisorId: card.serviceAdvisorId, deliveryAdvisorId: card.deliveryAdvisorId,
-    createdById: card.createdById, customerId: event === 'PART_RECEIVED' ? null : card.customerId, qcStatus: card.qcStatus,
-    qcNotes: event === 'PART_RECEIVED' ? null : card.qcNotes, promisedAt: card.promisedAt?.toISOString() ?? null,
+    createdById: card.createdById, customerId: event === 'PART_RECEIVED' ? null : card.customerId,
+    promisedAt: card.promisedAt?.toISOString() ?? null,
     workshopEvent: event, workshopOccurrence: occurrenceId, branchStoreOnly, ...extra,
   } satisfies Prisma.InputJsonObject;
   const id = `workshop:${card.id}:${event}:${occurrenceId}`;

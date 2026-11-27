@@ -27,10 +27,11 @@ export function assertRequisitionJob(job: { status: string; billedAt: Date | nul
 }
 
 export function requisitionWorkUpdate(status: string, userId: string, label = 'Requisition'): Prisma.JobCardUpdateInput {
-  if (!['READY', 'COMPLETED'].includes(status.toUpperCase())) return { qcStatus: 'PENDING' };
+  // The caller also puts the QC result back to pending (supersedeCurrentInspection).
+  if (!['READY', 'COMPLETED'].includes(status.toUpperCase())) return {};
   // TODO(confirm): changing issued work on a ready job reopens it for another QC.
   return {
-    qcStatus: 'PENDING', status: 'IN_PROGRESS', readyAt: null,
+    status: 'IN_PROGRESS', readyAt: null,
     statusHistory: { create: { fromStatus: status, toStatus: 'IN_PROGRESS', actorId: userId, remarks: `${label} changed; repeat quality check before marking ready` } },
   };
 }

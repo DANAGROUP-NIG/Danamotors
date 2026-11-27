@@ -14,16 +14,17 @@ export type InspectionJobCard = {
   };
 };
 
+/** A quality check recorded on a job card (job card revamp phase 7). */
 export type Inspection = {
   id: string;
   jobCardId: string;
-  inspectorId?: string;
-  findings: string;
-  passed?: boolean;
-  status: string;
-  notes?: string;
+  result: "PASSED" | "FAILED";
+  notes: string | null;
+  roadTestStartKm: number | null;
+  roadTestEndKm: number | null;
+  supersededAt: string | null;
   createdAt: string;
-  updatedAt: string;
+  inspector: { id: string; firstName: string; lastName: string } | null;
   jobCard: InspectionJobCard;
 };
 

@@ -19,6 +19,7 @@ import { applyWarrantyHandoff, loadWarrantyFacts } from "./job-warranty.service"
 import { loadEstimateStageFacts, vehicleDeclinedItems } from "./job-estimate.service";
 import { createWorkLines, loadRepairProblems, pauseWorkLines } from "./job-repair.service";
 import { moveStage } from "./job-stage.writer";
+import { QC_STATE_SELECT, qcStateFrom } from "./job-qc-state";
 import {
   ACTION_RULES,
   availableActions,
@@ -46,7 +47,7 @@ const workspaceJob = {
   createdAt: true,
   stage: true,
   status: true,
-  qcStatus: true,
+  ...QC_STATE_SELECT,
   technicianId: true,
   billedAt: true,
   creditApprovedById: true,
@@ -100,7 +101,7 @@ async function stageFacts(tx: Prisma.TransactionClient, job: WorkspaceJob, now: 
   return {
     stage: job.stage,
     status: job.status,
-    qcStatus: job.qcStatus,
+    qcState: qcStateFrom(job),
     technicianId: job.technicianId,
     complaintCount: job._count.complaints,
     openingSignatureProblem,
@@ -223,78 +224,80 @@ export class JobStageService {
    * Repeating a requestId returns the current workspace without acting twice.
    */
   async act(id: string, input: StageActionInput, actor: StageActor) {
+    await prisma.$transaction((tx) => this.actInTx(tx, id, input, actor), { maxWait: 5000, timeout: 15000 });
+    await drainJobcardNotifications(id);
+    return this.workspace(id, actor);
+  }
+
+  /**
+   * The same action inside the caller's transaction: the quality check records its inspection first.
+   * Takes the job row lock itself (a no-op when the caller already holds it).
+   */
+  async actInTx(tx: Prisma.TransactionClient, id: string, input: StageActionInput, actor: StageActor): Promise<void> {
     const rule = ACTION_RULES[input.action];
     const note = input.note?.trim() || undefined;
     if (rule.requiresNote && !note)
       throw new BadRequestError(NOTE_REQUIRED[input.action] ?? "Write a note before you continue.").withCode("FIELD_VALIDATION", { field: "note" });
 
-    await prisma.$transaction(
-      async (tx) => {
-        await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
-        const replay = await tx.jobStageEvent.findUnique({
-          where: { jobCardId_requestId: { jobCardId: id, requestId: input.requestId } },
-          select: { action: true },
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM "JobCard" WHERE id = ${id} FOR UPDATE`);
+    const replay = await tx.jobStageEvent.findUnique({
+      where: { jobCardId_requestId: { jobCardId: id, requestId: input.requestId } },
+      select: { action: true },
+    });
+    if (replay) {
+      if (replay.action !== input.action)
+        throw new ConflictError("This request was already used for a different action. Reload the job and try again.").withCode(
+          "STAGE_REQUEST_REUSED",
+        );
+      return;
+    }
+    const job = await tx.jobCard.findUnique({ where: { id }, select: workspaceJob });
+    if (!job) throw new NotFoundError("Job card not found");
+    if (job.jobType === JobCardType.PDI)
+      throw new ConflictError("PDI job cards are updated from the PDI menu.").withCode("STAGE_ACTION_BLOCKED", {
+        reasons: ["PDI job cards are updated from the PDI menu."],
+      });
+
+    const check = checkStageAction(input.action, await stageFacts(tx, job), actor);
+    if (!check.ok) {
+      const error =
+        check.kind === "forbidden" ? new ForbiddenError(check.reasons[0]) : new ConflictError(check.reasons.join(" "));
+      throw error.withCode(check.kind === "forbidden" ? "STAGE_ACTION_FORBIDDEN" : "STAGE_ACTION_BLOCKED", {
+        reasons: check.reasons,
+      });
+    }
+
+    const ctx = { action: input.action, requestId: input.requestId, note: diagnosisEventNote(input.action, note) };
+    if (!check.toStatus) {
+      // Diagnosis records who sent, returned or confirmed before the owner moves.
+      await applyDiagnosisAction(tx, id, input.action, actor, note);
+      // The warranty check opens the warranty case for warranty items and records the decision.
+      if (input.action === "WARRANTY_TO_ADVISOR") {
+        const decided = await applyWarrantyHandoff(tx, id, actor);
+        await moveStage(tx, id, check.to, actor.id, { ...ctx, note: note ? `${decided} ${note}` : decided });
+        return;
+      }
+      await moveStage(tx, id, check.to, actor.id, ctx);
+      // Check-in is finished: record who completed it and when.
+      if (input.action === "SEND_TO_SUPERVISOR")
+        await tx.jobCheckIn.upsert({
+          where: { jobCardId: id },
+          create: { jobCardId: id, completedAt: new Date(), completedById: actor.id },
+          update: { completedAt: new Date(), completedById: actor.id },
         });
-        if (replay) {
-          if (replay.action !== input.action)
-            throw new ConflictError("This request was already used for a different action. Reload the job and try again.").withCode(
-              "STAGE_REQUEST_REUSED",
-            );
-          return;
-        }
-        const job = await tx.jobCard.findUnique({ where: { id }, select: workspaceJob });
-        if (!job) throw new NotFoundError("Job card not found");
-        if (job.jobType === JobCardType.PDI)
-          throw new ConflictError("PDI job cards are updated from the PDI menu.").withCode("STAGE_ACTION_BLOCKED", {
-            reasons: ["PDI job cards are updated from the PDI menu."],
-          });
-
-        const check = checkStageAction(input.action, await stageFacts(tx, job), actor);
-        if (!check.ok) {
-          const error =
-            check.kind === "forbidden" ? new ForbiddenError(check.reasons[0]) : new ConflictError(check.reasons.join(" "));
-          throw error.withCode(check.kind === "forbidden" ? "STAGE_ACTION_FORBIDDEN" : "STAGE_ACTION_BLOCKED", {
-            reasons: check.reasons,
-          });
-        }
-
-        const ctx = { action: input.action, requestId: input.requestId, note: diagnosisEventNote(input.action, note) };
-        if (!check.toStatus) {
-          // Diagnosis records who sent, returned or confirmed before the owner moves.
-          await applyDiagnosisAction(tx, id, input.action, actor, note);
-          // The warranty check opens the warranty case for warranty items and records the decision.
-          if (input.action === "WARRANTY_TO_ADVISOR") {
-            const decided = await applyWarrantyHandoff(tx, id, actor);
-            await moveStage(tx, id, check.to, actor.id, { ...ctx, note: note ? `${decided} ${note}` : decided });
-            return;
-          }
-          await moveStage(tx, id, check.to, actor.id, ctx);
-          // Check-in is finished: record who completed it and when.
-          if (input.action === "SEND_TO_SUPERVISOR")
-            await tx.jobCheckIn.upsert({
-              where: { jobCardId: id },
-              create: { jobCardId: id, completedAt: new Date(), completedById: actor.id },
-              update: { completedAt: new Date(), completedById: actor.id },
-            });
-          return;
-        }
-        try {
-          await this.workflow.updateInTx(tx, id, { status: check.toStatus, remarks: note }, actor.id, ctx);
-          // Repair (phase 6): the approved work becomes the technician's list; a pause stops the clock.
-          if (input.action === "RELEASE_TO_REPAIR") await createWorkLines(tx, id, { supplementary: false });
-          if (input.action === "PAUSE_FOR_PARTS") await pauseWorkLines(tx, id);
-        } catch (error) {
-          // A workflow gate that our facts did not catch is still a blocked move, not a bad request.
-          if (error instanceof BadRequestError)
-            throw new ConflictError(error.message).withCode("STAGE_ACTION_BLOCKED", { reasons: [error.message] });
-          throw error;
-        }
-      },
-      { maxWait: 5000, timeout: 15000 },
-    );
-
-    await drainJobcardNotifications(id);
-    return this.workspace(id, actor);
+      return;
+    }
+    try {
+      await this.workflow.updateInTx(tx, id, { status: check.toStatus, remarks: note }, actor.id, ctx);
+      // Repair (phase 6): the approved work becomes the technician's list; a pause stops the clock.
+      if (input.action === "RELEASE_TO_REPAIR") await createWorkLines(tx, id, { supplementary: false });
+      if (input.action === "PAUSE_FOR_PARTS") await pauseWorkLines(tx, id);
+    } catch (error) {
+      // A workflow gate that our facts did not catch is still a blocked move, not a bad request.
+      if (error instanceof BadRequestError)
+        throw new ConflictError(error.message).withCode("STAGE_ACTION_BLOCKED", { reasons: [error.message] });
+      throw error;
+    }
   }
 }
 

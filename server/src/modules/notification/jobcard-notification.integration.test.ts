@@ -8,8 +8,8 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { ROLES, PERMISSIONS } from '../../shared/constants/roles';
-import { drainJobcardNotifications, replayJobcardNotification, sendJobcardReminders, setNotificationActor } from './jobcard-notification-router';
-import { jobWorkUpdate } from '../requisition/requisition-work';
+import { drainJobcardNotifications, queueQcReviewNotification, replayJobcardNotification, sendJobcardReminders, setNotificationActor } from './jobcard-notification-router';
+import { applyJobWorkChange } from '../requisition/requisition-work';
 
 jest.setTimeout(90_000);
 
@@ -52,6 +52,16 @@ integration('local staging jobcard notification flow', () => {
     const event = await prisma.jobcardNotificationEvent.findFirstOrThrow({ where: { jobCardId: cardId }, orderBy: { createdAt: 'desc' } });
     return prisma.notification.findMany({ where: { dedupeKey: { contains: `:${event.id}:` } } });
   }
+  /** A recorded quality check (phase 7): the inspection and its QC review notice, as the QC service queues them. */
+  async function review(result: 'PASSED' | 'FAILED', actorId = users.actor) {
+    const inspection = await prisma.inspection.create({ data: { jobCardId: cardId, inspectorId: actorId, result } });
+    await prisma.$transaction(async tx => {
+      const card = await tx.jobCard.findUniqueOrThrow({ where: { id: cardId } });
+      await queueQcReviewNotification(tx, { ...card, promisedAt: card.promisedAt?.toISOString() ?? null }, result === 'PASSED' ? 'QC_PASSED' : 'QC_FAILED', inspection.id, actorId);
+    });
+    await drainJobcardNotifications(cardId);
+    return prisma.notification.findMany({ where: { dedupeKey: { contains: `:qc:${cardId}:${inspection.id}:` } } });
+  }
   const expectUsers = (rows: { userId: string | null }[], labels: string[]) => expect(rows.map(row => row.userId).sort()).toEqual(labels.map(label => users[label]).sort());
 
   it('captures rollback safely and only after commit', async () => {
@@ -78,19 +88,21 @@ integration('local staging jobcard notification flow', () => {
     expectUsers(await change({ status: 'WAITING_PARTS' }), ['store', 'advisor']);
     expectUsers(await change({ status: 'IN_PROGRESS' }), ['tech']);
     expectUsers(await change({ status: 'QC' }), ['qc']);
-    expectUsers(await change({ qcStatus: 'FAILED', qcNotes: 'Repeat inspection repair' }, users.qc), ['tech', 'advisor', 'manager']);
-    expectUsers(await change({ status: 'IN_PROGRESS' }), ['tech', 'advisor', 'manager']);
-    expectUsers(await change({ status: 'QC', qcStatus: 'PENDING' }), ['qc']);
-    expectUsers(await change({ qcStatus: 'PASSED' }, users.qc), ['advisor']);
+    expectUsers(await review('FAILED', users.qc), ['tech', 'advisor', 'manager']);
+    // The failed notice already told them; returning the job adds no status handoff.
+    expectUsers(await change({ status: 'IN_PROGRESS' }), []);
+    expectUsers(await change({ status: 'QC' }), ['qc']);
+    // The step handoff tells the advisor; the passed notice goes to the technician.
+    expectUsers(await review('PASSED', users.qc), ['tech']);
     expectUsers(await change({ status: 'READY' }, users.advisor), ['billing', 'ccu']);
     expectUsers(await change({ status: 'BILLED' }, users.billing), ['advisor']);
     expectUsers(await change({ status: 'READY' }, users.billing), ['advisor']);
-    expectUsers(await change({ status: 'IN_PROGRESS', qcStatus: 'PENDING' }), ['tech']);
+    expectUsers(await change({ status: 'IN_PROGRESS' }), ['tech']);
     expectUsers(await change({ status: 'QC' }), ['qc']);
-    expectUsers(await change({ qcStatus: 'PASSED' }), ['advisor']);
+    expectUsers(await review('PASSED'), ['tech']);
     expectUsers(await change({ status: 'READY' }), ['billing', 'ccu']);
-    expectUsers(await change({ status: 'QC', qcStatus: 'PENDING' }), ['qc']); // estimate revision
-    await change({ qcStatus: 'PASSED' });
+    expectUsers(await change({ status: 'QC' }), ['qc']); // estimate revision
+    await review('PASSED');
     await change({ status: 'READY' });
     await change({ status: 'BILLED' });
     expectUsers(await change({ status: 'DELIVERED' }, users.advisor), ['requester', 'manager']);
@@ -175,19 +187,16 @@ integration('local staging jobcard notification flow', () => {
     expect(await prisma.notification.count({ where: { dedupeKey: { contains: `:${event.id}:` } } })).toBe(0);
   });
 
-  it('routes inspector reassignment and preserves the actor on parts/labour QC resets', async () => {
+  it('routes inspector reassignment, and a parts or labour QC reset sends nothing', async () => {
     cardId = await create(true);
     await change({ status: 'QC' });
     expectUsers(await change({ qualityInspectorId: users.techB }), ['techB']);
-    await change({ qcStatus: 'PASSED' });
-    await prisma.$transaction(async tx => {
-      const update = await jobWorkUpdate(tx, { id: cardId, status: 'QC' }, users.techB, 'Labour slip');
-      await tx.jobCard.update({ where: { id: cardId }, data: update });
-    });
+    await review('PASSED', users.techB);
+    const events = await prisma.jobcardNotificationEvent.count({ where: { jobCardId: cardId } });
+    await prisma.$transaction(tx => applyJobWorkChange(tx, { id: cardId, status: 'QC' }, users.techB, { label: 'Labour slip' }));
     await drainJobcardNotifications(cardId);
-    const event = await prisma.jobcardNotificationEvent.findFirstOrThrow({ where: { jobCardId: cardId }, orderBy: { createdAt: 'desc' } });
-    expect(event.actorId).toBe(users.techB);
-    expect(await prisma.notification.count({ where: { dedupeKey: { contains: `:${event.id}:` } } })).toBe(0);
+    expect(await prisma.inspection.count({ where: { jobCardId: cardId, supersededAt: null } })).toBe(0);
+    expect(await prisma.jobcardNotificationEvent.count({ where: { jobCardId: cardId } })).toBe(events);
   });
 
   afterAll(async () => {

@@ -145,7 +145,10 @@ test("finished steps show the recorded facts in plain words", () => {
       completedAt: "2026-11-25T08:40:00Z",
     },
     damageMarks: [{ id: "m", type: "SCRATCH", x: "50.00", y: "95.00" }],
-    qcStatus: "PASSED",
+    inspections: [
+      { id: "q1", result: "FAILED", notes: "Brake still noisy", createdAt: "2026-11-27T14:00:00Z", supersededAt: "2026-11-27T14:00:00Z" },
+      { id: "q2", result: "PASSED", notes: null, createdAt: "2026-11-27T16:00:00Z", supersededAt: null },
+    ],
     estimates: [{ id: "e", version: 2, status: "Approved", amount: 152112.5, customerTotal: 152112.5, currency: "NGN", description: "Estimate", approvals: [], lines: [] }],
   };
   const checkIn = Object.fromEntries(frame.stageDetails("CHECK_IN", job).map((row) => [row.label, row.value]));

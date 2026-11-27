@@ -5,6 +5,8 @@ import type { RequisitionInput } from "./requisition.validation";
 import type { JobCardLineService } from "../job-card-line/jobCardLine.service";
 import type { JobBillingService } from "../finance/job-billing.service";
 import type { InventoryService } from "../inventory/inventory.service";
+import { setQcResult } from "../service/job-qc-state.fixtures";
+import { loadQcState } from "../service/job-qc-state";
 
 const database = process.env.TEST_DATABASE_URL;
 const describeDb = database ? describe : describe.skip;
@@ -170,7 +172,7 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
     "blocks unfinished QC %s during actual billing without writing an invoice",
     async (qcStatus) => {
       const card = await job("READY");
-      await db.jobCard.update({ where: { id: card.id }, data: { qcStatus } });
+      await setQcResult(db, card.id, qcStatus as "PENDING" | "FAILED");
       const billing: JobBillingService =
         new (require("../finance/job-billing.service").JobBillingService)();
       await expect(
@@ -185,7 +187,8 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
       expect(await db.invoice.count({ where: { jobCardId: card.id } })).toBe(0);
       expect(
         await db.jobCard.findUniqueOrThrow({ where: { id: card.id } }),
-      ).toMatchObject({ status: "READY", billedAt: null, qcStatus });
+      ).toMatchObject({ status: "READY", billedAt: null });
+      expect(await loadQcState(db, card.id)).toBe(qcStatus);
     },
   );
 
@@ -357,10 +360,8 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
     expect(saved.map((line) => line.amount).sort((a, b) => a - b)).toEqual([
       90.01, 210.02,
     ]);
-    await db.jobCard.update({
-      where: { id: card.id },
-      data: { status: "READY", qcStatus: "PASSED" },
-    });
+    await db.jobCard.update({ where: { id: card.id }, data: { status: "READY" } });
+    await setQcResult(db, card.id, "PASSED");
     const billing: JobBillingService =
       new (require("../finance/job-billing.service").JobBillingService)();
     const preview = await billing.previewJobBill({
@@ -686,30 +687,26 @@ describeDb("Requisitions on isolated local PostgreSQL", () => {
         advanceAmount: 1,
       },
     });
-    await db.jobCard.update({
-      where: { id: card.id },
-      data: { qcStatus: "PASSED", readyAt: new Date() },
-    });
+    await db.jobCard.update({ where: { id: card.id }, data: { readyAt: new Date() } });
+    await setQcResult(db, card.id, "PASSED");
     const document = await service.create(input(card.id), actor);
     expect(
       await db.jobCard.findUnique({ where: { id: card.id } }),
     ).toMatchObject({
       status: "IN_PROGRESS",
-      qcStatus: "PENDING",
       readyAt: null,
     });
-    await db.jobCard.update({
-      where: { id: card.id },
-      data: { status: "READY", qcStatus: "PASSED", readyAt: new Date() },
-    });
+    expect(await loadQcState(db, card.id)).toBe("PENDING");
+    await db.jobCard.update({ where: { id: card.id }, data: { status: "READY", readyAt: new Date() } });
+    await setQcResult(db, card.id, "PASSED");
     await service.cancel(document.id, "Wrong part", actor);
     expect(
       await db.jobCard.findUnique({ where: { id: card.id } }),
     ).toMatchObject({
       status: "IN_PROGRESS",
-      qcStatus: "PENDING",
       readyAt: null,
     });
+    expect(await loadQcState(db, card.id)).toBe("PENDING");
   });
 
   it("serializes concurrent issues across jobs without overselling", async () => {

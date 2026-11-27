@@ -5,7 +5,7 @@ import { getInspectionsRequest } from "../api/inspection.api";
 type UseInspectionsParams = {
   page?: number;
   limit?: number;
-  status?: string;
+  result?: string;
   search?: string;
   branchId?: string;
 };

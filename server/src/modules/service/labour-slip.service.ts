@@ -41,7 +41,6 @@ const include = {
       createdAt: true,
       mileage: true,
       status: true,
-      qcStatus: true,
       workDone: true,
       vehicle: {
         select: {

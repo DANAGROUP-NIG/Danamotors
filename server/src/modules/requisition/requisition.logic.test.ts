@@ -140,16 +140,13 @@ describe("Requisition rules", () => {
     ).toThrow();
   });
 
-  it("reopens ready jobs for QC when requisitions change issued work", () => {
+  it("reopens ready jobs for QC when requisitions change issued work (the QC result is superseded by the caller)", () => {
     expect(requisitionWorkUpdate("READY", "actor")).toMatchObject({
-      qcStatus: "PENDING",
       status: "IN_PROGRESS",
       readyAt: null,
       statusHistory: { create: { actorId: "actor" } },
     });
-    expect(requisitionWorkUpdate("OPEN", "actor")).toEqual({
-      qcStatus: "PENDING",
-    });
+    expect(requisitionWorkUpdate("OPEN", "actor")).toEqual({});
   });
 
   it("requires branch:all for another branch and does not allow branchless users", () => {

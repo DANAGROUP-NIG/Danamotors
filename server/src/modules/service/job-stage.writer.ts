@@ -1,6 +1,7 @@
 import { Prisma, type JobStage } from "@prisma/client";
 import { enqueueWorkshopNotification } from "../notification/workshop-notification-outbox";
 import { reconcileStage, stageAllowsStatus, stageOwnerFor, type StageAction, type StageOwner } from "./job-stage.logic";
+import { QC_STATE_SELECT, qcStateFrom, supersedeCurrentInspection } from "./job-qc-state";
 
 /**
  * The only code that writes JobCard.stage, stageOwnerId, stageOwnerRole and stageEnteredAt.
@@ -23,8 +24,7 @@ const stageJob = {
   stage: true,
   stageOwnerId: true,
   stageOwnerRole: true,
-  qcStatus: true,
-  qcNotes: true,
+  ...QC_STATE_SELECT,
   technicianId: true,
   qualityInspectorId: true,
   serviceAdvisorId: true,
@@ -129,7 +129,7 @@ async function writeStage(
 
 /**
  * Brings the stage and owner in line with the job's current status and QC result.
- * Call it in the same transaction, after any write to status, qcStatus, technician,
+ * Call it in the same transaction, after any write to status, the QC result (inspections), technician,
  * inspector or advisors. Writes nothing when everything already agrees.
  */
 export async function syncStage(
@@ -139,7 +139,7 @@ export async function syncStage(
   ctx?: StageContext,
 ): Promise<StageWrite | null> {
   const job = await lockStageJob(tx, jobCardId);
-  const toStage = reconcileStage(job.stage, job.status, job.qcStatus, !!job.creditApprovedById);
+  const toStage = reconcileStage(job.stage, job.status, qcStateFrom(job), !!job.creditApprovedById);
   return writeStage(tx, job, toStage, ownerOf(toStage, job), actorId, ctx, false);
 }
 
@@ -160,6 +160,6 @@ export async function moveStage(
  * goes back to the quality check step.
  */
 export async function resetQualityCheck(tx: Prisma.TransactionClient, jobCardId: string, actorId: string | null) {
-  await tx.jobCard.update({ where: { id: jobCardId }, data: { qcStatus: "PENDING" } });
+  await supersedeCurrentInspection(tx, jobCardId);
   await syncStage(tx, jobCardId, actorId);
 }

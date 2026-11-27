@@ -2,6 +2,7 @@ import type { JobStage } from "@prisma/client";
 import { allGateReasons, checkInStep, type CheckInGates } from "./job-check-in.logic";
 import { ROLES } from "../../shared/constants/roles";
 import { DIAGNOSIS_ENGINEERS, WARRANTY_SKIPPED_REASON } from "./job-diagnosis.logic";
+import type { QcState } from "./job-quality-check.logic";
 
 /**
  * The staged job card: one job, one step, one owner.
@@ -153,11 +154,11 @@ export function stageAllowsStatus(stage: JobStage, status: string) {
 export function reconcileStage(
   current: JobStage,
   status: string,
-  qcStatus: string | null | undefined,
+  qcState: QcState,
   creditApproved = false,
 ): JobStage {
   const canonical = normaliseJobStatus(status);
-  const qc = qcStatus?.toUpperCase() ?? null;
+  const qc = qcState;
   switch (canonical) {
     case "CANCELLED":
       return "CANCELLED";
@@ -263,7 +264,7 @@ export const STAGE_ROLES: Record<JobStage, readonly string[]> = {
 export interface StageFacts {
   stage: JobStage;
   status: string;
-  qcStatus: string | null;
+  qcState: QcState;
   technicianId: string | null;
   complaintCount: number;
   /** Problem text from the existing gate checks, or null when the gate is met. */
@@ -467,7 +468,7 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     roles: SUPERVISORS,
     kind: "handoff",
     gates: (facts) => [
-      ...(facts.qcStatus?.toUpperCase() === "FAILED"
+      ...(facts.qcState === "FAILED"
         ? []
         : ["Record a failed quality check before returning the job to the technician."]),
       ...problems(facts.openingSignatureProblem, facts.approvalProblem, facts.depositProblem),
@@ -479,7 +480,7 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     roles: SUPERVISORS,
     kind: "handoff",
     gates: (facts) =>
-      facts.qcStatus?.toUpperCase() === "PASSED"
+      facts.qcState === "PASSED"
         ? []
         : ["Record a passed quality check before sending the job to the service advisor."],
   },
@@ -492,7 +493,7 @@ export const ACTION_RULES: Record<StageAction, ActionRule> = {
     roles: [ROLES.SERVICE_ADVISOR],
     kind: "handoff",
     gates: (facts) => [
-      ...(facts.qcStatus?.toUpperCase() === "PASSED" ? [] : ["Record a passed quality check first."]),
+      ...(facts.qcState === "PASSED" ? [] : ["Record a passed quality check first."]),
       ...(facts.unansweredCampaigns > 0
         ? ["Record whether the campaign work was done for each campaign on this job."]
         : []),
@@ -626,7 +627,7 @@ export type SubStep =
 /** The part of the current step the job is on. Later phases refine these as each stage is rebuilt. */
 export function currentSubStep(facts: StageFacts): SubStep | null {
   const status = normaliseJobStatus(facts.status);
-  const qc = facts.qcStatus?.toUpperCase();
+  const qc = facts.qcState;
   switch (facts.stage) {
     case "CHECK_IN":
       return facts.checkInGates ? checkInStep(facts.checkInGates) : "DETAILS";
@@ -670,7 +671,7 @@ export function stageAlerts(facts: StageFacts & { promisedAt: Date | null }, now
   const open = !["CLOSED", "CANCELLED"].includes(facts.stage);
   if (open && facts.promisedAt && facts.promisedAt.getTime() < now.getTime())
     alerts.push({ code: "PROMISE_PASSED", tone: "danger", message: "The promised delivery time has passed." });
-  if (facts.stage === "QUALITY_CHECK" && facts.qcStatus?.toUpperCase() === "FAILED")
+  if (facts.stage === "QUALITY_CHECK" && facts.qcState === "FAILED")
     alerts.push({ code: "QC_FAILED", tone: "danger", message: "The quality check failed. Return the job to the technician." });
   if (
     open &&

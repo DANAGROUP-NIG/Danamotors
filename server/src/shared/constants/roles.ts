@@ -1044,6 +1044,8 @@ const existingRolePermissions = {
     PERMISSIONS.ESTIMATE_CREATE,
     PERMISSIONS.FPC_VEHICLES_READ,
     PERMISSIONS.FPC_ANALYSIS_READ,
+    // Job card revamp phase 7: the quality check is done by the supervisor or the service manager.
+    PERMISSIONS.QCSTATUS_UPDATE,
   ],
 
   // Executes repairs, updates job card progress

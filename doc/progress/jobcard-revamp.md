@@ -261,3 +261,42 @@ Built on Jayking (no phase branch, at the owner's request).
 - Sheets and the customer approval form kept their error messages after the mistake was fixed; messages now follow the form once a save was tried.
 - The signature check told technicians to "Ask the customer to sign"; it now says "Sign in the box. A signature is required" (its old unit test expected "PNG" and had failed since phase 5).
 - `workshop-notification-outbox.integration.test.ts` used the removed button function; it now drives the store notice directly.
+
+## Phase 7: Quality check (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: `Inspection` reshaped (`result` PASSED or FAILED, `checks` JSON with per-line and general results, road test km and notes, AC outlet temperature as Decimal, certified by and at, `supersededAt`, request ID per job), `InspectionSignature` (separate row with hash), `JobWorkLine.reopenedAt`; `JobCard.qcStatus` and `qcNotes` dropped after converting them to inspection rows.
+2. QC state is derived: the job's current (not superseded) inspection, else Not required when only the estimation charge is billed, else Pending. Every former "reset to pending" supersedes the current inspection instead.
+3. Server: pure `job-quality-check.logic.ts` (state, general checks constant, pass and fail gates, km rules); `job-quality-check.service.ts` with `GET/POST /service/job-cards/:id/quality-check` under the job lock: the inspection plus `QC_PASSED_TO_ADVISOR` or `RETURN_TO_REPAIR` through the stage service in one transaction; fail reopens the failed work lines. Old `PATCH /workshop/qc/:id` and `POST /service/job-cards/:id/inspections` removed.
+4. Client: `lib/quality-check.logic.ts`, `use-job-quality-check.ts`, `components/quality-check/` (QualityCheckStep, FailDialog, history); old QualityCheckSection deleted; returned tag on reopened lines.
+5. Demo seed jobs at Quality check (fresh, and second check after a fail); tests (logic, integration fail, repair, pass; billing readiness), Playwright phase 7; docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Migrations `20261127180000_jobcard_quality_check` (additive with conversion: the 11 passed QC results on the server became current inspections), `20261127180100_qc_supervisor_permission`, `20261127180200_jobcard_drop_qc_columns` (drops, kept separate). Checked from a copy of the phase 6 demo database both ways: all three (residual diff for phase 7 objects empty) and without the drop (QC, stage and PDI integration tests pass in that state).
+- [x] Server: `job-quality-check.logic.ts`, `job-qc-state.ts`, `job-quality-check.service.ts` and routes; `JobStageService.actInTx`; every QC reader moved to the inspection (workflow, stage writer and logic, billing readiness and list, requisitions, labour, inventory issue, estimate revision, PDI, portal, notifications); old `PATCH /workshop/qc/:id` and `POST /service/job-cards/:id/inspections` removed; QC review notices queued with the inspection; the notification trigger no longer watches the dropped columns.
+- [x] Client: `lib/quality-check.logic.ts`, `use-job-quality-check.ts`, `components/quality-check/` (QualityCheckStep, QualityCheckForm, FailReturnDialog, QcHistory); returned tag on reopened lines (technician and advisor views, banner for the advisor too); Activity names passed and failed checks; Inspections list shows quality checks; old QC section, hook, schema and copy file deleted.
+- [x] Demo seed: JC-S26 to JC-S28 on a local copy (`dana_demo_p7`, the e2e template now).
+- [ ] Server database: see "Server database incident" below.
+- [x] Docs: `doc/job-cards.md` ("Quality check (phase 7)"), `doc/demo-data.md`, manual test guide `doc/testing/jobcard-revamp/phase-7-manual-test.md`.
+
+### Tests (27 Nov 2026)
+
+- Server: new `job-quality-check.logic.test.ts` (12) and `job-quality-check.integration.test.ts` (2: pass and fail gates, wrong role, km validation, fail with reopened lines and the technician's notice, repair without a second labour charge, second check and pass with the signature and history, billing readiness before and after a superseded check; not at the quality check). Updated: stage logic, billing logic and service, notification policy and router, requisition logic, repair logic, advance workflow, job card service, issue 140 workshop tests, and the stage, requisition, return slip, labour slip, workshop and notification integration tests. Touched modules (service, workshop, notification, requisition, finance, PDI, customer portal, inventory, middleware) on a local test database: 1,211 passed, 48 failed, 8 skipped (1,267). The 48 are the same 7 old integration suites and causes as phase 6 (vehicles without a model; fixtures without the check-in signature). Typecheck clean (server and seed).
+- Client: 147 of 148 (`issue117-components`, missing `BillHeads`, as before). New `test/quality-check.test.mjs` (5, including a render of the supervisor's form). Typecheck clean, lint 0 errors (74 old warnings), production build passes.
+- Browser (Playwright): phase 7 suite 5 of 5 (fail on a tablet with every form mistake, the dialog's rules, outside click and Esc; the technician's My jobs, banner, reopened line, redo and send back; the second check with history, pass, Billing and Activity; read only for the advisor and refused for a technician by the server; 1440, 1024, 768 and 390 px, keyboard Pass and Fail, offline pass keeping the entries).
+
+### Server database incident (27 Nov 2026)
+
+- At 11:25 UTC a full `prisma migrate deploy` of this working tree's migrations ran against the shared server database. It applied the three held drops (`20261126125424_jobcard_drop_observations`, `20261127090200_jobcard_drop_opening_estimate`, `20261127180200_jobcard_drop_qc_columns`) and the phase 7 migrations. None of the phase 7 session's commands targeted the server at that time (every deploy had an explicit local URL); the source could not be traced.
+- At 12:13 UTC branch `feat/issue-144-booking-customer-details` added `20261127130000_repair_job_card_inspection_columns`, which put the dropped columns back, empty, with `Inspection.findings` required and no default. The phase 7 code does not write that column, so the quality check, PDI vehicle ready and the demo seed fail on the server until that is resolved. Waiting for the owner's decision before changing the server again.
+
+### Found and fixed in passing
+
+- The `/inspections` page linked to a page that does not exist, showed raw outcome text, an en dash, middle dots and an ellipsis; it now lists quality checks with readable results and job links.
+- The customer portal job page showed the raw QC value and "—" fallbacks; it now shows the quality check result and "Not recorded".
+- The appointment check-in notice title used an em dash ("Checked in, open campaign" now).
+- The portal demo seed still wrote the removed `estimatedCost` column.

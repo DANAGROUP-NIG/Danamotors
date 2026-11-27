@@ -312,6 +312,8 @@ model User {
   estimationChargesDecided    EstimationCharge[]      @relation("EstimationChargeDecidedBy")
   jobPartsRequests            JobPartsRequest[]       @relation("JobPartsRequestCreatedBy")
   workLines                   JobWorkLine[]           @relation("WorkLineTechnician")
+  inspectionsDone             Inspection[]            @relation("InspectionInspector")
+  inspectionsCertified        Inspection[]            @relation("InspectionCertifier")
   externalServicesAdded       ExternalServiceRecord[] @relation("ExternalServiceAddedBy")
   externalServicesRemoved     ExternalServiceRecord[] @relation("ExternalServiceRemovedBy")
   qualityInspectorAssignments JobCard[]               @relation("QualityInspectorAssignments")
@@ -838,9 +840,6 @@ model JobCard {
 
   progress Int? @default(0)
 
-  qcStatus String? @default("Pending")
-  qcNotes  String?
-
   qualityInspectorId String?
   qualityInspector   User?   @relation("QualityInspectorAssignments", fields: [qualityInspectorId], references: [id], onDelete: SetNull)
 
@@ -929,6 +928,9 @@ model JobOpeningSignature {
 // INSPECTION
 // ============================================================
 
+/// A quality check of a job (job card revamp phase 7). The job's QC result is its current inspection
+/// (supersededAt null; at most one); none means pending. A fail, a fresh check or changed work after
+/// a pass supersedes it, so history keeps every check. Created only by the quality check service and PDI.
 model Inspection {
   id String @id @default(uuid())
 
@@ -936,16 +938,49 @@ model Inspection {
   jobCard   JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
 
   inspectorId String?
+  inspector   User?   @relation("InspectionInspector", fields: [inspectorId], references: [id], onDelete: SetNull)
 
-  findings String
-  passed   Boolean?
-  status   String   @default("Pending")
-  notes    String?
+  result InspectionResult
+  /// { lines: [{ workLineId, description, result }], general: [{ code, label, passed }] }
+  checks Json             @default("{}")
+  /// Fail: what the technician must fix. Pass: optional remarks.
+  notes  String?
+
+  roadTestStartKm Int?
+  roadTestEndKm   Int?
+  roadTestNotes   String?
+  acOutletTempC   Decimal? @db.Decimal(4, 1)
+
+  /// "Vehicle checked and certified as roadworthy in all respects", signed (pass only).
+  certifiedById String?
+  certifiedBy   User?                @relation("InspectionCertifier", fields: [certifiedById], references: [id], onDelete: SetNull)
+  certifiedAt   DateTime?
+  signature     InspectionSignature?
+
+  supersededAt DateTime?
+  /// The client request that recorded it, so a double submit records once.
+  requestId    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([jobCardId])
+  @@unique([jobCardId, requestId])
+  @@index([jobCardId, supersededAt])
+}
+
+enum InspectionResult {
+  PASSED
+  FAILED
+}
+
+/// The certification signature, kept apart so normal job responses never carry the image.
+model InspectionSignature {
+  inspectionId   String     @id
+  inspection     Inspection @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
+  signerId       String
+  signedAt       DateTime   @default(now())
+  contentHash    String     @db.Char(64)
+  signatureImage String     @db.Text
 }
 
 // ============================================================
@@ -5574,6 +5609,8 @@ model JobWorkLine {
   doneAt         DateTime?
   labourLineId   String?        @unique
   labourLine     JobCardLabour? @relation(fields: [labourLineId], references: [id], onDelete: SetNull)
+  /// Set when a failed quality check reopened it (phase 7); the technician sees "Returned from quality check".
+  reopenedAt     DateTime?
   /// The last request that changed it, so a double tap changes it once.
   lastRequestId  String?
   sortOrder      Int            @default(0)

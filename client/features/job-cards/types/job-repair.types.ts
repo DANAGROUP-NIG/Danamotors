@@ -20,6 +20,8 @@ export interface WorkLine {
   startedAt: string | null;
   doneAt: string | null;
   secondsWorked: number;
+  /** Reopened by a failed quality check and not done again yet. */
+  returnedFromQc: boolean;
 }
 
 export interface RepairFinding {

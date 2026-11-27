@@ -12,7 +12,7 @@ import { Prisma, type JobcardNotificationEvent } from '@prisma/client';
 import prisma from '../../prisma/client';
 import { drainJobcardNotifications, notificationDedupeKey, processJobcardNotification, sendJobcardReminders } from './jobcard-notification-router';
 
-const snapshot = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'IN_PROGRESS', technicianId: 'tech', qualityInspectorId: 'qc', serviceAdvisorId: 'advisor', deliveryAdvisorId: null, createdById: 'requester', customerId: 'customer', qcStatus: 'PENDING', qcNotes: null, promisedAt: '2026-11-13T10:00:00.000Z' };
+const snapshot = { id: 'job', branchId: 'branch', jobNumber: 'J1', status: 'IN_PROGRESS', technicianId: 'tech', qualityInspectorId: 'qc', serviceAdvisorId: 'advisor', deliveryAdvisorId: null, createdById: 'requester', customerId: 'customer', promisedAt: '2026-11-13T10:00:00.000Z' };
 function row(after = snapshot, before = { ...snapshot, status: 'OPEN' }): JobcardNotificationEvent {
   return { id: 'event-1', jobCardId: 'job', actorId: 'actor', before, after, createdAt: new Date('2026-11-12T08:00:00Z'), processedAt: null };
 }
@@ -203,9 +203,10 @@ it('consumes parts events through the same atomic notification/audit/processed t
 });
 
 
-it.each(['PASSED', 'FAILED'])('delivers a recorded QC %s after workflow advances without exposing review notes', async outcome => {
+it.each(['PASSED', 'FAILED'])('delivers a recorded QC %s queued with the inspection, after the workflow moved on, without review notes', async outcome => {
   const before = { ...snapshot, status: 'QC' };
-  const result = { ...row(before, before), after: { ...before, qcStatus: outcome, qcNotes: 'Private notes' } };
+  // The QC service queues the notice with the inspection; the job has already moved on (stale is fine).
+  const result = { ...row(before), before: null, id: 'qc:job:inspection', after: { ...before, notificationEvent: `QC_${outcome}`, notes: 'Private notes' } };
   (prisma.jobcardNotificationEvent.findUnique as jest.Mock).mockResolvedValue(result);
   await processJobcardNotification(result);
   expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({

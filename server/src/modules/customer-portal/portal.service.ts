@@ -12,6 +12,7 @@ import { availablePartyCredit } from "../finance/party-account.service";
 import { coverageFor, vehicleWarrantySelect } from "../warranty/warranty.coverage";
 import { Prisma, type FindingPayer, type LineDecision } from "@prisma/client";
 import { estimateTotals } from "../service/job-estimate.logic";
+import { qcStateOf } from '../service/job-quality-check.logic';
 
 /** What the customer pays on the job's latest estimate, with VAT (approved lines once answered). Null without an estimate. */
 function customerPays(estimate: { vatRate: Prisma.Decimal; lines: { payer: FindingPayer; amount: Prisma.Decimal; customerDecision: LineDecision | null }[] } | undefined) {
@@ -393,14 +394,15 @@ export class PortalService {
       estimatedHours: jobCard.estimatedHours,
       estimatedCost: customerPays(jobCard.estimates[0]),
       progress: jobCard.progress,
-      qcStatus: jobCard.qcStatus,
+      // The job's quality check result (current inspection); customers see the result and date only.
+      qualityCheck: qcStateOf(jobCard.inspections.find((inspection) => !inspection.supersededAt) ?? null, jobCard.estimationCharge?.status === 'ADDED'),
       createdAt: jobCard.createdAt,
       updatedAt: jobCard.updatedAt,
       vehicle: jobCard.vehicle,
       branch: jobCard.branch,
       estimates: jobCard.estimates.map(({ lines: _lines, vatRate: _vatRate, ...estimate }) => ({ ...estimate, amount: estimate.amount.toNumber() })),
       invoices: [...new Map([...jobCard.invoices, ...(jobCard.consolidatedInvoices ?? [])].map(invoice => [invoice.id, invoice])).values()],
-      inspections: jobCard.inspections,
+      inspections: jobCard.inspections.map(({ id, result, createdAt }) => ({ id, result, createdAt })),
     };
   }
 

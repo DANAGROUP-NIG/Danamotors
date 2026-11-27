@@ -16,6 +16,9 @@ import { JobDiagnosisService } from "../../../src/modules/service/job-diagnosis.
 import { decideCustomerPay } from "./warranty-check";
 import { notifyStoreOfParts } from "../../../src/modules/service/jobcard-parts-request.service";
 import { JobRepairService, type RepairActor } from "../../../src/modules/service/job-repair.service";
+import { JobQualityCheckService } from "../../../src/modules/service/job-quality-check.service";
+import { QC_GENERAL_CHECKS } from "../../../src/modules/service/job-quality-check.logic";
+import { demoSignaturePng } from "./check-in";
 import { ROLES } from "../../../src/shared/constants/roles";
 import type { StageAction } from "../../../src/modules/service/job-stage.logic";
 import { upfrontAmount } from "../../../src/modules/service/estimate-advance";
@@ -29,6 +32,7 @@ import {
   FindingFixture,
   EstimateFixture,
   JobFixture,
+  QualityCheckFixture,
   LABOUR,
   LabourKey,
   PARTS,
@@ -56,6 +60,7 @@ const services = {
   diagnosis: new JobDiagnosisService(),
   estimates: new JobEstimateService(),
   repair: new JobRepairService(),
+  qc: new JobQualityCheckService(),
 };
 
 /** A workshop user with the permissions of their role, as the repair screens send them. */
@@ -161,7 +166,7 @@ export async function seedJob(ctx: DemoContext, ref: Reference, parties: Parties
   if (fx.repair) await workRepair(ctx, ref, fx, id);
 
   await advance(ctx, fx, id);
-  await stopInWorkshop(ctx, fx, id);
+  await stopInWorkshop(ctx, ref, fx, id);
 
   if (fx.claim && claimUsesJobLines) await decideClaim(ctx, ref, id, fx.claim);
 
@@ -317,9 +322,9 @@ async function advance(ctx: DemoContext, fx: JobFixture, id: string) {
 }
 
 /** Runs one staged job card action as a seeded staff member. The request ID makes re-runs safe. */
-async function stageAction(fx: JobFixture, id: string, action: StageAction, actorId: string, note?: string) {
+async function stageAction(fx: JobFixture, id: string, action: StageAction, actorId: string, note?: string, attempt = "") {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: actorId }, select: { id: true, role: { select: { name: true } } } });
-  await services.stages.act(id, { action, note, requestId: demoUuid(`stage:${fx.id}:${action}`) }, { id: user.id, role: user.role.name });
+  await services.stages.act(id, { action, note, requestId: demoUuid(`stage:${fx.id}:${action}${attempt}`) }, { id: user.id, role: user.role.name });
 }
 
 const PRE_REPAIR: JobStage[] = ["CHECK_IN", "DIAGNOSIS", "WARRANTY", "ESTIMATE"];
@@ -469,12 +474,54 @@ async function recordAdvance(ctx: DemoContext, fx: JobFixture, id: string) {
   });
 }
 
-/** Records a passed QC and the supervisor hands the job to the service advisor. */
+/**
+ * The supervisor's quality check (phase 7) through the quality check service: every line passed,
+ * the general checks, an 8 km road test from the check-in reading, and the signed certification.
+ * A pass hands the job to the service advisor.
+ */
 async function passQualityCheck(ctx: DemoContext, fx: JobFixture, id: string) {
-  const supervisor = ctx.staff[fx.branch].supervisor;
-  const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { qcStatus: true, stage: true } });
-  if (job.qcStatus?.toUpperCase() !== "PASSED") await services.workshop.updateQC(id, "PASSED", "Road test passed", supervisor.id);
-  if (job.stage === "QUALITY_CHECK") await stageAction(fx, id, "QC_PASSED_TO_ADVISOR", supervisor.id);
+  const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, mileage: true } });
+  if (job.stage !== "QUALITY_CHECK") return;
+  const supervisor = await repairActor(ctx.staff[fx.branch].supervisor.id);
+  const lines = await prisma.jobWorkLine.findMany({ where: { jobCardId: id }, select: { id: true } });
+  const start = job.mileage ?? fx.mileage;
+  await services.qc.record(id, supervisor, {
+    requestId: demoUuid(`qc:${fx.id}:pass`),
+    outcome: "PASS",
+    lines: lines.map((line) => ({ workLineId: line.id, result: "PASS" as const })),
+    general: QC_GENERAL_CHECKS.map((check) => ({ code: check.code, passed: true })),
+    acOutletTempC: 6,
+    roadTestStartKm: start,
+    roadTestEndKm: start + 8,
+    roadTestNotes: "Road test completed. No abnormal noise. Brakes performed as expected.",
+    notes: null,
+    signatureImage: demoSignaturePng(),
+  });
+}
+
+/** A failed quality check: the fixture's lines fail with its note, and the job goes back to the technician. */
+async function failQualityCheck(ctx: DemoContext, fx: JobFixture, id: string, plan: QualityCheckFixture, ref: Reference) {
+  const failed = await prisma.inspection.count({ where: { jobCardId: id, result: "FAILED" } });
+  const job = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true, mileage: true } });
+  if (failed || job.stage !== "QUALITY_CHECK") return;
+  const supervisor = await repairActor(ctx.staff[fx.branch].supervisor.id);
+  const lines = await prisma.jobWorkLine.findMany({ where: { jobCardId: id }, select: { id: true, kind: true, labourItemId: true } });
+  const failing = new Set(
+    plan.fail.lines.map((key) => lines.find((line) => (key === "serviceType" ? line.kind === "SERVICE" : line.labourItemId === ref.labour[key]))?.id),
+  );
+  const start = job.mileage ?? fx.mileage;
+  await services.qc.record(id, supervisor, {
+    requestId: demoUuid(`qc:${fx.id}:fail`),
+    outcome: "FAIL",
+    lines: lines.map((line) => ({ workLineId: line.id, result: failing.has(line.id) ? ("FAIL" as const) : ("PASS" as const) })),
+    general: QC_GENERAL_CHECKS.map((check) => ({ code: check.code, passed: true })),
+    acOutletTempC: null,
+    roadTestStartKm: start,
+    roadTestEndKm: start + 6,
+    roadTestNotes: null,
+    notes: plan.fail.note,
+    signatureImage: null,
+  });
 }
 
 /** Jobs left in the workshop: paused for parts, waiting for QC, or passed QC and waiting for the advisor. */
@@ -549,7 +596,7 @@ async function finishWorkList(ctx: DemoContext, fx: JobFixture, id: string) {
   }
 }
 
-async function stopInWorkshop(ctx: DemoContext, fx: JobFixture, id: string) {
+async function stopInWorkshop(ctx: DemoContext, ref: Reference, fx: JobFixture, id: string) {
   if (fx.target !== "IN_PROGRESS" || !fx.stop) return;
   const technician = ctx.staff[fx.branch].technician.id;
   const status = canonicalJobStatus((await loadJob(id)).status);
@@ -557,6 +604,14 @@ async function stopInWorkshop(ctx: DemoContext, fx: JobFixture, id: string) {
   if (["QUALITY_CHECK", "QC_PASSED"].includes(fx.stop) && status === "IN_PROGRESS") {
     await finishWorkList(ctx, fx, id);
     await stageAction(fx, id, "SEND_TO_QC", technician, "Work complete, sent for quality check");
+  }
+  if (fx.qualityCheck) {
+    await failQualityCheck(ctx, fx, id, fx.qualityCheck, ref);
+    const back = await prisma.jobCard.findUniqueOrThrow({ where: { id }, select: { stage: true } });
+    if (fx.qualityCheck.redone && back.stage === "REPAIR") {
+      await finishWorkList(ctx, fx, id);
+      await stageAction(fx, id, "SEND_TO_QC", technician, "Caliper sliders cleaned and greased, sent for a second check", ":2");
+    }
   }
   if (fx.stop === "QC_PASSED") await passQualityCheck(ctx, fx, id);
 }

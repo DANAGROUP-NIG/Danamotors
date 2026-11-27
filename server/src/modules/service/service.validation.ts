@@ -252,20 +252,6 @@ export const updateJobCardSchema = z.object({
   }),
 });
 
-export const createInspectionSchema = z.object({
-  body: z.object({
-    inspectorId: z.string().uuid("Invalid inspector ID").optional(),
-    findings: z.string().min(1, "Findings are required"),
-    passed: z.boolean().optional(),
-    status: z.string().optional(),
-    notes: z.string().optional(),
-  }),
-
-  params: z.object({
-    id: z.string().uuid("Invalid job card ID"),
-  }),
-});
-
 export const estimateBody = z
   .object({
     description: z.string().trim().min(1).max(2000),

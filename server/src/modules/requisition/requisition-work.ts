@@ -4,6 +4,7 @@ import { assertSignedJobOpening } from "../service/job-opening-signature.service
 import { requisitionWorkUpdate } from "./requisition.logic";
 import { setNotificationActor } from "../notification/jobcard-notification-router";
 import { syncStage } from "../service/job-stage.writer";
+import { supersedeCurrentInspection } from "../service/job-qc-state";
 
 export async function jobWorkUpdate(
   tx: Prisma.TransactionClient,
@@ -30,6 +31,8 @@ export async function applyJobWorkChange(
   options: { label?: string; pdi?: boolean } = {},
 ) {
   const label = options.label ?? "Requisition";
+  // Changed work needs a fresh quality check.
+  await supersedeCurrentInspection(tx, job.id);
   await tx.jobCard.update({
     where: { id: job.id },
     data: options.pdi

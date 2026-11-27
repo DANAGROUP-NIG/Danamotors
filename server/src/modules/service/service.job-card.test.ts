@@ -19,6 +19,9 @@ jest.mock("../../prisma/client", () => ({
       findFirst: jest.fn(),
     },
 
+    // The QC result lives on inspections (phase 7).
+    inspection: { updateMany: jest.fn() },
+
     jobCard: {
       create: jest.fn(),
       count: jest.fn(),
@@ -606,7 +609,8 @@ describe("JobCard workflow", () => {
     (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, customerId: id, status: 'OPEN', invoices: [] });
     (prisma.estimate.findMany as jest.Mock).mockResolvedValue([]);
     await expect(new ServiceService().updateJobCard(id, { status: 'IN_PROGRESS' }, id)).rejects.toThrow('approval');
-    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, customerId: id, status: 'QC', qcStatus: 'FAILED', invoices: [] });
+    (prisma.jobCard.findUnique as jest.Mock).mockResolvedValue({ id, customerId: id, status: 'QC', invoices: [] });
+    (prisma.jobCard.findUniqueOrThrow as jest.Mock).mockResolvedValue({ inspections: [{ result: 'FAILED' }], estimationCharge: null });
     (prisma.estimate.findMany as jest.Mock).mockResolvedValue([{ id, status: 'Approved', amount: 0, lines: [], approvals: [{ approved: true, customerId: id }] }]);
     await expect(new ServiceService().updateJobCard(id, { status: 'READY' }, id)).rejects.toThrow('passed quality check');
     expect(prisma.jobCard.update).not.toHaveBeenCalled();

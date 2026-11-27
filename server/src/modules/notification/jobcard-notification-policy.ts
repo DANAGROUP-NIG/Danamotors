@@ -37,7 +37,9 @@ export interface NotificationJob {
   technicianId: string | null; qualityInspectorId: string | null;
   serviceAdvisorId: string | null; deliveryAdvisorId: string | null;
   createdById: string | null; customerId: string | null;
-  qcStatus: string | null; qcNotes: string | null; promisedAt: string | null;
+  promisedAt: string | null;
+  /** The job's step; at QC status, BILLING means the check passed and the advisor marks it ready. */
+  stage?: string | null;
 }
 export type JobNotificationEvent = 'CREATED' | 'ASSIGNED' | 'STATUS' | 'QC_PASSED' | 'QC_FAILED' | 'QC_REVIEW_REQUIRED' | 'REMINDER' | 'ESCALATION' | 'PROMISED_24H' | 'PROMISED_12H';
 export interface RecipientTarget {
@@ -58,8 +60,7 @@ export function actionTargets(card: NotificationJob): RecipientTarget[] {
     case 'IN_PROGRESS': return [tech('Continue work and submit for inspection')];
     case 'WAITING_PARTS': return [roleTarget(ROLES.BRANCH_STORE_MANAGER, 'Resolve parts availability')];
     case 'QC':
-      if (card.qcStatus?.toUpperCase() === 'PASSED') return [advisor('Review passed QC and mark Ready')];
-      if (card.qcStatus?.toUpperCase() === 'FAILED') return [...qcTechnician(card, 'QC failed. Review the job card for rework'), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
+      if (card.stage === 'BILLING') return [advisor('Review passed QC and mark Ready')];
       return card.qualityInspectorId ? [{ userId: card.qualityInspectorId, intent: 'Inspect completed work' }] : [{ permission: PERMISSIONS.QCSTATUS_UPDATE, intent: 'Inspect completed work' }];
     case 'READY': return [roleTarget(ROLES.BILLING_OFFICER, 'Prepare job bill')];
     case 'BILLED': return [userTarget(card.deliveryAdvisorId ?? card.serviceAdvisorId, ROLES.SERVICE_ADVISOR, 'Arrange vehicle delivery')];
@@ -75,7 +76,8 @@ export function routeJobNotification(event: JobNotificationEvent, before: Notifi
   if (event === 'REMINDER' || event.startsWith('PROMISED_')) return actionTargets(card).map(target => ({ ...target, intent: `${event === 'REMINDER' ? 'Reminder' : 'Promised delivery approaching'}: ${target.intent}` }));
   if (event === 'CREATED') return actionTargets({ ...card, status: 'OPEN' });
   if (event === 'ASSIGNED') return card.technicianId ? [{ userId: card.technicianId, intent: 'Start assigned work by the due date' }] : actionTargets({ ...card, status: 'OPEN' });
-  if (event === 'QC_PASSED') return [advisor('Review passed QC and mark Ready'), ...qcTechnician(card, 'QC passed')];
+  // The step handoff (STAGE_HANDOFF) already tells the service advisor; the technician hears the result.
+  if (event === 'QC_PASSED') return qcTechnician(card, 'QC passed');
   if (event === 'QC_REVIEW_REQUIRED') return actionTargets(card);
   if (event === 'QC_FAILED') return [...qcTechnician(card, 'QC failed. Review the job card for rework'), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];
   if (event === 'STATUS' && from === 'QC' && to === 'IN_PROGRESS') return [];
@@ -99,10 +101,9 @@ export function notificationEvents(before: NotificationJob | null, card: Notific
   const events: JobNotificationEvent[] = [];
   if (canonicalNotificationStatus(before.status) !== canonicalNotificationStatus(card.status)) events.push('STATUS');
   if (before.technicianId !== card.technicianId) events.push('ASSIGNED');
-  if (before.qcStatus?.toUpperCase() !== card.qcStatus?.toUpperCase() && ['PASSED', 'FAILED'].includes(card.qcStatus?.toUpperCase() ?? '')) events.push(card.qcStatus?.toUpperCase() === 'PASSED' ? 'QC_PASSED' : 'QC_FAILED');
+  // QC_PASSED and QC_FAILED are queued with the inspection (queueQcReviewNotification), not read from the job row.
   if (canonicalNotificationStatus(before.status) === 'QC' && canonicalNotificationStatus(card.status) === 'QC'
-    && !['PASSED', 'FAILED'].includes(card.qcStatus?.toUpperCase() ?? '')
-    && (before.qualityInspectorId !== card.qualityInspectorId || before.qcStatus?.toUpperCase() !== card.qcStatus?.toUpperCase())) events.push('QC_REVIEW_REQUIRED');
+    && card.stage !== 'BILLING' && before.qualityInspectorId !== card.qualityInspectorId) events.push('QC_REVIEW_REQUIRED');
   return events;
 }
 
