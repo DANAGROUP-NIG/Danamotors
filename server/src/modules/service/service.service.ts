@@ -38,7 +38,7 @@ import {
   serviceChargeReference,
 } from "./job-service-charge";
 import { lineAmount, sumMoney } from "../finance/money";
-import { Prisma, WarrantyCoverageStatus, type LineDecision } from "@prisma/client";
+import { Prisma, WarrantyCoverageStatus, type JobStage, type LineDecision } from "@prisma/client";
 import {
   canonicalJobStatus,
   jobStatusFilter,
@@ -630,6 +630,9 @@ export class ServiceService {
     jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
     dateFrom?: string;
     dateTo?: string;
+    advisorId?: string;
+    technicianId?: string;
+    stages?: JobStage[];
   }) {
     const jobType =
       params?.jobType === "HISTORY"
@@ -646,6 +649,9 @@ export class ServiceService {
     if (params?.status) where.status = jobStatusFilter(params.status);
 
     if (params?.unassignedTechnician) where.technicianId = null;
+    if (params?.technicianId) where.technicianId = params.technicianId;
+    if (params?.advisorId) where.serviceAdvisorId = params.advisorId;
+    if (params?.stages?.length) where.stage = { in: params.stages };
     if (jobType !== "ALL") where.jobType = jobType ?? "SERVICE";
 
     if (params?.search) {
@@ -711,6 +717,9 @@ export class ServiceService {
         jobType,
         dateFrom: params?.dateFrom,
         dateTo: params?.dateTo,
+        advisorId: params?.advisorId,
+        technicianId: params?.technicianId,
+        stages: params?.stages,
       }),
       prisma.jobCard.count({ where }),
     ]);

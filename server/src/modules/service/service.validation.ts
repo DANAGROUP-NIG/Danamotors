@@ -130,6 +130,16 @@ export const listJobCardsSchema = z.object({
       jobType: z.enum(["SERVICE", "PDI", "ALL", "HISTORY"]).optional(),
       dateFrom: jobCardDate.optional(),
       dateTo: jobCardDate.optional(),
+      // Workshop board, Table view (phase 10).
+      advisorId: z.string().uuid("Choose a service advisor from the list").optional(),
+      technicianId: z.string().uuid("Choose a technician from the list").optional(),
+      stage: z
+        .string()
+        .regex(
+          /^(CHECK_IN|DIAGNOSIS|WARRANTY|ESTIMATE|REPAIR|QUALITY_CHECK|BILLING|DELIVERY|CLOSED|CANCELLED)(,(CHECK_IN|DIAGNOSIS|WARRANTY|ESTIMATE|REPAIR|QUALITY_CHECK|BILLING|DELIVERY|CLOSED|CANCELLED))*$/,
+          "Choose job steps from the list",
+        )
+        .optional(),
     })
     .refine(
       (q) =>

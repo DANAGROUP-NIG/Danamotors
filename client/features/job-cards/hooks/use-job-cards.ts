@@ -13,6 +13,9 @@ type UseJobCardsParams = {
   jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
   dateFrom?: string;
   dateTo?: string;
+  advisorId?: string;
+  technicianId?: string;
+  stage?: string;
 };
 
 export function useJobCards(params?: UseJobCardsParams, enabled = true) {

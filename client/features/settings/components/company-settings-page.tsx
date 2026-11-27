@@ -18,6 +18,11 @@ type BranchSettings = {
   storageFreeHours: number;
   storageDailyRate: number;
   psfFollowUpDays: number;
+  stageTargetCheckInMinutes: number;
+  stageTargetDiagnosisMinutes: number;
+  stageTargetWarrantyMinutes: number;
+  stageTargetEstimateMinutes: number;
+  stageTargetQualityCheckMinutes: number;
   repeatWindowDays: number;
   repeatWindowKm: number | null;
   printRepeatBlock: boolean;
@@ -35,7 +40,12 @@ type BranchSettings = {
 };
 type NumberKey = { [K in keyof BranchSettings]: BranchSettings[K] extends number | null ? K : never }[keyof BranchSettings];
 
-const errorMessage = (error: unknown) => isAxiosError(error) ? error.response?.data?.message ?? "Could not save" : "Could not save";
+// A rejected field names itself and the fix (for example "The check-in time target must be at least 1 minute").
+const errorMessage = (error: unknown) => {
+  if (!isAxiosError(error)) return "Could not save. Check your connection and try again.";
+  const data = error.response?.data as { message?: string; errors?: { message?: string }[] } | undefined;
+  return data?.errors?.find(item => item.message)?.message ?? data?.message ?? "Could not save. Check your connection and try again.";
+};
 const sectionCls = "grid gap-4 rounded-xl border border-border bg-background p-4 shadow-sm md:p-6";
 const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
@@ -69,6 +79,17 @@ const NUMBER_GROUPS: { title: string; note: string; fields: [NumberKey, string, 
     title: "Follow-up call",
     note: "When a vehicle is delivered, the post-service follow-up call is scheduled this many days later (0 is the same day).",
     fields: [["psfFollowUpDays", "Follow-up call after delivery (days)", "1"]],
+  },
+  {
+    title: "Workshop board time targets",
+    note: "Minutes a job may spend in each step. On the workshop board its time shows amber once over the target and red once over twice the target. In repair, waiting parts and ready have no target.",
+    fields: [
+      ["stageTargetCheckInMinutes", "Check-in (minutes)", "1"],
+      ["stageTargetDiagnosisMinutes", "Diagnosis (minutes)", "1"],
+      ["stageTargetWarrantyMinutes", "Warranty check (minutes)", "1"],
+      ["stageTargetEstimateMinutes", "Awaiting approval (minutes)", "1"],
+      ["stageTargetQualityCheckMinutes", "Quality check (minutes)", "1"],
+    ],
   },
   {
     title: "Repeat jobs and bookings",
@@ -151,7 +172,7 @@ function BranchRules({ canManage }: { canManage: boolean }) {
         <legend className="text-sm font-semibold">{group.title}</legend>
         <p className="text-sm text-muted-foreground">{group.note}</p>
         <div className="grid gap-3 md:grid-cols-3">{group.fields.map(([key, label, step]) => <Field key={key} label={label}>
-          <input className={inputCls} type="number" min={key === "vorOrderDays" || key === "labourVatPercent" ? 0 : 1} step={step}
+          <input className={inputCls} type="number" min={key === "vorOrderDays" || key === "labourVatPercent" ? 0 : 1} max={key.startsWith("stageTarget") ? 10080 : undefined} step={step}
             required={key !== "repeatWindowKm"} value={form[key] ?? ""}
             onChange={event => setForm({ ...form, [key]: event.target.value === "" ? null : Number(event.target.value) })} /></Field>)}</div>
         {group.fields.some(([key]) => key === "repeatWindowDays") && <label className="flex items-center gap-2 text-sm">

@@ -1,3 +1,4 @@
+import type { JobStage } from "@prisma/client";
 import { scopeJobCard } from "./job-card-visibility";
 import { Request, Response, NextFunction } from "express";
 import { ServiceService } from "./service.service";
@@ -428,6 +429,9 @@ export class ServiceController {
         unassignedTechnician: req.query.unassignedTechnician === "true",
         dateFrom,
         dateTo,
+        advisorId: req.query.advisorId as string | undefined,
+        technicianId: req.query.technicianId as string | undefined,
+        stages: req.query.stage ? (String(req.query.stage).split(",") as JobStage[]) : undefined,
       });
       res
         .status(200)

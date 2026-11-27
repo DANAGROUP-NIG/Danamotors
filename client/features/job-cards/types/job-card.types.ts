@@ -261,6 +261,9 @@ export type JobCard = {
   status: JobCardStatus;
   /** Step on the staged job card. */
   stage?: JobStage;
+  /** Who holds the step now (the job list's With column). */
+  stageOwnerRole?: string | null;
+  stageOwner?: { id: string; firstName: string; lastName: string } | null;
   estimatedHours: number;
   progress: number;
   branchId: string;

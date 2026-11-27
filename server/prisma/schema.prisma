@@ -4944,6 +4944,13 @@ model BranchSettings {
   storageDailyRate        Decimal @default(2000) @db.Decimal(18, 2)
   /// Delivery (phase 9): the post-service follow-up call is due this many days after delivery.
   psfFollowUpDays         Int     @default(2)
+  /// Workshop board (phase 10): minutes a job may spend in a step before its time shows amber
+  /// (over target) or red (over twice the target). Repair, waiting parts and ready have no target.
+  stageTargetCheckInMinutes      Int @default(30)
+  stageTargetDiagnosisMinutes    Int @default(120)
+  stageTargetWarrantyMinutes     Int @default(120)
+  stageTargetEstimateMinutes     Int @default(120)
+  stageTargetQualityCheckMinutes Int @default(60)
 
   // Workshop rules. A job is a repeat when it is within either limit of the vehicle's last billed job.
   repeatWindowDays Int     @default(15)

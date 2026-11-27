@@ -14,7 +14,9 @@ import { loadOpeningConsent } from "./job-opening-consent";
 import { assertBookable } from "./booking.logic";
 import { projectEstimatePrint } from "./estimate-print";
 import { ServiceService } from "./service.service";
-import { ConflictError, NotFoundError } from "../../shared/errors/appError";
+import { BadRequestError, ConflictError, NotFoundError } from "../../shared/errors/appError";
+import { boardFilter, boardQuery } from "./job-board.logic";
+import { loadWorkshopBoard } from "./job-board.service";
 import { z } from "zod";
 import prisma from "../../prisma/client";
 import {
@@ -888,6 +890,40 @@ router.get(
     try {
       const query = multiJobVehiclesQuery.parse(req.query);
       const data = await listMultiJobVehicles(query, multiJobBranch(req.user, query.branchId));
+      res.json({ status: "success", statusCode: 200, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+/**
+ * @openapi
+ * /api/service/job-cards/board:
+ *   get:
+ *     tags: [Service]
+ *     summary: Workshop board, every active job of a branch by step
+ *     description: Requires jobcard:read and access to the branch (defaults to the user's branch). Columns Check-in, Diagnosis, Warranty check, Awaiting approval, In repair, Waiting parts, Quality check and Ready, each with its total, time target in minutes (null when the step has none) and at most 50 cards, longest in the step first. Summary figures In workshop, Awaiting approval, Waiting parts, Ready for collection and Overdue (promised time passed before Ready). PDI jobs are not shown.
+ *     parameters:
+ *       - { in: query, name: branchId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: advisorId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: technicianId, schema: { type: string, format: uuid } }
+ *       - { in: query, name: date, description: Jobs received on this day (Africa/Lagos), schema: { type: string, format: date } }
+ *     responses:
+ *       200: { description: 'status=success, data={ branchId, generatedAt, summary, columns }' }
+ *       400: { description: Invalid filter, or no branch chosen }
+ *       403: { description: Permission or branch access denied }
+ */
+router.get(
+  "/job-cards/board",
+  requirePermission(PERMISSIONS.JOBCARD_READ),
+  validateRequest(z.object({ query: boardQuery })),
+  async (req, res, next) => {
+    try {
+      const query = boardQuery.parse(req.query);
+      const branchId = query.branchId ?? req.user!.branchId;
+      if (!branchId) throw new BadRequestError("Choose a branch to see its workshop board");
+      assertBranchOwnership(req, branchId);
+      const data = await loadWorkshopBoard(boardFilter(query, branchId));
       res.json({ status: "success", statusCode: 200, data });
     } catch (error) {
       next(error);

@@ -132,6 +132,7 @@ export function WorkshopPicker({
   loadOnValue = true,
   staleTime = 30_000,
   getOptionId = row => row.id,
+  placeholder,
 }: {
   label: string;
   hideLabel?: boolean;
@@ -157,6 +158,8 @@ export function WorkshopPicker({
   loadOnValue?: boolean;
   staleTime?: number;
   getOptionId?: (row: PickerRecord) => string;
+  /** Shown when nothing is chosen, for example "All technicians" on a filter. */
+  placeholder?: string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -272,7 +275,7 @@ export function WorkshopPicker({
           placeholder={
             open
               ? `Search ${label.toLowerCase()}...`
-              : `Select ${label.toLowerCase()}`
+              : placeholder ?? `Select ${label.toLowerCase()}`
           }
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}

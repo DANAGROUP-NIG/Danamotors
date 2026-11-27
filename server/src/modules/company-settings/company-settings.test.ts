@@ -2,7 +2,7 @@ jest.mock('../../prisma/client', () => ({ __esModule: true, default: { branchSet
 import prisma from '../../prisma/client';
 import { calculateJobBillTotals } from '../finance/job-bill-calculator';
 import { assertWithinBookingHorizon } from '../service/service.service';
-import { branchSettingsSchema, defaultBranchSettings } from './company-settings.service';
+import { branchSettingsSchema, defaultBranchSettings, getBranchSettings } from './company-settings.service';
 
 beforeEach(() => jest.resetAllMocks());
 
@@ -35,4 +35,28 @@ it('validates branch settings', () => {
   expect(branchSettingsSchema.safeParse(defaultBranchSettings()).success).toBe(true);
   expect(branchSettingsSchema.safeParse({ ...defaultBranchSettings(), workStartTime: '7:30' }).success).toBe(false);
   expect(branchSettingsSchema.safeParse({ ...defaultBranchSettings(), signatories: Array(6).fill('A') }).success).toBe(false);
+});
+
+it('keeps the workshop board step targets in whole minutes, naming the step in each message', () => {
+  expect(defaultBranchSettings()).toMatchObject({
+    stageTargetCheckInMinutes: 30,
+    stageTargetDiagnosisMinutes: 120,
+    stageTargetWarrantyMinutes: 120,
+    stageTargetEstimateMinutes: 120,
+    stageTargetQualityCheckMinutes: 60,
+  });
+  const messages = (values: Record<string, unknown>) => {
+    const result = branchSettingsSchema.safeParse({ ...defaultBranchSettings(), ...values });
+    return result.success ? [] : result.error.issues.map(issue => issue.message);
+  };
+  expect(messages({ stageTargetCheckInMinutes: 0 })).toEqual(['The check-in time target must be at least 1 minute']);
+  expect(messages({ stageTargetDiagnosisMinutes: 90.5 })).toEqual(['Enter the diagnosis time target in whole minutes']);
+  expect(messages({ stageTargetQualityCheckMinutes: 20_000 })).toEqual(['The quality check time target must be 10,080 minutes (7 days) or less']);
+});
+
+it('leaves the books-closed date out of the branch rules, so a saved branch can be saved again', async () => {
+  (prisma.branchSettings.findUnique as jest.Mock).mockResolvedValue({ ...defaultBranchSettings(), branchId: 'b', updatedAt: new Date(), booksClosedUpTo: new Date('2026-10-31') });
+  const settings = await getBranchSettings('b');
+  expect(settings).not.toHaveProperty('booksClosedUpTo');
+  expect(branchSettingsSchema.safeParse(settings).success).toBe(true);
 });

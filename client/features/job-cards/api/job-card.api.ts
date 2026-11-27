@@ -14,6 +14,11 @@ export async function getJobCardsRequest(params?: {
   jobType?: "SERVICE" | "PDI" | "ALL" | "HISTORY";
   dateFrom?: string;
   dateTo?: string;
+  /** Workshop board, Table view (phase 10). */
+  advisorId?: string;
+  technicianId?: string;
+  /** One step, or several separated by commas (for example BILLING,DELIVERY). */
+  stage?: string;
 }): Promise<JobCardListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -26,6 +31,9 @@ export async function getJobCardsRequest(params?: {
   if (params?.unassignedTechnician) query.set("unassignedTechnician", "true");
   if (params?.dateFrom) query.set("dateFrom", params.dateFrom);
   if (params?.dateTo) query.set("dateTo", params.dateTo);
+  if (params?.advisorId) query.set("advisorId", params.advisorId);
+  if (params?.technicianId) query.set("technicianId", params.technicianId);
+  if (params?.stage) query.set("stage", params.stage);
   const qs = query.toString();
   return apiGet<JobCardListResponse>(
     `${API_ROUTES.service.jobCards.base}${qs ? `?${qs}` : ""}`,

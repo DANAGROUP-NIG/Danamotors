@@ -7,7 +7,7 @@ describes. Run them for every phase that changes a screen.
 ## What they need
 
 - The local Postgres in Docker (container `dana-jobflow-pg`, port 55433) with a **template
-  database** that has the base seed and the demo seed (`dana_demo_p9` by default). Build one with
+  database** that has the base seed and the demo seed (`dana_demo_p10` by default). Build one with
   `npx prisma migrate deploy`, `npm run prisma:seed` and
   `npm run prisma:seed:demo -- --second-branch="Abuja Branch" --allow-database=<name>` from `server/`.
 - Chromium for Playwright, once: `npx playwright install chromium`.
@@ -18,7 +18,7 @@ start from the same demo data. Never point these variables at a shared database.
 | Variable | Default |
 |---|---|
 | `E2E_DB_SERVER` | `postgresql://dana:jobflow@localhost:55433` |
-| `E2E_TEMPLATE_DB` | `dana_demo_p9` |
+| `E2E_TEMPLATE_DB` | `dana_demo_p10` |
 | `E2E_DB` | `dana_e2e` |
 | `E2E_API_PORT`, `E2E_CLIENT_PORT` | `5055`, `3055` |
 

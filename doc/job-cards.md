@@ -393,6 +393,48 @@ The bar names the first thing missing and how many more ("Tick Returned for ever
 
 **Migration** `20261127210000_jobcard_delivery` (additive): enum `CollectorType`; `JobDeliverySignature`; `JobReleaseApproval`; `JobCard.psfFollowUpDueAt`; `BranchSettings.psfFollowUpDays` (2). No data conversion: jobs delivered before it have no delivery signature or follow-up date, and their summary shows "Not provided" for those.
 
+### Workshop board (phase 10)
+
+The **Job Cards** page now has two views, **Board** and **Table**, switched with the toggle at the top right. The workshop supervisor (WorkshopManager) and the service manager open on the board; everyone else opens on the table. The view and every filter live in the address bar (`view`, `branch`, `advisor`, `technician`, `date`, `column`), so a reload or a shared link shows the same thing.
+
+**Board.** Every active service job of one branch (Check-in to Delivery; PDI, closed and cancelled jobs are left out), in eight columns:
+
+| Column | Jobs | Time target |
+|---|---|---|
+| Check-in | step Check-in | `BranchSettings.stageTargetCheckInMinutes` (30) |
+| Diagnosis | step Diagnosis | `stageTargetDiagnosisMinutes` (120) |
+| Warranty check | step Warranty | `stageTargetWarrantyMinutes` (120) |
+| Awaiting approval | step Estimate | `stageTargetEstimateMinutes` (120) |
+| In repair | step Repair, status IN_PROGRESS | none |
+| Waiting parts | step Repair, status WAITING_PARTS | none |
+| Quality check | step Quality check | `stageTargetQualityCheckMinutes` (60) |
+| Ready | steps Billing and Delivery (`TODO(confirm)`: QC-passed jobs not yet marked ready are here too) | none |
+
+Each card is one link to the job card: plate, model, customer, the job number, **Warranty** (same rule as the header tag, `isWarrantyJob`) and the repeat tag (Repeat, or Repeat, review pending), an initials avatar with **With:** and the step owner (a person's short name such as "Musa A.", else the owner role, else "Not assigned"), the time in the step from `stageEnteredAt` ("2 h 10 min"), and the promised time ("Promised: Today, 16:00"). The time shows amber with the words "over target" once past the column's target and red with "far over target" past twice the target (`timingTone`, `lib/board.logic.ts`); a column without a target never changes colour. A job not yet in Ready whose promised time has passed also shows "Promised time passed". Cards run longest in the step first. Each column shows at most 50 cards; when there are more, "Showing 50 of 63, longest waiting first. **Show all in table**" opens the table limited to that column.
+
+Above the columns, five figures: **In workshop** (Diagnosis to Quality check, that is past reception and not finished, `TODO(confirm)`), **Awaiting approval**, **Waiting parts**, **Ready for collection** (the Ready column) and **Overdue** (promised time passed before Ready, `TODO(confirm)`; red when above zero).
+
+**Filters.** Branch (admins and `branch:all` users choose; others see their own branch), Service advisor and Technician (the existing staff pickers), and **Received**: Any day, Today, Yesterday or a picked date, meaning jobs opened on that Lagos day (`TODO(confirm)`: the design shows a "Today" date filter; received date was chosen so that "Any day" keeps every active job on the board). **Clear filters** resets advisor, technician and date. On a phone the filters fold behind **Filters** ("Filters, 1 applied").
+
+**Refresh.** The board refetches when the window regains focus and every 60 seconds (TanStack Query `refetchInterval`, no websockets), with "Updated 14:05. The board refreshes every minute." and **Refresh now**. If a refresh fails, the last board stays with "Could not refresh the board. It shows the jobs as at 14:05." and **Try again**.
+
+**Phone.** Below 768 px the columns become a **Step** selector ("Waiting parts (1)") and that step's cards as a list; from 768 px the columns scroll sideways inside the board only, never the page.
+
+**States.** Loading: outline figures and columns. Empty: "No active jobs in the workshop" with **Open a job card** (for `jobcard:create`), or "No active jobs match these filters" with **Clear filters**. Error: "Could not load the workshop board" with **Try again**. Another branch: "You cannot see this workshop board".
+
+**Table.** The existing job list (`JobCardsTable`) with the board's branch, advisor, technician and received filters applied, a new **With** column (the step owner's name or role; "No one, job delivered" or "No one, job cancelled"), and, from **Show all in table**, "Showing jobs at Waiting parts only." with **Show every step**. The **Step** column was added in phase 0.
+
+| Endpoint | Permission | Purpose |
+|---|---|---|
+| `GET /service/job-cards/board?branchId&advisorId&technicianId&date` | `jobcard:read`; the branch must be the user's own unless they can access all branches (defaults to the user's branch; 400 "Choose a branch to see its workshop board" without one) | `{ branchId, generatedAt, summary, columns: [{ key, total, targetMinutes, cards }] }` |
+| `GET /service/job-cards` | unchanged | New optional filters `advisorId`, `technicianId` and `stage` (one step or several separated by commas, for example `BILLING,DELIVERY`); each row now includes `stageOwner` |
+
+The board reads the database three times whatever the number of jobs: a ranked ID query (at most 50 per step, longest waiting first), one `findMany` for those cards, and one grouped count (per step and status, with the overdue count) that gives every total and figure. Validation messages name the field ("Choose a technician from the list", "Enter the received date as YYYY-MM-DD").
+
+**Settings.** **Settings, Company**, branch section **Workshop board time targets**: Check-in, Diagnosis, Warranty check, Awaiting approval and Quality check, in whole minutes from 1 to 10,080 (7 days). Defaults from the plan (30, 120, 120, 120, 60; `TODO(confirm)`). Saving is audited `BRANCH_SETTINGS_UPDATED` as before. Fixed in passing: a branch whose rules had been saved before could not save them again ("Unrecognized key(s) in object: 'booksClosedUpTo'"); the books-closed date is no longer part of the branch rules form.
+
+**Migration** `20261127220000_jobcard_board_targets` (additive): the five `BranchSettings.stageTarget...Minutes` columns with their defaults. No data conversion.
+
 ### Vehicles with multiple job cards (issue 142)
 
 Open **Vehicles with multiple jobs** from Job cards. The default view groups vehicles with at least two visible, open and unbilled jobs. A closed date range adds delivered jobs based on their recorded delivery date in Africa/Lagos. The range can span up to 366 days. Cancelled jobs and historical jobs without a delivery date do not enter the closed results.

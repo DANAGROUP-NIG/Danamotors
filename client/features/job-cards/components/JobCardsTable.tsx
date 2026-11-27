@@ -7,6 +7,7 @@ import {
 } from "@/features/job-cards/types/job-card-status";
 
 import { jobStepBadge } from "@/features/job-cards/lib/job-stage.logic";
+import { listOwnerText } from "@/features/job-cards/lib/board.logic";
 import { NOT_PROVIDED } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ import {
   Share2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { DataTableSearchHeader } from "@/components/ui/table-components/DataTableSearchHeader";
 import { DataTableFilterChips } from "@/components/ui/table-components/DataTableFilterChips";
 import { DateInput } from "@/components/forms/DateInput";
@@ -92,7 +94,18 @@ function exportFilename() {
   return `job-cards-${new Date().toISOString().split("T")[0]}`;
 }
 
-export function JobCardsTable() {
+/** Filters set outside the table: the workshop board's branch, advisor, technician and column (phase 10). */
+export type JobCardsTableFilters = {
+  branchId?: string;
+  advisorId?: string;
+  technicianId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  stage?: string;
+  status?: string;
+};
+
+export function JobCardsTable({ filters }: { filters?: JobCardsTableFilters } = {}) {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -102,19 +115,25 @@ export function JobCardsTable() {
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
+  const branchId = filters?.branchId ?? activeBranch?.id;
+  const outside = [filters?.advisorId, filters?.technicianId, filters?.stage, filters?.status, filters?.dateFrom].join("|");
+
   useEffect(() => {
     setPage(1);
-  }, [activeBranch?.id, statusFilter, committedSearch, dateFrom, dateTo]);
+  }, [branchId, statusFilter, committedSearch, dateFrom, dateTo, outside]);
 
-  const { data, isLoading, isError, isFetching } = useJobCards({
+  const { data, isLoading, isError, isFetching, refetch } = useJobCards({
     page,
     limit: PAGE_SIZE,
-    branchId: activeBranch?.id,
-    status: isJobCardStatus(statusFilter) ? statusFilter : undefined,
+    branchId,
+    status: isJobCardStatus(statusFilter) ? statusFilter : filters?.status,
     unassignedTechnician: statusFilter === UNASSIGNED_TECHNICIAN,
     search: committedSearch || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+    dateFrom: dateFrom || filters?.dateFrom || undefined,
+    dateTo: dateTo || filters?.dateTo || undefined,
+    advisorId: filters?.advisorId,
+    technicianId: filters?.technicianId,
+    stage: filters?.stage,
   });
 
   const jobCards = useMemo(() => data?.jobCards ?? [], [data?.jobCards]);
@@ -179,9 +198,12 @@ export function JobCardsTable() {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <p className="text-sm text-destructive">
-            Failed to load job cards. Check the API connection and try again.
+          <p role="alert" className="text-sm text-destructive">
+            Could not load the job cards. Check your connection and try again.
           </p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void refetch()}>
+            Try again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -263,6 +285,10 @@ export function JobCardsTable() {
           <span className="text-muted-foreground">{NOT_PROVIDED}</span>
         );
       },
+    },
+    {
+      header: "With",
+      render: (jc) => <span className="text-muted-foreground">{listOwnerText(jc)}</span>,
     },
     {
       header: "Actions",

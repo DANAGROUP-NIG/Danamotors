@@ -1,3 +1,4 @@
+import type { JobStage } from "@prisma/client";
 import { ConflictError } from "../../shared/errors/appError";
 import { BookingCreate, createBooking } from "./booking.persistence";
 import prisma from "../../prisma/client";
@@ -235,6 +236,9 @@ export class ServiceRepository {
     jobType?: "SERVICE" | "PDI" | "ALL";
     dateFrom?: string;
     dateTo?: string;
+    advisorId?: string;
+    technicianId?: string;
+    stages?: JobStage[];
   }) {
     const where: Record<string, unknown> = {};
     if (params?.jobType !== "ALL") where.jobType = params?.jobType ?? "SERVICE";
@@ -252,6 +256,9 @@ export class ServiceRepository {
     }
 
     if (params?.unassignedTechnician) where.technicianId = null;
+    if (params?.technicianId) where.technicianId = params.technicianId;
+    if (params?.advisorId) where.serviceAdvisorId = params.advisorId;
+    if (params?.stages?.length) where.stage = { in: params.stages };
 
     if (params?.search) {
       where.OR = [
@@ -337,6 +344,9 @@ export class ServiceRepository {
           select: { id: true, firstName: true, lastName: true },
         },
         technician: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        stageOwner: {
           select: { id: true, firstName: true, lastName: true },
         },
       },

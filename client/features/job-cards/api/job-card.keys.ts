@@ -6,4 +6,5 @@ export const jobCardKeys = {
   details: () => [...jobCardKeys.all, "detail"] as const,
   detail: (id: string) => [...jobCardKeys.details(), id] as const,
   workspace: (id: string) => [...jobCardKeys.detail(id), "workspace"] as const,
+  board: (query: string) => [...jobCardKeys.all, "board", query] as const,
 };

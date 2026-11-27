@@ -20,6 +20,13 @@ export type CompanyProfile = z.infer<typeof companyProfileSchema>;
 const COMPANY_KEY = 'companyProfile';
 const DEFAULT_COMPANY: CompanyProfile = { name: 'Dana Motors Limited', tin: null, rcNumber: null, dealerCode: null };
 
+/** A step time target in whole minutes, from 1 minute to 7 days. */
+const stageTarget = (step: string) => z
+  .number({ invalid_type_error: `Enter the ${step} time target in whole minutes` })
+  .int(`Enter the ${step} time target in whole minutes`)
+  .min(1, `The ${step} time target must be at least 1 minute`)
+  .max(10_080, `The ${step} time target must be 10,080 minutes (7 days) or less`);
+
 // Legacy Control Calculation and Workshop Information, which each legacy database set for its location.
 export const branchSettingsSchema = z.object({
   labourVatPercent: z.number().min(0).max(100),
@@ -32,6 +39,12 @@ export const branchSettingsSchema = z.object({
   storageDailyRate: z.number({ invalid_type_error: 'Enter the storage charge per day as a number' }).min(0, 'The storage charge per day cannot be negative').max(1_000_000, 'The storage charge per day must be 1,000,000 or less').multipleOf(0.01, 'Use at most 2 decimal places for the storage charge per day'),
   // Delivery (job card revamp phase 9): the follow-up call is due this many days after delivery.
   psfFollowUpDays: z.number({ invalid_type_error: 'Enter the follow-up call days as a whole number' }).int('Enter the follow-up call days as a whole number').min(0, 'The follow-up call days cannot be negative').max(60, 'The follow-up call days must be 60 or less'),
+  // Workshop board (job card revamp phase 10): minutes in a step before the time shows over target.
+  stageTargetCheckInMinutes: stageTarget('check-in'),
+  stageTargetDiagnosisMinutes: stageTarget('diagnosis'),
+  stageTargetWarrantyMinutes: stageTarget('warranty check'),
+  stageTargetEstimateMinutes: stageTarget('awaiting approval'),
+  stageTargetQualityCheckMinutes: stageTarget('quality check'),
   repeatWindowDays: z.number().int().min(1).max(3650),
   repeatWindowKm: z.number().int().min(1).max(1_000_000).nullable(),
   printRepeatBlock: z.boolean().default(true),
@@ -63,6 +76,12 @@ export function defaultBranchSettings(): BranchSettingsValues {
     storageDailyRate: 2000,
     // TODO(confirm): the follow-up call two days after delivery, as in the design, until each branch sets its own.
     psfFollowUpDays: 2,
+    // TODO(confirm): the plan's default step targets until each branch sets its own.
+    stageTargetCheckInMinutes: 30,
+    stageTargetDiagnosisMinutes: 120,
+    stageTargetWarrantyMinutes: 120,
+    stageTargetEstimateMinutes: 120,
+    stageTargetQualityCheckMinutes: 60,
     repeatWindowDays: Number(process.env.JOB_REPEAT_WINDOW_DAYS ?? 15),
     repeatWindowKm: 500,
     printRepeatBlock: true,
@@ -84,7 +103,8 @@ export async function getBranchSettings(branchId: string, db: Db = prisma): Prom
   const row = await db.branchSettings.findUnique({ where: { branchId } });
   if (!row)
     return defaultBranchSettings();
-  const { branchId: _branchId, updatedAt: _updatedAt, estimationChargeMinimum, estimationChargePercent, storageDailyRate, ...values } = row;
+  // The books-closed date has its own screen and rules (books-closed.service.ts); it is not a branch rule.
+  const { branchId: _branchId, updatedAt: _updatedAt, booksClosedUpTo: _booksClosedUpTo, estimationChargeMinimum, estimationChargePercent, storageDailyRate, ...values } = row;
   return {
     ...values,
     estimationChargeMinimum: Number(estimationChargeMinimum),
@@ -120,7 +140,7 @@ export class CompanySettingsService {
   async saveBranch(branchId: string, values: BranchSettingsValues, actorId?: string) {
     const before = await this.getBranch(branchId);
     return prisma.$transaction(async (tx) => {
-      const { branchId: _branchId, updatedAt: _updatedAt, ...saved } = await tx.branchSettings.upsert({
+      const { branchId: _branchId, updatedAt: _updatedAt, booksClosedUpTo: _booksClosedUpTo, ...saved } = await tx.branchSettings.upsert({
         where: { branchId },
         create: { branchId, ...values },
         update: values,

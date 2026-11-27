@@ -367,3 +367,36 @@ Built on Jayking (no phase branch, at the owner's request).
 
 - Two unit tests in `service.job-card.test.ts` had failed since phase 8 (the payment check read invoices the mock did not have); the payment facts are now mocked.
 - The PSF entry header showed "—" fallbacks and middle dots in the row this phase touched; they read "Not provided" and use commas.
+
+## Phase 10: Workshop board (27 Nov 2026)
+
+Built on Jayking (no phase branch, at the owner's request).
+
+### Plan
+
+1. Data: five `BranchSettings.stageTarget...Minutes` columns (30, 120, 120, 120, 60), additive migration.
+2. Server: pure `job-board.logic.ts` (column per step and status, count folding, card grouping and cap, filters, targets) and `job-board.service.ts` (ranked IDs capped at 50 per step, one `findMany`, one grouped count); `GET /service/job-cards/board` (`jobcard:read`, branch-scoped); the job list gains `advisorId`, `technicianId`, `stage` and returns the step owner.
+3. Client: `lib/board.logic.ts` (tone, timing words, promised time, owner wording, address-bar filters, default view by role), `use-job-board` (focus and 60 second refresh), `components/board/` on the Job Cards page with the Board or Table toggle, phone step selector; `JobCardsTable` gets the With column and outside filters; Settings gets the targets.
+4. Demo data: none added. The existing JC-S01 to JC-S36 jobs fill every column, with warranty, repeat and overdue jobs; times are real (from each job's last step change), so they are not back-dated.
+5. Tests: logic, routes, integration, client logic and render, Playwright phase 10; docs and manual test guide.
+
+### Status (milestones)
+
+- [x] Migration `20261127220000_jobcard_board_targets` (additive, no data conversion). Generated against a copy of the phase 9 dev database (`dana_dev_p10`) and trimmed to the five columns (the generated diff also carried other teams' drift); residual diff for `BranchSettings` empty.
+- [x] Server: logic, service, route, list filters, settings validation. Fixed in passing: a branch whose rules were saved once could not save them again (`booksClosedUpTo` came back from the GET and the strict schema refused it).
+- [x] Client: board, filters, figures, states, table view, settings group.
+- [x] Server database: `20261127220000_jobcard_board_targets` applied on 27 Nov 2026 (the only pending migration). The demo seed was not re-run: it has no new jobs for this phase. Test-site facts for the guide read from the server: Main Branch board (39 in workshop, 19 awaiting approval, 1 waiting parts, 12 ready, 11 overdue at the time), supervisor wm.lagos@kiaamotors.com, "Dana Motors Demo" has no active jobs.
+- [x] e2e template `dana_demo_p10` (phase 9 template plus this migration).
+- [x] Docs: `doc/job-cards.md` ("Workshop board (phase 10)"), manual test guide `doc/testing/jobcard-revamp/phase-10-manual-test.md`.
+
+
+### Tests (27 Nov 2026)
+
+- Server: new `job-board.logic.test.ts` (10: column per step and status, count folding and figures, grouping order and the 50 cap, targets, Lagos received day, filter, messages naming the field), `job-board.routes.test.ts` (4: registered before `/job-cards/:id`, `jobcard:read`, bad filters, own branch, another branch 403, no branch 400) and `job-board.integration.test.ts` (3: branch scoping with closed, cancelled, PDI, other-branch and earlier-day jobs left out; advisor, technician and received filters; the cap with totals still counting every job). `company-settings.test.ts` 6 of 6 (targets and the books-closed fix). Service and company settings modules on a local test database: 634 passed, 40 failed in 5 old suites (booking, labour slip, part source, service document and workshop integration: vehicles created without a model, vendor wording, an ESM import), none in this phase's code. Server typecheck clean.
+- Client: new `test/board.test.mjs` (6, including a render of a card); all client tests 164 of 165 (`issue117-components`, missing `BillHeads`, as before). Typecheck clean, lint 0 errors (74 old warnings), production build passes.
+- Browser (Playwright): phase 10 suite 9 of 9 (the supervisor's board with figures matching the API, eight columns, tags, timing words, card link; technician filter in the address bar surviving a reload, a received date with no jobs, Clear filters; the table with the With column and one column; the advisor opening on the table; keyboard; offline refresh, load error with Try again and the empty board; another branch refused; 1440, 1024, 768 and 390 px with the phone step selector and folded filters; the time target set in Settings and shown on the board). Phases 0 and 1 again: 19 of 19.
+
+### Found and fixed in passing
+
+- Settings: a branch whose rules had been saved once could not be saved again ("Unrecognized key(s) in object: 'booksClosedUpTo'"). The save error now shows the first field message from the server.
+- `JobCardsTable` load error read "Failed to load job cards. Check the API connection"; it now says "Could not load the job cards. Check your connection and try again." with **Try again**.
