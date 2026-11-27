@@ -77,6 +77,7 @@ export function routeJobNotification(event: JobNotificationEvent, before: Notifi
   if (event === 'CREATED') return actionTargets({ ...card, status: 'OPEN' });
   if (event === 'ASSIGNED') return card.technicianId ? [{ userId: card.technicianId, intent: 'Start assigned work by the due date' }] : actionTargets({ ...card, status: 'OPEN' });
   // The step handoff (STAGE_HANDOFF) already tells the service advisor; the technician hears the result.
+  // TODO(confirm): the advisor no longer gets a second "Review passed QC" notice for the same pass.
   if (event === 'QC_PASSED') return qcTechnician(card, 'QC passed');
   if (event === 'QC_REVIEW_REQUIRED') return actionTargets(card);
   if (event === 'QC_FAILED') return [...qcTechnician(card, 'QC failed. Review the job card for rework'), advisor('Coordinate rework'), roleTarget(ROLES.WORKSHOP_MANAGER, 'Supervise rework')];

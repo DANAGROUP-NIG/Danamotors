@@ -51,6 +51,7 @@ export const qualityCheckBody = z.object({
     .max(GENERAL_CODES.length),
   acOutletTempC: z
     .number({ invalid_type_error: "AC outlet temperature must be a number." })
+    // TODO(confirm): 0 to 40 °C is a typing guard, not a pass limit; the supervisor judges the cooling.
     .min(0, "AC outlet temperature must be between 0 and 40 °C.")
     .max(40, "AC outlet temperature must be between 0 and 40 °C.")
     .nullable(),
@@ -94,6 +95,8 @@ export function qualityCheckFieldProblems(input: QualityCheckInput, workLines: Q
   }
   const road = roadTestProblem(input.roadTestStartKm, input.roadTestEndKm, input.outcome === "PASS");
   if (road && (input.outcome === "FAIL" || road.message !== "Enter the road test start and end km.")) problems.push(road);
+  // TODO(confirm): a fail needs at least one failed work line; a fault outside the approved work
+  // (for example a warning light) is written in the note against the closest line.
   if (input.outcome === "FAIL") {
     if (!input.notes?.trim()) problems.push({ field: "notes", message: "Write what the technician must fix." });
     const failed = input.lines.filter((line) => line.result === "FAIL").length;
@@ -102,7 +105,11 @@ export function qualityCheckFieldProblems(input: QualityCheckInput, workLines: Q
   return problems;
 }
 
-/** Why Pass quality check cannot be pressed yet, in the order the screen shows them. Empty when it can. */
+/**
+ * Why Pass quality check cannot be pressed yet, in the order the screen shows them. Empty when it can.
+ * TODO(confirm): every general check must be ticked to pass, and the road test km are required for a
+ * pass (optional on a fail); the certification signature is needed only to pass.
+ */
 export function passProblems(input: Pick<QualityCheckInput, "lines" | "general" | "roadTestStartKm" | "roadTestEndKm" | "signatureImage">, workLines: QcWorkLine[]): string[] {
   const problems: string[] = [];
   const results = new Map(input.lines.map((line) => [line.workLineId, line.result]));

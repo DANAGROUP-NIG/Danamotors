@@ -395,6 +395,7 @@ export class PortalService {
       estimatedCost: customerPays(jobCard.estimates[0]),
       progress: jobCard.progress,
       // The job's quality check result (current inspection); customers see the result and date only.
+      // TODO(confirm): whether customers should also see the supervisor's notes.
       qualityCheck: qcStateOf(jobCard.inspections.find((inspection) => !inspection.supersededAt) ?? null, jobCard.estimationCharge?.status === 'ADDED'),
       createdAt: jobCard.createdAt,
       updatedAt: jobCard.updatedAt,
